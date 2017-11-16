@@ -11,6 +11,9 @@ Tutorial is provided in an iPython Notebook ([GitHub](https://github.com/polakow
 
 ### Bitcoin Example
 Exhaustive grid search over 1 year of Bitcoin price, 2h-period OHLC data, SMA strategy, SMA crossover filter of 0.05 and transaction fees of 0.0015 (Poloniex exchange). Heatmap below visualizes grid of SMA windows and their expactancy rates.
+
 ![SMA-heatmap](SMA-heatmap.png)
+
 Distribution of expactancy rates in SMA strategy. 
+
 ![SMA-dist](SMA-dist.png)
