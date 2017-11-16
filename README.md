@@ -20,6 +20,6 @@ Distribution of expactancy rates in SMA strategy.
 
 ![SMA-dist](SMA-dist.png)
 
-Distribution of exapctancy rates in random strategy, for comparison. 
+Distribution of expectancy rates in random strategy, for comparison. 
 
 ![random-dist](random-dist.png)
