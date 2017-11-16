@@ -50,11 +50,4 @@ def onemap(func, params):
 
 def starmap(func, params):
     # Multiple params passed
-    gen = itertools.starmap(func, params)
-    t = timer()
-    first = next(gen)
-    n_calcs = len(params)
-    print('Calcs: %d, est. time: %.2fs' % (n_calcs, n_calcs * (timer() - t)))
-    output = dict(zip(params, [first] + list(gen)))
-    print('Finished. %.2fs' % (timer() - t))
-    return output
+    return dict(zip(params, list(itertools.starmap(func, params))))

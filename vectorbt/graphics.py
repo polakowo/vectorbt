@@ -6,11 +6,7 @@ from matplotlib import pyplot as plt
 # Colormaps
 ###########
 
-def discrete_cmap(sr, breakpoints, colors):
-    # Assign colors to input divided by breakpoints
-    vmin = np.min(sr)
-    vmax = np.max(sr)
-    bounds = [vmin] + breakpoints + [vmax]
+def discrete_cmap(bounds, colors):
     cmap = mcolors.ListedColormap(colors)
     norm = mcolors.BoundaryNorm(bounds, cmap.N)
     return cmap, norm

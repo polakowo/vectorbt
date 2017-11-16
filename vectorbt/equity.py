@@ -17,6 +17,7 @@ def diff_on_positions(pos_ret_sr):
 def from_returns(rate_sr, pos_ret_sr):
     """
     Generate equity in base and quote currency from position returns
+
     :param pos_ret_sr: position returns (both short/long positions)
     :return: dataframe
     """

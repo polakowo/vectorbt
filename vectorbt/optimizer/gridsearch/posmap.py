@@ -1,8 +1,11 @@
 from timeit import default_timer as timer
 
 from vectorbt import strategy, positions
-from vectorbt.optimizer.linmap import params
+from vectorbt.optimizer.gridsearch import params
 
+##########
+### L1 ###
+##########
 
 # Random
 ########
@@ -10,9 +13,10 @@ from vectorbt.optimizer.linmap import params
 def random(rate_sr, n, N):
     """
     Generate random positions N times
+
     :param maxn: max number of positions in vector
     :param N: number of vectors in the map
-    :return: vectors of positions keyed by their index
+    :return: position series keyed by their index
     """
     def positions_func():
         entries = strategy.random_entry_vector(rate_sr, n)
@@ -20,11 +24,14 @@ def random(rate_sr, n, N):
         pos_sr = positions.from_vectors(rate_sr, entries, exits)
         return pos_sr
 
-    t = timer()
+    print("random-posmap")
+    print("setup: positions = ~%d, N = %d" % (n, N))
+    t1 = timer()
     positions_func()
-    print('Calcs: %d, est. time: %.2fs' % (N, N * (timer() - t)))
+    t2 = timer()
+    print("calcs: %d (~%.2fs)" % (N, N * (t2 - t1)))
     posmap = dict(zip(range(N), params.repeat(positions_func, N)))
-    print('Finished. %.2fs' % (timer() - t))
+    print("passed. %.2fs" % (timer() - t1))
     return posmap
 
 
@@ -33,13 +40,14 @@ def random(rate_sr, n, N):
 
 def ma(rate_sr, min_ma, max_ma, step, th, ma_func):
     """
-    Generate crossover positions for a range of MA windows
+    Generate crossover positions for a range of MA windows combinations
+
     :param min_ma: minimum window for MA
     :param max_ma: maximum window
     :param step: step
     :param th: threshold (filter) for crossover in % of current rate
     :param ma_func: either SMA or EMA
-    :return: vectors of positions keyed by windows
+    :return: position series keyed by windows
     """
     # Precalculation
     params_range = params.range_params(min_ma, max_ma, step)
@@ -52,21 +60,31 @@ def ma(rate_sr, min_ma, max_ma, step, th, ma_func):
         pos_sr = positions.from_vectors(rate_sr, entries, exits)
         return pos_sr
 
-    # Window of fast MA is lower or equal than of slow MA
+    print("ma-posmap")
+    print("setup: ma_func = %s, th = %s" % (ma_func.__name__, str(th)))
     p = params.combine_rep_params(min_ma, max_ma, step, 2)
-    return params.starmap(positions_func, p)
+    print("grid: %f -> %f = %d" % (min_ma, max_ma, len(p)))
+    t1 = timer()
+    positions_func(min_ma, max_ma)
+    t2 = timer()
+    print("calcs: %d (~%.2fs)" % (len(p), len(p) * (t2 - t1)))
+    # Window of fast MA is lower or equal than of slow MA
+    posmap = params.starmap(positions_func, p)
+    print("passed. %.2fs" % (timer() - t2))
+    return posmap
 
 
-def ma_th(rate_sr, fast_ma, slow_ma, ma_func, min_th, max_th, step):
+def math(rate_sr, fast_ma, slow_ma, ma_func, min_th, max_th, step):
     """
-    Generate crossover positions for a range of thresholds
+    Generate crossover positions for a range of threshold combinations
+
     :param fast_ma: window of fast MA
     :param slow_ma: window of slow MA
     :param ma_func: either SMA or EMA
     :param min_th: minimum threshold
     :param max_th: maximum threshold
     :param step: step
-    :return: vectors of positions keyed by thresholds
+    :return: position series keyed by thresholds
     """
     # Precalculation
     fast_ma_sr = ma_func(rate_sr, fast_ma)
@@ -79,5 +97,15 @@ def ma_th(rate_sr, fast_ma, slow_ma, ma_func, min_th, max_th, step):
         pos_sr = positions.from_vectors(rate_sr, entries, exits)
         return pos_sr
 
+    print("math-posmap")
+    print("setup: ma_func = %s (%d, %d)" % (ma_func.__name__, fast_ma, slow_ma))
     p = params.product_params(min_th, max_th, step, 2)
-    return params.starmap(positions_func, p)
+    print("grid: %f -> %f = %d" % (min_th, max_th, len(p)))
+    t1 = timer()
+    positions_func(min_th, max_th)
+    t2 = timer()
+    print("calcs: %d (~%.2fs)" % (len(p), len(p) * (t2 - t1)))
+    # Window of fast MA is lower or equal than of slow MA
+    posmap = params.starmap(positions_func, p)
+    print("passed. %.2fs" % (timer() - t2))
+    return posmap

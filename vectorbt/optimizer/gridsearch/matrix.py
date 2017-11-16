@@ -1,15 +1,23 @@
 import pandas as pd
 from matplotlib import pyplot as plt
 import math
+from timeit import default_timer as timer
 
+
+##########
+### L5 ###
+##########
 
 def from_map(vmap, symmetric=False):
     # Transform a map into a 2d-matrix (only if params are tuples of 2)
+    t = timer()
     matrix_df = pd.DataFrame(dtype=float)
     for (i, c), x in vmap.items():
         matrix_df.loc[i, c] = x
         if symmetric:
             matrix_df.loc[c, i] = x
+    print("%d-%d-matrix"%(len(matrix_df.index), len(matrix_df.columns)))
+    print("passed. %.2fs" % (timer() - t))
     return matrix_df
 
 

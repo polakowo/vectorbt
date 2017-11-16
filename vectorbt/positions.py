@@ -3,7 +3,13 @@ from matplotlib import pyplot as plt
 
 
 def from_vectors(rate_sr, entry_vector, exit_vector):
-    # Generate positions from short/long signals
+    """
+    Generate positions from short/long signals
+
+    :param entry_vector: bit vector of long signals
+    :param exit_vector: bit vector of short signals
+    :return: bit vector of positions
+    """
     # Merge vectors
     signals = entry_vector - exit_vector - entry_vector * exit_vector
     # Always sell at the end
@@ -16,10 +22,12 @@ def from_vectors(rate_sr, entry_vector, exit_vector):
     # Always buy at the beginning
     if len(pos_sr.index)%2 != 0:
         pos_sr = pos_sr.iloc[1:]
+    # Positions are always even, starting with long, ending with short
     return pos_sr
 
 
 def on_hold(rate_sr):
+    # Positions on hold
     return pd.Series([1, -1], index=rate_sr.index[[0, -1]])
 
 

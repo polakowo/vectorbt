@@ -2,24 +2,19 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a8370650-b829-46eb-a9aa-27a4f39d1200" name="Default" comment="">
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/__index__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/data.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/equity.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/graphics.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/indicators.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/__index__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/__index__.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/eqdmap.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/kpimap.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/matrix.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/params.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/posmap.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/optimizer/linmap/scoremap.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/positions.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/returns.py" />
-      <change type="NEW" beforePath="" afterPath="$PROJECT_DIR$/vectorbt/strategy.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/__index__.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/__index__.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/eqdmap.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/eqdmap.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/kpimap.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/kpimap.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/matrix.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/matrix.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/params.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/params.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/posmap.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/posmap.py" />
+      <change type="MOVED" beforePath="$PROJECT_DIR$/vectorbt/optimizer/linmap/scoremap.py" afterPath="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/scoremap.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.ipynb_checkpoints/example-checkpoint.ipynb" afterPath="$PROJECT_DIR$/.ipynb_checkpoints/example-checkpoint.ipynb" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/example.ipynb" afterPath="$PROJECT_DIR$/example.ipynb" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/vectorbt/equity.py" afterPath="$PROJECT_DIR$/vectorbt/equity.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/vectorbt/graphics.py" afterPath="$PROJECT_DIR$/vectorbt/graphics.py" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/vectorbt/positions.py" afterPath="$PROJECT_DIR$/vectorbt/positions.py" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -30,11 +25,31 @@
   </component>
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
-      <file leaf-file-name="matrix.py" pinned="false" current-in-tab="true">
-        <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/matrix.py">
+      <file leaf-file-name="returns.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/vectorbt/returns.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="405">
-              <caret line="29" column="28" lean-forward="true" selection-start-line="29" selection-start-column="28" selection-end-line="29" selection-end-column="28" />
+            <state relative-caret-position="30">
+              <caret line="3" column="0" lean-forward="true" selection-start-line="3" selection-start-column="0" selection-end-line="3" selection-end-column="0" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="strategy.py" pinned="false" current-in-tab="true">
+        <entry file="file://$PROJECT_DIR$/vectorbt/strategy.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="225">
+              <caret line="18" column="0" lean-forward="true" selection-start-line="18" selection-start-column="0" selection-end-line="18" selection-end-column="0" />
+              <folding />
+            </state>
+          </provider>
+        </entry>
+      </file>
+      <file leaf-file-name="positions.py" pinned="false" current-in-tab="false">
+        <entry file="file://$PROJECT_DIR$/vectorbt/positions.py">
+          <provider selected="true" editor-type-id="text-editor">
+            <state relative-caret-position="83">
+              <caret line="10" column="36" lean-forward="true" selection-start-line="10" selection-start-column="36" selection-end-line="10" selection-end-column="36" />
               <folding />
             </state>
           </provider>
@@ -66,6 +81,7 @@
       <find>returns</find>
       <find>retmap</find>
       <find>map_shape</find>
+      <find>'</find>
     </findStrings>
     <replaceStrings>
       <replace>pos_returns_sr</replace>
@@ -82,6 +98,7 @@
       <replace>posmap</replace>
       <replace>positions</replace>
       <replace>eqdmap</replace>
+      <replace>&quot;</replace>
     </replaceStrings>
     <dirStrings>
       <dir>$PROJECT_DIR$</dir>
@@ -126,19 +143,25 @@
         <option value="$PROJECT_DIR$/vectorbt/returns.py" />
         <option value="$PROJECT_DIR$/vectorbt/bruteforce/b2_retmap.py" />
         <option value="$PROJECT_DIR$/vectorbt/indicators.py" />
-        <option value="$PROJECT_DIR$/vectorbt/equity.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/__index__.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/b2_retmap.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/retmap.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/params.py" />
         <option value="$PROJECT_DIR$/vectorbt/strategy.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/posmap.py" />
-        <option value="$PROJECT_DIR$/vectorbt/graphics.py" />
-        <option value="$PROJECT_DIR$/vectorbt/positions.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/matrix.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/eqdmap.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/scoremap.py" />
         <option value="$PROJECT_DIR$/vectorbt/optimizer/linmap/kpimap.py" />
+        <option value="$PROJECT_DIR$/vectorbt/graphics.py" />
+        <option value="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/params.py" />
+        <option value="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/matrix.py" />
+        <option value="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/scoremap.py" />
+        <option value="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/eqdmap.py" />
+        <option value="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/kpimap.py" />
+        <option value="$PROJECT_DIR$/vectorbt/optimizer/gridsearch/posmap.py" />
+        <option value="$PROJECT_DIR$/vectorbt/equity.py" />
+        <option value="$PROJECT_DIR$/vectorbt/positions.py" />
       </list>
     </option>
   </component>
@@ -188,7 +211,7 @@
               <item name="vector-bt" type="462c0819:PsiDirectoryNode" />
               <item name="vectorbt" type="462c0819:PsiDirectoryNode" />
               <item name="optimizer" type="462c0819:PsiDirectoryNode" />
-              <item name="linmap" type="462c0819:PsiDirectoryNode" />
+              <item name="gridsearch" type="462c0819:PsiDirectoryNode" />
             </path>
           </expand>
           <select />
@@ -347,17 +370,7 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/data.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="405">
-          <caret line="27" column="23" lean-forward="true" selection-start-line="27" selection-start-column="23" selection-end-line="27" selection-end-column="23" />
-          <folding>
-            <element signature="e#0#40#0" expanded="false" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/__index__.py">
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/__index__.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="0">
           <caret line="0" column="0" lean-forward="false" selection-start-line="0" selection-start-column="0" selection-end-line="0" selection-end-column="0" />
@@ -365,39 +378,11 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/graphics.py">
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/eqdmap.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="736">
-          <caret line="71" column="14" lean-forward="false" selection-start-line="71" selection-start-column="14" selection-end-line="71" selection-end-column="14" />
+        <state relative-caret-position="60">
+          <caret line="6" column="10" lean-forward="true" selection-start-line="6" selection-start-column="10" selection-end-line="6" selection-end-column="10" />
           <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/equity.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="555">
-          <caret line="40" column="69" lean-forward="true" selection-start-line="40" selection-start-column="69" selection-end-line="40" selection-end-column="69" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/posmap.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="165">
-          <caret line="11" column="29" lean-forward="true" selection-start-line="11" selection-start-column="29" selection-end-line="11" selection-end-column="29" />
-          <folding>
-            <element signature="e#0#41#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/params.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-44">
-          <caret line="9" column="37" lean-forward="true" selection-start-line="9" selection-start-column="37" selection-end-line="9" selection-end-column="37" />
-          <folding>
-            <element signature="e#0#16#0" expanded="true" />
-          </folding>
         </state>
       </provider>
     </entry>
@@ -409,10 +394,80 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/graphics.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-104">
+          <caret line="13" column="0" lean-forward="true" selection-start-line="13" selection-start-column="0" selection-end-line="13" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/equity.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="105">
+          <caret line="10" column="0" lean-forward="true" selection-start-line="10" selection-start-column="0" selection-end-line="10" selection-end-column="0" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/data.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="330">
+          <caret line="27" column="23" lean-forward="true" selection-start-line="27" selection-start-column="23" selection-end-line="27" selection-end-column="23" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/scoremap.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="196">
+          <caret line="20" column="53" lean-forward="true" selection-start-line="20" selection-start-column="53" selection-end-line="20" selection-end-column="53" />
+          <folding>
+            <element signature="e#0#19#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/kpimap.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="-44">
+          <caret line="22" column="16" lean-forward="true" selection-start-line="22" selection-start-column="16" selection-end-line="22" selection-end-column="16" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/matrix.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="75">
+          <caret line="8" column="10" lean-forward="true" selection-start-line="8" selection-start-column="10" selection-end-line="8" selection-end-column="10" />
+          <folding>
+            <element signature="e#0#19#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/params.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="60">
+          <caret line="7" column="12" lean-forward="true" selection-start-line="7" selection-start-column="12" selection-end-line="7" selection-end-column="12" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/gridsearch/posmap.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1005">
+          <caret line="70" column="57" lean-forward="true" selection-start-line="70" selection-start-column="57" selection-end-line="70" selection-end-column="57" />
+          <folding />
+        </state>
+      </provider>
+    </entry>
     <entry file="file://$PROJECT_DIR$/vectorbt/positions.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="435">
-          <caret line="30" column="27" lean-forward="true" selection-start-line="30" selection-start-column="27" selection-end-line="30" selection-end-column="27" />
+        <state relative-caret-position="83">
+          <caret line="10" column="36" lean-forward="true" selection-start-line="10" selection-start-column="36" selection-end-line="10" selection-end-column="36" />
           <folding />
         </state>
       </provider>
@@ -429,40 +484,6 @@
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="225">
           <caret line="18" column="0" lean-forward="true" selection-start-line="18" selection-start-column="0" selection-end-line="18" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/eqdmap.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="135">
-          <caret line="9" column="31" lean-forward="false" selection-start-line="9" selection-start-column="31" selection-end-line="9" selection-end-column="31" />
-          <folding>
-            <element signature="e#0#41#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/scoremap.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="391">
-          <caret line="30" column="36" lean-forward="true" selection-start-line="30" selection-start-column="36" selection-end-line="30" selection-end-column="36" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/kpimap.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="360">
-          <caret line="26" column="0" lean-forward="true" selection-start-line="26" selection-start-column="0" selection-end-line="26" selection-end-column="0" />
-          <folding />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/vectorbt/optimizer/linmap/matrix.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="405">
-          <caret line="29" column="28" lean-forward="true" selection-start-line="29" selection-start-column="28" selection-end-line="29" selection-end-column="28" />
           <folding />
         </state>
       </provider>
