@@ -2,6 +2,7 @@
 
 import json
 
+
 # Performance
 #############
 
@@ -22,7 +23,7 @@ def lastequity(pos_eqd_sr):
 
 
 def profit(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2] # on short positions only
+    sr = pos_eqd_sr.iloc[1::2]  # on short positions only
     return sr.sum()
 
 
@@ -127,6 +128,7 @@ def summary(pos_eqd_sr):
             'maxdd': maxdd(pos_eqd_sr)
         }
     }
+
 
 def print_summary(pos_eqd_sr):
     print(json.dumps(summary(pos_eqd_sr), indent=2))

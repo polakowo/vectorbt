@@ -128,7 +128,7 @@ def traverse_trailstops(rate_sr, entry_trail, exit_trail):
             j = trailstop_entry(rate_sr.iloc[i:], entry_trail)
             if j is not None:
                 trailstops.append(i + j)  # index adjusted to rate_sr
-                entry_vector[i+j] = 1
+                entry_vector[i + j] = 1
             else:
                 break
         else:
@@ -136,7 +136,7 @@ def traverse_trailstops(rate_sr, entry_trail, exit_trail):
             j = trailstop_exit(rate_sr.iloc[i:], exit_trail)
             if j is not None:
                 trailstops.append(i + j)
-                exit_vector[i+j] = 1
+                exit_vector[i + j] = 1
             else:
                 break
     return reduce_vector(entry_vector), reduce_vector(exit_vector)
@@ -148,7 +148,7 @@ def trailstop_entry_vector(rate_sr, exit_vector, trail):
     groups = rate_sr.groupby(np.cumsum(exit_vector))
     rel_entry_pos = groups.apply(lambda x: trailstop_entry(x, trail)).values
     abs_exit_pos = np.insert(np.flatnonzero(exit_vector), 0, 0)
-    abs_entry_pos = rel_entry_pos+abs_exit_pos
+    abs_entry_pos = rel_entry_pos + abs_exit_pos
     abs_entry_pos = abs_entry_pos[~np.isnan(abs_entry_pos)]
     abs_entry_pos = abs_entry_pos.astype(int)
     vector = np.zeros(len(rate_sr.index))

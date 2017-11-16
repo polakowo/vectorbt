@@ -3,6 +3,7 @@ from timeit import default_timer as timer
 from vectorbt import strategy, positions
 from vectorbt.optimizer.gridsearch import params
 
+
 ##########
 ### L1 ###
 ##########
@@ -18,6 +19,7 @@ def random(rate_sr, n, N):
     :param N: number of vectors in the map
     :return: position series keyed by their index
     """
+
     def positions_func():
         entries = strategy.random_entry_vector(rate_sr, n)
         exits = strategy.random_exit_vector(rate_sr, entries, n)

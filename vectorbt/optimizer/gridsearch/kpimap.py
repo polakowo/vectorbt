@@ -1,9 +1,9 @@
+from timeit import default_timer as timer
+
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
-from timeit import default_timer as timer
 
-from vectorbt import returns
 
 ##########
 ### L3 ###
@@ -16,14 +16,14 @@ def from_eqdmap(eqdmap, kpi_func):
     :param kpi_func: kpi (e.g., from vectorbt.indicators)
     :return: kpi series indexed by parameters
     """
-    print("%s-kpimap"%kpi_func.__name__)
+    print("%s-kpimap" % kpi_func.__name__)
     longest_sr = sorted(list(eqdmap.items()), key=lambda x: -len(x[1]))[0][1]
     t1 = timer()
     kpi_func(longest_sr)
     t2 = timer()
     print("calcs: %d (~%.2fs)" % (len(eqdmap), len(eqdmap) * (t2 - t1)))
     kpimap_sr = pd.Series({params: kpi_func(returns_sr) if len(returns_sr.index) > 0 else np.nan
-            for params, returns_sr in eqdmap.items()})
+                           for params, returns_sr in eqdmap.items()})
     print_bounds(kpimap_sr)
     print("passed. %.2fs" % (timer() - t1))
     return kpimap_sr
@@ -33,6 +33,7 @@ def bounds(kpimap_sr):
     # Bounds of series (min and max)
     return kpimap_sr.dropna().sort_values().iloc[[0, -1]]
 
+
 def print_bounds(kpimap_sr):
     kpimap_bounds = bounds(kpimap_sr)
     print("min %s: %s" % (str(kpimap_bounds.index[0]), str(kpimap_bounds.iloc[0])))
@@ -41,9 +42,9 @@ def print_bounds(kpimap_sr):
 
 def compare(kpimap_a_sr, kpimap_b_sr):
     # Compare distributions of KPI maps
-    info_df = pd.DataFrame() # contains general info for printing
+    info_df = pd.DataFrame()  # contains general info for printing
     perc_index = range(0, 101, 5)
-    perc_df = pd.DataFrame(index=perc_index) # contains percentiles for drawing
+    perc_df = pd.DataFrame(index=perc_index)  # contains percentiles for drawing
 
     for i, kpimap_sr in enumerate([kpimap_a_sr, kpimap_b_sr]):
         info_df[i] = kpimap_sr.describe()

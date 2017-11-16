@@ -2,6 +2,7 @@ from timeit import default_timer as timer
 
 from vectorbt import positions, returns, equity
 
+
 ##########
 ### L2 ###
 ##########

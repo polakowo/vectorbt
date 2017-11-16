@@ -1,7 +1,8 @@
-import pandas as pd
-from matplotlib import pyplot as plt
 import math
 from timeit import default_timer as timer
+
+import pandas as pd
+from matplotlib import pyplot as plt
 
 
 ##########
@@ -16,7 +17,7 @@ def from_map(vmap, symmetric=False):
         matrix_df.loc[i, c] = x
         if symmetric:
             matrix_df.loc[c, i] = x
-    print("%d-%d-matrix"%(len(matrix_df.index), len(matrix_df.columns)))
+    print("%d-%d-matrix" % (len(matrix_df.index), len(matrix_df.columns)))
     print("passed. %.2fs" % (timer() - t))
     return matrix_df
 
