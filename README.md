@@ -19,3 +19,7 @@ Parameters: 1 year of 2h-period OHLC data, SMA strategy, SMA crossover filter of
 Distribution of expactancy rates in SMA strategy. 
 
 ![SMA-dist](SMA-dist.png)
+
+Distribution of exapctancy rates in random strategy, for comparison. 
+
+![random-dist](random-dist.png)
