@@ -19,7 +19,7 @@ def days(pos_eqd_sr):
 
 
 def lastequity(pos_eqd_sr):
-    return (pos_eqd_sr + 1).cumpos_eqd_srod().iloc[-1] - 1
+    return (pos_eqd_sr + 1).cumprod().iloc[-1] - 1
 
 
 def profit(pos_eqd_sr):
@@ -86,7 +86,7 @@ def trades(pos_eqd_sr):
 # Risk / return
 ###############
 
-_days = lambda pos_eqd_sr: pos_eqd_sr.resample('D').sum().dropna()
+def _days(pos_eqd_sr): return pos_eqd_sr.resample('D').sum().dropna()
 
 
 def sharpe(pos_eqd_sr):
