@@ -1,5 +1,5 @@
 # vector-bt
-Vectorized library for backtesting and trade optimization
+Superfast vectorized library for backtesting and trade optimization
 
 ### Installation
 ```
