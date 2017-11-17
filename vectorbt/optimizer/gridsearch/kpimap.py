@@ -60,13 +60,13 @@ def compare(kpimap_a_sr, kpimap_b_sr):
                     perc_df[1],
                     perc_df[0],
                     where=perc_df[1] > perc_df[0],
-                    facecolor='limegreen',
+                    facecolor='lime',
                     interpolate=True)
     ax.fill_between(perc_index,
                     perc_df[1],
                     perc_df[0],
                     where=perc_df[1] < perc_df[0],
-                    facecolor='gold',
+                    facecolor='orangered',
                     interpolate=True)
     diff_df = perc_df[1] - perc_df[0]
     ax.plot(diff_df.idxmax(), perc_df.loc[diff_df.idxmax(), 1], marker='x', markersize=10, color='black')

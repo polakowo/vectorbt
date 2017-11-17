@@ -1,5 +1,6 @@
 import pandas as pd
 from matplotlib import pyplot as plt
+from vectorbt import graphics
 
 
 def from_vectors(rate_sr, entry_vector, exit_vector):
@@ -38,17 +39,10 @@ def plot(rate_sr, pos_sr):
 
     # Draw position markers
     purchase_dates = pos_sr.index[0::2]
-    ax.scatter(purchase_dates,
-               rate_sr.loc[purchase_dates].values,
-               marker='^',
-               c='darkgreen',
-               s=50,
-               zorder=100)
     sale_dates = pos_sr.index[1::2]
-    ax.scatter(sale_dates,
-               rate_sr.loc[sale_dates].values,
-               marker='v',
-               c='darkred',
-               s=50,
-               zorder=100)
+    ax.plot(purchase_dates, rate_sr.loc[purchase_dates].values, '^', color='lime',
+            markeredgecolor='darkgreen', markersize=8, markeredgewidth=1)
+    ax.plot(sale_dates, rate_sr.loc[sale_dates].values, 'v', color='orangered',
+            markeredgecolor='darkred', markersize=8, markeredgewidth=1)
     plt.show()
+

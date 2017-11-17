@@ -2,6 +2,11 @@ import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
 
+cParams = {
+    'negative': 'gold',
+    'positive': 'limegreen'
+}
+
 
 # Colormaps
 ###########
@@ -44,8 +49,8 @@ def plot_line(sr, benchmark=None):
             pass
         else:
             ax.plot(benchmark, color='lightgrey')
-        ax.fill_between(sr.index, sr, benchmark, where=sr > benchmark, facecolor='limegreen', interpolate=True)
-        ax.fill_between(sr.index, sr, benchmark, where=sr < benchmark, facecolor='gold', interpolate=True)
+        ax.fill_between(sr.index, sr, benchmark, where=sr > benchmark, facecolor='lime', interpolate=True)
+        ax.fill_between(sr.index, sr, benchmark, where=sr < benchmark, facecolor='orangered', interpolate=True)
     ax.plot(sr.idxmax(), sr.max(), marker='x', markersize=10, color='black')
     ax.plot(sr.idxmin(), sr.min(), marker='x', markersize=10, color='black')
     plt.show()
@@ -65,4 +70,7 @@ def plot_hist(sr, cmap=None, norm=mcolors.Normalize(), bins=50):
     else:
         colors = 'darkgrey'
     ax.bar(center, hist, color=colors, align='center', width=width)
+    ax.axvline(np.median(sr.values), color='yellow')
+    ax.axvline(np.mean(sr.values), color='orangered')
+    ax.legend(['median', 'mean'])
     plt.show()
