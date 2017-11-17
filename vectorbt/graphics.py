@@ -70,7 +70,4 @@ def plot_hist(sr, cmap=None, norm=mcolors.Normalize(), bins=50):
     else:
         colors = 'darkgrey'
     ax.bar(center, hist, color=colors, align='center', width=width)
-    ax.axvline(np.median(sr.values), color='yellow')
-    ax.axvline(np.mean(sr.values), color='orangered')
-    ax.legend(['median', 'mean'])
     plt.show()
