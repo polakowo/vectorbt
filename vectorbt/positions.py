@@ -33,6 +33,8 @@ def on_hold(rate_sr):
 
 
 def plot(rate_sr, pos_sr):
+    diffs = rate_sr.loc[pos_sr.index].diff().fillna(0)
+    print(pd.DataFrame(diffs.describe()).transpose())
     fig, ax = plt.subplots()
 
     ax.plot(rate_sr, c='darkgrey')

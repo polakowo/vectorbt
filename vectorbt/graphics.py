@@ -1,6 +1,7 @@
 import matplotlib.colors as mcolors
 import numpy as np
 from matplotlib import pyplot as plt
+import pandas as pd
 
 cParams = {
     'negative': 'gold',
@@ -41,6 +42,10 @@ def continuous_cmap(colors, midpoint=None, N=6):
 ###########
 
 def plot_line(sr, benchmark=None):
+    if benchmark is not None:
+        print(pd.DataFrame((sr-benchmark).describe()).transpose())
+    else:
+        print(pd.DataFrame(sr.describe()).transpose())
     fig, ax = plt.subplots()
 
     ax.plot(sr, color='darkgrey')
@@ -60,6 +65,7 @@ def plot_line(sr, benchmark=None):
 ###########
 
 def plot_hist(sr, cmap=None, norm=mcolors.Normalize(), bins=50):
+    print(pd.DataFrame(sr.describe()).transpose())
     fig, ax = plt.subplots()
 
     hist, bins = np.histogram(sr, bins=bins)
@@ -70,4 +76,5 @@ def plot_hist(sr, cmap=None, norm=mcolors.Normalize(), bins=50):
     else:
         colors = 'darkgrey'
     ax.bar(center, hist, color=colors, align='center', width=width)
+    ax.set_title("Series histogram")
     plt.show()
