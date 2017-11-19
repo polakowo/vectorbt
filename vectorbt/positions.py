@@ -18,8 +18,7 @@ def from_vectors(rate_sr, entry_vector, exit_vector):
     signal_sr = pd.Series(signals, index=rate_sr.index)
     signal_sr = signal_sr.iloc[signal_sr.nonzero()]
     # Generate positions
-    pos_sr = signal_sr.diff()
-    pos_sr = signal_sr.iloc[pos_sr.nonzero()]
+    pos_sr = signal_sr[signal_sr != signal_sr.shift()]
     # Always buy at the beginning
     if len(pos_sr.index)%2 != 0:
         pos_sr = pos_sr.iloc[1:]
