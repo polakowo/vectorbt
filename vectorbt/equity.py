@@ -5,12 +5,12 @@ from vectorbt import graphics
 
 
 def on_positions(pos_ret_sr):
-    # Equity on positions
+    """Equity on positions"""
     return (pos_ret_sr + 1).cumprod()
 
 
 def diff_on_positions(pos_ret_sr):
-    # Equity diffs on positions (absolute returns)
+    """Equity diffs on positions (absolute returns)"""
     return on_positions(pos_ret_sr) - on_positions(pos_ret_sr).shift().fillna(1)
 
 
@@ -38,5 +38,7 @@ def from_returns(rate_sr, pos_ret_sr):
 
 
 def plot(rate_sr, equity_df):
+    print("base")
     graphics.plot_line(equity_df['base'], benchmark=rate_sr)
+    print("quote")
     graphics.plot_line(equity_df['quote'], benchmark=rate_sr * 0 + 1)

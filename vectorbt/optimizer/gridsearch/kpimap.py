@@ -30,7 +30,7 @@ def from_eqdmap(eqdmap, kpi_func):
 
 
 def bounds(kpimap_sr):
-    # Bounds of series (min and max)
+    """Bounds of series (min and max)"""
     return kpimap_sr.dropna().sort_values().iloc[[0, -1]]
 
 
@@ -41,7 +41,7 @@ def print_bounds(kpimap_sr):
 
 
 def compare(kpimap_a_sr, kpimap_b_sr):
-    # Compare distributions of KPI maps
+    """Compare distributions of KPI maps"""
     info_df = pd.DataFrame()  # contains general info for printing
     perc_index = range(0, 101, 5)
     perc_df = pd.DataFrame(index=perc_index)  # contains percentiles for drawing

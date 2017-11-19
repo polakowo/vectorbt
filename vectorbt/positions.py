@@ -1,6 +1,7 @@
 import pandas as pd
 from matplotlib import pyplot as plt
-from vectorbt import graphics
+
+from vectorbt import signals
 
 
 def from_vectors(rate_sr, entry_vector, exit_vector):
@@ -12,22 +13,24 @@ def from_vectors(rate_sr, entry_vector, exit_vector):
     :return: bit vector of positions
     """
     # Merge vectors
-    signals = entry_vector - exit_vector - entry_vector * exit_vector
+    entry_vector = signals.reduce_vector(entry_vector)
+    exit_vector = signals.reduce_vector(exit_vector)
+    merged_vector = entry_vector - exit_vector - entry_vector * exit_vector
     # Always sell at the end
-    signals[-1] = -1
-    signal_sr = pd.Series(signals, index=rate_sr.index)
+    merged_vector[-1] = -1
+    signal_sr = pd.Series(merged_vector, index=rate_sr.index)
     signal_sr = signal_sr.iloc[signal_sr.nonzero()]
     # Generate positions
     pos_sr = signal_sr[signal_sr != signal_sr.shift()]
     # Always buy at the beginning
-    if len(pos_sr.index)%2 != 0:
+    if len(pos_sr.index) % 2 != 0:
         pos_sr = pos_sr.iloc[1:]
     # Positions are always even, starting with long, ending with short
     return pos_sr
 
 
 def on_hold(rate_sr):
-    # Positions on hold
+    """Positions on hold"""
     return pd.Series([1, -1], index=rate_sr.index[[0, -1]])
 
 
@@ -46,4 +49,3 @@ def plot(rate_sr, pos_sr):
     ax.plot(sale_dates, rate_sr.loc[sale_dates].values, 'v', color='orangered',
             markeredgecolor='darkred', markersize=8, markeredgewidth=1)
     plt.show()
-

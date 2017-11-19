@@ -10,7 +10,7 @@ from matplotlib import pyplot as plt
 ##########
 
 def from_map(vmap, symmetric=False):
-    # Transform a map into a 2d-matrix (only if params are tuples of 2)
+    """Transform a map into a 2d-matrix (only if params are tuples of 2)"""
     t = timer()
     matrix_df = pd.DataFrame(dtype=float)
     for (i, c), x in vmap.items():
@@ -23,7 +23,7 @@ def from_map(vmap, symmetric=False):
 
 
 def focused(matrix_df, condition=lambda x: x > 0, **kwargs):
-    # Cut matrix to an area containing elements that fulfill the condition
+    """Cut matrix to an area containing elements that fulfill the condition"""
     cond_matrix_df = matrix_df[matrix_df.apply(condition)]
     index = cond_matrix_df.loc[cond_matrix_df.isnull().all() == False].index
     return matrix_df.loc[min(index):max(index), min(index):max(index), kwargs]

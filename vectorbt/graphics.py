@@ -1,7 +1,7 @@
 import matplotlib.colors as mcolors
 import numpy as np
-from matplotlib import pyplot as plt
 import pandas as pd
+from matplotlib import pyplot as plt
 
 cParams = {
     'negative': 'gold',
@@ -43,7 +43,7 @@ def continuous_cmap(colors, midpoint=None, N=6):
 
 def plot_line(sr, benchmark=None):
     if benchmark is not None:
-        print(pd.DataFrame((sr-benchmark).describe()).transpose())
+        print(pd.DataFrame((sr - benchmark).describe()).transpose())
     else:
         print(pd.DataFrame(sr.describe()).transpose())
     fig, ax = plt.subplots()

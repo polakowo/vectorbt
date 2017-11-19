@@ -11,26 +11,27 @@ from poloniex import Poloniex
 
 
 def now_dt():
-    # Current datetime
+    """Current datetime"""
     return pytz.utc.localize(datetime.utcnow())
 
 
 def ago_dt(**kwargs):
+    """Time ago"""
     return now_dt() - timedelta(**kwargs)
 
 
 def dt_to_ts(date):
-    # Date to timestamp
+    """Date to timestamp"""
     return int(date.timestamp())
 
 
 def ts_to_dt(ts):
-    # Timestamp to date
+    """Timestamp to date"""
     return datetime.fromtimestamp(ts, )
 
 
 def load_cryptopair(pair, from_dt, to_dt, period=300):
-    # Load OHLC data on a cryptocurrency pair from Poloniex exchange
+    """Load OHLC data on a cryptocurrency pair from Poloniex exchange"""
     polo = Poloniex()
     t = timer()
     chart_data = polo.returnChartData(pair, period=period, start=dt_to_ts(from_dt), end=dt_to_ts(to_dt))
