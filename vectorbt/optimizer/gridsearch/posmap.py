@@ -57,8 +57,8 @@ def ma(rate_sr, min_ma, max_ma, step, th, ma_func):
 
     # Calculation
     def positions_func(fast_ma, slow_ma):
-        entries = signals.ma_entry_vector(rate_sr, mas[fast_ma], mas[slow_ma], th=th)
-        exits = signals.ma_exit_vector(rate_sr, mas[fast_ma], mas[slow_ma], th=th)
+        entries = signals.dmac_entry_vector(rate_sr, mas[fast_ma], mas[slow_ma], th=th)
+        exits = signals.dmac_exit_vector(rate_sr, mas[fast_ma], mas[slow_ma], th=th)
         pos_sr = positions.from_vectors(rate_sr, entries, exits)
         return pos_sr
 
@@ -94,8 +94,8 @@ def math(rate_sr, fast_ma, slow_ma, ma_func, min_th, max_th, step):
 
     # Calculation
     def positions_func(th_x, th_y):
-        entries = signals.ma_entry_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(th_x, th_y))
-        exits = signals.ma_exit_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(th_x, th_y))
+        entries = signals.dmac_entry_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(th_x, th_y))
+        exits = signals.dmac_exit_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(th_x, th_y))
         pos_sr = positions.from_vectors(rate_sr, entries, exits)
         return pos_sr
 

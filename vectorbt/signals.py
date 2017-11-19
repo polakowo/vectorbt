@@ -9,25 +9,33 @@ def reduce_vector(vector):
     return np.insert((np.diff(vector) == 1).astype(int), 0, vector[0])
 
 
-# Dual moving average
-#####################
+# Dual moving average crossover
+###############################
 
 
-def ma_entry_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
-    """Pass: the first time the fast MA is above the slow MA by threshold"""
+def dmac_entry_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
     return np.where(fast_ma_sr - slow_ma_sr > th[0] * rate_sr, 1, 0)
 
 
-def ma_exit_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
-    """Pass: the first time the fast MA is below the slow MA by threshold"""
+def dmac_exit_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
     return np.where(fast_ma_sr - slow_ma_sr < -th[0] * rate_sr, 1, 0)
+
+
+# Moving average envelope
+#########################
+
+def mae_entry_vector(rate_sr, ma_sr, envelope):
+    return np.where(rate_sr - (1 + envelope) * ma_sr > 0, 1, 0)
+
+
+def mae_exit_vector(rate_sr, ma_sr, envelope):
+    return np.where(rate_sr - (1 - envelope) * ma_sr < 0, 1, 0)
 
 
 # Random
 ########
 
 def random_entry_vector(rate_sr, n):
-    """Pass: any random date"""
     indexes = random.sample(range(len(rate_sr.index)), n)
     vector = np.zeros(len(rate_sr.index))
     vector[indexes] = 1
@@ -35,7 +43,6 @@ def random_entry_vector(rate_sr, n):
 
 
 def random_exit_vector(rate_sr, entry_vector, n):
-    """Pass: any random date between entries"""
     # Needs clear entry points
     entry_vector = reduce_vector(entry_vector)
     entries = np.flatnonzero(entry_vector)
@@ -50,12 +57,10 @@ def random_exit_vector(rate_sr, entry_vector, n):
 ########
 
 def turtle_entry_vector(rate_sr, window):
-    """Pass: first rate being max of the window"""
     return (rate_sr == rate_sr.rolling(window=window).max()).astype(int).values
 
 
 def turtle_exit_vector(rate_sr, window):
-    """Pass: first rate being min of the window"""
     return (rate_sr == rate_sr.rolling(window=window).min()).astype(int).values
 
 
@@ -63,7 +68,7 @@ def turtle_exit_vector(rate_sr, window):
 ###############
 
 def apply_trail(roll_sr, trail):
-    # Apply trail to rolling series
+    """Apply trail to rolling series"""
     # Trail is in %
     if isinstance(trail, float) and 0 < abs(trail) < 1:
         stop_sr = roll_sr * (1 + trail)
@@ -80,7 +85,6 @@ def apply_trail(roll_sr, trail):
 
 
 def trailstop_entry(rate_sr, trail):
-    """Pass: Rate is higher than trailing stop"""
     rollmin_sr = rate_sr.rolling(window=len(rate_sr.index), min_periods=1).min()
     stop_sr = apply_trail(rollmin_sr, trail)
     sellstops = np.flatnonzero(np.where(rate_sr > stop_sr, 1, 0))
@@ -89,7 +93,6 @@ def trailstop_entry(rate_sr, trail):
 
 
 def trailstop_exit(rate_sr, trail):
-    """Pass: Rate is lower than trailing stop"""
     rollmax_sr = rate_sr.rolling(window=len(rate_sr.index), min_periods=1).max()
     stop_sr = apply_trail(rollmax_sr, -trail)
     sellstops = np.flatnonzero(np.where(rate_sr < stop_sr, 1, 0))
@@ -169,11 +172,21 @@ def trailstop_exit_vector(rate_sr, entry_vector, trail):
 #################
 
 
-def bbounds_entry_vector(rate_sr, upper_band_sr):
-    """Pass: Rate is above the upper Bollinger Band"""
+def bb_entry_vector(rate_sr, upper_band_sr):
     return np.where(rate_sr > upper_band_sr, 1, 0)
 
 
-def bbounds_exit_vector(rate_sr, lower_band_sr):
-    """Pass: Rate is below the lower Bollinger Band"""
+def bb_exit_vector(rate_sr, lower_band_sr):
     return np.where(rate_sr < lower_band_sr, 1, 0)
+
+
+# RSI
+#####
+
+
+def rsi_entry_vector(rsi_sr, lower_bound):
+    return np.where(rsi_sr > lower_bound, 1, 0)
+
+
+def rsi_exit_vector(rsi_sr, upper_bound):
+    return np.where(rsi_sr > upper_bound, 1, 0)
