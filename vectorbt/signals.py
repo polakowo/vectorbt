@@ -14,6 +14,7 @@ def reduce_vector(vector):
 
 
 def dmac_entry_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
+    """We require provision of MA beforehand, so we don't need to recalculate it every time"""
     return np.where(fast_ma_sr - slow_ma_sr > th[0] * rate_sr, 1, 0)
 
 
@@ -30,6 +31,36 @@ def mae_entry_vector(rate_sr, ma_sr, envelope):
 
 def mae_exit_vector(rate_sr, ma_sr, envelope):
     return np.where(rate_sr - (1 - envelope) * ma_sr < 0, 1, 0)
+
+
+# MACD crossover
+################
+
+def macd_co_entry_vector(macd_sr, signal_sr):
+    return np.where(macd_sr - signal_sr > 0, 1, 0)
+
+
+def macd_co_exit_vector(macd_sr, signal_sr):
+    return np.where(macd_sr - signal_sr < 0, 1, 0)
+
+
+# MACD histogram drops
+######################
+
+def macd_hist_entry_vector(hist_sr, ndrops):
+    vector = (hist_sr[hist_sr < 0].diff() > 0).astype(int).reindex(hist_sr.index).fillna(0)
+    grouped = reduce_vector(vector).cumsum()
+    cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
+    return vector*cum_drops
+
+
+def macd_hist_exit_vector(hist_sr, ndrops):
+    """Entry market once there is N dropping bars in a row"""
+    vector = (hist_sr[hist_sr > 0].diff() < 0).astype(int).reindex(hist_sr.index).fillna(0)
+    grouped = reduce_vector(vector).cumsum()
+    cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
+    return vector*cum_drops
+
 
 
 # Random
