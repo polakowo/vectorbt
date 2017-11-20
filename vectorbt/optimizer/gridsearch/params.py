@@ -3,9 +3,6 @@ import itertools
 import numpy as np
 
 
-# Generators
-############
-
 def repeat(func, N, *args, **kwargs):
     """Execute function multiple times"""
     do = lambda: func(*args, **kwargs)
@@ -38,16 +35,3 @@ def combine_rep_params(min_param, max_param, step, dims):
 def random_params(min_param, max_param, dims, N):
     """Generate randomized params"""
     return repeat(np.random.uniform, N, min_param, max_param, dims)
-
-
-# Mappers
-#########
-
-def onemap(func, params):
-    """Simple map, one param passed"""
-    return dict(zip(params, map(func, params)))
-
-
-def starmap(func, params):
-    """Multiple params passed"""
-    return dict(zip(params, list(itertools.starmap(func, params))))

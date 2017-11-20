@@ -1,7 +1,7 @@
 from timeit import default_timer as timer
 
 from vectorbt import signals, positions
-from vectorbt.optimizer.gridsearch import params
+from vectorbt.optimizer.gridsearch import params, multiprocess
 
 
 ##########
@@ -20,7 +20,7 @@ def random(rate_sr, n, N):
     :return: position series keyed by their index
     """
 
-    def positions_func():
+    def positions_func(i):
         entries = signals.random_entry_vector(rate_sr, n)
         exits = signals.random_exit_vector(rate_sr, entries, n)
         pos_sr = positions.from_vectors(rate_sr, entries, exits)
@@ -28,12 +28,11 @@ def random(rate_sr, n, N):
 
     print("random-posmap")
     print("setup: positions = ~%d, N = %d" % (n, N))
-    t1 = timer()
-    positions_func()
-    t2 = timer()
-    print("calcs: %d (~%.2fs)" % (N, N * (t2 - t1)))
-    posmap = dict(zip(range(N), params.repeat(positions_func, N)))
-    print("passed. %.2fs" % (timer() - t1))
+    t = timer()
+    print("calcs: %d .." % N)
+    p = list(range(N))
+    posmap = dict(zip(p, multiprocess.onemap(positions_func, p)))
+    print("passed. %.2fs" % (timer() - t))
     return posmap
 
 
@@ -53,7 +52,7 @@ def ma(rate_sr, min_ma, max_ma, step, th, ma_func):
     """
     # Precalculation
     params_range = params.range_params(min_ma, max_ma, step)
-    mas = params.onemap(lambda x: ma_func(rate_sr, x), params_range)
+    mas = {x: ma_func(rate_sr, x) for x in params_range}
 
     # Calculation
     def positions_func(fast_ma, slow_ma):
@@ -66,13 +65,11 @@ def ma(rate_sr, min_ma, max_ma, step, th, ma_func):
     print("setup: ma_func = %s, th = %s" % (ma_func.__name__, str(th)))
     p = params.combine_rep_params(min_ma, max_ma, step, 2)
     print("grid: %f -> %f = %d" % (min_ma, max_ma, len(p)))
-    t1 = timer()
-    positions_func(min_ma, max_ma)
-    t2 = timer()
-    print("calcs: %d (~%.2fs)" % (len(p), len(p) * (t2 - t1)))
+    t = timer()
+    print("calcs: %d .." % len(p))
     # Window of fast MA is lower or equal than of slow MA
-    posmap = params.starmap(positions_func, p)
-    print("passed. %.2fs" % (timer() - t2))
+    posmap = dict(zip(p, multiprocess.starmap(positions_func, p)))
+    print("passed. %.2fs" % (timer() - t))
     return posmap
 
 
@@ -103,11 +100,9 @@ def math(rate_sr, fast_ma, slow_ma, ma_func, min_th, max_th, step):
     print("setup: ma_func = %s (%d, %d)" % (ma_func.__name__, fast_ma, slow_ma))
     p = params.product_params(min_th, max_th, step, 2)
     print("grid: %f -> %f = %d" % (min_th, max_th, len(p)))
-    t1 = timer()
-    positions_func(min_th, max_th)
-    t2 = timer()
-    print("calcs: %d (~%.2fs)" % (len(p), len(p) * (t2 - t1)))
+    t = timer()
+    print("calcs: %d .." % len(p))
     # Window of fast MA is lower or equal than of slow MA
-    posmap = params.starmap(positions_func, p)
-    print("passed. %.2fs" % (timer() - t2))
+    posmap = dict(zip(p, multiprocess.starmap(positions_func, p)))
+    print("passed. %.2fs" % (timer() - t))
     return posmap

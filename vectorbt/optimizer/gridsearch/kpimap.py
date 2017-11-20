@@ -4,6 +4,8 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
+from vectorbt.optimizer.gridsearch import multiprocess
+
 
 ##########
 ### L3 ###
@@ -17,15 +19,12 @@ def from_eqdmap(eqdmap, kpi_func):
     :return: kpi series indexed by parameters
     """
     print("%s-kpimap" % kpi_func.__name__)
-    longest_sr = sorted(list(eqdmap.items()), key=lambda x: -len(x[1]))[0][1]
-    t1 = timer()
-    kpi_func(longest_sr)
-    t2 = timer()
-    print("calcs: %d (~%.2fs)" % (len(eqdmap), len(eqdmap) * (t2 - t1)))
-    kpimap_sr = pd.Series({params: kpi_func(returns_sr) if len(returns_sr.index) > 0 else np.nan
-                           for params, returns_sr in eqdmap.items()})
+    print("calcs: %d .." % len(eqdmap))
+    t = timer()
+    func = lambda returns_sr: kpi_func(returns_sr) if len(returns_sr.index) > 0 else np.nan
+    kpimap_sr = pd.Series(dict(zip(list(eqdmap.keys()), multiprocess.onemap(func, list(eqdmap.values())))))
     print_bounds(kpimap_sr)
-    print("passed. %.2fs" % (timer() - t1))
+    print("passed. %.2fs" % (timer() - t))
     return kpimap_sr
 
 
