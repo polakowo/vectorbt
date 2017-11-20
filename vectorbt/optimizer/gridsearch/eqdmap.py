@@ -17,7 +17,7 @@ def from_posmap(rate_sr, posmap, fees):
     :return: equity diffs keyed by params
     """
     returns_func = lambda pos_sr: returns.from_positions(rate_sr, pos_sr, fees)
-    eqd_func = lambda pos_sr: equity.diff_on_positions(returns_func(pos_sr))
+    eqd_func = lambda pos_sr: equity.diffs(returns_func(pos_sr))
     print("eqdmap")
     print("setup: fees = %f" % fees)
     t = timer()

@@ -4,28 +4,28 @@ import pandas as pd
 from vectorbt import graphics
 
 
-def on_positions(pos_ret_sr):
+def on_positions(posret_sr):
     """Equity on positions"""
-    return (pos_ret_sr + 1).cumprod()
+    return (posret_sr + 1).cumprod()
 
 
-def diff_on_positions(pos_ret_sr):
+def diffs(posret_sr):
     """Equity diffs on positions (absolute returns)"""
-    return on_positions(pos_ret_sr) - on_positions(pos_ret_sr).shift().fillna(1)
+    return (on_positions(posret_sr) - on_positions(posret_sr).shift().fillna(1)).iloc[1::2]
 
 
-def from_returns(rate_sr, pos_ret_sr):
+def from_returns(rate_sr, posret_sr):
     """
     Generate equity in base and quote currency from position returns
 
-    :param pos_ret_sr: position returns (both short/long positions)
+    :param posret_sr: position returns (both short/long positions)
     :return: dataframe
     """
-    quote_sr = np.cumprod(pos_ret_sr + 1)
-    quote_sr *= rate_sr.loc[pos_ret_sr.index[0]]
+    quote_sr = np.cumprod(posret_sr + 1)
+    quote_sr *= rate_sr.loc[posret_sr.index[0]]
     quote_sr /= rate_sr.loc[quote_sr.index]
     # Hold and cash periods
-    pos_sr = pd.Series([1, -1] * (len(pos_ret_sr.index) // 2), index=pos_ret_sr.index)
+    pos_sr = pd.Series([1, -1] * (len(posret_sr.index) // 2), index=posret_sr.index)
     hold_mask = pos_sr.reindex(rate_sr.index).ffill() == 1
     hold_rates = rate_sr.loc[hold_mask]
     cash_rates = rate_sr.loc[~hold_mask]

@@ -6,125 +6,94 @@ import json
 # Performance
 #############
 
-def start(pos_eqd_sr):
-    return pos_eqd_sr.index[0]
+def profit(eqd_sr):
+    return eqd_sr.sum()
 
 
-def end(pos_eqd_sr):
-    return pos_eqd_sr.index[-1]
+def std(eqd_sr):
+    return eqd_sr.std()
 
 
-def days(pos_eqd_sr):
-    return (pos_eqd_sr.index[-1] - pos_eqd_sr.index[0]).days
+def average(eqd_sr):
+    return eqd_sr[eqd_sr != 0].mean()
 
 
-def profit(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]  # on short positions only
-    return sr.sum()
+def avggain(eqd_sr):
+    return eqd_sr[eqd_sr > 0].mean()
 
 
-def std(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return sr.std()
+def avgloss(eqd_sr):
+    return -eqd_sr[eqd_sr < 0].mean()
 
 
-def average(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return sr[sr != 0].mean()
+def winrate(eqd_sr):
+    return sum(eqd_sr > 0) / len(eqd_sr.index)
 
 
-def avggain(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return sr[sr > 0].mean()
+def lossrate(eqd_sr):
+    return 1 - winrate(eqd_sr)
 
 
-def avgloss(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return -sr[sr < 0].mean()
+def expectancy(eqd_sr):
+    return profit(eqd_sr) / trades(eqd_sr)
 
 
-def winrate(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return sum(sr > 0) / len(sr.index)
+def payoff(eqd_sr):
+    return avggain(eqd_sr) / avgloss(eqd_sr)
 
 
-def lossrate(pos_eqd_sr):
-    return 1 - winrate(pos_eqd_sr)
+def pf(eqd_sr):
+    return abs(eqd_sr[eqd_sr > 0].sum() / eqd_sr[eqd_sr < 0].sum())
 
 
-def expectancy(pos_eqd_sr):
-    return profit(pos_eqd_sr) / trades(pos_eqd_sr)
+def maxdd(eqd_sr):
+    return (eqd_sr.cumsum().expanding().max() - eqd_sr.cumsum()).max()
 
 
-def payoff(pos_eqd_sr):
-    return avggain(pos_eqd_sr) / avgloss(pos_eqd_sr)
+def rf(eqd_sr):
+    return eqd_sr.sum() / maxdd(eqd_sr)
 
 
-def pf(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return abs(sr[sr > 0].sum() / sr[sr < 0].sum())
-
-
-def maxdd(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return (sr.cumsum().expanding().max() - sr.cumsum()).max()
-
-
-def rf(pos_eqd_sr):
-    sr = pos_eqd_sr.iloc[1::2]
-    return sr.sum() / maxdd(pos_eqd_sr)
-
-
-def trades(pos_eqd_sr):
-    return len(pos_eqd_sr.index) // 2
+def trades(eqd_sr):
+    return len(eqd_sr.index)
 
 
 # Risk / return
 ###############
 
-def _days(pos_eqd_sr): return pos_eqd_sr.resample('D').sum().dropna()
+
+def sharpe(eqd_sr):
+    return eqd_sr.mean() / eqd_sr.std()
 
 
-def sharpe(pos_eqd_sr):
-    d = _days(pos_eqd_sr)
-    return (d.mean() / d.std()) * (252 ** 0.5)
-
-
-def sortino(pos_eqd_sr):
-    d = _days(pos_eqd_sr)
-    return (d.mean() / d[d < 0].std()) * (252 ** 0.5)
+def sortino(eqd_sr):
+    return eqd_sr.mean() / eqd_sr[eqd_sr < 0].std()
 
 
 # Summary
 #########
 
-def summary(pos_eqd_sr):
+def summary(eqd_sr):
     return {
-        'backtest': {
-            'from': str(start(pos_eqd_sr)),
-            'to': str(end(pos_eqd_sr)),
-            'days': days(pos_eqd_sr),
-            'trades': len(pos_eqd_sr),
-        },
         'performance': {
-            'profit': pos_eqd_sr.sum(),
+            'profit': eqd_sr.sum(),
             'averages': {
-                'trade': average(pos_eqd_sr),
-                'gain': avggain(pos_eqd_sr),
-                'loss': avgloss(pos_eqd_sr),
+                'trade': average(eqd_sr),
+                'gain': avggain(eqd_sr),
+                'loss': avgloss(eqd_sr),
             },
-            'winrate': winrate(pos_eqd_sr),
-            'payoff': payoff(pos_eqd_sr),
-            'PF': pf(pos_eqd_sr),
-            'RF': rf(pos_eqd_sr),
+            'winrate': winrate(eqd_sr),
+            'payoff': payoff(eqd_sr),
+            'PF': pf(eqd_sr),
+            'RF': rf(eqd_sr),
         },
         'risk/return profile': {
-            'sharpe': sharpe(pos_eqd_sr),
-            'sortino': sortino(pos_eqd_sr),
-            'maxdd': maxdd(pos_eqd_sr)
+            'sharpe': sharpe(eqd_sr),
+            'sortino': sortino(eqd_sr),
+            'maxdd': maxdd(eqd_sr)
         }
     }
 
 
-def print_summary(pos_eqd_sr):
-    print(json.dumps(summary(pos_eqd_sr), indent=2))
+def print_summary(eqd_sr):
+    print(json.dumps(summary(eqd_sr), indent=2))

@@ -4,18 +4,18 @@ from matplotlib import pyplot as plt
 from vectorbt import signals
 
 
-def from_vectors(rate_sr, entry_vector, exit_vector):
+def from_vectors(rate_sr, evector, xvector):
     """
     Generate positions from short/long signals
 
-    :param entry_vector: bit vector of long signals
-    :param exit_vector: bit vector of short signals
+    :param evector: bit vector of entry signals
+    :param xvector: bit vector of exit signals
     :return: bit vector of positions
     """
     # Merge vectors
-    entry_vector = signals.reduce_vector(entry_vector)
-    exit_vector = signals.reduce_vector(exit_vector)
-    merged_vector = entry_vector - exit_vector - entry_vector * exit_vector
+    evector = signals.reduce_vector(evector)
+    xvector = signals.reduce_vector(xvector)
+    merged_vector = evector - xvector - evector * xvector
     # Always sell at the end
     merged_vector[-1] = -1
     signal_sr = pd.Series(merged_vector, index=rate_sr.index)

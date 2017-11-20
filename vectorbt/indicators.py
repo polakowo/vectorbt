@@ -1,24 +1,31 @@
 import pandas as pd
 
+# Momentum
+##########
+
+def momentum(rate_sr, window):
+    rolling_sr = rate_sr.rolling(window=window)
+    return rolling_sr.last() / rolling_sr.first() - 1
+
 
 # Moving average
 ################
 
-def SMA(sr, window):
-    return sr.rolling(window=window).mean()
+def SMA(rate_sr, window):
+    return rate_sr.rolling(window=window).mean()
 
 
-def EMA(sr, span):
-    return sr.ewm(span=span, adjust=False).mean()
+def EMA(rate_sr, span):
+    return rate_sr.ewm(span=span, adjust=False).mean()
 
 
 # MACD
 ######
 
 
-def MACD(sr, fast_span, slow_span, signal_span):
+def MACD(rate_sr, fast_span, slow_span, signal_span):
     """Moving average convergence/divergence"""
-    macd_sr = EMA(sr, fast_span) - EMA(sr, slow_span)
+    macd_sr = EMA(rate_sr, fast_span) - EMA(rate_sr, slow_span)
     signal_sr = EMA(macd_sr, signal_span)
     hist_sr = macd_sr - signal_sr
     return macd_sr, signal_sr, hist_sr
@@ -27,18 +34,18 @@ def MACD(sr, fast_span, slow_span, signal_span):
 # Average true range
 ####################
 
-def TR(ohlc_df):
+def TR(high_sr, low_sr, close_sr):
     df = pd.DataFrame()
-    df[0] = ohlc_df['high'] - ohlc_df['low']
-    df[1] = ohlc_df['high'] - ohlc_df['close'].shift()
-    df[2] = ohlc_df['low'] - ohlc_df['close'].shift()
+    df[0] = high_sr - low_sr
+    df[1] = high_sr - close_sr.shift()
+    df[2] = low_sr - close_sr.shift()
     df = df.abs()
     return df.max(axis=1)
 
 
-def ATR(ohlc_df, ma_func, window, multiplier):
+def ATR(tr_sr, ma_func, window, multiplier):
     """Provides the degree of price volatility"""
-    return ma_func(TR(ohlc_df), window) * multiplier
+    return ma_func(tr_sr, window) * multiplier
 
 
 # Bollinger Bands

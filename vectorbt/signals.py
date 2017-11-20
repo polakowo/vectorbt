@@ -13,48 +13,45 @@ def reduce_vector(vector):
 ###############################
 
 
-def dmac_entry_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
+def DMAC_evector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
     """We require provision of MA beforehand, so we don't need to recalculate it every time"""
     return np.where(fast_ma_sr - slow_ma_sr > th[0] * rate_sr, 1, 0)
 
 
-def dmac_exit_vector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
+def DMAC_xvector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
     return np.where(fast_ma_sr - slow_ma_sr < -th[0] * rate_sr, 1, 0)
 
 
 # Moving average envelope
 #########################
 
-def mae_entry_vector(rate_sr, ma_sr, envelope):
+def MAE_evector(rate_sr, ma_sr, envelope):
     return np.where(rate_sr - (1 + envelope) * ma_sr > 0, 1, 0)
 
 
-def mae_exit_vector(rate_sr, ma_sr, envelope):
+def MAE_xvector(rate_sr, ma_sr, envelope):
     return np.where(rate_sr - (1 - envelope) * ma_sr < 0, 1, 0)
 
 
-# MACD crossover
-################
+# MACD
+######
 
-def macd_co_entry_vector(macd_sr, signal_sr):
+def MACD_evector(macd_sr, signal_sr):
     return np.where(macd_sr - signal_sr > 0, 1, 0)
 
 
-def macd_co_exit_vector(macd_sr, signal_sr):
+def MACD_xvector(macd_sr, signal_sr):
     return np.where(macd_sr - signal_sr < 0, 1, 0)
 
 
-# MACD histogram drops
-######################
-
-def macd_hist_entry_vector(hist_sr, ndrops):
+def MACD_hist_evector(hist_sr, ndrops):
     vector = (hist_sr[hist_sr < 0].diff() > 0).astype(int).reindex(hist_sr.index).fillna(0)
     grouped = reduce_vector(vector).cumsum()
     cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
     return vector * cum_drops
 
 
-def macd_hist_exit_vector(hist_sr, ndrops):
+def MACD_hist_xvector(hist_sr, ndrops):
     """Entry market once there is N dropping bars in a row"""
     vector = (hist_sr[hist_sr > 0].diff() < 0).astype(int).reindex(hist_sr.index).fillna(0)
     grouped = reduce_vector(vector).cumsum()
@@ -65,18 +62,18 @@ def macd_hist_exit_vector(hist_sr, ndrops):
 # Random
 ########
 
-def random_entry_vector(rate_sr, n):
+def random_evector(rate_sr, n):
     indexes = random.sample(range(len(rate_sr.index)), n)
     vector = np.zeros(len(rate_sr.index))
     vector[indexes] = 1
     return vector
 
 
-def random_exit_vector(rate_sr, entry_vector, n):
+def random_xvector(rate_sr, evector, n):
     # Needs clear entry points
-    entry_vector = reduce_vector(entry_vector)
-    entries = np.flatnonzero(entry_vector)
-    non_entries = np.flatnonzero(entry_vector == 0)
+    evector = reduce_vector(evector)
+    entries = np.flatnonzero(evector)
+    non_entries = np.flatnonzero(evector == 0)
     indexes = np.random.choice(non_entries[non_entries > entries[0]], n, replace=True)
     vector = np.zeros(len(rate_sr.index))
     vector[indexes] = 1
@@ -86,11 +83,11 @@ def random_exit_vector(rate_sr, entry_vector, n):
 # Turtle
 ########
 
-def turtle_entry_vector(rate_sr, window):
+def turtle_evector(rate_sr, window):
     return (rate_sr == rate_sr.rolling(window=window).max()).astype(int).values
 
 
-def turtle_exit_vector(rate_sr, window):
+def turtle_xvector(rate_sr, window):
     return (rate_sr == rate_sr.rolling(window=window).min()).astype(int).values
 
 
@@ -133,15 +130,15 @@ def trailstop_exit(rate_sr, trail):
 def traverse_trailstops(rate_sr, entry_trail, exit_trail):
     """In case both vectors are calculated using trailing stop and thus depending"""
     trailstops = [0]
-    entry_vector = np.zeros(len(rate_sr.index))
-    exit_vector = np.zeros(len(rate_sr.index))
+    evector = np.zeros(len(rate_sr.index))
+    xvector = np.zeros(len(rate_sr.index))
     while True:
         if len(trailstops) % 2 == 0:  # exit or entry?
             i = trailstops[-1] + 1  # exit excluded
             j = trailstop_entry(rate_sr.iloc[i:], entry_trail)
             if j is not None:
                 trailstops.append(i + j)  # index adjusted to rate_sr
-                entry_vector[i + j] = 1
+                evector[i + j] = 1
             else:
                 break
         else:
@@ -149,22 +146,22 @@ def traverse_trailstops(rate_sr, entry_trail, exit_trail):
             j = trailstop_exit(rate_sr.iloc[i:], exit_trail)
             if j is not None:
                 trailstops.append(i + j)
-                exit_vector[i + j] = 1
+                xvector[i + j] = 1
             else:
                 break
-    return entry_vector, exit_vector
+    return evector, xvector
 
 
-def trailstop_entry_vector(rate_sr, exit_vector, trail):
+def trailstop_evector(rate_sr, xvector, trail):
     """
     Exit vector needed
     Exit resets entry -> vectorized solution possible -> divide and conquer
     """
     # Needs clear exit points
-    exit_vector = reduce_vector(exit_vector)
-    groups = rate_sr.groupby(np.cumsum(exit_vector))
+    xvector = reduce_vector(xvector)
+    groups = rate_sr.groupby(np.cumsum(xvector))
     rel_entry_pos = groups.apply(lambda x: trailstop_entry(x, trail)).values
-    abs_exit_pos = np.insert(np.flatnonzero(exit_vector), 0, 0)
+    abs_exit_pos = np.insert(np.flatnonzero(xvector), 0, 0)
     abs_entry_pos = rel_entry_pos + abs_exit_pos
     abs_entry_pos = abs_entry_pos[~np.isnan(abs_entry_pos)]
     abs_entry_pos = abs_entry_pos.astype(int)
@@ -173,14 +170,14 @@ def trailstop_entry_vector(rate_sr, exit_vector, trail):
     return vector
 
 
-def trailstop_exit_vector(rate_sr, entry_vector, trail):
+def trailstop_xvector(rate_sr, evector, trail):
     """
     Entry vector needed
     Entry doesn't reset exit -> vectorized solution not possible -> iterate
     """
     # Needs clear entry points
-    entry_vector = reduce_vector(entry_vector)
-    entries = np.flatnonzero(entry_vector)
+    evector = reduce_vector(evector)
+    entries = np.flatnonzero(evector)
     exits = []
     while True:
         if len(exits) > 0:
@@ -201,12 +198,12 @@ def trailstop_exit_vector(rate_sr, entry_vector, trail):
 # Bollinger Bands
 #################
 
-def bb_entry_vector(rate_sr, lower_band_sr):
+def BB_evector(rate_sr, lower_band_sr):
     # Oversold
     return np.where(rate_sr < lower_band_sr, 1, 0)
 
 
-def bb_exit_vector(rate_sr, upper_band_sr):
+def BB_xvector(rate_sr, upper_band_sr):
     # Overbought
     return np.where(rate_sr > upper_band_sr, 1, 0)
 
@@ -214,11 +211,11 @@ def bb_exit_vector(rate_sr, upper_band_sr):
 # RSI
 #####
 
-def rsi_entry_vector(rsi_sr, lower_bound):
+def RSI_evector(rsi_sr, lower_bound):
     # Oversold
     return np.where(rsi_sr < lower_bound, 1, 0)
 
 
-def rsi_exit_vector(rsi_sr, upper_bound):
+def RSI_xvector(rsi_sr, upper_bound):
     # Overbought
     return np.where(rsi_sr > upper_bound, 1, 0)
