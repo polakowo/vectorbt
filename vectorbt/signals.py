@@ -51,7 +51,7 @@ def macd_hist_entry_vector(hist_sr, ndrops):
     vector = (hist_sr[hist_sr < 0].diff() > 0).astype(int).reindex(hist_sr.index).fillna(0)
     grouped = reduce_vector(vector).cumsum()
     cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
-    return vector*cum_drops
+    return vector * cum_drops
 
 
 def macd_hist_exit_vector(hist_sr, ndrops):
@@ -59,8 +59,7 @@ def macd_hist_exit_vector(hist_sr, ndrops):
     vector = (hist_sr[hist_sr > 0].diff() < 0).astype(int).reindex(hist_sr.index).fillna(0)
     grouped = reduce_vector(vector).cumsum()
     cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
-    return vector*cum_drops
-
+    return vector * cum_drops
 
 
 # Random
@@ -177,7 +176,7 @@ def trailstop_entry_vector(rate_sr, exit_vector, trail):
 def trailstop_exit_vector(rate_sr, entry_vector, trail):
     """
     Entry vector needed
-    Entry doesn't reset exit -> vectorized solution not possible -> iterate)
+    Entry doesn't reset exit -> vectorized solution not possible -> iterate
     """
     # Needs clear entry points
     entry_vector = reduce_vector(entry_vector)
@@ -202,22 +201,24 @@ def trailstop_exit_vector(rate_sr, entry_vector, trail):
 # Bollinger Bands
 #################
 
-
-def bb_entry_vector(rate_sr, upper_band_sr):
-    return np.where(rate_sr > upper_band_sr, 1, 0)
-
-
-def bb_exit_vector(rate_sr, lower_band_sr):
+def bb_entry_vector(rate_sr, lower_band_sr):
+    # Oversold
     return np.where(rate_sr < lower_band_sr, 1, 0)
+
+
+def bb_exit_vector(rate_sr, upper_band_sr):
+    # Overbought
+    return np.where(rate_sr > upper_band_sr, 1, 0)
 
 
 # RSI
 #####
 
-
 def rsi_entry_vector(rsi_sr, lower_bound):
-    return np.where(rsi_sr > lower_bound, 1, 0)
+    # Oversold
+    return np.where(rsi_sr < lower_bound, 1, 0)
 
 
 def rsi_exit_vector(rsi_sr, upper_bound):
+    # Overbought
     return np.where(rsi_sr > upper_bound, 1, 0)

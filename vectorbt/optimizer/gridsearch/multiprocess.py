@@ -4,6 +4,7 @@ import itertools
 
 
 def onemap(func, params, processes=psutil.cpu_count() - 1):
+    # one argument
     if processes > 1:
         with Pool(processes=processes) as pool:
             try:
@@ -17,6 +18,7 @@ def onemap(func, params, processes=psutil.cpu_count() - 1):
 
 
 def starmap(func, params, processes=psutil.cpu_count() - 1):
+    # multiple arguments
     if processes > 1:
         with Pool(processes=processes) as pool:
             try:

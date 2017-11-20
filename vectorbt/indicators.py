@@ -17,6 +17,7 @@ def EMA(sr, span):
 
 
 def MACD(sr, fast_span, slow_span, signal_span):
+    """Moving average convergence/divergence"""
     macd_sr = EMA(sr, fast_span) - EMA(sr, slow_span)
     signal_sr = EMA(macd_sr, signal_span)
     hist_sr = macd_sr - signal_sr
@@ -36,6 +37,7 @@ def TR(ohlc_df):
 
 
 def ATR(ohlc_df, ma_func, window, multiplier):
+    """Provides the degree of price volatility"""
     return ma_func(TR(ohlc_df), window) * multiplier
 
 
@@ -43,6 +45,7 @@ def ATR(ohlc_df, ma_func, window, multiplier):
 #################
 
 def BB(rate_sr, window, std_n):
+    """Price tends to return back to mean"""
     rollmean_sr = rate_sr.rolling(window=window, min_periods=1).mean()
     rollstd_sr = rate_sr.rolling(window=window, min_periods=1).std()
     upper_band_sr = rollmean_sr + std_n * rollstd_sr
@@ -54,6 +57,7 @@ def BB(rate_sr, window, std_n):
 #####
 
 def RSI(rate_sr, period):
+    """Compares magnitude of recent gains and losses over a time period"""
     delta = rate_sr.diff().dropna()
     up, down = delta * 0, delta * 0
     pos_mask = delta > 0
