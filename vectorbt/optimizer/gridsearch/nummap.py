@@ -3,13 +3,15 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 from vectorbt.optimizer.gridsearch import mapper
+from vectorbt import graphics
 
 
 def from_seriesmap(seriesmap, reducer):
     """Apply KPI and pack into Series"""
-    reduced = mapper.map(reducer, list(seriesmap.values()))
-    params = list(seriesmap.keys())
-    nummap_sr = pd.Series(dict(zip(params, reduced)))
+    params, series = zip(*seriesmap)
+    reduced = mapper.map(reducer, list(series))
+    params = list(params)
+    nummap_sr = pd.Series(reduced, index=params)
     bounds(nummap_sr)
     return nummap_sr
 
@@ -21,34 +23,50 @@ def bounds(nummap_sr):
     print("max %s: %s" % (str(sorted_sr.index[-1]), str(sorted_sr.iloc[-1])))
 
 
-def compare(nummap_a_sr, nummap_b_sr):
-    """Compare distributions of KPI maps"""
-    info_df = pd.DataFrame()  # contains general info for printing
+def compare_quantiles(nummap_sr, benchmark_sr):
+    print(pd.DataFrame([nummap_sr.describe(), benchmark_sr.describe()], index=['nummap', 'benchmark']))
+
     perc_index = range(0, 101, 5)
-    perc_df = pd.DataFrame(index=perc_index)  # contains percentiles for drawing
-
-    for i, nummap_sr in enumerate([nummap_a_sr, nummap_b_sr]):
-        info_df[i] = nummap_sr.describe()
-        perc_df[i] = [np.nanpercentile(nummap_sr, x) for x in perc_index]
-
-    print(info_df.transpose())
+    nummap_perc_sr = pd.Series({x: np.nanpercentile(nummap_sr, x) for x in perc_index})
+    benchmark_perc_sr = pd.Series({x: np.nanpercentile(benchmark_sr, x) for x in perc_index})
 
     fig, ax = plt.subplots()
-    ax.plot(perc_df[0], color='lightgrey')
-    ax.plot(perc_df[1], color='darkgrey')
+    ax.plot(benchmark_perc_sr, color='lightgrey')
+    ax.plot(nummap_perc_sr, color='darkgrey')
     ax.fill_between(perc_index,
-                    perc_df[1],
-                    perc_df[0],
-                    where=perc_df[1] > perc_df[0],
+                    nummap_perc_sr,
+                    benchmark_perc_sr,
+                    where=nummap_perc_sr > benchmark_perc_sr,
                     facecolor='lime',
                     interpolate=True)
     ax.fill_between(perc_index,
-                    perc_df[1],
-                    perc_df[0],
-                    where=perc_df[1] < perc_df[0],
+                    nummap_perc_sr,
+                    benchmark_perc_sr,
+                    where=nummap_perc_sr < benchmark_perc_sr,
                     facecolor='orangered',
                     interpolate=True)
-    diff_df = perc_df[1] - perc_df[0]
-    ax.plot(diff_df.idxmax(), perc_df.loc[diff_df.idxmax(), 1], marker='x', markersize=10, color='black')
-    ax.plot(diff_df.idxmin(), perc_df.loc[diff_df.idxmin(), 1], marker='x', markersize=10, color='black')
+    diff_sr = nummap_perc_sr - benchmark_perc_sr
+    ax.plot(diff_sr.idxmax(), nummap_perc_sr.loc[diff_sr.idxmax()], marker='x', markersize=10, color='black')
+    ax.plot(diff_sr.idxmin(), nummap_perc_sr.loc[diff_sr.idxmin()], marker='x', markersize=10, color='black')
     plt.show()
+
+
+def compare_hists(nummap_sr, benchmark_sr, bins, cmap, norm):
+    print(pd.DataFrame([nummap_sr.describe(), benchmark_sr.describe()], index=['nummap', 'benchmark']))
+
+    sr_min = np.min([nummap_sr.min(), benchmark_sr.min()])
+    sr_max = np.max([nummap_sr.max(), benchmark_sr.max()])
+    bins = np.linspace(sr_min, sr_max, bins)
+    width = np.diff(bins)
+    center = (bins[:-1] + bins[1:]) / 2
+    nummap_hist, _ = np.histogram(nummap_sr.dropna().values, bins=bins)
+    benchmark_hist, _ = np.histogram(benchmark_sr.dropna().values, bins=bins)
+
+    def plot_hist(hist):
+        fig, ax = plt.subplots()
+        ax.bar(center, hist, color=cmap(norm(bins)), align='center', width=width)
+        ax.set_ylim(0, np.max([nummap_hist.max(), benchmark_hist.max()]))
+        plt.show()
+
+    plot_hist(nummap_hist)
+    plot_hist(benchmark_hist)

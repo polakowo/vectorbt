@@ -64,7 +64,7 @@ def plot_line(sr, benchmark=None):
 # Histogram
 ###########
 
-def plot_hist(sr, cmap=None, norm=mcolors.Normalize(), bins=50):
+def plot_hist(sr, bins, cmap, norm):
     print(pd.DataFrame(sr.describe()).transpose())
     fig, ax = plt.subplots()
 
