@@ -30,7 +30,7 @@ def load_cryptopair(pair, from_dt, to_dt, period=300):
     polo = Poloniex()
     t = timer()
     chart_data = polo.returnChartData(pair, period=period, start=dt_to_ts(from_dt), end=dt_to_ts(to_dt))
-    print("passed. %.2fs" % (timer() - t))
+    print("done. %.2fs" % (timer() - t))
     chart_df = pd.DataFrame(chart_data)
     chart_df.set_index('date', drop=True, inplace=True)
     chart_df.index = pd.to_datetime(chart_df.index, unit='s')

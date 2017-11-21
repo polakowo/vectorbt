@@ -1,11 +1,11 @@
 import pandas as pd
 
+
 # Momentum
 ##########
 
 def momentum(rate_sr, window):
-    rolling_sr = rate_sr.rolling(window=window)
-    return rolling_sr.last() / rolling_sr.first() - 1
+    return rate_sr.rolling(window=window).apply(lambda g: g[-1] / g[0] - 1)
 
 
 # Moving average

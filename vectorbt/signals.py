@@ -4,33 +4,17 @@ import numpy as np
 import pandas as pd
 
 
-def reduce_vector(vector):
-    # Pick first entry from each sequence of entries
-    return np.insert((np.diff(vector) == 1).astype(int), 0, vector[0])
-
-
 # Dual moving average crossover
 ###############################
 
 
-def DMAC_evector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
+def DMAC_evector(fast_ma_sr, slow_ma_sr):
     """We require provision of MA beforehand, so we don't need to recalculate it every time"""
-    return np.where(fast_ma_sr - slow_ma_sr > th[0] * rate_sr, 1, 0)
+    return np.where(fast_ma_sr - slow_ma_sr > 0, 1, 0)
 
 
-def DMAC_xvector(rate_sr, fast_ma_sr, slow_ma_sr, th=(0, 0)):
-    return np.where(fast_ma_sr - slow_ma_sr < -th[0] * rate_sr, 1, 0)
-
-
-# Moving average envelope
-#########################
-
-def MAE_evector(rate_sr, ma_sr, envelope):
-    return np.where(rate_sr - (1 + envelope) * ma_sr > 0, 1, 0)
-
-
-def MAE_xvector(rate_sr, ma_sr, envelope):
-    return np.where(rate_sr - (1 - envelope) * ma_sr < 0, 1, 0)
+def DMAC_xvector(fast_ma_sr, slow_ma_sr):
+    return np.where(fast_ma_sr - slow_ma_sr < 0, 1, 0)
 
 
 # MACD
@@ -44,50 +28,42 @@ def MACD_xvector(macd_sr, signal_sr):
     return np.where(macd_sr - signal_sr < 0, 1, 0)
 
 
-def MACD_hist_evector(hist_sr, ndrops):
+def MACD_histdrop_evector(hist_sr, ndrops):
     vector = (hist_sr[hist_sr < 0].diff() > 0).astype(int).reindex(hist_sr.index).fillna(0)
-    grouped = reduce_vector(vector).cumsum()
-    cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
-    return vector * cum_drops
+    return vector.from_nst(vector, ndrops)
 
 
-def MACD_hist_xvector(hist_sr, ndrops):
+def MACD_histdrop_xvector(hist_sr, ndrops):
     """Entry market once there is N dropping bars in a row"""
     vector = (hist_sr[hist_sr > 0].diff() < 0).astype(int).reindex(hist_sr.index).fillna(0)
-    grouped = reduce_vector(vector).cumsum()
-    cum_drops = (vector.groupby(grouped).cumsum() >= ndrops).astype(int)
-    return vector * cum_drops
+    return vector.from_nst(vector, ndrops)
 
 
 # Random
 ########
 
-def random_evector(rate_sr, n):
-    indexes = random.sample(range(len(rate_sr.index)), n)
-    vector = np.zeros(len(rate_sr.index))
-    vector[indexes] = 1
+def random_vector(rate_sr, n, evector=None):
+    if evector is None:
+        indexes = random.sample(range(len(rate_sr.index)), n)
+        vector = np.zeros(len(rate_sr.index))
+        vector[indexes] = 1
+    else:
+        entries = np.flatnonzero(evector)
+        non_entries = np.flatnonzero(evector == 0)
+        indexes = np.random.choice(non_entries[non_entries > entries[0]], n, replace=True)
+        vector = np.zeros(len(rate_sr.index))
+        vector[indexes] = 1
     return vector
 
 
-def random_xvector(rate_sr, evector, n):
-    # Needs clear entry points
-    evector = reduce_vector(evector)
-    entries = np.flatnonzero(evector)
-    non_entries = np.flatnonzero(evector == 0)
-    indexes = np.random.choice(non_entries[non_entries > entries[0]], n, replace=True)
-    vector = np.zeros(len(rate_sr.index))
-    vector[indexes] = 1
-    return vector
+# Min/Max
+#########
 
-
-# Turtle
-########
-
-def turtle_evector(rate_sr, window):
+def max_vector(rate_sr, window):
     return (rate_sr == rate_sr.rolling(window=window).max()).astype(int).values
 
 
-def turtle_xvector(rate_sr, window):
+def min_vector(rate_sr, window):
     return (rate_sr == rate_sr.rolling(window=window).min()).astype(int).values
 
 
@@ -154,11 +130,9 @@ def traverse_trailstops(rate_sr, entry_trail, exit_trail):
 
 def trailstop_evector(rate_sr, xvector, trail):
     """
-    Exit vector needed
+    Sparse exit vector needed
     Exit resets entry -> vectorized solution possible -> divide and conquer
     """
-    # Needs clear exit points
-    xvector = reduce_vector(xvector)
     groups = rate_sr.groupby(np.cumsum(xvector))
     rel_entry_pos = groups.apply(lambda x: trailstop_entry(x, trail)).values
     abs_exit_pos = np.insert(np.flatnonzero(xvector), 0, 0)
@@ -175,8 +149,6 @@ def trailstop_xvector(rate_sr, evector, trail):
     Entry vector needed
     Entry doesn't reset exit -> vectorized solution not possible -> iterate
     """
-    # Needs clear entry points
-    evector = reduce_vector(evector)
     entries = np.flatnonzero(evector)
     exits = []
     while True:

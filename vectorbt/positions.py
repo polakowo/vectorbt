@@ -1,22 +1,14 @@
 import pandas as pd
+import numpy as np
 from matplotlib import pyplot as plt
 
-from vectorbt import signals
+from vectorbt import vector
 
 
 def from_vectors(rate_sr, evector, xvector):
-    """
-    Generate positions from short/long signals
-
-    :param evector: bit vector of entry signals
-    :param xvector: bit vector of exit signals
-    :return: bit vector of positions
-    """
+    """Generate positions from entry and exit bit-vectors"""
     # Merge vectors
-    evector = signals.reduce_vector(evector)
-    xvector = signals.reduce_vector(xvector)
     merged_vector = evector - xvector - evector * xvector
-    # Always sell at the end
     merged_vector[-1] = -1
     signal_sr = pd.Series(merged_vector, index=rate_sr.index)
     signal_sr = signal_sr.iloc[signal_sr.nonzero()]

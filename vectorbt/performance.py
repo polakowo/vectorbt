@@ -1,10 +1,14 @@
-# Credit: https://github.com/ematvey/pybacktest/blob/master/pybacktest/performance.py
-
 import json
+
+import numpy as np
 
 
 # Performance
 #############
+
+def trades(eqd_sr):
+    return len(eqd_sr.index)
+
 
 def profit(eqd_sr):
     return eqd_sr.sum()
@@ -27,7 +31,8 @@ def avgloss(eqd_sr):
 
 
 def winrate(eqd_sr):
-    return sum(eqd_sr > 0) / len(eqd_sr.index)
+    y = trades(eqd_sr)
+    return np.nan if y == 0 else (eqd_sr > 0).sum() / y
 
 
 def lossrate(eqd_sr):
@@ -35,27 +40,27 @@ def lossrate(eqd_sr):
 
 
 def expectancy(eqd_sr):
-    return profit(eqd_sr) / trades(eqd_sr)
+    y = trades(eqd_sr)
+    return np.nan if y == 0 else profit(eqd_sr) / y
 
 
 def payoff(eqd_sr):
-    return avggain(eqd_sr) / avgloss(eqd_sr)
-
-
-def pf(eqd_sr):
-    return abs(eqd_sr[eqd_sr > 0].sum() / eqd_sr[eqd_sr < 0].sum())
+    y = avgloss(eqd_sr)
+    return np.nan if y == 0 else avggain(eqd_sr) / y
 
 
 def maxdd(eqd_sr):
     return (eqd_sr.cumsum().expanding().max() - eqd_sr.cumsum()).max()
 
 
+def pf(eqd_sr):
+    y = -eqd_sr[eqd_sr < 0].sum()
+    return np.nan if y == 0 else eqd_sr[eqd_sr > 0].sum() / y
+
+
 def rf(eqd_sr):
-    return eqd_sr.sum() / maxdd(eqd_sr)
-
-
-def trades(eqd_sr):
-    return len(eqd_sr.index)
+    y = maxdd(eqd_sr)
+    return np.nan if y == 0 else eqd_sr.sum() / y
 
 
 # Risk / return
@@ -63,11 +68,13 @@ def trades(eqd_sr):
 
 
 def sharpe(eqd_sr):
-    return eqd_sr.mean() / eqd_sr.std()
+    y = eqd_sr.std()
+    return np.nan if y == 0 else eqd_sr.mean() / y
 
 
 def sortino(eqd_sr):
-    return eqd_sr.mean() / eqd_sr[eqd_sr < 0].std()
+    y = eqd_sr[eqd_sr < 0].std()
+    return np.nan if y == 0 else eqd_sr.mean() / y
 
 
 # Summary

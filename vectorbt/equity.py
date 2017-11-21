@@ -15,12 +15,7 @@ def diffs(posret_sr):
 
 
 def from_returns(rate_sr, posret_sr):
-    """
-    Generate equity in base and quote currency from position returns
-
-    :param posret_sr: position returns (both short/long positions)
-    :return: dataframe
-    """
+    """Generate equity in base and quote currency from position returns"""
     quote_sr = np.cumprod(posret_sr + 1)
     quote_sr *= rate_sr.loc[posret_sr.index[0]]
     quote_sr /= rate_sr.loc[quote_sr.index]
