@@ -17,10 +17,16 @@ def map(func, params, processes=psutil.cpu_count() - 1):
 
     if processes > 1:
         with Pool(processes=processes) as pool:
-            if starmap:
-                results = pool.starmap(func, params)
-            else:
-                results = pool.map(func, params)
+            try:
+                if starmap:
+                    results = pool.starmap(func, params)
+                else:
+                    results = pool.map(func, params)
+            except Exception as e:
+                pool.close()
+                pool.join()
+                raise e
+
     else:
         if starmap:
             results = list(itertools.starmap(func, params))
