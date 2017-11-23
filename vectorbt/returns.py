@@ -1,7 +1,5 @@
 import pandas as pd
 
-from vectorbt import graphics
-
 
 def from_positions(rate_sr, pos_sr, fees):
     """Generate position returns"""
@@ -22,4 +20,5 @@ def on_hold(rate_sr, fees):
 
 
 def plot(pos_ret_sr):
+    from vectorbt import graphics
     graphics.plot_line(pos_ret_sr, benchmark=0)

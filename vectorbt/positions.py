@@ -1,8 +1,5 @@
 import pandas as pd
-import numpy as np
 from matplotlib import pyplot as plt
-
-from vectorbt import vector
 
 
 def from_vectors(rate_sr, evector, xvector):

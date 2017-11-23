@@ -3,8 +3,6 @@ import random
 import numpy as np
 import pandas as pd
 
-from vectorbt import vector
-
 
 def above(rate_sr, benchmark_sr):
     """Rate above benchmark"""
@@ -16,6 +14,7 @@ def below(rate_sr, benchmark_sr):
 
 
 def raising(rate_sr, n):
+    from vectorbt import vector
     """nst raise in a row"""
     v = (rate_sr.diff() > 0).astype(int).reindex(rate_sr.index).fillna(0)
     return vector.from_nst(v, n)
@@ -35,6 +34,7 @@ def is_min(rate_sr, window):
 
 
 def depending_vector(rate_sr, on_vector, signal_func, wait=0):
+    from vectorbt import vector
     """For each source signal generate a target signal (e.g., stop loss)"""
     idx = []
     vector_idx = np.flatnonzero(on_vector)
@@ -46,12 +46,12 @@ def depending_vector(rate_sr, on_vector, signal_func, wait=0):
         y = signal_func(rate_sr.iloc[x:z])
         if y is not None:
             idx.append(x + y)
-    v = np.zeros(len(rate_sr.index), dtype=int)
-    v[idx] = 1
+    v = vector.from_idx(len(rate_sr.index), idx)
     return v
 
 
 def depending_vectors(rate_sr, entry_func, exit_func, wait=0):
+    from vectorbt import vector
     """Generate signals one after another iteratively"""
     idx = [entry_func(rate_sr)]
     while True:
@@ -64,10 +64,8 @@ def depending_vectors(rate_sr, entry_func, exit_func, wait=0):
             idx.append(i + j)
         else:
             break
-    evector = np.zeros(len(rate_sr.index), dtype=int)
-    xvector = np.zeros(len(rate_sr.index), dtype=int)
-    evector[idx[0::2]] = 1
-    xvector[idx[1::2]] = 1
+    evector = vector.from_idx(len(rate_sr.index), idx[0::2])
+    xvector = vector.from_idx(len(rate_sr.index), idx[1::2])
     return evector, xvector
 
 
@@ -76,18 +74,16 @@ def depending_vectors(rate_sr, entry_func, exit_func, wait=0):
 ##########
 
 def random_vector(rate_sr, n, excl_vector=None):
+    from vectorbt import vector
     """Random vector"""
     if excl_vector is None:
         # Pick signals not in excl_vector
-        indexes = random.sample(range(len(rate_sr.index)), n)
-        randv = np.zeros(len(rate_sr.index))
-        randv[indexes] = 1
+        idx = random.sample(range(len(rate_sr.index)), n)
     else:
         entries = np.flatnonzero(excl_vector)
         non_entries = np.flatnonzero(excl_vector == 0)
-        indexes = np.random.choice(non_entries[non_entries > entries[0]], n, replace=True)
-        randv = np.zeros(len(rate_sr.index))
-        randv[indexes] = 1
+        idx = np.random.choice(non_entries[non_entries > entries[0]], n, replace=True)
+    randv = vector.from_idx(len(rate_sr.index), idx)
     return randv
 
 

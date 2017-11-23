@@ -1,6 +1,17 @@
 import numpy as np
 
 
+def from_idx(n, idx):
+    """
+    n = 6
+    set_idx = 1, 3, 5
+    =   0 1 0 1 0 1
+    """
+    v = np.zeros(n, dtype=int)
+    v[idx] = 1
+    return v
+
+
 def first(v):
     """
         0 1 1 1 1 0

@@ -2,8 +2,6 @@ from timeit import default_timer as timer
 
 import pandas as pd
 
-from vectorbt.optimizer.gridsearch import nummap
-
 
 def from_nummap(nummap_sr, min_score, max_score, reversed=False):
     """Convert each number in KPI series into [min_score, max_score]"""
@@ -22,6 +20,7 @@ def from_nummap(nummap_sr, min_score, max_score, reversed=False):
 
 
 def from_nummaps(nummaps, weights, reversed):
+    from vectorbt.optimizer.gridsearch import nummap
     """Combine multiple weighted KPI series into a single score series"""
     t = timer()
     min_score, max_score = 1, 100

@@ -5,10 +5,6 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 
-##########
-### L4 ###
-##########
-
 def from_nummap(nunmap, symmetric=False):
     """Transform a map into a 2d-matrix (only if params are tuples of 2)"""
     t = timer()

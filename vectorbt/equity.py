@@ -1,8 +1,6 @@
 import numpy as np
 import pandas as pd
 
-from vectorbt import graphics
-
 
 def on_positions(posret_sr):
     """Equity on positions"""
@@ -33,6 +31,7 @@ def from_returns(rate_sr, posret_sr):
 
 
 def plot(rate_sr, equity_df):
+    from vectorbt import graphics
     print("base")
     graphics.plot_line(equity_df['base'], benchmark=rate_sr)
     print("quote")

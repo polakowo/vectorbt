@@ -2,11 +2,9 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from vectorbt.optimizer.gridsearch import mapper
-from vectorbt import graphics
-
 
 def from_seriesmap(seriesmap, reducer):
+    from vectorbt.optimizer.gridsearch import mapper
     """Apply KPI and pack into Series"""
     params, series = zip(*seriesmap)
     reduced = mapper.map(reducer, list(series))
