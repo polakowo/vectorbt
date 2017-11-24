@@ -35,3 +35,16 @@ def combine_rep_params(min_param, max_param, step, dims):
 def random_params(min_param, max_param, dims, N):
     """Generate randomized params"""
     return repeat(np.random.uniform, N, min_param, max_param, dims)
+
+
+def slices(sr, n):
+    """Split series into n chunks and return slices"""
+    return [slice(chunk[0], chunk[-1] + 1) for chunk in np.array_split(range(len(sr.index)), n)]
+
+
+def multiply(groups, params):
+    """ABC * DEF = AD AE AF BD BE BF CD CE CF"""
+    multi_params = zip(*(params * len(groups)))
+    multi_groups = [dp for p in range(len(groups)) for dp in [p] * len(params)]
+    joined = list(zip(multi_groups, *multi_params))
+    return joined
