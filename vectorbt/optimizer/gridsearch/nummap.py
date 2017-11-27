@@ -3,11 +3,12 @@ import pandas as pd
 from matplotlib import pyplot as plt
 
 
-def from_seriesmap(seriesmap, reducer):
-    from vectorbt.optimizer.gridsearch import mapper
+def from_srmap(srmap, reducer, multiprocess=False):
     """Apply KPI and pack into Series"""
-    params, series = zip(*seriesmap)
-    reduced = mapper.map(reducer, list(series))
+    from vectorbt.optimizer.gridsearch import mapper
+
+    params, series = zip(*srmap.items())
+    reduced = mapper.map(reducer, list(series), multiprocess=multiprocess)
     params = list(params)
     nummap_sr = pd.Series(reduced, index=params)
     bounds(nummap_sr)

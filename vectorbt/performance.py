@@ -1,106 +1,75 @@
-import json
-
 import numpy as np
+import pandas as pd
+
+
+def safe_divide(a, b):
+    if b == 0:
+        return np.nan
+    return a / b
 
 
 # Performance
 #############
 
-def trades(eqd_sr):
-    return len(eqd_sr.index)
+# Returns to equity
+_e = lambda r: (r.replace(to_replace=np.nan, value=0) + 1).cumprod()
 
 
-def profit(eqd_sr):
-    return eqd_sr.sum()
+# Total earned/lost
+def _total(e):
+    if len(e.index) == 0:
+        return np.nan
+    elif len(e.index) == 1:
+        return e.iloc[0] - 1
+    else:
+        return e.iloc[-1] / e.iloc[0] - 1
 
 
-def std(eqd_sr):
-    return eqd_sr.std()
+trades = lambda r: (r != 0).sum().item()  # np.int64 to int
+profits = lambda r: (r > 0).sum()
+losses = lambda r: (r < 0).sum()
+winrate = lambda r: safe_divide(profits(r), trades(r))
+lossrate = lambda r: safe_divide(losses(r), trades(r))
 
-
-def average(eqd_sr):
-    return eqd_sr[eqd_sr != 0].mean()
-
-
-def avggain(eqd_sr):
-    return eqd_sr[eqd_sr > 0].mean()
-
-
-def avgloss(eqd_sr):
-    return -eqd_sr[eqd_sr < 0].mean()
-
-
-def winrate(eqd_sr):
-    y = trades(eqd_sr)
-    return np.nan if y == 0 else (eqd_sr > 0).sum() / y
-
-
-def lossrate(eqd_sr):
-    return 1 - winrate(eqd_sr)
-
-
-def expectancy(eqd_sr):
-    y = trades(eqd_sr)
-    return np.nan if y == 0 else profit(eqd_sr) / y
-
-
-def payoff(eqd_sr):
-    y = avgloss(eqd_sr)
-    return np.nan if y == 0 else avggain(eqd_sr) / y
-
-
-def maxdd(eqd_sr):
-    return (eqd_sr.cumsum().expanding().max() - eqd_sr.cumsum()).max()
-
-
-def pf(eqd_sr):
-    y = -eqd_sr[eqd_sr < 0].sum()
-    return np.nan if y == 0 else eqd_sr[eqd_sr > 0].sum() / y
-
-
-def rf(eqd_sr):
-    y = maxdd(eqd_sr)
-    return np.nan if y == 0 else eqd_sr.sum() / y
+profit = lambda r: _total(_e(r))
+avggain = lambda r: r[r > 0].mean()
+avgloss = lambda r: -r[r < 0].mean()
+expectancy = lambda r: safe_divide(profit(r), trades(r))
+maxdd = lambda r: 1 - (_e(r) / _e(r).expanding(min_periods=1).max()).min()
 
 
 # Risk / return
 ###############
 
+def sharpe(r, nperiods=None):
+    res = safe_divide(r.mean(), r.std())
+    if nperiods is not None:
+        res *= (nperiods ** 0.5)
+    return res
 
-def sharpe(eqd_sr):
-    y = eqd_sr.std()
-    return np.nan if y == 0 else eqd_sr.mean() / y
 
-
-def sortino(eqd_sr):
-    y = eqd_sr[eqd_sr < 0].std()
-    return np.nan if y == 0 else eqd_sr.mean() / y
+def sortino(r, nperiods=None):
+    res = safe_divide(r.mean(), r[r < 0].std())
+    if nperiods is not None:
+        res *= (nperiods ** 0.5)
+    return res
 
 
 # Summary
 #########
 
-def summary(eqd_sr):
-    return {
-        'performance': {
-            'profit': eqd_sr.sum(),
-            'averages': {
-                'trade': average(eqd_sr),
-                'gain': avggain(eqd_sr),
-                'loss': avgloss(eqd_sr),
-            },
-            'winrate': winrate(eqd_sr),
-            'payoff': payoff(eqd_sr),
-            'PF': pf(eqd_sr),
-            'RF': rf(eqd_sr),
-        },
-        'risk/return profile': {
-            'sharpe': sharpe(eqd_sr),
-            'sortino': sortino(eqd_sr),
-            'maxdd': maxdd(eqd_sr)
-        }
-    }
+def summary(r):
+    summary_sr = r.describe()
+    summary_sr.index = pd.MultiIndex.from_tuples([('distribution', i) for i in summary_sr.index])
 
+    summary_sr.loc[('performance', 'profit')] = profit(r)
+    summary_sr.loc[('performance', 'avggain')] = avggain(r)
+    summary_sr.loc[('performance', 'avgloss')] = avgloss(r)
+    summary_sr.loc[('performance', 'winrate')] = winrate(r)
+    summary_sr.loc[('performance', 'expectancy')] = expectancy(r)
+    summary_sr.loc[('performance', 'maxdd')] = maxdd(r)
 
-def print_summary(eqd_sr):
-    print(json.dumps(summary(eqd_sr), indent=2))
+    summary_sr.loc[('risk/return profile', 'sharpe')] = sharpe(r)
+    summary_sr.loc[('risk/return profile', 'sortino')] = sortino(r)
+
+    return summary_sr

@@ -20,8 +20,9 @@ def from_nummap(nummap_sr, min_score, max_score, reversed=False):
 
 
 def from_nummaps(nummaps, weights, reversed):
-    from vectorbt.optimizer.gridsearch import nummap
     """Combine multiple weighted KPI series into a single score series"""
+    from vectorbt.optimizer.gridsearch import nummap
+
     t = timer()
     min_score, max_score = 1, 100
     if sum(weights) != 1:

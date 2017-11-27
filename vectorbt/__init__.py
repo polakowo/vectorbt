@@ -6,5 +6,5 @@ from vectorbt import performance
 from vectorbt import positions
 from vectorbt import returns
 from vectorbt import signals
-from vectorbt import vector
+from vectorbt import bitvector
 from vectorbt import optimizer
