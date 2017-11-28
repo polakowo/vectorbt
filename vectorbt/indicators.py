@@ -12,11 +12,11 @@ def momentum(rate_sr, window):
 ################
 
 def SMA(rate_sr, window):
-    return rate_sr.rolling(window=window).mean()
+    return rate_sr.rolling(window=window, min_periods=window).mean()
 
 
 def EMA(rate_sr, span):
-    return rate_sr.ewm(span=span, adjust=False).mean()
+    return rate_sr.ewm(span=span, adjust=False, min_periods=span).mean()
 
 
 # MACD

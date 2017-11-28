@@ -25,6 +25,8 @@ def focused(matrix_df, condition=lambda x: x > 0, **kwargs):
 
 
 def plot(matrix_df, cmap, norm):
+    print(pd.DataFrame(pd.Series(matrix_df.values.flatten()).describe()).transpose())
+
     plt.imshow(matrix_df,
                cmap=cmap,
                norm=norm,

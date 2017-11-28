@@ -14,16 +14,8 @@ def safe_divide(a, b):
 # Returns to equity
 _e = lambda r: (r.replace(to_replace=np.nan, value=0) + 1).cumprod()
 
-
 # Total earned/lost
-def _total(e):
-    if len(e.index) == 0:
-        return np.nan
-    elif len(e.index) == 1:
-        return e.iloc[0] - 1
-    else:
-        return e.iloc[-1] / e.iloc[0] - 1
-
+_total = lambda e: e.iloc[-1] / e.iloc[0] - 1
 
 trades = lambda r: (r != 0).sum().item()  # np.int64 to int
 profits = lambda r: (r > 0).sum()
