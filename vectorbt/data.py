@@ -39,7 +39,9 @@ def load_cryptopair(pair, from_dt, to_dt, period=Period.D1):
     """Load OHLC data on a cryptocurrency pair from Poloniex exchange"""
     polo = Poloniex()
     t = timer()
-    chart_data = polo.returnChartData(pair, period=period.value, start=dt_to_ts(from_dt), end=dt_to_ts(to_dt))
+    if isinstance(period, Period):
+        period = period.value
+    chart_data = polo.returnChartData(pair, period=period, start=dt_to_ts(from_dt), end=dt_to_ts(to_dt))
     print("done. %.2fs" % (timer() - t))
     chart_df = pd.DataFrame(chart_data)
     chart_df.set_index('date', drop=True, inplace=True)

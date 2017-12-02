@@ -4,19 +4,19 @@ import pandas as pd
 # Momentum
 ##########
 
-def momentum(rate_sr, window):
-    return rate_sr.rolling(window=window).apply(lambda g: g[-1] / g[0] - 1)
+def momentum(rate_sr, *args, **kwargs):
+    return rate_sr.rolling(*args, **kwargs).apply(lambda g: g[-1] / g[0] - 1)
 
 
 # Moving average
 ################
 
-def SMA(rate_sr, window):
-    return rate_sr.rolling(window=window, min_periods=window).mean()
+def SMA(rate_sr, *args, **kwargs):
+    return rate_sr.rolling(*args, **kwargs).mean()
 
 
-def EMA(rate_sr, span):
-    return rate_sr.ewm(span=span, adjust=False, min_periods=span).mean()
+def EMA(rate_sr, *args, **kwargs):
+    return rate_sr.ewm(*args, **kwargs).mean()
 
 
 # MACD
