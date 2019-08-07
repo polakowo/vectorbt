@@ -1,6 +1,6 @@
 # vector-bt
 
-From indicators, signals, positions, equity, returns, to performance metrics and grid search: This package shares the same approach as Quantopian and Zipline, but designed especially for fast strategy tuning. The code was made blazingly fast by using full vectorization with NumPy and multiprocessing.
+From indicators, signals, positions, equity, returns, to performance metrics and grid search: This package shares the same idea as Quantopian and Zipline, but designed especially for fast strategy tuning. The code was made blazingly fast by using full vectorization with NumPy and multiprocessing.
 
 The motivation behind this package is simple: *"How to select the optimal windows for a SMA crossover strategy? Which strategy has the lowest risk? Which strategy yields the highest return? Are technical indicators of any use at all?"*
 
