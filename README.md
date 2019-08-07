@@ -1,4 +1,4 @@
-# vector-bt
+# vectorbt
 
 From indicators, signals, positions, equity, returns, to performance metrics and grid search: This package shares the same idea as behind the [Quantopian](https://www.quantopian.com) and [Zipline](https://www.zipline.io), but designed especially for fast strategy tuning. The code was made blazingly fast by using full vectorization with NumPy and multiprocessing.
 
