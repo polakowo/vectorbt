@@ -1,6 +1,6 @@
 # vector-bt
 
-#### Superfast vectorized library for backtesting and trade optimization
+#### Vectorized library for backtesting and trade optimization
 
 From indicators, signals, positions, equity, returns, to performance metrics and grid search: This package shares the same approach as Quantopian and Zipline, but designed especially for fast strategy tuning. The code was made blazingly fast by using full vectorization with NumPy and multiprocessing.
 
