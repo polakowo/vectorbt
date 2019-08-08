@@ -8,15 +8,15 @@ The motivation behind this package is simple: *"How to select the optimal window
 
 Resulted in some cool animations such as how optimal hyperparameters change over time.
 
-### Installation
+#### Installation
 ```
 pip install git+https://github.com/polakowo/vector-bt.git
 ```
 
-### Tutorial
+#### Tutorial
 Tutorial is provided through [Jupyter nbviewer](http://nbviewer.jupyter.org/github/polakowo/vector-bt/blob/master/example.ipynb)
 
-### Bitcoin Example
+#### Bitcoin example
 Exhaustive grid search over Bitcoin price. 
 
 Parameters: 1 year of 2h-period OHLC data, dual SMA crossover strategy with filter of 0.05 * STD and transaction fees of 0.0015 (Poloniex exchange). Heatmap below visualizes grid of SMA windows and the respective rates.
