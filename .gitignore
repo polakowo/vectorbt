@@ -37,3 +37,4 @@ __pycache__/
 *~
 .tox
 .cache
+__pycache__
