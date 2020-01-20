@@ -1,226 +1,147 @@
 import numpy as np
 import pandas as pd
+import random
+
+from vectorbt.array import ffill
+
+##############
+# Main class #
+##############
 
 
-def above(rate_sr, benchmark_sr):
-    """Rate above benchmark"""
-    return np.where(rate_sr > benchmark_sr, 1, 0)
+class Signals(pd.Series):
+    @property
+    def _constructor(self):
+        return Signals
+
+    @classmethod
+    def from_idx(cls, n, idx):
+        """Create signals of size n where idx are indices of occurrences (True)."""
+        sr = pd.Series(False, index=range(n), dtype=bool)
+        sr.iloc[idx] = True
+        return Signals(sr)
+
+    @property
+    def ints(self):
+        """Transform bools into integers."""
+        return self.astype(int)
+
+    def rshift(self, n):
+        """Shift the series to the right."""
+        return self.shift(periods=n).fillna(False)
+
+    def lshift(self, n):
+        """Shift the series to the left."""
+        return self.shift(periods=-n).fillna(False)
+
+    def first(self):
+        """Set True at the first occurrence in each series of consecutive occurrences."""
+        return self & ~self.rshift(1)
+
+    def last(self):
+        """Set True at the last occurrence in each series of consecutive occurrences."""
+        return self & ~self.lshift(1)
+
+    def reverse(self):
+        """Reverse the series."""
+        sig = self.copy()[::-1]
+        sig.index = self.index
+        return sig
+
+    def rank(self):
+        """Assign position to each occurrence in each series of consecutive occurrences."""
+        idx = np.flatnonzero(self.first().ints)
+        z = np.zeros(len(self.ints))
+        cum = np.cumsum(self.ints.to_numpy())
+        z[idx] = cum[idx]
+        z = cum - ffill(z) + 1
+        z[~self.to_numpy()] = np.nan
+        return pd.Series(z, index=self.index)
+
+    def first_nst(self, n):
+        """Set True at the occurrence that is n data points after the first occurrence."""
+        return Signals(self.rank() == n, dtype=bool)
+
+    def from_first_nst(self, n):
+        """Set True at each occurrence after the nst occurrence."""
+        return Signals(self.rank() >= n, dtype=bool)
 
 
-def below(rate_sr, benchmark_sr):
-    return np.where(rate_sr < benchmark_sr, 1, 0)
+############################
+# Ways to generate signals #
+############################
 
 
-def raising(rate_sr, n):
-    """nst raise in a row"""
-    from vectorbt import bitvector
-
-    raised = (rate_sr.diff() > 0).astype(int).reindex(rate_sr.index).fillna(0)
-    return bitvector.from_nst(raised, n)
+def compare(sr1, sr2, compare_func=lambda x, y: x > y):
+    """Compare both array using compare_func."""
+    return Signals(compare_func(sr1, sr2), dtype=bool)
 
 
-def dropping(rate_sr, n):
-    return raising(-rate_sr, n)
+def nst_change_in_row(sr, n, change_func=lambda x: x.diff(), compare_func=lambda x: x > 0):
+    """Set True at each consecutive change according to compare_func."""
+    return Signals(compare_func(change_func(sr)).reindex(sr.index).fillna(False)).from_first_nst(n)
 
 
-def is_max(rate_sr, window):
-    """Rate is equal to window's max"""
-    return (rate_sr == rate_sr.rolling(window=window).max()).astype(int).values
+def rolling_window(sr, window, window_func=lambda x: np.mean(x), compare_func=lambda x, y: x > y, **kwargs):
+    """Compare each element in the series to the rolling window aggregation."""
+    return Signals(compare_func(sr, sr.rolling(window, **kwargs).apply(window_func, raw=False)))
 
 
-def is_min(rate_sr, window):
-    return (rate_sr == rate_sr.rolling(window=window).min()).astype(int).values
-
-
-def depending(rate_sr, on_vector, signal_func, wait=0):
-    """For each source signal generate a target signal (e.g., stop loss)"""
-    from vectorbt import bitvector
-
-    idx = []
-    vector_idx = np.flatnonzero(on_vector)
+def generate_exits(sr, entry_sr, exit_func):
+    """Generate exit signals based on entry signals.
+    
+    For each range between two entries in entry_sr, search for an exit signal."""
+    assert(len(sr.index) == len(entry_sr.index))
+    exit_idx = []
+    entry_idx = np.flatnonzero(entry_sr)
     # Every two adjacent signals in the vector become a bin
-    bins = list(zip(vector_idx, np.append(vector_idx[1:], None)))
+    bins = list(zip(entry_idx, np.append(entry_idx[1:], None)))
     for x, z in bins:
-        x += wait
-        # Apply signal function on the bin space only
-        y = signal_func(rate_sr.iloc[x:z])
-        if y is not None:
-            idx.append(x + y)
-    return bitvector.from_idx(len(rate_sr.index), idx)
+        if x < len(entry_sr.index) - 1:
+            # If entry is the last element, ignore
+            x = x + 1
+            # Apply exit function on the bin space only (between two entries)
+            y = exit_func(sr.iloc[x:z])
+            exit_idx.append(x + y)
+    exits = pd.Series(False, index=sr.index)
+    # Take note that x, y, and z are all relative indices
+    exits.iloc[exit_idx] = True
+    return Signals(exits)
 
 
-def cross_depending(rate_sr, entry_func, exit_func, wait=0):
-    """Generate signals one after another iteratively"""
-    from vectorbt import bitvector
-
-    idx = [entry_func(rate_sr)]
+def generate_entries_and_exits(sr, entry_func, exit_func):
+    """Generate entry and exit signals one after another."""
+    idx = [entry_func(sr)] # entry comes first
     while True:
-        i = idx[-1] + wait
-        if len(idx) % 2 == 0:  # exit or entry?
-            j = entry_func(rate_sr.iloc[i:])
-        else:
-            j = exit_func(rate_sr.iloc[i:])
-        if j is not None:
-            idx.append(i + j)
+        x = idx[-1]
+        if x < len(sr.index) - 1:
+            x = x + 1
         else:
             break
-    entries = bitvector.from_idx(len(rate_sr.index), idx[0::2])
-    exits = bitvector.from_idx(len(rate_sr.index), idx[1::2])
+        if len(idx) % 2 == 0:  # exit or entry?
+            y = entry_func(sr.iloc[x:])
+        else:
+            y = exit_func(sr.iloc[x:])
+        if y is None:
+            break
+        idx.append(x + y)
+    entries = pd.Series(False, index=sr.index)
+    entries.iloc[idx[0::2]] = True
+    exits = pd.Series(False, index=sr.index)
+    exits.iloc[idx[1::2]] = True
     return entries, exits
 
 
-def random(rate_sr, n, excl_vector=None):
-    """Random vector"""
-    from vectorbt import bitvector
-    import random
-
-    if excl_vector is None:
-        # Pick signals not in excl_vector
-        idx = random.sample(range(len(rate_sr.index)), n)
-    else:
-        entries = np.flatnonzero(excl_vector)
-        non_entries = np.flatnonzero(excl_vector == 0)
-        idx = np.random.choice(non_entries[non_entries > entries[0]], n, replace=True)
-    randv = bitvector.from_idx(len(rate_sr.index), idx)
-    return randv
-
-
-###############################
-# Trend confirmation patterns #
-###############################
-
-
-# Dual MA Crossover
-###################
-
-def DMAC_entries(fast_ma_sr, slow_ma_sr):
-    """Entry once fast MA over slow MA (or band)"""
-    return above(fast_ma_sr, slow_ma_sr)
-
-
-def DMAC_exits(fast_ma_sr, slow_ma_sr):
-    return below(fast_ma_sr, slow_ma_sr)
-
-
-# MA Convergence/Divergence
-###########################
-
-def MACD_entries(macd_sr, signal_sr):
-    """Entry once MACD higher than signal line"""
-    return above(macd_sr, signal_sr)
-
-
-def MACD_exits(macd_sr, signal_sr):
-    return below(macd_sr, signal_sr)
-
-
-def MACD_histdrop_entries(hist_sr, ndrops):
-    """Entry market once there is N negative but raising bars in a row"""
-    return raising(hist_sr[hist_sr < 0], ndrops)
-
-
-def MACD_histdrop_exits(hist_sr, ndrops):
-    return dropping(hist_sr[hist_sr > 0], ndrops)
-
-
-# Period min/max
-################
-
-def max_signals(rate_sr, window):
-    """Entry market once its period's max"""
-    return is_max(rate_sr, window)
-
-
-def min_signals(rate_sr, window):
-    return is_max(rate_sr, window)
-
-
-###########################
-# Trend reversal patterns #
-###########################
-
-# Bollinger Bands
-#################
-
-def BB_entries(rate_sr, lower_band_sr):
-    """Entry market once oversold"""
-    return below(rate_sr, lower_band_sr)
-
-
-def BB_exits(rate_sr, upper_band_sr):
-    return above(rate_sr, upper_band_sr)
-
-
-# RSI
-#####
-
-def RSI_entries(rsi_sr, lower_bound):
-    """Entry market once oversold"""
-    return below(rsi_sr, lower_bound)
-
-
-def RSI_exits(rsi_sr, upper_bound):
-    return above(rsi_sr, upper_bound)
-
-
-# Bullish/Bearish Engulfing Pattern
-###################################
-
-def BEP_entries(open_sr, high_sr, low_sr, close_sr, full=False, amount=1):
-    """Entry once hollow body completely engulfs the previous filled body/candlestick"""
-    hollow = close_sr.values[1:] > open_sr.values[1:]
-    if full:
-        last_candle = high_sr.values[:-1] - low_sr.values[:-1]
-    else:
-        last_candle = open_sr.values[:-1] - close_sr.values[:-1]
-    candle = close_sr.values[1:] - open_sr.values[1:]
-    engulfing = candle > amount * last_candle
-    entries = np.insert((hollow & engulfing).astype(int), 0, 0)
-    # Close is unknown (future) data -> shift vector
-    entries = np.insert(entries[1:], 0, 0)
+def generate_random_entries(sr, n, seed=None):
+    """Generate entries randomly."""
+    # Entries cannot be one after another
+    idx = sr[::2].sample(n, random_state=seed).index
+    entries = pd.Series(False, index=sr.index)
+    entries.loc[idx] = True
     return entries
 
 
-def BEP_exits(open_sr, high_sr, low_sr, close_sr, full=False, amount=1):
-    return BEP_entries(close_sr, high_sr, low_sr, open_sr, full=full, amount=amount)
-
-
-###################
-# Risk limitation #
-###################
-
-# Stop loss
-###########
-
-def stoploss_exit(rate_sr, stop):
-    """Index of the first rate below the stop"""
-    if isinstance(stop, pd.Series):
-        stop = stop.loc[rate_sr.index[0]]
-    stops = np.flatnonzero(below(rate_sr, stop))
-    return stops[0] if len(stops) > 0 else None
-
-
-def stoploss_exits(rate_sr, entries, stop):
-    """Apply stop loss on each entry signal"""
-    return depending(rate_sr, entries, lambda sr: stoploss_exit(sr, stop))
-
-
-# Trailing stop
-###############
-
-def trailstop_exit(rate_sr, trail):
-    rollmax_sr = rate_sr.rolling(window=len(rate_sr.index), min_periods=1).max()
-    # Trail is either absolute number or series of absolute numbers
-    # To set trail in %, multiply % with rate_sr beforehand to get absolute numbers
-    if isinstance(trail, pd.Series):
-        changing_sr = rollmax_sr.iloc[rollmax_sr.pct_change().nonzero()]
-        stop_sr = (changing_sr - trail).reindex(rate_sr.index).ffill()
-    else:
-        stop_sr = rollmax_sr - trail
-    sellstops = np.flatnonzero(below(rate_sr, stop_sr))
-    sellstop = sellstops[0] if len(sellstops) > 0 else None
-    return sellstop
-
-
-def trailstop_exits(rate_sr, entries, trail):
-    return depending(rate_sr, entries, lambda sr: trailstop_exit(sr, trail))
+def generate_random_exits(sr, entry_sr, seed=None):
+    """Generate exits between entries randomly."""
+    random.seed(seed)
+    return generate_exits(sr, entry_sr, lambda x: random.choice(range(len(x.index))))
