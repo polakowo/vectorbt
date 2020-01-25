@@ -1,52 +1,72 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 from matplotlib import pyplot as plt
 
+from vectorbt.utils.array import *
+from vectorbt.utils.plot import *
+from vectorbt.timeseries import TimeSeries
+from vectorbt.signals import Signals
 
-def from_signals(rate_sr, entries, exits):
-    """Generate positions from entry and exit bit-vectors"""
-    # Merge
-    merged = entries - exits - entries * exits
-    nz_idx = np.flatnonzero(merged)
-    if len(nz_idx) == 0:
-        return pd.Series(0, index=rate_sr.index)
-    mask_first = merged[nz_idx] != np.insert(merged[nz_idx[:-1]], 0, 0)
-    nz_idx = nz_idx[mask_first]
-    # Always buy first
-    if merged[nz_idx[0]] == -1:
-        nz_idx = nz_idx[1:]
-    return pd.Series(merged[nz_idx], index=rate_sr.index[nz_idx])
+class Positions(np.ndarray):
+    def __new__(cls, input_array, index=None):
+        # Input array is an already formed ndarray instance
+        # We first cast to be our class type
+        obj = np.asarray(input_array).view(cls)
+        if obj.dtype != np.integer:
+            raise TypeError("Data type is not integer")
+        if not ((obj >= -1) & (obj <= 1)).all():
+            raise TypeError("Values are outside of {-1, 0, 1}")
+        # add the new attribute to the created instance
+        if index is not None:
+            if obj.shape[0] != len(index):
+                raise TypeError("Index has different shape")
+            obj.index = index
+        elif isinstance(input_array, pd.Series):
+            obj.index = input_array.index.to_numpy()
+        else:
+            raise ValueError("Index is not set")
+        # Finally, we must return the newly created object:
+        return obj
 
+    def __array_finalize__(self, obj):
+        # see InfoArray.__array_finalize__ for comments
+        if obj is None: return
+        self.index = getattr(obj, 'index', None)
 
-def random(rate_sr, n):
-    """Generate random positions"""
-    import random
+    @classmethod
+    def from_signals(cls, entries, exits):
+        """Generate positions from entry and exit signals."""
+        if not isinstance(entries, Signals): 
+            raise TypeError("Argument entries is not Signals")
+        if not isinstance(exits, Signals): 
+            raise TypeError("Argument exits is not Signals")
+        # Safety check whether index of entries and exits is the same
+        if not np.array_equal(entries.index, exits.index):
+            raise ValueError("Arguments entries and exits do not share the same index")
 
-    if n == 0:
-        return pd.Series()
-    idx = sorted(random.sample(range(len(rate_sr.index)), n))
-    positions = pd.Series(index=rate_sr.index[idx])
-    positions.iloc[0::2] = 1
-    if n > 1:
-        positions.iloc[1::2] = -1
-    return positions
+        temp = np.zeros(entries.shape, dtype=int)
+        temp[entries] = 1
+        temp[exits] = -1
+        temp[entries & exits] = 0
+        # remove all exit signals before first entry signals
+        temp[:np.argwhere(entries)[0][0]] = 0
+        # take first signal from each consecutive series of signals of same type
+        temp = ffill(temp)
+        positions = Positions(np.zeros_like(temp), index=entries.index)
+        positions[Signals(temp == 1, index=entries.index).first()] = 1
+        positions[Signals(temp == -1, index=entries.index).first()] = -1
+        return positions
 
+    def non_empty(self):
+        """Return nonzero values as pd.Series."""
+        non_empty_idxs = np.argwhere(self).transpose()[0]
+        return pd.Series(self[non_empty_idxs], index=self.index[non_empty_idxs])
 
-def plot(rate_sr, pos_sr):
-    bought = rate_sr.loc[pos_sr.index[0::2]]
-    sold = rate_sr.loc[pos_sr.index[1::2]]
-    if pos_sr.iloc[-1] == 1:
-        sold.loc[rate_sr.index[-1]] = rate_sr.iloc[-1]
-    stats = pd.Series((sold.values - bought.values)).describe()
-    print(pd.DataFrame(stats).transpose())
-    fig, ax = plt.subplots()
+    def describe(self):
+        """Describe using pd.Series."""
+        return pd.Series(self).value_counts()
 
-    ax.plot(rate_sr, c='darkgrey')
-
-    # Draw position markers
-    ax.plot(bought.index, bought, '^', color='lime',
-            markeredgecolor='darkgreen', markersize=8, markeredgewidth=1)
-    ax.plot(sold.index, sold, 'v', color='orangered',
-            markeredgecolor='darkred', markersize=8, markeredgewidth=1)
-    plt.show()
+    def plot(self, ts, label='TimeSeries'):
+        """Plot positions over the ts."""
+        ts.plot(label=label, positions=self)
 

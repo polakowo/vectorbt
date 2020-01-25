@@ -1,38 +1,128 @@
 import numpy as np
 import pandas as pd
-import random
+from matplotlib import pyplot as plt
 
-from vectorbt.array import ffill
+from vectorbt.utils.array import *
+from vectorbt.utils.plot import *
+from vectorbt.timeseries import TimeSeries
 
-##############
-# Main class #
-##############
+class Signals(np.ndarray):
 
+    def __new__(cls, input_array, index=None):
+        # Input array is an already formed ndarray instance
+        # We first cast to be our class type
+        obj = np.asarray(input_array).view(cls)
+        if obj.dtype != np.bool:
+            raise TypeError("dtype is not bool")
+        # add the new attribute to the created instance
+        if index is not None:
+            if obj.shape[0] != len(index):
+                raise TypeError("Index has different shape")
+            obj.index = index
+        elif isinstance(input_array, pd.Series):
+            obj.index = input_array.index.to_numpy()
+        else:
+            raise ValueError("Index is not set")
+        # Finally, we must return the newly created object:
+        return obj
 
-class Signals(pd.Series):
-    @property
-    def _constructor(self):
-        return Signals
+    def __array_finalize__(self, obj):
+        # see InfoArray.__array_finalize__ for comments
+        if obj is None: return
+        self.index = getattr(obj, 'index', None)
 
     @classmethod
-    def from_idx(cls, n, idx):
-        """Create signals of size n where idx are indices of occurrences (True)."""
-        sr = pd.Series(False, index=range(n), dtype=bool)
-        sr.iloc[idx] = True
-        return Signals(sr)
+    def empty(cls, shape, index=None):
+        """Create an empty array and fill with False."""
+        return Signals(np.full(shape, False), index=index)
 
-    @property
-    def ints(self):
-        """Transform bools into integers."""
-        return self.astype(int)
+    @classmethod
+    def generate_exits(cls, ts, entries, exit_func):
+        """Generate exit signals based on entry signals.
+
+        For each range between two entries in entries, search for an exit signal."""
+        if not isinstance(ts, TimeSeries): 
+            raise TypeError("Argument ts is not TimeSeries")
+        if not isinstance(entries, Signals): 
+            raise TypeError("Argument entries is not Signals")
+        
+        # TODO: Vectorize
+        exit_idxs = []
+        entry_idxs = np.flatnonzero(entries)
+        # Every two adjacent signals in the vector become a bin
+        bins = list(zip(entry_idxs, np.append(entry_idxs[1:], None)))
+        for prev_idx, next_idx in bins:
+            # If entry is the last element, ignore
+            if prev_idx < ts.shape[0] - 1:
+                # Apply exit function on the bin space only (between two entries)
+                exit_idx = exit_func(ts, prev_idx=prev_idx, next_idx=next_idx)
+                if exit_idx is not None:
+                    exit_idxs.append(exit_idx)
+        exits = Signals.empty(ts.shape, index=ts.index)
+        # Take note that x, y, and z are all relative indices
+        exits[exit_idxs] = True
+        return exits
+
+    @classmethod
+    def generate_entries_and_exits(cls, ts, entry_func, exit_func):
+        """Generate entry and exit signals one after another."""
+        if not isinstance(ts, TimeSeries): 
+            raise TypeError("Argument ts is not TimeSeries")
+
+        # TODO: Vectorize
+        idxs = [entry_func(ts)]  # entry comes first
+        while True:
+            prev_idx = idxs[-1]
+            if prev_idx < ts.shape[0] - 1:
+                if len(idxs) % 2 == 0:  # exit or entry?
+                    idx = entry_func(ts, prev_idx=prev_idx)
+                else:
+                    idx = exit_func(ts, prev_idx=prev_idx)
+                if idx is None:
+                    break
+                idxs.append(idx)
+            else:
+                break
+        entries = Signals.empty(ts.shape, index=ts.index)
+        entries[idxs[0::2]] = True
+        exits = Signals.empty(ts.shape, index=ts.index)
+        exits[idxs[1::2]] = True
+        return entries, exits
+
+    @classmethod
+    def generate_random_entries(cls, ts, n, seed=None):
+        """Generate entries randomly."""
+        if not isinstance(ts, TimeSeries): 
+            raise TypeError("Argument ts is not TimeSeries")
+
+        if seed is not None:
+            np.random.seed(seed)
+        # Entries cannot be one after another
+        idxs = np.random.choice(np.arange(ts.shape[0])[::2], size=n, replace=False)
+        entries = Signals.empty(ts.shape, index=ts.index)
+        entries[idxs] = True
+        return entries
+
+    @classmethod
+    def generate_random_exits(cls, ts, entries, seed=None):
+        """Generate exits between entries randomly."""
+        if not isinstance(ts, TimeSeries): 
+            raise TypeError("Argument ts is not TimeSeries")
+        if not isinstance(entries, Signals): 
+            raise TypeError("Argument entries is not Signals")
+
+        def random_exit_func(ts, prev_idx=None, next_idx=None):
+            return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:next_idx])
+
+        return Signals.generate_exits(ts, entries, random_exit_func)
 
     def rshift(self, n):
-        """Shift the series to the right."""
-        return self.shift(periods=n).fillna(False)
+        """Shift the elements to the right."""
+        return rshift(self, n)
 
     def lshift(self, n):
-        """Shift the series to the left."""
-        return self.shift(periods=-n).fillna(False)
+        """Shift the elements to the left."""
+        return lshift(self, n)
 
     def first(self):
         """Set True at the first occurrence in each series of consecutive occurrences."""
@@ -42,106 +132,36 @@ class Signals(pd.Series):
         """Set True at the last occurrence in each series of consecutive occurrences."""
         return self & ~self.lshift(1)
 
-    def reverse(self):
-        """Reverse the series."""
-        sig = self.copy()[::-1]
-        sig.index = self.index
-        return sig
-
     def rank(self):
         """Assign position to each occurrence in each series of consecutive occurrences."""
-        idx = np.flatnonzero(self.first().ints)
-        z = np.zeros(len(self.ints))
-        cum = np.cumsum(self.ints.to_numpy())
-        z[idx] = cum[idx]
-        z = cum - ffill(z) + 1
-        z[~self.to_numpy()] = np.nan
-        return pd.Series(z, index=self.index)
+        idxs = np.flatnonzero(self.first().astype(int))
+        ranks = np.zeros(self.shape[0])
+        cum = np.array(np.cumsum(self.astype(int)))
+        ranks[idxs] = cum[idxs]
+        ranks = cum - ffill(ranks) + 1
+        ranks[~self] = 0
+        return ranks # produces np.ndarray, not Signals!
 
     def first_nst(self, n):
         """Set True at the occurrence that is n data points after the first occurrence."""
-        return Signals(self.rank() == n, dtype=bool)
+        return Signals(self.rank() == n, index=self.index)
 
     def from_first_nst(self, n):
-        """Set True at each occurrence after the nst occurrence."""
-        return Signals(self.rank() >= n, dtype=bool)
+        """Set True at the occurrence that at least n data points after the first occurrence."""
+        return Signals(self.rank() >= n, index=self.index)
 
+    def non_empty(self):
+        """Return True values as pd.Series."""
+        non_empty_idxs = np.argwhere(self).transpose()[0]
+        return pd.Series(self[non_empty_idxs], index=self.index[non_empty_idxs])
 
-############################
-# Ways to generate signals #
-############################
+    def describe(self):
+        """Describe using pd.Series."""
+        return pd.Series(self).value_counts()
 
-
-def compare(sr1, sr2, compare_func=lambda x, y: x > y):
-    """Compare both array using compare_func."""
-    return Signals(compare_func(sr1, sr2), dtype=bool)
-
-
-def nst_change_in_row(sr, n, change_func=lambda x: x.diff(), compare_func=lambda x: x > 0):
-    """Set True at each consecutive change according to compare_func."""
-    return Signals(compare_func(change_func(sr)).reindex(sr.index).fillna(False)).from_first_nst(n)
-
-
-def rolling_window(sr, window, window_func=lambda x: np.mean(x), compare_func=lambda x, y: x > y, **kwargs):
-    """Compare each element in the series to the rolling window aggregation."""
-    return Signals(compare_func(sr, sr.rolling(window, **kwargs).apply(window_func, raw=False)))
-
-
-def generate_exits(sr, entry_sr, exit_func):
-    """Generate exit signals based on entry signals.
-    
-    For each range between two entries in entry_sr, search for an exit signal."""
-    assert(len(sr.index) == len(entry_sr.index))
-    exit_idx = []
-    entry_idx = np.flatnonzero(entry_sr)
-    # Every two adjacent signals in the vector become a bin
-    bins = list(zip(entry_idx, np.append(entry_idx[1:], None)))
-    for x, z in bins:
-        if x < len(entry_sr.index) - 1:
-            # If entry is the last element, ignore
-            x = x + 1
-            # Apply exit function on the bin space only (between two entries)
-            y = exit_func(sr.iloc[x:z])
-            exit_idx.append(x + y)
-    exits = pd.Series(False, index=sr.index)
-    # Take note that x, y, and z are all relative indices
-    exits.iloc[exit_idx] = True
-    return Signals(exits)
-
-
-def generate_entries_and_exits(sr, entry_func, exit_func):
-    """Generate entry and exit signals one after another."""
-    idx = [entry_func(sr)] # entry comes first
-    while True:
-        x = idx[-1]
-        if x < len(sr.index) - 1:
-            x = x + 1
-        else:
-            break
-        if len(idx) % 2 == 0:  # exit or entry?
-            y = entry_func(sr.iloc[x:])
-        else:
-            y = exit_func(sr.iloc[x:])
-        if y is None:
-            break
-        idx.append(x + y)
-    entries = pd.Series(False, index=sr.index)
-    entries.iloc[idx[0::2]] = True
-    exits = pd.Series(False, index=sr.index)
-    exits.iloc[idx[1::2]] = True
-    return entries, exits
-
-
-def generate_random_entries(sr, n, seed=None):
-    """Generate entries randomly."""
-    # Entries cannot be one after another
-    idx = sr[::2].sample(n, random_state=seed).index
-    entries = pd.Series(False, index=sr.index)
-    entries.loc[idx] = True
-    return entries
-
-
-def generate_random_exits(sr, entry_sr, seed=None):
-    """Generate exits between entries randomly."""
-    random.seed(seed)
-    return generate_exits(sr, entry_sr, lambda x: random.choice(range(len(x.index))))
+    def plot(self):
+        """Plot signals as a line."""
+        fig, ax = plt.subplots()
+        plot_line(ax, self, "Signals")
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.show()

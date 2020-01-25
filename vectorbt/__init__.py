@@ -1,10 +1,2 @@
-from vectorbt import data
-from vectorbt import equity
-from vectorbt import graphics
-from vectorbt import indicators
-from vectorbt import performance
-from vectorbt import positions
-from vectorbt import returns
-from vectorbt import signals
-from vectorbt import bitvector
-from vectorbt import optimizer
+from vectorbt import utils
+from vectorbt import signals, strategy, positions, portfolio
