@@ -35,14 +35,6 @@ def generate_exits(ts, entries, exit_func):
         exits[np.asarray(exit_idxs), i] = True
     return exits
 
-@njit # 38.4 µs vs 214 µs
-def random_exit_func(ts, prev_idx, next_idx):
-    if next_idx is None:
-        return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:])
-    if next_idx - prev_idx > 1:
-        return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:next_idx])
-    return None
-
 @njit # 41.8 µs vs 83.9 µs
 def generate_entries_and_exits(ts, entry_func, exit_func):
     # NOTE: Cannot be vectorized since both signals depend on each other.
@@ -112,14 +104,6 @@ class Signals(Array):
         return cls.generate_random(ts.shape, *args, index=ts.index, columns=ts.columns, **kwargs)
 
     @classmethod
-    def generate_random_exits(cls, entries, seed=None):
-        """Generate an exit signal after every entry signal randomly."""
-        if not isinstance(entries, Signals):
-            raise TypeError("Argument entries must be Signals")
-
-        return Signals.generate_exits(entries, entries, random_exit_func)
-
-    @classmethod
     def generate_exits(cls, ts, entries, exit_func):
         """Generate an exit signal after every entry signal using exit_func."""
         if not isinstance(ts, TimeSeries) and not isinstance(ts, Signals): # pass entries as ts if you don't need ts
@@ -136,6 +120,36 @@ class Signals(Array):
         exits = generate_exits(ts, entries, exit_func)
         # Collapse dims if two 1d arrays provided
         if ts_ndim == 1 and entries_ndim == 1:
+            exits = exits[:, 0]
+        return cls(exits, index=entries.index, columns=entries.columns)
+
+    @classmethod
+    def generate_random_exits(cls, entries, seed=None):
+        """Generate an exit signal after every entry signal randomly."""
+        if not isinstance(entries, Signals):
+            raise TypeError("Argument entries must be Signals")
+
+        if seed is not None:
+            np.random.seed(seed)
+        entries_ndim = entries.ndim
+        if entries_ndim == 1:
+            entries = entries[:, None]
+
+        # For each column, we need to randomly pick an index between two entry signals
+        cumsum = entries.flatten(order='F').cumsum().reshape(entries.shape, order='F')
+        cumsum[entries.cumsum(axis=0) == 0] = 0
+        flattened = cumsum.flatten(order='F')
+
+        unique, counts = np.unique(flattened, return_counts=True)
+        rel_rand_idxs = np.floor(np.random.uniform(size=len(unique)) * (counts - 1)) + 1
+        rel_rand_idxs = rel_rand_idxs[1:]
+        entry_idxs = np.argwhere(entries.flatten(order='F') == 1).transpose()[0]
+        rand_idxs = rel_rand_idxs + entry_idxs
+
+        exits = np.full(len(flattened), False)
+        exits[rand_idxs.astype(int)] = True
+        exits = exits.reshape(entries.shape, order='F')
+        if entries_ndim == 1:
             exits = exits[:, 0]
         return cls(exits, index=entries.index, columns=entries.columns)
 
@@ -198,12 +212,6 @@ class Signals(Array):
     def from_first_nst(self, n):
         """Set True at the occurrence that at least n data points after the first occurrence."""
         return Signals(self.rank() >= n, index=self.index, columns=self.columns)
-
-    @requires_1dim
-    def non_empty(self):
-        """Return True's using pandas."""
-        non_empty_idxs = np.argwhere(self).transpose()[0]
-        return pd.Series(self[non_empty_idxs], index=self.index[non_empty_idxs])
 
     @requires_1dim
     def plot(self, label='Signals', ax=None):
