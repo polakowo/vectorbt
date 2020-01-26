@@ -38,3 +38,4 @@ __pycache__/
 .tox
 .cache
 __pycache__
+.vscode
