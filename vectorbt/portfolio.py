@@ -2,7 +2,6 @@ import numpy as np
 import pandas as pd
 
 from vectorbt.utils.array import *
-from vectorbt.utils.plot import *
 from vectorbt.timeseries import TimeSeries
 from vectorbt.positions import Positions
 

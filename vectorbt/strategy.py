@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 
 from vectorbt.utils.array import *
-from vectorbt.utils.plot import *
 from vectorbt.signals import Signals
 from vectorbt.timeseries import TimeSeries
 

@@ -1,1 +1,1 @@
-from vectorbt.utils import array, plot
+from vectorbt.utils import array, decorators

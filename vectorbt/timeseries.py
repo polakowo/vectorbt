@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
 
 from vectorbt.utils.array import Array
 from vectorbt.utils.decorators import requires_1dim
@@ -34,7 +36,7 @@ class TimeSeries(Array):
             ax.fill_between(ts.index, ts, benchmark, where=ts>benchmark, facecolor='#add8e6', interpolate=True)
             ax.fill_between(ts.index, ts, benchmark, where=ts<benchmark, facecolor='#ffcccb', interpolate=True)
         if positions is not None:
-            ax = positions.plot(ax=ax)
+            ax = positions.plot(self, ax=ax)
         if no_ax:
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         return ax

@@ -145,12 +145,12 @@ class Array(np.ndarray):
         """Create and fill an empty array."""
         return cls(np.full(shape, fill), index=index, columns=columns)
 
-    def align_columns(self, other):
+    def align_columns(self, other, expand_dims=False):
         """If the array has less columns, replicate them horizontally."""
         if not np.array_equal(self.index, other.index):
             raise ValueError("Arguments self and other must share the same index")
 
-        if self.ndim == 1 and other.ndim == 1:
+        if not expand_dims and self.ndim == 1 and other.ndim == 1:
             return self
         index = self.index
         columns = self.columns
@@ -176,7 +176,7 @@ class Array(np.ndarray):
         if self.ndim == 1:
             raise ValueError("1D arrays do not have columns")
         if column_name not in self.columns:
-            raise ValueError(f"Column {column_name} not found")
+            raise ValueError(f"Column '{column_name}' not found")
         column_idx = np.argwhere(self.columns == column_name)[0][0]
         return self.__class__(self[:, column_idx], index=self.index)
 

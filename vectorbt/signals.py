@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from pandas.plotting import register_matplotlib_converters
+register_matplotlib_converters()
 from numba import njit
 
 from vectorbt.utils.array import Array, fshift, bshift, ffill, shuffle_along_axis
@@ -28,7 +30,7 @@ def generate_exits(ts, entries, exit_func):
                 # Apply exit function on the bin space only (between two entries)
                 exit_idx = exit_func(ts[:, i], prev_idx, next_idx)
                 if exit_idx is not None:
-                    exit_idxs.append(exit_idx)
+                    exit_idxs.append(int(exit_idx))
         # Take note that x, y, and z are all relative indices
         exits[np.asarray(exit_idxs), i] = True
     return exits
@@ -37,7 +39,9 @@ def generate_exits(ts, entries, exit_func):
 def random_exit_func(ts, prev_idx, next_idx):
     if next_idx is None:
         return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:])
-    return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:next_idx])
+    if next_idx - prev_idx > 1:
+        return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:next_idx])
+    return None
 
 @njit # 41.8 µs vs 83.9 µs
 def generate_entries_and_exits(ts, entry_func, exit_func):
@@ -81,7 +85,7 @@ class Signals(Array):
         return super().empty(shape, False, index=index, columns=columns)
 
     @classmethod
-    def generate_random_entries(cls, shape, n, seed=None, index=None, columns=None):
+    def generate_random(cls, shape, n, index=None, columns=None, seed=None):
         """Generate entry signals randomly."""
         if seed is not None:
             np.random.seed(seed)
@@ -92,8 +96,8 @@ class Signals(Array):
             new_shape = (shape[0], 1)
         else:
             new_shape = shape
-        # Entries cannot be one after another, hence ::2
-        idxs = np.tile(np.arange(new_shape[0])[:, None], (1, new_shape[1]))[::2, :]
+
+        idxs = np.tile(np.arange(new_shape[0])[:, None], (1, new_shape[1]))
         idxs = shuffle_along_axis(idxs)[:n]
         entries = np.full(new_shape, False)
         entries[idxs, np.arange(new_shape[1])[None, :]] = True
@@ -101,6 +105,11 @@ class Signals(Array):
             # Collapse (x,1) back to (x,)
             entries = entries[:, 0]
         return cls(entries, index=index, columns=columns)
+
+    @classmethod
+    def generate_random_like(cls, ts, *args, **kwargs):
+        """Generate entry signals randomly in form of ts."""
+        return cls.generate_random(ts.shape, *args, index=ts.index, columns=ts.columns, **kwargs)
 
     @classmethod
     def generate_random_exits(cls, entries, seed=None):
@@ -120,17 +129,13 @@ class Signals(Array):
         if not np.array_equal(ts.index, entries.index):
             raise ValueError("Arguments ts and entries must share the same index")
 
-        ts_new = ts.align_columns(entries)
-        entries_new = entries.align_columns(ts_new)
-        # Expand dims if two 1d arrays provided
-        if ts_new.ndim == 1:
-            ts_new = ts_new[:, None]
-        if entries_new.ndim == 1:
-            entries_new = entries_new[:, None]
+        ts_ndim, entries_ndim = ts.ndim, entries.ndim
+        ts = ts.align_columns(entries, expand_dims=True)
+        entries = entries.align_columns(ts, expand_dims=True)
         # Do not forget to wrap exit_func with @njit in your code!
-        exits = generate_exits(ts_new, entries_new, exit_func)
+        exits = generate_exits(ts, entries, exit_func)
         # Collapse dims if two 1d arrays provided
-        if ts.ndim == 1 and entries.ndim == 1:
+        if ts_ndim == 1 and entries_ndim == 1:
             exits = exits[:, 0]
         return cls(exits, index=entries.index, columns=entries.columns)
 
