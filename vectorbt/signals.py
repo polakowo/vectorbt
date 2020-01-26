@@ -4,7 +4,6 @@ from matplotlib import pyplot as plt
 from numba import njit
 
 from vectorbt.utils.array import Array, fshift, bshift, ffill, shuffle_along_axis
-from vectorbt.utils.plot import plot_line
 from vectorbt.utils.decorators import expand_dims, requires_1dim
 from vectorbt.timeseries import TimeSeries
 
@@ -89,6 +88,8 @@ class Signals(Array):
         if not isinstance(shape, tuple):
             # Expand (x,) to (x,1)
             new_shape = (shape, 1)
+        elif len(shape) == 1:
+            new_shape = (shape[0], 1)
         else:
             new_shape = shape
         # Entries cannot be one after another, hence ::2
@@ -96,7 +97,7 @@ class Signals(Array):
         idxs = shuffle_along_axis(idxs)[:n]
         entries = np.full(new_shape, False)
         entries[idxs, np.arange(new_shape[1])[None, :]] = True
-        if not isinstance(shape, tuple):
+        if not isinstance(shape, tuple) or len(shape) == 1:
             # Collapse (x,1) back to (x,)
             entries = entries[:, 0]
         return cls(entries, index=index, columns=columns)
@@ -200,9 +201,12 @@ class Signals(Array):
         return pd.Series(self[non_empty_idxs], index=self.index[non_empty_idxs])
 
     @requires_1dim
-    def plot(self, label="Signals"):
+    def plot(self, label='Signals', ax=None):
         """Plot signals as a line."""
-        fig, ax = plt.subplots()
-        plot_line(ax, self, label)
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.show()
+        no_ax = ax is None
+        if no_ax:
+            fig, ax = plt.subplots()
+        pd.DataFrame(self.astype(int).to_pandas(), columns=[label]).plot(ax=ax, color='#1f77b4')
+        if no_ax:
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        return ax

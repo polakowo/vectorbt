@@ -4,7 +4,6 @@ from matplotlib import pyplot as plt
 
 from vectorbt.utils.array import Array
 from vectorbt.utils.decorators import requires_1dim
-from vectorbt.utils.plot import plot_line
 
 class TimeSeries(Array):
     def __new__(cls, input_array, index=None, columns=None):
@@ -19,12 +18,24 @@ class TimeSeries(Array):
         return super().empty(shape, 0, index=index, columns=columns)
 
     @requires_1dim
-    def plot(self, label='TimeSeries', positions=None, **kwargs):
+    def plot(self, label='TimeSeries', benchmark=None, benchmark_label='Benchmark', positions=None, ax=None):
         """Plot time series as a line."""
-        fig, ax = plt.subplots()
-        plot_line(ax, self, label, **kwargs)
+        no_ax = ax is None
+        if no_ax:
+            fig, ax = plt.subplots()
+        # Plot a
+        ts = self.to_pandas()
+        pd.DataFrame(ts, columns=[label]).plot(ax=ax, color='#1f77b4')
+        # Plot b
+        if benchmark is not None:
+            if isinstance(benchmark, (int, float, complex)):
+                benchmark = pd.Series(benchmark, index=ts.index)
+            pd.DataFrame(benchmark, columns=[benchmark_label]).plot(ax=ax, color='#1f77b4', linestyle='--')
+            ax.fill_between(ts.index, ts, benchmark, where=ts>benchmark, facecolor='#add8e6', interpolate=True)
+            ax.fill_between(ts.index, ts, benchmark, where=ts<benchmark, facecolor='#ffcccb', interpolate=True)
         if positions is not None:
-            plot_markers(ax, self, positions == 1, positions == -1)
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        plt.show()
+            ax = positions.plot(ax=ax)
+        if no_ax:
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+        return ax
     
