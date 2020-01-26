@@ -1,167 +1,208 @@
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from numba import njit
 
-from vectorbt.utils.array import *
-from vectorbt.utils.plot import *
+from vectorbt.utils.array import Array, fshift, bshift, ffill, shuffle_along_axis
+from vectorbt.utils.plot import plot_line
+from vectorbt.utils.decorators import expand_dims, requires_1dim
 from vectorbt.timeseries import TimeSeries
 
-class Signals(np.ndarray):
+@njit
+def generate_exits(ts, entries, exit_func):
+    # NOTE: Cannot be vectorized since each exit signal depends on the previous entry signal.
+    # You will have to write your exit_func to be compatible with numba.
 
-    def __new__(cls, input_array, index=None):
-        # Input array is an already formed ndarray instance
-        # We first cast to be our class type
-        obj = np.asarray(input_array).view(cls)
-        if obj.dtype != np.bool:
-            raise TypeError("dtype is not bool")
-        # add the new attribute to the created instance
-        if index is not None:
-            if obj.shape[0] != len(index):
-                raise TypeError("Index has different shape")
-            obj.index = index
-        elif isinstance(input_array, pd.Series):
-            obj.index = input_array.index.to_numpy()
-        else:
-            raise ValueError("Index is not set")
-        # Finally, we must return the newly created object:
-        return obj
-
-    def __array_finalize__(self, obj):
-        # see InfoArray.__array_finalize__ for comments
-        if obj is None: return
-        self.index = getattr(obj, 'index', None)
-
-    @classmethod
-    def empty(cls, shape, index=None):
-        """Create an empty array and fill with False."""
-        return Signals(np.full(shape, False), index=index)
-
-    @classmethod
-    def generate_exits(cls, ts, entries, exit_func):
-        """Generate exit signals based on entry signals.
-
-        For each range between two entries in entries, search for an exit signal."""
-        if not isinstance(ts, TimeSeries): 
-            raise TypeError("Argument ts is not TimeSeries")
-        if not isinstance(entries, Signals): 
-            raise TypeError("Argument entries is not Signals")
-        
-        # TODO: Vectorize
+    exits = np.full(ts.shape, False)
+    for i in range(ts.shape[1]):
         exit_idxs = []
-        entry_idxs = np.flatnonzero(entries)
+        entry_idxs = np.flatnonzero(entries[:, i])
         # Every two adjacent signals in the vector become a bin
-        bins = list(zip(entry_idxs, np.append(entry_idxs[1:], None)))
-        for prev_idx, next_idx in bins:
+        bins = np.column_stack((entry_idxs, np.append(entry_idxs[1:], -1)))
+        for j in range(bins.shape[0]):
+            prev_idx = bins[j][0]
+            next_idx = bins[j][1]
+            if next_idx == -1:
+                next_idx = None
             # If entry is the last element, ignore
             if prev_idx < ts.shape[0] - 1:
                 # Apply exit function on the bin space only (between two entries)
-                exit_idx = exit_func(ts, prev_idx=prev_idx, next_idx=next_idx)
+                exit_idx = exit_func(ts[:, i], prev_idx, next_idx)
                 if exit_idx is not None:
                     exit_idxs.append(exit_idx)
-        exits = Signals.empty(ts.shape, index=ts.index)
         # Take note that x, y, and z are all relative indices
-        exits[exit_idxs] = True
-        return exits
+        exits[np.asarray(exit_idxs), i] = True
+    return exits
 
-    @classmethod
-    def generate_entries_and_exits(cls, ts, entry_func, exit_func):
-        """Generate entry and exit signals one after another."""
-        if not isinstance(ts, TimeSeries): 
-            raise TypeError("Argument ts is not TimeSeries")
+@njit # 38.4 µs vs 214 µs
+def random_exit_func(ts, prev_idx, next_idx):
+    if next_idx is None:
+        return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:])
+    return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:next_idx])
 
-        # TODO: Vectorize
-        idxs = [entry_func(ts)]  # entry comes first
+@njit # 41.8 µs vs 83.9 µs
+def generate_entries_and_exits(ts, entry_func, exit_func):
+    # NOTE: Cannot be vectorized since both signals depend on each other.
+    # You will have to write your entry_func and exit_func to be compatible with numba.
+
+    entries = np.full(ts.shape, False)
+    exits = np.full(ts.shape, False)
+
+    for i in range(ts.shape[1]):
+        idxs = [entry_func(ts[:, i], None, None)]  # entry comes first
         while True:
             prev_idx = idxs[-1]
             if prev_idx < ts.shape[0] - 1:
                 if len(idxs) % 2 == 0:  # exit or entry?
-                    idx = entry_func(ts, prev_idx=prev_idx)
+                    idx = entry_func(ts[:, i], prev_idx, None)
                 else:
-                    idx = exit_func(ts, prev_idx=prev_idx)
+                    idx = exit_func(ts[:, i], prev_idx, None)
                 if idx is None:
                     break
                 idxs.append(idx)
             else:
                 break
-        entries = Signals.empty(ts.shape, index=ts.index)
-        entries[idxs[0::2]] = True
-        exits = Signals.empty(ts.shape, index=ts.index)
-        exits[idxs[1::2]] = True
-        return entries, exits
+        entries[np.asarray(idxs[0::2]), i] = True
+        exits[np.asarray(idxs[1::2]), i] = True
+    return entries, exits
+
+
+class Signals(Array):
+    """Signals class extends the Array class by implementing boolean operations."""
+
+    def __new__(cls, input_array, index=None, columns=None):
+        obj = Array(input_array, index=index, columns=columns).view(cls)
+        if obj.dtype != np.bool:
+            raise TypeError("dtype must be bool")
+        return obj
 
     @classmethod
-    def generate_random_entries(cls, ts, n, seed=None):
-        """Generate entries randomly."""
-        if not isinstance(ts, TimeSeries): 
-            raise TypeError("Argument ts is not TimeSeries")
+    def empty(cls, shape, index=None, columns=None):
+        """Create and fill an empty array with False."""
+        return super().empty(shape, False, index=index, columns=columns)
 
+    @classmethod
+    def generate_random_entries(cls, shape, n, seed=None, index=None, columns=None):
+        """Generate entry signals randomly."""
         if seed is not None:
             np.random.seed(seed)
-        # Entries cannot be one after another
-        idxs = np.random.choice(np.arange(ts.shape[0])[::2], size=n, replace=False)
-        entries = Signals.empty(ts.shape, index=ts.index)
-        entries[idxs] = True
-        return entries
+        if not isinstance(shape, tuple):
+            # Expand (x,) to (x,1)
+            new_shape = (shape, 1)
+        else:
+            new_shape = shape
+        # Entries cannot be one after another, hence ::2
+        idxs = np.tile(np.arange(new_shape[0])[:, None], (1, new_shape[1]))[::2, :]
+        idxs = shuffle_along_axis(idxs)[:n]
+        entries = np.full(new_shape, False)
+        entries[idxs, np.arange(new_shape[1])[None, :]] = True
+        if not isinstance(shape, tuple):
+            # Collapse (x,1) back to (x,)
+            entries = entries[:, 0]
+        return cls(entries, index=index, columns=columns)
 
     @classmethod
-    def generate_random_exits(cls, ts, entries, seed=None):
-        """Generate exits between entries randomly."""
-        if not isinstance(ts, TimeSeries): 
-            raise TypeError("Argument ts is not TimeSeries")
-        if not isinstance(entries, Signals): 
-            raise TypeError("Argument entries is not Signals")
+    def generate_random_exits(cls, entries, seed=None):
+        """Generate an exit signal after every entry signal randomly."""
+        if not isinstance(entries, Signals):
+            raise TypeError("Argument entries must be Signals")
 
-        def random_exit_func(ts, prev_idx=None, next_idx=None):
-            return np.random.choice(np.arange(ts.shape[0])[prev_idx+1:next_idx])
+        return Signals.generate_exits(entries, entries, random_exit_func)
 
-        return Signals.generate_exits(ts, entries, random_exit_func)
+    @classmethod
+    def generate_exits(cls, ts, entries, exit_func):
+        """Generate an exit signal after every entry signal using exit_func."""
+        if not isinstance(ts, TimeSeries) and not isinstance(ts, Signals): # pass entries as ts if you don't need ts
+            raise TypeError("Argument ts must be TimeSeries or Signals")
+        if not isinstance(entries, Signals):
+            raise TypeError("Argument entries must be Signals")
+        if not np.array_equal(ts.index, entries.index):
+            raise ValueError("Arguments ts and entries must share the same index")
 
-    def rshift(self, n):
+        ts_new = ts.align_columns(entries)
+        entries_new = entries.align_columns(ts_new)
+        # Expand dims if two 1d arrays provided
+        if ts_new.ndim == 1:
+            ts_new = ts_new[:, None]
+        if entries_new.ndim == 1:
+            entries_new = entries_new[:, None]
+        # Do not forget to wrap exit_func with @njit in your code!
+        exits = generate_exits(ts_new, entries_new, exit_func)
+        # Collapse dims if two 1d arrays provided
+        if ts.ndim == 1 and entries.ndim == 1:
+            exits = exits[:, 0]
+        return cls(exits, index=entries.index, columns=entries.columns)
+
+    @classmethod
+    def generate_entries_and_exits(cls, ts, entry_func, exit_func):
+        """Generate entry and exit signals one after another iteratively.
+        
+        Use this if your entries depend on previous exit signals, otherwise generate entries first."""
+        if not isinstance(ts, TimeSeries):
+            raise TypeError("Argument ts must be TimeSeries")
+
+        # Expand dims if two 1d arrays provided
+        ts_ndim = ts.ndim
+        if ts_ndim == 1:
+            ts = ts[:, None]
+        entries, exits = generate_entries_and_exits(ts, entry_func, exit_func)
+        # Collapse dims if two 1d arrays provided
+        if ts_ndim == 1:
+            entries = entries[:, 0]
+            exits = exits[:, 0]
+        return cls(entries, index=ts.index, columns=ts.columns), cls(exits, index=ts.index, columns=ts.columns)
+
+    @expand_dims
+    def fshift(self, n):
         """Shift the elements to the right."""
-        return rshift(self, n)
+        return fshift(self, n)
 
-    def lshift(self, n):
+    @expand_dims
+    def bshift(self, n):
         """Shift the elements to the left."""
-        return lshift(self, n)
+        return bshift(self, n)
 
+    @expand_dims
     def first(self):
         """Set True at the first occurrence in each series of consecutive occurrences."""
-        return self & ~self.rshift(1)
+        return self & ~self.fshift(1)
 
+    @expand_dims
     def last(self):
         """Set True at the last occurrence in each series of consecutive occurrences."""
-        return self & ~self.lshift(1)
+        return self & ~self.bshift(1)
 
+    @expand_dims
     def rank(self):
         """Assign position to each occurrence in each series of consecutive occurrences."""
-        idxs = np.flatnonzero(self.first().astype(int))
-        ranks = np.zeros(self.shape[0])
-        cum = np.array(np.cumsum(self.astype(int)))
+        idxs = np.nonzero(self.first().astype(int))
+        ranks = np.zeros(self.shape)
+        cum = np.array(np.cumsum(self.astype(int), axis=0))
         ranks[idxs] = cum[idxs]
         ranks = cum - ffill(ranks) + 1
         ranks[~self] = 0
-        return ranks # produces np.ndarray, not Signals!
+        return ranks  # produces np.ndarray, not Signals!
 
+    @expand_dims
     def first_nst(self, n):
         """Set True at the occurrence that is n data points after the first occurrence."""
-        return Signals(self.rank() == n, index=self.index)
+        return Signals(self.rank() == n, index=self.index, columns=self.columns)
 
+    @expand_dims
     def from_first_nst(self, n):
         """Set True at the occurrence that at least n data points after the first occurrence."""
-        return Signals(self.rank() >= n, index=self.index)
+        return Signals(self.rank() >= n, index=self.index, columns=self.columns)
 
+    @requires_1dim
     def non_empty(self):
-        """Return True values as pd.Series."""
+        """Return True's using pandas."""
         non_empty_idxs = np.argwhere(self).transpose()[0]
         return pd.Series(self[non_empty_idxs], index=self.index[non_empty_idxs])
 
-    def describe(self):
-        """Describe using pd.Series."""
-        return pd.Series(self).value_counts()
-
-    def plot(self):
+    @requires_1dim
+    def plot(self, label="Signals"):
         """Plot signals as a line."""
         fig, ax = plt.subplots()
-        plot_line(ax, self, "Signals")
+        plot_line(ax, self, label)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         plt.show()
