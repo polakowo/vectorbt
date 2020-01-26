@@ -28,6 +28,17 @@ def ffill(a, fill=0):
     return np.take_along_axis(a, prev_idxs, 0)
 
 
+def pct_change(a):
+    """pd.pct_change in NumPy."""
+    return np.insert(np.diff(a, axis=0) / a[:-1, :], 0, np.zeros((1, a.shape[1])), axis=0)
+
+
+def shuffle_along_axis(a):
+    """Shuffle multidimensional array against an axis."""
+    idx = np.random.rand(*a.shape).argsort(axis=0)
+    return np.take_along_axis(a, idx, axis=0)
+
+
 def rolling(a, window=None):
     """Rolling window over the array.
     Produce the pandas result when min_periods=1."""
@@ -71,17 +82,6 @@ def ewma(a, window=None):
     cumsums = mult.cumsum()
     out = offset + cumsums * scale_arr[::-1]
     return out
-
-
-def pct_change(a):
-    """pd.pct_change in NumPy."""
-    return np.insert(np.diff(a) / a[:-1], 0, 0)
-
-
-def shuffle_along_axis(a):
-    """Shuffle multidimensional array against an axis."""
-    idx = np.random.rand(*a.shape).argsort(axis=0)
-    return np.take_along_axis(a, idx, axis=0)
 
 
 class Array(np.ndarray):
@@ -154,7 +154,7 @@ class Array(np.ndarray):
             return self
         index = self.index
         columns = self.columns
-        
+
         # Expand columns horizontally for both shapes to match
         if self.ndim == 1:
             self = self[:, None]
@@ -169,7 +169,6 @@ class Array(np.ndarray):
                 columns = other.columns
 
         return self.__class__(self, index=index, columns=columns)
-
 
     def select_column(self, column_name):
         """Return the 1D array corresponding to a column."""
