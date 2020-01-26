@@ -19,5 +19,5 @@ def requires_1dim(func):
         if self.ndim == 1:
             return func(self, *args, **kwargs)
         else:
-            raise ValueError("Cannot plot 2-dim array (Hint: use select_column)")
+            raise ValueError("You must select a column (use select_column)")
     return wrapper_decorator

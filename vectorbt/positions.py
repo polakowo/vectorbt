@@ -47,14 +47,14 @@ class Positions(Array):
         both[both.cumsum(axis=0) == -1] = 0
         # take first signal from each consecutive series of signals of same type
         both = ffill(both)
-        positions = Positions(np.zeros_like(both), index=entries.index, columns=entries.columns)
+        positions = np.zeros_like(both)
         positions[Signals(both == 1).first()] = 1
         positions[Signals(both == -1).first()] = -1
 
         # Collapse dims back
         if entries_ndim == 1 and exits_ndim == 1:
             positions = positions[:, 0]
-        return positions
+        return Positions(positions, index=entries.index, columns=entries.columns)
 
     @requires_1dim
     def plot(self, ts, label='TimeSeries', ax=None):
