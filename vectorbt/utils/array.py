@@ -1,28 +1,30 @@
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils.decorators import ndim2
+from vectorbt.utils.decorators import to_dim2
 
 # All functions below require input to be a two-dimensional NumPy array,
 # where first axis is index and second axis are columns
 # They all move along the first axis (axis=0)
 
 
-@ndim2
+@to_dim2(0)
 def fshift(a, n=1, fill=0):
     """Shift to the right."""
     rolled = np.roll(a, n, axis=0)
     rolled[:n, :] = fill
     return rolled
 
-@ndim2
+
+@to_dim2(0)
 def bshift(a, n=1, fill=0):
     """Shift to the left."""
     rolled = np.roll(a, -n, axis=0)
     rolled[-n:, :] = fill
     return rolled
 
-@ndim2
+
+@to_dim2(0)
 def ffill(a, fill=0):
     """Fill zeros with the last non-zero value."""
     prev_idxs = np.tile(np.arange(a.shape[0])[:, None], (1, a.shape[1]))
@@ -30,18 +32,21 @@ def ffill(a, fill=0):
     prev_idxs = np.maximum.accumulate(prev_idxs, axis=0)
     return np.take_along_axis(a, prev_idxs, 0)
 
-@ndim2
+
+@to_dim2(0)
 def pct_change(a):
     """pd.pct_change in NumPy."""
     return np.insert(np.diff(a, axis=0) / a[:-1, :], 0, np.zeros((1, a.shape[1])), axis=0)
 
-@ndim2
+
+@to_dim2(0)
 def shuffle_along_axis(a):
     """Shuffle multidimensional array."""
     idx = np.random.rand(*a.shape).argsort(axis=0)
     return np.take_along_axis(a, idx, axis=0)
 
-@ndim2
+
+@to_dim2(0)
 def rolling_window(a, window=None):
     """Rolling window over the array.
 
@@ -54,19 +59,23 @@ def rolling_window(a, window=None):
     strided = np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
     return strided  # raw output
 
-@ndim2
+
+@to_dim2(0)
 def rolling_mean(a, **kwargs):
     return np.nanmean(rolling_window(a, **kwargs), axis=0)
 
-@ndim2
+
+@to_dim2(0)
 def rolling_std(a, **kwargs):
     return np.nanstd(rolling_window(a, **kwargs), axis=0)
 
-@ndim2
+
+@to_dim2(0)
 def rolling_max(a, **kwargs):
     return np.nanmax(rolling_window(a, **kwargs), axis=0)
 
-@ndim2
+
+@to_dim2(0)
 def ewma(a, window=None):
     """Exponential weighted moving average.
     Produce the pandas result when min_periods=1 and adjust=False.
@@ -101,7 +110,7 @@ class Array2D(np.ndarray):
         # We first cast to be our class type
         obj = np.asarray(input_array).view(cls)
         if obj.ndim == 1:
-            obj = obj[:, None] # expand
+            obj = obj[:, None]  # expand
         if obj.ndim != 2:
             raise ValueError("This method requires a two-dimensional array")
 
@@ -117,18 +126,11 @@ class Array2D(np.ndarray):
         """Create and fill an empty array."""
         return cls(np.full(shape, fill))
 
-    @ndim2
-    def broadcast_columns(self, other):
-        """If the array has less columns than the other one, replicate them."""
-        if not isinstance(other, Array2D):
-            raise TypeError("Argument other must be a subclass of Array2D")
-        if self.shape[0] != other.shape[0]:
-            raise ValueError("Argument other must have the same index")
-        if self.shape == other.shape:
-            return self
-
-        # Expand columns horizontally
-        if self.shape[1] == 1:
-            return self.__class__(np.tile(self, (1, other.shape[1])))
-        elif self.shape[1] > 1 and other.shape[1] > 1:
-            raise ValueError("Multiple columns on both sides cannot be broadcasted")
+    def to_pandas(self, index=None, columns=None):
+        """Convert array to pandas."""
+        if self.ndim == 1:
+            return pd.Series(self, index=index)
+        elif self.shape[1] == 1:
+            return pd.Series(self[:, 0], index=index)
+        else:
+            return pd.DataFrame(self, index=index, columns=columns)

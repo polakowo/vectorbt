@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+from vectorbt.utils.decorators import has_type, to_dim2
 from vectorbt.utils.array import fshift, pct_change, ffill
 from vectorbt.timeseries import TimeSeries
 from vectorbt.positions import Positions
@@ -9,15 +10,11 @@ from vectorbt.positions import Positions
 class Portfolio():
     """Propagate investment through positions to generate equity and returns."""
 
+    @has_type(1, TimeSeries)
+    @to_dim2(1)
+    @has_type(2, Positions)
+    @to_dim2(2)
     def __init__(self, ts, positions, investment=1, fees=0, slippage=0):
-        if not isinstance(ts, TimeSeries):
-            raise TypeError("Argument ts is not TimeSeries")
-        if not isinstance(positions, Positions):
-            raise TypeError("Argument positions is not Positions")
-        # Safety check whether index of ts and positions is the same
-        if not np.array_equal(ts.index, positions.index):
-            raise ValueError("Arguments ts and positions do not share the same index")
-
         self.ts = ts
         self.positions = positions
         self.investment = investment
@@ -42,7 +39,7 @@ class Portfolio():
         else:
             equity[pos_idx] *= 1 - self.fees
         equity = np.cumprod(equity, axis=0)
-        return TimeSeries(equity, index=self.ts.index, columns=self.ts.columns)
+        return TimeSeries(equity)
 
     @property
     def cash_equity(self):

@@ -1,43 +1,72 @@
+from vectorbt.utils.decorators import to_dim1, has_type
+from vectorbt.utils.array import Array2D
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
-from vectorbt.utils.array import Array
-from vectorbt.utils.decorators import requires_1dim
 
-class TimeSeries(Array):
-    def __new__(cls, input_array, index=None, columns=None):
-        obj = Array(input_array, index=index, columns=columns).view(cls)
+class TimeSeries(Array2D):
+    def __new__(cls, input_array):
+        obj = Array2D(input_array).view(cls)
         if obj.dtype != np.float:
             raise TypeError("dtype must be float")
         return obj
 
     @classmethod
-    def empty(cls, shape, index=None, columns=None):
+    def empty(cls, shape):
         """Create and fill an empty array with 0."""
-        return super().empty(shape, 0, index=index, columns=columns)
+        return super().empty(shape, 0)
 
-    @requires_1dim
-    def plot(self, label='TimeSeries', benchmark=None, benchmark_label='Benchmark', positions=None, ax=None):
+    @to_dim1(0)
+    def plot(self, index=None, label=None, benchmark=None, benchmark_label=None, ax=None, **kwargs):
         """Plot time series as a line."""
         no_ax = ax is None
         if no_ax:
             fig, ax = plt.subplots()
-        # Plot a
-        ts = self.to_pandas()
-        pd.DataFrame(ts, columns=[label]).plot(ax=ax, color='#1f77b4')
-        # Plot b
+
+        # Plot TimeSeries
+        ts_df = pd.DataFrame(self)
+        if index is not None:
+            ts_df.index = pd.Index(index)
+        if label is not None:
+            ts_df.columns = [label]
+        else:
+            ts_df.columns = ['TimeSeries']
+        ts_df.plot(ax=ax, **kwargs)
+
+        # Plot benchmark
         if benchmark is not None:
-            if isinstance(benchmark, (int, float, complex)):
-                benchmark = pd.Series(benchmark, index=ts.index)
-            pd.DataFrame(benchmark, columns=[benchmark_label]).plot(ax=ax, color='#1f77b4', linestyle='--')
-            ax.fill_between(ts.index, ts, benchmark, where=ts>benchmark, facecolor='#add8e6', interpolate=True)
-            ax.fill_between(ts.index, ts, benchmark, where=ts<benchmark, facecolor='#ffcccb', interpolate=True)
-        if positions is not None:
-            ax = positions.plot(self, ax=ax)
+            if isinstance(benchmark, pd.Series):
+                benchmark_df = benchmark
+                benchmark_df.columns = ['Benchmark']
+            elif isinstance(benchmark, (int, float, complex)):
+                benchmark_df = pd.DataFrame(np.full(len(ts_df.index), benchmark))
+                benchmark_df.columns = [str(benchmark)]
+                benchmark_df.index = ts_df.index
+            else:
+                benchmark_df = pd.DataFrame(benchmark)
+                benchmark_df.columns = ['Benchmark']
+                benchmark_df.index = ts_df.index
+            if benchmark_label is not None:
+                benchmark_df.columns = [benchmark_label]
+            benchmark_df.plot(ax=ax)
+            ax.fill_between(
+                ts_df.index,
+                ts_df.iloc[:, 0],
+                benchmark_df.iloc[:, 0],
+                where=ts_df.iloc[:, 0] > benchmark_df.iloc[:, 0],
+                facecolor='#add8e6',
+                interpolate=True)
+            ax.fill_between(
+                ts_df.index,
+                ts_df.iloc[:, 0],
+                benchmark_df.iloc[:, 0],
+                where=ts_df.iloc[:, 0] < benchmark_df.iloc[:, 0],
+                facecolor='#ffcccb',
+                interpolate=True)
+
         if no_ax:
             ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
         return ax
-    
