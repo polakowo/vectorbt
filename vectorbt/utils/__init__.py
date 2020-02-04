@@ -1,1 +1,1 @@
-from vectorbt.utils import array, decorators
+from vectorbt.utils import decorators
