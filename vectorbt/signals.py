@@ -1,207 +1,266 @@
-from vectorbt.timeseries import TimeSeries
-from vectorbt.utils.decorators import has_type, to_dim1, to_dim2, broadcast
-from vectorbt.utils.array import Array2D, fshift, bshift, ffill, shuffle_along_axis
-from numba import njit
+from vectorbt.utils.decorators import *
+from numba.types.containers import UniTuple
+from numba import njit, f8, i8, b1, optional
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 from pandas.plotting import register_matplotlib_converters
 register_matplotlib_converters()
 
+# ############# Numba functions ############# #
 
-@njit
-def generate_exits(ts, entries, exit_func):
-    # NOTE: Cannot be vectorized since each exit signal depends on the previous entry signal.
-    # You will have to write your exit_func to be compatible with numba.
 
-    exits = np.full(ts.shape, False)
-    for i in range(ts.shape[1]):
-        exit_idxs = []
-        entry_idxs = np.flatnonzero(entries[:, i])
-        # Every two adjacent signals in the vector become a bin
-        bins = np.column_stack((entry_idxs, np.append(entry_idxs[1:], -1)))
-        for j in range(bins.shape[0]):
-            prev_idx = bins[j][0]
-            next_idx = bins[j][1]
-            if next_idx == -1:
-                next_idx = None
+@njit(b1[:, :](UniTuple(i8, 2), i8, optional(i8), optional(i8)))  # 1.17 ms vs 56.4 ms for vectorized
+def generate_random_entries_nb(shape, n, every_nth, seed):
+    """Randomly generate entry signals."""
+    if seed is not None:
+        np.random.seed(seed)
+    if every_nth is None:
+        every_nth = 1
+    a = np.full(shape, False, dtype=b1)
+    for i in range(shape[1]):
+        idxs = np.random.choice(np.arange(shape[0])[::every_nth], size=n, replace=False)
+        a[idxs, i] = True
+    return a
+
+
+@njit(b1[:, :](b1[:, :], optional(i8)))  # 3.01 ms vs 3.81 ms for vectorized
+def generate_random_exits_nb(entries, seed):
+    """Randomly generate at least one exit signal between two entry signals."""
+    if seed is not None:
+        np.random.seed(seed)
+    a = np.full_like(entries, False)
+    for j in range(entries.shape[1]):
+        prev_entry_idx = -1
+        for i in range(entries.shape[0]):
+            if entries[i, j] or i == a.shape[0]-1:
+                if prev_entry_idx == -1:
+                    prev_entry_idx = i
+                    continue
+                if i == a.shape[0]-1 and not entries[i, j]:
+                    rand_range = np.arange(prev_entry_idx+1, i+1)
+                else:
+                    rand_range = np.arange(prev_entry_idx+1, i)
+                if len(rand_range) > 0:
+                    rand_idx = np.random.choice(rand_range)
+                    a[rand_idx, j] = True
+                prev_entry_idx = i
+    return a
+
+
+@njit  # 5.49 ms vs 48.8 ms for entries.shape = (1000, 20) and number of entries = 200
+# NOTE: no explicit types since args are not known before the runtime
+def generate_exits_nb(entries, exit_func_nb, only_first, *args):
+    # exit_func_nb must return a boolean mask for a column specified by col_idx.
+    # You will have to write your exit_func to be compatible with numba!
+
+    exits = np.full(entries.shape, False)
+
+    for col_idx in range(entries.shape[1]):
+        entry_idxs = np.flatnonzero(entries[:, col_idx])
+
+        for i in range(entry_idxs.shape[0]):
+            # prev_idx is the previous entry index, next_idx is the next entry index
+            prev_idx = entry_idxs[i]
+            if i < entry_idxs.shape[0] - 1:
+                next_idx = entry_idxs[i+1]
+            else:
+                next_idx = -1
+
             # If entry is the last element, ignore
-            if prev_idx < ts.shape[0] - 1:
-                # Apply exit function on the bin space only (between two entries)
-                exit_idx = exit_func(ts[:, i], prev_idx, next_idx)
-                if exit_idx is not None:
-                    exit_idxs.append(int(exit_idx))
-        # Take note that x, y, and z are all relative indices
-        exits[np.asarray(exit_idxs), i] = True
+            if prev_idx < entries.shape[0] - 1:
+                # Exit mask must return mask with exit signals for that column
+                exit_mask = exit_func_nb(entries, col_idx, prev_idx, *args)
+                exit_idxs = np.where(exit_mask)[0]
+                # Filter out signals before previous entry and after next entry
+                idx_mask = exit_idxs > prev_idx
+                if next_idx != -1:
+                    idx_mask = idx_mask & (exit_idxs < next_idx)
+                if not idx_mask.any():
+                    continue
+                exit_mask[:] = False
+                if only_first:
+                    # consider only the first signal
+                    exit_mask[exit_idxs[idx_mask][0]] = True
+                else:
+                    exit_mask[exit_idxs[idx_mask]] = True
+                exits[:, col_idx] = exits[:, col_idx] | exit_mask
     return exits
 
 
-@njit  # 41.8 µs vs 83.9 µs
-def generate_entries_and_exits(ts, entry_func, exit_func):
-    # NOTE: Cannot be vectorized since both signals depend on each other.
-    # You will have to write your entry_func and exit_func to be compatible with numba.
+@njit  # 39.6 ms vs 274 ms for ts.shape = (1000, 20)
+# NOTE: no explicit types since args are not known before the runtime
+def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
+    # entry_func_nb and exit_func_nb must return boolean masks for a column specified by col_idx.
+     # You will have to write them to be compatible with numba!
 
-    entries = np.full(ts.shape, False)
-    exits = np.full(ts.shape, False)
+    entries = np.full(shape, False)
+    exits = np.full(shape, False)
 
-    for i in range(ts.shape[1]):
-        idxs = [entry_func(ts[:, i], None, None)]  # entry comes first
-        while True:
-            prev_idx = idxs[-1]
-            if prev_idx < ts.shape[0] - 1:
-                if len(idxs) % 2 == 0:  # exit or entry?
-                    idx = entry_func(ts[:, i], prev_idx, None)
-                else:
-                    idx = exit_func(ts[:, i], prev_idx, None)
-                if idx is None:
-                    break
-                idxs.append(idx)
+    for col_idx in range(shape[1]):
+        prev_idx = -1
+        i = 0
+        while prev_idx < shape[0] - 1:
+            if i % 2 == 0:
+                # Cannot assign two functions to a var in numba
+                mask = entry_func_nb(exits, col_idx, prev_idx, *args)
+                a = entries
             else:
+                mask = exit_func_nb(entries, col_idx, prev_idx, *args)
+                a = exits
+            if prev_idx != -1:
+                mask[:prev_idx+1] = False
+            if not mask.any():
                 break
-        entries[np.asarray(idxs[0::2]), i] = True
-        exits[np.asarray(idxs[1::2]), i] = True
+            prev_idx = np.where(mask)[0][0]
+            mask[:] = False
+            mask[prev_idx] = True  # consider only the first signal
+            a[:, col_idx] = a[:, col_idx] | mask
+            i += 1
     return entries, exits
 
 
-class Signals(Array2D):
-    """Signals class extends the Array class by implementing boolean operations."""
+@njit(i8[:, :](b1[:, :]))
+def rank_true_nb(a):
+    """Rank over each partition of true values."""
+    b = np.zeros(a.shape, dtype=i8)
+    for j in range(a.shape[1]):
+        inc = 0
+        for i in range(a.shape[0]):
+            if a[i, j]:
+                inc += 1
+                b[i, j] = inc
+            else:
+                inc = 0
+    return b
+
+
+@njit(i8[:, :](b1[:, :]))
+def rank_false_nb(a):
+    """Rank over each partition of false values (must come after at least one true)."""
+    b = np.zeros(a.shape, dtype=i8)
+    for j in range(a.shape[1]):
+        inc = -1
+        for i in range(a.shape[0]):
+            if not a[i, j]:
+                if inc != -1:
+                    inc += 1
+                    b[i, j] = inc
+            else:
+                inc = 0
+    return b
+
+
+# ############# Boolean operations ############# #
+
+# Boolean operations are natively supported by np.ndarray
+# You can, for example, perform Signals_1 & Signals_2 to get logical AND of both arrays
+# NOTE: We don't implement backward operations to avoid look-ahead bias!
+
+@njit(b1[:, :](b1[:, :], i8, b1))
+def prepend_nb(a, n, fill_value):
+    """Prepend n values to the array."""
+    b = np.full((a.shape[0]+n, a.shape[1]), fill_value, dtype=a.dtype)
+    b[-a.shape[0]:] = a
+    return b
+
+
+@njit(b1[:, :](b1[:, :], i8))
+def fshift_nb(a, n):
+    """Shift forward by n."""
+    a = prepend_nb(a, n, False)
+    return a[:-n, :]
+
+
+@njit(b1[:, :](b1[:, :]))
+def first_nb(a):
+    """Select the first true value in each row of true values."""
+    return a & ~fshift_nb(a, 1)
+
+
+@njit(b1[:, :](b1[:, :], i8))
+def first_nst_nb(a, n):
+    """Select the nst true value in each row of true values."""
+    return rank_true_nb(a) == n
+
+
+@njit(b1[:, :](b1[:, :], i8))
+def from_first_nst_nb(a, n):
+    """Select the nst true value and beyond in each row of true values."""
+    return rank_true_nb(a) >= n
+
+
+@njit(b1[:, :](b1[:, :], i8))
+def last_nst_nb(a, n):
+    """Select the nst false value after a row of true values."""
+    return rank_false_nb(a) == n
+
+
+@njit(b1[:, :](b1[:, :], i8))
+def from_last_nst_nb(a, n):
+    """Select the nst false value and beyond after a row of true values."""
+    return rank_false_nb(a) >= n
+
+# ############# Main class ############# #
+
+# Add numba functions as methods to the Signals class
+
+
+@add_nb_methods(
+    prepend_nb,
+    fshift_nb,
+    first_nb,
+    first_nst_nb,
+    from_first_nst_nb,
+    last_nst_nb,
+    from_last_nst_nb
+)
+class Signals(np.ndarray):
+    """Signals class extends the np.ndarray class by implementing boolean operations."""
 
     def __new__(cls, input_array):
-        obj = Array2D(input_array).view(cls)
+        obj = np.asarray(input_array).view(cls)
+        if obj.ndim == 1:
+            obj = obj[:, None]  # expand
+        if obj.ndim != 2:
+            raise ValueError("Argument input_array must be a two-dimensional array")
         if obj.dtype != np.bool:
-            raise TypeError("dtype must be bool")
+            raise TypeError("dtype must be np.bool")
         return obj
 
-    #################
-    # Class methods #
-    #################
+    @classmethod
+    def falses(cls, shape):
+        return cls(np.full(shape, False, dtype=np.bool))
 
     @classmethod
-    def empty(cls, shape):
-        """Create and fill an empty array with False."""
-        return super().empty(shape, False)
+    def falses_like(cls, a):
+        return cls.falses(a.shape)
 
     @classmethod
-    def generate_random(cls, shape, n, seed=None):
+    def generate_random_entries(cls, shape, n, every_nth=1, seed=None):
         """Generate entry signals randomly."""
-        if seed is not None:
-            np.random.seed(seed)
-        if not isinstance(shape, tuple):
-            # Expand x to (x,1)
-            new_shape = (shape, 1)
-        elif len(shape) == 1:
-            # Expand (x,) to (x,1)
-            new_shape = (shape[0], 1)
-        else:
-            new_shape = shape
-
-        idxs = np.tile(np.arange(new_shape[0])[:, None], (1, new_shape[1]))
-        idxs = shuffle_along_axis(idxs)[:n]
-        entries = np.full(new_shape, False)
-        entries[idxs, np.arange(new_shape[1])[None, :]] = True
-        return cls(entries)
+        return cls(generate_random_entries_nb(shape, n, every_nth, seed))
 
     @classmethod
-    @has_type(1, Array2D)
-    @to_dim2(1)
-    def generate_random_like(cls, ts, *args, **kwargs):
-        """Generate entry signals randomly in form of ts."""
-        return cls.generate_random(ts.shape, *args, **kwargs)
-
-    @classmethod
-    @has_type(1, Array2D)
-    @has_type(2, 0)
-    @broadcast(1, 2)
-    def generate_exits(cls, ts, entries, exit_func):
-        """Generate an exit signal after every entry signal using exit_func."""
-
-        # Do not forget to wrap exit_func with @njit in your code!
-        exits = generate_exits(ts, entries, exit_func)
-        return cls(exits)
-
-    @classmethod
-    @has_type(1, 0)
-    @to_dim2(1)
-    def generate_random_exits(cls, entries, seed=None):
-        """Generate an exit signal after every entry signal randomly."""
-        if seed is not None:
-            np.random.seed(seed)
-
-        # For each column, we need to randomly pick an index between two entry signals
-        cumsum = entries.flatten(order='F').cumsum().reshape(entries.shape, order='F')
-        cumsum[entries.cumsum(axis=0) == 0] = 0
-        flattened = cumsum.flatten(order='F')
-
-        unique, counts = np.unique(flattened, return_counts=True)
-        unique, counts = unique[unique != 0], counts[unique != 0]
-        rel_rand_idxs = np.floor(np.random.uniform(size=len(unique)) * (counts - 1)) + 1
-        entry_idxs = np.argwhere(entries.flatten(order='F') == 1).transpose()[0]
-        valid_idxs = np.argwhere(counts > 1).transpose()[0]
-        rand_idxs = rel_rand_idxs[valid_idxs] + entry_idxs[valid_idxs]
-
-        exits = np.full(len(flattened), False)
-        exits[rand_idxs.astype(int)] = True
-        exits = exits.reshape(entries.shape, order='F')
-        return cls(exits)
-
-    @classmethod
-    @has_type(1, Array2D)
-    @to_dim2(1)
-    def generate_entries_and_exits(cls, ts, entry_func, exit_func):
+    def generate_entries_and_exits(cls, shape, entry_func_nb, exit_func_nb, *args):
         """Generate entry and exit signals one after another iteratively.
-
         Use this if your entries depend on previous exit signals, otherwise generate entries first."""
-
-        # Do not forget to wrap entry_func and exit_func with @njit in your code!
-        entries, exits = generate_entries_and_exits(ts, entry_func, exit_func)
+        entries, exits = generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args)
         return cls(entries), cls(exits)
 
-    ######################
-    # Boolean operations #
-    ######################
+    @to_dim2('self')
+    def generate_random_exits(self, seed=None):
+        """Generate an exit signal after every entry signal randomly."""
+        exits = generate_random_exits_nb(self, seed)
+        return Signals(exits)
 
-    @to_dim2(0)
-    def fshift(self, n):
-        """Shift the elements to the right."""
-        return fshift(self, n)
+    @to_dim2('self')
+    def generate_exits(self, exit_func_nb, *args, only_first=True):
+        """Generate an exit signal after every entry signal using exit_func."""
+        exits = generate_exits_nb(self, exit_func_nb, only_first, *args)
+        return Signals(exits)
 
-    @to_dim2(0)
-    def bshift(self, n):
-        """Shift the elements to the left."""
-        return bshift(self, n)
-
-    @to_dim2(0)
-    def first(self):
-        """Set True at the first event in each series of consecutive events."""
-        return self & ~self.fshift(1)
-
-    @to_dim2(0)
-    def last(self):
-        """Set True at the last event in each series of consecutive events."""
-        return self & ~self.bshift(1)
-
-    @to_dim2(0)
-    def rank(self):
-        """Assign position to each event in each series of consecutive events."""
-        idxs = np.nonzero(self.first().astype(int))
-        ranks = np.zeros(self.shape)
-        cum = np.array(np.cumsum(self.astype(int), axis=0))
-        ranks[idxs] = cum[idxs]
-        ranks = cum - ffill(ranks) + 1
-        ranks[~self] = 0
-        return ranks  # produces np.ndarray, not Signals!
-
-    @to_dim2(0)
-    def first_nst(self, n):
-        """Set True at the event that is n data points after the first event."""
-        return Signals(self.rank() == n)
-
-    @to_dim2(0)
-    def from_first_nst(self, n):
-        """Set True at the event that at least n data points after the first event."""
-        return Signals(self.rank() >= n)
-
-    @to_dim1(0)
+    @to_dim1('self')
     def plot(self, index=None, label=None, ax=None, **kwargs):
         """Plot signals as a line."""
         no_ax = ax is None
