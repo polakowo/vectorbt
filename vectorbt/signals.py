@@ -10,7 +10,7 @@ register_matplotlib_converters()
 # ############# Numba functions ############# #
 
 
-@njit(b1[:, :](UniTuple(i8, 2), i8, optional(i8), optional(i8)))  # 1.17 ms vs 56.4 ms for vectorized
+@njit(b1[:, :](UniTuple(i8, 2), i8, optional(i8), optional(i8)), cache=True)  # 1.17 ms vs 56.4 ms for vectorized
 def generate_random_entries_nb(shape, n, every_nth, seed):
     """Randomly generate entry signals."""
     if seed is not None:
@@ -24,7 +24,7 @@ def generate_random_entries_nb(shape, n, every_nth, seed):
     return a
 
 
-@njit(b1[:, :](b1[:, :], optional(i8)))  # 3.01 ms vs 3.81 ms for vectorized
+@njit(b1[:, :](b1[:, :], optional(i8)), cache=True)  # 3.01 ms vs 3.81 ms for vectorized
 def generate_random_exits_nb(entries, seed):
     """Randomly generate at least one exit signal between two entry signals."""
     if seed is not None:
@@ -120,7 +120,7 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
     return entries, exits
 
 
-@njit(i8[:, :](b1[:, :]))
+@njit(i8[:, :](b1[:, :]), cache=True)
 def rank_true_nb(a):
     """Rank over each partition of true values."""
     b = np.zeros(a.shape, dtype=i8)
@@ -135,7 +135,7 @@ def rank_true_nb(a):
     return b
 
 
-@njit(i8[:, :](b1[:, :]))
+@njit(i8[:, :](b1[:, :]), cache=True)
 def rank_false_nb(a):
     """Rank over each partition of false values (must come after at least one true)."""
     b = np.zeros(a.shape, dtype=i8)
@@ -157,7 +157,7 @@ def rank_false_nb(a):
 # You can, for example, perform Signals_1 & Signals_2 to get logical AND of both arrays
 # NOTE: We don't implement backward operations to avoid look-ahead bias!
 
-@njit(b1[:, :](b1[:, :], i8, b1))
+@njit(b1[:, :](b1[:, :], i8, b1), cache=True)
 def prepend_nb(a, n, fill_value):
     """Prepend n values to the array."""
     b = np.full((a.shape[0]+n, a.shape[1]), fill_value, dtype=a.dtype)
@@ -165,38 +165,38 @@ def prepend_nb(a, n, fill_value):
     return b
 
 
-@njit(b1[:, :](b1[:, :], i8))
+@njit(b1[:, :](b1[:, :], i8), cache=True)
 def fshift_nb(a, n):
     """Shift forward by n."""
     a = prepend_nb(a, n, False)
     return a[:-n, :]
 
 
-@njit(b1[:, :](b1[:, :]))
+@njit(b1[:, :](b1[:, :]), cache=True)
 def first_nb(a):
     """Select the first true value in each row of true values."""
     return a & ~fshift_nb(a, 1)
 
 
-@njit(b1[:, :](b1[:, :], i8))
+@njit(b1[:, :](b1[:, :], i8), cache=True)
 def first_nst_nb(a, n):
     """Select the nst true value in each row of true values."""
     return rank_true_nb(a) == n
 
 
-@njit(b1[:, :](b1[:, :], i8))
+@njit(b1[:, :](b1[:, :], i8), cache=True)
 def from_first_nst_nb(a, n):
     """Select the nst true value and beyond in each row of true values."""
     return rank_true_nb(a) >= n
 
 
-@njit(b1[:, :](b1[:, :], i8))
+@njit(b1[:, :](b1[:, :], i8), cache=True)
 def last_nst_nb(a, n):
     """Select the nst false value after a row of true values."""
     return rank_false_nb(a) == n
 
 
-@njit(b1[:, :](b1[:, :], i8))
+@njit(b1[:, :](b1[:, :], i8), cache=True)
 def from_last_nst_nb(a, n):
     """Select the nst false value and beyond after a row of true values."""
     return rank_false_nb(a) >= n
@@ -218,15 +218,10 @@ def from_last_nst_nb(a, n):
 class Signals(np.ndarray):
     """Signals class extends the np.ndarray class by implementing boolean operations."""
 
+    @to_2d('input_array')
+    @has_dtype('input_array', np.bool_)
     def __new__(cls, input_array):
-        obj = np.asarray(input_array).view(cls)
-        if obj.ndim == 1:
-            obj = obj[:, None]  # expand
-        if obj.ndim != 2:
-            raise ValueError("Argument input_array must be a two-dimensional array")
-        if obj.dtype != np.bool:
-            raise TypeError("dtype must be np.bool")
-        return obj
+        return np.asarray(input_array).view(cls)
 
     @classmethod
     def falses(cls, shape):
@@ -248,19 +243,19 @@ class Signals(np.ndarray):
         entries, exits = generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args)
         return cls(entries), cls(exits)
 
-    @to_dim2('self')
+    @to_2d('self')
     def generate_random_exits(self, seed=None):
         """Generate an exit signal after every entry signal randomly."""
         exits = generate_random_exits_nb(self, seed)
         return Signals(exits)
 
-    @to_dim2('self')
+    @to_2d('self')
     def generate_exits(self, exit_func_nb, *args, only_first=True):
         """Generate an exit signal after every entry signal using exit_func."""
         exits = generate_exits_nb(self, exit_func_nb, only_first, *args)
         return Signals(exits)
 
-    @to_dim1('self')
+    @to_1d('self')
     def plot(self, index=None, label=None, ax=None, **kwargs):
         """Plot signals as a line."""
         no_ax = ax is None

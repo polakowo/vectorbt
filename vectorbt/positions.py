@@ -11,7 +11,7 @@ register_matplotlib_converters()
 # ############# Numba functions ############# #
 
 
-@njit(i1[:, :](b1[:, :], b1[:, :]))
+@njit(i1[:, :](b1[:, :], b1[:, :]), cache=True)
 def from_signals_nb(entries, exits):
     positions = np.zeros(entries.shape, dtype=i1)
     for j in range(entries.shape[1]):
@@ -33,14 +33,10 @@ def from_signals_nb(entries, exits):
 
 
 class Positions(np.ndarray):
+    @to_2d('input_array')
+    @has_dtype('input_array', np.int8)
     def __new__(cls, input_array):
         obj = np.asarray(input_array).view(cls)
-        if obj.ndim == 1:
-            obj = obj[:, None]  # expand
-        if obj.ndim != 2:
-            raise ValueError("Argument input_array must be a two-dimensional array")
-        if obj.dtype != np.int8:
-            raise TypeError("dtype must be np.int8")
         if not ((obj >= -1) & (obj <= 1)).all():
             raise TypeError("Values must be one of -1, 0, or 1")
         return obj
@@ -48,14 +44,14 @@ class Positions(np.ndarray):
     @classmethod
     @has_type('entries', Signals)
     @has_type('exits', Signals)
-    @broadcast_both('entries', 'exits')
+    @broadcast('entries', 'exits')
     def from_signals(cls, entries, exits):
         """Generate positions from entry and exit signals."""
         return cls(from_signals_nb(entries, exits))
 
-    @to_dim1('self')
-    @to_dim1('ts')
     @has_type('ts', TimeSeries)
+    @to_1d('self')
+    @to_1d('ts')
     def plot(self, ts=None, index=None, ax=None, **kwargs):
         """Plot position markers on top of ts."""
         pos_idxs = np.argwhere(self == 1).transpose()[0]

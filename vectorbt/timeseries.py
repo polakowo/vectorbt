@@ -15,7 +15,7 @@ register_matplotlib_converters()
 # They all move along the first axis (axis=0)
 
 
-@njit(f8[:, :](f8[:, :], b1[:, :], f8))
+@njit(f8[:, :](f8[:, :], b1[:, :], f8), cache=True)
 def set_by_mask_nb(a, mask, value):
     """Set value by 2D boolean mask."""
     b = a.copy()
@@ -24,13 +24,13 @@ def set_by_mask_nb(a, mask, value):
     return b
 
 
-@njit(f8[:, :](f8[:, :], f8))
+@njit(f8[:, :](f8[:, :], f8), cache=True)
 def fillna_nb(a, fill_value):
     """Fill NaNs with fill_value."""
     return set_by_mask_nb(a, np.isnan(a), fill_value)
 
 
-@njit(f8[:, :](f8[:, :], i8, f8))
+@njit(f8[:, :](f8[:, :], i8, f8), cache=True)
 def prepend_nb(a, n, fill_value):
     """Prepend n values to the array."""
     b = np.full((a.shape[0]+n, a.shape[1]), fill_value, dtype=a.dtype)
@@ -38,7 +38,7 @@ def prepend_nb(a, n, fill_value):
     return b
 
 
-@njit(f8[:, :](f8[:, :], i8))
+@njit(f8[:, :](f8[:, :], i8), cache=True)
 def fshift_nb(a, n):
     """Shift forward by n."""
     a = prepend_nb(a, n, np.nan)
@@ -46,6 +46,14 @@ def fshift_nb(a, n):
 
 
 @njit(f8[:, :](f8[:, :]))
+def diff_nb(a):
+    b = np.full_like(a, np.nan)
+    for i in range(a.shape[1]):
+        b[1:, i] = np.diff(a[:, i].copy())
+    return b
+
+
+@njit(f8[:, :](f8[:, :]), cache=True)
 def pct_change_nb(a):
     """Compute the percentage change from the immediately previous row."""
     b = np.full_like(a, np.nan)
@@ -54,7 +62,7 @@ def pct_change_nb(a):
     return b
 
 
-@njit(f8[:, :](f8[:, :]))
+@njit(f8[:, :](f8[:, :]), cache=True)
 def ffill_nb(a):
     """Fill NaNs with the last value."""
     b = np.empty_like(a)
@@ -69,7 +77,7 @@ def ffill_nb(a):
     return b
 
 
-@njit(f8[:, :, :](f8[:, :], i8))
+@njit(f8[:, :, :](f8[:, :], i8), cache=True)
 def _rolling_window_nb(a, window):
     """Rolling window over the array.
 
@@ -81,7 +89,7 @@ def _rolling_window_nb(a, window):
     return strided  # raw output
 
 
-@njit(f8[:, :](f8[:, :, :]))
+@njit(f8[:, :](f8[:, :, :]), cache=True)
 def _nanmean_nb(a):
     # numba doesn't support axis kwarg in np.nan_ functions
     b = np.empty((a.shape[0], a.shape[2]), dtype=a.dtype)
@@ -91,7 +99,7 @@ def _nanmean_nb(a):
     return b
 
 
-@njit(f8[:, :](f8[:, :, :]))
+@njit(f8[:, :](f8[:, :, :]), cache=True)
 def _nanstd_nb(a):
     # numba doesn't support axis kwarg in np.nan_ functions
     b = np.empty((a.shape[0], a.shape[2]), dtype=a.dtype)
@@ -101,7 +109,7 @@ def _nanstd_nb(a):
     return b
 
 
-@njit(f8[:, :](f8[:, :, :]))
+@njit(f8[:, :](f8[:, :, :]), cache=True)
 def _nanmax_nb(a):
     # numba doesn't support axis kwarg in np.nan_ functions
     b = np.empty((a.shape[0], a.shape[2]), dtype=a.dtype)
@@ -111,28 +119,28 @@ def _nanmax_nb(a):
     return b
 
 
-@njit(f8[:, :](f8[:, :], optional(i8)))
+@njit(f8[:, :](f8[:, :], optional(i8)), cache=True)
 def rolling_mean_nb(a, window):
     if window is None:  # expanding
         window = a.shape[0]
     return _nanmean_nb(_rolling_window_nb(a, window))
 
 
-@njit(f8[:, :](f8[:, :], optional(i8)))
+@njit(f8[:, :](f8[:, :], optional(i8)), cache=True)
 def rolling_std_nb(a, window):
     if window is None:  # expanding
         window = a.shape[0]
     return _nanstd_nb(_rolling_window_nb(a, window))
 
 
-@njit(f8[:, :](f8[:, :], optional(i8)))
+@njit(f8[:, :](f8[:, :], optional(i8)), cache=True)
 def rolling_max_nb(a, window):
     if window is None:  # expanding
         window = a.shape[0]
     return _nanmax_nb(_rolling_window_nb(a, window))
 
 
-@njit(f8[:](f8[:], i8))
+@njit(f8[:](f8[:], i8), cache=True)
 def _ewma_nb(arr_in, window):
     # https://stackoverflow.com/a/51392341/8141780
     n = arr_in.shape[0]
@@ -148,7 +156,7 @@ def _ewma_nb(arr_in, window):
     return ewma
 
 
-@njit(f8[:](f8[:], i8))
+@njit(f8[:](f8[:], i8), cache=True)
 def _ewma_infinite_hist_nb(arr_in, window):
     # https://stackoverflow.com/a/51392341/8141780
     n = arr_in.shape[0]
@@ -160,7 +168,7 @@ def _ewma_infinite_hist_nb(arr_in, window):
     return ewma
 
 
-@njit(f8[:, :](f8[:, :], optional(i8), b1))
+@njit(f8[:, :](f8[:, :], optional(i8), b1), cache=True)
 def ewma_nb(a, window, adjust):
     """Exponential weighted moving average."""
     b = np.empty_like(a)
@@ -174,7 +182,7 @@ def ewma_nb(a, window, adjust):
     return b
 
 
-@njit(f8[:, :](f8[:, :]))
+@njit(f8[:, :](f8[:, :]), cache=True)
 def cumsum_nb(a):
     """Cumulative sum (axis=0)."""
     b = np.empty_like(a, dtype=a.dtype)
@@ -183,7 +191,7 @@ def cumsum_nb(a):
     return b
 
 
-@njit(f8[:, :](f8[:, :]))
+@njit(f8[:, :](f8[:, :]), cache=True)
 def cumprod_nb(a):
     """Cumulative product (axis=0)."""
     b = np.empty_like(a, dtype=a.dtype)
@@ -234,8 +242,9 @@ class TimeSeries(np.ndarray):
     def full_like(cls, *args, **kwargs):
         return cls(np.full_like(*args, **kwargs))
 
-    @to_dim1('self')
-    @to_dim1('benchmark', allow_number=True)
+    @to_1d('self')
+    @to_1d('benchmark')
+    @broadcast_to('benchmark', 'self')
     def plot(self, index=None, label=None, benchmark=None, benchmark_label=None, ax=None, **kwargs):
         """Plot TimeSeries as a line."""
         no_ax = ax is None

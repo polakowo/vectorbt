@@ -9,7 +9,7 @@ from vectorbt.positions import Positions
 # ############# Numba functions ############# #
 
 
-@njit(f8[:, :](f8[:, :], i1[:, :], f8, f8[:, :], f8[:, :]))
+@njit(f8[:, :](f8[:, :], i1[:, :], f8, f8[:, :], f8[:, :]), cache=True)
 def equity_nb(ts, positions, investment, fees, slippage):
     equity = np.zeros_like(ts)
     for j in range(ts.shape[1]):
@@ -27,7 +27,7 @@ def equity_nb(ts, positions, investment, fees, slippage):
     return equity
 
 
-@njit(f8[:, :](f8[:, :], i1[:, :]))
+@njit(f8[:, :](f8[:, :], i1[:, :]), cache=True)
 def trade_profits_nb(equity, positions):
     trade_profits = np.zeros_like(equity)
     for j in range(equity.shape[1]):
@@ -43,7 +43,7 @@ def trade_profits_nb(equity, positions):
     return trade_profits
 
 
-@njit(f8[:, :](f8[:, :], i1[:, :]))
+@njit(f8[:, :](f8[:, :], i1[:, :]), cache=True)
 def trade_returns_nb(equity, positions):
     trade_returns = np.zeros_like(equity)
     for j in range(equity.shape[1]):
@@ -66,7 +66,7 @@ class Portfolio():
 
     @has_type('ts', TimeSeries)
     @has_type('positions', Positions)
-    @broadcast_both('ts', 'positions')
+    @broadcast('ts', 'positions')
     @broadcast_to('fees', 'ts')
     @broadcast_to('slippage', 'ts')
     @to_dtype('fees', np.float64)
