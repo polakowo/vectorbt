@@ -4,9 +4,7 @@ from vectorbt.utils.decorators import *
 from numba import njit, i1, b1
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
-from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
+import plotly.graph_objects as go
 
 # ############# Numba functions ############# #
 
@@ -42,46 +40,78 @@ class Positions(np.ndarray):
         return obj
 
     @classmethod
+    @broadcast('entries', 'exits')
     @has_type('entries', Signals)
     @has_type('exits', Signals)
-    @broadcast('entries', 'exits')
     def from_signals(cls, entries, exits):
         """Generate positions from entry and exit signals."""
         return cls(from_signals_nb(entries, exits))
 
+    @to_2d('self')
+    @to_2d('ts')
+    @broadcast('self', 'ts')
     @has_type('ts', TimeSeries)
-    @to_1d('self')
-    @to_1d('ts')
-    def plot(self, ts=None, index=None, ax=None, **kwargs):
-        """Plot position markers on top of ts."""
-        pos_idxs = np.argwhere(self == 1).transpose()[0]
-        neg_idxs = np.argwhere(self == -1).transpose()[0]
+    def plot(self,
+             ts,
+             column=None,
+             plot_ts=True,
+             index=None,
+             buy_scatter_kwargs={},
+             sell_scatter_kwargs={},
+             figsize=(800, 300),
+             return_fig=False,
+             static=True,
+             fig=None,
+             **kwargs):
 
-        no_ax = ax is None
-        if no_ax:
-            fig, ax = plt.subplots()
-
-        if ts is not None:
-            # Plot TimeSeries
-            ax = ts.plot(index=index, ax=ax, **kwargs)
-            buy_vals = ts[pos_idxs]
-            sell_vals = ts[neg_idxs]
-        else:
-            buy_vals = np.full(len(pos_idxs), 1)
-            sell_vals = np.full(len(neg_idxs), -1)
-
+        if column is None:
+            if self.shape[1] == 1:
+                column = 0
+            else:
+                raise ValueError("For an array with multiple columns, you must pass a column index")
+        # Plot TimeSeries
+        if plot_ts:
+            fig = ts.plot(column, index=index, figsize=figsize, return_fig=True, fig=fig, **kwargs)
+        elif fig is None:
+            raise ValueError("Plot TimeSeries or specify a FigureWidget object")
         # Plot Positions
-        buy_df = pd.DataFrame(buy_vals, columns=['Buy'])
-        sell_df = pd.DataFrame(sell_vals, columns=['Sell'])
-        if index is not None:
-            buy_df.index = pd.Index(index)[pos_idxs]
-            sell_df.index = pd.Index(index)[neg_idxs]
-        else:
-            buy_df.index = pos_idxs
-            sell_df.index = neg_idxs
-        buy_df.plot(marker='^', color='lime', markersize=10, linestyle='None', ax=ax)
-        sell_df.plot(marker='v', color='orangered', markersize=10, linestyle='None', ax=ax)
+        positions = self[:, column]
+        ts = ts[:, column]
+        buy_idxs = np.where(positions == 1)[0]
+        sell_idxs = np.where(positions == -1)[0]
+        if index is None:
+            index = np.arange(positions.shape[0])
+        buy_scatter = go.Scatter(
+            x=index[buy_idxs],
+            y=ts[buy_idxs],
+            mode='markers',
+            marker=go.scatter.Marker(
+                symbol='triangle-up',
+                color='lime',
+                size=10
+            ),
+            name='Buy'
+        )
+        buy_scatter.update(**buy_scatter_kwargs)
+        fig.add_trace(buy_scatter)
+        sell_scatter = go.Scatter(
+            x=index[sell_idxs],
+            y=ts[sell_idxs],
+            mode='markers',
+            marker=go.scatter.Marker(
+                symbol='triangle-down',
+                color='orangered',
+                size=10
+            ),
+            name='Sell'
+        )
+        sell_scatter.update(**sell_scatter_kwargs)
+        fig.add_trace(sell_scatter)
 
-        if no_ax:
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        return ax
+        if return_fig:
+            return fig
+        else:
+            if static:
+                fig.show(renderer="png", width=figsize[0], height=figsize[1])
+            else:
+                fig.show()
