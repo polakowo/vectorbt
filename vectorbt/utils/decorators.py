@@ -37,7 +37,7 @@ def _get_arg(arg_name, func, *args, **kwargs):
 
 
 def _set_arg(arg, arg_name, func, *args, **kwargs):
-    """Motify arguments or keyword arguments to include new arg."""
+    """Modify arguments or keyword arguments to include new arg."""
     func_params = signature(func).parameters
     if func_params[arg_name].default is Parameter.empty:
         # modify args
@@ -107,14 +107,45 @@ def to_dtype(arg_name, dtype):
     return to_dtype_decorator
 
 
-def _to_1d(arg):
+def have_same_shape(arg1_name, arg2_name, along_axis=None):
+    def have_same_shape_decorator(func):
+        @wraps(func)
+        def wrapper_decorator(*args, **kwargs):
+            """If both arrays do not have the same shape, raise an exception."""
+            arg1 = _get_arg(arg1_name, func, *args, **kwargs)
+            arg2 = _get_arg(arg2_name, func, *args, **kwargs)
+            if arg1 is None or arg2 is None:
+                return func(*args, **kwargs)
+            if not isinstance(arg1, np.ndarray):
+                arg1 = np.asarray(arg1)
+            if not isinstance(arg2, np.ndarray):
+                arg2 = np.asarray(arg2)
+            if along_axis is None:
+                if arg1.shape != arg2.shape:
+                    raise ValueError(f"Arguments {arg1_name} and {arg2_name} must have the same shape")
+            else:
+                if isinstance(along_axis, tuple):
+                    if arg1.shape[along_axis[0]] != arg2.shape[along_axis[1]]:
+                        raise ValueError(f"Axis {along_axis[0]} of argument {arg1_name} must be the same as axis {along_axis[1]} of argument {arg2_name}")
+                else:
+                    if arg1.shape[along_axis] != arg2.shape[along_axis]:
+                        raise ValueError(f"Arguments {arg1_name} and {arg2_name} must have the same axis {along_axis}")
+            return func(*args, **kwargs)
+        return wrapper_decorator
+    return have_same_shape_decorator
+
+
+def _to_1d(arg, arg_name):
     if not isinstance(arg, np.ndarray):
         arg = np.asarray(arg)
+    if arg.ndim == 2:
+        if arg.shape[1] == 1:
+            return arg[:, 0]
     if arg.ndim == 1:
         return arg
     elif arg.ndim == 0:
         return arg.reshape((1,))
-    raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 1 dimension")
+    raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array {arg_name} to 1 dimension")
 
 
 def to_1d(arg_name):
@@ -125,26 +156,26 @@ def to_1d(arg_name):
             arg = _get_arg(arg_name, func, *args, **kwargs)
             if arg is None:
                 return func(*args, **kwargs)
-            arg = _to_1d(arg)
+            arg = _to_1d(arg, arg_name)
             args, kwargs = _set_arg(arg, arg_name, func, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapper_decorator
     return to_1d_decorator
 
 
-def _to_2d(arg):
+def _to_2d(arg, expand_axis):
     if not isinstance(arg, np.ndarray):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         return arg
     elif arg.ndim == 1:
-        return arg.reshape((arg.shape[0], 1))
+        return np.expand_dims(arg, expand_axis)
     elif arg.ndim == 0:
         return arg.reshape((1, 1))
     raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions")
 
 
-def to_2d(arg_name):
+def to_2d(arg_name, expand_axis=1):
     def to_2d_decorator(func):
         @wraps(func)
         def wrapper_decorator(*args, **kwargs):
@@ -152,7 +183,7 @@ def to_2d(arg_name):
             arg = _get_arg(arg_name, func, *args, **kwargs)
             if arg is None:
                 return func(*args, **kwargs)
-            arg = _to_2d(arg)
+            arg = _to_2d(arg, expand_axis)
             args, kwargs = _set_arg(arg, arg_name, func, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapper_decorator
@@ -226,9 +257,16 @@ def add_nb_methods(*nb_funcs):
     """Wrap numba functions as methods."""
     def wrapper(cls):
         for nb_func in nb_funcs:
-            @to_2d('self')
-            def array_operation(self, *args, nb_func=nb_func):
-                return cls(nb_func(self, *args))
+            def get_default_args(func):
+                return {
+                    k: v.default
+                    for k, v in signature(func).parameters.items()
+                    if v.default is not Parameter.empty
+                }
+            default_kwargs = get_default_args(nb_func)
+            @to_2d('self') # default shape for all our classes
+            def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
+                return cls(nb_func(self, *args, **{**default_kwargs, **kwargs})) # kwargs must be specified for numba
             setattr(cls, nb_func.__name__.replace('_nb', ''), array_operation)
         return cls
     return wrapper
