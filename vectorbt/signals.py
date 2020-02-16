@@ -3,9 +3,7 @@ from numba.types.containers import UniTuple
 from numba import njit, f8, i8, b1, optional
 import numpy as np
 import pandas as pd
-from matplotlib import pyplot as plt
-from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
+import plotly.graph_objects as go
 
 # ############# Numba functions ############# #
 
@@ -120,34 +118,39 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
     return entries, exits
 
 
-@njit(i8[:, :](b1[:, :]), cache=True)
-def rank_true_nb(a):
-    """Rank over each partition of true values."""
+@njit(i8[:, :](b1[:, :], b1), cache=True)
+def rank_true_nb(a, after_false):
+    """Rank over each partition of true values (optional: must come after at least one false)."""
     b = np.zeros(a.shape, dtype=i8)
     for j in range(a.shape[1]):
-        inc = 0
+        if after_false:
+            inc = -1
+        else:
+            inc = 0
         for i in range(a.shape[0]):
             if a[i, j]:
-                inc += 1
-                b[i, j] = inc
+                if not after_false or (after_false and inc != -1):
+                    inc += 1
+                    b[i, j] = inc
             else:
                 inc = 0
     return b
 
 
-@njit(i8[:, :](b1[:, :]), cache=True)
-def rank_false_nb(a):
-    """Rank over each partition of false values (must come after at least one true)."""
-    b = np.zeros(a.shape, dtype=i8)
-    for j in range(a.shape[1]):
-        inc = -1
-        for i in range(a.shape[0]):
-            if not a[i, j]:
-                if inc != -1:
-                    inc += 1
-                    b[i, j] = inc
-            else:
-                inc = 0
+@njit(i8[:, :](b1[:, :], b1), cache=True)
+def rank_false_nb(a, after_true):
+    """Rank over each partition of false values (optional: must come after at least one true)."""
+    return rank_true_nb(~a, after_true)
+
+
+@njit(b1[:, :](b1[:, :], optional(i8)), cache=True)
+def shuffle(a, seed=None):
+    """Shuffle along first axis."""
+    if seed is not None:
+        np.random.seed(seed)
+    b = np.full_like(a, np.nan)
+    for i in range(a.shape[1]):
+        b[:, i] = np.random.permutation(a[:, i])
     return b
 
 
@@ -172,34 +175,40 @@ def fshift_nb(a, n):
     return a[:-n, :]
 
 
-@njit(b1[:, :](b1[:, :]), cache=True)
-def first_nb(a):
+@njit(b1[:, :](b1[:, :], b1), cache=True)
+def first_true_nb(a, after_false=False):
     """Select the first true value in each row of true values."""
-    return a & ~fshift_nb(a, 1)
+    return rank_true_nb(a, after_false) == 1
 
 
-@njit(b1[:, :](b1[:, :], i8), cache=True)
-def first_nst_nb(a, n):
+@njit(b1[:, :](b1[:, :], b1), cache=True)
+def first_false_nb(a, after_true=False):
+    """Select the first false value in each row of false values."""
+    return rank_false_nb(a, after_true) == 1
+
+
+@njit(b1[:, :](b1[:, :], i8, b1), cache=True)
+def nst_true_nb(a, n, after_false=False):
     """Select the nst true value in each row of true values."""
-    return rank_true_nb(a) == n
+    return rank_true_nb(a, after_false) == n
 
 
-@njit(b1[:, :](b1[:, :], i8), cache=True)
-def from_first_nst_nb(a, n):
+@njit(b1[:, :](b1[:, :], i8, b1), cache=True)
+def nst_false_nb(a, n, after_true=False):
+    """Select the nst false value in each row of false values."""
+    return rank_false_nb(a, after_true) == n
+
+
+@njit(b1[:, :](b1[:, :], i8, b1), cache=True)
+def from_nst_true_nb(a, n, after_false=False):
     """Select the nst true value and beyond in each row of true values."""
-    return rank_true_nb(a) >= n
+    return rank_true_nb(a, after_false) >= n
 
 
-@njit(b1[:, :](b1[:, :], i8), cache=True)
-def last_nst_nb(a, n):
-    """Select the nst false value after a row of true values."""
-    return rank_false_nb(a) == n
-
-
-@njit(b1[:, :](b1[:, :], i8), cache=True)
-def from_last_nst_nb(a, n):
-    """Select the nst false value and beyond after a row of true values."""
-    return rank_false_nb(a) >= n
+@njit(b1[:, :](b1[:, :], i8, b1), cache=True)
+def from_nst_false_nb(a, n, after_true=False):
+    """Select the nst false value and beyond in each row of false values."""
+    return rank_false_nb(a, after_true) >= n
 
 # ############# Main class ############# #
 
@@ -209,11 +218,13 @@ def from_last_nst_nb(a, n):
 @add_nb_methods(
     prepend_nb,
     fshift_nb,
-    first_nb,
-    first_nst_nb,
-    from_first_nst_nb,
-    last_nst_nb,
-    from_last_nst_nb
+    first_true_nb,
+    first_false_nb,
+    nst_true_nb,
+    nst_false_nb,
+    from_nst_true_nb,
+    from_nst_false_nb,
+    shuffle
 )
 class Signals(np.ndarray):
     """Signals class extends the np.ndarray class by implementing boolean operations."""
@@ -255,23 +266,48 @@ class Signals(np.ndarray):
         exits = generate_exits_nb(self, exit_func_nb, only_first, *args)
         return Signals(exits)
 
-    @to_1d('self')
-    def plot(self, index=None, label=None, ax=None, **kwargs):
-        """Plot signals as a line."""
-        no_ax = ax is None
-        if no_ax:
-            fig, ax = plt.subplots()
+    @to_2d('self')
+    def plot(self,
+             column=None,
+             index=None,
+             label='Signals',
+             layout_kwargs={},
+             scatter_kwargs={},
+             figsize=(800, 300),
+             return_fig=False,
+             static=True,
+             fig=None):
 
+        if column is None:
+            if self.shape[1] == 1:
+                column = 0
+            else:
+                raise ValueError("For an array with multiple columns, you must pass a column index")
+        signals = self[:, column]
+        if index is None:
+            index = np.arange(signals.shape[0])
+        if fig is None:
+            fig = go.FigureWidget()
+            fig.update_layout(
+                autosize=False,
+                width=figsize[0],
+                height=figsize[1],
+                margin=go.layout.Margin(
+                    b=30,
+                    t=30
+                ),
+                showlegend=True,
+                hovermode='closest'
+            )
         # Plot Signals
-        df = pd.DataFrame(self.astype(int))
-        if index is not None:
-            df.index = pd.Index(index)
-        if label is not None:
-            df.columns = [label]
-        else:
-            df.columns = ['Signals']
-        df.plot(ax=ax, **kwargs)
+        scatter = go.Scatter(x=index, y=signals, mode='lines', name=label)
+        scatter.update(**scatter_kwargs)
+        fig.add_trace(scatter)
 
-        if no_ax:
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        return ax
+        if return_fig:
+            return fig
+        else:
+            if static:
+                fig.show(renderer="png", width=figsize[0], height=figsize[1])
+            else:
+                fig.show()
