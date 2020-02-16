@@ -4,9 +4,7 @@ import pandas as pd
 import inspect
 import sys
 from numba import njit, f8, i8, b1, optional
-from matplotlib import pyplot as plt
-from pandas.plotting import register_matplotlib_converters
-register_matplotlib_converters()
+import plotly.graph_objects as go
 
 # ############# Numba functions ############# #
 
@@ -75,6 +73,13 @@ def ffill_nb(a):
                 b[i, j] = a[i, j]
                 maxval = b[i, j]
     return b
+
+
+@njit(f8[:, :](f8[:], i8), cache=True)
+def _rolling_window_1d_nb(a, window):
+    shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
+    strides = a.strides + (a.strides[-1],)
+    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
 
 
 @njit(f8[:, :, :](f8[:, :], i8), cache=True)
@@ -216,23 +221,10 @@ class TimeSeries(np.ndarray):
     Similar to pd.DataFrame, but optimized for complex matrix operations.
     NOTE: There is no index nor columns vars - you will have to handle them separately."""
 
+    @to_2d('input_array')
+    @has_dtype('input_array', np.float64)
     def __new__(cls, input_array):
-        # Input array is an already formed ndarray instance
-        # We first cast to be our class type
-        obj = np.asarray(input_array).view(cls)
-        if obj.ndim == 1:
-            obj = obj[:, None]  # expand
-        if obj.ndim != 2:
-            raise ValueError("Argument input_array must be a two-dimensional array")
-        if obj.dtype != np.float64:
-            raise TypeError("dtype must be np.float64")
-
-        # Be aware: index and columns do not change when slicing, subscribing or modifying the array!
-        # Since arrays are meant to be the same shape throught processing.
-        # If you want to change these variables as well, do it explicitly in your code.
-
-        # Finally, we must return the newly created object:
-        return obj
+        return np.asarray(input_array).view(cls)
 
     @classmethod
     def full(cls, *args, **kwargs):
@@ -243,52 +235,85 @@ class TimeSeries(np.ndarray):
         return cls(np.full_like(*args, **kwargs))
 
     @to_1d('self')
-    @to_1d('benchmark')
+    def rolling_window_1d(self, window, step=1):
+        return TimeSeries(_rolling_window_1d_nb(self, window).transpose()[:, ::step])
+
+    @to_2d('self')
+    @to_2d('benchmark')
     @broadcast_to('benchmark', 'self')
-    def plot(self, index=None, label=None, benchmark=None, benchmark_label=None, ax=None, **kwargs):
-        """Plot TimeSeries as a line."""
-        no_ax = ax is None
-        if no_ax:
-            fig, ax = plt.subplots()
+    def plot(self,
+             column=None,
+             label='TimeSeries',
+             benchmark=None,
+             benchmark_label='Benchmark',
+             index=None,
+             layout_kwargs={},
+             benchmark_scatter_kwargs={},
+             ts_scatter_kwargs={},
+             figsize=(800, 300),
+             return_fig=False,
+             static=True,
+             fig=None):
 
-        # Plot TimeSeries
-        ts_df = pd.DataFrame(self)
-        if index is not None:
-            ts_df.index = pd.Index(index)
-        if label is not None:
-            ts_df.columns = [label]
-        else:
-            ts_df.columns = ['TimeSeries']
-        ts_df.plot(ax=ax, **kwargs)
-
-        # Plot benchmark
-        if benchmark is not None:
-            if isinstance(benchmark, (int, float, complex)):
-                benchmark_df = pd.DataFrame(np.full(len(ts_df.index), benchmark))
-                benchmark_df.columns = [str(benchmark)]
-                benchmark_df.index = ts_df.index
+        if column is None:
+            if self.shape[1] == 1:
+                column = 0
             else:
-                benchmark_df = pd.DataFrame(np.asarray(benchmark))
-                benchmark_df.columns = ['Benchmark']
-                benchmark_df.index = ts_df.index
-            if benchmark_label is not None:
-                benchmark_df.columns = [benchmark_label]
-            benchmark_df.plot(ax=ax)
-            ax.fill_between(
-                ts_df.index,
-                ts_df.iloc[:, 0],
-                benchmark_df.iloc[:, 0],
-                where=ts_df.iloc[:, 0] > benchmark_df.iloc[:, 0],
-                facecolor='#add8e6',
-                interpolate=True)
-            ax.fill_between(
-                ts_df.index,
-                ts_df.iloc[:, 0],
-                benchmark_df.iloc[:, 0],
-                where=ts_df.iloc[:, 0] < benchmark_df.iloc[:, 0],
-                facecolor='#ffcccb',
-                interpolate=True)
+                raise ValueError("For an array with multiple columns, you must pass a column index")
+        ts = self[:, column]
+        if benchmark is not None:
+            benchmark = benchmark[:, column]
 
-        if no_ax:
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-        return ax
+        if index is None:
+            index = np.arange(ts.shape[0])
+        if fig is None:
+            fig = go.FigureWidget()
+            fig.update_layout(
+                autosize=False,
+                width=figsize[0],
+                height=figsize[1],
+                margin=go.layout.Margin(
+                    b=30,
+                    t=30
+                ),
+                showlegend=True,
+                hovermode='closest'
+            )
+            fig.update_layout(**layout_kwargs)
+
+        if benchmark is not None:
+            # Plot benchmark
+            benchmark_scatter = go.Scatter(
+                x=index,
+                y=benchmark,
+                mode='lines',
+                name=benchmark_label,
+                line_color='#ff7f0e'
+            )
+            benchmark_scatter.update(**benchmark_scatter_kwargs)
+            fig.add_trace(benchmark_scatter)
+            _min, _max = np.min(np.concatenate((ts, benchmark))), np.max(np.concatenate((ts, benchmark)))
+        else:
+            _min, _max = np.min(ts), np.max(ts)
+        # Plot TimeSeries
+        ts_scatter = go.Scatter(
+            x=index,
+            y=ts,
+            mode='lines',
+            name=label,
+            line_color='#1f77b4'
+        )
+        ts_scatter.update(**ts_scatter_kwargs)
+        fig.add_trace(ts_scatter)
+
+        # Adjust y-axis
+        space = 0.05 * (_max - _min)
+        fig.update_yaxes(range=[_min - space, _max + space])
+
+        if return_fig:
+            return fig
+        else:
+            if static:
+                fig.show(renderer="png", width=figsize[0], height=figsize[1])
+            else:
+                fig.show()
