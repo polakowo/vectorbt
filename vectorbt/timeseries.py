@@ -217,8 +217,7 @@ nb_funcs = [
 # Add numba functions as methods to the TimeSeries class
 @add_nb_methods(*nb_funcs)
 class TimeSeries(np.ndarray):
-    """Base class inherited by TimeSeries, Signals and Positions.
-    Similar to pd.DataFrame, but optimized for complex matrix operations.
+    """Similar to pd.DataFrame, but optimized for complex matrix operations.
     NOTE: There is no index nor columns vars - you will have to handle them separately."""
 
     @to_2d('input_array')
