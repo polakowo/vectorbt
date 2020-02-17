@@ -76,6 +76,7 @@ class OHLCV():
                 x=index,
                 y=volume,
                 marker_color=marker_colors,
+                marker_line_width=0,
                 name='Volume',
                 yaxis="y",
                 xaxis="x"
