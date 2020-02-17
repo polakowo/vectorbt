@@ -111,7 +111,7 @@ class Portfolio():
     def key_metrics_df(self):
         """Build dataframe with key metrics."""
         df = pd.DataFrame(columns=range(self.ts.shape[1]))
-        props = ['total_net_profit', 'avg_win', 'avg_loss', 'win_prob', 'loss_prob', 'appt', 'mdd']
+        props = ['num_trades', 'total_net_profit', 'avg_win', 'avg_loss', 'win_prob', 'loss_prob', 'appt', 'mdd']
         for prop in props:
             df.loc[prop, :] = getattr(self, prop)
         return df
@@ -159,16 +159,29 @@ class Portfolio():
         return avg_loss
 
     @property
+    def num_entries(self):
+        return np.sum(self.positions == 1)
+
+    @property
+    def num_exits(self):
+        return np.sum(self.positions == -1)
+
+    @property
+    def num_trades(self):
+        return np.sum(~np.isnan(self.trade_profits), axis=0)
+
+    @property
     def win_prob(self):
         """Profitability = % of total trades that resulted in profits."""
-        trade_profits = self.trade_profits.copy()
-        num_pos = np.sum(trade_profits > 0, axis=0)
-        num_all = np.sum(trade_profits != 0, axis=0)
-        return np.asarray(num_pos / num_all)
+        return np.asarray(np.sum(self.trade_profits > 0, axis=0) / self.num_trades)
 
     @property
     def loss_prob(self):
-        return 1 - self.win_prob
+        return np.asarray(np.sum(self.trade_profits < 0, axis=0) / self.num_trades)
+
+    @property
+    def profit_factor(self):
+        return self.sum_win / self.sum_loss
 
     @property
     def appt(self):
@@ -180,11 +193,11 @@ class Portfolio():
 
     @property
     def total_net_profit(self):
-        return self.sum_win - self.sum_loss
+        return self.equity[-1, :] - self.investment
 
     @property
-    def profit_factor(self):
-        return self.sum_win / self.sum_loss
+    def roi(self):
+        return self.total_net_profit / self.investment
 
     @property
     def mdd(self):
