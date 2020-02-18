@@ -1,7 +1,6 @@
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 from vectorbt.timeseries import TimeSeries
 import plotly.graph_objects as go
-
 
 class OHLCV():
     @have_same_shape('open', 'high')

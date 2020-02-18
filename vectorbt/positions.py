@@ -1,6 +1,6 @@
 from vectorbt.signals import Signals
 from vectorbt.timeseries import TimeSeries
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 from numba import njit, i1, b1
 import numpy as np
 import pandas as pd

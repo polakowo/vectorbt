@@ -6,7 +6,7 @@ from numba.typed import Dict
 from vectorbt.timeseries import ewma_nb, rolling_mean_nb, rolling_std_nb, diff_nb, \
     set_by_mask_nb, fillna_nb, prepend_nb, rolling_max_nb, pct_change_nb, ffill_nb
 
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 from vectorbt.signals import Signals, generate_exits_nb
 from vectorbt.timeseries import TimeSeries
 
@@ -243,20 +243,20 @@ def stoploss_exits_nb(ts, entries, stops, is_relative, only_first):
         exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = i_exits
     return exits
 
+class StopLoss():
+    @to_2d('ts')
+    @to_2d('entries')
+    @broadcast('ts', 'entries')
+    @broadcast_to_cube_of('stops', 'ts')
+    @has_type('ts', TimeSeries)
+    @has_type('entries', Signals)
+    # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
+    def __init__(self, ts, entries, stops, is_relative=True, only_first=True):
+        """A stop-loss is designed to limit an investor's loss on a security position. 
+        Setting a stop-loss order for 10% below the price at which you bought the stock 
+        will limit your loss to 10%."""
 
-@to_2d('ts')
-@to_2d('entries')
-@broadcast('ts', 'entries')
-@broadcast_to_cube_of('stops', 'ts')
-@has_type('ts', TimeSeries)
-@has_type('entries', Signals)
-# stops can be either a number, an array of numbers, or an array of matrices each of ts shape
-def price_hits_stop_loss(ts, entries, stops, is_relative=True, only_first=True):
-    """A stop-loss is designed to limit an investor's loss on a security position. 
-    Setting a stop-loss order for 10% below the price at which you bought the stock 
-    will limit your loss to 10%."""
-
-    return Signals(stoploss_exits_nb(ts, entries, stops, is_relative, only_first))
+        self.exits = Signals(stoploss_exits_nb(ts, entries, stops, is_relative, only_first))
 
 
 @njit(b1[:](b1[:, :], i8, i8, f8[:, :], f8[:, :], b1), cache=True)
@@ -287,17 +287,17 @@ def tstop_exits_nb(ts, entries, stops, is_relative, only_first):
         exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = i_exits
     return exits
 
+class TrailingStop():
+    @to_2d('ts')
+    @to_2d('entries')
+    @broadcast('ts', 'entries')
+    @broadcast_to_cube_of('stops', 'ts')
+    @has_type('ts', TimeSeries)
+    @has_type('entries', Signals)
+    # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
+    def __init__(self, ts, entries, stops, is_relative=True, only_first=True):
+        """A Trailing Stop order is a stop order that can be set at a defined percentage 
+        or amount away from the current market price. The main difference between a regular 
+        stop loss and a trailing stop is that the trailing stop moves as the price moves."""
 
-@to_2d('ts')
-@to_2d('entries')
-@broadcast('ts', 'entries')
-@broadcast_to_cube_of('stops', 'ts')
-@has_type('ts', TimeSeries)
-@has_type('entries', Signals)
-# stops can be either a number, an array of numbers, or an array of matrices each of ts shape
-def price_hits_trailing_stop(ts, entries, stops, is_relative=True, only_first=True):
-    """A Trailing Stop order is a stop order that can be set at a defined percentage 
-    or amount away from the current market price. The main difference between a regular 
-    stop loss and a trailing stop is that the trailing stop moves as the price moves."""
-
-    return Signals(tstop_exits_nb(ts, entries, stops, is_relative, only_first))
+        self.exits = Signals(tstop_exits_nb(ts, entries, stops, is_relative, only_first))

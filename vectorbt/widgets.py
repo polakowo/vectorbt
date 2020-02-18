@@ -2,7 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 import ipywidgets as widgets
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 
 
 class UpdatableFigureWidget(go.FigureWidget):

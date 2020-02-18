@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import njit, i1, f8
 from vectorbt.timeseries import pct_change_nb, fillna_nb, rolling_max_nb
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 from vectorbt.timeseries import TimeSeries
 from vectorbt.positions import Positions
 

@@ -1,4 +1,4 @@
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 from numba.types.containers import UniTuple
 from numba import njit, f8, i8, b1, optional
 import numpy as np

@@ -1,4 +1,4 @@
-from vectorbt.utils.decorators import *
+from vectorbt.decorators import *
 import numpy as np
 import pandas as pd
 import inspect
