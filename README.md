@@ -74,6 +74,8 @@ widgets.VBox([
 
 ![msft_heatmap_by_fees.gif](msft_heatmap_by_fees.gif)
 
+And we haven't played with slippage yet :)
+
 A more advanced example can be found [here](hello).
 
 #### How it works?
