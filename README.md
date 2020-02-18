@@ -13,9 +13,8 @@ import yfinance as yf
 # Prepare data
 msft = yf.Ticker("MSFT")
 history = msft.history(period="max")
-ohlcv = vbt.ohlcv.OHLCV.from_df(history)
+ohlcv = vbt.OHLCV.from_df(history)
 investment = 100 # $
-fees = 0.001 # %
 
 # Create window combinations
 windows = np.arange(2, 101)
@@ -24,10 +23,10 @@ fast_idxs, slow_idxs = np.asarray(list(comb)).transpose()
 fast_windows, slow_windows = windows[fast_idxs], windows[slow_idxs]
 
 # Calculate the performance of the strategy
-dmac = vbt.strategy.DMAC(ohlcv.open, fast_windows, slow_windows)
+dmac = vbt.DMAC(ohlcv.open, fast_windows, slow_windows)
 entries, exits = dmac.crossover_signals()
-positions = vbt.positions.Positions.from_signals(entries, exits)
-portfolio = vbt.portfolio.Portfolio(ohlcv.open, positions, investment=investment, fees=fees)
+positions = vbt.Positions.from_signals(entries, exits)
+portfolio = vbt.Portfolio(ohlcv.open, positions, investment=investment)
 tnp = portfolio.total_net_profit
 
 # Plot heatmap
@@ -35,12 +34,12 @@ tnp_matrix = np.empty((len(windows), len(windows)))
 tnp_matrix[fast_idxs, slow_idxs] = tnp
 tnp_matrix[slow_idxs, fast_idxs] = tnp # symmetry
 
-vbt.utils.widgets.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
+vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
 ```
 
 ![msft_heatmap.png](msft_heatmap.png)
 
-And here is a snippet for testing different fees on the same strategy interactively:
+The only problem with this image: we didn't include fees. Let's fix that, interactively:
 
 ```python
 import ipywidgets as widgets
