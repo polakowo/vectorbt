@@ -4,7 +4,7 @@ This package shares a similar idea as behind [most other Python backtesting pack
 
 Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Microsoft stock history in about 5 seconds:
 
-```
+```python
 import vectorbt as vbt
 import numpy as np
 import itertools
@@ -42,7 +42,7 @@ vbt.utils.widgets.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450))
 
 And here is a snippet for testing different fees on the same strategy interactively:
 
-```
+```python
 import ipywidgets as widgets
 
 fees_slider = widgets.FloatSlider(value=0, min=0, max=0.1, step=0.01)
