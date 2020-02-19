@@ -43,13 +43,13 @@ vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
 
 ![msft_heatmap.png](msft_heatmap.png)
 
-A more advanced example can be found [here](tests/Tests.ipynb).
+A more advanced example can be found [here](examples/Bitcoin_DMAC.ipynb).
 
 ## How it works?
 
 Each vectorbt class is a subclass of `np.ndarray` with a custom set of methods optimized for working with time series data. For example, the `Signals` class is a binary NumPy array supporting advanced binary operations. Each method is either vectorized or Numba compiled for best peformance; most of the times even a badly "looped" Numba is faster than vectorized NumPy though. Moreover, each object is stricly a 2-dimensional array, where first axis is index (time) and second axis are columns (features). Thus, similar to a `pd.DataFrame`, one can do a single operation to transform tons of columns simultaneously. This, for example, is the magic behind backtesting thousands of window combinations at once.
 
-To get more understanding, check [tests](examples/Bitcoin_DMAC.ipynb).
+For more details, check [tests](tests/Tests.ipynb).
 
 ## Installation
 
