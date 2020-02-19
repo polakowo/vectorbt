@@ -1,6 +1,6 @@
 # vectorbt
 
-![logo.png](logo.png)
+![Made by Vectors Market](logo.png)
 
 This package shares a similar idea as behind [most other Python backtesting packages](https://github.com/mementum/backtrader#alternatives), but designed especially for fast strategy backtesting, tuning and comparison at scale. 
 
