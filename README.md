@@ -1,6 +1,8 @@
 # vectorbt
 
-This package shares a similar idea as behind [most other Python backtesting packages](https://github.com/mementum/backtrader#alternatives), but designed especially for fast strategy backtesting, tuning and comparison at scale. It combines numpy and Numba magic to obtain orders-of-magnitude speedup over pandas; for example, it takes less time to calculate a rolling window over a `(100, 10)` array (207 µs) than initialize a single `pd.DataFrame` object (220 µs). Furthermore, it integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to build interactive charts and complex dashboards. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
+This package shares a similar idea as behind [most other Python backtesting packages](https://github.com/mementum/backtrader#alternatives), but designed especially for fast strategy backtesting, tuning and comparison at scale. 
+
+It combines numpy and Numba magic to obtain orders-of-magnitude speedup over pandas; for example, it takes less time to calculate a rolling window over a `(100, 10)` array (207 µs) than initialize a single `pd.DataFrame` object (220 µs). Furthermore, it integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to build interactive charts and complex dashboards. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
 
 Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Microsoft stock history in about 5 seconds:
 
