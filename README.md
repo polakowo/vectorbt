@@ -39,43 +39,6 @@ vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
 
 ![msft_heatmap.png](msft_heatmap.png)
 
-The only problem with this image: we didn't include fees. Let's fix that, interactively:
-
-```python
-import ipywidgets as widgets
-
-fees_slider = widgets.FloatSlider(value=0, min=0, max=0.1, step=0.01)
-heatmap_img = widgets.Image(
-    format='png',
-    width=heatmap_fig.layout.width,
-    height=heatmap_fig.layout.height,
-)
-
-def on_value_change(value):
-    fees = value['new']
-    portfolio = vbt.Portfolio(ohlcv.open, positions, investment=investment, fees=fees)
-    tnp = portfolio.total_net_profit
-    tnp_matrix[fast_idxs, slow_idxs] = tnp
-    tnp_matrix[slow_idxs, fast_idxs] = tnp
-    heatmap_fig.update_data(tnp_matrix)
-    heatmap_img.value = heatmap_fig.to_image(format="png")
-    
-fees_slider.observe(on_value_change, names='value')
-on_value_change({'new': fees_slider.value})
-
-widgets.VBox([
-    widgets.HBox([
-        widgets.Label('Fees:'), 
-        fees_slider
-    ]), 
-    heatmap_img
-])
-```
-
-![msft_heatmap_by_fees.gif](msft_heatmap_by_fees.gif)
-
-And we haven't played with slippage yet :)
-
 A more advanced example can be found [here](hello).
 
 #### How it works?
