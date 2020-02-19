@@ -8,6 +8,5 @@ setup(
     author_email='olegpolakow@gmail.com',
     url='https://github.com/polakowo/vectorbt',
     packages=['vectorbt'],
-    setup_requires=["numpy"],
     install_requires=['numpy', 'pandas', 'matplotlib', 'plotly', 'numba']
 )
