@@ -56,3 +56,5 @@ To get more understanding, check [tests](examples/Bitcoin_DMAC.ipynb).
 ```
 pip install git+https://github.com/polakowo/vectorbt.git
 ```
+
+Note: importing for the first time may take a minute to run due to compilation.
