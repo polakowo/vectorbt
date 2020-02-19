@@ -1,7 +1,6 @@
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-import ipywidgets as widgets
 from vectorbt.decorators import *
 
 
