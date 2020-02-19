@@ -1,9 +1,8 @@
 from setuptools import setup
-from vectorbt import __version__
 
 setup(
     name='vectorbt',
-    version=__version__,
+    version=0.2,
     description='Python library for backtesting trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
