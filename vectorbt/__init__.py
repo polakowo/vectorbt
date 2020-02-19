@@ -8,3 +8,5 @@ from vectorbt.positions import Positions
 from vectorbt.portfolio import Portfolio
 from vectorbt.widgets import Gauge, Bar, Scatter, Histogram, Heatmap
 
+# Package version
+__version__ = '0.2'
