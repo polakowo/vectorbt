@@ -47,7 +47,9 @@ A more advanced example can be found [here](examples/Bitcoin_DMAC.ipynb).
 
 ## Motivation
 
-While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, most pandas array operations are extremely slow compared to their NumPy counterparts. The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either vectorize your code or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. Finally, vectorbt doesn't force you to use anything (it's not a framework after all): every function and class was made just for convenience and can be easily replaced/extended.
+While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, most pandas array operations are extremely slow compared to their NumPy counterparts. 
+
+The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either vectorize your code or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. Finally, vectorbt doesn't force you to use anything (it's not a framework after all): every function and class was made just for convenience and can be easily replaced/extended.
 
 ## How it works?
 
