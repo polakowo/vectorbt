@@ -43,8 +43,6 @@ vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
 
 ![msft_heatmap.png](msft_heatmap.png)
 
-A more advanced example can be found [here](examples/Bitcoin_DMAC.ipynb).
-
 ## Motivation
 
 While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, most pandas array operations are extremely slow compared to their NumPy counterparts. 
@@ -64,3 +62,8 @@ pip install git+https://github.com/polakowo/vectorbt.git
 ```
 
 Note: importing vectorbt for the first time may take a while due to compilation.
+
+## Examples
+
+- [Testing Dual Moving Average Crossover (DMAC) strategy on Bitcoin](examples/Bitcoin_DMAC.ipynb)
+- [Testing stop-loss and trailing stop orders](examples/StopLoss.ipynb)
