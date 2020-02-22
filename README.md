@@ -4,7 +4,7 @@
 
 This package shares a similar idea as behind [most other Python backtesting packages](https://github.com/mementum/backtrader#alternatives), but designed especially for fast strategy backtesting, tuning and comparison at scale. 
 
-It combines numpy and Numba magic to obtain orders-of-magnitude speedup over pandas; for example, it takes less time to calculate a rolling window over a `(100, 10)` array (207 µs) than initialize a single `pd.DataFrame` object (220 µs)! Furthermore, it integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to build interactive charts and complex dashboards. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
+It combines numpy and Numba magic to obtain orders-of-magnitude speedup over pandas. Furthermore, it integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to build interactive charts and complex dashboards. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
 
 Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Microsoft stock history in about 5 seconds:
 
@@ -45,9 +45,13 @@ vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
 
 A more advanced example can be found [here](examples/Bitcoin_DMAC.ipynb).
 
+## Motivation
+
+While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, most pandas array operations are extremely slow compared to their NumPy counterparts. The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either vectorize your code or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. Finally, vectorbt doesn't force you to use anything (it's not a framework after all): every function and class was made just for convenience and can be easily replaced/extended.
+
 ## How it works?
 
-Each vectorbt class is a subclass of `np.ndarray` with a custom set of methods optimized for working with time series data. For example, the `Signals` class is a binary NumPy array supporting advanced binary operations. Each method is either vectorized or Numba compiled for best peformance; most of the times even a badly "looped" Numba is faster than vectorized NumPy though. Moreover, each object is stricly a 2-dimensional array, where first axis is index (time) and second axis are columns (features). Thus, similar to a `pd.DataFrame`, one can do a single operation to transform tons of columns simultaneously. This, for example, is the magic behind backtesting thousands of window combinations at once.
+Each vectorbt class is a subclass of `np.ndarray` with a custom set of methods optimized for working with time series data. For example, the `Signals` class is a binary NumPy array supporting advanced binary operations. Each method is either vectorized or Numba compiled for best peformance; most of the times even a badly "looped" Numba is faster than vectorized NumPy though. Moreover, each class stricly accepts a 2-dimensional array, where first axis is index (time) and second axis are columns (features), and provides standardized methods for processing 2-dimensional data along first axis. Thus, similar to a `pd.DataFrame`, one can do a single operation to transform tons of columns simultaneously. This, for example, is the magic behind backtesting thousands of window combinations at once.
 
 For more details, check [tests](tests/Tests.ipynb).
 
