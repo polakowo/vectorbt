@@ -24,7 +24,7 @@ def generate_random_entries_nb(shape, n, every_nth, seed):
 
 @njit(b1[:, :](b1[:, :], optional(i8)), cache=True)  # 3.01 ms vs 3.81 ms for vectorized
 def generate_random_exits_nb(entries, seed):
-    """Randomly generate at least one exit signal between two entry signals."""
+    """Randomly generate exit signals between entry signals."""
     if seed is not None:
         np.random.seed(seed)
     a = np.full_like(entries, False)
@@ -49,6 +49,7 @@ def generate_random_exits_nb(entries, seed):
 @njit  # 5.49 ms vs 48.8 ms for entries.shape = (1000, 20) and number of entries = 200
 # NOTE: no explicit types since args are not known before the runtime
 def generate_exits_nb(entries, exit_func_nb, only_first, *args):
+    """Generate entries based on exit_func_nb."""
     # exit_func_nb must return a boolean mask for a column specified by col_idx.
     # You will have to write your exit_func to be compatible with numba!
 
@@ -63,17 +64,15 @@ def generate_exits_nb(entries, exit_func_nb, only_first, *args):
             if i < entry_idxs.shape[0] - 1:
                 next_idx = entry_idxs[i+1]
             else:
-                next_idx = -1
+                next_idx = entries.shape[0]
 
             # If entry is the last element, ignore
             if prev_idx < entries.shape[0] - 1:
                 # Exit mask must return mask with exit signals for that column
-                exit_mask = exit_func_nb(entries, col_idx, prev_idx, *args)
+                exit_mask = exit_func_nb(entries, col_idx, prev_idx, next_idx, *args)
                 exit_idxs = np.where(exit_mask)[0]
                 # Filter out signals before previous entry and after next entry
-                idx_mask = exit_idxs > prev_idx
-                if next_idx != -1:
-                    idx_mask = idx_mask & (exit_idxs < next_idx)
+                idx_mask = (exit_idxs > prev_idx) & (exit_idxs < next_idx)
                 if not idx_mask.any():
                     continue
                 exit_mask[:] = False
@@ -89,6 +88,7 @@ def generate_exits_nb(entries, exit_func_nb, only_first, *args):
 @njit  # 39.6 ms vs 274 ms for ts.shape = (1000, 20)
 # NOTE: no explicit types since args are not known before the runtime
 def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
+    """Generate entries and exits based on entry_func_nb and exit_func_nb."""
     # entry_func_nb and exit_func_nb must return boolean masks for a column specified by col_idx.
      # You will have to write them to be compatible with numba!
 
@@ -101,10 +101,10 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
         while prev_idx < shape[0] - 1:
             if i % 2 == 0:
                 # Cannot assign two functions to a var in numba
-                mask = entry_func_nb(exits, col_idx, prev_idx, *args)
+                mask = entry_func_nb(exits, col_idx, prev_idx, -1, *args)
                 a = entries
             else:
-                mask = exit_func_nb(entries, col_idx, prev_idx, *args)
+                mask = exit_func_nb(entries, col_idx, prev_idx, -1, *args)
                 a = exits
             if prev_idx != -1:
                 mask[:prev_idx+1] = False
@@ -120,7 +120,9 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
 
 @njit(i8[:, :](b1[:, :], b1), cache=True)
 def rank_true_nb(a, after_false):
-    """Rank over each partition of true values (optional: must come after at least one false)."""
+    """Rank over each partition of true values.
+    
+    after_false: must come after at least one false."""
     b = np.zeros(a.shape, dtype=i8)
     for j in range(a.shape[1]):
         if after_false:
@@ -139,7 +141,9 @@ def rank_true_nb(a, after_false):
 
 @njit(i8[:, :](b1[:, :], b1), cache=True)
 def rank_false_nb(a, after_true):
-    """Rank over each partition of false values (optional: must come after at least one true)."""
+    """Rank over each partition of false values.
+    
+    after_true: must come after at least one true."""
     return rank_true_nb(~a, after_true)
 
 
@@ -151,6 +155,14 @@ def shuffle(a, seed=None):
     b = np.full_like(a, np.nan)
     for i in range(a.shape[1]):
         b[:, i] = np.random.permutation(a[:, i])
+    return b
+
+
+@njit(f8[:](b1[:, :]), cache=True)
+def avg_distance_nb(a):
+    b = np.full((a.shape[1],), np.nan)
+    for i in range(a.shape[1]):
+        b[i] = np.mean(np.diff(np.flatnonzero(a[:, i])))
     return b
 
 
@@ -265,6 +277,18 @@ class Signals(np.ndarray):
         """Generate an exit signal after every entry signal using exit_func."""
         exits = generate_exits_nb(self, exit_func_nb, only_first, *args)
         return Signals(exits)
+
+    @property
+    @to_2d('self')
+    def n(self):
+        """Number of signals."""
+        return np.asarray(np.sum(self, axis=0))
+
+    @property
+    @to_2d('self')
+    def avg_distance(self):
+        """Average distance between signals."""
+        return avg_distance_nb(self)
 
     @to_2d('self')
     def plot(self,
