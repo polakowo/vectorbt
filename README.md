@@ -45,17 +45,20 @@ vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
 
 ## Motivation
 
-While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, most pandas array operations are extremely slow compared to their NumPy counterparts (see below, [link](https://penandpants.com/2014/09/05/performance-of-pandas-series-vs-numpy-arrays/)). 
+While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, some pandas operations may be extremely slow compared to their NumPy counterparts.
 
 ```
-In [10]: %timeit a[i]
+a = np.arange(100)
+s = pd.Series(a)
+
+%timeit a[i]
 1000000 loops, best of 3: 998 ns per loop
 
-In [11]: %timeit s[i]
+%timeit s[i]
 10000 loops, best of 3: 168 µs per loop
 ```
 
-The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. Also, vectorbt doesn't force you to use anything (it's not a framework after all): every function and class was made just for convenience and can be easily replaced/extended.
+The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either try to vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. This lib doesn't force you anything (it's not a framework after all): every function and class was made for convenience, you can easily replace/extend functions and mix the whole thing with pandas.
 
 ## How it works?
 
