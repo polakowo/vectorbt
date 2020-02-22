@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from numba import njit, i1, f8
-from vectorbt.timeseries import pct_change_nb, fillna_nb, rolling_max_nb
+from vectorbt.timeseries import pct_change_nb, fillna_nb, expanding_max_nb
 from vectorbt.decorators import *
 from vectorbt.timeseries import TimeSeries
 from vectorbt.positions import Positions
@@ -160,11 +160,11 @@ class Portfolio():
 
     @property
     def num_entries(self):
-        return np.sum(self.positions == 1)
+        return np.sum(self.positions == 1, axis=0)
 
     @property
     def num_exits(self):
-        return np.sum(self.positions == -1)
+        return np.sum(self.positions == -1, axis=0)
 
     @property
     def num_trades(self):
@@ -203,4 +203,4 @@ class Portfolio():
     def mdd(self):
         """A maximum drawdown (MDD) is the maximum observed loss from a peak 
         to a trough of a portfolio, before a new peak is attained."""
-        return np.max(1 - self.equity / rolling_max_nb(self.equity, None), axis=0)
+        return np.max(1 - self.equity / expanding_max_nb(self.equity), axis=0)
