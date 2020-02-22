@@ -1,4 +1,5 @@
 from vectorbt.decorators import *
+from vectorbt.widgets import FigureWidget
 from numba.types.containers import UniTuple
 from numba import njit, f8, i8, b1, optional
 import numpy as np
@@ -295,12 +296,9 @@ class Signals(np.ndarray):
              column=None,
              index=None,
              label='Signals',
-             layout_kwargs={},
              scatter_kwargs={},
-             figsize=(800, 300),
-             return_fig=False,
-             static=True,
-             fig=None):
+             fig=None, 
+             **layout_kwargs):
 
         if column is None:
             if self.shape[1] == 1:
@@ -311,27 +309,12 @@ class Signals(np.ndarray):
         if index is None:
             index = np.arange(signals.shape[0])
         if fig is None:
-            fig = go.FigureWidget()
-            fig.update_layout(
-                autosize=False,
-                width=figsize[0],
-                height=figsize[1],
-                margin=go.layout.Margin(
-                    b=30,
-                    t=30
-                ),
-                showlegend=True,
-                hovermode='closest'
-            )
+            fig = FigureWidget()
+            fig.update_layout(showlegend=True)
+            fig.update_layout(**layout_kwargs)
         # Plot Signals
         scatter = go.Scatter(x=index, y=signals, mode='lines', name=label)
         scatter.update(**scatter_kwargs)
         fig.add_trace(scatter)
 
-        if return_fig:
-            return fig
-        else:
-            if static:
-                fig.show(renderer="png", width=figsize[0], height=figsize[1])
-            else:
-                fig.show()
+        return fig

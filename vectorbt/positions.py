@@ -1,6 +1,7 @@
 from vectorbt.signals import Signals
 from vectorbt.timeseries import TimeSeries
 from vectorbt.decorators import *
+from vectorbt.widgets import FigureWidget
 from numba import njit, i1, b1
 import numpy as np
 import pandas as pd
@@ -58,11 +59,8 @@ class Positions(np.ndarray):
              index=None,
              buy_scatter_kwargs={},
              sell_scatter_kwargs={},
-             figsize=(800, 300),
-             return_fig=False,
-             static=True,
              fig=None,
-             **kwargs):
+             **ts_plot_kwargs):
 
         if column is None:
             if self.shape[1] == 1:
@@ -71,7 +69,7 @@ class Positions(np.ndarray):
                 raise ValueError("For an array with multiple columns, you must pass a column index")
         # Plot TimeSeries
         if plot_ts:
-            fig = ts.plot(column, index=index, figsize=figsize, return_fig=True, fig=fig, **kwargs)
+            fig = ts.plot(column, index=index, fig=fig, **ts_plot_kwargs)
         elif fig is None:
             raise ValueError("Plot TimeSeries or specify a FigureWidget object")
         # Plot Positions
@@ -108,10 +106,4 @@ class Positions(np.ndarray):
         sell_scatter.update(**sell_scatter_kwargs)
         fig.add_trace(sell_scatter)
 
-        if return_fig:
-            return fig
-        else:
-            if static:
-                fig.show(renderer="png", width=figsize[0], height=figsize[1])
-            else:
-                fig.show()
+        return fig

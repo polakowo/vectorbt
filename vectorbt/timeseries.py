@@ -1,4 +1,5 @@
 from vectorbt.decorators import *
+from vectorbt.widgets import FigureWidget
 import numpy as np
 import pandas as pd
 import inspect
@@ -156,7 +157,7 @@ def rolling_mean_nb(a, window):
 
 @njit(f8[:](f8[:], i8), cache=True)
 def _rolling_std_1d_nb(a, window):
-    """Rolling std (1D). Note: ddof = 0."""
+    """Rolling std (1D) for ddof = 0."""
     b = np.empty_like(a)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -389,13 +390,10 @@ class TimeSeries(np.ndarray):
              benchmark=None,
              benchmark_label='Benchmark',
              index=None,
-             layout_kwargs={},
              benchmark_scatter_kwargs={},
              ts_scatter_kwargs={},
-             figsize=(800, 300),
-             return_fig=False,
-             static=True,
-             fig=None):
+             fig=None, 
+             **layout_kwargs):
 
         if column is None:
             if self.shape[1] == 1:
@@ -409,18 +407,8 @@ class TimeSeries(np.ndarray):
         if index is None:
             index = np.arange(ts.shape[0])
         if fig is None:
-            fig = go.FigureWidget()
-            fig.update_layout(
-                autosize=False,
-                width=figsize[0],
-                height=figsize[1],
-                margin=go.layout.Margin(
-                    b=30,
-                    t=30
-                ),
-                showlegend=True,
-                hovermode='closest'
-            )
+            fig = FigureWidget()
+            fig.update_layout(showlegend=True)
             fig.update_layout(**layout_kwargs)
 
         if benchmark is not None:
@@ -452,10 +440,4 @@ class TimeSeries(np.ndarray):
         space = 0.05 * (_max - _min)
         fig.update_yaxes(range=[_min - space, _max + space])
 
-        if return_fig:
-            return fig
-        else:
-            if static:
-                fig.show(renderer="png", width=figsize[0], height=figsize[1])
-            else:
-                fig.show()
+        return fig

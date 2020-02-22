@@ -1,4 +1,5 @@
 from vectorbt.decorators import *
+from vectorbt.widgets import FigureWidget
 from vectorbt.timeseries import TimeSeries
 import plotly.graph_objects as go
 
@@ -34,12 +35,9 @@ class OHLCV():
     def plot(self,
              column=None,
              index=None,
-             layout_kwargs={},
              candlestick_kwargs={},
-             bar_kwargs={},
-             figsize=(800, 300),
-             return_fig=False,
-             static=True):
+             bar_kwargs={}, 
+             **layout_kwargs):
 
         if column is None:
             if self.open.shape[1] == 1:
@@ -51,7 +49,7 @@ class OHLCV():
         low = self.low[:, column]
         close = self.close[:, column]
 
-        fig = go.FigureWidget()
+        fig = FigureWidget()
         candlestick = go.Candlestick(
             x=index,
             open=open,
@@ -91,25 +89,11 @@ class OHLCV():
                 )
             )
         fig.update_layout(
-            xaxis_rangeslider_visible=False,
-            autosize=False,
-            width=figsize[0],
-            height=figsize[1],
-            margin=go.layout.Margin(
-                b=30,
-                t=30
-            ),
             showlegend=True,
-            hovermode='closest',
+            xaxis_rangeslider_visible=False,
             xaxis_showgrid=True,
             yaxis_showgrid=True
         )
         fig.update_layout(**layout_kwargs)
 
-        if return_fig:
-            return fig
-        else:
-            if static:
-                fig.show(renderer="png", width=figsize[0], height=figsize[1])
-            else:
-                fig.show()
+        return fig

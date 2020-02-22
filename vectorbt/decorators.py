@@ -50,6 +50,19 @@ def _set_arg(arg, arg_name, func, *args, **kwargs):
     return args, kwargs
 
 
+def required(arg_name):
+    def required_decorator(func):
+        @wraps(func)
+        def wrapper_decorator(*args, **kwargs):
+            """If None, raise an exception."""
+            arg = _get_arg(arg_name, func, *args, **kwargs)
+            if arg is None:
+                raise ValueError(f"Argument {arg_name} must be set")
+            return func(*args, **kwargs)
+        return wrapper_decorator
+    return required_decorator
+
+
 def has_type(arg_name, types):
     def has_type_decorator(func):
         @wraps(func)
@@ -126,7 +139,8 @@ def have_same_shape(arg1_name, arg2_name, along_axis=None):
             else:
                 if isinstance(along_axis, tuple):
                     if arg1.shape[along_axis[0]] != arg2.shape[along_axis[1]]:
-                        raise ValueError(f"Axis {along_axis[0]} of argument {arg1_name} must be the same as axis {along_axis[1]} of argument {arg2_name}")
+                        raise ValueError(
+                            f"Axis {along_axis[0]} of argument {arg1_name} must be the same as axis {along_axis[1]} of argument {arg2_name}")
                 else:
                     if arg1.shape[along_axis] != arg2.shape[along_axis]:
                         raise ValueError(f"Arguments {arg1_name} and {arg2_name} must have the same axis {along_axis}")
@@ -264,9 +278,9 @@ def add_nb_methods(*nb_funcs):
                     if v.default is not Parameter.empty
                 }
             default_kwargs = get_default_args(nb_func)
-            @to_2d('self') # default shape for all our classes
+            @to_2d('self')  # default shape for all our classes
             def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
-                return cls(nb_func(self, *args, **{**default_kwargs, **kwargs})) # kwargs must be specified for numba
+                return cls(nb_func(self, *args, **{**default_kwargs, **kwargs}))  # kwargs must be specified for numba
             setattr(cls, nb_func.__name__.replace('_nb', ''), array_operation)
         return cls
     return wrapper
