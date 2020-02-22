@@ -58,7 +58,7 @@ s = pd.Series(a)
 10000 loops, best of 3: 168 µs per loop
 ```
 
-The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either try to vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. This lib doesn't force you anything (it's not a framework after all): every function and class was made for convenience, you can easily replace/extend functions and mix the whole thing with pandas.
+The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either try to vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. Finally, vectorbt is a library, not a framework: every function and class was made for convenience, you can still easily replace/extend functions and mix the whole thing with pandas.
 
 ## How it works?
 
