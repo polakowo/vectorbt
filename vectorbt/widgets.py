@@ -1,10 +1,22 @@
 import numpy as np
 import plotly.graph_objects as go
 from vectorbt.decorators import *
+import matplotlib.pyplot as plt
+
+
+def rgb_from_cmap(cmap_name, value, vrange):
+    """Map vrange to colormap and get RGB of the value from that range."""
+    if vrange[0] == vrange[1]:
+        norm_value = 0.5
+    else:
+        norm_value = (value - vrange[0]) / (vrange[1] - vrange[0])
+    cmap = plt.get_cmap(cmap_name)
+    return "rgb(%d,%d,%d)" % tuple(np.round(np.asarray(cmap(norm_value))[:3] * 255))
 
 
 class FigureWidget(go.FigureWidget):
     """Subclass of the graph_objects.FigureWidget class with default params."""
+
     def __init__(self):
         super().__init__()
         # Good default params
@@ -28,8 +40,51 @@ class FigureWidget(go.FigureWidget):
 
 class UpdatableFigureWidget(FigureWidget):
     """Subclass of the FigureWidget class with abstract update method."""
+
     def update_data(self, *args, **kwargs):
         raise NotImplementedError
+
+
+class Gauge(UpdatableFigureWidget):
+    """Accepts a single value and draws an indicator."""
+
+    def __init__(self,
+                 data=None,
+                 label=None,
+                 cmap_name='Spectral',
+                 indicator_kwargs={},
+                 **layout_kwargs):
+
+        super().__init__()
+        self.update_layout(width=500, height=300)
+        self.update_layout(**layout_kwargs)
+        self._vrange = None
+        self._cmap_name = cmap_name
+        indicator = go.Indicator(
+            domain=dict(x=[0, 1], y=[0, 1]),
+            mode="gauge+number+delta",
+            title=dict(text=label)
+        )
+        indicator.update(**indicator_kwargs)
+        self.add_trace(indicator)
+        if data is not None:
+            self.update_data(data)
+
+    @has_type('data', (int, float, complex))
+    # NOTE: If called by Plotly event handler and in case of error, this won't visible in a notebook cell, but in logs!
+    def update_data(self, data):
+        if self._vrange is None:
+            self._vrange = data, data
+        else:
+            self._vrange = min(self._vrange[0], data), max(self._vrange[1], data)
+        with self.batch_update():
+            indicator = self.data[0]
+            if self._vrange is not None:
+                indicator.gauge.axis.range = self._vrange
+                if self._cmap_name is not None:
+                    indicator.gauge.bar.color = rgb_from_cmap(self._cmap_name, data, self._vrange)
+            indicator.delta.reference = indicator.value
+            indicator.value = data
 
 
 class Bar(UpdatableFigureWidget):
@@ -39,7 +94,7 @@ class Bar(UpdatableFigureWidget):
                  data=None,
                  x_labels=None,
                  colorscale='Spectral',
-                 bar_kwargs={}, 
+                 bar_kwargs={},
                  **layout_kwargs):
 
         super().__init__()
@@ -74,7 +129,7 @@ class Scatter(UpdatableFigureWidget):
                  data=None,
                  data_labels=None,
                  x_labels=None,
-                 scatter_kwargs={}, 
+                 scatter_kwargs={},
                  **layout_kwargs):
 
         super().__init__()
@@ -115,7 +170,7 @@ class Histogram(UpdatableFigureWidget):
     def __init__(self,
                  data=None,
                  data_labels=None,
-                 histogram_kwargs={}, 
+                 histogram_kwargs={},
                  **layout_kwargs):
 
         super().__init__()
@@ -150,7 +205,7 @@ class Heatmap(UpdatableFigureWidget):
                  x_labels=None,
                  y_labels=None,
                  colorscale='Plasma',
-                 heatmap_kwargs={}, 
+                 heatmap_kwargs={},
                  **layout_kwargs):
 
         super().__init__()

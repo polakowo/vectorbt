@@ -1,18 +1,31 @@
-from functools import wraps
+from functools import wraps, reduce
 from inspect import signature, Parameter
 import numpy as np
+
+
+def rgetattr(obj, path: str, *default):
+    """https://stackoverflow.com/a/54547158/8141780"""
+    attrs = path.split('.')
+    try:
+        return reduce(getattr, attrs, obj)
+    except AttributeError:
+        if default:
+            return default[0]
+        raise
 
 
 def _get_arg(arg_name, func, *args, **kwargs):
     """Search for arg in arguments and keyword arguments."""
     arg_attr = None
     if '.' in arg_name:
-        arg_name, arg_attr = arg_name.split('.')
+        attrs = arg_name.split('.')
+        arg_name = attrs[0]
+        arg_attr = '.'.join(attrs[1:])
     if arg_name in kwargs and kwargs[arg_name] is not None:
         # in kwargs
         arg = kwargs[arg_name]
         if arg_attr is not None:
-            return getattr(arg, arg_attr)
+            return rgetattr(arg, arg_attr)
         return arg
     else:
         func_params = signature(func).parameters
@@ -21,7 +34,7 @@ def _get_arg(arg_name, func, *args, **kwargs):
                 # in args
                 arg = args[list(func_params.keys()).index(arg_name)]
                 if arg_attr is not None:
-                    return getattr(arg, arg_attr)
+                    return rgetattr(arg, arg_attr)
                 return arg
             else:
                 # in function's kwargs with default value
@@ -29,7 +42,7 @@ def _get_arg(arg_name, func, *args, **kwargs):
                 if default_value is not None:
                     arg = default_value
                     if arg_attr is not None:
-                        return getattr(arg, arg_attr)
+                        return rgetattr(arg, arg_attr)
                     return arg
         else:
             raise ValueError(f"Argument {arg_name} not found")
@@ -38,6 +51,8 @@ def _get_arg(arg_name, func, *args, **kwargs):
 
 def _set_arg(arg, arg_name, func, *args, **kwargs):
     """Modify arguments or keyword arguments to include new arg."""
+    if '.' in arg_name:
+        raise ValueError("Argument {arg_name} is an object attribute and cannot be set.")
     func_params = signature(func).parameters
     if func_params[arg_name].default is Parameter.empty:
         # modify args
@@ -118,6 +133,16 @@ def to_dtype(arg_name, dtype):
             return func(*args, **kwargs)
         return wrapper_decorator
     return to_dtype_decorator
+
+
+def return_type(arg_type):
+    def return_type_decorator(func):
+        @wraps(func)
+        def wrapper_decorator(*args, **kwargs):
+            """Convert the returned object to another type."""
+            return arg_type(func(*args, **kwargs))
+        return wrapper_decorator
+    return return_type_decorator
 
 
 def have_same_shape(arg1_name, arg2_name, along_axis=None):
@@ -213,6 +238,10 @@ def broadcast(arg1_name, arg2_name):
             b = _get_arg(arg2_name, func, *args, **kwargs)
             if a is None or b is None:
                 return func(*args, **kwargs)
+            if not isinstance(a, np.ndarray):
+                a = np.asarray(a)
+            if not isinstance(b, np.ndarray):
+                b = np.asarray(b)
             a, b = np.broadcast_arrays(a, b, subok=True)
             a = a.copy()  # deprecation warning
             b = b.copy()
@@ -232,6 +261,10 @@ def broadcast_to(arg1_name, arg2_name):
             b = _get_arg(arg2_name, func, *args, **kwargs)
             if a is None or b is None:
                 return func(*args, **kwargs)
+            if not isinstance(a, np.ndarray):
+                a = np.asarray(a)
+            if not isinstance(b, np.ndarray):
+                b = np.asarray(b)
             a = np.broadcast_to(a, b.shape, subok=True)
             a = a.copy()  # deprecation warning
             args, kwargs = _set_arg(a, arg1_name, func, *args, **kwargs)
@@ -267,7 +300,7 @@ def broadcast_to_cube_of(arg1_name, arg2_name):
     return broadcast_to_cube_of_decorator
 
 
-def add_nb_methods(*nb_funcs):
+def add_2d_nb_methods(*nb_funcs):
     """Wrap numba functions as methods."""
     def wrapper(cls):
         for nb_func in nb_funcs:

@@ -82,28 +82,33 @@ class Portfolio():
 
     @property
     @cache_property
+    @return_type(TimeSeries)
     def equity(self):
-        return TimeSeries(equity_nb(self.ts, self.positions, self.investment, self.fees, self.slippage))
+        return equity_nb(self.ts, self.positions, self.investment, self.fees, self.slippage)
 
     @property
     @cache_property
+    @return_type(TimeSeries)
     def equity_in_shares(self):
-        return TimeSeries(self.equity / self.ts)
+        return self.equity / self.ts
 
     @property
     @cache_property
+    @return_type(TimeSeries)
     def returns(self):
-        return TimeSeries(fillna_nb(pct_change_nb(self.equity), 0))
+        return fillna_nb(pct_change_nb(self.equity), 0)
 
     @property
     @cache_property
+    @return_type(TimeSeries)
     def trade_profits(self):
-        return TimeSeries(trade_profits_nb(self.equity, self.positions))
+        return trade_profits_nb(self.equity, self.positions)
 
     @property
     @cache_property
+    @return_type(TimeSeries)
     def trade_returns(self):
-        return TimeSeries(trade_returns_nb(self.equity, self.positions))
+        return trade_returns_nb(self.equity, self.positions)
 
     # ############# Performance metrics ############# #
 
@@ -119,87 +124,92 @@ class Portfolio():
     def __repr__(self):
         return self.key_metrics_df.__repr__()
 
-    def __str__(self):
-        return self.key_metrics_df.__str__()
+    __str__ = __repr__
 
+    @property
+    @return_type(np.array)
+    def num_trades(self):
+        return np.sum(self.positions == 1, axis=0)
+
+    @return_type(np.array)
     def reduce_win(self, func):
         """Perform reducing operation on wins."""
         trade_profits = self.trade_profits.copy()
         trade_profits[trade_profits <= 0] = np.nan
-        return np.asarray(func(trade_profits))
+        return func(trade_profits)
 
+    @return_type(np.array)
     def reduce_loss(self, func):
         """Perform reducing operation on losses."""
         trade_profits = self.trade_profits.copy()
         trade_profits[trade_profits >= 0] = np.nan
-        return np.asarray(np.abs(func(trade_profits)))
+        return np.abs(func(trade_profits))
 
     @property
+    @return_type(np.array)
     def sum_win(self):
         sum_win = self.reduce_win(lambda x: np.nansum(x, axis=0))
         sum_win[np.isnan(sum_win)] = 0
         return sum_win
 
     @property
+    @return_type(np.array)
     def sum_loss(self):
         sum_loss = self.reduce_loss(lambda x: np.nansum(x, axis=0))
         sum_loss[np.isnan(sum_loss)] = 0
         return sum_loss
 
     @property
+    @return_type(np.array)
     def avg_win(self):
         avg_win = self.reduce_win(lambda x: np.nanmean(x, axis=0))
         avg_win[np.isnan(avg_win)] = 0
         return avg_win
 
     @property
+    @return_type(np.array)
     def avg_loss(self):
         avg_loss = self.reduce_loss(lambda x: np.nanmean(x, axis=0))
         avg_loss[np.isnan(avg_loss)] = 0
         return avg_loss
 
     @property
-    def num_entries(self):
-        return np.sum(self.positions == 1, axis=0)
-
-    @property
-    def num_exits(self):
-        return np.sum(self.positions == -1, axis=0)
-
-    @property
-    def num_trades(self):
-        return np.sum(~np.isnan(self.trade_profits), axis=0)
-
-    @property
+    @return_type(np.array)
     def win_prob(self):
         """Profitability = % of total trades that resulted in profits."""
-        return np.asarray(np.sum(self.trade_profits > 0, axis=0) / self.num_trades)
+        return np.sum(self.trade_profits > 0, axis=0) / self.num_trades
 
     @property
+    @return_type(np.array)
     def loss_prob(self):
-        return np.asarray(np.sum(self.trade_profits < 0, axis=0) / self.num_trades)
+        return np.sum(self.trade_profits < 0, axis=0) / self.num_trades
 
     @property
+    @return_type(np.array)
     def profit_factor(self):
         return self.sum_win / self.sum_loss
 
     @property
+    @return_type(np.array)
     def appt(self):
         """Average profitability per trade (APPT)
 
         For every trade you place, you are likely to win/lose this amount.
         What matters is that your APPT comes up positive."""
-        return (self.win_prob * self.avg_win) - (self.loss_prob * self.avg_loss)
+        return self.win_prob * self.avg_win - self.loss_prob * self.avg_loss
 
     @property
+    @return_type(np.array)
     def total_net_profit(self):
         return self.equity[-1, :] - self.investment
 
     @property
+    @return_type(np.array)
     def roi(self):
         return self.total_net_profit / self.investment
 
     @property
+    @return_type(np.array)
     def mdd(self):
         """A maximum drawdown (MDD) is the maximum observed loss from a peak 
         to a trough of a portfolio, before a new peak is attained."""

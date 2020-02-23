@@ -228,7 +228,7 @@ def from_nst_false_nb(a, n, after_true=False):
 # Add numba functions as methods to the Signals class
 
 
-@add_nb_methods(
+@add_2d_nb_methods(
     prepend_nb,
     fshift_nb,
     first_true_nb,

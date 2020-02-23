@@ -356,7 +356,7 @@ nb_funcs = [
 ]
 
 # Add numba functions as methods to the TimeSeries class
-@add_nb_methods(*nb_funcs)
+@add_2d_nb_methods(*nb_funcs)
 class TimeSeries(np.ndarray):
     """Similar to pd.DataFrame, but optimized for complex matrix operations.
     NOTE: There is no index nor columns vars - you will have to handle them separately."""
