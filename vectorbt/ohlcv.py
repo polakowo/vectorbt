@@ -35,6 +35,7 @@ class OHLCV():
     def plot(self,
              column=None,
              index=None,
+             display_volume=True,
              candlestick_kwargs={},
              bar_kwargs={}, 
              **layout_kwargs):
@@ -62,7 +63,7 @@ class OHLCV():
         )
         candlestick.update(**candlestick_kwargs)
         fig.add_trace(candlestick)
-        if self.volume is not None:
+        if display_volume and self.volume is not None:
             volume = self.volume[:, column]
 
             marker_colors = np.empty(volume.shape, dtype=np.object)
