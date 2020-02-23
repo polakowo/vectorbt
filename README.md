@@ -45,7 +45,7 @@ vbt.Heatmap(data=tnp_matrix, x_labels=windows, y_labels=windows, width=600, heig
 
 ## Motivation
 
-While other backtesting packages or even pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take pandas for example: while certain pandas functionality such as rolling windows is implemented in both Cython and Numba, it cannot be accessed within user-defined Numba code. Moreover, some pandas operations may be extremely slow compared to their NumPy counterparts.
+While other backtesting packages and pandas may be sufficient to run a handful number of tests, they have their limits in testing large amounts of strategies and hyperparameters. Take for example pandas: while certain array operations such as window functions are implemented using either Cython or Numba, they cannot be accessed within a user-defined Numba code. Moreover, some operations may be extremely slow compared to their NumPy counterparts:
 
 ```
 a = np.arange(100)
@@ -58,7 +58,7 @@ s = pd.Series(a)
 10000 loops, best of 3: 168 µs per loop
 ```
 
-The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. Thanks to the iterative nature of backtesting, you can either try to vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. Finally, vectorbt is a library, not a framework: you can easily replace/extend functions or mix the whole thing with pandas.
+The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. You can either try to vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. And since vectorbt is a library, you can easily replace/extend functions or mix the whole thing with pandas.
 
 ## How it works?
 
@@ -79,4 +79,4 @@ Note: importing vectorbt for the first time may take a while due to compilation.
 - [Testing Dual Moving Average Crossover (DMAC) strategy on Bitcoin](examples/Bitcoin_DMAC.ipynb)
 - [Testing stop-loss and trailing stop orders](examples/StopLoss.ipynb)
 
-Note: you will need to run these notebooks to display widgets.
+Note: you will need to run the notebook to play with widgets.
