@@ -205,7 +205,7 @@ class Portfolio():
 
     @property
     @return_type(np.array)
-    def total_returns(self):
+    def total_return(self):
         return self.total_net_profit / self.investment
 
     @property
