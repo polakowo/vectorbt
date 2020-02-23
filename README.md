@@ -38,7 +38,7 @@ tnp_matrix = np.empty((len(windows), len(windows)))
 tnp_matrix[fast_idxs, slow_idxs] = tnp
 tnp_matrix[slow_idxs, fast_idxs] = tnp # symmetry
 
-vbt.Heatmap(windows, windows, data=tnp_matrix, figsize=(600, 450)).show_png()
+vbt.Heatmap(data=tnp_matrix, x_labels=windows, y_labels=windows, width=600, height=450).show_png()
 ```
 
 ![msft_heatmap.png](msft_heatmap.png)
