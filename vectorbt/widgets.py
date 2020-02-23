@@ -170,6 +170,7 @@ class Histogram(UpdatableFigureWidget):
     def __init__(self,
                  data=None,
                  data_labels=None,
+                 horizontal=False,
                  histogram_kwargs={},
                  **layout_kwargs):
 
@@ -177,6 +178,7 @@ class Histogram(UpdatableFigureWidget):
         self.update_layout(showlegend=True, barmode='overlay')
         self.update_layout(**layout_kwargs)
         self._data_labels = data_labels
+        self._horizontal = horizontal
         for data_label in data_labels:
             histogram = go.Histogram(
                 name=data_label,
@@ -194,7 +196,10 @@ class Histogram(UpdatableFigureWidget):
 
         with self.batch_update():
             for i, hist in enumerate(self.data):
-                hist.x = data[i]
+                if self._horizontal:
+                    hist.y = data[i]
+                else:
+                    hist.x = data[i]
 
 
 class Heatmap(UpdatableFigureWidget):
