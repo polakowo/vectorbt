@@ -47,22 +47,9 @@ vbt.Heatmap(data=tnp_matrix, x_labels=windows, y_labels=windows, width=600, heig
 
 As data scientist and recent trader, I've been curious of how effective is technical analysis. I wanted answers to general questions like "How this strategy compares to the other ones? What technical indicators are best and what are worst for this market? Is technical analysis of any use at all, or is it just a buzzword and everything in the market is fully governed by random choice?"
 
-To answer these and more, you need to set up experiments where you traverse thousands or even millions of parameter combinations, time ranges and markets, to see what performs best where. While there are many great backtesting libraries for Python, I found none that could handle these amounts of tests in a timely manner.
+To answer these and more, you need to set up experiments where you traverse thousands or even millions of parameter combinations, time ranges and markets, to see what performs best where. While there are many great backtesting libraries for Python, I found none that could handle these amounts of tests in a timely manner. 
 
-Take for example pandas: while certain array operations such as window functions are implemented using either Cython or Numba, they cannot be accessed within a user-defined Numba code. Moreover, some operations may be extremely slow compared to their NumPy counterparts:
-
-```
-a = np.arange(100)
-s = pd.Series(a)
-
-%timeit a[i]
-1000000 loops, best of 3: 998 ns per loop
-
-%timeit s[i]
-10000 loops, best of 3: 168 µs per loop
-```
-
-The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba. You can either try to vectorize your code, or simply wrap your loops with Numba and execute your strategy without leaving the compiled code. And since vectorbt is a library, you can easily replace/extend functions or mix the whole thing with pandas.
+The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba to deliver backtesting at scale. It also integrates Plotly to display charts and dashbaords akin to Tableau right in the Jupyter notebook.
 
 ## How it works?
 
