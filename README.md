@@ -2,7 +2,9 @@
 
 ![Made by Vectors Market](logo.png)
 
-This package shares a similar idea as behind [most other Python backtesting packages](https://github.com/mementum/backtrader#alternatives), but designed especially for fast strategy backtesting, tuning and comparison at scale. 
+Backtesting is a process of testing a predictive model on historical data. It allows you to review how a given strategy instance will perform in given market conditions. Think of each strategy as a class in OOP: each instance of this class has its own properties (such as a combination of windows in Dual Moving Average Crossover), and your task as a trader is to find a strategy instance that leads to best performance - a needle in a haystack. There exist [many great backtesting packages](https://github.com/mementum/backtrader#alternatives) out there for Python that let you test whether your instance is this needle. Say, you found your needle, and now you're happy and ready to use it in the real world. But wait! What if the entire strategy class is a pure trash and the needle you just found was an outlier that will underperform in majority of cases where market condititions change?
+
+Instead of evaluating your strategy using a bunch of tests, vectorbt allows you to evaluate the entire space of strategy instances at once. It is more of a data mining tool that makes analysis of entire strategies possible. It excels at processing performance and offers interactive tools to explore complex phenomena in trading.
 
 It builds upon numpy and Numba to obtain orders-of-magnitude speedup over pandas. Furthermore, it integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to build interactive charts and complex dashboards. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
 
