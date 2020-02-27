@@ -6,6 +6,8 @@ from vectorbt.decorators import *
 from vectorbt.timeseries import TimeSeries
 from vectorbt.positions import Positions
 
+__all__ = ['Portfolio']
+
 # ############# Numba functions ############# #
 
 
@@ -111,20 +113,6 @@ class Portfolio():
         return trade_returns_nb(self.equity, self.positions)
 
     # ############# Performance metrics ############# #
-
-    @property
-    def key_metrics_df(self):
-        """Build dataframe with key metrics."""
-        df = pd.DataFrame(columns=range(self.ts.shape[1]))
-        props = ['num_trades', 'total_net_profit', 'avg_win', 'avg_loss', 'win_prob', 'loss_prob', 'appt', 'mdd']
-        for prop in props:
-            df.loc[prop, :] = getattr(self, prop)
-        return df
-
-    def __repr__(self):
-        return self.key_metrics_df.__repr__()
-
-    __str__ = __repr__
 
     @property
     @return_type(np.array)

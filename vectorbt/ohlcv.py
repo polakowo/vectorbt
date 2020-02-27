@@ -3,6 +3,8 @@ from vectorbt.widgets import FigureWidget
 from vectorbt.timeseries import TimeSeries
 import plotly.graph_objects as go
 
+__all__ = ['OHLCV']
+
 class OHLCV():
     @have_same_shape('open', 'high')
     @have_same_shape('open', 'low')

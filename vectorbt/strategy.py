@@ -2,12 +2,13 @@ import pandas as pd
 import numpy as np
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1
-from vectorbt.timeseries import rolling_mean_nb, rolling_std_nb, ewm_mean_nb, ewm_std_nb, diff_nb, \
-    set_by_mask_nb, prepend_nb, _expanding_max_1d_nb, _pct_change_1d_nb, _ffill_1d_nb
+from vectorbt.timeseries import rolling_mean_nb, rolling_std_nb, ewm_mean_nb, ewm_std_nb, diff_nb, set_by_mask_nb, prepend_nb
 
 from vectorbt.decorators import *
 from vectorbt.signals import Signals, generate_exits_nb
 from vectorbt.timeseries import TimeSeries
+
+__all__ = ['DMAC', 'BollingerBands', 'RSI']
 
 # ############# MovingAverage ############# #
 
@@ -200,99 +201,3 @@ class RSI():
     @broadcast_to('threshold', 'self.rsi')
     def is_rsi_below_threshold(self, threshold):
         return Signals(self.rsi < threshold)
-
-
-# ############# Risk minimization ############# #
-
-@njit(b1[:](b1[:, :], i8, i8, i8, f8[:, :], f8[:, :], b1), cache=True)
-def stoploss_exit_mask_nb(entries, col_idx, prev_idx, next_idx, ts, stop, is_relative):
-    """Index of the first event below the stop."""
-    ts = ts[:, col_idx]
-    # Stop is defined at the entry point
-    stop = stop[prev_idx, col_idx]
-    if is_relative:
-        stop = (1 - stop) * ts[prev_idx]
-    return ts < stop
-
-
-@njit(b1[:, :](f8[:, :], b1[:, :], f8[:, :, :], b1, b1), cache=True)
-def stoploss_exits_nb(ts, entries, stops, is_relative, only_first):
-    """Calculate exit signals based on stop loss strategy.
-
-    An approach here significantly differs from the approach with rolling windows.
-    If user wants to try out different rolling windows, he can pass them as a 1d array.
-    Here, user must be able to try different stops not only for the `ts` itself,
-    but also for each element in `ts`, since stops may vary with time.
-    This requires the variable `stops` to be a 3d array (cube) out of 2d matrices of form of `ts`.
-    For example, if you want to try stops 0.1 and 0.2, both must have the shape of `ts`,
-    wrapped into an array, thus forming a cube (2, ts.shape[0], ts.shape[1])"""
-
-    exits = np.empty((ts.shape[0], ts.shape[1] * stops.shape[0]), dtype=b1)
-    for i in range(stops.shape[0]):
-        i_exits = generate_exits_nb(entries, stoploss_exit_mask_nb, only_first, ts, stops[i, :, :], is_relative)
-        exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = i_exits
-    return exits
-
-
-class StopLoss():
-    @to_2d('ts')
-    @to_2d('entries')
-    @broadcast('ts', 'entries')
-    @broadcast_to_cube_of('stops', 'ts')
-    @has_type('ts', TimeSeries)
-    @has_type('entries', Signals)
-    # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
-    def __init__(self, ts, entries, stops, is_relative=True, only_first=True):
-        """A stop-loss is designed to limit an investor's loss on a security position. 
-        Setting a stop-loss order for 10% below the price at which you bought the stock 
-        will limit your loss to 10%."""
-
-        self.exits = Signals(stoploss_exits_nb(ts, entries, stops, is_relative, only_first))
-
-
-@njit(b1[:](b1[:, :], i8, i8, i8, f8[:, :], f8[:, :], b1), cache=True)
-def tstop_exit_mask_nb(entries, col_idx, prev_idx, next_idx, ts, stop, is_relative):
-    """Index of the first event below the trailing stop."""
-    exit_mask = np.empty(ts.shape[0], dtype=b1)
-    ts = ts[prev_idx:next_idx, col_idx]
-    stop = stop[prev_idx:next_idx, col_idx]
-    # Propagate the maximum value from the entry using expanding max
-    peak = _expanding_max_1d_nb(ts)
-    if np.min(stop) != np.max(stop):
-        # Propagate the stop value of the last max
-        raising_idxs = np.flatnonzero(_pct_change_1d_nb(peak))
-        stop_temp = np.full(ts.shape, np.nan)
-        stop_temp[raising_idxs] = stop[raising_idxs]
-        stop_temp = _ffill_1d_nb(stop_temp)
-        stop_temp[np.isnan(stop_temp)] = -np.inf
-        stop = stop_temp
-    if is_relative:
-        stop = (1 - stop) * peak
-    exit_mask[prev_idx:next_idx] = ts < stop
-    return exit_mask
-
-
-@njit(b1[:, :](f8[:, :], b1[:, :], f8[:, :, :], b1, b1), cache=True)
-def tstop_exits_nb(ts, entries, stops, is_relative, only_first):
-    """Calculate exit signals based on trailing stop strategy."""
-    exits = np.empty((ts.shape[0], ts.shape[1] * stops.shape[0]), dtype=b1)
-    for i in range(stops.shape[0]):
-        i_exits = generate_exits_nb(entries, tstop_exit_mask_nb, only_first, ts, stops[i, :, :], is_relative)
-        exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = i_exits
-    return exits
-
-
-class TrailingStop():
-    @to_2d('ts')
-    @to_2d('entries')
-    @broadcast('ts', 'entries')
-    @broadcast_to_cube_of('stops', 'ts')
-    @has_type('ts', TimeSeries)
-    @has_type('entries', Signals)
-    # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
-    def __init__(self, ts, entries, stops, is_relative=True, only_first=True):
-        """A Trailing Stop order is a stop order that can be set at a defined percentage 
-        or amount away from the current market price. The main difference between a regular 
-        stop loss and a trailing stop is that the trailing stop moves as the price moves."""
-
-        self.exits = Signals(tstop_exits_nb(ts, entries, stops, is_relative, only_first))

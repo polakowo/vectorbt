@@ -3,6 +3,8 @@ import plotly.graph_objects as go
 from vectorbt.decorators import *
 import matplotlib.pyplot as plt
 
+__all__ = ['Gauge', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
+
 
 def rgb_from_cmap(cmap_name, value, vrange):
     """Map vrange to colormap and get RGB of the value from that range."""

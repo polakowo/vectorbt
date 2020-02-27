@@ -7,6 +7,8 @@ import sys
 from numba import njit, f8, i8, b1
 import plotly.graph_objects as go
 
+__all__ = ['TimeSeries']
+
 # ############# Numba functions ############# #
 
 # All functions below require input to be a two-dimensional NumPy array,
