@@ -2,7 +2,11 @@
 
 ![Made by Vectors Market](logo.png)
 
-vectorbt is a backtesting library on steroids. It follows a vectorized approach to backtest and analyze trading strategies at scale. While there are many other great backtesting packages for Python, vectorbt is more of a data mining tool: it excels at processing performance and offers interactive tools to explore complex phenomena in trading. With it you can traverse a huge number of parameter combinations, time periods and instruments in no time, to explore where your strategy performs best and even to uncover hidden patterns in data.
+vectorbt is a backtesting library on steroids. It operates entirely on NumPy arrays and is powered by Numba to backtest and analyze trading strategies at scale. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashbaords akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
+
+## Motivation
+
+While there are many other great backtesting packages for Python, vectorbt is more of a data mining tool: it excels at processing performance and offers interactive tools to explore complex phenomena in trading. With it you can traverse a huge number of parameter combinations, time periods and instruments in no time, to explore where your strategy performs best and even to uncover hidden patterns in data.
 
 Take a simple Dual Moving Average Crossover strategy for example. By calculating the performance of each reasonable window combination and plotting the whole thing as a heatmap (as we do below), you can easily identify how performance depends on window size. If you additionally calculate the same heatmap over multiple time periods, you will also spot how performance varies with downtrends and uptrends. By doing the same for other strategies such as holding and trading randomly, you can even compare them using significance tests. With vectorbt, this analysis can be done in less than a minute, and will effectively save you days of getting the same insights using other libraries.
 
@@ -43,30 +47,7 @@ vbt.Heatmap(data=tnp_matrix, x_labels=windows, y_labels=windows, width=600, heig
 
 ![msft_heatmap.png](msft_heatmap.png)
 
-## Motivation
-
-As data scientist and recent trader, I've been curious of how effective is technical analysis. I wanted answers to general questions like "*How this strategy compares to the other ones? What technical indicators are best and what are worst for this market? Is technical analysis of any use at all, or is it just a buzzword and everything in the market is fully governed by random choice?*"
-
-To answer these and more, you need to set up experiments where you traverse thousands or even millions of parameter combinations, time ranges and markets, to see what performs best where. While there are many great backtesting libraries for Python, I found none that could handle these amounts of tests in a timely manner. 
-
-Take for example pandas: while certain array operations such as window functions are implemented using either Cython or Numba, they cannot be accessed within a user-defined Numba code. Moreover, some operations may be extremely slow compared to their NumPy counterparts:
-
-```
-a = np.arange(100)
-s = pd.Series(a)
-
-%timeit a[i]
-1000000 loops, best of 3: 998 ns per loop
-
-%timeit s[i]
-10000 loops, best of 3: 168 µs per loop
-```
-
-The idea behind vectorbt is to create a backtesting library that operates entirely on NumPy arrays and is powered by Numba to deliver backtesting at scale. It also integrates Plotly to display charts and dashbaords akin to Tableau right in the Jupyter notebook.
-
 ## How it works?
-
-It builds upon numpy and Numba to obtain orders-of-magnitude speedup over pandas. Furthermore, it integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to build interactive charts and complex dashboards. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
 
 Each vectorbt class is a subclass of `np.ndarray` with a custom set of methods optimized for working with time series data. For example, the `Signals` class is a binary NumPy array supporting advanced binary operations. Each method is either vectorized or Numba compiled for best peformance; most of the times even a badly "looped" Numba is faster than vectorized NumPy though. Moreover, each class stricly accepts a 2-dimensional array, where first axis is index (time) and second axis are columns (features), and provides standardized methods for processing 2-dimensional data along first axis. Thus, similar to a `pd.DataFrame`, one can do a single operation to transform tons of columns simultaneously. This, for example, is the magic behind backtesting thousands of window combinations at once.
 
