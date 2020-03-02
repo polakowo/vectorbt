@@ -6,15 +6,15 @@ import plotly.graph_objects as go
 __all__ = ['OHLCV']
 
 class OHLCV():
-    @have_same_shape('open', 'high')
-    @have_same_shape('open', 'low')
-    @have_same_shape('open', 'close')
-    @have_same_shape('open', 'volume')
     @has_type('open', TimeSeries)
     @has_type('high', TimeSeries)
     @has_type('low', TimeSeries)
     @has_type('close', TimeSeries)
     @has_type('volume', TimeSeries)
+    @have_same_shape('open', 'high')
+    @have_same_shape('open', 'low')
+    @have_same_shape('open', 'close')
+    @have_same_shape('open', 'volume')
     def __init__(self, open, high, low, close, volume=None):
         self.open = open
         self.high = high

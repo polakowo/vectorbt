@@ -34,8 +34,8 @@ def fillna_nb(a, fill_value):
 @njit(f8[:, :](f8[:, :], i8, f8), cache=True)
 def prepend_nb(a, n, fill_value):
     """Prepend n values to the array."""
-    b = np.full((a.shape[0]+n, a.shape[1]), fill_value, dtype=a.dtype)
-    b[-a.shape[0]:] = a
+    b = np.full((a.shape[0]+n, a.shape[1]), fill_value)
+    b[n:, :] = a
     return b
 
 
@@ -46,19 +46,21 @@ def fshift_nb(a, n):
     return a[:-n, :]
 
 
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def diff_nb(a, n):
+@njit(f8[:, :](f8[:, :]), cache=True)
+def diff_nb(a):
     """Calculate the n-th discrete difference."""
     b = np.full_like(a, np.nan)
     for i in range(a.shape[1]):
-        b[n:, i] = np.diff(a[:, i].copy(), n=n)
+        b[1:, i] = np.diff(a[:, i].copy())
     return b
 
 
 @njit(f8[:](f8[:]), cache=True)
 def _pct_change_1d_nb(a):
     """Compute the percentage change (1D)."""
-    return np.concatenate((np.full(1, np.nan), np.diff(a.copy()) / a[:-1]))
+    b = np.full_like(a, np.nan)
+    b[1:] = np.diff(a.copy()) / a[:-1]
+    return b
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
@@ -96,20 +98,26 @@ def ffill_nb(a):
 @njit(f8[:, :](f8[:, :]), cache=True)
 def cumsum_nb(a):
     """Cumulative sum."""
-    b = np.empty_like(a, dtype=a.dtype)
+    b = np.full_like(a, np.nan)
     for j in range(a.shape[1]):
-        b[:, j] = np.nancumsum(a[:, j])
-        b[np.isnan(a[:, j]), j] = np.nan
+        cumsum = 0
+        for i in range(a.shape[0]):
+            if ~np.isnan(a[i, j]):
+                cumsum += a[i, j]
+                b[i, j] = cumsum
     return b
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def cumprod_nb(a):
     """Cumulative product."""
-    b = np.empty_like(a, dtype=a.dtype)
+    b = np.full_like(a, np.nan)
     for j in range(a.shape[1]):
-        b[:, j] = np.nancumprod(a[:, j])
-        b[np.isnan(a[:, j]), j] = np.nan
+        cumprod = 1
+        for i in range(a.shape[0]):
+            if ~np.isnan(a[i, j]):
+                cumprod *= a[i, j]
+                b[i, j] = cumprod
     return b
 
 
@@ -364,7 +372,7 @@ class TimeSeries(np.ndarray):
     NOTE: There is no index nor columns vars - you will have to handle them separately."""
 
     @to_2d('input_array')
-    @has_dtype('input_array', np.float64)
+    @to_dtype('input_array', np.float64)
     def __new__(cls, input_array):
         return np.asarray(input_array).view(cls)
 
@@ -378,23 +386,26 @@ class TimeSeries(np.ndarray):
 
     @classmethod
     @to_1d('input_array')
-    @has_dtype('input_array', np.float64)
+    @to_dtype('input_array', np.float64)
     def from_rolling_window(cls, input_array, window, step=1):
         strided = _rolling_window_1d_nb(input_array, window)
         return cls(strided.transpose()[:, ::step])
 
     @to_2d('self')
-    @to_2d('benchmark')
-    @broadcast_to('benchmark', 'self')
+    def reduce_on_mask(self, func, mask):
+        """Perform reducing operation on mask."""
+        position_profits = self.copy()
+        position_profits[~mask] = np.nan
+        return np.asarray(func(position_profits)) # no longer TimeSeries
+
+    @to_2d('self')
+    @have_same_shape('self', 'index', along_axis=0)
     def plot(self,
              column=None,
              label='TimeSeries',
-             benchmark=None,
-             benchmark_label='Benchmark',
              index=None,
-             benchmark_scatter_kwargs={},
              ts_scatter_kwargs={},
-             fig=None, 
+             fig=None,
              **layout_kwargs):
 
         if column is None:
@@ -403,8 +414,6 @@ class TimeSeries(np.ndarray):
             else:
                 raise ValueError("For an array with multiple columns, you must pass a column index")
         ts = self[:, column]
-        if benchmark is not None:
-            benchmark = benchmark[:, column]
 
         if index is None:
             index = np.arange(ts.shape[0])
@@ -413,33 +422,14 @@ class TimeSeries(np.ndarray):
             fig.update_layout(showlegend=True)
             fig.update_layout(**layout_kwargs)
 
-        if benchmark is not None:
-            # Plot benchmark
-            benchmark_scatter = go.Scatter(
-                x=index,
-                y=benchmark,
-                mode='lines',
-                name=benchmark_label,
-                line_color='#ff7f0e'
-            )
-            benchmark_scatter.update(**benchmark_scatter_kwargs)
-            fig.add_trace(benchmark_scatter)
-            _min, _max = np.min(np.concatenate((ts, benchmark))), np.max(np.concatenate((ts, benchmark)))
-        else:
-            _min, _max = np.min(ts), np.max(ts)
         # Plot TimeSeries
         ts_scatter = go.Scatter(
             x=index,
             y=ts,
             mode='lines',
-            name=label,
-            line_color='#1f77b4'
+            name=label
         )
         ts_scatter.update(**ts_scatter_kwargs)
         fig.add_trace(ts_scatter)
-
-        # Adjust y-axis
-        space = 0.05 * (_max - _min)
-        fig.update_yaxes(range=[_min - space, _max + space])
 
         return fig

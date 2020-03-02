@@ -159,11 +159,6 @@ class Scatter(UpdatableFigureWidget):
             for i, scatter in enumerate(self.data):
                 scatter.y = data[i]
 
-            # Set y-axis range, mainly for fill='tozeroy'
-            vmin, vmax = np.min(data), np.max(data)
-            space = 0.05 * (vmax - vmin)
-            self.update_yaxes(range=(vmin - space, vmax + space))
-
 
 class Histogram(UpdatableFigureWidget):
     """Accepts a matrix and draws a histogram for each array along 1st axis."""

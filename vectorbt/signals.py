@@ -349,7 +349,7 @@ class Signals(np.ndarray):
     @to_2d('self')
     @to_2d('ts')
     @broadcast('ts', 'self')
-    @broadcast_to_cube_of('stops', 'self')
+    @broadcast_to_combs_of('stops', 'self')
     @has_type('ts', TimeSeries)
     # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
     def generate_stoploss_exits(self, ts, stops, is_relative=True, only_first=True):
@@ -362,7 +362,7 @@ class Signals(np.ndarray):
     @to_2d('self')
     @to_2d('ts')
     @broadcast('ts', 'self')
-    @broadcast_to_cube_of('stops', 'self')
+    @broadcast_to_combs_of('stops', 'self')
     @has_type('ts', TimeSeries)
     # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
     def generate_trailstop_exits(self, ts, stops, is_relative=True, only_first=True):
@@ -372,19 +372,20 @@ class Signals(np.ndarray):
         exits = Signals(trailstop_exits_nb(self, ts, stops, is_relative, only_first))
         return exits
 
-    @property
+    @cached_property
     @to_2d('self')
     def n(self):
         """Number of signals."""
         return np.asarray(np.sum(self, axis=0))
 
-    @property
+    @cached_property
     @to_2d('self')
     def avg_distance(self):
         """Average distance between signals."""
         return avg_distance_nb(self)
 
     @to_2d('self')
+    @have_same_shape('self', 'index', along_axis=0)
     def plot(self,
              column=None,
              index=None,
@@ -403,10 +404,23 @@ class Signals(np.ndarray):
             index = np.arange(signals.shape[0])
         if fig is None:
             fig = FigureWidget()
-            fig.update_layout(showlegend=True)
+            fig.update_layout(
+                showlegend=True,
+                yaxis=dict(
+                    tickmode='array',
+                    tickvals=[0, 1],
+                    ticktext=['false', 'true']
+                )
+            )
             fig.update_layout(**layout_kwargs)
         # Plot Signals
-        scatter = go.Scatter(x=index, y=signals, mode='lines', name=label)
+        scatter = go.Scatter(
+            x=index, 
+            y=signals.astype(np.uint8), 
+            customdata=signals,
+            mode='lines', 
+            name=label
+        )
         scatter.update(**scatter_kwargs)
         fig.add_trace(scatter)
 
