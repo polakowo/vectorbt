@@ -244,48 +244,25 @@ def to_2d(arg_name, expand_axis=1):
     return to_2d_decorator
 
 
-def _broadcast(a, b):
-    if not isinstance(a, np.ndarray):
-        a = np.asarray(a)
-    if not isinstance(b, np.ndarray):
-        b = np.asarray(b)
-    a, b = np.broadcast_arrays(a, b, subok=True)
-    a = a.copy()  # deprecation warning
-    b = b.copy()
-    return a, b
-
-
-def broadcast(arg1_name, arg2_name):
+def broadcast(*arg_names):
     def broadcast_decorator(func):
         @wraps(func)
         def wrapper_decorator(*args, **kwargs):
-            """Bring both arguments to the same shape."""
-            a = _get_arg(arg1_name, func, *args, **kwargs)
-            b = _get_arg(arg2_name, func, *args, **kwargs)
-            if a is None or b is None:
-                return func(*args, **kwargs)
-            a, b = _broadcast(a, b)
-            args, kwargs = _set_arg(a, arg1_name, func, *args, **kwargs)
-            args, kwargs = _set_arg(b, arg2_name, func, *args, **kwargs)
+            """Bring arguments to the same shape."""
+            arg_objs = {}
+            for arg_name in arg_names:
+                a = _get_arg(arg_name, func, *args, **kwargs)
+                if a is not None:
+                    if not isinstance(a, np.ndarray):
+                        a = np.asarray(a)
+                    arg_objs[arg_name] = a
+            if len(arg_objs) > 1:
+                new_arg_objs = np.broadcast_arrays(*arg_objs.values(), subok=True)
+                for i, arg_name in enumerate(arg_objs.keys()):
+                    args, kwargs = _set_arg(new_arg_objs[i].copy(), arg_name, func, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapper_decorator
     return broadcast_decorator
-
-
-def broadcast_to(arg1_name, arg2_name):
-    def broadcast_to_decorator(func):
-        @wraps(func)
-        def wrapper_decorator(*args, **kwargs):
-            """Bring the first argument to the shape of the second argument."""
-            a = _get_arg(arg1_name, func, *args, **kwargs)
-            b = _get_arg(arg2_name, func, *args, **kwargs)
-            if a is None or b is None:
-                return func(*args, **kwargs)
-            a, b = _broadcast(a, b)
-            args, kwargs = _set_arg(a, arg1_name, func, *args, **kwargs)
-            return func(*args, **kwargs)
-        return wrapper_decorator
-    return broadcast_to_decorator
 
 
 def broadcast_to_combs_of(arg1_name, arg2_name):
