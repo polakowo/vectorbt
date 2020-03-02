@@ -2,7 +2,7 @@
 
 ![Made by Vectors Market](logo.png)
 
-vectorbt is a backtesting library on steroids. It follows an array-oriented computing approach: it operates entirely on NumPy arrays and is powered by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at scale. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashbaords akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
+vectorbt is a backtesting library on steroids. It operates entirely on NumPy arrays and is powered by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at scale. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashbaords akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
 
 ## Motivation
 
@@ -33,8 +33,7 @@ fast_windows, slow_windows = windows[fast_idxs], windows[slow_idxs]
 # Calculate the performance of the strategy
 dmac = vbt.DMAC(ohlcv.open, fast_windows, slow_windows)
 entries, exits = dmac.crossover_signals()
-positions = vbt.Positions.from_signals(entries, exits)
-portfolio = vbt.Portfolio(ohlcv.open, positions, investment=investment)
+portfolio = vbt.Portfolio.from_signals(ohlcv.open, entries, exits, investment=investment)
 tnp = portfolio.total_net_profit
 
 # Plot heatmap
