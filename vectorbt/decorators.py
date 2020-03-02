@@ -2,6 +2,8 @@ from functools import wraps, reduce
 from inspect import signature, Parameter
 import numpy as np
 
+# ############# Args/kwargs ############# #
+
 
 def rgetattr(obj, path: str, *default):
     """https://stackoverflow.com/a/54547158/8141780"""
@@ -64,6 +66,8 @@ def _set_arg(arg, arg_name, func, *args, **kwargs):
         kwargs[arg_name] = arg
     return args, kwargs
 
+# ############# Required ############# #
+
 
 def required(arg_name):
     def required_decorator(func):
@@ -76,6 +80,8 @@ def required(arg_name):
             return func(*args, **kwargs)
         return wrapper_decorator
     return required_decorator
+
+# ############# Type ############# #
 
 
 def has_type(arg_name, types):
@@ -103,6 +109,23 @@ def has_type(arg_name, types):
             return func(*args, **kwargs)
         return wrapper_decorator
     return has_type_decorator
+
+
+def to_type(arg_name, arg_type):
+    def to_type_decorator(func):
+        @wraps(func)
+        def wrapper_decorator(*args, **kwargs):
+            """Convert to another type."""
+            arg = _get_arg(arg_name, func, *args, **kwargs)
+            if arg is None:
+                return func(*args, **kwargs)
+            arg = arg_type(arg)
+            args, kwargs = _set_arg(arg, arg_name, func, *args, **kwargs)
+            return func(*args, **kwargs)
+        return wrapper_decorator
+    return to_type_decorator
+
+# ############# Data type ############# #
 
 
 def has_dtype(arg_name, dtype):
@@ -134,15 +157,7 @@ def to_dtype(arg_name, dtype):
         return wrapper_decorator
     return to_dtype_decorator
 
-
-def return_type(arg_type):
-    def return_type_decorator(func):
-        @wraps(func)
-        def wrapper_decorator(*args, **kwargs):
-            """Convert the returned object to another type."""
-            return arg_type(func(*args, **kwargs))
-        return wrapper_decorator
-    return return_type_decorator
+# ############# Shape ############# #
 
 
 def have_same_shape(arg1_name, arg2_name, along_axis=None):
@@ -229,55 +244,32 @@ def to_2d(arg_name, expand_axis=1):
     return to_2d_decorator
 
 
-def broadcast(arg1_name, arg2_name):
+def broadcast(*arg_names):
     def broadcast_decorator(func):
         @wraps(func)
         def wrapper_decorator(*args, **kwargs):
-            """Bring both arguments to the same shape."""
-            a = _get_arg(arg1_name, func, *args, **kwargs)
-            b = _get_arg(arg2_name, func, *args, **kwargs)
-            if a is None or b is None:
-                return func(*args, **kwargs)
-            if not isinstance(a, np.ndarray):
-                a = np.asarray(a)
-            if not isinstance(b, np.ndarray):
-                b = np.asarray(b)
-            a, b = np.broadcast_arrays(a, b, subok=True)
-            a = a.copy()  # deprecation warning
-            b = b.copy()
-            args, kwargs = _set_arg(a, arg1_name, func, *args, **kwargs)
-            args, kwargs = _set_arg(b, arg2_name, func, *args, **kwargs)
+            """Bring arguments to the same shape."""
+            arg_objs = {}
+            for arg_name in arg_names:
+                a = _get_arg(arg_name, func, *args, **kwargs)
+                if a is not None:
+                    if not isinstance(a, np.ndarray):
+                        a = np.asarray(a)
+                    arg_objs[arg_name] = a
+            if len(arg_objs) > 1:
+                new_arg_objs = np.broadcast_arrays(*arg_objs.values(), subok=True)
+                for i, arg_name in enumerate(arg_objs.keys()):
+                    args, kwargs = _set_arg(new_arg_objs[i].copy(), arg_name, func, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapper_decorator
     return broadcast_decorator
 
 
-def broadcast_to(arg1_name, arg2_name):
-    def broadcast_to_decorator(func):
+def broadcast_to_combs_of(arg1_name, arg2_name):
+    def broadcast_to_combs_of_decorator(func):
         @wraps(func)
         def wrapper_decorator(*args, **kwargs):
-            """Bring the first argument to the same shape of the second argument."""
-            a = _get_arg(arg1_name, func, *args, **kwargs)
-            b = _get_arg(arg2_name, func, *args, **kwargs)
-            if a is None or b is None:
-                return func(*args, **kwargs)
-            if not isinstance(a, np.ndarray):
-                a = np.asarray(a)
-            if not isinstance(b, np.ndarray):
-                b = np.asarray(b)
-            a = np.broadcast_to(a, b.shape, subok=True)
-            a = a.copy()  # deprecation warning
-            args, kwargs = _set_arg(a, arg1_name, func, *args, **kwargs)
-            return func(*args, **kwargs)
-        return wrapper_decorator
-    return broadcast_to_decorator
-
-
-def broadcast_to_cube_of(arg1_name, arg2_name):
-    def broadcast_to_cube_of_decorator(func):
-        @wraps(func)
-        def wrapper_decorator(*args, **kwargs):
-            """Reshape the first argument to be a cube out of second argument."""
+            """Bring the first argument to the shape of a combinations array of the second argument."""
             a = _get_arg(arg1_name, func, *args, **kwargs)
             b = _get_arg(arg2_name, func, *args, **kwargs)
             if a is None or b is None:
@@ -297,12 +289,14 @@ def broadcast_to_cube_of(arg1_name, arg2_name):
             args, kwargs = _set_arg(a, arg1_name, func, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapper_decorator
-    return broadcast_to_cube_of_decorator
+    return broadcast_to_combs_of_decorator
+
+# ############# Class decorators ############# #
 
 
 def add_2d_nb_methods(*nb_funcs):
-    """Wrap numba functions as methods."""
     def wrapper(cls):
+        """Wrap numba functions as methods."""
         for nb_func in nb_funcs:
             def get_default_args(func):
                 return {
@@ -319,7 +313,7 @@ def add_2d_nb_methods(*nb_funcs):
     return wrapper
 
 
-def cache_property(func):
+def cached_property(func):
     @wraps(func)
     def wrapper_decorator(*args, **kwargs):
         """Cache property to avoid recalculating it again and again."""
@@ -331,4 +325,4 @@ def cache_property(func):
             to_be_cached = func(*args, **kwargs)
             setattr(obj, attr_name, to_be_cached)
             return to_be_cached
-    return wrapper_decorator
+    return property(wrapper_decorator)

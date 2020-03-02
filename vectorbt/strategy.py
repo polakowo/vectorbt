@@ -10,6 +10,33 @@ from vectorbt.timeseries import TimeSeries
 
 __all__ = ['DMAC', 'BollingerBands', 'RSI']
 
+# ############# Numba functions ############# #
+
+
+@njit
+def stack_outputs_nb(a, b, output_func):
+    """Stack outputs along axis 1.
+    
+    We always work with 2D data, so stack all new combinations horizontally."""
+    c = np.empty((a.shape[0], a.shape[1] * b.shape[0]), dtype=b1)
+    for i in range(b.shape[0]):
+        c[:, i*a.shape[1]:(i+1)*a.shape[1]] = output_func(a, b[i, :, :])
+    return c
+
+
+greater_than = njit(lambda a, b: a > b)
+less_than = njit(lambda a, b: a < b)
+
+
+@njit(b1[:, :](f8[:, :], f8[:, :, :]), cache=True)
+def above_thresholds_nb(a, thresholds):
+    return stack_outputs_nb(a, thresholds, greater_than)
+
+
+@njit(b1[:, :](f8[:, :], f8[:, :, :]), cache=True)
+def below_thresholds_nb(a, thresholds):
+    return stack_outputs_nb(a, thresholds, less_than)
+
 # ############# MovingAverage ############# #
 
 
@@ -115,36 +142,36 @@ class BollingerBands():
         self.middle = TimeSeries(middle)
         self.lower = TimeSeries(lower)
 
-    @property
+    @cached_property
     def percent_b(self):
         """Shows where price is in relation to the bands.
         %b equals 1 at the upper band and 0 at the lower band."""
         return TimeSeries((self.ts - self.lower) / (self.upper - self.lower))
 
-    @property
+    @cached_property
     def bandwidth(self):
         """Bandwidth tells how wide the Bollinger Bands are on a normalized basis."""
         return TimeSeries((self.upper - self.lower) / self.middle)
 
-    @to_2d('threshold')
-    @broadcast_to('threshold', 'self.ts')
-    def is_percent_b_above_threshold(self, threshold):
-        return Signals(self.percent_b > threshold)
+    @broadcast_to_combs_of('thresholds', 'self.ts')
+    @to_dtype('thresholds', np.float64)
+    def is_percent_b_above(self, thresholds):
+        return Signals(above_thresholds_nb(self.percent_b, thresholds))
 
-    @to_2d('threshold')
-    @broadcast_to('threshold', 'self.ts')
-    def is_percent_b_below_threshold(self, threshold):
-        return Signals(self.percent_b < threshold)
+    @broadcast_to_combs_of('thresholds', 'self.ts')
+    @to_dtype('thresholds', np.float64)
+    def is_percent_b_below(self, thresholds):
+        return Signals(below_thresholds_nb(self.percent_b, thresholds))
 
-    @to_2d('threshold')
-    @broadcast_to('threshold', 'self.ts')
-    def is_bandwidth_above_threshold(self, threshold):
-        return Signals(self.bandwidth > threshold)
+    @broadcast_to_combs_of('thresholds', 'self.ts')
+    @to_dtype('thresholds', np.float64)
+    def is_bandwidth_above(self, thresholds):
+        return Signals(above_thresholds_nb(self.bandwidth, thresholds))
 
-    @to_2d('threshold')
-    @broadcast_to('threshold', 'self.ts')
-    def is_bandwidth_below_threshold(self, threshold):
-        return Signals(self.bandwidth < threshold)
+    @broadcast_to_combs_of('thresholds', 'self.ts')
+    @to_dtype('thresholds', np.float64)
+    def is_bandwidth_below(self, thresholds):
+        return Signals(below_thresholds_nb(self.bandwidth, thresholds))
 
 
 # ############# RSI ############# #
@@ -152,7 +179,7 @@ class BollingerBands():
 @njit(f8[:, :](f8[:, :], i8[:], b1, b1), cache=True)
 def rsi_nb(ts, windows, is_ewm, is_min_periods):
     """For each window, calculate the RSI."""
-    delta = diff_nb(ts, 1)[1:, :]  # otherwise ewma will be all NaN
+    delta = diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
     up = set_by_mask_nb(up, up < 0, 0)
     down = np.abs(set_by_mask_nb(down, down > 0, 0))
@@ -192,12 +219,12 @@ class RSI():
     def __init__(self, ts, windows, is_ewm=False, is_min_periods=True):
         self.rsi = TimeSeries(rsi_nb(ts, windows, is_ewm, is_min_periods))
 
-    @to_2d('threshold')
-    @broadcast_to('threshold', 'self.rsi')
-    def is_rsi_above_threshold(self, threshold):
-        return Signals(self.rsi > threshold)
+    @broadcast_to_combs_of('thresholds', 'self.rsi')
+    @to_dtype('thresholds', np.float64)
+    def is_rsi_above(self, thresholds):
+        return Signals(above_thresholds_nb(self.rsi, thresholds))
 
-    @to_2d('threshold')
-    @broadcast_to('threshold', 'self.rsi')
-    def is_rsi_below_threshold(self, threshold):
-        return Signals(self.rsi < threshold)
+    @broadcast_to_combs_of('thresholds', 'self.rsi')
+    @to_dtype('thresholds', np.float64)
+    def is_rsi_below(self, thresholds):
+        return Signals(below_thresholds_nb(self.rsi, thresholds))
