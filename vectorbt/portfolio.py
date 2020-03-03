@@ -125,12 +125,14 @@ def apply_on_positions(trades, apply_func, *args):
         entry_i = -1
         position = False
         for i in range(trades.shape[0]):
-            if position and ((not np.isnan(trades[i, col]) and trades[i, col] < 0) or i == trades.shape[0] - 1):  # unrealized
+            if position and trades[i, col] < 0:
                 out[i, col] = apply_func(entry_i, i, col, trades, *args)
                 position = False
-            elif not position and not np.isnan(trades[i, col]) and trades[i, col] > 0:
+            elif not position and trades[i, col] > 0:
                 entry_i = i
                 position = True
+            if position and i == trades.shape[0] - 1: # unrealized
+                out[i, col] = apply_func(entry_i, i, col, trades, *args)
     return out
 
 
@@ -149,11 +151,37 @@ def position_returns_nb(trades, equity):
     """Calculate returns per trade."""
     return apply_on_positions(trades, _returns_nb, equity)
 
+
+@njit
+def reduce_on_mask_nb(a, func_nb, mask):
+    """Perform reducing operation on mask."""
+    b = np.full(a.shape[1], np.nan)
+    for col in range(a.shape[1]):
+        if mask[:, col].any():
+            b[col] = func_nb(a[:, col][mask[:, col]])
+    return b
+
+
+_sum_1d_nb = njit(lambda x: np.sum(x))
+_mean_1d_nb = njit(lambda x: np.mean(x))
+
+
+@njit(f8[:](f8[:, :], b1[:, :]), cache=True)
+def sum_on_mask_nb(a, mask):
+    """Sum of values at mask."""
+    return reduce_on_mask_nb(a, _sum_1d_nb, mask)
+
+
+@njit(f8[:](f8[:, :], b1[:, :]), cache=True)
+def mean_on_mask_nb(a, mask):
+    """Mean of values at mask."""
+    return reduce_on_mask_nb(a, _mean_1d_nb, mask)
+
 # ############# TimeSeries subclasses ############# #
 
 
 class TradeSeries(TimeSeries):
-    """TradeSeries holds the number of shares bought/sold at each time step, everything else is NaN."""
+    """TradeSeries holds the number of shares bought/sold at each time step."""
 
     @to_2d('self')
     def detect_order_accumulation(self):
@@ -224,39 +252,57 @@ class TradeSeries(TimeSeries):
 
 
 class TradePLSeries(TimeSeries):
-    """TradePLSeries holds the profit/loss at each time step, everything else is NaN."""
+    """TradePLSeries holds the profit/loss at each position end, everything else is NaN."""
+
+    @cached_property
+    def win_mask(self):
+        return np.asarray(np.greater(self, 0, where=~np.isnan(self)) & ~np.isnan(self))
+
+    @cached_property
+    def loss_mask(self):
+        return np.asarray(np.less(self, 0, where=~np.isnan(self)) & ~np.isnan(self))
+
+    @cached_property
+    def position_mask(self):
+        return np.asarray(~np.isnan(self))
 
     @cached_property
     def sum_win(self):
-        sum_win = self.reduce_on_mask(lambda x: np.nansum(x, axis=0), self > 0)
-        sum_win[np.isnan(sum_win)] = 0
-        return np.asarray(sum_win)
+        """Sum of wins."""
+        sum_win = np.asarray(sum_on_mask_nb(self, self.win_mask))
+        sum_win[np.isnan(sum_win) & self.position_mask.any(axis=0)] = 0. # nan only if no positions
+        return sum_win
 
     @cached_property
     def sum_loss(self):
-        sum_loss = self.reduce_on_mask(lambda x: np.nansum(x, axis=0), self < 0)
-        sum_loss[np.isnan(sum_loss)] = 0
-        return np.asarray(np.abs(sum_loss))
+        """Sum of losses (always positive)."""
+        sum_loss = np.asarray(np.abs(sum_on_mask_nb(self, self.loss_mask)))
+        sum_loss[np.isnan(sum_loss) & self.position_mask.any(axis=0)] = 0.
+        return sum_loss
 
     @cached_property
     def avg_win(self):
-        avg_win = self.reduce_on_mask(lambda x: np.nanmean(x, axis=0), self > 0)
-        avg_win[np.isnan(avg_win)] = 0
-        return np.asarray(avg_win)
+        """Average win."""
+        avg_win = np.asarray(mean_on_mask_nb(self, self.win_mask))
+        avg_win[np.isnan(avg_win) & self.position_mask.any(axis=0)] = 0.
+        return avg_win
 
     @cached_property
     def avg_loss(self):
-        avg_loss = self.reduce_on_mask(lambda x: np.nanmean(x, axis=0), self < 0)
-        avg_loss[np.isnan(avg_loss)] = 0
-        return np.asarray(np.abs(avg_loss))
+        """Average loss (always positive)."""
+        avg_loss = np.asarray(np.abs(mean_on_mask_nb(self, self.loss_mask)))
+        avg_loss[np.isnan(avg_loss) & self.position_mask.any(axis=0)] = 0.
+        return avg_loss
 
     @cached_property
     def win_prob(self):
-        return np.asarray(np.sum(self > 0, axis=0) / np.sum(~np.isnan(self), axis=0))
+        """Fraction of wins."""
+        return np.asarray(np.sum(self.win_mask, axis=0) / np.sum(self.position_mask, axis=0))
 
     @cached_property
     def loss_prob(self):
-        return np.asarray(np.sum(self < 0, axis=0) / np.sum(~np.isnan(self), axis=0))
+        """Fraction of losses."""
+        return np.asarray(np.sum(self.loss_mask, axis=0) / np.sum(self.position_mask, axis=0))
 
     @have_same_shape('self', 'index', along_axis=0)
     def plot(self,
@@ -428,8 +474,6 @@ class Portfolio():
     def trades(self):
         trades = fillna_nb(diff_nb(self.shares), 0)
         trades[0, :] = self.shares[0, :]
-        trade_mask = trades != 0
-        trades[~trade_mask] = np.nan
         return TradeSeries(trades)
 
     @cached_property
