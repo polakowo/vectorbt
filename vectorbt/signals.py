@@ -20,9 +20,9 @@ def generate_random_entries_nb(shape, n, every_nth, seed):
     if every_nth is None:
         every_nth = 1
     a = np.full(shape, False, dtype=b1)
-    for i in range(shape[1]):
+    for col in range(a.shape[1]): # TODO: cannot parallel, tuple throws error
         idxs = np.random.choice(np.arange(shape[0])[::every_nth], size=n, replace=False)
-        a[idxs, i] = True
+        a[idxs, col] = True
     return a
 
 
@@ -32,20 +32,20 @@ def generate_random_exits_nb(entries, seed):
     if seed is not None:
         np.random.seed(seed)
     a = np.full_like(entries, False)
-    for j in range(entries.shape[1]):
+    for col in range(entries.shape[1]):
         prev_entry_idx = -1
         for i in range(entries.shape[0]):
-            if entries[i, j] or i == a.shape[0]-1:
+            if entries[i, col] or i == a.shape[0]-1:
                 if prev_entry_idx == -1:
                     prev_entry_idx = i
                     continue
-                if i == a.shape[0]-1 and not entries[i, j]:
+                if i == a.shape[0]-1 and not entries[i, col]:
                     rand_range = np.arange(prev_entry_idx+1, i+1)
                 else:
                     rand_range = np.arange(prev_entry_idx+1, i)
                 if len(rand_range) > 0:
                     rand_idx = np.random.choice(rand_range)
-                    a[rand_idx, j] = True
+                    a[rand_idx, col] = True
                 prev_entry_idx = i
     return a
 
@@ -54,13 +54,13 @@ def generate_random_exits_nb(entries, seed):
 # NOTE: no explicit types since args are not known before the runtime
 def generate_exits_nb(entries, exit_func_nb, only_first, *args):
     """Generate entries based on exit_func_nb."""
-    # exit_func_nb must return a boolean mask for a column specified by col_idx.
+    # exit_func_nb must return a boolean mask for a column specified by col.
     # You will have to write your exit_func to be compatible with numba!
 
     exits = np.full(entries.shape, False)
 
-    for col_idx in range(entries.shape[1]):
-        entry_idxs = np.flatnonzero(entries[:, col_idx])
+    for col in range(entries.shape[1]): # TODO: cannot parallel, function throws error
+        entry_idxs = np.flatnonzero(entries[:, col])
 
         for i in range(entry_idxs.shape[0]):
             # prev_idx is the previous entry index, next_idx is the next entry index
@@ -73,7 +73,7 @@ def generate_exits_nb(entries, exit_func_nb, only_first, *args):
             # If entry is the last element, ignore
             if prev_idx < entries.shape[0] - 1:
                 # Exit mask must return mask with exit signals for that column
-                exit_mask = exit_func_nb(entries, col_idx, prev_idx, next_idx, *args)
+                exit_mask = exit_func_nb(entries, col, prev_idx, next_idx, *args)
                 exit_idxs = np.where(exit_mask)[0]
                 # Filter out signals before previous entry and after next entry
                 idx_mask = (exit_idxs > prev_idx) & (exit_idxs < next_idx)
@@ -85,7 +85,7 @@ def generate_exits_nb(entries, exit_func_nb, only_first, *args):
                     exit_mask[exit_idxs[idx_mask][0]] = True
                 else:
                     exit_mask[exit_idxs[idx_mask]] = True
-                exits[:, col_idx] = exits[:, col_idx] | exit_mask
+                exits[:, col] = exits[:, col] | exit_mask
     return exits
 
 
@@ -99,16 +99,16 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
     entries = np.full(shape, False)
     exits = np.full(shape, False)
 
-    for col_idx in range(shape[1]):
+    for col in range(shape[1]): # TODO: cannot parallel, function throws error
         prev_idx = -1
         i = 0
         while prev_idx < shape[0] - 1:
             if i % 2 == 0:
                 # Cannot assign two functions to a var in numba
-                mask = entry_func_nb(exits, col_idx, prev_idx, -1, *args)
+                mask = entry_func_nb(exits, col, prev_idx, -1, *args)
                 a = entries
             else:
-                mask = exit_func_nb(entries, col_idx, prev_idx, -1, *args)
+                mask = exit_func_nb(entries, col, prev_idx, -1, *args)
                 a = exits
             if prev_idx != -1:
                 mask[:prev_idx+1] = False
@@ -117,7 +117,7 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
             prev_idx = np.where(mask)[0][0]
             mask[:] = False
             mask[prev_idx] = True  # consider only the first signal
-            a[:, col_idx] = a[:, col_idx] | mask
+            a[:, col] = a[:, col] | mask
             i += 1
     return entries, exits
 
@@ -128,16 +128,16 @@ def rank_true_nb(a, after_false):
 
     after_false: must come after at least one false."""
     b = np.zeros(a.shape, dtype=i8)
-    for j in range(a.shape[1]):
+    for col in range(a.shape[1]):
         if after_false:
             inc = -1
         else:
             inc = 0
         for i in range(a.shape[0]):
-            if a[i, j]:
+            if a[i, col]:
                 if not after_false or (after_false and inc != -1):
                     inc += 1
-                    b[i, j] = inc
+                    b[i, col] = inc
             else:
                 inc = 0
     return b
@@ -157,16 +157,16 @@ def shuffle(a, seed=None):
     if seed is not None:
         np.random.seed(seed)
     b = np.full_like(a, np.nan)
-    for i in range(a.shape[1]):
-        b[:, i] = np.random.permutation(a[:, i])
+    for col in range(a.shape[1]):
+        b[:, col] = np.random.permutation(a[:, col])
     return b
 
 
 @njit(f8[:](b1[:, :]), cache=True)
 def avg_distance_nb(a):
     b = np.full((a.shape[1],), np.nan)
-    for i in range(a.shape[1]):
-        b[i] = np.mean(np.diff(np.flatnonzero(a[:, i])))
+    for col in range(a.shape[1]):
+        b[col] = np.mean(np.diff(np.flatnonzero(a[:, col])))
     return b
 
 

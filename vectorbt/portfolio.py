@@ -15,30 +15,30 @@ __all__ = ['Portfolio']
 
 
 @njit(f8(i8, i8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
-def signals_order_func_np(i, j, run_cash, run_shares, entries, exits, volume, accumulate):
+def signals_order_func_np(i, col, run_cash, run_shares, entries, exits, volume, accumulate):
     """Order function to buy/sell based on signals."""
     if run_shares > 0:
-        if entries[i, j] and not exits[i, j]:
+        if entries[i, col] and not exits[i, col]:
             if accumulate:
-                return volume[i, j]
-        elif not entries[i, j] and exits[i, j]:
-            return -volume[i, j]
+                return volume[i, col]
+        elif not entries[i, col] and exits[i, col]:
+            return -volume[i, col]
     else:
-        if entries[i, j] and not exits[i, j]:
-            return volume[i, j]
-        elif not entries[i, j] and exits[i, j]:
+        if entries[i, col] and not exits[i, col]:
+            return volume[i, col]
+        elif not entries[i, col] and exits[i, col]:
             if accumulate:
-                return -volume[i, j]
+                return -volume[i, col]
     return 0.
 
 
 @njit(f8(i8, i8, f8, f8, f8[:, :], b1), cache=True)
-def orders_order_func_np(i, j, run_cash, run_shares, orders, is_target):
+def orders_order_func_np(i, col, run_cash, run_shares, orders, is_target):
     """Buy/sell the amount of shares specified by orders."""
     if is_target:
-        return orders[i, j] - run_shares
+        return orders[i, col] - run_shares
     else:
-        return orders[i, j]
+        return orders[i, col]
 
 
 @njit
@@ -47,34 +47,34 @@ def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
     cash = np.empty_like(ts)
     shares = np.empty_like(ts)
 
-    for j in range(ts.shape[1]):
+    for col in range(ts.shape[1]):
         run_cash = investment
         run_shares = 0
         for i in range(ts.shape[0]):
-            volume = order_func_np(i, j, run_cash, run_shares, *args)  # the amount of shares to buy/sell
+            volume = order_func_np(i, col, run_cash, run_shares, *args)  # the amount of shares to buy/sell
             if volume > 0:
                 # Buy volume
-                adj_price = ts[i, j] * (1 + slippage[i, j])  # slippage applies on price
+                adj_price = ts[i, col] * (1 + slippage[i, col])  # slippage applies on price
                 req_cash = volume * adj_price
-                req_cash /= (1 - commission[i, j])  # total cash required for this volume
+                req_cash /= (1 - commission[i, col])  # total cash required for this volume
                 if req_cash <= run_cash:  # sufficient cash
                     run_shares += volume
                     run_cash -= req_cash
                 else:  # not sufficient cash, volume will be less than requested
                     adj_cash = run_cash
-                    adj_cash *= (1 - commission[i, j])  # commission in % applies on transaction volume
+                    adj_cash *= (1 - commission[i, col])  # commission in % applies on transaction volume
                     run_shares += adj_cash / adj_price
                     run_cash = 0
             elif volume < 0:
                 # Sell volume
-                adj_price = ts[i, j] * (1 - slippage[i, j])
+                adj_price = ts[i, col] * (1 - slippage[i, col])
                 adj_shares = min(run_shares, abs(volume))
                 adj_cash = adj_shares * adj_price
-                adj_cash *= (1 - commission[i, j])
+                adj_cash *= (1 - commission[i, col])
                 run_shares -= adj_shares
                 run_cash += adj_cash
-            cash[i, j] = run_cash
-            shares[i, j] = run_shares
+            cash[i, col] = run_cash
+            shares[i, col] = run_shares
 
     return cash, shares
 
@@ -96,19 +96,19 @@ def detect_order_accumulation_nb(trades):
     """Detect accumulation of orders, that is, position is being increased/decreased gradually.
 
     When it happens, it's not easy to calculate P/L of a position anymore."""
-    for j in range(trades.shape[1]):
+    for col in range(trades.shape[1]):
         entry_i = -1
         position = False
         for i in range(trades.shape[0]):
-            if trades[i, j] > 0:
+            if trades[i, col] > 0:
                 if position:
                     return True
                 entry_i = i
                 position = True
-            elif trades[i, j] < 0:
+            elif trades[i, col] < 0:
                 if not position:
                     return True
-                if trades[entry_i, j] != abs(trades[i, j]):
+                if trades[entry_i, col] != abs(trades[i, col]):
                     return True
                 position = False
     return False
@@ -121,21 +121,21 @@ def apply_on_positions(trades, apply_func, *args):
         raise ValueError("Order accumulation detected. Cannot calculate performance per position.")
     out = np.full_like(trades, np.nan)
 
-    for j in range(trades.shape[1]):
+    for col in range(trades.shape[1]):
         entry_i = -1
         position = False
         for i in range(trades.shape[0]):
-            if position and ((not np.isnan(trades[i, j]) and trades[i, j] < 0) or i == trades.shape[0] - 1):  # unrealized
-                out[i, j] = apply_func(entry_i, i, j, trades, *args)
+            if position and ((not np.isnan(trades[i, col]) and trades[i, col] < 0) or i == trades.shape[0] - 1):  # unrealized
+                out[i, col] = apply_func(entry_i, i, col, trades, *args)
                 position = False
-            elif not position and not np.isnan(trades[i, j]) and trades[i, j] > 0:
+            elif not position and not np.isnan(trades[i, col]) and trades[i, col] > 0:
                 entry_i = i
                 position = True
     return out
 
 
-_profits_nb = njit(lambda entry_i, exit_i, j, trades, equity: equity[exit_i, j] - equity[entry_i, j])
-_returns_nb = njit(lambda entry_i, exit_i, j, trades, equity: equity[exit_i, j] / equity[entry_i, j] - 1)
+_profits_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] - equity[entry_i, col])
+_returns_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] / equity[entry_i, col] - 1)
 
 
 @njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)

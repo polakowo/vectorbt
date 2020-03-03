@@ -20,8 +20,8 @@ __all__ = ['TimeSeries']
 def set_by_mask_nb(a, mask, value):
     """Set value by 2D boolean mask."""
     b = a.copy()
-    for j in range(b.shape[1]):
-        b[mask[:, j], j] = value
+    for col in range(b.shape[1]):
+        b[mask[:, col], col] = value
     return b
 
 
@@ -50,8 +50,8 @@ def fshift_nb(a, n):
 def diff_nb(a):
     """Calculate the n-th discrete difference."""
     b = np.full_like(a, np.nan)
-    for i in range(a.shape[1]):
-        b[1:, i] = np.diff(a[:, i].copy())
+    for col in range(a.shape[1]):
+        b[1:, col] = np.diff(a[:, col].copy())
     return b
 
 
@@ -67,8 +67,8 @@ def _pct_change_1d_nb(a):
 def pct_change_nb(a):
     """Compute the percentage change."""
     b = np.empty_like(a)
-    for i in range(a.shape[1]):
-        b[:, i] = _pct_change_1d_nb(a[:, i])
+    for col in range(a.shape[1]):
+        b[:, col] = _pct_change_1d_nb(a[:, col])
     return b
 
 
@@ -90,8 +90,8 @@ def _ffill_1d_nb(a):
 def ffill_nb(a):
     """Fill NaNs with the last value."""
     b = np.empty_like(a)
-    for j in range(a.shape[1]):
-        b[:, j] = _ffill_1d_nb(a[:, j])
+    for col in range(a.shape[1]):
+        b[:, col] = _ffill_1d_nb(a[:, col])
     return b
 
 
@@ -99,12 +99,12 @@ def ffill_nb(a):
 def cumsum_nb(a):
     """Cumulative sum."""
     b = np.full_like(a, np.nan)
-    for j in range(a.shape[1]):
+    for col in range(a.shape[1]):
         cumsum = 0
         for i in range(a.shape[0]):
-            if ~np.isnan(a[i, j]):
-                cumsum += a[i, j]
-                b[i, j] = cumsum
+            if ~np.isnan(a[i, col]):
+                cumsum += a[i, col]
+                b[i, col] = cumsum
     return b
 
 
@@ -112,12 +112,12 @@ def cumsum_nb(a):
 def cumprod_nb(a):
     """Cumulative product."""
     b = np.full_like(a, np.nan)
-    for j in range(a.shape[1]):
+    for col in range(a.shape[1]):
         cumprod = 1
         for i in range(a.shape[0]):
-            if ~np.isnan(a[i, j]):
-                cumprod *= a[i, j]
-                b[i, j] = cumprod
+            if ~np.isnan(a[i, col]):
+                cumprod *= a[i, col]
+                b[i, col] = cumprod
     return b
 
 
@@ -160,8 +160,8 @@ def _rolling_mean_1d_nb(a, window):
 def rolling_mean_nb(a, window):
     """Rolling mean."""
     b = np.empty_like(a)
-    for j in range(a.shape[1]):
-        b[:, j] = _rolling_mean_1d_nb(a[:, j], window)
+    for col in range(a.shape[1]):
+        b[:, col] = _rolling_mean_1d_nb(a[:, col], window)
     return b
 
 
@@ -204,8 +204,8 @@ def _rolling_std_1d_nb(a, window):
 def rolling_std_nb(a, window):
     """Rolling std."""
     b = np.empty_like(a)
-    for j in range(a.shape[1]):
-        b[:, j] = _rolling_std_1d_nb(a[:, j], window)
+    for col in range(a.shape[1]):
+        b[:, col] = _rolling_std_1d_nb(a[:, col], window)
     return b
 
 
@@ -230,8 +230,8 @@ def _expanding_max_1d_nb(a):
 def expanding_max_nb(a):
     """Expanding max."""
     b = np.empty_like(a)
-    for j in range(a.shape[1]):
-        b[:, j] = _expanding_max_1d_nb(a[:, j])
+    for col in range(a.shape[1]):
+        b[:, col] = _expanding_max_1d_nb(a[:, col])
     return b
 
 
@@ -271,8 +271,8 @@ def _ewm_mean_1d_nb(vals, span):
 def ewm_mean_nb(a, span):
     """Exponential weighted moving average."""
     b = np.empty_like(a)
-    for i in range(a.shape[1]):
-        b[:, i] = _ewm_mean_1d_nb(a[:, i], span)
+    for col in range(a.shape[1]):
+        b[:, col] = _ewm_mean_1d_nb(a[:, col], span)
     return b
 
 
@@ -351,8 +351,8 @@ def _ewm_std_1d_nb(vals, span):
 def ewm_std_nb(a, span):
     """Exponential weighted moving STD."""
     b = np.empty_like(a)
-    for i in range(a.shape[1]):
-        b[:, i] = _ewm_std_1d_nb(a[:, i], span)
+    for col in range(a.shape[1]):
+        b[:, col] = _ewm_std_1d_nb(a[:, col], span)
     return b
 
 # ############# Main class ############# #
