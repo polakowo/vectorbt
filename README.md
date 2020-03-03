@@ -2,7 +2,7 @@
 
 ![Made by Vectors Market](logo.png)
 
-vectorbt is a backtesting library on steroids - it operates entirely on NumPy arrays and is powered by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at scale. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashbaords akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
+vectorbt is a backtesting library on steroids - it operates entirely on NumPy arrays and is accelerated by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at scale. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashbaords akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to re-calculate data on the fly, thus enabling the user to interact with data-hungry widgets without significant delays.
 
 ## Motivation
 
@@ -61,7 +61,7 @@ a_df = pd.DataFrame(a)
 266 ms ± 7.26 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
 
-Each vectorbt class is a subclass of `np.ndarray` with a custom set of methods optimized for working with time series data. For example, the `Signals` class is a binary NumPy array supporting advanced binary operations. Each calculation is Numba compiled: sometimes Numba operations are slightly slower than vectorized NumPy, but having an arsenal full of Numba functions makes possible re-using these functions inside of custom Numba code. Moreover, each class stricly accepts a 2-dimensional array, where first axis is index (time) and second axis are columns (features), and provides standardized methods for processing 2-dimensional data along first axis. Thus, similar to a `pd.DataFrame`, one can do a single operation to transform tons of columns simultaneously. This, for example, is the magic behind backtesting thousands of window combinations at once.
+Each vectorbt class is a subclass of `np.ndarray` with a custom set of methods optimized for working with time series data. For example, the `Signals` class is a binary NumPy array supporting advanced binary operations. Most of those operations are Numba compiled: sometimes Numba operations are slightly slower than vectorized NumPy, but having an arsenal full of Numba functions makes possible re-using these functions inside of custom Numba code. Moreover, each class stricly accepts a 2-dimensional array, where first axis is index (time) and second axis are columns (features), and provides standardized methods for processing 2-dimensional data along first axis. Thus, similar to a `pd.DataFrame`, one can do a single operation to transform tons of columns simultaneously. This, for example, is the magic behind backtesting thousands of window combinations at once.
 
 For more details, check [tests](tests/Modules.ipynb).
 
