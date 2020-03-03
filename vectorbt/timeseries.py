@@ -392,13 +392,6 @@ class TimeSeries(np.ndarray):
         return cls(strided.transpose()[:, ::step])
 
     @to_2d('self')
-    def reduce_on_mask(self, func, mask):
-        """Perform reducing operation on mask."""
-        position_profits = self.copy()
-        position_profits[~mask] = np.nan
-        return np.asarray(func(position_profits)) # no longer TimeSeries
-
-    @to_2d('self')
     @have_same_shape('self', 'index', along_axis=0)
     def plot(self,
              column=None,
