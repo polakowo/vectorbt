@@ -24,7 +24,7 @@ class FigureWidget(go.FigureWidget):
         # Good default params
         self.update_layout(
             autosize=False,
-            width=800,
+            width=700,
             height=300,
             margin=go.layout.Margin(
                 b=30,

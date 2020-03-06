@@ -2,10 +2,11 @@ import pandas as pd
 import numpy as np
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1
-from vectorbt.timeseries import rolling_mean_nb, rolling_std_nb, ewm_mean_nb, ewm_std_nb, diff_nb, set_by_mask_nb, prepend_nb
+from vectorbt.timeseries import rolling_mean_2d_nb, rolling_std_2d_nb, ewm_mean_2d_nb, \
+    ewm_std_2d_nb, diff_2d_nb, set_by_mask_2d_nb, prepend_2d_nb
 
 from vectorbt.decorators import *
-from vectorbt.signals import Signals, generate_exits_nb
+from vectorbt.signals import Signals
 from vectorbt.timeseries import TimeSeries
 
 __all__ = ['DMAC', 'BollingerBands', 'RSI']
@@ -16,7 +17,7 @@ __all__ = ['DMAC', 'BollingerBands', 'RSI']
 @njit
 def stack_outputs_nb(a, b, output_func):
     """Stack outputs along axis 1.
-    
+
     We always work with 2D data, so stack all new combinations horizontally."""
     c = np.empty((a.shape[0], a.shape[1] * b.shape[0]), dtype=b1)
     for i in range(b.shape[0]):
@@ -48,9 +49,9 @@ def dmac_nb(ts, fast_windows, slow_windows, is_ewm, is_min_periods):
     cache_d = dict()
     for i in range(unique_windows.shape[0]):
         if is_ewm:
-            ma = ewm_mean_nb(ts, unique_windows[i])
+            ma = ewm_mean_2d_nb(ts, unique_windows[i])
         else:
-            ma = rolling_mean_nb(ts, unique_windows[i])
+            ma = rolling_mean_2d_nb(ts, unique_windows[i])
         if is_min_periods:
             ma[:unique_windows[i], :] = np.nan
         cache_d[unique_windows[i]] = ma
@@ -103,11 +104,11 @@ def bb_nb(ts, ns, ks, is_ewm, is_min_periods):
     cache_d = dict()
     for i in range(unique_windows.shape[0]):
         if is_ewm:
-            ma = ewm_mean_nb(ts, unique_windows[i])
-            mstd = ewm_std_nb(ts, unique_windows[i])
+            ma = ewm_mean_2d_nb(ts, unique_windows[i])
+            mstd = ewm_std_2d_nb(ts, unique_windows[i])
         else:
-            ma = rolling_mean_nb(ts, unique_windows[i])
-            mstd = rolling_std_nb(ts, unique_windows[i])
+            ma = rolling_mean_2d_nb(ts, unique_windows[i])
+            mstd = rolling_std_2d_nb(ts, unique_windows[i])
         if is_min_periods:
             ma[:unique_windows[i], :] = np.nan
             mstd[:unique_windows[i], :] = np.nan
@@ -179,22 +180,22 @@ class BollingerBands():
 @njit(f8[:, :](f8[:, :], i8[:], b1, b1), cache=True)
 def rsi_nb(ts, windows, is_ewm, is_min_periods):
     """For each window, calculate the RSI."""
-    delta = diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
+    delta = diff_2d_nb(ts)[1:, :]  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
-    up = set_by_mask_nb(up, up < 0, 0)
-    down = np.abs(set_by_mask_nb(down, down > 0, 0))
+    up = set_by_mask_2d_nb(up, up < 0, 0)
+    down = np.abs(set_by_mask_2d_nb(down, down > 0, 0))
     # Cache moving averages to effectively reduce the number of operations
     unique_windows = np.unique(windows)
     cache_d = dict()
     for i in range(unique_windows.shape[0]):
         if is_ewm:
-            roll_up = ewm_mean_nb(up, unique_windows[i])
-            roll_down = ewm_mean_nb(down, unique_windows[i])
+            roll_up = ewm_mean_2d_nb(up, unique_windows[i])
+            roll_down = ewm_mean_2d_nb(down, unique_windows[i])
         else:
-            roll_up = rolling_mean_nb(up, unique_windows[i])
-            roll_down = rolling_mean_nb(down, unique_windows[i])
-        roll_up = prepend_nb(roll_up, 1, np.nan)  # bring to old shape
-        roll_down = prepend_nb(roll_down, 1, np.nan)
+            roll_up = rolling_mean_2d_nb(up, unique_windows[i])
+            roll_down = rolling_mean_2d_nb(down, unique_windows[i])
+        roll_up = prepend_2d_nb(roll_up, 1, np.nan)  # bring to old shape
+        roll_down = prepend_2d_nb(roll_down, 1, np.nan)
         if is_min_periods:
             roll_up[:unique_windows[i], :] = np.nan
             roll_down[:unique_windows[i], :] = np.nan

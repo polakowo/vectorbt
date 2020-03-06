@@ -1,60 +1,52 @@
+import pandas as pd
 from vectorbt.decorators import *
 from vectorbt.widgets import FigureWidget
 from vectorbt.timeseries import TimeSeries
 import plotly.graph_objects as go
 
-__all__ = ['OHLCV']
+__all__ = []
 
-class OHLCV():
-    @has_type('open', TimeSeries)
-    @has_type('high', TimeSeries)
-    @has_type('low', TimeSeries)
-    @has_type('close', TimeSeries)
-    @has_type('volume', TimeSeries)
-    @have_same_shape('open', 'high')
-    @have_same_shape('open', 'low')
-    @have_same_shape('open', 'close')
-    @have_same_shape('open', 'volume')
-    def __init__(self, open, high, low, close, volume=None):
-        self.open = open
-        self.high = high
-        self.low = low
-        self.close = close
-        self.volume = volume
 
-    @classmethod
-    def from_df(cls, df, labels=['Open', 'High', 'Low', 'Close', 'Volume']):
-        open = TimeSeries(df[labels[0]].astype(float))
-        high = TimeSeries(df[labels[1]].astype(float))
-        low = TimeSeries(df[labels[2]].astype(float))
-        close = TimeSeries(df[labels[3]].astype(float))
-        if labels[4] in df.columns:
-            volume = TimeSeries(df[labels[4]].astype(float))
-        else:
-            volume = None
-        return cls(open, high, low, close, volume)
+class OHLCV:
+    pass
+
+# ############# Custom pd.DataFrame accessor ############# #
+
+
+@pd.api.extensions.register_dataframe_accessor("ohlcv")
+class CustomDFAccessor:
+    def __init__(self, obj):
+        self._validate(obj)
+        self._obj = obj
+
+    @staticmethod
+    def _validate(obj):
+        if (obj.dtypes != np.float64).any():
+            raise ValueError("All columns must be float64")
+        if 'Open' not in obj.columns:
+            raise ValueError("Column 'Open' missing")
+        if 'High' not in obj.columns:
+            raise ValueError("Column 'High' missing")
+        if 'Low' not in obj.columns:
+            raise ValueError("Column 'Low' missing")
+        if 'Close' not in obj.columns:
+            raise ValueError("Column 'Close' missing")
 
     def plot(self,
-             column=None,
-             index=None,
              display_volume=True,
              candlestick_kwargs={},
-             bar_kwargs={}, 
+             bar_kwargs={},
              **layout_kwargs):
 
-        if column is None:
-            if self.open.shape[1] == 1:
-                column = 0
-            else:
-                raise ValueError("For an array with multiple columns, you must pass a column index")
-        open = self.open[:, column]
-        high = self.high[:, column]
-        low = self.low[:, column]
-        close = self.close[:, column]
+        open = self._obj['Open']
+        high = self._obj['High']
+        low = self._obj['Low']
+        close = self._obj['Close']
+        volume = self._obj['Volume'] if 'Volume' in self._obj.columns else None
 
         fig = FigureWidget()
         candlestick = go.Candlestick(
-            x=index,
+            x=self._obj.index,
             open=open,
             high=high,
             low=low,
@@ -65,15 +57,13 @@ class OHLCV():
         )
         candlestick.update(**candlestick_kwargs)
         fig.add_trace(candlestick)
-        if display_volume and self.volume is not None:
-            volume = self.volume[:, column]
-
+        if display_volume and volume is not None:
             marker_colors = np.empty(volume.shape, dtype=np.object)
             marker_colors[(close - open) > 0] = 'green'
             marker_colors[(close - open) == 0] = 'lightgrey'
             marker_colors[(close - open) < 0] = 'red'
             bar = go.Bar(
-                x=index,
+                x=self._obj.index,
                 y=volume,
                 marker_color=marker_colors,
                 marker_line_width=0,

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import njit, b1, i1, i8, f8
 from numba.types import UniTuple
-from vectorbt.timeseries import pct_change_nb, fillna_nb, expanding_max_nb, diff_nb
+from vectorbt.timeseries import pct_change_2d_nb, fillna_2d_nb, expanding_max_2d_nb, diff_2d_nb
 from vectorbt.decorators import *
 from vectorbt.timeseries import TimeSeries
 from vectorbt.signals import Signals
@@ -464,15 +464,15 @@ class Portfolio():
 
     @cached_property
     def returns(self):
-        return TimeSeries(pct_change_nb(self.equity))
+        return TimeSeries(pct_change_2d_nb(self.equity))
 
     @cached_property
     def drawdown(self):
-        return TimeSeries(1 - self.equity / expanding_max_nb(self.equity))
+        return TimeSeries(1 - self.equity / expanding_max_2d_nb(self.equity))
 
     @cached_property
     def trades(self):
-        trades = fillna_nb(diff_nb(self.shares), 0)
+        trades = fillna_2d_nb(diff_2d_nb(self.shares), 0)
         trades[0, :] = self.shares[0, :]
         return TradeSeries(trades)
 

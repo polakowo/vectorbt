@@ -1,33 +1,48 @@
 from vectorbt.decorators import *
 from vectorbt.widgets import FigureWidget
-from vectorbt.timeseries import TimeSeries, _expanding_max_1d_nb, _pct_change_1d_nb, _ffill_1d_nb
+from vectorbt.timeseries import CustomBaseAccessor, expanding_max_1d_nb, pct_change_1d_nb, ffill_1d_nb
 from numba.types.containers import UniTuple
 from numba import njit, f8, i8, b1, optional
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-__all__ = ['Signals']
-
-# ############# Numba functions ############# #
+__all__ = []
 
 
-@njit(b1[:, :](UniTuple(i8, 2), i8, optional(i8), optional(i8)), cache=True)  # 1.17 ms vs 56.4 ms for vectorized
-def generate_random_entries_nb(shape, n, every_nth, seed):
+class Signals:
+    pass
+
+# ############# Random signal generation ############# #
+
+
+@njit(b1[:, :](b1[:, :], optional(i8)), cache=True)
+def shuffle_2d_nb(a, seed=None):
+    """Shuffle along first axis."""
+    if seed is not None:
+        np.random.seed(seed)
+    b = np.full_like(a, np.nan)
+    for col in range(a.shape[1]):
+        b[:, col] = np.random.permutation(a[:, col])
+    return b
+
+
+@njit(b1[:, :](UniTuple(i8, 2), i8, optional(i8), optional(i8)), cache=True)
+def generate_random_entries_2d_nb(shape, n, every_nth, seed):
     """Randomly generate entry signals."""
     if seed is not None:
         np.random.seed(seed)
     if every_nth is None:
         every_nth = 1
     a = np.full(shape, False, dtype=b1)
-    for col in range(a.shape[1]): # TODO: cannot parallel, tuple throws error
+    for col in range(a.shape[1]):
         idxs = np.random.choice(np.arange(shape[0])[::every_nth], size=n, replace=False)
         a[idxs, col] = True
     return a
 
 
-@njit(b1[:, :](b1[:, :], optional(i8)), cache=True)  # 3.01 ms vs 3.81 ms for vectorized
-def generate_random_exits_nb(entries, seed):
+@njit(b1[:, :](b1[:, :], optional(i8)), cache=True)
+def generate_random_exits_2d_nb(entries, seed):
     """Randomly generate exit signals between entry signals."""
     if seed is not None:
         np.random.seed(seed)
@@ -49,17 +64,17 @@ def generate_random_exits_nb(entries, seed):
                 prev_entry_idx = i
     return a
 
+# ############# Custom signal generation ############# #
 
-@njit  # 5.49 ms vs 48.8 ms for entries.shape = (1000, 20) and number of entries = 200
-# NOTE: no explicit types since args are not known before the runtime
-def generate_exits_nb(entries, exit_func_nb, only_first, *args):
+@njit
+def generate_exits_2d_nb(entries, exit_func_nb, only_first, *args):
     """Generate entries based on exit_func_nb."""
     # exit_func_nb must return a boolean mask for a column specified by col.
     # You will have to write your exit_func to be compatible with numba!
 
     exits = np.full(entries.shape, False)
 
-    for col in range(entries.shape[1]): # TODO: cannot parallel, function throws error
+    for col in range(entries.shape[1]):
         entry_idxs = np.flatnonzero(entries[:, col])
 
         for i in range(entry_idxs.shape[0]):
@@ -73,7 +88,7 @@ def generate_exits_nb(entries, exit_func_nb, only_first, *args):
             # If entry is the last element, ignore
             if prev_idx < entries.shape[0] - 1:
                 # Exit mask must return mask with exit signals for that column
-                exit_mask = exit_func_nb(entries, col, prev_idx, next_idx, *args)
+                exit_mask = exit_func_nb(entries[:, col], col, prev_idx, next_idx, *args)
                 exit_idxs = np.where(exit_mask)[0]
                 # Filter out signals before previous entry and after next entry
                 idx_mask = (exit_idxs > prev_idx) & (exit_idxs < next_idx)
@@ -89,9 +104,8 @@ def generate_exits_nb(entries, exit_func_nb, only_first, *args):
     return exits
 
 
-@njit  # 39.6 ms vs 274 ms for ts.shape = (1000, 20)
-# NOTE: no explicit types since args are not known before the runtime
-def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
+@njit
+def generate_entries_and_exits_2d_nb(shape, entry_func_nb, exit_func_nb, *args):
     """Generate entries and exits based on entry_func_nb and exit_func_nb."""
     # entry_func_nb and exit_func_nb must return boolean masks for a column specified by col_idx.
     # You will have to write them to be compatible with numba!
@@ -99,16 +113,16 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
     entries = np.full(shape, False)
     exits = np.full(shape, False)
 
-    for col in range(shape[1]): # TODO: cannot parallel, function throws error
+    for col in range(shape[1]):
         prev_idx = -1
         i = 0
         while prev_idx < shape[0] - 1:
             if i % 2 == 0:
                 # Cannot assign two functions to a var in numba
-                mask = entry_func_nb(exits, col, prev_idx, -1, *args)
+                mask = entry_func_nb(exits[:, col], col, prev_idx, shape[0], *args)
                 a = entries
             else:
-                mask = exit_func_nb(entries, col, prev_idx, -1, *args)
+                mask = exit_func_nb(entries[:, col], col, prev_idx, shape[0], *args)
                 a = exits
             if prev_idx != -1:
                 mask[:prev_idx+1] = False
@@ -121,11 +135,12 @@ def generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args):
             i += 1
     return entries, exits
 
+# ############# Ranking ############# #
+
 
 @njit(i8[:, :](b1[:, :], b1), cache=True)
-def rank_true_nb(a, after_false):
+def rank_true_2d_nb(a, after_false=False):
     """Rank over each partition of true values.
-
     after_false: must come after at least one false."""
     b = np.zeros(a.shape, dtype=i8)
     for col in range(a.shape[1]):
@@ -144,26 +159,16 @@ def rank_true_nb(a, after_false):
 
 
 @njit(i8[:, :](b1[:, :], b1), cache=True)
-def rank_false_nb(a, after_true):
+def rank_false_2d_nb(a, after_true=False):
     """Rank over each partition of false values.
-
     after_true: must come after at least one true."""
-    return rank_true_nb(~a, after_true)
+    return rank_true_2d_nb(~a, after_true)
 
-
-@njit(b1[:, :](b1[:, :], optional(i8)), cache=True)
-def shuffle(a, seed=None):
-    """Shuffle along first axis."""
-    if seed is not None:
-        np.random.seed(seed)
-    b = np.full_like(a, np.nan)
-    for col in range(a.shape[1]):
-        b[:, col] = np.random.permutation(a[:, col])
-    return b
+# ############# Signal properties ############# #
 
 
 @njit(f8[:](b1[:, :]), cache=True)
-def avg_distance_nb(a):
+def avg_distance_2d_nb(a):
     b = np.full((a.shape[1],), np.nan)
     for col in range(a.shape[1]):
         b[col] = np.mean(np.diff(np.flatnonzero(a[:, col])))
@@ -172,77 +177,74 @@ def avg_distance_nb(a):
 
 # ############# Boolean operations ############# #
 
-# Boolean operations are natively supported by np.ndarray
+# Boolean operations are natively supported by pandas
 # You can, for example, perform Signals_1 & Signals_2 to get logical AND of both arrays
 # NOTE: We don't implement backward operations to avoid look-ahead bias!
 
-@njit(b1[:, :](b1[:, :], i8, b1), cache=True)
-def prepend_nb(a, n, fill_value):
-    """Prepend n values to the array."""
-    b = np.full((a.shape[0]+n, a.shape[1]), fill_value, dtype=a.dtype)
-    b[-a.shape[0]:] = a
+
+@njit(b1[:, :](b1[:, :], i8), cache=True)
+def fshift_2d_nb(a, n):
+    b = np.full_like(a, False)
+    b[n:, :] = a[:-n, :]
     return b
 
 
-@njit(b1[:, :](b1[:, :], i8), cache=True)
-def fshift_nb(a, n):
-    """Shift forward by n."""
-    a = prepend_nb(a, n, False)
-    return a[:-n, :]
-
-
 @njit(b1[:, :](b1[:, :], b1), cache=True)
-def first_true_nb(a, after_false=False):
+def first_true_2d_nb(a, after_false=False):
     """Select the first true value in each row of true values."""
-    return rank_true_nb(a, after_false) == 1
+    return rank_true_2d_nb(a, after_false=after_false) == 1
 
 
 @njit(b1[:, :](b1[:, :], b1), cache=True)
-def first_false_nb(a, after_true=False):
+def first_false_2d_nb(a, after_true=False):
     """Select the first false value in each row of false values."""
-    return rank_false_nb(a, after_true) == 1
+    return rank_false_2d_nb(a, after_true=after_true) == 1
 
 
 @njit(b1[:, :](b1[:, :], i8, b1), cache=True)
-def nst_true_nb(a, n, after_false=False):
+def nst_true_2d_nb(a, n, after_false=False):
     """Select the nst true value in each row of true values."""
-    return rank_true_nb(a, after_false) == n
+    return rank_true_2d_nb(a, after_false=after_false) == n
 
 
 @njit(b1[:, :](b1[:, :], i8, b1), cache=True)
-def nst_false_nb(a, n, after_true=False):
+def nst_false_2d_nb(a, n, after_true=False):
     """Select the nst false value in each row of false values."""
-    return rank_false_nb(a, after_true) == n
+    return rank_false_2d_nb(a, after_true=after_true) == n
 
 
 @njit(b1[:, :](b1[:, :], i8, b1), cache=True)
-def from_nst_true_nb(a, n, after_false=False):
+def from_nst_true_2d_nb(a, n, after_false=False):
     """Select the nst true value and beyond in each row of true values."""
-    return rank_true_nb(a, after_false) >= n
+    return rank_true_2d_nb(a, after_false=after_false) >= n
 
 
 @njit(b1[:, :](b1[:, :], i8, b1), cache=True)
-def from_nst_false_nb(a, n, after_true=False):
+def from_nst_false_2d_nb(a, n, after_true=False):
     """Select the nst false value and beyond in each row of false values."""
-    return rank_false_nb(a, after_true) >= n
+    return rank_false_2d_nb(a, after_true=after_true) >= n
 
 
 # ############# Stop-loss operations ############# #
 
-@njit(b1[:](b1[:, :], i8, i8, i8, f8[:, :], f8[:, :], b1), cache=True)
-def stoploss_exit_mask_nb(entries, col_idx, prev_idx, next_idx, ts, stop, is_relative):
+@njit(b1[:](b1[:], i8, i8, i8, f8[:, :], f8[:, :], b1), cache=True)
+def stoploss_exit_mask_2d_nb(entries, col, prev_idx, next_idx, ts, stop, is_relative):
     """Index of the first event below the stop."""
-    ts = ts[:, col_idx]
+    ts = ts[:, col]
     # Stop is defined at the entry point
-    stop = stop[prev_idx, col_idx]
+    stop = stop[prev_idx, col]
     if is_relative:
         stop = (1 - stop) * ts[prev_idx]
     return ts < stop
 
 
 @njit(b1[:, :](b1[:, :], f8[:, :], f8[:, :, :], b1, b1), cache=True)
-def stoploss_exits_nb(entries, ts, stops, is_relative, only_first):
+def stoploss_exits_2d_nb(entries, ts, stops, is_relative, only_first):
     """Calculate exit signals based on stop loss strategy.
+
+    A stop-loss is designed to limit an investor's loss on a security position. 
+    Setting a stop-loss order for 10% below the price at which you bought the stock 
+    will limit your loss to 10%.
 
     An approach here significantly differs from the approach with rolling windows.
     If user wants to try out different rolling windows, he can pass them as a 1d array.
@@ -254,25 +256,25 @@ def stoploss_exits_nb(entries, ts, stops, is_relative, only_first):
 
     exits = np.empty((ts.shape[0], ts.shape[1] * stops.shape[0]), dtype=b1)
     for i in range(stops.shape[0]):
-        i_exits = generate_exits_nb(entries, stoploss_exit_mask_nb, only_first, ts, stops[i, :, :], is_relative)
-        exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = i_exits
+        exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = generate_exits_2d_nb(
+            entries, stoploss_exit_mask_2d_nb, only_first, ts, stops[i, :, :], is_relative)
     return exits
 
 
-@njit(b1[:](b1[:, :], i8, i8, i8, f8[:, :], f8[:, :], b1), cache=True)
-def trailstop_exit_mask_nb(entries, col_idx, prev_idx, next_idx, ts, stop, is_relative):
+@njit(b1[:](b1[:], i8, i8, i8, f8[:, :], f8[:, :], b1), cache=True)
+def trailstop_exit_mask_2d_nb(entries, col, prev_idx, next_idx, ts, stop, is_relative):
     """Index of the first event below the trailing stop."""
     exit_mask = np.empty(ts.shape[0], dtype=b1)
-    ts = ts[prev_idx:next_idx, col_idx]
-    stop = stop[prev_idx:next_idx, col_idx]
+    ts = ts[prev_idx:next_idx, col]
+    stop = stop[prev_idx:next_idx, col]
     # Propagate the maximum value from the entry using expanding max
-    peak = _expanding_max_1d_nb(ts)
+    peak = expanding_max_1d_nb(ts)
     if np.min(stop) != np.max(stop):
         # Propagate the stop value of the last max
-        raising_idxs = np.flatnonzero(_pct_change_1d_nb(peak))
+        raising_idxs = np.flatnonzero(pct_change_1d_nb(peak))
         stop_temp = np.full(ts.shape, np.nan)
         stop_temp[raising_idxs] = stop[raising_idxs]
-        stop_temp = _ffill_1d_nb(stop_temp)
+        stop_temp = ffill_1d_nb(stop_temp)
         stop_temp[np.isnan(stop_temp)] = -np.inf
         stop = stop_temp
     if is_relative:
@@ -282,130 +284,165 @@ def trailstop_exit_mask_nb(entries, col_idx, prev_idx, next_idx, ts, stop, is_re
 
 
 @njit(b1[:, :](b1[:, :], f8[:, :], f8[:, :, :], b1, b1), cache=True)
-def trailstop_exits_nb(entries, ts, stops, is_relative, only_first):
-    """Calculate exit signals based on trailing stop strategy."""
+def trailstop_exits_2d_nb(entries, ts, stops, is_relative, only_first):
+    """Calculate exit signals based on trailing stop strategy.
+
+    A Trailing Stop order is a stop order that can be set at a defined percentage 
+    or amount away from the current market price. The main difference between a regular 
+    stop loss and a trailing stop is that the trailing stop moves as the price moves."""
     exits = np.empty((ts.shape[0], ts.shape[1] * stops.shape[0]), dtype=b1)
     for i in range(stops.shape[0]):
-        i_exits = generate_exits_nb(entries, trailstop_exit_mask_nb, only_first, ts, stops[i, :, :], is_relative)
-        exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = i_exits
+        exits[:, i*ts.shape[1]:(i+1)*ts.shape[1]] = generate_exits_2d_nb(
+            entries, trailstop_exit_mask_2d_nb, only_first, ts, stops[i, :, :], is_relative)
     return exits
 
-# ############# Main class ############# #
-
-# Add numba functions as methods to the Signals class
+# ############# Custom pd.DataFrame accessor ############# #
 
 
-@add_2d_nb_methods(
-    prepend_nb,
-    fshift_nb,
-    first_true_nb,
-    first_false_nb,
-    nst_true_nb,
-    nst_false_nb,
-    from_nst_true_nb,
-    from_nst_false_nb,
-    shuffle
-)
-class Signals(np.ndarray):
-    """Signals class extends the np.ndarray class by implementing boolean operations."""
+@pd.api.extensions.register_dataframe_accessor("signals")
+@add_safe_nb_methods(
+    shuffle_2d_nb,
+    rank_true_2d_nb,
+    rank_false_2d_nb,
+    fshift_2d_nb,
+    first_true_2d_nb,
+    first_false_2d_nb,
+    nst_true_2d_nb,
+    nst_false_2d_nb,
+    from_nst_true_2d_nb,
+    from_nst_false_2d_nb)
+class CustomDFAccessor(CustomBaseAccessor):
+    def __init__(self, obj):
+        self._validate(obj)
+        self._obj = obj
 
-    @to_2d('input_array')
-    @has_dtype('input_array', np.bool_)
-    def __new__(cls, input_array):
-        return np.asarray(input_array).view(cls)
-
-    @classmethod
-    def falses(cls, shape):
-        return cls(np.full(shape, False, dtype=np.bool))
+    @staticmethod
+    def _validate(obj):
+        if (obj.dtypes != np.bool_).any():
+            raise ValueError("All columns must be boolean")
 
     @classmethod
-    def falses_like(cls, a):
-        return cls.falses(a.shape)
+    def generate_empty(cls, shape, **kwargs):
+        return pd.DataFrame(np.full(shape, False), **kwargs)
 
     @classmethod
-    def generate_random_entries(cls, shape, n, every_nth=1, seed=None):
-        """Generate entry signals randomly."""
-        return cls(generate_random_entries_nb(shape, n, every_nth, seed))
+    def generate_random_entries(cls, shape, n, every_nth=1, seed=None, **kwargs):
+        return pd.DataFrame(generate_random_entries_2d_nb(shape, n, every_nth, seed), **kwargs)
 
-    @classmethod
-    def generate_entries_and_exits(cls, shape, entry_func_nb, exit_func_nb, *args):
-        """Generate entry and exit signals one after another iteratively.
-        Use this if your entries depend on previous exit signals, otherwise generate entries first."""
-        entries, exits = generate_entries_and_exits_nb(shape, entry_func_nb, exit_func_nb, *args)
-        return cls(entries), cls(exits)
-
-    @to_2d('self')
     def generate_random_exits(self, seed=None):
-        """Generate an exit signal after every entry signal randomly."""
-        exits = generate_random_exits_nb(self, seed)
-        return Signals(exits)
+        return self._after_nb(generate_random_exits_2d_nb(self._before_nb(), seed))
 
-    @to_2d('self')
+    @classmethod
+    def generate_entries_and_exits(cls, shape, entry_func_nb, exit_func_nb, *args, **kwargs):
+        entries, exits = generate_entries_and_exits_2d_nb(shape, entry_func_nb, exit_func_nb, *args)
+        return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
+
     def generate_exits(self, exit_func_nb, *args, only_first=True):
-        """Generate an exit signal after every entry signal using exit_func."""
-        exits = generate_exits_nb(self, exit_func_nb, only_first, *args)
-        return Signals(exits)
+        return self._after_nb(generate_exits_2d_nb(self._before_nb(), exit_func_nb, only_first, *args))
 
-    @to_2d('self')
+    @pass_pd_obj('entries')
+    @has_type('entries', (pd.Series, pd.DataFrame))
+    @has_type('ts', (pd.Series, pd.DataFrame))
+    @has_type('stop_index', pd.Index)
+    @to_2d('entries')
     @to_2d('ts')
-    @broadcast('ts', 'self')
-    @broadcast_to_combs_of('stops', 'self')
-    @has_type('ts', TimeSeries)
-    # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
-    def generate_stoploss_exits(self, ts, stops, is_relative=True, only_first=True):
-        """A stop-loss is designed to limit an investor's loss on a security position. 
-        Setting a stop-loss order for 10% below the price at which you bought the stock 
-        will limit your loss to 10%."""
-        exits = Signals(stoploss_exits_nb(self, ts, stops, is_relative, only_first))
-        return exits
+    @broadcast('entries', 'ts')
+    @broadcast_to_combs_of('stops', 'entries')
+    def generate_stoploss_exits(self, entries, ts, stops, is_relative=True, only_first=True, stop_index=None):
+        exits = stoploss_exits_2d_nb(entries.values, ts.values, stops, is_relative, only_first)
+        if stops.shape[0] > 1:
+            if stop_index is not None:
+                upper_cols = stop_index
+            else:
+                upper_cols = pd.Index(np.arange(stops.shape[0]))
+            lower_cols = entries.columns
+            columns = self.vstack_columns(upper_cols, lower_cols)
+            return self._after_nb(exits, columns=columns)
+        else:
+            return self._after_nb(exits)
 
-    @to_2d('self')
+    @pass_pd_obj('entries')
+    @has_type('entries', (pd.Series, pd.DataFrame))
+    @has_type('ts', (pd.Series, pd.DataFrame))
+    @has_type('stop_index', pd.Index)
+    @to_2d('entries')
     @to_2d('ts')
-    @broadcast('ts', 'self')
-    @broadcast_to_combs_of('stops', 'self')
-    @has_type('ts', TimeSeries)
-    # stops can be either a number, an array of numbers, or an array of matrices each of ts shape
-    def generate_trailstop_exits(self, ts, stops, is_relative=True, only_first=True):
-        """A Trailing Stop order is a stop order that can be set at a defined percentage 
-        or amount away from the current market price. The main difference between a regular 
-        stop loss and a trailing stop is that the trailing stop moves as the price moves."""
-        exits = Signals(trailstop_exits_nb(self, ts, stops, is_relative, only_first))
-        return exits
+    @broadcast('entries', 'ts')
+    @broadcast_to_combs_of('stops', 'entries')
+    def generate_trailstop_exits(self, entries, ts, stops, is_relative=True, only_first=True, stop_index=None):
+        exits = trailstop_exits_2d_nb(entries.values, ts.values, stops, is_relative, only_first)
+        if stops.shape[0] > 1:
+            if stop_index is not None:
+                upper_cols = stop_index
+            else:
+                upper_cols = pd.Index(np.arange(stops.shape[0]))
+            lower_cols = entries.columns
+            columns = self.vstack_columns(upper_cols, lower_cols)
+            return self._after_nb(exits, columns=columns)
+        else:
+            return self._after_nb(exits)
 
     @cached_property
-    @to_2d('self')
     def n(self):
         """Number of signals."""
-        return np.asarray(np.sum(self, axis=0))
+        return pd.Series(np.sum(self._obj.values, axis=0), index=self._obj.columns)
 
     @cached_property
-    @to_2d('self')
     def avg_distance(self):
         """Average distance between signals."""
-        return avg_distance_nb(self)
+        return pd.Series(avg_distance_2d_nb(self._obj.values), index=self._obj.columns)
 
-    @to_2d('self')
-    @have_same_shape('self', 'index', along_axis=0)
-    def plot(self,
-             column=None,
-             index=None,
-             label='Signals',
-             scatter_kwargs={},
-             fig=None,
-             **layout_kwargs):
+    def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
+        # Plot TimeSeries
+        for col in range(self._obj.shape[1]):
+            fig = self._obj.iloc[:, col].signals.plot(
+                scatter_kwargs=scatter_kwargs[col] if isinstance(scatter_kwargs, list) else scatter_kwargs,
+                fig=fig,
+                **layout_kwargs
+            )
 
-        if column is None:
-            if self.shape[1] == 1:
-                column = 0
-            else:
-                raise ValueError("For an array with multiple columns, you must pass a column index")
-        signals = self[:, column]
-        if index is None:
-            index = np.arange(signals.shape[0])
+        return fig
+
+
+# ############# Custom pd.Series accessor ############# #
+
+
+@pd.api.extensions.register_series_accessor("signals")
+class CustomSRAccessor(CustomDFAccessor):
+    def __init__(self, obj):
+        self._validate(obj)
+        self._obj = obj
+
+    @staticmethod
+    def _validate(obj):
+        if obj.dtype != np.bool_:
+            raise ValueError("Must be boolean")
+
+    @classmethod
+    def generate_empty(cls, size, **kwargs):
+        return pd.Series(np.full(size, False), **kwargs)
+
+    @classmethod
+    def generate_random_entries(cls, size, n, every_nth=1, seed=None, **kwargs):
+        return pd.Series(generate_random_entries_2d_nb((size, 1), n, every_nth, seed)[:, 0], **kwargs)
+
+    @classmethod
+    def generate_entries_and_exits(cls, size, entry_func_nb, exit_func_nb, *args, **kwargs):
+        entries, exits = generate_entries_and_exits_2d_nb((size, 1), entry_func_nb, exit_func_nb, *args)
+        return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
+
+    @cached_property
+    def n(self):
+        return np.sum(self._before_nb(force_1d=True))
+
+    @cached_property
+    def avg_distance(self):
+        return avg_distance_2d_nb(self._before_nb())[0]
+
+    def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
         if fig is None:
             fig = FigureWidget()
             fig.update_layout(
-                showlegend=True,
                 yaxis=dict(
                     tickmode='array',
                     tickvals=[0, 1],
@@ -413,13 +450,15 @@ class Signals(np.ndarray):
                 )
             )
             fig.update_layout(**layout_kwargs)
-        # Plot Signals
+        if self._obj.name is not None:
+            fig.update_layout(showlegend=True)
+
+        # Plot TimeSeries
         scatter = go.Scatter(
-            x=index, 
-            y=signals.astype(np.uint8), 
-            customdata=signals,
-            mode='lines', 
-            name=label
+            x=self._obj.index,
+            y=self._obj.values.astype(np.uint8),
+            mode='lines',
+            name=str(self._obj.name)
         )
         scatter.update(**scatter_kwargs)
         fig.add_trace(scatter)

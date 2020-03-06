@@ -1,9 +1,12 @@
 from functools import wraps, reduce
 from inspect import signature, Parameter
 import numpy as np
+import pandas as pd
 
 # ############# Args/kwargs ############# #
 
+# Most decorators operate natively on np.ndarray, 
+# so don't forget to wrap with @to_type(arg_name, np.array) first
 
 def rgetattr(obj, path: str, *default):
     """https://stackoverflow.com/a/54547158/8141780"""
@@ -54,7 +57,7 @@ def _get_arg(arg_name, func, *args, **kwargs):
 def _set_arg(arg, arg_name, func, *args, **kwargs):
     """Modify arguments or keyword arguments to include new arg."""
     if '.' in arg_name:
-        raise ValueError("Argument {arg_name} is an object attribute and cannot be set.")
+        raise ValueError(f"Argument {arg_name} is an object attribute and cannot be set")
     func_params = signature(func).parameters
     if func_params[arg_name].default is Parameter.empty:
         # modify args
@@ -136,8 +139,12 @@ def has_dtype(arg_name, dtype):
             arg = _get_arg(arg_name, func, *args, **kwargs)
             if arg is None:
                 return func(*args, **kwargs)
-            if not np.issubdtype(arg.dtype, dtype):
-                raise ValueError(f"Argument {arg_name} must be of dtype {dtype}")
+            if isinstance(arg, pd.DataFrame):
+                if (arg.dtypes != dtype).any():
+                    raise ValueError(f"Argument {arg_name} must be of dtype {dtype}")
+            else:
+                if arg.dtype != dtype:
+                    raise ValueError(f"Argument {arg_name} must be of dtype {dtype}")
             return func(*args, **kwargs)
         return wrapper_decorator
     return has_dtype_decorator
@@ -169,9 +176,9 @@ def have_same_shape(arg1_name, arg2_name, along_axis=None):
             arg2 = _get_arg(arg2_name, func, *args, **kwargs)
             if arg1 is None or arg2 is None:
                 return func(*args, **kwargs)
-            if not isinstance(arg1, np.ndarray):
+            if not isinstance(arg1, (np.ndarray, pd.Series, pd.DataFrame)):
                 arg1 = np.asarray(arg1)
-            if not isinstance(arg2, np.ndarray):
+            if not isinstance(arg2, (np.ndarray, pd.Series, pd.DataFrame)):
                 arg2 = np.asarray(arg2)
             if along_axis is None:
                 if arg1.shape != arg2.shape:
@@ -190,10 +197,12 @@ def have_same_shape(arg1_name, arg2_name, along_axis=None):
 
 
 def _to_1d(arg, arg_name):
-    if not isinstance(arg, np.ndarray):
+    if not isinstance(arg, (np.ndarray, pd.Series, pd.DataFrame)):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         if arg.shape[1] == 1:
+            if isinstance(arg, pd.DataFrame):
+                return arg.iloc[:, 0]
             return arg[:, 0]
     if arg.ndim == 1:
         return arg
@@ -218,11 +227,13 @@ def to_1d(arg_name):
 
 
 def _to_2d(arg, expand_axis):
-    if not isinstance(arg, np.ndarray):
+    if not isinstance(arg, (np.ndarray, pd.Series, pd.DataFrame)):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         return arg
     elif arg.ndim == 1:
+        if isinstance(arg, pd.Series):
+            return arg.to_frame()
         return np.expand_dims(arg, expand_axis)
     elif arg.ndim == 0:
         return arg.reshape((1, 1))
@@ -249,17 +260,35 @@ def broadcast(*arg_names):
         @wraps(func)
         def wrapper_decorator(*args, **kwargs):
             """Bring arguments to the same shape."""
+            old_arg_objs = {}
             arg_objs = {}
             for arg_name in arg_names:
                 a = _get_arg(arg_name, func, *args, **kwargs)
                 if a is not None:
+                    old_arg_objs[arg_name] = a
                     if not isinstance(a, np.ndarray):
-                        a = np.asarray(a)
-                    arg_objs[arg_name] = a
+                        arg_objs[arg_name] = np.asarray(a)
             if len(arg_objs) > 1:
                 new_arg_objs = np.broadcast_arrays(*arg_objs.values(), subok=True)
                 for i, arg_name in enumerate(arg_objs.keys()):
-                    args, kwargs = _set_arg(new_arg_objs[i].copy(), arg_name, func, *args, **kwargs)
+                    old_arr = old_arg_objs[arg_name]
+                    new_arr = new_arg_objs[i].copy()
+                    if isinstance(old_arr, (pd.Series, pd.DataFrame)):
+                        if new_arr.shape[0] != old_arr.shape[0]:
+                            index = None
+                        else:
+                            index = old_arr.index
+                        if old_arr.ndim == 1 and new_arr.ndim == 2:
+                            columns = None # columns expanded, reset columns
+                        elif old_arr.ndim == 2 and new_arr.shape[1] > old_arr.shape[1]:
+                            columns = None # columns expanded, reset columns
+                        else:
+                            columns = old_arr.columns # columns not changed
+                        if new_arr.ndim == 1:
+                            new_arr = pd.Series(new_arr, index=index)
+                        else:
+                            new_arr = pd.DataFrame(new_arr, index=index, columns=columns)
+                    args, kwargs = _set_arg(new_arr, arg_name, func, *args, **kwargs)
             return func(*args, **kwargs)
         return wrapper_decorator
     return broadcast_decorator
@@ -294,7 +323,7 @@ def broadcast_to_combs_of(arg1_name, arg2_name):
 # ############# Class decorators ############# #
 
 
-def add_2d_nb_methods(*nb_funcs):
+def add_safe_nb_methods(*nb_funcs):
     def wrapper(cls):
         """Wrap numba functions as methods."""
         for nb_func in nb_funcs:
@@ -305,10 +334,9 @@ def add_2d_nb_methods(*nb_funcs):
                     if v.default is not Parameter.empty
                 }
             default_kwargs = get_default_args(nb_func)
-            @to_2d('self')  # default shape for all our classes
             def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
-                return cls(nb_func(self, *args, **{**default_kwargs, **kwargs}))  # kwargs must be specified for numba
-            setattr(cls, nb_func.__name__.replace('_nb', ''), array_operation)
+                return self._after_nb(nb_func(self._before_nb(), *args, **{**default_kwargs, **kwargs}))
+            setattr(cls, nb_func.__name__.replace('_1d_nb', '').replace('_2d_nb', ''), array_operation)
         return cls
     return wrapper
 
@@ -326,3 +354,18 @@ def cached_property(func):
             setattr(obj, attr_name, to_be_cached)
             return to_be_cached
     return property(wrapper_decorator)
+
+
+# ############# Decorators for pandas objects ############# #
+
+def pass_pd_obj(new_arg_name):
+    def pass_pd_obj_decorator(func):
+        @wraps(func)
+        def wrapper_decorator(*args, **kwargs):
+            """Pass pandas object as first argument after self."""
+            obj = args[0]._obj
+            args = list(args)
+            args.insert(1, obj)
+            return func(*args, **kwargs)
+        return wrapper_decorator
+    return pass_pd_obj_decorator
