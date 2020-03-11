@@ -20,28 +20,26 @@ import yfinance as yf
 
 # Prepare data
 msft = yf.Ticker("MSFT")
-history = msft.history(period="max")
-ohlcv = vbt.OHLCV.from_df(history)
-investment = 100 # $
+df = msft.history(period="max")
+price = df['Open']
+windows = np.arange(2, 101)
+investment = 100 # in $
+commission = 0.001 # in %
 
 # Create window combinations
-windows = np.arange(2, 101)
-comb = itertools.combinations(np.arange(len(windows)), 2) # twice less params
-fast_idxs, slow_idxs = np.asarray(list(comb)).transpose()
-fast_windows, slow_windows = windows[fast_idxs], windows[slow_idxs]
+comb = itertools.combinations(windows, 2) # twice less params
+fast_windows, slow_windows = np.asarray(list(comb)).transpose()
 
 # Calculate the performance of the strategy
-dmac = vbt.DMAC(ohlcv.open, fast_windows, slow_windows)
+dmac = vbt.DMAC(price, fast_windows, slow_windows)
 entries, exits = dmac.crossover_signals()
-portfolio = vbt.Portfolio.from_signals(ohlcv.open, entries, exits, investment=investment)
-tnp = portfolio.total_net_profit
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
+    investment=investment, commission=commission, new_columns=entries.columns)
+performance = portfolio.total_net_profit
 
 # Plot heatmap
-tnp_matrix = np.empty((len(windows), len(windows)))
-tnp_matrix[fast_idxs, slow_idxs] = tnp
-tnp_matrix[slow_idxs, fast_idxs] = tnp # symmetry
-
-vbt.Heatmap(data=tnp_matrix, x_labels=windows, y_labels=windows, width=600, height=450).show_png()
+tnp_df = performance.cols.unstack_to_df(symmetric=True)
+tnp_df.heatmap(width=600, height=450).show_png()
 ```
 
 ![msft_heatmap.png](msft_heatmap.png)
