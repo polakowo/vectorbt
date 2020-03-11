@@ -1,6 +1,6 @@
-from vectorbt.decorators import *
+from vectorbt.utils import *
 from vectorbt.widgets import FigureWidget
-from vectorbt.timeseries import CustomBaseAccessor, expanding_max_1d_nb, pct_change_1d_nb, ffill_1d_nb
+from vectorbt.timeseries import expanding_max_1d_nb, pct_change_1d_nb, ffill_1d_nb
 from numba.types.containers import UniTuple
 from numba import njit, f8, i8, b1, optional
 import numpy as np
@@ -8,10 +8,6 @@ import pandas as pd
 import plotly.graph_objects as go
 
 __all__ = []
-
-
-class Signals:
-    pass
 
 # ############# Random signal generation ############# #
 
@@ -65,6 +61,7 @@ def generate_random_exits_2d_nb(entries, seed):
     return a
 
 # ############# Custom signal generation ############# #
+
 
 @njit
 def generate_exits_2d_nb(entries, exit_func_nb, only_first, *args):
@@ -296,10 +293,9 @@ def trailstop_exits_2d_nb(entries, ts, stops, is_relative, only_first):
             entries, trailstop_exit_mask_2d_nb, only_first, ts, stops[i, :, :], is_relative)
     return exits
 
-# ############# Custom pd.DataFrame accessor ############# #
+# ############# Custom accessors ############# #
 
 
-@pd.api.extensions.register_dataframe_accessor("signals")
 @add_safe_nb_methods(
     shuffle_2d_nb,
     rank_true_2d_nb,
@@ -311,89 +307,84 @@ def trailstop_exits_2d_nb(entries, ts, stops, is_relative, only_first):
     nst_false_2d_nb,
     from_nst_true_2d_nb,
     from_nst_false_2d_nb)
-class CustomDFAccessor(CustomBaseAccessor):
-    def __init__(self, obj):
-        self._validate(obj)
-        self._obj = obj
-
-    @staticmethod
-    def _validate(obj):
-        if (obj.dtypes != np.bool_).any():
-            raise ValueError("All columns must be boolean")
+class Signals_Accessor():
+    dtype = np.bool
 
     @classmethod
-    def generate_empty(cls, shape, **kwargs):
-        return pd.DataFrame(np.full(shape, False), **kwargs)
+    def _validate(cls, obj):
+        if cls.dtype is not None:
+            check_dtype(obj, cls.dtype)
+
+    def generate_random_exits(self, seed=None):
+        return self.wrap_array(generate_random_exits_2d_nb(self.to_2d_array(), seed))
+
+    def generate_exits(self, exit_func_nb, *args, only_first=True):
+        return self.wrap_array(generate_exits_2d_nb(self.to_2d_array(), exit_func_nb, only_first, *args))
+
+    def generate_stoploss_exits(self, ts, stops, is_relative=True, only_first=True):
+        # Checks and preprocessing
+        check_type(ts, (pd.Series, pd.DataFrame))
+        ts.timeseries.validate()
+        entries = to_2d(self._obj)
+        entries, ts = broadcast(entries, ts)
+        stops = broadcast_to_array_of(stops, entries)
+
+        exits = stoploss_exits_2d_nb(
+            entries.signals.to_2d_array(),
+            ts.timeseries.to_2d_array(),
+            stops, is_relative, only_first)
+
+        # Build column hierarchy
+        param_columns = pd.DataFrame.cols.index_from_params(stops, name='stoploss')
+        columns = entries.cols.combine_columns(param_columns)
+
+        return self.wrap_array(exits, columns=columns)
+
+    def generate_trailstop_exits(self, ts, stops, is_relative=True, only_first=True):
+        # Checks and preprocessing
+        check_type(ts, (pd.Series, pd.DataFrame))
+        ts.timeseries.validate()
+        entries = to_2d(self._obj)
+        entries, ts = broadcast(entries, ts)
+        stops = broadcast_to_array_of(stops, entries)
+
+        exits = trailstop_exits_2d_nb(
+            entries.signals.to_2d_array(),
+            ts.timeseries.to_2d_array(),
+            stops, is_relative, only_first)
+        
+        # Build column hierarchy
+        param_columns = pd.DataFrame.cols.index_from_params(stops, name='trailstop')
+        columns = entries.cols.combine_columns(param_columns)
+        
+        return self.wrap_array(exits, columns=columns)
+
+
+@pd.api.extensions.register_dataframe_accessor("signals")
+class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
+
+    @classmethod
+    def generate_empty(cls, *args, fill_value=False, **kwargs):
+        return Base_DFAccessor.generate_empty(*args, fill_value=fill_value, **kwargs)
 
     @classmethod
     def generate_random_entries(cls, shape, n, every_nth=1, seed=None, **kwargs):
         return pd.DataFrame(generate_random_entries_2d_nb(shape, n, every_nth, seed), **kwargs)
-
-    def generate_random_exits(self, seed=None):
-        return self._after_nb(generate_random_exits_2d_nb(self._before_nb(), seed))
 
     @classmethod
     def generate_entries_and_exits(cls, shape, entry_func_nb, exit_func_nb, *args, **kwargs):
         entries, exits = generate_entries_and_exits_2d_nb(shape, entry_func_nb, exit_func_nb, *args)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_exits(self, exit_func_nb, *args, only_first=True):
-        return self._after_nb(generate_exits_2d_nb(self._before_nb(), exit_func_nb, only_first, *args))
-
-    @pass_pd_obj('entries')
-    @has_type('entries', (pd.Series, pd.DataFrame))
-    @has_type('ts', (pd.Series, pd.DataFrame))
-    @has_type('stop_index', pd.Index)
-    @to_2d('entries')
-    @to_2d('ts')
-    @broadcast('entries', 'ts')
-    @broadcast_to_combs_of('stops', 'entries')
-    def generate_stoploss_exits(self, entries, ts, stops, is_relative=True, only_first=True, stop_index=None):
-        exits = stoploss_exits_2d_nb(entries.values, ts.values, stops, is_relative, only_first)
-        if stops.shape[0] > 1:
-            if stop_index is not None:
-                upper_cols = stop_index
-            else:
-                upper_cols = pd.Index(np.arange(stops.shape[0]))
-            lower_cols = entries.columns
-            columns = self.vstack_columns(upper_cols, lower_cols)
-            return self._after_nb(exits, columns=columns)
-        else:
-            return self._after_nb(exits)
-
-    @pass_pd_obj('entries')
-    @has_type('entries', (pd.Series, pd.DataFrame))
-    @has_type('ts', (pd.Series, pd.DataFrame))
-    @has_type('stop_index', pd.Index)
-    @to_2d('entries')
-    @to_2d('ts')
-    @broadcast('entries', 'ts')
-    @broadcast_to_combs_of('stops', 'entries')
-    def generate_trailstop_exits(self, entries, ts, stops, is_relative=True, only_first=True, stop_index=None):
-        exits = trailstop_exits_2d_nb(entries.values, ts.values, stops, is_relative, only_first)
-        if stops.shape[0] > 1:
-            if stop_index is not None:
-                upper_cols = stop_index
-            else:
-                upper_cols = pd.Index(np.arange(stops.shape[0]))
-            lower_cols = entries.columns
-            columns = self.vstack_columns(upper_cols, lower_cols)
-            return self._after_nb(exits, columns=columns)
-        else:
-            return self._after_nb(exits)
-
     @cached_property
     def n(self):
-        """Number of signals."""
-        return pd.Series(np.sum(self._obj.values, axis=0), index=self._obj.columns)
+        return pd.Series(np.sum(self.to_2d_array(), axis=0), index=self._obj.columns)
 
     @cached_property
     def avg_distance(self):
-        """Average distance between signals."""
-        return pd.Series(avg_distance_2d_nb(self._obj.values), index=self._obj.columns)
+        return pd.Series(avg_distance_2d_nb(self.to_2d_array()), index=self._obj.columns)
 
     def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
-        # Plot TimeSeries
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].signals.plot(
                 scatter_kwargs=scatter_kwargs[col] if isinstance(scatter_kwargs, list) else scatter_kwargs,
@@ -404,23 +395,12 @@ class CustomDFAccessor(CustomBaseAccessor):
         return fig
 
 
-# ############# Custom pd.Series accessor ############# #
-
-
 @pd.api.extensions.register_series_accessor("signals")
-class CustomSRAccessor(CustomDFAccessor):
-    def __init__(self, obj):
-        self._validate(obj)
-        self._obj = obj
-
-    @staticmethod
-    def _validate(obj):
-        if obj.dtype != np.bool_:
-            raise ValueError("Must be boolean")
+class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
 
     @classmethod
-    def generate_empty(cls, size, **kwargs):
-        return pd.Series(np.full(size, False), **kwargs)
+    def generate_empty(cls, *args, fill_value=False, **kwargs):
+        return Base_SRAccessor.generate_empty(*args, fill_value=fill_value, **kwargs)
 
     @classmethod
     def generate_random_entries(cls, size, n, every_nth=1, seed=None, **kwargs):
@@ -433,13 +413,14 @@ class CustomSRAccessor(CustomDFAccessor):
 
     @cached_property
     def n(self):
-        return np.sum(self._before_nb(force_1d=True))
+        return np.sum(self.to_1d_array())
 
     @cached_property
     def avg_distance(self):
-        return avg_distance_2d_nb(self._before_nb())[0]
+        return avg_distance_2d_nb(self.to_2d_array())[0]
 
     def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
+        # Set up figure
         if fig is None:
             fig = FigureWidget()
             fig.update_layout(
@@ -453,12 +434,11 @@ class CustomSRAccessor(CustomDFAccessor):
         if self._obj.name is not None:
             fig.update_layout(showlegend=True)
 
-        # Plot TimeSeries
         scatter = go.Scatter(
             x=self._obj.index,
-            y=self._obj.values.astype(np.uint8),
+            y=self._obj.values,
             mode='lines',
-            name=str(self._obj.name)
+            name=str(self._obj.name) if self._obj.name is not None else None
         )
         scatter.update(**scatter_kwargs)
         fig.add_trace(scatter)

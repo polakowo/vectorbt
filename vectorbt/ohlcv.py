@@ -1,20 +1,15 @@
 import pandas as pd
-from vectorbt.decorators import *
+import numpy as np
 from vectorbt.widgets import FigureWidget
-from vectorbt.timeseries import TimeSeries
 import plotly.graph_objects as go
 
 __all__ = []
-
-
-class OHLCV:
-    pass
 
 # ############# Custom pd.DataFrame accessor ############# #
 
 
 @pd.api.extensions.register_dataframe_accessor("ohlcv")
-class CustomDFAccessor:
+class OHLCV_DFAccessor:
     def __init__(self, obj):
         self._validate(obj)
         self._obj = obj

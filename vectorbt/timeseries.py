@@ -1,4 +1,4 @@
-from vectorbt.decorators import *
+from vectorbt.utils import *
 from vectorbt.widgets import FigureWidget
 import numpy as np
 import pandas as pd
@@ -9,19 +9,10 @@ import plotly.graph_objects as go
 
 __all__ = []
 
-
-class TimeSeries:
-    pass
-
-
-class TimeFrame:
-    pass
-
 # ############# Numba functions ############# #
 
-# Both pd.Series and pd.DataFrame work mostly on 2d numba functions
-# pd.Series gets converted to pd.DataFrame before calling a 2d numba function
 # Although we don't need most of the following 1d functions here, they are needed by other modules
+
 
 @njit(f8[:](f8[:], i8, f8), cache=True)
 def prepend_1d_nb(a, n, value):
@@ -405,55 +396,9 @@ def ewm_std_2d_nb(a, span):
         b[:, col] = ewm_std_1d_nb(a[:, col], span)
     return b
 
-# ############# Base accessor ############# #
-
-class CustomBaseAccessor:
-    def _before_nb(self, force_1d=False):
-        """Convert pandas object to numpy array to be used in numba."""
-        if isinstance(self._obj, pd.Series):
-            # In numba we work mainly with 2d arrays
-            # and pd.Series is just a pd.DataFrame with one column
-            if not force_1d:
-                return self._obj.values[:, None] # to 2d
-        return self._obj.values
-
-    def _after_nb(self, a, index=None, columns=None, force_2d=False):
-        """Convert numpy array back to pandas object."""
-        if index is None:
-            index = self._obj.index
-        if isinstance(self._obj, pd.Series):
-            if force_2d or (a.ndim == 2 and a.shape[1] > 1):
-                return pd.DataFrame(a, index=index, columns=columns)
-            return pd.Series(a[:, 0], index=index) # back to 1d
-        if columns is None:
-            columns = self._obj.columns
-        return pd.DataFrame(a, index=index, columns=columns)
-
-    @classmethod
-    @has_type('upper_index', pd.Index)
-    @has_type('lower_index', pd.Index)
-    def vstack_columns(cls, upper_index, lower_index):
-        """Stack columns vertically into a hierarchy."""
-        upper_columns = np.repeat(upper_index.to_numpy(), len(lower_index))
-        lower_columns = np.tile(lower_index.to_numpy(), len(upper_index))
-        if isinstance(upper_columns[0], tuple):
-            upper_columns = list(zip(*upper_columns))
-        else:
-            upper_columns = [upper_columns.tolist()]
-        if isinstance(lower_columns[0], tuple):
-            lower_columns = list(zip(*lower_columns))
-        else:
-            lower_columns = [lower_columns.tolist()]
-        tuples = list(zip(*(upper_columns + lower_columns)))
-        return pd.MultiIndex.from_tuples(tuples, names=upper_index.names + lower_index.names)
-
-    def plot(self, *args, **kwargs):
-        raise NotImplementedError
+# ############# Custom accessors ############# #
 
 
-# ############# Custom pd.DataFrame accessor ############# #
-
-@pd.api.extensions.register_dataframe_accessor("timeseries")
 @add_safe_nb_methods(
     fillna_2d_nb,
     fshift_2d_nb,
@@ -467,18 +412,27 @@ class CustomBaseAccessor:
     expanding_max_2d_nb,
     ewm_mean_2d_nb,
     ewm_std_2d_nb)
-class CustomDFAccessor(CustomBaseAccessor):
-    def __init__(self, obj):
-        self._validate(obj)
-        self._obj = obj
+class TimeSeries_Accessor():
+    dtype = np.float64
 
-    @staticmethod
-    def _validate(obj):
-        if (obj.dtypes != np.float64).any():
-            raise ValueError("All columns must be float64")
+    @classmethod
+    def _validate(cls, obj):
+        if cls.dtype is not None:
+            check_dtype(obj, cls.dtype)
+
+    def rolling_window(self, window, step=1):
+        """Generate a new DataFrame from a rolling window."""
+        strided = rolling_window_1d_nb(self.to_1d_array(), window)
+        columns = np.arange(strided.shape[0])[::step]
+        rolled = strided.transpose()[:, ::step]
+        index = np.arange(rolled.shape[0])
+        return self.wrap_array(rolled, index=index, columns=columns)
+
+
+@pd.api.extensions.register_dataframe_accessor("timeseries")
+class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
     def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
-        # Plot TimeSeries
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].timeseries.plot(
                 scatter_kwargs=scatter_kwargs[col] if isinstance(scatter_kwargs, list) else scatter_kwargs,
@@ -489,27 +443,8 @@ class CustomDFAccessor(CustomBaseAccessor):
         return fig
 
 
-# ############# Custom pd.Series accessor ############# #
-
-
 @pd.api.extensions.register_series_accessor("timeseries")
-class CustomSRAccessor(CustomDFAccessor):
-    def __init__(self, obj):
-        self._validate(obj)
-        self._obj = obj
-
-    @staticmethod
-    def _validate(obj):
-        if obj.dtype != np.float64:
-            raise ValueError("Must be float64")
-
-    def rolling_window(self, window, step=1):
-        """Generate a new DataFrame from a rolling window."""
-        strided = rolling_window_1d_nb(self._before_nb(force_1d=True), window)
-        columns = np.arange(strided.shape[0])[::step]
-        rolled = strided.transpose()[:, ::step]
-        index = np.arange(rolled.shape[0])
-        return self._after_nb(rolled, index=index, columns=columns, force_2d=True)
+class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
     def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
         if fig is None:
@@ -518,12 +453,11 @@ class CustomSRAccessor(CustomDFAccessor):
         if self._obj.name is not None:
             fig.update_layout(showlegend=True)
 
-        # Plot TimeSeries
         scatter = go.Scatter(
             x=self._obj.index,
             y=self._obj.values,
             mode='lines',
-            name=str(self._obj.name)
+            name=str(self._obj.name) if self._obj.name is not None else None
         )
         scatter.update(**scatter_kwargs)
         fig.add_trace(scatter)
