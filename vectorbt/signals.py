@@ -321,12 +321,12 @@ class Signals_Accessor():
     def generate_exits(self, exit_func_nb, *args, only_first=True):
         return self.wrap_array(generate_exits_2d_nb(self.to_2d_array(), exit_func_nb, only_first, *args))
 
-    def generate_stoploss_exits(self, ts, stops, is_relative=True, only_first=True):
+    def generate_stoploss_exits(self, ts, stops, is_relative=True, only_first=True, new_columns=None):
         # Checks and preprocessing
         check_type(ts, (pd.Series, pd.DataFrame))
         ts.timeseries.validate()
         entries = to_2d(self._obj)
-        entries, ts = broadcast(entries, ts)
+        entries, ts = broadcast(entries, ts, new_columns=new_columns)
         stops = broadcast_to_array_of(stops, entries)
 
         exits = stoploss_exits_2d_nb(
@@ -340,23 +340,23 @@ class Signals_Accessor():
 
         return self.wrap_array(exits, columns=columns)
 
-    def generate_trailstop_exits(self, ts, stops, is_relative=True, only_first=True):
+    def generate_trailstop_exits(self, ts, stops, is_relative=True, only_first=True, new_columns=None):
         # Checks and preprocessing
         check_type(ts, (pd.Series, pd.DataFrame))
         ts.timeseries.validate()
         entries = to_2d(self._obj)
-        entries, ts = broadcast(entries, ts)
+        entries, ts = broadcast(entries, ts, new_columns=new_columns)
         stops = broadcast_to_array_of(stops, entries)
 
         exits = trailstop_exits_2d_nb(
             entries.signals.to_2d_array(),
             ts.timeseries.to_2d_array(),
             stops, is_relative, only_first)
-        
+
         # Build column hierarchy
         param_columns = pd.DataFrame.cols.index_from_params(stops, name='trailstop')
         columns = entries.cols.combine_columns(param_columns)
-        
+
         return self.wrap_array(exits, columns=columns)
 
 

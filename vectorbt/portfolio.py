@@ -223,7 +223,7 @@ class Portfolio():
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=1., slippage=0., commission=0.):
+    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=1., slippage=0., commission=0., new_columns=None):
         """Build portfolio based on entry and exit signals and the corresponding volume.
 
         Set volume to the number of shares to buy/sell.
@@ -238,7 +238,7 @@ class Portfolio():
         entries.signals.validate()
         exits.signals.validate()
 
-        ts, entries, exits = broadcast(ts, entries, exits)
+        ts, entries, exits = broadcast(ts, entries, exits, new_columns=new_columns)
 
         volume = broadcast_to(volume, ts)
         slippage = broadcast_to(slippage, ts)
@@ -265,7 +265,7 @@ class Portfolio():
         return cls(ts, cash, shares, investment)
 
     @classmethod
-    def from_orders(cls, ts, orders, is_target=False, investment=1., slippage=0., commission=0.):
+    def from_orders(cls, ts, orders, is_target=False, investment=1., slippage=0., commission=0., new_columns=None):
         """Build portfolio based on orders.
 
         Set an orders element to positive/negative number - a number of shares to buy/sell.
@@ -276,7 +276,7 @@ class Portfolio():
         ts.timeseries.validate()
         orders.timeseries.validate()
 
-        ts, orders = broadcast(ts, orders)
+        ts, orders = broadcast(ts, orders, new_columns=new_columns)
 
         slippage = broadcast_to(slippage, ts)
         commission = broadcast_to(commission, ts)

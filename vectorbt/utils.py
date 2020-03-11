@@ -149,31 +149,24 @@ def _broadcast_index(old_index, new_size):
         return None
 
 
-def _wrap_broadcasted(old_arg, new_arg, is_1d=True):
-    """Transform newly broadcasted array to match the type of the original array."""
+def _wrap_broadcasted(old_arg, new_arg, is_1d=True, new_columns=None):
+    """Transform newly broadcasted array to match the type of the original object."""
     if old_arg.shape == new_arg.shape:
         return old_arg
     if is_1d:
         if isinstance(old_arg, pd.Series):
             # Index changed from 1 to new_arg.shape[0]
-            index = _broadcast_index(old_arg.index, new_arg.shape[0])
-            return pd.Series(new_arg, index=index)
+            raise ValueError("Index broadcasting is not supported")
     if isinstance(old_arg, pd.DataFrame):
-        if new_arg.shape[0] == old_arg.shape[0]:
-            index = old_arg.index
-        else:
+        if new_arg.shape[0] != old_arg.shape[0]:
             # Index changed from 1 to new_arg.shape[0]
-            index = _broadcast_index(old_arg.index, new_arg.shape[0])
-        if new_arg.shape[1] == old_arg.shape[1]:
-            columns = old_arg.columns
-        else:
-            # Columns changed from 1 to new_arg.shape[1]
-            columns = _broadcast_index(old_arg.columns, new_arg.shape[1])
-        return pd.DataFrame(new_arg, index=index, columns=columns)
+            raise ValueError("Index broadcasting is not supported")
+        # Columns changed from 1 to new_arg.shape[1]
+        return pd.DataFrame(new_arg, index=old_arg.index, columns=new_columns)
     return new_arg
 
 
-def broadcast_to(arg1, arg2):
+def broadcast_to(arg1, arg2, new_columns=None):
     """Bring the first argument to the shape of the second argument."""
     is_1d = True
     if not isinstance(arg1, (np.ndarray, pd.Series, pd.DataFrame)):
@@ -186,10 +179,10 @@ def broadcast_to(arg1, arg2):
         if isinstance(arg1, pd.Series):
             arg1 = arg1.to_frame()
     arg1_new = np.broadcast_to(arg1, arg2.shape, subok=True).copy()
-    return _wrap_broadcasted(arg1, arg1_new, is_1d=is_1d)
+    return _wrap_broadcasted(arg1, arg1_new, is_1d=is_1d, new_columns=new_columns)
 
 
-def broadcast(*args):
+def broadcast(*args, new_columns=None):
     """Bring arguments to the same shape."""
     is_1d = True
     args = list(args)
@@ -213,7 +206,7 @@ def broadcast(*args):
     for i in range(len(new_args)):
         old_arg = args[i].copy()
         new_arg = new_args[i].copy()
-        args[i] = _wrap_broadcasted(old_arg, new_arg, is_1d=is_1d)
+        args[i] = _wrap_broadcasted(old_arg, new_arg, is_1d=is_1d, new_columns=new_columns)
     return args
 
 
