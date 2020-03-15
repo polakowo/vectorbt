@@ -1,54 +1,99 @@
-from vectorbt.decorators import *
-from vectorbt.widgets import FigureWidget
 import numpy as np
 import pandas as pd
 import inspect
 import sys
-from numba import njit, f8, i8, b1
+from numba import njit, guvectorize, f8, i8, b1
 import plotly.graph_objects as go
 
-__all__ = ['TimeSeries']
+from vectorbt.utils import *
+from vectorbt.accessors import *
+from vectorbt.widgets import FigureWidget
+
+__all__ = []
 
 # ############# Numba functions ############# #
 
-# All functions below require input to be a two-dimensional NumPy array,
-# where first axis is index and second axis are columns.
-# They all move along the first axis (axis=0)
+# Although we don't need most of the following 1d functions here, they are needed by other modules
+
+
+@njit(f8[:](f8[:], i8, f8), cache=True)
+def prepend_1d_nb(a, n, value):
+    """Prepend n values to the array."""
+    b = np.full(a.shape[0]+n, value)
+    b[n:] = a
+    return b
+
+
+@njit(f8[:, :](f8[:, :], i8, f8), cache=True)
+def prepend_nb(a, n, value):
+    b = np.full((a.shape[0]+n, a.shape[1]), value)
+    b[n:, :] = a
+    return b
+
+
+@njit(f8[:, :](f8[:], i8), cache=True)
+def rolling_window_1d_nb(a, window):
+    """Rolling window over the array."""
+    b = np.empty((window, a.shape[0]-window+1))
+    for col in range(b.shape[1]):
+        b[:, col] = a[col:col+window]
+    return b
+
+# Functions below have shape in = shape out
+
+
+@njit(f8[:](f8[:], b1[:], f8), cache=True)
+def set_by_mask_1d_nb(a, mask, value):
+    """Set value by boolean mask."""
+    b = a.copy()
+    b[mask] = value
+    return b
 
 
 @njit(f8[:, :](f8[:, :], b1[:, :], f8), cache=True)
 def set_by_mask_nb(a, mask, value):
-    """Set value by 2D boolean mask."""
     b = a.copy()
     for col in range(b.shape[1]):
         b[mask[:, col], col] = value
     return b
 
 
+@njit(f8[:](f8[:], f8), cache=True)
+def fillna_1d_nb(a, value):
+    """Fill NaNs with value."""
+    return set_by_mask_1d_nb(a, np.isnan(a), value)
+
+
 @njit(f8[:, :](f8[:, :], f8), cache=True)
-def fillna_nb(a, fill_value):
-    """Fill NaNs with fill_value."""
-    return set_by_mask_nb(a, np.isnan(a), fill_value)
+def fillna_nb(a, value):
+    return set_by_mask_nb(a, np.isnan(a), value)
 
 
-@njit(f8[:, :](f8[:, :], i8, f8), cache=True)
-def prepend_nb(a, n, fill_value):
-    """Prepend n values to the array."""
-    b = np.full((a.shape[0]+n, a.shape[1]), fill_value)
-    b[n:, :] = a
+@njit(f8[:](f8[:], i8), cache=True)
+def fshift_1d_nb(a, n):
+    """Shift forward by n."""
+    b = np.full_like(a, np.nan)
+    b[n:] = a[:-n]
     return b
 
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
 def fshift_nb(a, n):
-    """Shift forward by n."""
-    a = prepend_nb(a, n, np.nan)
-    return a[:-n, :]
+    b = np.full_like(a, np.nan)
+    b[n:, :] = a[:-n, :]
+    return b
+
+
+@njit(f8[:](f8[:]), cache=True)
+def diff_1d_nb(a):
+    """Calculate the n-th discrete difference."""
+    b = np.full_like(a, np.nan)
+    b[1:] = np.diff(a.copy())
+    return b
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def diff_nb(a):
-    """Calculate the n-th discrete difference."""
     b = np.full_like(a, np.nan)
     for col in range(a.shape[1]):
         b[1:, col] = np.diff(a[:, col].copy())
@@ -56,8 +101,8 @@ def diff_nb(a):
 
 
 @njit(f8[:](f8[:]), cache=True)
-def _pct_change_1d_nb(a):
-    """Compute the percentage change (1D)."""
+def pct_change_1d_nb(a):
+    """Compute the percentage change."""
     b = np.full_like(a, np.nan)
     b[1:] = np.diff(a.copy()) / a[:-1]
     return b
@@ -65,17 +110,16 @@ def _pct_change_1d_nb(a):
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def pct_change_nb(a):
-    """Compute the percentage change."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _pct_change_1d_nb(a[:, col])
+        b[:, col] = pct_change_1d_nb(a[:, col])
     return b
 
 
 @njit(f8[:](f8[:]), cache=True)
-def _ffill_1d_nb(a):
-    """Fill NaNs with the last value (1D)."""
-    b = np.empty_like(a)
+def ffill_1d_nb(a):
+    """Fill NaNs with the last value."""
+    b = np.full_like(a, np.nan)
     maxval = a[0]
     for i in range(a.shape[0]):
         if np.isnan(a[i]):
@@ -88,50 +132,55 @@ def _ffill_1d_nb(a):
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def ffill_nb(a):
-    """Fill NaNs with the last value."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _ffill_1d_nb(a[:, col])
+        b[:, col] = ffill_1d_nb(a[:, col])
+    return b
+
+
+@njit(f8[:](f8[:]), cache=True)
+def cumsum_1d_nb(a):
+    """Cumulative sum."""
+    b = np.full_like(a, np.nan)
+    cumsum = 0
+    for i in range(a.shape[0]):
+        if ~np.isnan(a[i]):
+            cumsum += a[i]
+            b[i] = cumsum
     return b
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def cumsum_nb(a):
-    """Cumulative sum."""
-    b = np.full_like(a, np.nan)
+    b = np.empty_like(a)
     for col in range(a.shape[1]):
-        cumsum = 0
-        for i in range(a.shape[0]):
-            if ~np.isnan(a[i, col]):
-                cumsum += a[i, col]
-                b[i, col] = cumsum
+        b[:, col] = cumsum_1d_nb(a[:, col])
+    return b
+
+
+@njit(f8[:](f8[:]), cache=True)
+def cumprod_1d_nb(a):
+    """Cumulative product."""
+    b = np.full_like(a, np.nan)
+    cumprod = 1
+    for i in range(a.shape[0]):
+        if ~np.isnan(a[i]):
+            cumprod *= a[i]
+            b[i] = cumprod
     return b
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def cumprod_nb(a):
-    """Cumulative product."""
-    b = np.full_like(a, np.nan)
+    b = np.empty_like(a)
     for col in range(a.shape[1]):
-        cumprod = 1
-        for i in range(a.shape[0]):
-            if ~np.isnan(a[i, col]):
-                cumprod *= a[i, col]
-                b[i, col] = cumprod
+        b[:, col] = cumprod_1d_nb(a[:, col])
     return b
 
 
-@njit(f8[:, :](f8[:], i8), cache=True)
-def _rolling_window_1d_nb(a, window):
-    """Rolling window over the array."""
-    shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
-    strides = a.strides + (a.strides[-1],)
-    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
-
-
 @njit(f8[:](f8[:], i8), cache=True)
-def _rolling_mean_1d_nb(a, window):
-    """Rolling mean (1D)."""
+def rolling_mean_1d_nb(a, window):
+    """Rolling mean."""
     b = np.empty_like(a)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -158,16 +207,15 @@ def _rolling_mean_1d_nb(a, window):
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
 def rolling_mean_nb(a, window):
-    """Rolling mean."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _rolling_mean_1d_nb(a[:, col], window)
+        b[:, col] = rolling_mean_1d_nb(a[:, col], window)
     return b
 
 
 @njit(f8[:](f8[:], i8), cache=True)
-def _rolling_std_1d_nb(a, window):
-    """Rolling std (1D) for ddof = 0."""
+def rolling_std_1d_nb(a, window):
+    """Rolling std for ddof = 0."""
     b = np.empty_like(a)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -202,16 +250,15 @@ def _rolling_std_1d_nb(a, window):
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
 def rolling_std_nb(a, window):
-    """Rolling std."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _rolling_std_1d_nb(a[:, col], window)
+        b[:, col] = rolling_std_1d_nb(a[:, col], window)
     return b
 
 
 @njit(f8[:](f8[:]), cache=True)
-def _expanding_max_1d_nb(a):
-    """Expanding max (1D)."""
+def expanding_max_1d_nb(a):
+    """Expanding max."""
     b = np.empty_like(a)
     maxv = np.nan
     for i in range(a.shape[0]):
@@ -228,15 +275,14 @@ def _expanding_max_1d_nb(a):
 
 @njit(f8[:, :](f8[:, :]), cache=True)
 def expanding_max_nb(a):
-    """Expanding max."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _expanding_max_1d_nb(a[:, col])
+        b[:, col] = expanding_max_1d_nb(a[:, col])
     return b
 
 
 @njit(f8[:](f8[:], i8), cache=True)
-def _ewm_mean_1d_nb(vals, span):
+def ewm_mean_1d_nb(vals, span):
     """Adaptation of pandas._libs.window.aggregations.window_aggregations.ewma with default params."""
     N = len(vals)
     output = np.empty(N, dtype=f8)
@@ -269,15 +315,14 @@ def _ewm_mean_1d_nb(vals, span):
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
 def ewm_mean_nb(a, span):
-    """Exponential weighted moving average."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _ewm_mean_1d_nb(a[:, col], span)
+        b[:, col] = ewm_mean_1d_nb(a[:, col], span)
     return b
 
 
 @njit(f8[:](f8[:], i8), cache=True)
-def _ewm_std_1d_nb(vals, span):
+def ewm_std_1d_nb(vals, span):
     """Adaptation of pandas._libs.window.aggregations.window_aggregations.ewmcov with default params."""
     N = len(vals)
     output = np.empty(N, dtype=f8)
@@ -349,80 +394,77 @@ def _ewm_std_1d_nb(vals, span):
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
 def ewm_std_nb(a, span):
-    """Exponential weighted moving STD."""
     b = np.empty_like(a)
     for col in range(a.shape[1]):
-        b[:, col] = _ewm_std_1d_nb(a[:, col], span)
+        b[:, col] = ewm_std_1d_nb(a[:, col], span)
     return b
 
-# ############# Main class ############# #
+# ############# Custom accessors ############# #
 
 
-# List numba functions in current module
-nb_funcs = [
-    obj
-    for name, obj in inspect.getmembers(sys.modules[__name__])
-    if '_nb' in name and not name.startswith('_')
-]
-
-# Add numba functions as methods to the TimeSeries class
-@add_2d_nb_methods(*nb_funcs)
-class TimeSeries(np.ndarray):
-    """Similar to pd.DataFrame, but optimized for complex matrix operations.
-    NOTE: There is no index nor columns vars - you will have to handle them separately."""
-
-    @to_2d('input_array')
-    @to_dtype('input_array', np.float64)
-    def __new__(cls, input_array):
-        return np.asarray(input_array).view(cls)
+@add_safe_nb_methods(
+    fillna_nb,
+    fshift_nb,
+    diff_nb,
+    pct_change_nb,
+    ffill_nb,
+    cumsum_nb,
+    cumprod_nb,
+    rolling_mean_nb,
+    rolling_std_nb,
+    expanding_max_nb,
+    ewm_mean_nb,
+    ewm_std_nb)
+class TimeSeries_Accessor():
+    dtype = np.float64
 
     @classmethod
-    def full(cls, *args, **kwargs):
-        return cls(np.full(*args, **kwargs))
+    def _validate(cls, obj):
+        if cls.dtype is not None:
+            check_dtype(obj, cls.dtype)
 
-    @classmethod
-    def full_like(cls, *args, **kwargs):
-        return cls(np.full_like(*args, **kwargs))
+    def roll_range(self, window, step=1):
+        """Generate a new DataFrame from a rolling window."""
+        rolled = rolling_window_1d_nb(self.to_1d_array(), window)
+        columns = pd.Index(np.arange(rolled.shape[1])[::step], name='range')
+        rolled = rolled[:, ::step]
+        index = np.arange(rolled.shape[0])
+        return self.wrap_array(rolled, index=index, columns=columns)
 
-    @classmethod
-    @to_1d('input_array')
-    @to_dtype('input_array', np.float64)
-    def from_rolling_window(cls, input_array, window, step=1):
-        strided = _rolling_window_1d_nb(input_array, window)
-        return cls(strided.transpose()[:, ::step])
 
-    @to_2d('self')
-    @have_same_shape('self', 'index', along_axis=0)
-    def plot(self,
-             column=None,
-             label='TimeSeries',
-             index=None,
-             ts_scatter_kwargs={},
-             fig=None,
-             **layout_kwargs):
+@register_dataframe_accessor('timeseries')
+class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
-        if column is None:
-            if self.shape[1] == 1:
-                column = 0
-            else:
-                raise ValueError("For an array with multiple columns, you must pass a column index")
-        ts = self[:, column]
+    def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
+        for col in range(self._obj.shape[1]):
+            fig = self._obj.iloc[:, col].vbt.timeseries.plot(
+                scatter_kwargs=scatter_kwargs,
+                fig=fig,
+                **layout_kwargs
+            )
 
-        if index is None:
-            index = np.arange(ts.shape[0])
+        return fig
+
+
+@register_series_accessor('timeseries')
+class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
+
+    def plot(self, name=None, scatter_kwargs={}, fig=None, **layout_kwargs):
         if fig is None:
             fig = FigureWidget()
-            fig.update_layout(showlegend=True)
             fig.update_layout(**layout_kwargs)
+        if name is None:
+            name = self._obj.name
+        if name is not None:
+            fig.update_layout(showlegend=True)
 
-        # Plot TimeSeries
-        ts_scatter = go.Scatter(
-            x=index,
-            y=ts,
+        scatter = go.Scatter(
+            x=self._obj.index,
+            y=self._obj.values,
             mode='lines',
-            name=label
+            name=str(name) if name is not None else None
         )
-        ts_scatter.update(**ts_scatter_kwargs)
-        fig.add_trace(ts_scatter)
+        scatter.update(**scatter_kwargs)
+        fig.add_trace(scatter)
 
         return fig

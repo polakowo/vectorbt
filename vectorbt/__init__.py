@@ -1,4 +1,4 @@
-from vectorbt import timeseries, ohlcv, signals, strategy, portfolio, decorators, widgets
+from vectorbt import timeseries, ohlcv, signals, strategy, portfolio, widgets, utils, accessors
 
 from vectorbt.timeseries import *
 from vectorbt.ohlcv import *
