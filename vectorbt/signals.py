@@ -372,6 +372,17 @@ class Signals_Accessor():
     def NOT(self):
         return np.logical_not(self._obj)
 
+    @cached_property
+    def num_signals(self):
+        return self._obj.sum(axis=0)
+
+    @cached_property
+    def avg_distance(self):
+        sr = pd.Series(avg_distance_nb(self.to_2d_array()), index=to_2d(self._obj).columns)
+        if isinstance(self._obj, pd.Series):
+            return sr.iloc[0]
+        return sr
+
 
 @register_dataframe_accessor('signals')
 class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
@@ -392,14 +403,6 @@ class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
     def entries_and_exits(cls, shape, entry_mask_nb, exit_mask_nb, *args, **kwargs):
         entries, exits = entries_and_exits_nb(shape, entry_mask_nb, exit_mask_nb, *args)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
-
-    @cached_property
-    def n(self):
-        return pd.Series(np.sum(self.to_2d_array(), axis=0), index=self._obj.columns)
-
-    @cached_property
-    def avg_distance(self):
-        return pd.Series(avg_distance_nb(self.to_2d_array()), index=self._obj.columns)
 
     def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
         for col in range(self._obj.shape[1]):
@@ -431,14 +434,6 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
     def entries_and_exits(cls, size, entry_mask_nb, exit_mask_nb, *args, **kwargs):
         entries, exits = entries_and_exits_nb((size, 1), entry_mask_nb, exit_mask_nb, *args)
         return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
-
-    @cached_property
-    def n(self):
-        return np.sum(self.to_1d_array())
-
-    @cached_property
-    def avg_distance(self):
-        return avg_distance_nb(self.to_2d_array())[0]
 
     def plot(self, name=None, scatter_kwargs={}, fig=None, **layout_kwargs):
         # Set up figure
