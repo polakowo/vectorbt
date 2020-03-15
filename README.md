@@ -48,7 +48,7 @@ tnp_df.vbt.heatmap(width=600, height=450).show_png()
 
 vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries. It takes advantage of the vectorized nature of time series data such as price and signals, and implements Numba-compiled functions for traversing matrices along their index and column axes. 
 
-In contrast to most other vectorized libraries where one matrix (for example holding OHLCV data) means one backtesting operation, vectorbt treats each column of a matrix as a distinct feature. This way, user can construct matrices with millions of columns and calculate performance for each column in a highly efficient manner, thanks to vectorbt functions that are optimized for working with 2-dimensional data. This, for example, is the magic behind backtesting thousands of window combinations at once.
+In contrast to most other vectorized libraries where one matrix (for example holding OHLCV data) means one backtesting operation, vectorbt treats each column of a matrix as a distinct feature. This way, user can construct matrices with millions of columns and calculate performance for each column in a highly efficient manner - thanks to vectorbt functions that are optimized for working with 2-dimensional data. This is the magic behind backtesting thousands of window combinations at once.
 
 ### Efficiency
 
