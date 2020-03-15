@@ -2,10 +2,13 @@ import pandas as pd
 import numpy as np
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1
-from vectorbt.timeseries import rolling_mean_2d_nb, rolling_std_2d_nb, ewm_mean_2d_nb, \
-    ewm_std_2d_nb, diff_2d_nb, set_by_mask_2d_nb, prepend_2d_nb
+from copy import copy
+import plotly.graph_objects as go
+
 from vectorbt.utils import *
-from copy import deepcopy
+from vectorbt.accessors import *
+from vectorbt.timeseries import rolling_mean_nb, rolling_std_nb, ewm_mean_nb, \
+    ewm_std_nb, diff_nb, set_by_mask_nb, prepend_nb
 
 __all__ = ['DMAC', 'BollingerBands', 'RSI']
 
@@ -47,9 +50,9 @@ def dmac_nb(ts, fast_windows, slow_windows, is_ewm, is_min_periods):
     cache_d = dict()
     for i in range(unique_windows.shape[0]):
         if is_ewm:
-            ma = ewm_mean_2d_nb(ts, unique_windows[i])
+            ma = ewm_mean_nb(ts, unique_windows[i])
         else:
-            ma = rolling_mean_2d_nb(ts, unique_windows[i])
+            ma = rolling_mean_nb(ts, unique_windows[i])
         if is_min_periods:
             ma[:unique_windows[i], :] = np.nan
         cache_d[unique_windows[i]] = ma
@@ -63,7 +66,7 @@ def dmac_nb(ts, fast_windows, slow_windows, is_ewm, is_min_periods):
 
 
 def dmac_indexing_func(obj, getitem_func):
-    obj_copy = deepcopy(obj)
+    obj_copy = copy(obj)
     obj_copy.ts = getitem_func(obj.ts)
     obj_copy.fast = getitem_func(obj.fast)
     obj_copy.slow = getitem_func(obj.slow)
@@ -79,7 +82,7 @@ class DMAC():
     def __init__(self, ts, fast_windows, slow_windows, is_ewm=False, is_min_periods=True):
         # Checks and preprocessing
         check_type(ts, (pd.Series, pd.DataFrame))
-        ts.timeseries.validate()
+        ts.vbt.timeseries.validate()
         fast_windows = to_1d(fast_windows)
         slow_windows = to_1d(slow_windows)
         fast_windows, slow_windows = broadcast(fast_windows, slow_windows)
@@ -87,20 +90,20 @@ class DMAC():
         check_dtype(slow_windows, np.int64)
 
         # fast_windows and slow_windows can be either np.ndarray or single number
-        fast, slow = dmac_nb(ts.arr.to_2d_array(), fast_windows, slow_windows, is_ewm, is_min_periods)
+        fast, slow = dmac_nb(ts.vbt.to_2d_array(), fast_windows, slow_windows, is_ewm, is_min_periods)
 
         # Build column hierarchy
-        fast_index = pd.DataFrame.cols.index_from_params(fast_windows, name='fast_window')
-        slow_index = pd.DataFrame.cols.index_from_params(slow_windows, name='slow_window')
-        param_columns = pd.DataFrame.cols.stack_indexes(fast_index, slow_index)
-        columns = ts.cols.combine_columns(param_columns)
+        fast_index = pd.DataFrame.vbt.index_from_params(fast_windows, name='fast_window')
+        slow_index = pd.DataFrame.vbt.index_from_params(slow_windows, name='slow_window')
+        param_columns = pd.DataFrame.vbt.stack_indexes(fast_index, slow_index)
+        columns = ts.vbt.combine_columns(param_columns)
 
         if fast_windows.shape[0] > 1:
-            self.ts = ts.arr.wrap_array(np.tile(to_2d(ts), (1, fast_windows.shape[0])), columns=columns)
+            self.ts = ts.vbt.wrap_array(np.tile(to_2d(ts), (1, fast_windows.shape[0])), columns=columns)
         else:
-            self.ts = ts.arr.wrap_array(ts, columns=columns)
-        self.fast = ts.arr.wrap_array(fast, columns=columns)
-        self.slow = ts.arr.wrap_array(slow, columns=columns)
+            self.ts = ts.vbt.wrap_array(ts, columns=columns)
+        self.fast = ts.vbt.wrap_array(fast, columns=columns)
+        self.slow = ts.vbt.wrap_array(slow, columns=columns)
 
     def is_fast_above_slow(self):
         return self.fast > self.slow
@@ -110,8 +113,8 @@ class DMAC():
 
     def crossover_signals(self):
         # crossover is first true after false
-        entries = self.is_fast_above_slow().signals.first_true(after_false=True)
-        exits = self.is_fast_below_slow().signals.first_true(after_false=True)
+        entries = self.is_fast_above_slow().vbt.signals.first_true(after_false=True)
+        exits = self.is_fast_below_slow().vbt.signals.first_true(after_false=True)
         return entries, exits
 
     def plot(self,
@@ -119,6 +122,8 @@ class DMAC():
              ts_scatter_kwargs={},
              fast_scatter_kwargs={},
              slow_scatter_kwargs={},
+             entry_scatter_kwargs={},
+             exit_scatter_kwargs={},
              fig=None,
              **layout_kwargs):
         # Checks and preprocessing
@@ -131,9 +136,38 @@ class DMAC():
         slow_scatter_kwargs = {**dict(name='Slow MA'), **slow_scatter_kwargs}
 
         if plot_ts:
-            fig = self.ts.timeseries.plot(scatter_kwargs=ts_scatter_kwargs, fig=fig, **layout_kwargs)
-        fig = self.fast.timeseries.plot(scatter_kwargs=fast_scatter_kwargs, fig=fig)
-        fig = self.slow.timeseries.plot(scatter_kwargs=slow_scatter_kwargs, fig=fig)
+            fig = self.ts.vbt.timeseries.plot(scatter_kwargs=ts_scatter_kwargs, fig=fig, **layout_kwargs)
+        fig = self.fast.vbt.timeseries.plot(scatter_kwargs=fast_scatter_kwargs, fig=fig)
+        fig = self.slow.vbt.timeseries.plot(scatter_kwargs=slow_scatter_kwargs, fig=fig)
+
+        # Plot markets
+        entries, exits = self.crossover_signals()
+        entry_scatter = go.Scatter(
+            x=self.ts.index[entries],
+            y=self.ts[entries],
+            mode='markers',
+            marker=dict(
+                symbol='triangle-up',
+                color='limegreen',
+                size=10
+            ),
+            name='Entry'
+        )
+        entry_scatter.update(**entry_scatter_kwargs)
+        fig.add_trace(entry_scatter)
+        exit_scatter = go.Scatter(
+            x=self.ts.index[exits],
+            y=self.ts[exits],
+            mode='markers',
+            marker=dict(
+                symbol='triangle-down',
+                color='orangered',
+                size=10
+            ),
+            name='Exit'
+        )
+        exit_scatter.update(**exit_scatter_kwargs)
+        fig.add_trace(exit_scatter)
 
         return fig
 
@@ -149,11 +183,11 @@ def bb_nb(ts, ns, ks, is_ewm, is_min_periods):
     cache_d = dict()
     for i in range(unique_windows.shape[0]):
         if is_ewm:
-            ma = ewm_mean_2d_nb(ts, unique_windows[i])
-            mstd = ewm_std_2d_nb(ts, unique_windows[i])
+            ma = ewm_mean_nb(ts, unique_windows[i])
+            mstd = ewm_std_nb(ts, unique_windows[i])
         else:
-            ma = rolling_mean_2d_nb(ts, unique_windows[i])
-            mstd = rolling_std_2d_nb(ts, unique_windows[i])
+            ma = rolling_mean_nb(ts, unique_windows[i])
+            mstd = rolling_std_nb(ts, unique_windows[i])
         if is_min_periods:
             ma[:unique_windows[i], :] = np.nan
             mstd[:unique_windows[i], :] = np.nan
@@ -175,17 +209,17 @@ def compare_with_thresholds(compare_func, pd_obj, thresholds):
     thresholds = to_1d(thresholds)
     thresholds = thresholds.astype(np.float64)
 
-    arr = compare_func(pd_obj.arr.to_2d_array(), thresholds)
+    arr = compare_func(pd_obj.vbt.to_2d_array(), thresholds)
 
     # Build column hierarchy
-    param_columns = pd.DataFrame.cols.index_from_params(thresholds, name='threshold')
-    columns = pd_obj.cols.combine_columns(param_columns)
+    param_columns = pd.DataFrame.vbt.index_from_params(thresholds, name='threshold')
+    columns = pd_obj.vbt.combine_columns(param_columns)
 
-    return pd_obj.arr.wrap_array(arr, columns=columns)
+    return pd_obj.vbt.wrap_array(arr, columns=columns)
 
 
 def bb_indexing_func(obj, getitem_func):
-    obj_copy = deepcopy(obj)
+    obj_copy = copy(obj)
     obj_copy.ts = getitem_func(obj.ts)
     obj_copy.upper = getitem_func(obj.upper)
     obj_copy.middle = getitem_func(obj.middle)
@@ -205,7 +239,7 @@ class BollingerBands():
     def __init__(self, ts, windows, std_ns, is_ewm=False, is_min_periods=True):
         # Checks and preprocessing
         check_type(ts, (pd.Series, pd.DataFrame))
-        ts.timeseries.validate()
+        ts.vbt.timeseries.validate()
         windows = to_1d(windows)
         std_ns = to_1d(std_ns)
         windows, std_ns = broadcast(windows, std_ns)
@@ -213,21 +247,21 @@ class BollingerBands():
         check_dtype(std_ns, np.int64)
 
         # windows and std_ns can be either np.ndarray or single number
-        upper, middle, lower = bb_nb(ts.arr.to_2d_array(), windows, std_ns, is_ewm, is_min_periods)
+        upper, middle, lower = bb_nb(ts.vbt.to_2d_array(), windows, std_ns, is_ewm, is_min_periods)
 
         # Build column hierarchy
-        window_index = pd.DataFrame.cols.index_from_params(windows, name='window')
-        std_n_index = pd.DataFrame.cols.index_from_params(std_ns, name='std_n')
-        param_columns = pd.DataFrame.cols.stack_indexes(window_index, std_n_index)
-        columns = ts.cols.combine_columns(param_columns)
+        window_index = pd.DataFrame.vbt.index_from_params(windows, name='window')
+        std_n_index = pd.DataFrame.vbt.index_from_params(std_ns, name='std_n')
+        param_columns = pd.DataFrame.vbt.stack_indexes(window_index, std_n_index)
+        columns = ts.vbt.combine_columns(param_columns)
 
         if windows.shape[0] > 1:
-            self.ts = ts.arr.wrap_array(np.tile(to_2d(ts), (1, windows.shape[0])), columns=columns)
+            self.ts = ts.vbt.wrap_array(np.tile(to_2d(ts), (1, windows.shape[0])), columns=columns)
         else:
-            self.ts = ts.arr.wrap_array(ts, columns=columns)
-        self.upper = ts.arr.wrap_array(upper, columns=columns)
-        self.middle = ts.arr.wrap_array(middle, columns=columns)
-        self.lower = ts.arr.wrap_array(lower, columns=columns)
+            self.ts = ts.vbt.wrap_array(ts, columns=columns)
+        self.upper = ts.vbt.wrap_array(upper, columns=columns)
+        self.middle = ts.vbt.wrap_array(middle, columns=columns)
+        self.lower = ts.vbt.wrap_array(lower, columns=columns)
 
     @cached_property
     def percent_b(self):
@@ -272,10 +306,10 @@ class BollingerBands():
         lower_scatter_kwargs = {**dict(name='Lower Band', line=dict(color='grey')), **lower_scatter_kwargs}
 
         if plot_ts:
-            fig = self.ts.timeseries.plot(scatter_kwargs=ts_scatter_kwargs, fig=fig, **layout_kwargs)
-        fig = self.upper.timeseries.plot(scatter_kwargs=upper_scatter_kwargs, fig=fig)
-        fig = self.middle.timeseries.plot(scatter_kwargs=middle_scatter_kwargs, fig=fig)
-        fig = self.lower.timeseries.plot(scatter_kwargs=lower_scatter_kwargs, fig=fig)
+            fig = self.ts.vbt.timeseries.plot(scatter_kwargs=ts_scatter_kwargs, fig=fig, **layout_kwargs)
+        fig = self.upper.vbt.timeseries.plot(scatter_kwargs=upper_scatter_kwargs, fig=fig)
+        fig = self.middle.vbt.timeseries.plot(scatter_kwargs=middle_scatter_kwargs, fig=fig)
+        fig = self.lower.vbt.timeseries.plot(scatter_kwargs=lower_scatter_kwargs, fig=fig)
 
         return fig
 
@@ -285,22 +319,22 @@ class BollingerBands():
 @njit(f8[:, :](f8[:, :], i8[:], b1, b1), cache=True)
 def rsi_nb(ts, windows, is_ewm, is_min_periods):
     """For each window, calculate the RSI."""
-    delta = diff_2d_nb(ts)[1:, :]  # otherwise ewma will be all NaN
+    delta = diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
-    up = set_by_mask_2d_nb(up, up < 0, 0)
-    down = np.abs(set_by_mask_2d_nb(down, down > 0, 0))
+    up = set_by_mask_nb(up, up < 0, 0)
+    down = np.abs(set_by_mask_nb(down, down > 0, 0))
     # Cache moving averages to effectively reduce the number of operations
     unique_windows = np.unique(windows)
     cache_d = dict()
     for i in range(unique_windows.shape[0]):
         if is_ewm:
-            roll_up = ewm_mean_2d_nb(up, unique_windows[i])
-            roll_down = ewm_mean_2d_nb(down, unique_windows[i])
+            roll_up = ewm_mean_nb(up, unique_windows[i])
+            roll_down = ewm_mean_nb(down, unique_windows[i])
         else:
-            roll_up = rolling_mean_2d_nb(up, unique_windows[i])
-            roll_down = rolling_mean_2d_nb(down, unique_windows[i])
-        roll_up = prepend_2d_nb(roll_up, 1, np.nan)  # bring to old shape
-        roll_down = prepend_2d_nb(roll_down, 1, np.nan)
+            roll_up = rolling_mean_nb(up, unique_windows[i])
+            roll_down = rolling_mean_nb(down, unique_windows[i])
+        roll_up = prepend_nb(roll_up, 1, np.nan)  # bring to old shape
+        roll_down = prepend_nb(roll_down, 1, np.nan)
         if is_min_periods:
             roll_up[:unique_windows[i], :] = np.nan
             roll_down[:unique_windows[i], :] = np.nan
@@ -314,7 +348,7 @@ def rsi_nb(ts, windows, is_ewm, is_min_periods):
 
 
 def rsi_indexing_func(obj, getitem_func):
-    obj_copy = deepcopy(obj)
+    obj_copy = copy(obj)
     obj_copy.ts = getitem_func(obj.ts)
     obj_copy.rsi = getitem_func(obj.rsi)
     return obj_copy
@@ -329,22 +363,22 @@ class RSI():
     def __init__(self, ts, windows, is_ewm=False, is_min_periods=True):
         # Checks and preprocessing
         check_type(ts, (pd.Series, pd.DataFrame))
-        ts.timeseries.validate()
+        ts.vbt.timeseries.validate()
         windows = to_1d(windows)
         check_dtype(windows, np.int64)
 
         # windows can be either np.ndarray or single number
-        rsi = rsi_nb(ts.arr.to_2d_array(), windows, is_ewm, is_min_periods)
+        rsi = rsi_nb(ts.vbt.to_2d_array(), windows, is_ewm, is_min_periods)
 
         # Build column hierarchy
-        param_columns = pd.DataFrame.cols.index_from_params(windows, name='window')
-        columns = ts.cols.combine_columns(param_columns)
+        param_columns = pd.DataFrame.vbt.index_from_params(windows, name='window')
+        columns = ts.vbt.combine_columns(param_columns)
 
         if windows.shape[0] > 1:
-            self.ts = ts.arr.wrap_array(np.tile(to_2d(ts), (1, windows.shape[0])), columns=columns)
+            self.ts = ts.vbt.wrap_array(np.tile(to_2d(ts), (1, windows.shape[0])), columns=columns)
         else:
-            self.ts = ts.arr.wrap_array(ts, columns=columns)
-        self.rsi = ts.arr.wrap_array(rsi, columns=columns)
+            self.ts = ts.vbt.wrap_array(ts, columns=columns)
+        self.rsi = ts.vbt.wrap_array(rsi, columns=columns)
 
     def is_rsi_above(self, thresholds):
         return compare_with_thresholds(above_thresholds_nb, self.rsi, thresholds)
@@ -361,6 +395,6 @@ class RSI():
 
         rsi_scatter_kwargs = {**dict(name='RSI'), **rsi_scatter_kwargs}  # user kwargs override default kwargs
 
-        fig = self.rsi.timeseries.plot(scatter_kwargs=rsi_scatter_kwargs, fig=fig, **layout_kwargs)
+        fig = self.rsi.vbt.timeseries.plot(scatter_kwargs=rsi_scatter_kwargs, fig=fig, **layout_kwargs)
 
         return fig

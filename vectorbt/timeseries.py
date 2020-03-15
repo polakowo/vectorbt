@@ -1,11 +1,13 @@
-from vectorbt.utils import *
-from vectorbt.widgets import FigureWidget
 import numpy as np
 import pandas as pd
 import inspect
 import sys
 from numba import njit, guvectorize, f8, i8, b1
 import plotly.graph_objects as go
+
+from vectorbt.utils import *
+from vectorbt.accessors import *
+from vectorbt.widgets import FigureWidget
 
 __all__ = []
 
@@ -23,7 +25,7 @@ def prepend_1d_nb(a, n, value):
 
 
 @njit(f8[:, :](f8[:, :], i8, f8), cache=True)
-def prepend_2d_nb(a, n, value):
+def prepend_nb(a, n, value):
     b = np.full((a.shape[0]+n, a.shape[1]), value)
     b[n:, :] = a
     return b
@@ -32,9 +34,10 @@ def prepend_2d_nb(a, n, value):
 @njit(f8[:, :](f8[:], i8), cache=True)
 def rolling_window_1d_nb(a, window):
     """Rolling window over the array."""
-    shape = a.shape[:-1] + (a.shape[-1] - window + 1, window)
-    strides = a.strides + (a.strides[-1],)
-    return np.lib.stride_tricks.as_strided(a, shape=shape, strides=strides)
+    b = np.empty((window, a.shape[0]-window+1))
+    for col in range(b.shape[1]):
+        b[:, col] = a[col:col+window]
+    return b
 
 # Functions below have shape in = shape out
 
@@ -48,7 +51,7 @@ def set_by_mask_1d_nb(a, mask, value):
 
 
 @njit(f8[:, :](f8[:, :], b1[:, :], f8), cache=True)
-def set_by_mask_2d_nb(a, mask, value):
+def set_by_mask_nb(a, mask, value):
     b = a.copy()
     for col in range(b.shape[1]):
         b[mask[:, col], col] = value
@@ -62,8 +65,8 @@ def fillna_1d_nb(a, value):
 
 
 @njit(f8[:, :](f8[:, :], f8), cache=True)
-def fillna_2d_nb(a, value):
-    return set_by_mask_2d_nb(a, np.isnan(a), value)
+def fillna_nb(a, value):
+    return set_by_mask_nb(a, np.isnan(a), value)
 
 
 @njit(f8[:](f8[:], i8), cache=True)
@@ -75,7 +78,7 @@ def fshift_1d_nb(a, n):
 
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
-def fshift_2d_nb(a, n):
+def fshift_nb(a, n):
     b = np.full_like(a, np.nan)
     b[n:, :] = a[:-n, :]
     return b
@@ -90,7 +93,7 @@ def diff_1d_nb(a):
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
-def diff_2d_nb(a):
+def diff_nb(a):
     b = np.full_like(a, np.nan)
     for col in range(a.shape[1]):
         b[1:, col] = np.diff(a[:, col].copy())
@@ -106,7 +109,7 @@ def pct_change_1d_nb(a):
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
-def pct_change_2d_nb(a):
+def pct_change_nb(a):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = pct_change_1d_nb(a[:, col])
@@ -128,7 +131,7 @@ def ffill_1d_nb(a):
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
-def ffill_2d_nb(a):
+def ffill_nb(a):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = ffill_1d_nb(a[:, col])
@@ -148,7 +151,7 @@ def cumsum_1d_nb(a):
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
-def cumsum_2d_nb(a):
+def cumsum_nb(a):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = cumsum_1d_nb(a[:, col])
@@ -168,7 +171,7 @@ def cumprod_1d_nb(a):
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
-def cumprod_2d_nb(a):
+def cumprod_nb(a):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = cumprod_1d_nb(a[:, col])
@@ -203,7 +206,7 @@ def rolling_mean_1d_nb(a, window):
 
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
-def rolling_mean_2d_nb(a, window):
+def rolling_mean_nb(a, window):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = rolling_mean_1d_nb(a[:, col], window)
@@ -246,7 +249,7 @@ def rolling_std_1d_nb(a, window):
 
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
-def rolling_std_2d_nb(a, window):
+def rolling_std_nb(a, window):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = rolling_std_1d_nb(a[:, col], window)
@@ -271,7 +274,7 @@ def expanding_max_1d_nb(a):
 
 
 @njit(f8[:, :](f8[:, :]), cache=True)
-def expanding_max_2d_nb(a):
+def expanding_max_nb(a):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = expanding_max_1d_nb(a[:, col])
@@ -311,7 +314,7 @@ def ewm_mean_1d_nb(vals, span):
 
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
-def ewm_mean_2d_nb(a, span):
+def ewm_mean_nb(a, span):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = ewm_mean_1d_nb(a[:, col], span)
@@ -390,7 +393,7 @@ def ewm_std_1d_nb(vals, span):
 
 
 @njit(f8[:, :](f8[:, :], i8), cache=True)
-def ewm_std_2d_nb(a, span):
+def ewm_std_nb(a, span):
     b = np.empty_like(a)
     for col in range(a.shape[1]):
         b[:, col] = ewm_std_1d_nb(a[:, col], span)
@@ -400,18 +403,18 @@ def ewm_std_2d_nb(a, span):
 
 
 @add_safe_nb_methods(
-    fillna_2d_nb,
-    fshift_2d_nb,
-    diff_2d_nb,
-    pct_change_2d_nb,
-    ffill_2d_nb,
-    cumsum_2d_nb,
-    cumprod_2d_nb,
-    rolling_mean_2d_nb,
-    rolling_std_2d_nb,
-    expanding_max_2d_nb,
-    ewm_mean_2d_nb,
-    ewm_std_2d_nb)
+    fillna_nb,
+    fshift_nb,
+    diff_nb,
+    pct_change_nb,
+    ffill_nb,
+    cumsum_nb,
+    cumprod_nb,
+    rolling_mean_nb,
+    rolling_std_nb,
+    expanding_max_nb,
+    ewm_mean_nb,
+    ewm_std_nb)
 class TimeSeries_Accessor():
     dtype = np.float64
 
@@ -420,22 +423,22 @@ class TimeSeries_Accessor():
         if cls.dtype is not None:
             check_dtype(obj, cls.dtype)
 
-    def rolling_window(self, window, step=1):
+    def roll_range(self, window, step=1):
         """Generate a new DataFrame from a rolling window."""
-        strided = rolling_window_1d_nb(self.to_1d_array(), window)
-        columns = np.arange(strided.shape[0])[::step]
-        rolled = strided.transpose()[:, ::step]
+        rolled = rolling_window_1d_nb(self.to_1d_array(), window)
+        columns = pd.Index(np.arange(rolled.shape[1])[::step], name='range')
+        rolled = rolled[:, ::step]
         index = np.arange(rolled.shape[0])
         return self.wrap_array(rolled, index=index, columns=columns)
 
 
-@pd.api.extensions.register_dataframe_accessor("timeseries")
+@register_dataframe_accessor('timeseries')
 class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
     def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
         for col in range(self._obj.shape[1]):
-            fig = self._obj.iloc[:, col].timeseries.plot(
-                scatter_kwargs=scatter_kwargs[col] if isinstance(scatter_kwargs, list) else scatter_kwargs,
+            fig = self._obj.iloc[:, col].vbt.timeseries.plot(
+                scatter_kwargs=scatter_kwargs,
                 fig=fig,
                 **layout_kwargs
             )
@@ -443,21 +446,23 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
         return fig
 
 
-@pd.api.extensions.register_series_accessor("timeseries")
+@register_series_accessor('timeseries')
 class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
-    def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, name=None, scatter_kwargs={}, fig=None, **layout_kwargs):
         if fig is None:
             fig = FigureWidget()
             fig.update_layout(**layout_kwargs)
-        if self._obj.name is not None:
+        if name is None:
+            name = self._obj.name
+        if name is not None:
             fig.update_layout(showlegend=True)
 
         scatter = go.Scatter(
             x=self._obj.index,
             y=self._obj.values,
             mode='lines',
-            name=str(self._obj.name) if self._obj.name is not None else None
+            name=str(name) if name is not None else None
         )
         scatter.update(**scatter_kwargs)
         fig.add_trace(scatter)

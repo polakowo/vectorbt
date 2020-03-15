@@ -1,7 +1,9 @@
 import numpy as np
 import plotly.graph_objects as go
-from vectorbt.utils import *
 import matplotlib.pyplot as plt
+
+from vectorbt.utils import *
+from vectorbt.accessors import *
 
 __all__ = ['Gauge', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
 
@@ -103,7 +105,7 @@ class Bar(UpdatableFigureWidget):
     """Draw a barplot for each value in a series."""
 
     def __init__(self,
-                 sr=None,
+                 data=None,
                  bar_kwargs={},
                  **layout_kwargs):
         self._bar_kwargs = bar_kwargs
@@ -111,35 +113,42 @@ class Bar(UpdatableFigureWidget):
         super().__init__()
         self.update_layout(**layout_kwargs)
 
-        if sr is not None:
-            self.update_data(sr)
+        if data is not None:
+            self.update_data(data)
 
-    def update_data(self, sr):
+    def update_data(self, data):
         # Checks and preprocessing
-        check_type(sr, pd.Series)
+        check_type(data, (pd.Series, pd.DataFrame))
+        df = to_2d(data)
 
         with self.batch_update():
-            if len(self.data) == 0:
+            if len(self.data) != len(df.columns):
+                # Create new traces
                 self.data = []
-                bar = go.Bar(
-                    marker=dict(colorscale='Spectral')
-                )
-                bar.update(**self._bar_kwargs)
-                self.add_trace(bar)
-            bar = self.data[0]
-            bar.x = sr.index
-            bar.y = sr.values
-            if bar.marker.colorscale is not None:
-                bar.marker.color = sr.values
+                for i, column in enumerate(df.columns):
+                    bar = go.Bar(
+                        name=column
+                    )
+                    bar.update(**self._bar_kwargs)
+                    self.add_trace(bar)
+
+            for i, bar in enumerate(self.data):
+                # Update traces
+                bar.x = df.index
+                bar.y = df.iloc[:, i].values
+                bar.name = df.columns[i]
+                if bar.marker.colorscale is not None:
+                    bar.marker.color = df.iloc[:, i].values
 
 
-@pd.api.extensions.register_series_accessor("bar")
+@register_dataframe_accessor('bar')
+@register_series_accessor('bar')
 class Bar_Accessor():
     def __init__(self, obj):
-        self._obj = obj
+        self._obj = obj._obj  # access pandas object
 
     def __call__(self, **kwargs):
-        return Bar(sr=self._obj, **kwargs)
+        return Bar(data=self._obj, **kwargs)
 
 # ############# Scatter ############# #
 
@@ -148,7 +157,7 @@ class Scatter(UpdatableFigureWidget):
     """Draws a scatterplot for each column in a dataframe."""
 
     def __init__(self,
-                 df=None,
+                 data=None,
                  scatter_kwargs={},
                  **layout_kwargs):
         self._scatter_kwargs = scatter_kwargs
@@ -157,33 +166,40 @@ class Scatter(UpdatableFigureWidget):
         self.update_layout(showlegend=True)
         self.update_layout(**layout_kwargs)
 
-        if df is not None:
-            self.update_data(df)
+        if data is not None:
+            self.update_data(data)
 
-    def update_data(self, df):
+    def update_data(self, data):
         # Checks and preprocessing
-        check_type(df, pd.DataFrame)
+        check_type(data, (pd.Series, pd.DataFrame))
+        df = to_2d(data)
 
         with self.batch_update():
             if len(self.data) != len(df.columns):
+                # Create new traces
                 self.data = []
                 for i, column in enumerate(df.columns):
-                    scatter = go.Scatter(name=column)
-                    scatter.update(
-                        **(self._scatter_kwargs[i] if isinstance(self._scatter_kwargs, list) else self._scatter_kwargs))
+                    scatter = go.Scatter(
+                        name=column
+                    )
+                    scatter.update(self._scatter_kwargs)
                     self.add_trace(scatter)
+            
             for i, scatter in enumerate(self.data):
+                # Update traces
                 scatter.x = df.index
                 scatter.y = df.iloc[:, i].values
+                scatter.name = df.columns[i]
 
 
-@pd.api.extensions.register_dataframe_accessor("scatter")
+@register_dataframe_accessor('scatter')
+@register_series_accessor('scatter')
 class Scatter_Accessor():
     def __init__(self, obj):
-        self._obj = obj
+        self._obj = obj._obj  # access pandas object
 
     def __call__(self, **kwargs):
-        return Scatter(df=self._obj, **kwargs)
+        return Scatter(data=self._obj, **kwargs)
 
 # ############# Histogram ############# #
 
@@ -192,7 +208,7 @@ class Histogram(UpdatableFigureWidget):
     """Draws a histogram for each column in a dataframe."""
 
     def __init__(self,
-                 df=None,
+                 data=None,
                  horizontal=False,
                  histogram_kwargs={},
                  **layout_kwargs):
@@ -202,40 +218,45 @@ class Histogram(UpdatableFigureWidget):
         super().__init__()
         self.update_layout(showlegend=True, barmode='overlay')
         self.update_layout(**layout_kwargs)
-        if df is not None:
-            self.update_data(df)
+        if data is not None:
+            self.update_data(data)
 
-    def update_data(self, df):
+    def update_data(self, data):
         # Checks and preprocessing
-        check_type(df, pd.DataFrame)
+        check_type(data, (pd.Series, pd.DataFrame))
+        df = to_2d(data)
 
         with self.batch_update():
             if len(self.data) != len(df.columns):
+                # Create new traces
                 self.data = []
-                for column in df.columns:
+                for i, column in enumerate(df.columns):
                     histogram = go.Histogram(
+                        name=column,
                         opacity=0.75 if len(df.columns) > 1 else 1
                     )
-                    histogram.update(
-                        **(self._histogram_kwargs[i] if isinstance(self._histogram_kwargs, list) else self._histogram_kwargs))
+                    histogram.update(self._histogram_kwargs)
                     self.add_trace(histogram)
-            for i, hist in enumerate(self.data):
-                hist.name = df.columns[i]
+
+            for i, histogram in enumerate(self.data):
+                # Update traces
+                histogram.name = df.columns[i]
                 if self._horizontal:
-                    hist.x = None
-                    hist.y = df.iloc[:, i].values
+                    histogram.x = None
+                    histogram.y = df.iloc[:, i].values
                 else:
-                    hist.x = df.iloc[:, i].values
-                    hist.y = None
+                    histogram.x = df.iloc[:, i].values
+                    histogram.y = None
 
 
-@pd.api.extensions.register_dataframe_accessor("histogram")
+@register_dataframe_accessor('histogram')
+@register_series_accessor('histogram')
 class Histogram_Accessor():
     def __init__(self, obj):
-        self._obj = obj
+        self._obj = obj._obj  # access pandas object
 
     def __call__(self, **kwargs):
-        return Histogram(df=self._obj, **kwargs)
+        return Histogram(data=self._obj, **kwargs)
 
 
 # ############# Heatmap ############# #
@@ -244,22 +265,26 @@ class Heatmap(UpdatableFigureWidget):
     """Draw a heatmap of a dataframe."""
 
     def __init__(self,
-                 df=None,
+                 data=None,
+                 horizontal=False,
                  heatmap_kwargs={},
                  **layout_kwargs):
+        self._horizontal = horizontal
         self._heatmap_kwargs = heatmap_kwargs
 
         super().__init__()
         self.update_layout(**layout_kwargs)
-        if df is not None:
-            self.update_data(df)
+        if data is not None:
+            self.update_data(data)
 
-    def update_data(self, df):
+    def update_data(self, data):
         # Checks and preprocessing
-        check_type(df, pd.DataFrame)
+        check_type(data, (pd.Series, pd.DataFrame))
+        df = to_2d(data)
 
         with self.batch_update():
-            if len(self.data) != len(df.columns):
+            if len(self.data) == 0:
+                # Create new traces
                 self.data = []
                 heatmap = go.Heatmap(
                     hoverongaps=False,
@@ -267,16 +292,25 @@ class Heatmap(UpdatableFigureWidget):
                 )
                 heatmap.update(**self._heatmap_kwargs)
                 self.add_trace(heatmap)
+
+            # Update traces
             heatmap = self.data[0]
-            heatmap.x = df.columns
-            heatmap.y = df.index
-            heatmap.z = df.values
+            if self._horizontal:
+                heatmap.y = df.columns
+                heatmap.x = df.index
+                heatmap.z = df.values.transpose()
+            else:
+                heatmap.x = df.columns
+                heatmap.y = df.index
+                heatmap.z = df.values
+            
 
 
-@pd.api.extensions.register_dataframe_accessor("heatmap")
+@register_dataframe_accessor('heatmap')
+@register_series_accessor('heatmap')
 class Heatmap_Accessor():
     def __init__(self, obj):
-        self._obj = obj
+        self._obj = obj._obj  # access pandas object
 
     def __call__(self, **kwargs):
-        return Heatmap(df=self._obj, **kwargs)
+        return Heatmap(data=self._obj, **kwargs)

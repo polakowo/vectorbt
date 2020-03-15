@@ -34,12 +34,12 @@ fast_windows, slow_windows = np.asarray(list(comb)).transpose()
 dmac = vbt.DMAC(price, fast_windows, slow_windows)
 entries, exits = dmac.crossover_signals()
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
-    investment=investment, commission=commission, new_columns=entries.columns)
+    investment=investment, commission=commission, bc_columns=entries.columns)
 performance = portfolio.total_net_profit
 
 # Plot heatmap
-tnp_df = performance.cols.unstack_to_df(symmetric=True)
-tnp_df.heatmap(width=600, height=450).show_png()
+tnp_df = performance.vbt.unstack_to_df(symmetric=True)
+tnp_df.vbt.heatmap(width=600, height=450).show_png()
 ```
 
 ![msft_heatmap.png](msft_heatmap.png)

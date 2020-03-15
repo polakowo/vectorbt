@@ -29,6 +29,11 @@ def check_dtype(arg, dtype):
             raise ValueError(f"Data type must be {dtype}")
 
 
+def check_same_type(arg1, arg2):
+    if type(arg1) != type(arg2):
+        raise ValueError(f"Must have the same type")
+
+
 def check_same_dtype(arg1, arg2):
     if isinstance(arg1, pd.DataFrame) and not isinstance(arg2, pd.DataFrame):
         if (arg1.dtypes == arg2.dtype).all():
@@ -75,23 +80,38 @@ def check_same_shape(arg1, arg2, along_axis=None):
 
 
 def check_same_index(arg1, arg2):
-    if (arg1.index != arg2.index).any():
-        raise ValueError(f"Must have the same index")
+    passed = arg1.index == arg2.index
+    if isinstance(passed, bool):
+        if passed:
+            return
+    else:
+        if passed.all():
+            return
+    raise ValueError(f"Must have the same index")
 
 
 def check_same_columns(arg1, arg2):
-    if (arg1.columns != arg2.columns).any():
-        raise ValueError(f"Must have the same columns")
+    passed = arg1.columns == arg2.columns
+    if isinstance(passed, bool):
+        if passed:
+            return
+    else:
+        if passed.all():
+            return
+    raise ValueError(f"Must have the same columns")
 
 
-def check_same_meta(arg1, arg2):
-    check_type(arg1, type(arg2))
+def check_same_meta(arg1, arg2, check_dtype=True):
+    check_same_type(arg1, arg2)
     check_same_shape(arg1, arg2)
     if isinstance(arg1, (pd.Series, pd.DataFrame)):
         check_same_index(arg1, arg2)
         if isinstance(arg1, pd.DataFrame):
             check_same_columns(arg1, arg2)
-    check_same_dtype(arg1, arg2)
+        else:
+            check_same_columns(to_2d(arg1), to_2d(arg2))
+    if check_dtype:
+        check_same_dtype(arg1, arg2)
 
 
 def check_same(arg1, arg2):
@@ -101,7 +121,7 @@ def check_same(arg1, arg2):
     else:
         if np.array_equal(arg1, arg2):
             return
-    raise ValueError(f"Must have the same types and values")
+    raise ValueError(f"Must have the same type and values")
 
 
 # ############# Broadcasting ############# #
@@ -149,25 +169,21 @@ def _broadcast_index(old_index, new_size):
         return None
 
 
-def _wrap_broadcasted(old_arg, new_arg, is_1d=True, new_columns=None):
+def _wrap_broadcasted(old_arg, new_arg, new_columns=None):
     """Transform newly broadcasted array to match the type of the original object."""
     if old_arg.shape == new_arg.shape:
         return old_arg
-    if is_1d:
-        if isinstance(old_arg, pd.Series):
-            # Index changed from 1 to new_arg.shape[0]
-            raise ValueError("Index broadcasting is not supported")
     if isinstance(old_arg, pd.DataFrame):
-        if new_arg.shape[0] != old_arg.shape[0]:
-            # Index changed from 1 to new_arg.shape[0]
-            raise ValueError("Index broadcasting is not supported")
-        # Columns changed from 1 to new_arg.shape[1]
         return pd.DataFrame(new_arg, index=old_arg.index, columns=new_columns)
     return new_arg
 
 
-def broadcast_to(arg1, arg2, new_columns=None):
+def broadcast_to(arg1, arg2):
     """Bring the first argument to the shape of the second argument."""
+    # All pandas objects must have the same index
+    if isinstance(arg1, (pd.Series, pd.DataFrame)) and isinstance(arg2, (pd.Series, pd.DataFrame)):
+        check_same_index(arg1, arg2)
+
     is_1d = True
     if not isinstance(arg1, (np.ndarray, pd.Series, pd.DataFrame)):
         arg1 = np.asarray(arg1)
@@ -175,15 +191,25 @@ def broadcast_to(arg1, arg2, new_columns=None):
         arg2 = np.asarray(arg2)
     if arg2.ndim > 1:
         is_1d = False
+    new_columns = None
     if not is_1d:
         if isinstance(arg1, pd.Series):
             arg1 = arg1.to_frame()
+        if isinstance(arg1, pd.DataFrame) and isinstance(arg2, pd.DataFrame):
+            if len(arg2.columns) > len(arg1.columns):
+                new_columns = arg2.columns
     arg1_new = np.broadcast_to(arg1, arg2.shape, subok=True).copy()
-    return _wrap_broadcasted(arg1, arg1_new, is_1d=is_1d, new_columns=new_columns)
+    return _wrap_broadcasted(arg1, arg1_new, new_columns=new_columns)
 
 
-def broadcast(*args, new_columns=None):
-    """Bring arguments to the same shape."""
+def broadcast(*args):
+    """Bring multiple arguments to the same shape."""
+    # All pandas objects must have the same index
+    pd_args = [arg for arg in args if isinstance(arg, (pd.Series, pd.DataFrame))]
+    if len(pd_args) > 1:
+        for i in range(1, len(pd_args)):
+            check_same_index(pd_args[i-1], pd_args[i])
+
     is_1d = True
     args = list(args)
     # Convert to np.ndarray object if not numpy or pandas
@@ -196,17 +222,23 @@ def broadcast(*args, new_columns=None):
             is_1d = False
             break
     # If in 2d mode, convert all pd.Series objects to pd.DataFrame
+    new_columns = None
     if not is_1d:
         for i in range(len(args)):
             if isinstance(args[i], pd.Series):
                 args[i] = args[i].to_frame()
+            if isinstance(args[i], pd.DataFrame):
+                if new_columns is None:
+                    new_columns = args[i].columns
+                if len(args[i].columns) > len(new_columns):
+                    new_columns = args[i].columns
     # Perform broadcasting operation
     new_args = np.broadcast_arrays(*args, subok=True)
     # Bring arrays to their old types (e.g. array -> pandas)
     for i in range(len(new_args)):
         old_arg = args[i].copy()
         new_arg = new_args[i].copy()
-        args[i] = _wrap_broadcasted(old_arg, new_arg, is_1d=is_1d, new_columns=new_columns)
+        args[i] = _wrap_broadcasted(old_arg, new_arg, new_columns=new_columns)
     return args
 
 
@@ -227,6 +259,19 @@ def broadcast_to_array_of(arg1, arg2):
         return arg1.copy()  # deprecation warning
     return None
 
+def broadcast_and_combine(*args, combine_func=None):
+    """Broadcast multiple arguments and apply a combiner on each successive pair."""
+    check_not_none(combine_func)
+
+    broadcasted = broadcast(*args)
+    result = None
+    for i in range(1, len(broadcasted)):
+        if result is None:
+            result = combine_func(broadcasted[i-1], broadcasted[i])
+        else:
+            result = combine_func(result, broadcasted[i])
+    return result
+
 # ############# Class decorators ############# #
 
 
@@ -243,11 +288,12 @@ def add_safe_nb_methods(*nb_funcs):
             default_kwargs = get_default_args(nb_func)
 
             def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
-                if '_1d_nb' in nb_func.__name__:
+                if '_1d' in nb_func.__name__:
                     return self.wrap_array(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
                 else:
+                    # We work natively on 2d arrays
                     return self.wrap_array(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
-            setattr(cls, nb_func.__name__.replace('_1d_nb', '').replace('_2d_nb', ''), array_operation)
+            setattr(cls, nb_func.__name__.replace('_1d', '').replace('_nb', ''), array_operation)
         return cls
     return wrapper
 
@@ -326,9 +372,29 @@ def cached_property(func):
 
 # ############# Custom accessors ############# #
 
-class Arr_Accessor():
+
+class Base_Accessor():
     def __init__(self, obj):
-        self._obj = obj
+        self._obj = obj._obj  # access pandas object
+        self._validate(self._obj)
+
+    dtype = None
+
+    @classmethod
+    def _validate(cls, obj):
+        pass
+
+    def validate(self):
+        # Don't override it, just call it for the object to be instantiated
+        pass
+
+    @classmethod
+    def empty(cls, *args, **kwargs):
+        raise NotImplementedError
+
+    @classmethod
+    def empty_like(cls, *args, **kwargs):
+        raise NotImplementedError
 
     def to_1d_array(self):
         return to_1d(self._obj.values)
@@ -339,38 +405,20 @@ class Arr_Accessor():
     def wrap_array(self, *args, **kwargs):
         raise NotImplementedError
 
+    def tile(self, n, new_columns=None):
+        return self.wrap_array(np.tile(self.to_2d_array(), (1, n)), columns=new_columns)
 
-@pd.api.extensions.register_dataframe_accessor("arr")
-class Arr_DFAccessor(Arr_Accessor):
-    def wrap_array(self, a, index=None, columns=None):
-        if index is None:
-            index = self._obj.index
-        if columns is None:
-            columns = self._obj.columns
-        # dtype should be set on array level
-        return pd.DataFrame(a, index=index, columns=columns)
+    def broadcast_to(self, other):
+        return broadcast_to(self._obj, other)
 
+    def broadcast(self, *others):
+        return broadcast(self._obj, *others)
 
-@pd.api.extensions.register_series_accessor("arr")
-class Arr_SRAccessor(Arr_Accessor):
-    def wrap_array(self, a, index=None, columns=None, name=None):
-        if index is None:
-            index = self._obj.index
-        if name is None:
-            name = self._obj.name
-        # dtype should be set on array level
-        if a.ndim == 1:
-            return pd.Series(a, index=index, name=name)
-        if a.shape[1] == 1:
-            return pd.Series(a[:, 0], index=index, name=name)
-        else:
-            return pd.DataFrame(a, index=index, columns=columns)
+    def broadcast_and_combine(self, *others, combine_func=None):
+        return broadcast_and_combine(self._obj, *others, combine_func=combine_func)
 
-
-@pd.api.extensions.register_dataframe_accessor("cols")
-class Cols_DFAccessor():
-    def __init__(self, obj):
-        self._obj = obj
+    def plot(self, *args, **kwargs):
+        raise NotImplementedError
 
     @classmethod
     def index_from_params(cls, params, name=None):
@@ -442,15 +490,15 @@ class Cols_DFAccessor():
         return cls.stack_indexes(index1, index2)
 
     def stack_columns(self, columns):
+        """Stack columns on top of object's columns."""
         # Checks and preprocessing
         df = to_2d(self._obj)
         check_type(columns, pd.Index)
 
         return self.stack_indexes(columns, df.columns)
 
-
     def combine_columns(self, columns):
-        """Create a cartesian product of columns."""
+        """Stack columns on top of object's columns using a cartesian product."""
         # Checks and preprocessing
         df = to_2d(self._obj)
         check_type(columns, pd.Index)
@@ -462,78 +510,55 @@ class Cols_DFAccessor():
         else:
             return self.combine_indexes(columns, df.columns)
 
-
-@pd.api.extensions.register_series_accessor("cols")
-class Cols_SRAccessor(Cols_DFAccessor):
     def unstack_to_array(self):
-        """Reshape series based on multi-index into a multi-dimensional array."""
+        """Reshape object based on multi-index into a multi-dimensional array."""
+        # Checks and preprocessing
+        sr = to_1d(self._obj)
+
         vals_idx_list = []
-        for i in range(len(self._obj.index.levels)):
-            vals = self._obj.index.get_level_values(i).to_numpy()
+        for i in range(len(sr.index.levels)):
+            vals = sr.index.get_level_values(i).to_numpy()
             unique_vals = np.unique(vals)
             idx_map = dict(zip(unique_vals, range(len(unique_vals))))
             vals_idx = list(map(lambda x: idx_map[x], vals))
             vals_idx_list.append(vals_idx)
 
-        a = np.full(list(map(len, self._obj.index.levels)), np.nan)
-        a[tuple(zip(vals_idx_list))] = self._obj.values
+        a = np.full(list(map(len, sr.index.levels)), np.nan)
+        a[tuple(zip(vals_idx_list))] = sr.values
         return a
 
+    def make_symmetric(self):
+        """Make object symmetric across the diagonal."""
+        # Checks and preprocessing
+        df = to_2d(self._obj)
+
+        unique_index = np.unique(np.concatenate((df.columns, df.index)))
+        df_out = pd.DataFrame(index=unique_index, columns=unique_index)
+        df_out.loc[:, :] = df
+        df_out[df_out.isnull()] = df.transpose()
+        return df_out
+
     def unstack_to_df(self, symmetric=False):
-        """Reshape series based on multi-index into dataframe."""
-        vals0 = self._obj.index.get_level_values(0).to_numpy()
-        vals1 = self._obj.index.get_level_values(1).to_numpy()
+        """Reshape object based on multi-index into dataframe."""
+        # Checks and preprocessing
+        sr = to_1d(self._obj)
+
+        index = sr.index.levels[0]
+        columns = sr.index.levels[1]
+        df = pd.DataFrame(self.unstack_to_array(), index=index, columns=columns)
         if symmetric:
-            unique_vals = np.unique(np.concatenate((vals0, vals1)))
-            idx_map = dict(zip(unique_vals, range(len(unique_vals))))
-            vals0_idx = list(map(lambda x: idx_map[x], vals0))
-            vals1_idx = list(map(lambda x: idx_map[x], vals1))
-
-            df = pd.DataFrame(index=unique_vals, columns=unique_vals)
-            df.values[vals0_idx, vals1_idx] = self._obj.values
-            df.values[vals1_idx, vals0_idx] = self._obj.values
-            return df
-        else:
-            a = self.unstack_to_array()
-            df = pd.DataFrame(a, index=self._obj.index.levels[0], columns=self._obj.index.levels[1])
-            return df
+            df = df.vbt.make_symmetric()
+        return df
 
 
-class Base_Accessor():
-    def __init__(self, obj):
-        self._obj = obj
-        self._validate(obj)
-
-    dtype = None
-
-    @classmethod
-    def _validate(cls, obj):
-        pass
-
-    def validate(self):
-        # Don't override it, just call it for the object to be instantiated
-        pass
-
-    @classmethod
-    def generate_empty(cls, *args, **kwargs):
-        raise NotImplementedError
-
-    @classmethod
-    def generate_empty_like(cls, *args, **kwargs):
-        raise NotImplementedError
-
-    def plot(self, *args, **kwargs):
-        raise NotImplementedError
-
-
-class Base_DFAccessor(Base_Accessor, Arr_DFAccessor):
+class Base_DFAccessor(Base_Accessor):
 
     @classmethod
     def _validate(cls, obj):
         check_type(obj, pd.DataFrame)
 
     @classmethod
-    def generate_empty(cls, shape, fill_value=np.nan, index=None, columns=None):
+    def empty(cls, shape, fill_value=np.nan, index=None, columns=None):
         return pd.DataFrame(
             np.full(shape, fill_value),
             index=index,
@@ -541,17 +566,25 @@ class Base_DFAccessor(Base_Accessor, Arr_DFAccessor):
             dtype=cls.dtype)
 
     @classmethod
-    def generate_empty_like(cls, df, fill_value=np.nan):
+    def empty_like(cls, df, fill_value=np.nan):
         cls._validate(df)
 
-        return cls.generate_empty(
+        return cls.empty(
             df.shape,
             fill_value=fill_value,
             index=df.index,
             columns=df.columns)
 
+    def wrap_array(self, a, index=None, columns=None):
+        if index is None:
+            index = self._obj.index
+        if columns is None:
+            columns = self._obj.columns
+        # dtype should be set on array level
+        return pd.DataFrame(a, index=index, columns=columns)
 
-class Base_SRAccessor(Base_Accessor, Arr_SRAccessor):
+
+class Base_SRAccessor(Base_Accessor):
     # series is just a dataframe with one column
     # this way we don't have to define our custom functions for working with 1d data
     @classmethod
@@ -559,7 +592,7 @@ class Base_SRAccessor(Base_Accessor, Arr_SRAccessor):
         check_type(obj, pd.Series)
 
     @classmethod
-    def generate_empty(cls, size, fill_value=np.nan, index=None, name=None):
+    def empty(cls, size, fill_value=np.nan, index=None, name=None):
         return pd.Series(
             np.full(size, fill_value),
             index=index,
@@ -567,11 +600,24 @@ class Base_SRAccessor(Base_Accessor, Arr_SRAccessor):
             dtype=cls.dtype)
 
     @classmethod
-    def generate_empty_like(cls, sr, fill_value=np.nan):
+    def empty_like(cls, sr, fill_value=np.nan):
         cls._validate(sr)
 
-        return cls.generate_empty(
+        return cls.empty(
             sr.shape,
             fill_value=fill_value,
             index=sr.index,
             name=sr.name)
+
+    def wrap_array(self, a, index=None, columns=None, name=None):
+        if index is None:
+            index = self._obj.index
+        if name is None:
+            name = self._obj.name
+        # dtype should be set on array level
+        if a.ndim == 1:
+            return pd.Series(a, index=index, name=name)
+        if a.shape[1] == 1:
+            return pd.Series(a[:, 0], index=index, name=name)
+        else:
+            return pd.DataFrame(a, index=index, columns=columns)

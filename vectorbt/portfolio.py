@@ -2,10 +2,12 @@ import numpy as np
 import pandas as pd
 from numba import njit, b1, i1, i8, f8
 from numba.types import UniTuple
-from vectorbt.timeseries import pct_change_2d_nb, fillna_2d_nb, expanding_max_2d_nb, diff_2d_nb
-from vectorbt.utils import *
 import plotly.graph_objects as go
+
+from vectorbt.utils import *
+from vectorbt.accessors import *
 from vectorbt.widgets import FigureWidget
+from vectorbt.timeseries import pct_change_nb, fillna_nb, expanding_max_nb, diff_nb
 
 __all__ = ['Portfolio']
 
@@ -112,7 +114,7 @@ def detect_order_accumulation_1d_nb(trades):
 
 
 @njit(b1[:](f8[:, :]), cache=True)
-def detect_order_accumulation_2d_nb(trades):
+def detect_order_accumulation_nb(trades):
     """Detect accumulation of orders, that is, position is being increased/decreased gradually.
 
     When it happens, it's not easy to calculate P/L of a position anymore."""
@@ -125,7 +127,7 @@ def detect_order_accumulation_2d_nb(trades):
 @njit
 def apply_on_positions(trades, apply_func, *args):
     """Apply a function on each position."""
-    if detect_order_accumulation_2d_nb(trades).any():
+    if detect_order_accumulation_nb(trades).any():
         raise ValueError("Order accumulation detected. Cannot calculate performance per position.")
     out = np.full_like(trades, np.nan)
 
@@ -161,13 +163,15 @@ def position_returns_nb(trades, equity):
 
 # ############# Custom accessors ############# #
 
+
 def indexing_func(obj, getitem_func):
     return obj.__class__(
-            getitem_func(obj.ts),
-            getitem_func(obj.cash),
-            getitem_func(obj.shares),
-            obj.investment
-        )
+        getitem_func(obj.ts),
+        getitem_func(obj.cash),
+        getitem_func(obj.shares),
+        obj.investment
+    )
+
 
 @add_indexing_methods(indexing_func)
 class Portfolio():
@@ -178,9 +182,9 @@ class Portfolio():
         check_type(cash, (pd.Series, pd.DataFrame))
         check_type(shares, (pd.Series, pd.DataFrame))
 
-        ts.timeseries.validate()
-        cash.timeseries.validate()
-        shares.timeseries.validate()
+        ts.vbt.timeseries.validate()
+        cash.vbt.timeseries.validate()
+        shares.vbt.timeseries.validate()
 
         check_same_meta(ts, cash)
         check_same_meta(ts, shares)
@@ -223,7 +227,7 @@ class Portfolio():
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=1., slippage=0., commission=0., new_columns=None):
+    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=1., slippage=0., commission=0.):
         """Build portfolio based on entry and exit signals and the corresponding volume.
 
         Set volume to the number of shares to buy/sell.
@@ -234,38 +238,41 @@ class Portfolio():
         check_type(entries, (pd.Series, pd.DataFrame))
         check_type(exits, (pd.Series, pd.DataFrame))
 
-        ts.timeseries.validate()
-        entries.signals.validate()
-        exits.signals.validate()
+        ts.vbt.timeseries.validate()
+        entries.vbt.signals.validate()
+        exits.vbt.signals.validate()
 
-        ts, entries, exits = broadcast(ts, entries, exits, new_columns=new_columns)
+        check_same_index(ts, entries)
+        check_same_index(ts, exits)
+
+        ts, entries, exits = broadcast(ts, entries, exits)
 
         volume = broadcast_to(volume, ts)
         slippage = broadcast_to(slippage, ts)
         commission = broadcast_to(commission, ts)
 
-        volume = volume.astype(np.float64)
-        slippage = slippage.astype(np.float64)
-        commission = commission.astype(np.float64)
+        volume = to_2d(np.asarray(volume).astype(np.float64))
+        slippage = to_2d(np.asarray(slippage).astype(np.float64))
+        commission = to_2d(np.asarray(commission).astype(np.float64))
         investment = float(investment)
 
         cash, shares = portfolio_from_signals_np(
-            ts.arr.to_2d_array(),
+            ts.vbt.to_2d_array(),
             investment,
-            to_2d(slippage),
-            to_2d(commission),
-            entries.arr.to_2d_array(),
-            exits.arr.to_2d_array(),
-            to_2d(volume),
+            slippage,
+            commission,
+            entries.vbt.to_2d_array(),
+            exits.vbt.to_2d_array(),
+            volume,
             accumulate)
 
-        cash = ts.arr.wrap_array(cash)
-        shares = ts.arr.wrap_array(shares)
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
 
         return cls(ts, cash, shares, investment)
 
     @classmethod
-    def from_orders(cls, ts, orders, is_target=False, investment=1., slippage=0., commission=0., new_columns=None):
+    def from_orders(cls, ts, orders, is_target=False, investment=1., slippage=0., commission=0.):
         """Build portfolio based on orders.
 
         Set an orders element to positive/negative number - a number of shares to buy/sell.
@@ -273,28 +280,30 @@ class Portfolio():
         check_type(ts, (pd.Series, pd.DataFrame))
         check_type(orders, (pd.Series, pd.DataFrame))
 
-        ts.timeseries.validate()
-        orders.timeseries.validate()
+        ts.vbt.timeseries.validate()
+        orders.vbt.timeseries.validate()
 
-        ts, orders = broadcast(ts, orders, new_columns=new_columns)
+        check_same_index(ts, orders)
+
+        ts, orders = broadcast(ts, orders)
 
         slippage = broadcast_to(slippage, ts)
         commission = broadcast_to(commission, ts)
 
-        slippage = slippage.astype(np.float64)
-        commission = commission.astype(np.float64)
+        slippage = to_2d(np.asarray(slippage).astype(np.float64))
+        commission = to_2d(np.asarray(commission).astype(np.float64))
         investment = float(investment)
 
         cash, shares = portfolio_from_orders_np(
-            ts.arr.to_2d_array(),
+            ts.vbt.to_2d_array(),
             investment,
-            to_2d(slippage),
-            to_2d(commission),
-            orders.arr.to_2d_array(),
+            slippage,
+            commission,
+            orders.vbt.to_2d_array(),
             is_target)
 
-        cash = ts.arr.wrap_array(cash)
-        shares = ts.arr.wrap_array(shares)
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
 
         return cls(ts, cash, shares, investment)
 
@@ -303,25 +312,25 @@ class Portfolio():
         """Build portfolio based on order function."""
         check_type(ts, (pd.Series, pd.DataFrame))
 
-        ts.timeseries.validate()
+        ts.vbt.timeseries.validate()
 
         slippage = broadcast_to(slippage, ts)
         commission = broadcast_to(commission, ts)
 
-        slippage = slippage.astype(np.float64)
-        commission = commission.astype(np.float64)
+        slippage = to_2d(np.asarray(slippage).astype(np.float64))
+        commission = to_2d(np.asarray(commission).astype(np.float64))
         investment = float(investment)
 
         cash, shares = portfolio_np(
-            ts.arr.to_2d_array(),
+            ts.vbt.to_2d_array(),
             investment,
-            to_2d(slippage),
-            to_2d(commission),
+            slippage,
+            commission,
             order_func_np,
             *args)
 
-        cash = ts.arr.wrap_array(cash)
-        shares = ts.arr.wrap_array(shares)
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
 
         return cls(ts, cash, shares, investment)
 
@@ -337,28 +346,28 @@ class Portfolio():
 
     @cached_property
     def returns(self):
-        return self.ts.arr.wrap_array(pct_change_2d_nb(self.equity.arr.to_2d_array()))
+        return self.ts.vbt.wrap_array(pct_change_nb(self.equity.vbt.to_2d_array()))
 
     @cached_property
     def drawdown(self):
-        return 1 - self.equity / self.ts.arr.wrap_array(expanding_max_2d_nb(self.equity.arr.to_2d_array()))
+        return 1 - self.equity / self.ts.vbt.wrap_array(expanding_max_nb(self.equity.vbt.to_2d_array()))
 
     @cached_property
     def trades(self):
-        shares = self.shares.arr.to_2d_array()
-        trades = fillna_2d_nb(diff_2d_nb(shares), 0)
+        shares = self.shares.vbt.to_2d_array()
+        trades = fillna_nb(diff_nb(shares), 0)
         trades[0, :] = shares[0, :]
-        return self.ts.arr.wrap_array(trades)
+        return self.ts.vbt.wrap_array(trades)
 
     @cached_property
     def position_profits(self):
-        position_profits = position_profits_nb(self.trades.arr.to_2d_array(), self.equity.arr.to_2d_array())
-        return self.ts.arr.wrap_array(position_profits)
+        position_profits = position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_profits)
 
     @cached_property
     def position_returns(self):
-        position_returns = position_returns_nb(self.trades.arr.to_2d_array(), self.equity.arr.to_2d_array())
-        return self.ts.arr.wrap_array(position_returns)
+        position_returns = position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_returns)
 
     # ############# Trade P/L properties ############# #
 
@@ -377,22 +386,42 @@ class Portfolio():
     @cached_property
     def sum_win(self):
         """Sum of wins."""
-        return self.position_profits[self.win_mask].sum()
+        sum_win = self.position_profits[self.win_mask].sum()
+        if isinstance(sum_win, pd.Series):
+            return sum_win.fillna(0)
+        if np.isnan(sum_win):
+            return 0
+        return sum_win
 
     @cached_property
     def sum_loss(self):
         """Sum of losses (always positive)."""
-        return np.abs(self.position_profits[self.loss_mask].sum())
+        sum_loss = np.abs(self.position_profits[self.loss_mask].sum())
+        if isinstance(sum_loss, pd.Series):
+            return sum_loss.fillna(0)
+        if np.isnan(sum_loss):
+            return 0
+        return sum_loss
 
     @cached_property
     def avg_win(self):
         """Average win."""
-        return self.position_profits[self.win_mask].mean()
+        avg_win = self.position_profits[self.win_mask].mean()
+        if isinstance(avg_win, pd.Series):
+            return avg_win.fillna(0)
+        if np.isnan(avg_win):
+            return 0
+        return avg_win
 
     @cached_property
     def avg_loss(self):
         """Average loss (always positive)."""
-        return np.abs(self.position_profits[self.win_mask].mean())
+        avg_loss = np.abs(self.position_profits[self.loss_mask].mean())
+        if isinstance(avg_loss, pd.Series):
+            return avg_loss.fillna(0)
+        if np.isnan(avg_loss):
+            return 0
+        return avg_loss
 
     @cached_property
     def win_prob(self):
@@ -446,7 +475,7 @@ class Portfolio():
         buy_mask = self.trades > 0
 
         # Plot TimeSeries
-        fig = self.ts.timeseries.plot(fig=fig, **ts_kwargs)
+        fig = self.ts.vbt.timeseries.plot(fig=fig, **ts_kwargs)
 
         # Plot markets
         buy_scatter = go.Scatter(

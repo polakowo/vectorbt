@@ -3,16 +3,19 @@ import numpy as np
 from vectorbt.widgets import FigureWidget
 import plotly.graph_objects as go
 
+from vectorbt.utils import *
+from vectorbt.accessors import *
+
 __all__ = []
 
 # ############# Custom pd.DataFrame accessor ############# #
 
 
-@pd.api.extensions.register_dataframe_accessor("ohlcv")
+@register_dataframe_accessor('ohlcv')
 class OHLCV_DFAccessor:
     def __init__(self, obj):
-        self._validate(obj)
-        self._obj = obj
+        self._obj = obj._obj  # access pandas object
+        self._validate(self._obj)
 
     @staticmethod
     def _validate(obj):
