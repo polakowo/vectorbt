@@ -46,7 +46,7 @@ tnp_df.vbt.heatmap(width=600, height=450).show_png()
 
 ## How it works?
 
-vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries. It takes advantage of the vectorized nature of time series data such as price and signals, and implements Numba-compiled functions for fast traversing vectors along index and column axes. In contrast to most other vectorized libraries where one matrix (for example holding OHLCV data) means one backtesting operation, vectorbt treats each column of a matrix as a distinct feature that should be tested. This way, user can construct matrices with millions of columns and calculate performance for each column in a highly efficient manner due to vectorbt functions optimized for working with 2-dimensional data. This, for example, is the magic behind backtesting thousands of window combinations at once.
+vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries. It takes advantage of the vectorized nature of time series data such as price and signals, and implements Numba-compiled functions for traversing matrices along their index and column axes. In contrast to most other vectorized libraries where one matrix (for example holding OHLCV data) means one backtesting operation, vectorbt treats each column of a matrix as a distinct feature. This way, user can construct matrices with millions of columns and calculate performance for each column in a highly efficient manner, thanks to vectorbt functions that are optimized for working with 2-dimensional data. This, for example, is the magic behind backtesting thousands of window combinations at once.
 
 ### Efficiency
 
@@ -65,7 +65,7 @@ a_df = pd.DataFrame(a)
 266 ms ± 7.26 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
 
-Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline and offers an arsenal of advanced Numba-compiled functions ready to be used in a user-defined code. Pandas is mainly used for wrapping the resulted NumPy arrays and for high-level operations that are outside of the pipeline, require advanced indexing, and just for convenience.
+Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline and offers an arsenal of advanced Numba-compiled functions ready to be used in a user-defined code. Pandas is mainly used for wrapping the resulted NumPy arrays and for high-level operations that are outside of the pipeline, require advanced indexing, or just for convenience.
 
 ### Usability
 
