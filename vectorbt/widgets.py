@@ -1,27 +1,11 @@
 import numpy as np
 import plotly.graph_objects as go
-import plotly.io as pio
 import matplotlib.pyplot as plt
 
 from vectorbt.utils import *
 from vectorbt.accessors import *
 
 __all__ = ['Gauge', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
-
-plotly_theme = pio.templates["plotly"]
-seaborn_theme = pio.templates["seaborn"]
-
-# Modern Plotly theme with Seaborn colors
-
-plotly_theme['data']['contour'][0]['colorscale'] = seaborn_theme['data']['contour'][0]['colorscale']
-plotly_theme['data']['heatmap'][0]['colorscale'] = seaborn_theme['data']['heatmap'][0]['colorscale']
-plotly_theme['data']['heatmapgl'][0]['colorscale'] = seaborn_theme['data']['heatmapgl'][0]['colorscale']
-plotly_theme['data']['histogram2d'][0]['colorscale'] = seaborn_theme['data']['histogram2d'][0]['colorscale']
-plotly_theme['data']['histogram2dcontour'][0]['colorscale'] = seaborn_theme['data']['histogram2dcontour'][0]['colorscale']
-plotly_theme['data']['surface'][0]['colorscale'] = seaborn_theme['data']['surface'][0]['colorscale']
-
-plotly_theme['layout']['colorscale'] = seaborn_theme['layout']['colorscale']
-plotly_theme['layout']['colorway'] = seaborn_theme['layout']['colorway']
 
 # You can change this from code using vbt.widgets.default_layout[key] = value
 default_layout = dict(
@@ -33,7 +17,10 @@ default_layout = dict(
         t=30
     ),
     hovermode='closest',
-    template=plotly_theme
+    colorway=[
+        "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
+        "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+    ]
 )
 
 
