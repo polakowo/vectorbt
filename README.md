@@ -33,8 +33,7 @@ fast_windows, slow_windows = np.asarray(list(comb)).transpose()
 # Calculate the performance of the strategy
 dmac = vbt.DMAC(price, fast_windows, slow_windows)
 entries, exits = dmac.crossover_signals()
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
-    investment=investment, commission=commission, bc_columns=entries.columns)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, investment=investment, commission=commission)
 performance = portfolio.total_net_profit
 
 # Plot heatmap
