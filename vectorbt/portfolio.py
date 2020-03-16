@@ -161,6 +161,44 @@ def position_returns_nb(trades, equity):
     """Calculate returns per trade."""
     return apply_on_positions(trades, _returns_nb, equity)
 
+
+@njit
+def apply_on_position_profits_nb(position_profits, apply_func, mask_func):
+    applied = np.zeros(position_profits.shape[1])
+
+    for col in range(position_profits.shape[1]):
+        mask = mask_func(position_profits[:, col])
+        if mask.any():
+            masked = position_profits[:, col][mask]
+            applied[col] = apply_func(masked)
+    return applied
+
+
+nanmean_nb = njit(lambda x: np.nanmean(x))
+nansum_nb = njit(lambda x: np.nansum(x))
+win_mask_nb = njit(lambda x: x > 0)
+loss_mask_nb = njit(lambda x: x < 0)
+
+
+@njit(f8[:](f8[:, :]))
+def sum_win_nb(position_profits):
+    return apply_on_position_profits_nb(position_profits, nansum_nb, win_mask_nb)
+
+
+@njit(f8[:](f8[:, :]))
+def sum_loss_nb(position_profits):
+    return np.abs(apply_on_position_profits_nb(position_profits, nansum_nb, loss_mask_nb))
+
+
+@njit(f8[:](f8[:, :]))
+def avg_win_nb(position_profits):
+    return apply_on_position_profits_nb(position_profits, nanmean_nb, win_mask_nb)
+
+
+@njit(f8[:](f8[:, :]))
+def avg_loss_nb(position_profits):
+    return np.abs(apply_on_position_profits_nb(position_profits, nanmean_nb, loss_mask_nb))
+
 # ############# Custom accessors ############# #
 
 
@@ -338,11 +376,11 @@ class Portfolio():
 
     @cached_property
     def equity(self):
-        return self.cash + self.shares * self.ts
+        return self.ts.vbt.wrap_array(self.cash.values + self.shares.values * self.ts.values)
 
     @cached_property
     def equity_in_shares(self):
-        return self.equity / self.ts
+        return self.ts.vbt.wrap_array(self.equity.values / self.ts.values)
 
     @cached_property
     def returns(self):
@@ -350,7 +388,8 @@ class Portfolio():
 
     @cached_property
     def drawdown(self):
-        return 1 - self.equity / self.ts.vbt.wrap_array(expanding_max_nb(self.equity.vbt.to_2d_array()))
+        drawdown = 1 - self.equity.vbt.to_2d_array() / expanding_max_nb(self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(drawdown)
 
     @cached_property
     def trades(self):
@@ -369,59 +408,62 @@ class Portfolio():
         position_returns = position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_returns)
 
-    # ############# Trade P/L properties ############# #
-
     @cached_property
     def win_mask(self):
-        return self.position_profits > 0
+        position_profits = self.position_profits.values.copy()
+        position_profits[np.isnan(position_profits)] = 0 # avoid warnings
+        win_mask = position_profits > 0
+        return self.ts.vbt.wrap_array(win_mask)
 
     @cached_property
     def loss_mask(self):
-        return self.position_profits < 0
+        position_profits = self.position_profits.values.copy()
+        position_profits[np.isnan(position_profits)] = 0
+        loss_mask = position_profits < 0
+        return self.ts.vbt.wrap_array(loss_mask)
 
     @cached_property
     def position_mask(self):
-        return ~self.position_profits.isnull()
+        position_mask = ~np.isnan(self.position_profits.values)
+        return self.ts.vbt.wrap_array(position_mask)
+
+    # ############# Trade P/L properties ############# #
 
     @cached_property
     def sum_win(self):
         """Sum of wins."""
-        sum_win = self.position_profits[self.win_mask].sum()
-        if isinstance(sum_win, pd.Series):
-            return sum_win.fillna(0)
-        if np.isnan(sum_win):
-            return 0
-        return sum_win
+        sum_win = sum_win_nb(self.position_profits.vbt.to_2d_array())
+        if isinstance(self.position_profits, pd.DataFrame):
+            return pd.Series(sum_win, index=self.position_profits.columns)
+        else:
+            return sum_win[0]
 
     @cached_property
     def sum_loss(self):
         """Sum of losses (always positive)."""
-        sum_loss = np.abs(self.position_profits[self.loss_mask].sum())
-        if isinstance(sum_loss, pd.Series):
-            return sum_loss.fillna(0)
-        if np.isnan(sum_loss):
-            return 0
-        return sum_loss
+        sum_loss = sum_loss_nb(self.position_profits.vbt.to_2d_array())
+        if isinstance(self.position_profits, pd.DataFrame):
+            return pd.Series(sum_loss, index=self.position_profits.columns)
+        else:
+            return sum_loss[0]
 
     @cached_property
     def avg_win(self):
         """Average win."""
-        avg_win = self.position_profits[self.win_mask].mean()
-        if isinstance(avg_win, pd.Series):
-            return avg_win.fillna(0)
-        if np.isnan(avg_win):
-            return 0
-        return avg_win
+        avg_win = avg_win_nb(self.position_profits.vbt.to_2d_array())
+        if isinstance(self.position_profits, pd.DataFrame):
+            return pd.Series(avg_win, index=self.position_profits.columns)
+        else:
+            return avg_win[0]
 
     @cached_property
     def avg_loss(self):
         """Average loss (always positive)."""
-        avg_loss = np.abs(self.position_profits[self.loss_mask].mean())
-        if isinstance(avg_loss, pd.Series):
-            return avg_loss.fillna(0)
-        if np.isnan(avg_loss):
-            return 0
-        return avg_loss
+        avg_loss = avg_loss_nb(self.position_profits.vbt.to_2d_array())
+        if isinstance(self.position_profits, pd.DataFrame):
+            return pd.Series(avg_loss, index=self.position_profits.columns)
+        else:
+            return avg_loss[0]
 
     @cached_property
     def win_prob(self):

@@ -1,11 +1,40 @@
 import numpy as np
 import plotly.graph_objects as go
+import plotly.io as pio
 import matplotlib.pyplot as plt
 
 from vectorbt.utils import *
 from vectorbt.accessors import *
 
 __all__ = ['Gauge', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
+
+plotly_theme = pio.templates["plotly"]
+seaborn_theme = pio.templates["seaborn"]
+
+# Modern Plotly theme with Seaborn colors
+
+plotly_theme['data']['contour'][0]['colorscale'] = seaborn_theme['data']['contour'][0]['colorscale']
+plotly_theme['data']['heatmap'][0]['colorscale'] = seaborn_theme['data']['heatmap'][0]['colorscale']
+plotly_theme['data']['heatmapgl'][0]['colorscale'] = seaborn_theme['data']['heatmapgl'][0]['colorscale']
+plotly_theme['data']['histogram2d'][0]['colorscale'] = seaborn_theme['data']['histogram2d'][0]['colorscale']
+plotly_theme['data']['histogram2dcontour'][0]['colorscale'] = seaborn_theme['data']['histogram2dcontour'][0]['colorscale']
+plotly_theme['data']['surface'][0]['colorscale'] = seaborn_theme['data']['surface'][0]['colorscale']
+
+plotly_theme['layout']['colorscale'] = seaborn_theme['layout']['colorscale']
+plotly_theme['layout']['colorway'] = seaborn_theme['layout']['colorway']
+
+# You can change this from code using vbt.widgets.default_layout[key] = value
+default_layout = dict(
+    autosize=False,
+    width=700,
+    height=300,
+    margin=dict(
+        b=30,
+        t=30
+    ),
+    hovermode='closest',
+    template=plotly_theme
+)
 
 
 class FigureWidget(go.FigureWidget):
@@ -14,16 +43,7 @@ class FigureWidget(go.FigureWidget):
     def __init__(self):
         super().__init__()
         # Good default params
-        self.update_layout(
-            autosize=False,
-            width=700,
-            height=300,
-            margin=go.layout.Margin(
-                b=30,
-                t=30
-            ),
-            hovermode='closest'
-        )
+        self.update_layout(**default_layout)
         # You can then update them using update_layout
 
     def show_png(self):
@@ -184,7 +204,7 @@ class Scatter(UpdatableFigureWidget):
                     )
                     scatter.update(self._scatter_kwargs)
                     self.add_trace(scatter)
-            
+
             for i, scatter in enumerate(self.data):
                 # Update traces
                 scatter.x = df.index
@@ -303,7 +323,6 @@ class Heatmap(UpdatableFigureWidget):
                 heatmap.x = df.columns
                 heatmap.y = df.index
                 heatmap.z = df.values
-            
 
 
 @register_dataframe_accessor('heatmap')
