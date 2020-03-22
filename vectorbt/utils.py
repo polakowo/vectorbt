@@ -3,6 +3,28 @@ import pandas as pd
 from functools import wraps, reduce, update_wrapper
 from inspect import signature, Parameter
 import types
+import itertools
+from collections.abc import Iterable
+
+
+def is_series(arg):
+    return isinstance(arg, pd.Series)
+
+
+def is_frame(arg):
+    return isinstance(arg, pd.DataFrame)
+
+
+def is_pandas(arg):
+    return is_series(arg) or is_frame(arg)
+
+
+def is_array(arg):
+    return isinstance(arg, np.ndarray)
+
+
+def is_array_like(arg):
+    return is_pandas(arg) or is_array(arg)
 
 # ############# Tests ############# #
 
@@ -21,7 +43,7 @@ def check_type(arg, types):
 
 
 def check_dtype(arg, dtype):
-    if isinstance(arg, pd.DataFrame):
+    if is_frame(arg):
         if (arg.dtypes != dtype).any():
             raise ValueError(f"Data type must be {dtype} for all columns")
     else:
@@ -35,23 +57,29 @@ def check_same_type(arg1, arg2):
 
 
 def check_same_dtype(arg1, arg2):
-    if isinstance(arg1, pd.DataFrame) and not isinstance(arg2, pd.DataFrame):
-        if (arg1.dtypes == arg2.dtype).all():
-            return
-    elif not isinstance(arg1, pd.DataFrame) and isinstance(arg2, pd.DataFrame):
-        if (arg2.dtypes == arg1.dtype).all():
-            return
-    elif isinstance(arg1, pd.DataFrame) and isinstance(arg2, pd.DataFrame):
-        if (arg1.dtypes == arg2.dtypes).all():
-            return
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+    if is_frame(arg1):
+        dtypes1 = arg1.dtypes.to_numpy()
     else:
-        if arg1.dtype == arg2.dtype:
+        dtypes1 = np.asarray([arg1.dtype])
+    if is_frame(arg2):
+        dtypes2 = arg2.dtypes.to_numpy()
+    else:
+        dtypes2 = np.asarray([arg2.dtype])
+    if len(dtypes1) == len(dtypes2):
+        if (dtypes1 == dtypes2).all():
+            return
+    elif len(np.unique(dtypes1)) == 1 and len(np.unique(dtypes2)) == 1:
+        if (np.unique(dtypes1) == np.unique(dtypes2)).all():
             return
     raise ValueError(f"Data types do not match")
 
 
 def check_ndim(arg, ndims):
-    if not isinstance(arg, (np.ndarray, pd.Series, pd.DataFrame)):
+    if not is_array_like(arg):
         arg = np.asarray(arg)
     if isinstance(ndims, tuple):
         if arg.ndim not in ndims:
@@ -62,9 +90,9 @@ def check_ndim(arg, ndims):
 
 
 def check_same_shape(arg1, arg2, along_axis=None):
-    if not isinstance(arg1, (np.ndarray, pd.Series, pd.DataFrame)):
+    if not is_array_like(arg1):
         arg1 = np.asarray(arg1)
-    if not isinstance(arg2, (np.ndarray, pd.Series, pd.DataFrame)):
+    if not is_array_like(arg2):
         arg2 = np.asarray(arg2)
     if along_axis is None:
         if arg1.shape != arg2.shape:
@@ -104,9 +132,9 @@ def check_same_columns(arg1, arg2):
 def check_same_meta(arg1, arg2, check_dtype=True):
     check_same_type(arg1, arg2)
     check_same_shape(arg1, arg2)
-    if isinstance(arg1, (pd.Series, pd.DataFrame)):
+    if is_pandas(arg1):
         check_same_index(arg1, arg2)
-        if isinstance(arg1, pd.DataFrame):
+        if is_frame(arg1):
             check_same_columns(arg1, arg2)
         else:
             check_same_columns(to_2d(arg1), to_2d(arg2))
@@ -115,7 +143,7 @@ def check_same_meta(arg1, arg2, check_dtype=True):
 
 
 def check_same(arg1, arg2):
-    if isinstance(arg1, (pd.Series, pd.DataFrame)):
+    if is_pandas(arg1):
         if arg1.equals(arg2):
             return
     else:
@@ -124,16 +152,28 @@ def check_same(arg1, arg2):
     raise ValueError(f"Must have the same type and values")
 
 
+def check_level_exists(arg, level_name):
+    if is_frame(arg):
+        if level_name not in arg.columns.names:
+            raise ValueError("Level not exists")
+
+
+def check_level_not_exists(arg, level_name):
+    if is_frame(arg):
+        if level_name in arg.columns.names:
+            raise ValueError("Level already exists")
+
+
 # ############# Broadcasting ############# #
 
 
 def to_1d(arg):
     """Reshape argument to one dimension."""
-    if not isinstance(arg, (np.ndarray, pd.Series, pd.DataFrame)):
+    if not is_array_like(arg):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         if arg.shape[1] == 1:
-            if isinstance(arg, pd.DataFrame):
+            if is_frame(arg):
                 return arg.iloc[:, 0]
             return arg[:, 0]
     if arg.ndim == 1:
@@ -145,12 +185,12 @@ def to_1d(arg):
 
 def to_2d(arg, expand_axis=1):
     """Reshape argument to two dimensions."""
-    if not isinstance(arg, (np.ndarray, pd.Series, pd.DataFrame)):
+    if not is_array_like(arg):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         return arg
     elif arg.ndim == 1:
-        if isinstance(arg, pd.Series):
+        if is_series(arg):
             if expand_axis == 0:
                 return pd.DataFrame(arg.values[None, :], columns=arg.index)
             elif expand_axis == 1:
@@ -161,116 +201,407 @@ def to_2d(arg, expand_axis=1):
     raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions")
 
 
-def _broadcast_index(old_index, new_size):
-    """Broadcast index/columns."""
-    if isinstance(old_index[0], str):
-        return ['%s_%d' % (old_index[0], i) for i in range(new_size)]
-    else:
-        return None
+def tile_2d(arg, n, new_columns=None):
+    arg = to_2d(arg)
+    if is_frame(arg):
+        return pd.concat([arg for i in range(n)], axis=1)
+    return np.tile(arg, (1, n))
 
 
-def _wrap_broadcasted(old_arg, new_arg, new_columns=None):
+# You can change default broadcasting rules from code
+# Useful for magic methods that cannot accept broadcasting parameters as kwargs
+broadcasting_rules = dict(
+    index_from='strict',
+    columns_from='stack'
+)
+
+
+def broadcast_index(*args, index_from=None, is_columns=False, **kwargs):
+    """Broadcast index/columns of all arguments."""
+    args = list(args)
+    new_index = None
+
+    if index_from == 'default':
+        index_from = broadcasting_rules[f"{'columns' if is_columns else 'index'}_from"]
+    if index_from is not None:
+        if isinstance(index_from, int):
+            # Take index/columns of the object indexed by index_from
+            if is_pandas(args[index_from]):
+                if is_columns:
+                    if is_frame(args[index_from]):
+                        new_index = args[index_from].columns
+                else:
+                    new_index = args[index_from].index
+        elif isinstance(index_from, str):
+            if index_from == 'stack':
+                # If pandas objects have different index/columns, stack them together for better tracking
+                for i in range(len(args)):
+                    if is_pandas(args[i]):
+                        if is_columns:
+                            if is_frame(args[i]) and args[i].shape[1] > 1:
+                                if new_index is None:
+                                    new_index = args[i].columns
+                                new_index = stack_indexes(new_index, args[i].columns, **kwargs)
+                        else:
+                            if args[i].shape[0] > 1:
+                                if new_index is None:
+                                    new_index = args[i].index
+                                new_index = stack_indexes(new_index, args[i].index, **kwargs)
+            elif index_from == 'strict':
+                # If pandas objects have different index/columns, raise an exception
+                for i in range(len(args)):
+                    if is_pandas(args[i]):
+                        if is_columns:
+                            if is_frame(args[i]):
+                                if new_index is None:
+                                    new_index = args[i].columns
+                                if len(new_index) != len(args[i].columns) or (new_index != args[i].columns).any():
+                                    raise ValueError("All pandas object must have the same columns")
+                        else:
+                            if new_index is None:
+                                new_index = args[i].index
+                            if len(new_index) != len(args[i].index) or (new_index != args[i].index).any():
+                                raise ValueError("All pandas object must have the same index")
+            else:
+                raise ValueError(f"Invalid value for {'columns' if is_columns else 'index'}_from")
+        else:
+            raise ValueError(f"Invalid value for {'columns' if is_columns else 'index'}_from")
+    return args, new_index
+
+
+def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=None):
     """Transform newly broadcasted array to match the type of the original object."""
-    if old_arg.shape == new_arg.shape:
-        return old_arg
-    if isinstance(old_arg, pd.DataFrame):
-        return pd.DataFrame(new_arg, index=old_arg.index, columns=new_columns)
+    # If the array expanded beyond new_index or new_columns
+    if new_arg.ndim >= 1:
+        if new_index is not None and new_arg.shape[0] > len(new_index):
+            new_index = None  # basic range
+    if new_arg.ndim == 2:
+        if new_columns is not None and new_arg.shape[1] > len(new_columns):
+            new_columns = None
+
+    if is_pd:
+        if is_pandas(old_arg):
+            if new_index is None and old_arg.shape[0] == new_arg.shape[0]:
+                new_index = old_arg.index
+            if new_arg.ndim == 1:
+                # Series -> Series
+                return pd.Series(new_arg, index=new_index)
+            if new_arg.ndim == 2:
+                if is_frame(old_arg):
+                    if new_columns is None and old_arg.shape[1] == new_arg.shape[1]:
+                        new_columns = old_arg.columns
+                    # DataFrame -> DataFrame
+                    return pd.DataFrame(new_arg, index=new_index, columns=new_columns)
+                # Series -> DataFrame
+                return pd.DataFrame(new_arg, index=new_index, columns=new_columns)
+        if new_arg.ndim == 1:
+            # Other -> Series
+            return pd.Series(new_arg, index=new_index)
+        if new_arg.ndim == 2:
+            # Other -> DataFrame
+            return pd.DataFrame(new_arg, index=new_index, columns=new_columns)
+    # Other -> Array
     return new_arg
 
 
-def broadcast_to(arg1, arg2):
-    """Bring the first argument to the shape of the second argument."""
-    # All pandas objects must have the same index
-    if isinstance(arg1, (pd.Series, pd.DataFrame)) and isinstance(arg2, (pd.Series, pd.DataFrame)):
-        check_same_index(arg1, arg2)
-
-    is_1d = True
-    if not isinstance(arg1, (np.ndarray, pd.Series, pd.DataFrame)):
-        arg1 = np.asarray(arg1)
-    if not isinstance(arg2, (np.ndarray, pd.Series, pd.DataFrame)):
-        arg2 = np.asarray(arg2)
-    if arg2.ndim > 1:
-        is_1d = False
-    new_columns = None
-    if not is_1d:
-        if isinstance(arg1, pd.Series):
-            arg1 = arg1.to_frame()
-        if isinstance(arg1, pd.DataFrame) and isinstance(arg2, pd.DataFrame):
-            if len(arg2.columns) > len(arg1.columns):
-                new_columns = arg2.columns
-    arg1_new = np.broadcast_to(arg1, arg2.shape, subok=True).copy()
-    return _wrap_broadcasted(arg1, arg1_new, new_columns=new_columns)
-
-
-def broadcast(*args):
+def broadcast(*args, index_from='default', columns_from='default', **kwargs):
     """Bring multiple arguments to the same shape."""
-    # All pandas objects must have the same index
-    pd_args = [arg for arg in args if isinstance(arg, (pd.Series, pd.DataFrame))]
-    if len(pd_args) > 1:
-        for i in range(1, len(pd_args)):
-            check_same_index(pd_args[i-1], pd_args[i])
-
-    is_1d = True
+    is_pd = False
+    is_2d = False
     args = list(args)
+
     # Convert to np.ndarray object if not numpy or pandas
     for i in range(len(args)):
-        if not isinstance(args[i], (np.ndarray, pd.Series, pd.DataFrame)):
+        if not is_array_like(args[i]):
             args[i] = np.asarray(args[i])
-    # Check if we need to switch to 2d
-    for arg in args:
-        if arg.ndim > 1:
-            is_1d = False
-            break
-    # If in 2d mode, convert all pd.Series objects to pd.DataFrame
-    new_columns = None
-    if not is_1d:
+        if args[i].ndim > 1:
+            is_2d = True
+        if is_pandas(args[i]):
+            is_pd = True
+
+    # Decide on index and columns
+    args, new_index = broadcast_index(*args, index_from=index_from, is_columns=False, **kwargs)
+    args, new_columns = broadcast_index(*args, index_from=columns_from, is_columns=True, **kwargs)
+
+    # Convert all pd.Series objects to pd.DataFrame
+    if is_2d:
         for i in range(len(args)):
-            if isinstance(args[i], pd.Series):
+            if is_series(args[i]):
                 args[i] = args[i].to_frame()
-            if isinstance(args[i], pd.DataFrame):
-                if new_columns is None:
-                    new_columns = args[i].columns
-                if len(args[i].columns) > len(new_columns):
-                    new_columns = args[i].columns
+
     # Perform broadcasting operation
     new_args = np.broadcast_arrays(*args, subok=True)
+
     # Bring arrays to their old types (e.g. array -> pandas)
     for i in range(len(new_args)):
         old_arg = args[i].copy()
         new_arg = new_args[i].copy()
-        args[i] = _wrap_broadcasted(old_arg, new_arg, new_columns=new_columns)
+        args[i] = wrap_broadcasted(old_arg, new_arg, is_pd=is_pd, new_index=new_index, new_columns=new_columns)
     return args
 
 
+def broadcast_to(arg1, arg2, index_from='default', columns_from=1, **kwargs):
+    """Bring first argument to the shape of second argument."""
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+
+    # Decide on index and columns
+    args, new_index = broadcast_index(arg1, arg2, index_from=index_from, is_columns=False, **kwargs)
+    args, new_columns = broadcast_index(arg1, arg2, index_from=columns_from, is_columns=True, **kwargs)
+
+    # Convert all pd.Series objects to pd.DataFrame
+    is_2d = arg1.ndim > 1 or arg2.ndim > 1
+    is_pd = is_pandas(arg1) or is_pandas(arg2)
+    if is_2d:
+        if is_series(arg1):
+            arg1 = arg1.to_frame()
+        if is_series(arg2):
+            arg2 = arg2.to_frame()
+
+    # Perform broadcasting operation
+    arg1_new = np.broadcast_to(arg1, arg2.shape, subok=True).copy()
+
+    # Bring array to its old types (e.g. array -> pandas)
+    return wrap_broadcasted(arg1, arg1_new, is_pd=is_pd, new_index=new_index, new_columns=new_columns)
+
+
 def broadcast_to_array_of(arg1, arg2):
-    """Bring the first argument to the shape of an array of the second argument."""
-    if arg1 is not None and arg2 is not None:
-        if not isinstance(arg1, np.ndarray):
-            arg1 = np.asarray(arg1)
-        if not isinstance(arg2, np.ndarray):
-            arg2 = np.asarray(arg2)
-        if arg1.ndim == 0:
+    """Bring first argument to the shape of an array of second argument."""
+    arg1 = np.asarray(arg1)
+    arg2 = np.asarray(arg2)
+    if arg1.ndim == 0:
+        arg1 = np.broadcast_to(arg1, arg2.shape, subok=True)[None, :]
+    elif arg1.ndim == 1:
+        arg1 = np.tile(arg1[:, None][:, None], (1, *arg2.shape))
+    elif arg1.ndim == 2:
+        if arg1.shape[1] != arg2.shape[0] or arg1.shape[2] != arg2.shape[1]:
             arg1 = np.broadcast_to(arg1, arg2.shape, subok=True)[None, :]
-        elif arg1.ndim == 1:
-            arg1 = np.tile(arg1[:, None][:, None], (1, *arg2.shape))
-        elif arg1.ndim == 2:
-            if arg1.shape[1] != arg2.shape[0] or arg1.shape[2] != arg2.shape[1]:
-                arg1 = np.broadcast_to(arg1, arg2.shape, subok=True)[None, :]
-        return arg1.copy()  # deprecation warning
-    return None
+    return arg1.copy()  # deprecation warning
 
-def broadcast_and_combine(*args, combine_func=None):
-    """Broadcast multiple arguments and apply a combiner on each successive pair."""
-    check_not_none(combine_func)
 
-    broadcasted = broadcast(*args)
-    result = None
-    for i in range(1, len(broadcasted)):
-        if result is None:
-            result = combine_func(broadcasted[i-1], broadcasted[i])
+# ############# Indexing ############# #
+
+def index_from_params(params, name=None):
+    """Create index using params array."""
+    check_ndim(params, (1, 3))
+
+    if np.asarray(params).ndim == 1:
+        # frame-wise params
+        return pd.Index(params, name=name)
+    else:
+        # element-wise params per frame
+        if np.array_equal(np.min(params, axis=(1, 2)), np.max(params, axis=(1, 2))):
+            return pd.Index(params[:, 0, 0], name=name)
         else:
-            result = combine_func(result, broadcasted[i])
-    return result
+            return pd.Index(['mix_%d' % i for i in range(params.shape[0])], name=name)
+
+
+def stack_indexes(index1, index2, drop_duplicates=True, **kwargs):
+    """Stack indexes."""
+    check_type(index1, pd.Index)
+    check_type(index2, pd.Index)
+    check_same_shape(index1, index2)
+
+    tuples1 = index1.to_numpy()
+    tuples2 = index2.to_numpy()
+
+    names = []
+    if isinstance(index1, pd.MultiIndex):
+        tuples1 = list(zip(*tuples1))
+        names.extend(index1.names)
+    else:
+        tuples1 = [tuples1]
+        names.append(index1.name)
+    if isinstance(index2, pd.MultiIndex):
+        tuples2 = list(zip(*tuples2))
+        names.extend(index2.names)
+    else:
+        tuples2 = [tuples2]
+        names.append(index2.name)
+
+    tuples = list(zip(*(tuples1 + tuples2)))
+    multiindex = pd.MultiIndex.from_tuples(tuples, names=names)
+    if drop_duplicates:
+        multiindex = drop_duplicate_levels(multiindex, **kwargs)
+    return multiindex
+
+
+def combine_indexes(index1, index2, **kwargs):
+    """Combine indexes using Cartesian product."""
+    check_type(index1, pd.Index)
+    check_type(index2, pd.Index)
+
+    if len(index1) == 1:
+        return index2
+    elif len(index2) == 1:
+        return index1
+
+    tuples1 = np.repeat(index1.to_numpy(), len(index2))
+    tuples2 = np.tile(index2.to_numpy(), len(index1))
+
+    if isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
+    else:
+        index1 = pd.Index(tuples1, name=index1.name)
+    if isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
+    else:
+        index2 = pd.Index(tuples2, name=index2.name)
+
+    return stack_indexes(index1, index2, **kwargs)
+
+
+def broadcast_combine_frames(df1, df2, drop_conflict=False, **kwargs):
+    """Broadcast dataframes using Cartesian product."""
+    check_type(df1, pd.DataFrame)
+    check_type(df2, pd.DataFrame)
+
+    values1 = np.repeat(df1.to_numpy(), len(df2.columns), axis=1)
+    values2 = np.tile(df2.to_numpy(), len(df1.columns))
+    columns = combine_indexes(df1.columns, df2.columns, **kwargs)
+    df1 = pd.DataFrame(values1, index=df1.index, columns=columns)
+    df2 = pd.DataFrame(values2, index=df2.index, columns=columns)
+    if drop_conflict:
+        keep_mask, columns = drop_conflict_values(columns, **kwargs)
+        df1 = df1.loc[:, keep_mask]
+        df2 = df2.loc[:, keep_mask]
+        df1.columns = columns
+        df2.columns = columns
+    return df1, df2
+
+
+def drop_conflict_values(index, **kwargs):
+    """Drop index tuples that have conflicting values (different values with same level names)."""
+    if not isinstance(index, pd.MultiIndex) and isinstance(index, pd.Index):
+        return index
+    check_type(index, pd.MultiIndex)
+    if len(index.names) == len(set(index.names)):
+        return index
+
+    keep_mask = np.full(len(index), True)
+    for name in set(index.names):
+        name_values = []
+        for i, name2 in enumerate(index.names):
+            if name == name2:
+                name_values.append(index.get_level_values(i).to_numpy().tolist())
+        name_values = np.array(name_values)
+        keep_mask &= np.sum(np.diff(name_values, axis=0), axis=0) == 0
+
+    new_index = pd.MultiIndex.from_tuples(index.to_numpy()[keep_mask], names=index.names)
+    return keep_mask, drop_duplicate_levels(new_index, **kwargs)
+
+
+def drop_duplicate_levels(index, keep='last'):
+    """Drop duplicate levels with the same name and values."""
+    if not isinstance(index, pd.MultiIndex) and isinstance(index, pd.Index):
+        return index
+    check_type(index, pd.MultiIndex)
+
+    levels = []
+    levels_to_drop = []
+    if keep == 'first':
+        r = range(0, len(index.levels))
+    elif keep == 'last':
+        r = range(len(index.levels)-1, -1, -1)  # loop backwards
+    for i in r:
+        level = (index.levels[i].name, tuple(index.get_level_values(i).to_numpy().tolist()))
+        if level not in levels:
+            levels.append(level)
+        else:
+            levels_to_drop.append(i)
+    return index.droplevel(levels_to_drop)
+
+
+def drop_duplicate_columns(arg):
+    """Drop duplicate columns with the same name."""
+    check_type(arg, (pd.Series, pd.DataFrame))
+
+    if is_frame(arg):
+        return arg.loc[:, ~arg.columns.duplicated()]
+    return arg
+
+
+def clean_columns(arg, drop_levels=True, drop_columns=True, **kwargs):
+    """Remove redundant columns."""
+    check_type(arg, (pd.Series, pd.DataFrame))
+    arg = to_2d(arg)
+
+    if drop_levels:
+        arg.columns = drop_duplicate_levels(arg.columns, **kwargs)
+    if drop_columns:
+        arg = drop_duplicate_columns(arg)
+    if isinstance(arg.columns, pd.MultiIndex):
+        levels_to_drop = []
+        for i in range(len(arg.columns.levels)):
+            if len(arg.columns.get_level_values(i).unique()) == 1:
+                levels_to_drop.append(i)
+        if len(levels_to_drop) == len(arg.columns.levels):
+            arg = arg.iloc[:, 0]
+        else:
+            arg.columns = arg.columns.droplevel(levels_to_drop)
+    if is_frame(arg):
+        if isinstance(arg.columns, pd.Index):
+            if len(arg.columns.unique()) == 1:
+                arg = arg.iloc[:, 0]
+    return arg
+
+
+def rename_levels(index, name_dict):
+    """Rename index/column levels."""
+    for k, v in name_dict.items():
+        if isinstance(index, pd.MultiIndex):
+            if k in index.names:
+                index = index.rename(v, level=k)
+        else:
+            if index.name == k:
+                index.name = v
+    return index
+
+
+def unstack_to_array(arg):
+    """Reshape object based on multi-index into a multi-dimensional array."""
+    check_type(arg, (pd.Series, pd.DataFrame))
+    sr = to_1d(arg)
+
+    vals_idx_list = []
+    for i in range(len(sr.index.levels)):
+        vals = sr.index.get_level_values(i).to_numpy()
+        unique_vals = np.unique(vals)
+        idx_map = dict(zip(unique_vals, range(len(unique_vals))))
+        vals_idx = list(map(lambda x: idx_map[x], vals))
+        vals_idx_list.append(vals_idx)
+
+    a = np.full(list(map(len, sr.index.levels)), np.nan)
+    a[tuple(zip(vals_idx_list))] = sr.values
+    return a
+
+
+def make_symmetric(arg):
+    """Make object symmetric along the diagonal."""
+    check_type(arg, (pd.Series, pd.DataFrame))
+    df = to_2d(arg)
+
+    unique_index = np.unique(np.concatenate((df.columns, df.index)))
+    df_out = pd.DataFrame(index=unique_index, columns=unique_index)
+    df_out.loc[:, :] = df
+    df_out[df_out.isnull()] = df.transpose()
+    return df_out
+
+
+def unstack_to_df(arg, symmetric=False):
+    """Reshape object based on multi-index into dataframe."""
+    check_type(arg, (pd.Series, pd.DataFrame))
+    sr = to_1d(arg)
+
+    index = sr.index.levels[0]
+    columns = sr.index.levels[1]
+    df = pd.DataFrame(unstack_to_array(sr), index=index, columns=columns)
+    if symmetric:
+        return make_symmetric(df)
+    return df
+
 
 # ############# Class decorators ############# #
 
@@ -298,12 +629,23 @@ def add_safe_nb_methods(*nb_funcs):
     return wrapper
 
 
-def add_indexing_methods(indexing_func):
+def copy_func(f):
+    """Based on http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)"""
+    g = types.FunctionType(f.__code__, f.__globals__, name=f.__name__,
+                           argdefs=f.__defaults__,
+                           closure=f.__closure__)
+    g = update_wrapper(g, f)
+    g.__kwdefaults__ = f.__kwdefaults__
+    return g
+
+
+def add_indexing(indexing_func):
     def wrapper(cls):
         """Add iloc, loc and plain brackets indexing to a class.
 
         Each indexing operation is forwarded to the underlying pandas objects and
         a new instance of the class with new pandas objects is created using the indexing_func."""
+
         class iLoc:
             def __init__(self, obj):
                 self.obj = obj
@@ -326,17 +668,11 @@ def add_indexing_methods(indexing_func):
         def loc(self):
             return self._loc
 
+        def xs(self, *args, **kwargs):
+            return indexing_func(self, lambda x: x.xs(*args, **kwargs))
+
         def __getitem__(self, key):
             return indexing_func(self, lambda x: x.__getitem__(key))
-
-        def copy_func(f):
-            """Based on http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)"""
-            g = types.FunctionType(f.__code__, f.__globals__, name=f.__name__,
-                                   argdefs=f.__defaults__,
-                                   closure=f.__closure__)
-            g = update_wrapper(g, f)
-            g.__kwdefaults__ = f.__kwdefaults__
-            return g
 
         orig_init_method = copy_func(cls.__init__)
 
@@ -349,6 +685,83 @@ def add_indexing_methods(indexing_func):
         setattr(cls, '__getitem__', __getitem__)
         setattr(cls, 'iloc', iloc)
         setattr(cls, 'loc', loc)
+        setattr(cls, 'xs', xs)
+        return cls
+    return wrapper
+
+
+def loc_mapper(mapper, like_df, loc_pandas_func):
+    """Mapper requires some pre and post-processing."""
+    mapper = broadcast_to(mapper.to_frame().transpose(), like_df, index_from=1, columns_from=1)
+    mapper = loc_pandas_func(mapper)
+    if is_frame(mapper):
+        mapper = pd.Series(mapper.values[0], index=mapper.columns)
+    elif is_series(mapper):
+        mapper = pd.Series([mapper.values[0]], index=[mapper.name])
+    return mapper
+
+
+def add_param_indexing(param_name, indexing_func):
+    def wrapper(cls):
+        """Add loc indexing of params to a class. Requires a mapper."""
+
+        class ParamLoc:
+            def __init__(self, obj, param_mapper, clean_columns=True, **clean_kwargs):
+                check_type(param_mapper, pd.Series)
+
+                self.obj = obj
+                self.param_mapper = param_mapper
+                self.clean_columns = clean_columns
+                self.clean_kwargs = clean_kwargs
+
+            def __call__(self, clean_columns=None, **clean_kwargs):
+                if clean_columns is None:
+                    clean_columns = self.clean_columns
+                return self.__class__(self.obj, self.param_mapper, clean_columns=clean_columns, **clean_kwargs)
+
+            def __getitem__(self, key):
+                def loc_pandas_func(obj):
+                    nonlocal key
+                    if self.param_mapper.dtype == 'O':
+                        # If params are objects, we must cast them to string first
+                        param_mapper = self.param_mapper.astype(str)
+                        # We must also cast the key to string
+                        if isinstance(key, slice):
+                            start = str(key.start) if key.start is not None else None
+                            stop = str(key.stop) if key.stop is not None else None
+                            key = slice(start, stop, key.step)
+                        elif isinstance(key, list):
+                            key = list(map(str, key))
+                        else:
+                            # Tuples, objects, etc.
+                            key = str(key)
+                    else:
+                        param_mapper = self.param_mapper
+                    # Use pandas to perform indexing
+                    param_mapper = pd.Series(np.arange(len(param_mapper.index)), index=param_mapper.values)
+                    indexes = param_mapper.loc.__getitem__(key)
+                    if isinstance(indexes, pd.Series):
+                        indexes = indexes.values
+                    obj = obj.iloc[:, indexes]
+                    if self.clean_columns:
+                        obj = clean_columns(obj, **self.clean_kwargs)
+                    return obj
+
+                return indexing_func(self.obj, loc_pandas_func)
+
+        @property
+        def param_loc(self):
+            return getattr(self, f'_{param_name}_loc')
+
+        orig_init_method = copy_func(cls.__init__)
+
+        def __init__(self, *args, **kwargs):
+            orig_init_method(self, *args, **kwargs)
+            mapper = getattr(self, f'{param_name}_mapper')
+            setattr(self, f'_{param_name}_loc', ParamLoc(self, mapper))
+
+        setattr(cls, '__init__', __init__)
+        setattr(cls, f'{param_name}_loc', param_loc)
         return cls
     return wrapper
 
@@ -405,150 +818,50 @@ class Base_Accessor():
     def wrap_array(self, *args, **kwargs):
         raise NotImplementedError
 
-    def tile(self, n, new_columns=None):
-        return self.wrap_array(np.tile(self.to_2d_array(), (1, n)), columns=new_columns)
-
-    def broadcast_to(self, other):
-        return broadcast_to(self._obj, other)
-
-    def broadcast(self, *others):
-        return broadcast(self._obj, *others)
-
-    def broadcast_and_combine(self, *others, combine_func=None):
-        return broadcast_and_combine(self._obj, *others, combine_func=combine_func)
-
     def plot(self, *args, **kwargs):
         raise NotImplementedError
 
-    @classmethod
-    def index_from_params(cls, params, name=None):
-        # Checks and preprocessing
-        check_ndim(params, (1, 3))
+    def combine_with(self, *others, np_combine_func=None, **kwargs):
+        check_not_none(np_combine_func)
+        others = list(others)
+        for i in range(len(others)):
+            if isinstance(others[i], Base_Accessor):
+                others[i] = others[i]._obj
+        broadcasted = broadcast(self._obj, *others, **kwargs)
 
-        if np.asarray(params).ndim == 1:
-            # frame-wise params
-            return pd.Index(params, name=name)
-        else:
-            # element-wise params per frame
-            if np.array_equal(np.min(params, axis=(1, 2)), np.max(params, axis=(1, 2))):
-                return pd.Index(params[:, 0, 0], name=name)
-            else:
-                return pd.Index(['mix_%d' % i for i in range(params.shape[0])], name=name)
+        def multi_np_combine_func(*broadcasted):
+            result = None
+            for i in range(1, len(broadcasted)):
+                if result is None:
+                    result = np_combine_func(broadcasted[i-1], broadcasted[i])
+                else:
+                    result = np_combine_func(result, broadcasted[i])
+            return result
 
-    @classmethod
-    def stack_indexes(cls, index1, index2):
-        """Stack indexes."""
-        # Checks and preprocessing
-        check_type(index1, pd.Index)
-        check_type(index2, pd.Index)
-        check_same_shape(index1, index2)
+        return broadcasted[0].vbt.wrap_array(multi_np_combine_func(*list(map(np.asarray, broadcasted))))
 
-        tuples1 = index1.to_numpy()
-        tuples2 = index2.to_numpy()
+    # Comparison operators
+    def __eq__(self, other): return self.combine_with(other, np_combine_func=np.equal)
+    def __ne__(self, other): return self.combine_with(other, np_combine_func=np.not_equal)
+    def __lt__(self, other): return self.combine_with(other, np_combine_func=np.less)
+    def __gt__(self, other): return self.combine_with(other, np_combine_func=np.greater)
+    def __le__(self, other): return self.combine_with(other, np_combine_func=np.less_equal)
+    def __ge__(self, other): return self.combine_with(other, np_combine_func=np.greater_equal)
 
-        if isinstance(tuples1[0], tuple):
-            tuples1 = list(zip(*tuples1))
-        else:
-            tuples1 = [tuples1.tolist()]
-        if isinstance(tuples2[0], tuple):
-            tuples2 = list(zip(*tuples2))
-        else:
-            tuples2 = [tuples2.tolist()]
-        tuples = list(zip(*(tuples1 + tuples2)))
+    # Binary operators
+    def __add__(self, other): return self.combine_with(other, np_combine_func=np.add)
+    def __sub__(self, other): return self.combine_with(other, np_combine_func=np.subtract)
+    def __mul__(self, other): return self.combine_with(other, np_combine_func=np.multiply)
+    def __div__(self, other): return self.combine_with(other, np_combine_func=np.divide)
+    __radd__ = __add__
+    __rsub__ = __sub__
+    __rmul__ = __mul__
+    __rdiv__ = __div__
 
-        names = []
-        if isinstance(index1, pd.MultiIndex):
-            names.extend(index1.names)
-        else:
-            names.append(index1.name)
-        if isinstance(index2, pd.MultiIndex):
-            names.extend(index2.names)
-        else:
-            names.append(index2.name)
-
-        return pd.MultiIndex.from_tuples(tuples, names=names)
-
-    @classmethod
-    def combine_indexes(cls, index1, index2):
-        """Combine indexes using Cartesian product."""
-        # Checks and preprocessing
-        check_type(index1, pd.Index)
-        check_type(index2, pd.Index)
-
-        tuples1 = np.repeat(index1.to_numpy(), len(index2))
-        tuples2 = np.tile(index2.to_numpy(), len(index1))
-
-        if isinstance(index1, pd.MultiIndex):
-            index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
-        else:
-            index1 = pd.Index(tuples1, name=index1.name)
-        if isinstance(index2, pd.MultiIndex):
-            index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
-        else:
-            index2 = pd.Index(tuples2, name=index2.name)
-
-        return cls.stack_indexes(index1, index2)
-
-    def stack_columns(self, columns):
-        """Stack columns on top of object's columns."""
-        # Checks and preprocessing
-        df = to_2d(self._obj)
-        check_type(columns, pd.Index)
-
-        return self.stack_indexes(columns, df.columns)
-
-    def combine_columns(self, columns):
-        """Stack columns on top of object's columns using a cartesian product."""
-        # Checks and preprocessing
-        df = to_2d(self._obj)
-        check_type(columns, pd.Index)
-
-        if len(columns) == 1:
-            return df.columns
-        elif len(df.columns) == 1:
-            return columns
-        else:
-            return self.combine_indexes(columns, df.columns)
-
-    def unstack_to_array(self):
-        """Reshape object based on multi-index into a multi-dimensional array."""
-        # Checks and preprocessing
-        sr = to_1d(self._obj)
-
-        vals_idx_list = []
-        for i in range(len(sr.index.levels)):
-            vals = sr.index.get_level_values(i).to_numpy()
-            unique_vals = np.unique(vals)
-            idx_map = dict(zip(unique_vals, range(len(unique_vals))))
-            vals_idx = list(map(lambda x: idx_map[x], vals))
-            vals_idx_list.append(vals_idx)
-
-        a = np.full(list(map(len, sr.index.levels)), np.nan)
-        a[tuple(zip(vals_idx_list))] = sr.values
-        return a
-
-    def make_symmetric(self):
-        """Make object symmetric across the diagonal."""
-        # Checks and preprocessing
-        df = to_2d(self._obj)
-
-        unique_index = np.unique(np.concatenate((df.columns, df.index)))
-        df_out = pd.DataFrame(index=unique_index, columns=unique_index)
-        df_out.loc[:, :] = df
-        df_out[df_out.isnull()] = df.transpose()
-        return df_out
-
-    def unstack_to_df(self, symmetric=False):
-        """Reshape object based on multi-index into dataframe."""
-        # Checks and preprocessing
-        sr = to_1d(self._obj)
-
-        index = sr.index.levels[0]
-        columns = sr.index.levels[1]
-        df = pd.DataFrame(self.unstack_to_array(), index=index, columns=columns)
-        if symmetric:
-            df = df.vbt.make_symmetric()
-        return df
+    # Boolean operators
+    def __and__(self, other): return self.combine_with(other, np_combine_func=np.logical_and)
+    def __or__(self, other): return self.combine_with(other, np_combine_func=np.logical_or)
+    def __xor__(self, other): return self.combine_with(other, np_combine_func=np.logical_xor)
 
 
 class Base_DFAccessor(Base_Accessor):

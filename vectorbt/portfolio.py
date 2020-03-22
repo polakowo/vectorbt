@@ -202,16 +202,16 @@ def avg_loss_nb(position_profits):
 # ############# Custom accessors ############# #
 
 
-def indexing_func(obj, getitem_func):
+def indexing_func(obj, loc_pandas_func):
     return obj.__class__(
-        getitem_func(obj.ts),
-        getitem_func(obj.cash),
-        getitem_func(obj.shares),
+        loc_pandas_func(obj.ts),
+        loc_pandas_func(obj.cash),
+        loc_pandas_func(obj.shares),
         obj.investment
     )
 
 
-@add_indexing_methods(indexing_func)
+@add_indexing(indexing_func)
 class Portfolio():
 
     def __init__(self, ts, cash, shares, investment):
@@ -265,7 +265,7 @@ class Portfolio():
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=1., slippage=0., commission=0.):
+    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=1., slippage=0., commission=0., **kwargs):
         """Build portfolio based on entry and exit signals and the corresponding volume.
 
         Set volume to the number of shares to buy/sell.
@@ -283,7 +283,7 @@ class Portfolio():
         check_same_index(ts, entries)
         check_same_index(ts, exits)
 
-        ts, entries, exits = broadcast(ts, entries, exits)
+        ts, entries, exits = broadcast(ts, entries, exits, **kwargs)
 
         volume = broadcast_to(volume, ts)
         slippage = broadcast_to(slippage, ts)
@@ -310,7 +310,7 @@ class Portfolio():
         return cls(ts, cash, shares, investment)
 
     @classmethod
-    def from_orders(cls, ts, orders, is_target=False, investment=1., slippage=0., commission=0.):
+    def from_orders(cls, ts, orders, is_target=False, investment=1., slippage=0., commission=0., **kwargs):
         """Build portfolio based on orders.
 
         Set an orders element to positive/negative number - a number of shares to buy/sell.
@@ -323,7 +323,7 @@ class Portfolio():
 
         check_same_index(ts, orders)
 
-        ts, orders = broadcast(ts, orders)
+        ts, orders = broadcast(ts, orders, **kwargs)
 
         slippage = broadcast_to(slippage, ts)
         commission = broadcast_to(commission, ts)

@@ -319,14 +319,14 @@ class Signals_Accessor():
     def exits(self, exit_mask_nb, *args, only_first=True):
         return self.wrap_array(exits_nb(self.to_2d_array(), exit_mask_nb, only_first, *args))
 
-    def stoploss_exits(self, ts, stops, is_relative=True, only_first=True):
+    def stoploss_exits(self, ts, stops, is_relative=True, only_first=True, **kwargs):
         # Checks and preprocessing
         entries = self._obj
         check_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
         check_same_index(entries, ts)
 
-        entries, ts = broadcast(entries, ts)
+        entries, ts = broadcast(entries, ts, **kwargs)
         stops = broadcast_to_array_of(stops, entries.vbt.to_2d_array())
 
         exits = stoploss_exits_nb(
@@ -335,18 +335,18 @@ class Signals_Accessor():
             stops, is_relative, only_first)
 
         # Build column hierarchy
-        param_columns = pd.DataFrame.vbt.index_from_params(stops, name='stoploss')
-        columns = entries.vbt.combine_columns(param_columns)
+        param_columns = index_from_params(stops, name='stoploss')
+        columns = combine_indexes(param_columns, to_2d(entries).columns)
         return entries.vbt.wrap_array(exits, columns=columns)
 
-    def trailstop_exits(self, ts, stops, is_relative=True, only_first=True):
+    def trailstop_exits(self, ts, stops, is_relative=True, only_first=True, **kwargs):
         # Checks and preprocessing
         entries = self._obj
         check_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
         check_same_index(entries, ts)
 
-        entries, ts = broadcast(entries, ts)
+        entries, ts = broadcast(entries, ts, **kwargs)
         stops = broadcast_to_array_of(stops, entries.vbt.to_2d_array())
 
         exits = trailstop_exits_nb(
@@ -355,22 +355,19 @@ class Signals_Accessor():
             stops, is_relative, only_first)
 
         # Build column hierarchy
-        param_columns = pd.DataFrame.vbt.index_from_params(stops, name='stoploss')
-        columns = entries.vbt.combine_columns(param_columns)
+        param_columns = index_from_params(stops, name='trailstop')
+        columns = combine_indexes(param_columns, to_2d(entries).columns)
         return entries.vbt.wrap_array(exits, columns=columns)
 
-    def AND(self, *others):
+    def AND(self, *others, **kwargs):
         # you can also do A & B, but then you need to have the same index and columns
-        return self.broadcast_and_combine(*others, combine_func=np.logical_and)
+        return self.combine_with(*others, np_combine_func=np.logical_and, **kwargs)
 
-    def OR(self, *others):
-        return self.broadcast_and_combine(*others, combine_func=np.logical_or)
+    def OR(self, *others, **kwargs):
+        return self.combine_with(*others, np_combine_func=np.logical_or, **kwargs)
 
-    def XOR(self, *others):
-        return self.broadcast_and_combine(*others, combine_func=np.logical_xor)
-
-    def NOT(self):
-        return np.logical_not(self._obj)
+    def XOR(self, *others, **kwargs):
+        return self.combine_with(*others, np_combine_func=np.logical_xor, **kwargs)
 
     @cached_property
     def num_signals(self):
