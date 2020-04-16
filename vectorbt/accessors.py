@@ -5,6 +5,7 @@ from vectorbt.utils import Base_DFAccessor, Base_SRAccessor
 
 @pd.api.extensions.register_dataframe_accessor("vbt")
 class Vbt_DFAccessor(DirNamesMixin, Base_DFAccessor):
+    # By subclassing DirNamesMixin, we can build accessors on top of each other
     def __init__(self, obj):
         self._obj = obj
 
