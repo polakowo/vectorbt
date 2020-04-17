@@ -510,8 +510,8 @@ class Portfolio():
     # ############# Plotting ############# #
 
     def plot_trades(self,
-                    buy_scatter_kwargs={},
-                    sell_scatter_kwargs={},
+                    buy_trace_kwargs={},
+                    sell_trace_kwargs={},
                     fig=None,
                     **ts_kwargs):
         check_type(self.ts, pd.Series)
@@ -536,7 +536,7 @@ class Portfolio():
             ),
             name='Buy'
         )
-        buy_scatter.update(**buy_scatter_kwargs)
+        buy_scatter.update(**buy_trace_kwargs)
         fig.add_trace(buy_scatter)
         sell_scatter = go.Scatter(
             x=self.trades.index[sell_mask],
@@ -551,14 +551,14 @@ class Portfolio():
             ),
             name='Sell'
         )
-        sell_scatter.update(**sell_scatter_kwargs)
+        sell_scatter.update(**sell_trace_kwargs)
         fig.add_trace(sell_scatter)
 
         return fig
 
     def plot_position_profits(self,
-                              profit_scatter_kwargs={},
-                              loss_scatter_kwargs={},
+                              profit_trace_kwargs={},
+                              loss_trace_kwargs={},
                               fig=None,
                               **layout_kwargs):
         check_type(self.position_profits, pd.Series)
@@ -585,7 +585,7 @@ class Portfolio():
             ),
             name='Profit'
         )
-        profit_scatter.update(**profit_scatter_kwargs)
+        profit_scatter.update(**profit_trace_kwargs)
         fig.add_trace(profit_scatter)
         loss_scatter = go.Scatter(
             x=self.position_profits.index,
@@ -598,7 +598,7 @@ class Portfolio():
             ),
             name='Loss'
         )
-        loss_scatter.update(**loss_scatter_kwargs)
+        loss_scatter.update(**loss_trace_kwargs)
         fig.add_trace(loss_scatter)
 
         # Set up axes

@@ -18,17 +18,19 @@ import numpy as np
 import itertools
 import yfinance as yf
 
-# Prepare data
-msft = yf.Ticker("MSFT")
-df = msft.history(period="max")
-price = df['Open']
+# Define params
 windows = np.arange(2, 101)
 investment = 100 # in $
 commission = 0.001 # in %
 
+# Prepare data
+msft = yf.Ticker("MSFT")
+df = msft.history(period="max")
+price = df['Open']
+
 # Calculate the performance of the strategy
-fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2)
-entries, exits = fast_ma.ma_crossover(slow_ma)
+dmac = vbt.DMAC.from_combinations(price, windows)
+entries, exits = dmac.crossover()
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, investment=investment, commission=commission)
 performance = portfolio.total_net_profit
 

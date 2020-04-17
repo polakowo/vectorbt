@@ -445,10 +445,10 @@ class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
         entries, exits = entries_and_exits_nb(shape, entry_mask_nb, exit_mask_nb, *args)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.signals.plot(
-                scatter_kwargs=scatter_kwargs,
+                trace_kwargs=trace_kwargs,
                 fig=fig,
                 **layout_kwargs
             )
@@ -480,7 +480,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         entries, exits = entries_and_exits_nb((size, 1), entry_mask_nb, exit_mask_nb, *args)
         return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
 
-    def plot(self, name=None, scatter_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         # Set up figure
         if fig is None:
             fig = FigureWidget()
@@ -503,7 +503,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
             mode='lines',
             name=str(name) if name is not None else None
         )
-        scatter.update(**scatter_kwargs)
+        scatter.update(**trace_kwargs)
         fig.add_trace(scatter)
 
         return fig

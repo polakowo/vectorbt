@@ -489,52 +489,52 @@ def ewm_std_nb(a, span):
 
 
 @njit
-def rolling_apply_1d_nb(a, window, apply_func):
+def rolling_apply_1d_nb(a, window, apply_func_nb):
     """Rolling apply."""
     b = np.empty_like(a)
     for i in range(a.shape[0]):
-        b[i] = apply_func(a[max(0, i+1-window):i+1])
+        b[i] = apply_func_nb(a[max(0, i+1-window):i+1])
     b[:(window-1)] = np.nan
     return b
 
 
 @njit
-def rolling_apply_nb(a, window, apply_func, on_2d=False):
-    """Use on_2d=True to pass rolling matrix to the apply_func."""
+def rolling_apply_nb(a, window, apply_func_nb, on_2d=False):
+    """Use on_2d=True to pass rolling matrix to the apply_func_nb."""
     b = np.empty_like(a)
     if on_2d:
         for i in range(a.shape[0]):
-            b[i, :] = apply_func(a[max(0, i+1-window):i+1, :])
+            b[i, :] = apply_func_nb(a[max(0, i+1-window):i+1, :])
             b[:(window-1)] = np.nan
     else:
         for col in range(a.shape[1]):
-            b[:, col] = rolling_apply_1d_nb(a[:, col], window, apply_func)
+            b[:, col] = rolling_apply_1d_nb(a[:, col], window, apply_func_nb)
     return b
 
 
 @njit
-def expanding_apply_1d_nb(a, apply_func):
+def expanding_apply_1d_nb(a, apply_func_nb):
     """Expanding apply."""
     b = np.empty_like(a)
     for i in range(a.shape[0]):
-        b[i] = apply_func(a[0:i+1])
+        b[i] = apply_func_nb(a[0:i+1])
     return b
 
 
 @njit
-def expanding_apply_nb(a, apply_func, on_2d=False):
+def expanding_apply_nb(a, apply_func_nb, on_2d=False):
     b = np.empty_like(a)
     if on_2d:
         for i in range(a.shape[0]):
-            b[i, :] = apply_func(a[0:i+1, :])
+            b[i, :] = apply_func_nb(a[0:i+1, :])
     else:
         for col in range(a.shape[1]):
-            b[:, col] = expanding_apply_1d_nb(a[:, col], apply_func)
+            b[:, col] = expanding_apply_1d_nb(a[:, col], apply_func_nb)
     return b
 
 
 @njit
-def groupby_apply_1d_nb(a, by_b, apply_func):
+def groupby_apply_1d_nb(a, by_b, apply_func_nb):
     """Group array by another array and apply a function."""
     groups = np.unique(by_b)
     group_idxs = []
@@ -546,12 +546,12 @@ def groupby_apply_1d_nb(a, by_b, apply_func):
         group_idxs.append(np.asarray(idx_lst))
     b = np.empty(len(groups))
     for i, idxs in enumerate(group_idxs):
-        b[i] = apply_func(a[idxs])
+        b[i] = apply_func_nb(a[idxs])
     return groups, b
 
 
 @njit
-def groupby_apply_nb(a, by_b, apply_func, on_2d=False):
+def groupby_apply_nb(a, by_b, apply_func_nb, on_2d=False):
     groups = np.unique(by_b)
     group_idxs = []
     for i in range(len(groups)):
@@ -563,31 +563,31 @@ def groupby_apply_nb(a, by_b, apply_func, on_2d=False):
     b = np.empty((len(groups), a.shape[1]))
     for i, idxs in enumerate(group_idxs):
         if on_2d:
-            b[i, :] = apply_func(a[idxs, :])
+            b[i, :] = apply_func_nb(a[idxs, :])
         else:
             for col in range(a.shape[1]):
-                b[i, col] = apply_func(a[idxs, col])
+                b[i, col] = apply_func_nb(a[idxs, col])
     return groups, b
 
 
 @njit
-def apply_by_mask_1d_nb(a, mask, apply_func):
+def apply_by_mask_1d_nb(a, mask, apply_func_nb):
     """Apply a function on masked array."""
     b = np.empty(mask.shape[0])
     for i in range(mask.shape[0]):
-        b[i] = apply_func(a[mask[i, :]])
+        b[i] = apply_func_nb(a[mask[i, :]])
     return b
 
 
 @njit
-def apply_by_mask_nb(a, mask, apply_func, on_2d=False):
+def apply_by_mask_nb(a, mask, apply_func_nb, on_2d=False):
     b = np.empty((mask.shape[0], a.shape[1]))
     if on_2d:
         for i in range(mask.shape[0]):
-            b[i, :] = apply_func(a[mask[i, :], :])
+            b[i, :] = apply_func_nb(a[mask[i, :], :])
     else:
         for col in range(a.shape[1]):
-            b[:, col] = apply_by_mask_1d_nb(a[:, col], mask, apply_func)
+            b[:, col] = apply_by_mask_1d_nb(a[:, col], mask, apply_func_nb)
     return b
 
 # ############# Custom accessors ############# #
@@ -618,11 +618,11 @@ class TimeSeries_Accessor():
         if cls.dtype is not None:
             check_dtype(obj, cls.dtype)
 
-    def groupby_apply(self, by, apply_func, on_2d=False):
-        groups, applied = groupby_apply_nb(self.to_2d_array(), by, apply_func, on_2d=on_2d)
+    def groupby_apply(self, by, apply_func_nb, on_2d=False):
+        groups, applied = groupby_apply_nb(self.to_2d_array(), by, apply_func_nb, on_2d=on_2d)
         return self.wrap_array(applied, index=groups)
 
-    def resample_apply(self, freq, apply_func, on_2d=False, **kwargs):
+    def resample_apply(self, freq, apply_func_nb, on_2d=False, **kwargs):
         resampled = self._obj.resample(freq, **kwargs)
         # Build a mask that acts as a map between new and old indices
         # It works on resampled.indices instead of resampled.groups, so there is no redundancy
@@ -636,7 +636,7 @@ class TimeSeries_Accessor():
         mask_idxs = np.unravel_index(mask_idxs.astype(int), mask.shape)
         mask[mask_idxs] = True
         # Apply a function on each group of values from the old dataframe indexed by new mask
-        applied = apply_by_mask_nb(self.to_2d_array(), mask, apply_func, on_2d=on_2d)
+        applied = apply_by_mask_nb(self.to_2d_array(), mask, apply_func_nb, on_2d=on_2d)
         # Finally, map output to the new dataframe using resampled.groups
         applied_obj = self.wrap_array(applied, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, to_2d(self._obj).shape[1]), np.nan)
@@ -660,10 +660,10 @@ class TimeSeries_Accessor():
 @register_dataframe_accessor('timeseries')
 class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
-    def plot(self, scatter_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.timeseries.plot(
-                scatter_kwargs=scatter_kwargs,
+                trace_kwargs=trace_kwargs,
                 fig=fig,
                 **layout_kwargs
             )
@@ -674,7 +674,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 @register_series_accessor('timeseries')
 class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
-    def plot(self, name=None, scatter_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         if fig is None:
             fig = FigureWidget()
             fig.update_layout(**layout_kwargs)
@@ -689,7 +689,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             mode='lines',
             name=str(name) if name is not None else None
         )
-        scatter.update(**scatter_kwargs)
+        scatter.update(**trace_kwargs)
         fig.add_trace(scatter)
 
         return fig
@@ -714,7 +714,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
     def plot(self,
              display_volume=True,
              candlestick_kwargs={},
-             bar_kwargs={},
+             trace_kwargs={},
              **layout_kwargs):
         open = self._obj[self._column_map['open']]
         high = self._obj[self._column_map['high']]
@@ -750,7 +750,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
                 yaxis="y",
                 xaxis="x"
             )
-            bar.update(**bar_kwargs)
+            bar.update(**trace_kwargs)
             fig.add_trace(bar)
             fig.update_layout(
                 yaxis2=dict(
