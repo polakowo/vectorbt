@@ -12,7 +12,7 @@ from vectorbt.accessors import *
 from vectorbt.timeseries import rolling_mean_nb, rolling_std_nb, ewm_mean_nb, \
     ewm_std_nb, diff_nb, set_by_mask_nb, prepend_nb, rolling_min_nb, rolling_max_nb
 
-__all__ = ['IndicatorFactory', 'MA', 'MSTD', 'BollingerBands', 'RSI', 'Stochastic', 'MACD', 'OBV']
+__all__ = ['IndicatorFactory', 'MA', 'DMAC', 'MSTD', 'BollingerBands', 'RSI', 'Stochastic', 'MACD', 'OBV']
 
 # ############# Indicator factory ############# #
 
@@ -54,7 +54,7 @@ def broadcast_ts(ts, params_len, new_columns):
         return ts.vbt.wrap_array(ts, columns=new_columns)
 
 
-def from_params_pipeline(ts_list, param_list, level_names, custom_func, *args, pass_lists=False,
+def from_params_pipeline(ts_list, param_list, level_names, output_names, custom_func, *args, pass_lists=False,
                          param_product=False, broadcast_kwargs={}, **kwargs):
     """A pipeline to calculate an indicator based on its parameters.
 
@@ -97,6 +97,13 @@ def from_params_pipeline(ts_list, param_list, level_names, custom_func, *args, p
         output_list = custom_func(*ts_list, *param_list, *args, **kwargs)
     if not isinstance(output_list, (tuple, list, List)):
         output_list = (output_list,)
+    # Other outputs should be returned without post-processing (for example cache_dict)
+    if len(output_list) > len(output_names):
+        other_list = output_list[len(output_names):]
+    else:
+        other_list = ()
+    # Process only those outputs that are in the output_names
+    output_list = output_list[:len(output_names)]
     if len(param_list) > 0:
         # Build new column levels on top of time series levels
         new_columns = build_column_hierarchy(param_list, level_names, to_2d(ts_list[0]).columns)
@@ -114,7 +121,7 @@ def from_params_pipeline(ts_list, param_list, level_names, custom_func, *args, p
         # Tuple object is a mapper that accepts tuples of parameters
         tuple_mapper = build_tuple_mapper(mapper_list, new_columns, tuple(level_names))
         mapper_list.append(tuple_mapper)
-    return new_ts_list, output_list, mapper_list
+    return new_ts_list, output_list, mapper_list, other_list
 
 
 def perform_init_checks(ts_list, output_list, mapper_list):
@@ -208,9 +215,13 @@ class IndicatorFactory():
                 ts_list = args[:len(ts_names)]
                 param_list = args[len(ts_names):len(ts_names)+len(param_names)]
                 new_args = args[len(ts_names)+len(param_names):]
-                new_ts_list, output_list, mapper_list = from_params_pipeline(
-                    ts_list, param_list, level_names, custom_func, *new_args, pass_lists=pass_lists, **kwargs)
-                return cls(*new_ts_list, *output_list, *mapper_list, name)
+                new_ts_list, output_list, mapper_list, other_list = from_params_pipeline(
+                    ts_list, param_list, level_names, output_names,
+                    custom_func, *new_args, pass_lists=pass_lists, **kwargs)
+                obj = cls(*new_ts_list, *output_list, *mapper_list, name)
+                if len(other_list) > 0:
+                    return (obj,) + other_list
+                return obj
 
         # Add indexing methods
         def indexing_func(obj, loc_pandas_func):
@@ -298,9 +309,9 @@ class IndicatorFactory():
     @classmethod
     def from_apply_func(cls, apply_func, caching_func=None, output_names=['output'], **kwargs):
         """Apply function is performed on each parameter individually.
-        
+
         Apply functions are simpler to write since parameter selection and concating is done for you.
-        
+
         But it has some limitations:
             - If your apply function isn't numba compiled, concating is also not numba compiled.
             - You can work with one parameter selection at a time, and can't view all parameters.
@@ -319,13 +330,14 @@ class IndicatorFactory():
 
             def custom_func(ts_list, param_list, *args):
                 # avoid deprecation warnings
-                ts_list = list(map(lambda x: x.vbt.to_2d_array(), ts_list))
-                typed_ts_list = tuple(ts_list)
-                typed_param_tuples = tuple(list(zip(*param_list)))
+                typed_ts_list = tuple(map(lambda x: x.vbt.to_2d_array(), ts_list))
+                typed_param_tuples = List()
+                for param_tuple in list(zip(*param_list)):
+                    typed_param_tuples.append(param_tuple)
 
                 # User-defined preprocessing function (useful for caching)
                 if caching_func is not None:
-                    more_args = caching_func(*ts_list, *param_list, *args)
+                    more_args = caching_func(*typed_ts_list, *param_list, *args)
                     if not isinstance(more_args, (tuple, list, List)):
                         more_args = (more_args,)
                 else:
@@ -368,12 +380,11 @@ class IndicatorFactory():
 
         return cls.from_custom_func(custom_func, output_names=output_names, pass_lists=True, **kwargs)
 
-
 # ############# MA ############# #
+
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
 def ma_caching_nb(ts, windows, ewms):
-    # Cache moving averages to effectively reduce the number of operations.
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
@@ -385,30 +396,14 @@ def ma_caching_nb(ts, windows, ewms):
     return cache_dict
 
 
-@njit(f8[:, :](i8, i8[:], b1[:], DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
-def ma_apply_func_nb(i, windows, ewms, cache_dict):
-    # For i-th window, take moving average out of cache and return.
-    return cache_dict[(windows[i], int(ewms[i]))]
+@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+def ma_apply_func_nb(ts, window, ewm, cache_dict):
+    return cache_dict[(window, int(ewm))]
 
 
-@njit(f8[:, :](f8[:, :], i8[:], b1[:]), cache=True)
-def ma_custom_func_nb(ts, windows, ewms):
-    # Run the apply function on each window and concat results horizontally.
-    cache_dict = ma_caching_nb(ts, windows, ewms)
-    return apply_and_concat_one_nb(len(windows), ma_apply_func_nb, windows, ewms, cache_dict)
-
-
-def ma_custom_func(ts, windows, ewms, from_ma=None):
-    if from_ma is not None:
-        # Use another MA to take windows from there to avoid re-calculation
-        indices = from_ma.tuple_loc.get_indices(list(zip(windows, ewms)))
-        return from_ma.ma.values[:, indices]
-    # Calculate MA from scratch
-    return ma_custom_func_nb(ts.vbt.to_2d_array(), windows, ewms)
-
-
-FactoryMA = IndicatorFactory.from_custom_func(
-    ma_custom_func,
+FactoryMA = IndicatorFactory.from_apply_func(
+    ma_apply_func_nb,
+    caching_func=ma_caching_nb,
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['ma'],
@@ -427,25 +422,11 @@ class MA(FactoryMA):
     def from_params(cls, ts, window, ewm=False, **kwargs):
         return super().from_params(ts, window, ewm, **kwargs)
 
-    @classmethod
-    def from_combinations(cls, ts, windows, r, ewm=False, names=None, **kwargs):
-        if names is None:
-            names = ['ma_' + str(i+1) for i in range(r)]
-        windows, ewm = broadcast(windows, ewm, writeable=True)
-        ma = cls.from_params(ts, windows, ewm=ewm, **kwargs)
-        param_lists = zip(*itertools.combinations(zip(windows, ewm), r))
-        mas = []
-        for i, param_list in enumerate(param_lists):
-            i_windows, i_ewm = zip(*param_list)
-            mas.append(cls.from_params(ts, i_windows, ewm=i_ewm, from_ma=ma, name=names[i], **kwargs))
-        return tuple(mas)
-
     def plot(self,
-             plot_ts=True,
              ts_name=None,
              ma_name=None,
-             ts_scatter_kwargs={},
-             ma_scatter_kwargs={},
+             ts_trace_kwargs={},
+             ma_trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.ts, pd.Series)
@@ -456,37 +437,87 @@ class MA(FactoryMA):
         if ma_name is None:
             ma_name = f'MA ({self.name})'
 
-        if plot_ts:
-            fig = self.ts.vbt.timeseries.plot(name=ts_name, scatter_kwargs=ts_scatter_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.timeseries.plot(name=ma_name, scatter_kwargs=ma_scatter_kwargs, fig=fig)
+        fig = self.ts.vbt.timeseries.plot(name=ts_name, trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.timeseries.plot(name=ma_name, trace_kwargs=ma_trace_kwargs, fig=fig)
 
         return fig
 
-    def plot_ma_crossover(self, other,
-                          crossover_kwargs={},
-                          other_name=None,
-                          other_scatter_kwargs={},
-                          entry_scatter_kwargs={},
-                          exit_scatter_kwargs={},
-                          fig=None,
-                          **plot_kwargs):
+# ############# DMAC ############# #
+
+
+@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:], i8[:], b1[:]), cache=True)
+def dmac_caching_nb(ts, fast_windows, fast_ewms, slow_windows, slow_ewms):
+    return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((fast_ewms, slow_ewms)))
+
+
+@njit(UniTuple(f8[:, :], 2)(f8[:, :], i8, b1, i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+def dmac_apply_func_nb(ts, fast_window, fast_ewm, slow_window, slow_ewm, cache_dict):
+    return cache_dict[(fast_window, int(fast_ewm))], cache_dict[(slow_window, int(slow_ewm))]
+
+
+FactoryDMAC = IndicatorFactory.from_apply_func(
+    dmac_apply_func_nb,
+    caching_func=dmac_caching_nb,
+    ts_names=['ts'],
+    param_names=['fast_window', 'fast_ewm', 'slow_window', 'slow_ewm'],
+    output_names=['fast_ma', 'slow_ma'],
+    short_name='dmac',
+    comparison_params=dict(
+        fast_ma=dict(
+            include_attr_name=False
+        ),
+        slow_ma=dict(
+            include_attr_name=False
+        )
+    )
+)
+
+
+class DMAC(FactoryDMAC):
+    @classmethod
+    def from_params(cls, ts, fast_window, slow_window, fast_ewm=False, slow_ewm=False, **kwargs):
+        return super().from_params(ts, fast_window, fast_ewm, slow_window, slow_ewm, **kwargs)
+
+    @classmethod
+    def from_combinations(cls, ts, windows, ewm=False, **kwargs):
+        windows, ewm = broadcast(windows, ewm, writeable=True)
+        param_lists = tuple(zip(*itertools.combinations(zip(windows, ewm), 2)))
+        fast_windows, fast_ewms = zip(*param_lists[0])
+        slow_windows, slow_ewms = zip(*param_lists[1])
+        return cls.from_params(ts, fast_windows, slow_windows, fast_ewm=fast_ewms, slow_ewm=slow_ewms, **kwargs)
+
+    def crossover(self, **kwargs):
+        return self.fast_ma_crossover(self.slow_ma, **kwargs)
+
+    def plot(self,
+             crossover_kwargs={},
+             ts_name=None,
+             fast_ma_name=None,
+             slow_ma_name=None,
+             ts_trace_kwargs={},
+             fast_ma_trace_kwargs={},
+             slow_ma_trace_kwargs={},
+             entry_trace_kwargs={},
+             exit_trace_kwargs={},
+             fig=None,
+             **layout_kwargs):
         check_type(self.ts, pd.Series)
-        check_type(self.ma, pd.Series)
+        check_type(self.fast_ma, pd.Series)
+        check_type(self.slow_ma, pd.Series)
 
-        if isinstance(other, MA):
-            if other_name is None:
-                other_name = f'MA ({other.name})'
-            other = other.ma
-        else:
-            if other_name is None:
-                other_name = 'Other'
-        check_type(other, pd.Series)
+        if ts_name is None:
+            ts_name = f'Price ({self.name})'
+        if fast_ma_name is None:
+            fast_ma_name = f'Fast MA ({self.name})'
+        if slow_ma_name is None:
+            slow_ma_name = f'Slow MA ({self.name})'
 
-        fig = self.plot(**plot_kwargs)
-        fig = other.vbt.timeseries.plot(name=other_name, scatter_kwargs=other_scatter_kwargs, fig=fig)
+        fig = self.ts.vbt.timeseries.plot(name=ts_name, trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.fast_ma.vbt.timeseries.plot(name=fast_ma_name, trace_kwargs=fast_ma_trace_kwargs, fig=fig)
+        fig = self.slow_ma.vbt.timeseries.plot(name=slow_ma_name, trace_kwargs=slow_ma_trace_kwargs, fig=fig)
 
         # Plot markets
-        entries, exits = self.ma_crossover(other, **crossover_kwargs)
+        entries, exits = self.crossover(**crossover_kwargs)
         entry_scatter = go.Scatter(
             x=self.ts.index[entries],
             y=self.ts[entries],
@@ -498,7 +529,7 @@ class MA(FactoryMA):
             ),
             name='Entry'
         )
-        entry_scatter.update(**entry_scatter_kwargs)
+        entry_scatter.update(**entry_trace_kwargs)
         fig.add_trace(entry_scatter)
         exit_scatter = go.Scatter(
             x=self.ts.index[exits],
@@ -511,13 +542,13 @@ class MA(FactoryMA):
             ),
             name='Exit'
         )
-        exit_scatter.update(**exit_scatter_kwargs)
+        exit_scatter.update(**exit_trace_kwargs)
         fig.add_trace(exit_scatter)
 
         return fig
 
-
 # ############# MSTD ############# #
+
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
 def mstd_caching_nb(ts, windows, ewms):
@@ -525,10 +556,10 @@ def mstd_caching_nb(ts, windows, ewms):
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                ma = ewm_std_nb(ts, windows[i])
+                mstd = ewm_std_nb(ts, windows[i])
             else:
-                ma = rolling_std_nb(ts, windows[i])
-            cache_dict[(windows[i], int(ewms[i]))] = ma
+                mstd = rolling_std_nb(ts, windows[i])
+            cache_dict[(windows[i], int(ewms[i]))] = mstd
     return cache_dict
 
 
@@ -560,7 +591,7 @@ class MSTD(FactoryMSTD):
 
     def plot(self,
              name=None,
-             scatter_kwargs={},
+             trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.mstd, pd.Series)
@@ -568,7 +599,7 @@ class MSTD(FactoryMSTD):
         if name is None:
             name = f'MSTD ({self.name})'
 
-        fig = self.mstd.vbt.timeseries.plot(name=name, scatter_kwargs=scatter_kwargs, fig=fig, **layout_kwargs)
+        fig = self.mstd.vbt.timeseries.plot(name=name, trace_kwargs=trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -617,10 +648,10 @@ class BollingerBands(FactoryBollingerBands):
              upper_band_name=None,
              middle_band_name=None,
              lower_band_name=None,
-             ts_scatter_kwargs={},
-             upper_band_scatter_kwargs={},
-             middle_band_scatter_kwargs={},
-             lower_band_scatter_kwargs={},
+             ts_trace_kwargs={},
+             upper_band_trace_kwargs={},
+             middle_band_trace_kwargs={},
+             lower_band_trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.ts, pd.Series)
@@ -637,17 +668,17 @@ class BollingerBands(FactoryBollingerBands):
         if lower_band_name is None:
             lower_band_name = f'Lower Band ({self.name})'
 
-        upper_band_scatter_kwargs = {**dict(line=dict(color='grey')), **upper_band_scatter_kwargs}  # default kwargs
-        lower_band_scatter_kwargs = {**dict(line=dict(color='grey')), **lower_band_scatter_kwargs}
+        upper_band_trace_kwargs = {**dict(line=dict(color='grey')), **upper_band_trace_kwargs}  # default kwargs
+        lower_band_trace_kwargs = {**dict(line=dict(color='grey')), **lower_band_trace_kwargs}
 
         if plot_ts:
-            fig = self.ts.vbt.timeseries.plot(name=ts_name, scatter_kwargs=ts_scatter_kwargs, fig=fig, **layout_kwargs)
+            fig = self.ts.vbt.timeseries.plot(name=ts_name, trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
         fig = self.upper_band.vbt.timeseries.plot(
-            name=upper_band_name, scatter_kwargs=upper_band_scatter_kwargs, fig=fig)
+            name=upper_band_name, trace_kwargs=upper_band_trace_kwargs, fig=fig)
         fig = self.middle_band.vbt.timeseries.plot(
-            name=middle_band_name, scatter_kwargs=middle_band_scatter_kwargs, fig=fig)
+            name=middle_band_name, trace_kwargs=middle_band_trace_kwargs, fig=fig)
         fig = self.lower_band.vbt.timeseries.plot(
-            name=lower_band_name, scatter_kwargs=lower_band_scatter_kwargs, fig=fig)
+            name=lower_band_name, trace_kwargs=lower_band_trace_kwargs, fig=fig)
 
         return fig
 
@@ -705,7 +736,7 @@ class RSI(FactoryRSI):
 
     def plot(self,
              name=None,
-             scatter_kwargs={},
+             trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.rsi, pd.Series)
@@ -713,7 +744,7 @@ class RSI(FactoryRSI):
         if name is None:
             name = f'RSI ({self.name})'
 
-        fig = self.rsi.vbt.timeseries.plot(name=name, scatter_kwargs=scatter_kwargs, fig=fig, **layout_kwargs)
+        fig = self.rsi.vbt.timeseries.plot(name=name, trace_kwargs=trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -773,8 +804,8 @@ class Stochastic(FactoryStochastic):
     def plot(self,
              percent_k_name=None,
              percent_d_name=None,
-             percent_k_scatter_kwargs={},
-             percent_d_scatter_kwargs={},
+             percent_k_trace_kwargs={},
+             percent_d_trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.percent_k, pd.Series)
@@ -786,8 +817,8 @@ class Stochastic(FactoryStochastic):
             percent_d_name = f'%D ({self.name})'
 
         fig = self.percent_k.vbt.timeseries.plot(
-            name=percent_k_name, scatter_kwargs=percent_k_scatter_kwargs, fig=fig, **layout_kwargs)
-        fig = self.percent_d.vbt.timeseries.plot(name=percent_d_name, scatter_kwargs=percent_d_scatter_kwargs, fig=fig)
+            name=percent_k_name, trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.percent_d.vbt.timeseries.plot(name=percent_d_name, trace_kwargs=percent_d_trace_kwargs, fig=fig)
 
         return fig
 
@@ -833,8 +864,8 @@ class MACD(FactoryMACD):
     def plot(self,
              macd_name=None,
              signal_name=None,
-             macd_scatter_kwargs={},
-             signal_scatter_kwargs={},
+             macd_trace_kwargs={},
+             signal_trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.macd, pd.Series)
@@ -846,8 +877,8 @@ class MACD(FactoryMACD):
             signal_name = f'Signal ({self.name})'
 
         fig = self.macd.vbt.timeseries.plot(
-            name=macd_name, scatter_kwargs=macd_scatter_kwargs, fig=fig, **layout_kwargs)
-        fig = self.signal.vbt.timeseries.plot(name=signal_name, scatter_kwargs=signal_scatter_kwargs, fig=fig)
+            name=macd_name, trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.signal.vbt.timeseries.plot(name=signal_name, trace_kwargs=signal_trace_kwargs, fig=fig)
 
         return fig
 
@@ -890,7 +921,7 @@ class OBV(FactoryOBV):
 
     def plot(self,
              name=None,
-             scatter_kwargs={},
+             trace_kwargs={},
              fig=None,
              **layout_kwargs):
         check_type(self.obv, pd.Series)
@@ -898,6 +929,6 @@ class OBV(FactoryOBV):
         if name is None:
             name = f'OBV ({self.name})'
 
-        fig = self.obv.vbt.timeseries.plot(name=name, scatter_kwargs=scatter_kwargs, fig=fig, **layout_kwargs)
+        fig = self.obv.vbt.timeseries.plot(name=name, trace_kwargs=trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
