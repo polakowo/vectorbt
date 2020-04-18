@@ -132,11 +132,10 @@ But also, vectorized implementation is hard to read or cannot be properly define
 
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
-- Provides a collection of utility functions for working with data
+- Provides a [collection of utility functions](vectorbt/utils) for working with data
 - Extensive input and output validation during execution (data type, shape, etc.)
 - Implements NumPy broadcasting for pandas
     - Supports different modes for broadcasting index/columns
-- Charting functions with Plotly that help visualize backtest results
 - `vbt.timeseries` accessor for working with time-series data
     - Provides compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data
@@ -144,7 +143,14 @@ But also, vectorized implementation is hard to read or cannot be properly define
     - Generation of stop loss and trailing stop exits signals
 - `vbt.portfolio` accessor for modeling portfolio performance
     - From signals, orders, or custom order function
-    - Provides a range of performance time series, metrics, and charting functions
+    - Provides a range of performance time series, metrics, and plotting functions
+- Provides a range of indicators with full Numba support
+    - Moving average and STD, Dual Moving Average Crossover, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
+    - Indicator factory for construction of complex technical indicators in a simplified way
+    - Each indicator class offers methods for generating signals and plotting
+- Provides interactive Plotly-based widgets to visualize backtest results
+    - Gauge, Bar, Scatter, Histogram and Heatmap
+    - Full integration with ipywidgets
 
 ## Installation
 
