@@ -17,7 +17,6 @@ Here a snippet for testing 4851 window combinations of a dual SMA crossover stra
 ```python
 import vectorbt as vbt
 import numpy as np
-import itertools
 import yfinance as yf
 
 # Define params
