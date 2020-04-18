@@ -132,7 +132,7 @@ But also, vectorized implementation is hard to read or cannot be properly define
 
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
-- Provides a [collection of utility functions](vectorbt/utils) for working with data
+- Provides a [collection of utility functions](vectorbt/utils.py) for working with data
 - Extensive input and output validation during execution (data type, shape, etc.)
 - Implements NumPy broadcasting for pandas
     - Supports different modes for broadcasting index/columns
