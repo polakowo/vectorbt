@@ -75,6 +75,8 @@ a_df = pd.DataFrame(a)
 
 Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline.
 
+#### Broadcasting and indexing
+
 The other problem relies in broadcasting rules implemented in pandas: they are less flexible than in NumPy. Also, pandas follows strict rules regarding indexing; for example, you will have issues using multiple dataframes with different index/columns in the same operation, but such operations are quite common in backtesting (think of combining signals from different indicators, each having columns of the same cardinality but different labels).
 
 To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object.
