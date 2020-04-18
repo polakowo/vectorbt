@@ -90,24 +90,10 @@ df2 = pd.DataFrame(
     index=pd.Index(['x2', 'y2', 'z2'], name='idx2'), 
     columns=pd.Index(['a2', 'b2', 'c2'], name='cols2'))
 
-print(df)
-print(df2)
 print(df.vbt + df2.vbt)
 ```
 
 ```
-cols  a  b  c
-idx          
-x     1  2  3
-y     4  5  6
-z     7  8  9
-
-cols2  a2  b2  c2
-idx2             
-x2      1   2   3
-y2      4   5   6
-z2      7   8   9
-
 cols       a   b   c
 cols2     a2  b2  c2
 idx idx2            
