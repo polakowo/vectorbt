@@ -12,8 +12,6 @@ While there are [many other great backtesting packages for Python](https://githu
 
 Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Moving_average_crossover) strategy for example. By calculating the performance of each reasonable window combination and plotting the whole thing as a heatmap (as we do below), you can easily identify how performance depends on window size. If you additionally calculate the same heatmap over multiple time periods, you will spot how performance varies with downtrends and uptrends. By doing the same for other strategies such as holding and trading randomly, you can compare them using significance tests. With vectorbt, this analysis can be done in minutes, and will effectively save you hours of getting the same insights using other libraries.
 
-### Example
-
 Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 3 seconds:
 
 ```python
@@ -35,14 +33,14 @@ price = df['Close']
 dmac = vbt.DMAC.from_combinations(price, windows)
 entries, exits = dmac.crossover()
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, investment=investment, commission=commission)
-performance = portfolio.total_net_profit
+performance = portfolio.total_return * 100
 
 # Plot heatmap
-tnp_df = performance.vbt.unstack_to_df(symmetric=True)
-tnp_df.vbt.Heatmap(
+perf_df = performance.vbt.unstack_to_df(symmetric=True)
+perf_df.vbt.Heatmap(
     xaxis_title='Slow window', 
     yaxis_title='Fast window', 
-    trace_kwargs=dict(colorbar=dict(title='Net profit')),
+    trace_kwargs=dict(colorbar=dict(title='Total return in %')),
     width=600, height=450).show_png()
 ```
 

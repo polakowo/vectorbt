@@ -491,13 +491,13 @@ class Portfolio():
         return self.wrap_metric(appt)
 
     @cached_property
-    def total_net_profit(self):
-        total_net_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
-        return self.wrap_metric(total_net_profit)
+    def total_profit(self):
+        total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
+        return self.wrap_metric(total_profit)
 
     @cached_property
     def total_return(self):
-        total_return = to_1d(self.total_net_profit, raw=True) / self.investment
+        total_return = to_1d(self.total_profit, raw=True) / self.investment
         return self.wrap_metric(total_return)
 
     @cached_property
