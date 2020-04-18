@@ -37,10 +37,10 @@ performance = portfolio.total_net_profit
 
 # Plot heatmap
 tnp_df = performance.vbt.unstack_to_df(symmetric=True)
-tnp_df.vbt.Heatmap(width=600, height=450).show_png()
+tnp_df.vbt.Heatmap(xaxis_title='Slow window', yaxis_title='Fast window', width=600, height=450).show_png()
 ```
 
-![msft_heatmap.png](msft_heatmap.png)
+![dmac_heatmap.png](dmac_heatmap.png)
 
 ## How it works?
 
