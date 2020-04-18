@@ -134,8 +134,7 @@ But also, vectorized implementation is hard to read or cannot be properly define
 - For high performance, most operations are done stricly using NumPy and Numba 
 - Provides a [collection of utility functions](vectorbt/utils.py) for working with data
 - Extensive input and output validation during execution (data type, shape, etc.)
-- Implements NumPy broadcasting for pandas ([source]
-(https://github.com/polakowo/vectorbt/blob/8b228948f8dde793a467c18fd9798fd7c4c75dd4/vectorbt/utils.py#L645))
+- Implements NumPy broadcasting for pandas ([source](https://github.com/polakowo/vectorbt/blob/8b228948f8dde793a467c18fd9798fd7c4c75dd4/vectorbt/utils.py#L645))
     - Supports different modes for broadcasting index/columns
 - `vbt.timeseries` accessor for working with time-series data
     - Provides compiled versions of common pandas functions, such as rolling, groupby, and resample
