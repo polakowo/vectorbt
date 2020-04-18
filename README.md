@@ -1,3 +1,5 @@
+![](https://img.shields.io/badge/version-0.5-blue)
+
 # vectorbt
 
 ![Made by Vectors Market](logo.png)
