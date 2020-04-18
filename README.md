@@ -132,23 +132,23 @@ But also, vectorized implementation is hard to read or cannot be properly define
 
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
-- Provides a collection of utility functions for working with data
+- Provides a collection of utility functions for working with data ([utils.py](vectorbt/utils.py))
 - Extensive input and output validation during execution (data type, shape, etc.)
 - Implements NumPy broadcasting for pandas
     - Supports different modes for broadcasting index/columns
 - `vbt.timeseries` accessor for working with time-series data ([timeseries.py](vectorbt/timeseries.py))
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
-- `vbt.signals` accessor for working with signals data
+- `vbt.signals` accessor for working with signals data ([signals.py](vectorbt/signals.py))
     - Entry, exit and random signal generation, ranking and distance functions
     - Generation of stop loss and trailing stop exits signals
-- `vbt.portfolio` accessor for modeling portfolio performance
+- `vbt.portfolio` accessor for modeling portfolio performance ([portfolio.py](vectorbt/portfolio.py))
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
-- Provides a range of indicators with full Numba support
+- Provides a range of indicators with full Numba support ([indicators.py](vectorbt/indicators.py))
     - Moving average and STD, Dual Moving Average Crossover, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
     - Indicator factory for construction of complex technical indicators in a simplified way
     - Each indicator class offers methods for generating signals and plotting
-- Interactive Plotly-based widgets to visualize backtest results
+- Interactive Plotly-based widgets to visualize backtest results ([widgets.py](vectorbt/widgets.py))
     - Gauge, Bar, Scatter, Histogram and Heatmap
     - Full integration with ipywidgets
 
