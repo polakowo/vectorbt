@@ -86,7 +86,7 @@ Note: importing vectorbt for the first time may take a while due to compilation.
 
 ## Examples
 
-- [Testing Dual Moving Average Crossover (DMAC) strategy on Bitcoin](examples/Bitcoin_DMAC.ipynb)
-- [Testing stop-loss and trailing stop orders](examples/StopLoss.ipynb)
+- [Testing Dual Moving Average Crossover (DMAC) strategy on Bitcoin](examples/Bitcoin-DMAC.ipynb)
+- [Comparing stop-loss and trailing stop orders](examples/StopLoss-vs-TrailingStop.ipynb)
 
 Note: you will need to run the notebook to play with widgets.
