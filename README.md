@@ -143,7 +143,7 @@ But also, vectorized implementation is hard to read or cannot be properly define
     - Generation of stop loss and trailing stop exits signals
 - `vbt.portfolio` accessor for modeling portfolio performance ([portfolio.py](vectorbt/portfolio.py))
     - From signals, orders, or custom order function
-    - Provides a range of performance time series, metrics, and plotting functions
+    - A range of performance time series, metrics, and plotting functions
 - Provides a range of technical indicators with full Numba support ([indicators.py](vectorbt/indicators.py))
     - Moving average and STD, Dual Moving Average Crossover, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
     - Indicator factory for construction of complex technical indicators in a simplified way
