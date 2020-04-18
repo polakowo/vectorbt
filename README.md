@@ -60,7 +60,7 @@ In contrast to most other vectorized backtesting libraries where backtesting is 
 
 While there is a subset of pandas functionality that is already compiled with Cython and/or Numba, such as window functions, it cannot be accessed within user-defined Numba code, since Numba cannot do any compilation on pandas objects. Take for example generating trailing stop orders: to calculate expanding maximum for each order, you cannot do `df.expanding().max()` from within Numba, but write and compile your own expanding max function wrapped with `@njit`. That's why vectorbt also provides an arsenal of Numba-compiled functions that are ready to be used everywhere.
 
-But also compared to NumPy: some operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
+Compare to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
 
 ```
 a = np.random.randint(10, size=(1000, 1000)).astype(float)
@@ -74,6 +74,47 @@ a_df = pd.DataFrame(a)
 ```
 
 Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline.
+
+The other problem relies in broadcasting rules implemented in pandas: they are less flexible than in NumPy. Also, pandas follows strict rules regarding indexing; for example, you will have issues using multiple dataframes with different index/columns in the same operation, but such operations are quite common in backtesting (think of combining signals from different indicators, each having columns of the same cardinality but different labels).
+
+To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object:
+
+```python
+df = pd.DataFrame(
+    [[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
+    index=pd.Index(['x', 'y', 'z'], name='idx'), 
+    columns=pd.Index(['a', 'b', 'c'], name='cols'))
+    
+df2 = pd.DataFrame(
+    [[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
+    index=pd.Index(['x2', 'y2', 'z2'], name='idx2'), 
+    columns=pd.Index(['a2', 'b2', 'c2'], name='cols2'))
+
+print(df)
+print(df2)
+print(df.vbt + df2.vbt)
+```
+
+```
+cols  a  b  c
+idx          
+x     1  2  3
+y     4  5  6
+z     7  8  9
+
+cols2  a2  b2  c2
+idx2             
+x2      1   2   3
+y2      4   5   6
+z2      7   8   9
+
+cols       a   b   c
+cols2     a2  b2  c2
+idx idx2            
+x   x2     2   4   6
+y   y2     8  10  12
+z   z2    14  16  18
+```
 
 ### Why not pure NumPy?
 
