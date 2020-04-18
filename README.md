@@ -62,14 +62,16 @@ While there is a subset of pandas functionality that is already compiled with Cy
 
 Compare to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
 
-```
+```python
 a = np.random.randint(10, size=(1000, 1000)).astype(float)
 a_df = pd.DataFrame(a)
+```
 
-%timeit np.diff(a, axis=0) / a[:-1, :]
+```
+>>> %timeit np.diff(a, axis=0) / a[:-1, :]
 3.69 ms ± 110 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
-%timeit a_df.pct_change()
+>>> %timeit a_df.pct_change()
 266 ms ± 7.26 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
 
@@ -79,7 +81,7 @@ The other problem relies in broadcasting rules implemented in pandas: they are l
 
 To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object.
 
-Consider the following dataframes:
+Consider the following dataframes with different index/columns:
 
 ```python
 df = pd.DataFrame(
