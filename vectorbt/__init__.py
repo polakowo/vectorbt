@@ -1,8 +1,7 @@
-from vectorbt import timeseries, ohlcv, signals, strategy, portfolio, widgets, utils, accessors
+from vectorbt import timeseries, signals, indicators, portfolio, widgets, utils, accessors
 
 from vectorbt.timeseries import *
-from vectorbt.ohlcv import *
 from vectorbt.signals import *
-from vectorbt.strategy import *
+from vectorbt.indicators import *
 from vectorbt.portfolio import *
 from vectorbt.widgets import *

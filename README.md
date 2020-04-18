@@ -18,27 +18,25 @@ import numpy as np
 import itertools
 import yfinance as yf
 
-# Prepare data
-msft = yf.Ticker("MSFT")
-df = msft.history(period="max")
-price = df['Open']
+# Define params
 windows = np.arange(2, 101)
 investment = 100 # in $
 commission = 0.001 # in %
 
-# Create window combinations
-comb = itertools.combinations(windows, 2) # twice less params
-fast_windows, slow_windows = np.asarray(list(comb)).transpose()
+# Prepare data
+msft = yf.Ticker("MSFT")
+df = msft.history(period="max")
+price = df['Open']
 
 # Calculate the performance of the strategy
-dmac = vbt.DMAC(price, fast_windows, slow_windows)
-entries, exits = dmac.crossover_signals()
+dmac = vbt.DMAC.from_combinations(price, windows)
+entries, exits = dmac.crossover()
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, investment=investment, commission=commission)
 performance = portfolio.total_net_profit
 
 # Plot heatmap
 tnp_df = performance.vbt.unstack_to_df(symmetric=True)
-tnp_df.vbt.heatmap(width=600, height=450).show_png()
+tnp_df.vbt.Heatmap(width=600, height=450).show_png()
 ```
 
 ![msft_heatmap.png](msft_heatmap.png)
@@ -79,6 +77,8 @@ For more details, check [tests](tests/Modules.ipynb).
 ```
 pip install git+https://github.com/polakowo/vectorbt.git
 ```
+
+See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) for Plotly figures.
 
 Note: importing vectorbt for the first time may take a while due to compilation.
 
