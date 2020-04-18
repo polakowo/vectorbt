@@ -62,12 +62,10 @@ While there is a subset of pandas functionality that is already compiled with Cy
 
 Compare to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
 
-```python
+```
 a = np.random.randint(10, size=(1000, 1000)).astype(float)
 a_df = pd.DataFrame(a)
-```
 
-```
 >>> %timeit np.diff(a, axis=0) / a[:-1, :]
 3.69 ms ± 110 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 
@@ -109,7 +107,7 @@ z  NaN NaN NaN NaN NaN NaN
 z2 NaN NaN NaN NaN NaN NaN
 ```
 
-Addition operation using vectorbt yields correct results with stacked indices:
+Addition operation using vectorbt yields correct results:
 
 ```
 >>> print(df.vbt + df2.vbt)
