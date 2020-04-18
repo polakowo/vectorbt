@@ -60,7 +60,7 @@ In contrast to most other vectorized backtesting libraries where backtesting is 
 
 While there is a subset of pandas functionality that is already compiled with Cython and/or Numba, such as window functions, it cannot be accessed within user-defined Numba code, since Numba cannot do any compilation on pandas objects. Take for example generating trailing stop orders: to calculate expanding maximum for each order, you cannot do `df.expanding().max()` from within Numba, but write and compile your own expanding max function wrapped with `@njit`. That's why vectorbt also provides an arsenal of Numba-compiled functions that are ready to be used everywhere.
 
-Compare to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
+Compared to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
 
 ```
 a = np.random.randint(10, size=(1000, 1000)).astype(float)
@@ -124,7 +124,27 @@ z   z2    14  16  18
 
 ### Why not only NumPy?
 
-Working with NumPy alone, from the user's point of view, is problematic, since important information in form of index and columns and all indexing checks must be explicitly handled by the user, making analysis prone to errors. But also, vectorized implementation is hard to read or cannot be properly defined at all, and one must rely on an iterative approach instead, which is processing data in element-by-element fashion. That's where Numba comes into play: it allows both writing iterative code and compiling slow Python loops to be run at native machine code speed.
+Working with NumPy alone, from the user's point of view, is problematic, since important information in form of index and columns and all indexing checks must be explicitly handled by the user, making analysis prone to errors. 
+
+But also, vectorized implementation is hard to read or cannot be properly defined at all, and one must rely on an iterative approach instead, which is processing data in element-by-element fashion. That's where Numba comes into play: it allows both writing iterative code and compiling slow Python loops to be run at native machine code speed.
+
+## Features
+
+- Extends pandas using a custom `vbt` accessor
+- For high performance, most operations are done stricly using NumPy and Numba 
+- Provides a collection of utility functions for working with data
+- Extensive input and output validation during execution (data type, shape, etc.)
+- Implements NumPy broadcasting for pandas
+    - Supports different modes for broadcasting index/columns
+- Charting functions with Plotly that help visualize backtest results
+- `vbt.timeseries` accessor for working with time-series data
+    - Provides compiled versions of common pandas functions, such as rolling, groupby, and resample
+- `vbt.signals` accessor for working with signals data
+    - Entry, exit and random signal generation, ranking and distance functions
+    - Generation of stop loss and trailing stop exits signals
+- `vbt.portfolio` accessor for modeling portfolio performance
+    - From signals, orders, or custom order function
+    - Provides a range of performance time series, metrics, and charting functions
 
 ## Installation
 
