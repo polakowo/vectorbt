@@ -89,11 +89,27 @@ df2 = pd.DataFrame(
     [[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
     index=pd.Index(['x2', 'y2', 'z2'], name='idx2'), 
     columns=pd.Index(['a2', 'b2', 'c2'], name='cols2'))
-
-print(df.vbt + df2.vbt)
 ```
 
+Usual pandas operation:
+
 ```
+>>> print(df + df2)
+
+     a  a2   b  b2   c  c2
+x  NaN NaN NaN NaN NaN NaN
+x2 NaN NaN NaN NaN NaN NaN
+y  NaN NaN NaN NaN NaN NaN
+y2 NaN NaN NaN NaN NaN NaN
+z  NaN NaN NaN NaN NaN NaN
+z2 NaN NaN NaN NaN NaN NaN
+```
+
+vectorbt-enabled operation:
+
+```
+>>> print(df.vbt + df2.vbt)
+
 cols       a   b   c
 cols2     a2  b2  c2
 idx idx2            
