@@ -77,7 +77,9 @@ Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline
 
 The other problem relies in broadcasting rules implemented in pandas: they are less flexible than in NumPy. Also, pandas follows strict rules regarding indexing; for example, you will have issues using multiple dataframes with different index/columns in the same operation, but such operations are quite common in backtesting (think of combining signals from different indicators, each having columns of the same cardinality but different labels).
 
-To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object:
+To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object.
+
+Consider the following dataframes:
 
 ```python
 df = pd.DataFrame(
@@ -91,7 +93,7 @@ df2 = pd.DataFrame(
     columns=pd.Index(['a2', 'b2', 'c2'], name='cols2'))
 ```
 
-Usual pandas operation:
+Addition operation using pandas yields NaNs:
 
 ```
 >>> print(df + df2)
@@ -105,7 +107,7 @@ z  NaN NaN NaN NaN NaN NaN
 z2 NaN NaN NaN NaN NaN NaN
 ```
 
-vectorbt-enabled operation:
+Addition operation using vectorbt yields correct results with stacked indices:
 
 ```
 >>> print(df.vbt + df2.vbt)
