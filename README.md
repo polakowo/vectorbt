@@ -142,7 +142,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data ([signals.py](vectorbt/signals.py))
     - Entry, exit and random signal generation, ranking and distance functions
-    - Generation of stop loss and trailing stop exits signals
+    - Generation of stop loss and trailing stop order signals
 - `vbt.portfolio` accessor for modeling portfolio performance ([portfolio.py](vectorbt/portfolio.py))
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
@@ -150,7 +150,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - Moving average and STD, Dual Moving Average Crossover, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
     - Indicator factory for construction of complex technical indicators in a simplified way
     - Each indicator offers methods for generating signals and plotting
-    - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or products
+    - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or product
 - Interactive Plotly-based widgets to visualize backtest results ([widgets.py](vectorbt/widgets.py))
     - Gauge, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
