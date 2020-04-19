@@ -31,9 +31,11 @@ msft = yf.Ticker("BTC-USD")
 df = msft.history(period="max")
 price = df['Close']
 
-# Calculate the performance of the strategy
+# Generate signals
 dmac = vbt.DMAC.from_combinations(price, windows)
 entries, exits = dmac.crossover()
+
+# Calculate performance
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, investment=investment, commission=commission)
 performance = portfolio.total_return * 100
 
