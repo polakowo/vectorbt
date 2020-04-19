@@ -4,7 +4,9 @@
 
 ![Made by Vectors Market](logo.png)
 
-vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy, and is accelerated by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at speed and scale. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to process data on the fly and thus enable the user to interact with data-hungry widgets without significant delays.
+vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy, and is accelerated by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at speed and scale. 
+
+It follows a unique approach to backtesting that builds upon vectorized matrix calculations and fast iterative processing with Numba for event-driven backtesting. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to process data on the fly and thus enable the user to interact with data-hungry widgets without significant delays.
 
 ## Motivation
 
