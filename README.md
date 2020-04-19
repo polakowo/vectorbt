@@ -128,7 +128,7 @@ Working with NumPy alone, from the user's point of view, is problematic, since i
 
 But also, vectorized implementation is hard to read or cannot be properly defined at all, and one must rely on an iterative approach instead, which is processing data in element-by-element fashion. That's where Numba comes into play: it allows both writing iterative code and compiling slow Python loops to be run at native machine code speed.
 
-The previous versions of vectorbt were written in pure NumPy which led to more performance but less usability. You can find them in the commit history ending with [this commit](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5dc4ff5468dbcc14a29c4f45f557).
+The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5dc4ff5468dbcc14a29c4f45f557) of vectorbt were written in pure NumPy which led to more performance but less usability.
 
 ## Features
 
