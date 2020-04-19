@@ -149,10 +149,12 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
 - Provides a range of technical indicators with full Numba support ([indicators.py](vectorbt/indicators.py))
     - Moving average and STD, Dual Moving Average Crossover, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
     - Indicator factory for construction of complex technical indicators in a simplified way
-    - Each indicator class offers methods for generating signals and plotting
+    - Each indicator offers methods for generating signals and plotting
+    - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or products
 - Interactive Plotly-based widgets to visualize backtest results ([widgets.py](vectorbt/widgets.py))
     - Gauge, Bar, Scatter, Histogram and Heatmap
-    - Full integration with ipywidgets
+    - Each provides a method for efficiently updating data
+    - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
 
 ## Installation
 
