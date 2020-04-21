@@ -5,6 +5,7 @@ install:
 script:
     - pdoc --html --force --output-dir api vectorbt
     - mv api/vectorbt/* api
+    - mv docs/img api
     - rmdir api/vectorbt
     - rm -rf !(api)
     - echo "<meta http-equiv=\"refresh\" content=\"0; url=./api/index.html\" />" > index.html
