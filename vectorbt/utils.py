@@ -1247,11 +1247,7 @@ class Base_Accessor():
         """Broadcast with other objects to the same shape and combine them all pairwise.
         
         The returned shape is the same as broadcasted shape if concat is False.
-        The returned shape is concatenation of broadcasted shapes if concat is True.
-        
-        Examples
-        --------
-        Combining without stacking:"""
+        The returned shape is concatenation of broadcasted shapes if concat is True."""
         others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
         check_not_none(combine_func)
         check_type(others, Iterable)
