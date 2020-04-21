@@ -1,0 +1,4149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>vectorbt.utils API documentation</title>
+<meta name="description" content="" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>vectorbt.utils</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import numpy as np
+import pandas as pd
+from functools import wraps, reduce, update_wrapper
+from inspect import signature, Parameter
+import types
+import itertools
+from collections.abc import Iterable
+import numba
+from numba import njit, literal_unroll
+from numba.typed import List
+
+# ############# Configuration ############# #
+
+
+class Config(dict):
+    &#34;&#34;&#34;A simple dict with frozen keys.&#34;&#34;&#34;
+
+    def __init__(self, *args, **kwargs):
+        self.update(*args, **kwargs)
+        self.default_config = dict(self)
+        for key, value in dict.items(self):
+            if isinstance(value, dict):
+                dict.__setitem__(self, key, Config(value))
+
+    def __setitem__(self, key, val):
+        if key not in self:
+            raise KeyError(f&#34;Key {key} is not a valid parameter&#34;)
+        dict.__setitem__(self, key, val)
+
+    def reset(self):
+        self.update(self.default_config)
+
+
+# You can change defaults from code
+# Useful for magic methods that cannot accept keyword arguments
+defaults = Config(
+    broadcast=dict(
+        index_from=&#39;strict&#39;,
+        columns_from=&#39;stack&#39;
+    ),
+    broadcast_to=dict(
+        index_from=1,
+        columns_from=1
+    ),
+    drop_duplicates=True,
+    drop_redundant=True,
+    keep=&#39;last&#39;
+)
+
+# ############# Checks ############# #
+
+
+def is_series(arg):
+    return isinstance(arg, pd.Series)
+
+
+def is_frame(arg):
+    return isinstance(arg, pd.DataFrame)
+
+
+def is_pandas(arg):
+    return is_series(arg) or is_frame(arg)
+
+
+def is_array(arg):
+    return isinstance(arg, np.ndarray)
+
+
+def is_array_like(arg):
+    return is_pandas(arg) or is_array(arg)
+
+
+def is_numba_func(arg):
+    return isinstance(arg, numba.targets.registry.CPUDispatcher)
+
+
+def check_not_none(arg):
+    if arg is None:
+        raise TypeError(f&#34;Cannot be None&#34;)
+
+
+def check_type(arg, types):
+    if not isinstance(arg, types):
+        if isinstance(types, tuple):
+            raise TypeError(f&#34;Type must be one of {types}, not {type(arg)}&#34;)
+        else:
+            raise TypeError(f&#34;Type must be {types}, not {type(arg)}&#34;)
+
+
+def check_not_type(arg, types):
+    if isinstance(arg, types):
+        if isinstance(types, tuple):
+            raise TypeError(f&#34;Type cannot be any of {types}&#34;)
+        else:
+            raise TypeError(f&#34;Type cannot be {types}&#34;)
+
+
+def check_same_type(arg1, arg2):
+    if type(arg1) != type(arg2):
+        raise TypeError(f&#34;Types {type(arg1)} and {type(arg2)} do not match&#34;)
+
+
+def check_dtype(arg, dtype):
+    if is_frame(arg):
+        if (arg.dtypes != dtype).any():
+            raise ValueError(f&#34;Data type must be {dtype}, not {arg.dtypes}&#34;)
+    else:
+        if arg.dtype != dtype:
+            raise ValueError(f&#34;Data type must be {dtype}, not {arg.dtype}&#34;)
+
+
+def check_same_dtype(arg1, arg2):
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+    if is_frame(arg1):
+        dtypes1 = arg1.dtypes.to_numpy()
+    else:
+        dtypes1 = np.asarray([arg1.dtype])
+    if is_frame(arg2):
+        dtypes2 = arg2.dtypes.to_numpy()
+    else:
+        dtypes2 = np.asarray([arg2.dtype])
+    if len(dtypes1) == len(dtypes2):
+        if (dtypes1 == dtypes2).all():
+            return
+    elif len(np.unique(dtypes1)) == 1 and len(np.unique(dtypes2)) == 1:
+        if (np.unique(dtypes1) == np.unique(dtypes2)).all():
+            return
+    raise ValueError(f&#34;Data types {dtypes1} and {dtypes2} do not match&#34;)
+
+
+def check_ndim(arg, ndims):
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if isinstance(ndims, tuple):
+        if arg.ndim not in ndims:
+            raise ValueError(f&#34;Number of dimensions must be one of {ndims}, not {arg.ndim}&#34;)
+    else:
+        if arg.ndim != ndims:
+            raise ValueError(f&#34;Number of dimensions must be {ndims}, not {arg.ndim}&#34;)
+
+
+def check_same_len(arg1, arg2):
+    if len(arg1) != len(arg2):
+        raise ValueError(f&#34;Lengths {len(arg1)} and {len(arg2)} do not match&#34;)
+
+
+def check_same_shape(arg1, arg2, along_axis=None):
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+    if along_axis is None:
+        if arg1.shape != arg2.shape:
+            raise ValueError(f&#34;Shapes {arg1.shape} and {arg2.shape} do not match&#34;)
+    else:
+        if isinstance(along_axis, tuple):
+            if arg1.shape[along_axis[0]] != arg2.shape[along_axis[1]]:
+                raise ValueError(
+                    f&#34;Axis {along_axis[0]} of {arg1.shape} and axis {along_axis[1]} of {arg2.shape} do not match&#34;)
+        else:
+            if arg1.shape[along_axis] != arg2.shape[along_axis]:
+                raise ValueError(f&#34;Axis {along_axis} of {arg1.shape} and {arg2.shape} do not match&#34;)
+
+
+def check_same_index(arg1, arg2):
+    if not pd.Index.equals(arg1.index, arg2.index):
+        raise ValueError(f&#34;Indices {arg1.index} and {arg2.index} do not match&#34;)
+
+
+def check_same_columns(arg1, arg2):
+    if not pd.Index.equals(arg1.columns, arg2.columns):
+        raise ValueError(f&#34;Columns {arg1.columns} and {arg2.columns} do not match&#34;)
+
+
+def check_same_meta(arg1, arg2, check_dtype=True):
+    check_same_type(arg1, arg2)
+    check_same_shape(arg1, arg2)
+    if is_pandas(arg1) or is_pandas(arg2):
+        check_same_index(arg1, arg2)
+        check_same_columns(to_2d(arg1), to_2d(arg2))
+    if is_array_like(arg1) or is_array_like(arg2):
+        if check_dtype:
+            check_same_dtype(arg1, arg2)
+
+
+def check_same(arg1, arg2):
+    check_same_meta(arg1, arg2)
+    if is_pandas(arg1):
+        if arg1.equals(arg2):
+            return
+    else:
+        arg1 = np.asarray(arg1)
+        arg2 = np.asarray(arg2)
+        if np.array_equal(arg1, arg2):
+            return
+    raise ValueError(f&#34;Values do not match&#34;)
+
+
+def check_level_not_exists(arg, level_name):
+    if not is_frame(arg):
+        return
+    if isinstance(arg.columns, pd.MultiIndex):
+        names = arg.columns.names
+    else:
+        names = [arg.columns.name]
+    if level_name in names:
+        raise ValueError(f&#34;Level {level_name} already exists in {names}&#34;)
+
+# ############# Index and columns ############# #
+
+
+def index_from_values(values, name=None, value_names=None):
+    &#34;&#34;&#34;Create index using array of values.&#34;&#34;&#34;
+    if value_names is not None:
+        check_same_shape(values, value_names, along_axis=0)
+        return pd.Index(value_names, name=name)  # just return the names
+    value_names = []
+    for i, v in enumerate(values):
+        if not is_array(v):
+            v = np.asarray(v)
+        if np.all(v == v.item(0)):
+            value_names.append(v.item(0))
+        else:
+            value_names.append(&#39;mix_%d&#39; % i)
+    return pd.Index(value_names, name=name)
+
+
+def drop_redundant_levels(index):
+    &#34;&#34;&#34;Drop levels that have a single value.&#34;&#34;&#34;
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+    if len(index) == 1:
+        return index
+
+    if isinstance(index, pd.MultiIndex):
+        levels_to_drop = []
+        for i, level in enumerate(index.levels):
+            if len(level) == 1:
+                levels_to_drop.append(i)
+            elif level.name is None and (level == np.arange(len(level))).all():  # basic range
+                if len(index.get_level_values(i)) == len(level):
+                    levels_to_drop.append(i)
+        # Remove redundant levels only if there are some non-redundant levels left
+        if len(levels_to_drop) &lt; len(index.levels):
+            return index.droplevel(levels_to_drop)
+    return index
+
+
+def drop_duplicate_levels(index, keep=&#39;default&#39;):
+    &#34;&#34;&#34;Drop duplicate levels with the same name and values.&#34;&#34;&#34;
+    if isinstance(index, pd.Index) and not isinstance(index, pd.MultiIndex):
+        return index
+    check_type(index, pd.MultiIndex)
+
+    levels = []
+    levels_to_drop = []
+    if keep == &#39;default&#39;:
+        keep = defaults[&#39;keep&#39;]
+    if keep == &#39;first&#39;:
+        r = range(0, len(index.levels))
+    elif keep == &#39;last&#39;:
+        r = range(len(index.levels)-1, -1, -1)  # loop backwards
+    for i in r:
+        level = (index.levels[i].name, tuple(index.get_level_values(i).to_numpy().tolist()))
+        if level not in levels:
+            levels.append(level)
+        else:
+            levels_to_drop.append(i)
+    return index.droplevel(levels_to_drop)
+
+
+def clean_index(index, drop_duplicates=&#39;default&#39;, drop_redundant=&#39;default&#39;, **kwargs):
+    &#34;&#34;&#34;Clean index from redundant and/or duplicate levels.&#34;&#34;&#34;
+    if drop_duplicates == &#39;default&#39;:
+        drop_duplicates = defaults[&#39;drop_duplicates&#39;]
+    if drop_redundant == &#39;default&#39;:
+        drop_redundant = defaults[&#39;drop_redundant&#39;]
+
+    if drop_duplicates:
+        index = drop_duplicate_levels(index, **kwargs)
+    if drop_redundant:
+        index = drop_redundant_levels(index)
+    return index
+
+
+def repeat_index(index, n):
+    &#34;&#34;&#34;Repeat each element in index n times.&#34;&#34;&#34;
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+
+    return np.repeat(index, n)
+
+
+def tile_index(index, n):
+    &#34;&#34;&#34;Tile the whole index n times.&#34;&#34;&#34;
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+
+    if isinstance(index, pd.MultiIndex):
+        return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
+    return pd.Index(np.tile(index, n), name=index.name)
+
+
+def stack_indices(index1, index2):
+    &#34;&#34;&#34;Stack indices.&#34;&#34;&#34;
+    check_same_shape(index1, index2)
+    if not isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_arrays([index1])
+    if not isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_arrays([index2])
+
+    levels = []
+    for i in range(len(index1.names)):
+        levels.append(index1.get_level_values(i))
+    for i in range(len(index2.names)):
+        levels.append(index2.get_level_values(i))
+
+    new_index = pd.MultiIndex.from_arrays(levels)
+    return new_index
+
+
+def combine_indices(index1, index2):
+    &#34;&#34;&#34;Combine indices using Cartesian product.&#34;&#34;&#34;
+    if not isinstance(index1, pd.Index):
+        index1 = pd.Index(index1)
+    if not isinstance(index2, pd.Index):
+        index2 = pd.Index(index2)
+
+    if len(index1) == 1:
+        return index2
+    elif len(index2) == 1:
+        return index1
+
+    tuples1 = np.repeat(index1.to_numpy(), len(index2))
+    tuples2 = np.tile(index2.to_numpy(), len(index1))
+
+    if isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
+    else:
+        index1 = pd.Index(tuples1, name=index1.name)
+    if isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
+    else:
+        index2 = pd.Index(tuples2, name=index2.name)
+
+    return stack_indices(index1, index2)
+
+
+def drop_levels(index, levels):
+    &#34;&#34;&#34;Drop levels from index.&#34;&#34;&#34;
+    check_type(index, pd.MultiIndex)
+
+    levels_to_drop = []
+    if not isinstance(levels, (tuple, list)):
+        levels = [levels]
+    for level in levels:
+        if level in index.names:
+            levels_to_drop.append(level)
+    if len(levels_to_drop) &lt; len(index.names):
+        # Drop only if there will be some indices left
+        return index.droplevel(levels_to_drop)
+    return index
+
+
+def rename_levels(index, name_dict):
+    &#34;&#34;&#34;Rename index/column levels.&#34;&#34;&#34;
+    for k, v in name_dict.items():
+        if isinstance(index, pd.MultiIndex):
+            if k in index.names:
+                index = index.rename(v, level=k)
+        else:
+            if index.name == k:
+                index.name = v
+    return index
+
+
+# ############# Broadcasting ############# #
+
+def soft_broadcast_to_ndim(arg, ndim):
+    &#34;&#34;&#34;Try to softly bring the argument to the specified number of dimensions (max 2).&#34;&#34;&#34;
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if ndim == 1:
+        if arg.ndim == 2:
+            if arg.shape[1] == 1:
+                if is_pandas(arg):
+                    return arg.iloc[:, 0]
+                return arg[:, 0]  # downgrade
+    if ndim == 2:
+        if arg.ndim == 1:
+            if is_pandas(arg):
+                return arg.to_frame()
+            return arg[:, None]  # upgrade
+    return arg  # do nothing
+
+
+def wrap_array(arg, index=None, columns=None, dtype=None, default_index=None, default_columns=None, to_ndim=None):
+    &#34;&#34;&#34;Wrap array into a series/dataframe.&#34;&#34;&#34;
+    if not is_array(arg):
+        arg = np.asarray(arg)
+    if to_ndim is not None:
+        arg = soft_broadcast_to_ndim(arg, to_ndim)
+    if index is None:
+        index = default_index
+    if columns is None:
+        columns = default_columns
+    if columns is not None and len(columns) == 1:
+        name = columns[0]
+    else:
+        name = None
+
+    # Perform checks
+    if index is not None:
+        check_same_shape(arg, index, along_axis=(0, 0))
+    if arg.ndim == 2 and columns is not None:
+        check_same_shape(arg, columns, along_axis=(1, 0))
+
+    if arg.ndim == 1:
+        return pd.Series(arg, index=index, name=name, dtype=dtype)
+    return pd.DataFrame(arg, index=index, columns=columns, dtype=dtype)
+
+
+def to_1d(arg, raw=False):
+    &#34;&#34;&#34;Reshape argument to one dimension.&#34;&#34;&#34;
+    if raw:
+        arg = np.asarray(arg)
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if arg.ndim == 2:
+        if arg.shape[1] == 1:
+            if is_frame(arg):
+                return arg.iloc[:, 0]
+            return arg[:, 0]
+    if arg.ndim == 1:
+        return arg
+    elif arg.ndim == 0:
+        return arg.reshape((1,))
+    raise ValueError(f&#34;Cannot reshape a {arg.ndim}-dimensional array to 1 dimension&#34;)
+
+
+def to_2d(arg, raw=False, expand_axis=1):
+    &#34;&#34;&#34;Reshape argument to two dimensions.&#34;&#34;&#34;
+    if raw:
+        arg = np.asarray(arg)
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if arg.ndim == 2:
+        return arg
+    elif arg.ndim == 1:
+        if is_series(arg):
+            if expand_axis == 0:
+                return pd.DataFrame(arg.values[None, :], columns=arg.index)
+            elif expand_axis == 1:
+                return arg.to_frame()
+        return np.expand_dims(arg, expand_axis)
+    elif arg.ndim == 0:
+        return arg.reshape((1, 1))
+    raise ValueError(f&#34;Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions&#34;)
+
+
+def tile(arg, n, along_axis=1):
+    &#34;&#34;&#34;Tile array n times along specified axis.&#34;&#34;&#34;
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if along_axis == 0:
+        if arg.ndim == 1:
+            if is_pandas(arg):
+                return arg.vbt.wrap_array(
+                    np.tile(arg.values, n),
+                    index=tile_index(arg.index, n))
+            return np.tile(arg, n)
+        if arg.ndim == 2:
+            if is_pandas(arg):
+                return arg.vbt.wrap_array(
+                    np.tile(arg.values, (n, 1)),
+                    index=tile_index(arg.index, n))
+            return np.tile(arg, (n, 1))
+    elif along_axis == 1:
+        arg = to_2d(arg)
+        if is_pandas(arg):
+            return arg.vbt.wrap_array(
+                np.tile(arg.values, (1, n)),
+                columns=tile_index(arg.columns, n))
+        return np.tile(arg, (1, n))
+    else:
+        raise ValueError(&#34;Only axis 0 and 1 are supported&#34;)
+
+
+def repeat(arg, n, along_axis=1):
+    &#34;&#34;&#34;Repeat array n times along specified axis.&#34;&#34;&#34;
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if along_axis == 0:
+        if is_pandas(arg):
+            return arg.vbt.wrap_array(
+                np.repeat(arg.values, n, axis=0),
+                index=repeat_index(arg.index, n))
+        return np.repeat(arg, n, axis=0)
+    elif along_axis == 1:
+        arg = to_2d(arg)
+        if is_pandas(arg):
+            return arg.vbt.wrap_array(
+                np.repeat(arg.values, n, axis=1),
+                columns=repeat_index(arg.columns, n))
+        return np.repeat(arg, n, axis=1)
+    else:
+        raise ValueError(&#34;Only axis 0 and 1 are supported&#34;)
+
+
+def align_index_to(index1, index2):
+    &#34;&#34;&#34;Align the first index to the second one. 
+
+    Returns integer indices of occurrences and None if aligning not needed.
+
+    The second one must contain all levels from the first (and some more)
+    In all these levels, both must share the same elements.
+    Only then the first index can be broadcasted to the match the shape of the second one.&#34;&#34;&#34;
+    if not isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_arrays([index1])
+    if not isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_arrays([index2])
+    if index1.duplicated().any():
+        raise ValueError(&#34;Duplicates index values are not allowed for the first index&#34;)
+
+    if pd.Index.equals(index1, index2):
+        return pd.IndexSlice[:]
+    if len(index1) &lt;= len(index2):
+        if len(index1) == 1:
+            return pd.IndexSlice[np.tile([0])]
+        js = []
+        for i in range(len(index1.names)):
+            for j in range(len(index2.names)):
+                if index1.names[i] == index2.names[j]:
+                    if np.array_equal(index1.levels[i], index2.levels[j]):
+                        js.append(j)
+                        break
+        if len(index1.names) == len(js):
+            new_index = pd.MultiIndex.from_arrays([index2.get_level_values(j) for j in js])
+            xsorted = np.argsort(index1)
+            ypos = np.searchsorted(index1[xsorted], new_index)
+            return pd.IndexSlice[xsorted[ypos]]
+
+    raise ValueError(&#34;Indices could not be aligned together&#34;)
+
+
+def broadcast_index(*args, index_from=None, axis=0, is_2d=False, **kwargs):
+    &#34;&#34;&#34;Broadcast index/columns of all arguments.&#34;&#34;&#34;
+    index_str = &#39;columns&#39; if axis == 1 else &#39;index&#39;
+    new_index = None
+    if index_from is not None:
+        if isinstance(index_from, int):
+            # Take index/columns of the object indexed by index_from
+            if axis == 1:
+                new_index = to_2d(args[index_from]).columns
+            else:
+                new_index = args[index_from].index
+        elif isinstance(index_from, str) and index_from in (&#39;stack&#39;, &#39;strict&#39;):
+            # If pandas objects have different index/columns, stack them together
+            # maxlen stores the length of the longest index
+            max_shape = np.lib.stride_tricks._broadcast_shape(*args)
+            if axis == 1 and len(max_shape) == 1:
+                max_shape = (max_shape[0], 1)
+            maxlen = max_shape[1] if axis == 1 else max_shape[0]
+            for arg in args:
+                if is_pandas(arg):
+                    if is_series(arg):
+                        arg = arg.to_frame()  # series name counts as a column
+                    index = arg.columns if axis == 1 else arg.index
+                    if new_index is None:
+                        new_index = index
+                    else:
+                        if index_from == &#39;strict&#39;:
+                            # If pandas objects have different index/columns, raise an exception
+                            if not pd.Index.equals(index, new_index):
+                                raise ValueError(f&#34;Broadcasting {index_str} is not allowed for {index_str}_from=strict&#34;)
+                        # Broadcasting index must follow the rules of a regular broadcasting operation
+                        # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
+                        # 1. rule: if indices are of the same length, they are simply stacked
+                        # 2. rule: if index has one element, it gets repeated and then stacked
+
+                        if pd.Index.equals(index, new_index):
+                            continue
+                        if len(index) != len(new_index):
+                            if len(index) &gt; 1 and len(new_index) &gt; 1:
+                                raise ValueError(&#34;Indices could not be broadcast together&#34;)
+                            if len(index) &gt; len(new_index):
+                                new_index = repeat_index(new_index, len(index))
+                            elif len(index) &lt; len(new_index):
+                                index = repeat_index(index, len(new_index))
+                        new_index = clean_index(stack_indices(new_index, index), **kwargs)
+            if maxlen &gt; len(new_index):
+                if index_from == &#39;strict&#39;:
+                    raise ValueError(f&#34;Broadcasting {index_str} is not allowed for {index_str}_from=strict&#34;)
+                # This happens only when some numpy object is longer than the new pandas index
+                # In this case, new pandas index (one element) should be repeated to match this length.
+                if maxlen &gt; 1 and len(new_index) &gt; 1:
+                    raise ValueError(&#34;Indices could not be broadcast together&#34;)
+                new_index = repeat_index(new_index, maxlen)
+        else:
+            raise ValueError(f&#34;Invalid value {index_from} for {&#39;columns&#39; if axis == 1 else &#39;index&#39;}_from&#34;)
+    return new_index
+
+
+def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=None):
+    &#34;&#34;&#34;Transform newly broadcasted array to match the type of the original object.&#34;&#34;&#34;
+    if is_pd:
+        if is_pandas(old_arg):
+            if new_index is None:
+                # Take index from original pandas object
+                if old_arg.shape[0] == new_arg.shape[0]:
+                    new_index = old_arg.index
+                else:
+                    new_index = repeat_index(old_arg.index, new_arg.shape[0])
+            if new_columns is None:
+                # Take columns from original pandas object
+                if new_arg.ndim == 2:
+                    if is_series(old_arg):
+                        old_arg = old_arg.to_frame()
+                    if old_arg.shape[1] == new_arg.shape[1]:
+                        new_columns = old_arg.columns
+                    else:
+                        new_columns = repeat_index(old_arg.columns, new_arg.shape[1])
+        else:
+            if new_index is None and new_columns is None:
+                # Return plain numpy array if not pandas and no rules set
+                return new_arg
+        return wrap_array(new_arg, index=new_index, columns=new_columns)
+    return new_arg
+
+
+def is_broadcasting_needed(*args):
+    &#34;&#34;&#34;Broadcasting may be expensive, do we really need it?&#34;&#34;&#34;
+    args = list(args)
+    shapes = []
+    for i in range(len(args)):
+        if not is_array_like(args[i]):
+            args[i] = np.asarray(args[i])
+        shapes.append(args[i].shape)
+    return len(set(shapes)) &gt; 1
+
+
+def broadcast(*args, index_from=&#39;default&#39;, columns_from=&#39;default&#39;, writeable=False, copy_kwargs={}, **kwargs):
+    &#34;&#34;&#34;Bring multiple arguments to the same shape.&#34;&#34;&#34;
+    is_pd = False
+    is_2d = False
+    args = list(args)
+
+    # Convert to np.ndarray object if not numpy or pandas
+    for i in range(len(args)):
+        if not is_array_like(args[i]):
+            args[i] = np.asarray(args[i])
+        if args[i].ndim &gt; 1:
+            is_2d = True
+        if is_pandas(args[i]):
+            is_pd = True
+
+    if is_pd:
+        # Convert all pd.Series objects to pd.DataFrame
+        if is_2d:
+            for i in range(len(args)):
+                if is_series(args[i]):
+                    args[i] = args[i].to_frame()
+
+        # Decide on index and columns
+        if index_from == &#39;default&#39;:
+            index_from = defaults[&#39;broadcast&#39;][&#39;index_from&#39;]
+        if columns_from == &#39;default&#39;:
+            columns_from = defaults[&#39;broadcast&#39;][&#39;columns_from&#39;]
+        new_index = broadcast_index(*args, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
+        new_columns = broadcast_index(*args, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
+    else:
+        new_index, new_columns = None, None
+
+    # Perform broadcasting operation if needed
+    if is_broadcasting_needed(*args):
+        new_args = np.broadcast_arrays(*args, subok=True)
+        # The problem is that broadcasting creates readonly objects and numba requires writable ones.
+        # So we have to copy all of them, which is ok for small-sized arrays and not ok for large ones.
+
+        # copy kwarg is only applied when broadcasting was done to avoid deprecation warnings
+        # NOTE: If copy=False, then the resulting arrays will be readonly in the future!
+        new_args = list(map(lambda x: np.array(x, copy=writeable, **copy_kwargs), new_args))
+    else:
+        # No copy here, just pandas -&gt; numpy and any order to contiguous
+        new_args = list(map(lambda x: np.array(x, copy=False, **copy_kwargs), args))
+
+    # Bring arrays to their old types (e.g. array -&gt; pandas)
+    for i in range(len(new_args)):
+        new_args[i] = wrap_broadcasted(args[i], new_args[i], is_pd=is_pd, new_index=new_index, new_columns=new_columns)
+
+    return tuple(new_args)
+
+
+def broadcast_to(arg1, arg2, index_from=&#39;default&#39;, columns_from=&#39;default&#39;, writeable=False, copy_kwargs={}, raw=False, **kwargs):
+    &#34;&#34;&#34;Bring first argument to the shape of second argument. 
+
+    Closely resembles the other broadcast function.&#34;&#34;&#34;
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+
+    is_2d = arg1.ndim &gt; 1 or arg2.ndim &gt; 1
+    is_pd = is_pandas(arg1) or is_pandas(arg2)
+
+    if is_pd:
+        if is_2d:
+            if is_series(arg1):
+                arg1 = arg1.to_frame()
+            if is_series(arg2):
+                arg2 = arg2.to_frame()
+
+        if index_from == &#39;default&#39;:
+            index_from = defaults[&#39;broadcast_to&#39;][&#39;index_from&#39;]
+        if columns_from == &#39;default&#39;:
+            columns_from = defaults[&#39;broadcast_to&#39;][&#39;columns_from&#39;]
+        new_index = broadcast_index(arg1, arg2, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
+        new_columns = broadcast_index(arg1, arg2, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
+    else:
+        new_index, new_columns = None, None
+
+    if is_broadcasting_needed(arg1, arg2):
+        arg1_new = np.broadcast_to(arg1, arg2.shape, subok=True)
+        arg1_new = np.array(arg1_new, copy=writeable, **copy_kwargs)
+    else:
+        arg1_new = np.array(arg1, copy=False, **copy_kwargs)
+    return wrap_broadcasted(arg1, arg1_new, is_pd=is_pd, new_index=new_index, new_columns=new_columns)
+
+
+def broadcast_to_array_of(arg1, arg2):
+    &#34;&#34;&#34;Bring first argument to the shape of an array of second argument.&#34;&#34;&#34;
+    arg1 = np.asarray(arg1)
+    arg2 = np.asarray(arg2)
+    if arg1.ndim == arg2.ndim + 1:
+        if arg1.shape[1:] == arg2.shape:
+            return arg1
+    # From here on arg1 can be only a 1-dim array
+    if arg1.ndim == 0:
+        arg1 = to_1d(arg1)
+    check_ndim(arg1, 1)
+
+    if arg2.ndim == 0:
+        return arg1
+    for i in range(arg2.ndim):
+        arg1 = np.expand_dims(arg1, axis=-1)
+    return np.tile(arg1, (1, *arg2.shape))
+
+# ############# Indexing ############# #
+
+
+def copy_func(f):
+    &#34;&#34;&#34;Based on http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)&#34;&#34;&#34;
+    g = types.FunctionType(f.__code__, f.__globals__, name=f.__name__,
+                           argdefs=f.__defaults__,
+                           closure=f.__closure__)
+    g = update_wrapper(g, f)
+    g.__kwdefaults__ = f.__kwdefaults__
+    return g
+
+
+def add_indexing(indexing_func):
+    def wrapper(cls):
+        &#34;&#34;&#34;Add iloc, loc and plain brackets indexing to a class.
+
+        Each indexing operation is forwarded to the underlying pandas objects and
+        a new instance of the class with new pandas objects is created using the indexing_func.&#34;&#34;&#34;
+
+        class iLoc:
+            def __init__(self, obj):
+                self.obj = obj
+
+            def __getitem__(self, key):
+                return indexing_func(self.obj, lambda x: x.iloc.__getitem__(key))
+
+        class Loc:
+            def __init__(self, obj):
+                self.obj = obj
+
+            def __getitem__(self, key):
+                return indexing_func(self.obj, lambda x: x.loc.__getitem__(key))
+
+        @property
+        def iloc(self):
+            return self._iloc
+
+        @property
+        def loc(self):
+            return self._loc
+
+        def xs(self, *args, **kwargs):
+            return indexing_func(self, lambda x: x.xs(*args, **kwargs))
+
+        def __getitem__(self, key):
+            return indexing_func(self, lambda x: x.__getitem__(key))
+
+        orig_init_method = copy_func(cls.__init__)
+
+        def __init__(self, *args, **kwargs):
+            orig_init_method(self, *args, **kwargs)
+            self._iloc = iLoc(self)
+            self._loc = Loc(self)
+
+        setattr(cls, &#39;__init__&#39;, __init__)
+        setattr(cls, &#39;__getitem__&#39;, __getitem__)
+        setattr(cls, &#39;iloc&#39;, iloc)
+        setattr(cls, &#39;loc&#39;, loc)
+        setattr(cls, &#39;xs&#39;, xs)
+        return cls
+    return wrapper
+
+
+def loc_mapper(mapper, like_df, loc_pandas_func):
+    &#34;&#34;&#34;Broadcast mapper series to a dataframe to perform advanced pandas indexing on it.&#34;&#34;&#34;
+    df_range_mapper = broadcast_to(np.arange(len(mapper.index)), like_df, index_from=1, columns_from=1)
+    loced_range_mapper = loc_pandas_func(df_range_mapper)
+    new_mapper = mapper.iloc[loced_range_mapper.values[0]]
+    if is_frame(loced_range_mapper):
+        return pd.Series(new_mapper.values, index=loced_range_mapper.columns, name=mapper.name)
+    elif is_series(loced_range_mapper):
+        return pd.Series([new_mapper], index=[loced_range_mapper.name], name=mapper.name)
+
+
+def add_param_indexing(param_name, indexing_func):
+    def wrapper(cls):
+        &#34;&#34;&#34;Add loc indexing of params to a class.
+
+        Uses a mapper, which is just a pd.Series object that maps columns to params.&#34;&#34;&#34;
+
+        class ParamLoc:
+            def __init__(self, obj, param_mapper, level_names=None):
+                check_type(param_mapper, pd.Series)
+
+                self.obj = obj
+                if param_mapper.dtype == &#39;O&#39;:
+                    # If params are objects, we must cast them to string first
+                    # The original mapper isn&#39;t touched
+                    param_mapper = param_mapper.astype(str)
+                self.param_mapper = param_mapper
+
+            def get_indices(self, key):
+                if self.param_mapper.dtype == &#39;O&#39;:
+                    # We must also cast the key to string
+                    if isinstance(key, slice):
+                        start = str(key.start) if key.start is not None else None
+                        stop = str(key.stop) if key.stop is not None else None
+                        key = slice(start, stop, key.step)
+                    elif isinstance(key, (list, np.ndarray)):
+                        key = list(map(str, key))
+                    else:
+                        # Tuples, objects, etc.
+                        key = str(key)
+                param_mapper = self.param_mapper
+                # Use pandas to perform indexing
+                param_mapper = pd.Series(np.arange(len(param_mapper.index)), index=param_mapper.values)
+                indices = param_mapper.loc.__getitem__(key)
+                if isinstance(indices, pd.Series):
+                    indices = indices.values
+                return indices
+
+            def __getitem__(self, key):
+                indices = self.get_indices(key)
+                is_multiple = isinstance(key, (slice, list, np.ndarray))
+                level_name = self.param_mapper.name  # name of the mapper should contain level names of the params
+
+                def loc_pandas_func(obj):
+                    new_obj = obj.iloc[:, indices]
+                    if not is_multiple:
+                        # If we selected only one param, then remove its columns levels to keep it clean
+                        if level_name is not None:
+                            if is_frame(new_obj):
+                                if isinstance(new_obj.columns, pd.MultiIndex):
+                                    new_obj.columns = drop_levels(new_obj.columns, level_name)
+                    return new_obj
+
+                return indexing_func(self.obj, loc_pandas_func)
+
+        @property
+        def param_loc(self):
+            return getattr(self, f&#39;_{param_name}_loc&#39;)
+
+        orig_init_method = copy_func(cls.__init__)
+
+        def __init__(self, *args, **kwargs):
+            orig_init_method(self, *args, **kwargs)
+            mapper = getattr(self, f&#39;{param_name}_mapper&#39;)
+            setattr(self, f&#39;_{param_name}_loc&#39;, ParamLoc(self, mapper))
+
+        setattr(cls, &#39;__init__&#39;, __init__)
+        setattr(cls, f&#39;{param_name}_loc&#39;, param_loc)
+        return cls
+    return wrapper
+
+# ############# Stacking ############# #
+
+
+def unstack_to_array(arg):
+    &#34;&#34;&#34;Reshape object based on multi-index into a multi-dimensional array.&#34;&#34;&#34;
+    check_type(arg, (pd.Series, pd.DataFrame))
+    if is_frame(arg):
+        if arg.shape[0] == 1:
+            arg = arg.iloc[0, :]
+        elif arg.shape[1] == 1:
+            arg = arg.iloc[:, 0]
+    check_type(arg.index, pd.MultiIndex)
+    sr = to_1d(arg)
+
+    vals_idx_list = []
+    for i in range(len(sr.index.levels)):
+        vals = sr.index.get_level_values(i).to_numpy()
+        unique_vals = np.unique(vals)
+        idx_map = dict(zip(unique_vals, range(len(unique_vals))))
+        vals_idx = list(map(lambda x: idx_map[x], vals))
+        vals_idx_list.append(vals_idx)
+
+    a = np.full(list(map(len, sr.index.levels)), np.nan)
+    a[tuple(zip(vals_idx_list))] = sr.values
+    return a
+
+
+def make_symmetric(arg):
+    &#34;&#34;&#34;Make object symmetric along the diagonal.&#34;&#34;&#34;
+    check_type(arg, (pd.Series, pd.DataFrame))
+    arg = to_2d(arg)
+    check_not_type(arg.index, pd.MultiIndex)
+    check_not_type(arg.columns, pd.MultiIndex)
+
+    names = tuple(dict.fromkeys([arg.index.name, arg.columns.name]))
+    if len(names) == 1:
+        names = names[0]
+    unique_index = pd.Index(dict.fromkeys(arg.index.tolist() + arg.columns.tolist()), name=names)
+    df_out = pd.DataFrame(index=unique_index, columns=unique_index)
+    df_out.loc[:, :] = arg
+    df_out[df_out.isnull()] = arg.transpose()
+    return df_out
+
+
+def unstack_to_df(arg, symmetric=False):
+    &#34;&#34;&#34;Reshape object based on multi-index into dataframe.&#34;&#34;&#34;
+    check_type(arg, (pd.Series, pd.DataFrame))
+    if is_frame(arg):
+        if arg.shape[0] == 1:
+            arg = arg.iloc[0, :]
+        elif arg.shape[1] == 1:
+            arg = arg.iloc[:, 0]
+    check_type(arg.index, pd.MultiIndex)
+    sr = to_1d(arg)
+
+    index = sr.index.levels[0]
+    columns = sr.index.levels[1]
+    df = pd.DataFrame(unstack_to_array(sr), index=index, columns=columns)
+    if symmetric:
+        return make_symmetric(df)
+    return df
+
+
+def apply_and_concat_one(n, apply_func, *args, **kwargs):
+    &#34;&#34;&#34;For a range from 0 to n, apply a function and concat the results horizontally.&#34;&#34;&#34;
+    return np.hstack([to_2d(apply_func(i, *args, **kwargs)) for i in range(n)])
+
+
+@njit
+def to_2d_one_nb(a):
+    if a.ndim &gt; 1:
+        return a
+    return np.expand_dims(a, axis=1)
+
+
+@njit
+def apply_and_concat_one_nb(n, apply_func_nb, *args):  # numba doesn&#39;t accepts **kwargs
+    output_0 = to_2d_one_nb(apply_func_nb(0, *args))
+    output = np.empty((output_0.shape[0], n * output_0.shape[1]), dtype=output_0.dtype)
+    for i in range(n):
+        if i == 0:
+            outputs_i = output_0
+        else:
+            outputs_i = to_2d_one_nb(apply_func_nb(i, *args))
+        output[:, i*outputs_i.shape[1]:(i+1)*outputs_i.shape[1]] = outputs_i
+    return output
+
+
+def apply_and_concat_multiple(n, apply_func, *args, **kwargs):
+    outputs = [tuple(map(to_2d, apply_func(i, *args, **kwargs))) for i in range(n)]
+    return list(map(np.hstack, list(zip(*outputs))))
+
+
+@njit
+def to_2d_multiple_nb(a):
+    lst = List()
+    for _a in a:
+        lst.append(to_2d_one_nb(_a))
+    return lst
+
+
+@njit
+def apply_and_concat_multiple_nb(n, apply_func_nb, *args):  # numba doesn&#39;t accepts **kwargs
+    # NOTE: apply_func_nb must return a homogeneous tuple!
+    outputs = []
+    outputs_0 = to_2d_multiple_nb(apply_func_nb(0, *args))
+    for j in range(len(outputs_0)):
+        outputs.append(np.empty((outputs_0[j].shape[0], n * outputs_0[j].shape[1]), dtype=outputs_0[j].dtype))
+    for i in range(n):
+        if i == 0:
+            outputs_i = outputs_0
+        else:
+            outputs_i = to_2d_multiple_nb(apply_func_nb(i, *args))
+        for j in range(len(outputs_i)):
+            outputs[j][:, i*outputs_i[j].shape[1]:(i+1)*outputs_i[j].shape[1]] = outputs_i[j]
+    return outputs
+
+
+def apply_and_concat(obj, n, apply_func, *args, **kwargs):
+    return apply_and_concat_one(n, apply_func, obj, *args, **kwargs)
+
+
+@njit
+def apply_and_concat_nb(obj, n, apply_func_nb, *args):
+    return apply_and_concat_one_nb(n, apply_func_nb, obj, *args)
+
+
+def select_and_combine(i, obj, others, combine_func, *args, **kwargs):
+    return combine_func(obj, others[i], *args, **kwargs)
+
+
+def combine_and_concat(obj, others, combine_func, *args, **kwargs):
+    &#34;&#34;&#34;For each element in others, combine obj and other element and concat the results horizontally.&#34;&#34;&#34;
+    return apply_and_concat(obj, len(others), select_and_combine, others, combine_func, *args, **kwargs)
+
+
+@njit
+def select_and_combine_nb(i, obj, others, combine_func_nb, *args):
+    # NOTE: others must be homogeneuous!
+    return combine_func_nb(obj, others[i], *args)
+
+
+@njit
+def combine_and_concat_nb(obj, others, combine_func_nb, *args):
+    return apply_and_concat_nb(obj, len(others), select_and_combine_nb, others, combine_func_nb, *args)
+
+
+def combine_multiple(objs, combine_func, *args, **kwargs):
+    &#34;&#34;&#34;Combine a list of objects pairwise.&#34;&#34;&#34;
+    result = None
+    for i in range(1, len(objs)):
+        if result is None:
+            result = combine_func(objs[i-1], objs[i], *args, **kwargs)
+        else:
+            result = combine_func(result, objs[i], *args, **kwargs)
+    return result
+
+
+@njit
+def combine_multiple_nb(objs, combine_func_nb, *args):
+    # NOTE: each time combine_func_nb must return the array of the same type!
+    # Also NOTE: objs must all have the same type and arrays in the same memory order!
+    result = None
+    for i in range(1, len(objs)):
+        if result is None:
+            result = combine_func_nb(objs[i-1], objs[i], *args)
+        else:
+            result = combine_func_nb(result, objs[i], *args)
+    return result
+
+
+# ############# Numba decorators ############# #
+
+def get_default_args(func):
+    return {
+        k: v.default
+        for k, v in signature(func).parameters.items()
+        if v.default is not Parameter.empty
+    }
+
+
+def add_safe_nb_methods(*nb_funcs):
+    def wrapper(cls):
+        &#34;&#34;&#34;Wrap numba functions as methods.&#34;&#34;&#34;
+        for nb_func in nb_funcs:
+            default_kwargs = get_default_args(nb_func)
+
+            def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
+                if &#39;_1d&#39; in nb_func.__name__:
+                    return self.wrap_array(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
+                else:
+                    # We work natively on 2d arrays
+                    return self.wrap_array(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
+            setattr(cls, nb_func.__name__.replace(&#39;_1d&#39;, &#39;&#39;).replace(&#39;_nb&#39;, &#39;&#39;), array_operation)
+        return cls
+    return wrapper
+
+# ############# Caching ############# #
+
+
+def cached_property(func):
+    @wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        &#34;&#34;&#34;Cache property to avoid recalculating it again and again.&#34;&#34;&#34;
+        obj = args[0]
+        attr_name = &#39;_&#39; + func.__name__
+        if hasattr(obj, attr_name):
+            return getattr(obj, attr_name)
+        else:
+            to_be_cached = func(*args, **kwargs)
+            setattr(obj, attr_name, to_be_cached)
+            return to_be_cached
+    return property(wrapper_decorator)
+
+
+# ############# Custom accessors ############# #
+
+class class_or_instancemethod(classmethod):
+    def __get__(self, instance, type_):
+        descr_get = super().__get__ if instance is None else self.__func__.__get__
+        return descr_get(instance, type_)
+
+
+class Base_Accessor():
+    def __init__(self, obj):
+        self._obj = obj._obj  # access pandas object
+        self._validate(self._obj)
+
+    dtype = None
+
+    @classmethod
+    def _validate(cls, obj):
+        pass
+
+    def validate(self):
+        # Don&#39;t override it, just call it for the object to be instantiated
+        pass
+
+    @classmethod
+    def empty(cls, *args, **kwargs):
+        raise NotImplementedError
+
+    @classmethod
+    def empty_like(cls, *args, **kwargs):
+        raise NotImplementedError
+
+    def to_1d_array(self):
+        return to_1d(self._obj, raw=True)
+
+    def to_2d_array(self):
+        return to_2d(self._obj, raw=True)
+
+    def wrap_array(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def plot(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def tile(self, n, as_columns=None):
+        tiled = tile(self._obj, n, along_axis=1)
+        if as_columns is not None:
+            new_columns = combine_indices(as_columns, to_2d(self._obj).columns)
+            return self.wrap_array(tiled.values, columns=new_columns)
+        return tiled
+
+    def repeat(self, n, as_columns=None):
+        repeated = repeat(self._obj, n, along_axis=1)
+        if as_columns is not None:
+            new_columns = combine_indices(to_2d(self._obj).columns, as_columns)
+            return self.wrap_array(repeated.values, columns=new_columns)
+        return repeated
+
+    def align_to(self, other):
+        check_type(other, (pd.Series, pd.DataFrame))
+        obj = to_2d(self._obj)
+        other = to_2d(other)
+
+        aligned_index = align_index_to(obj.index, other.index)
+        aligned_columns = align_index_to(obj.columns, other.columns)
+        obj = obj.iloc[aligned_index, aligned_columns]
+        return self.wrap_array(obj.values, index=other.index, columns=other.columns)
+
+    @class_or_instancemethod
+    def broadcast(self_or_cls, *others, **kwargs):
+        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        if isinstance(self_or_cls, type):
+            return broadcast(*others, **kwargs)
+        return broadcast(self_or_cls._obj, *others, **kwargs)
+
+    def broadcast_to(self, other, **kwargs):
+        if isinstance(other, Base_Accessor):
+            other = other._obj
+        return broadcast_to(self._obj, other, **kwargs)
+
+    def make_symmetric(self):
+        return make_symmetric(self._obj)
+
+    def unstack_to_array(self):
+        return unstack_to_array(self._obj)
+
+    def unstack_to_df(self, **kwargs):
+        return unstack_to_df(self._obj, **kwargs)
+
+    @class_or_instancemethod
+    def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
+        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        if isinstance(self_or_cls, type):
+            objs = others
+        else:
+            objs = (self_or_cls._obj,) + others
+        broadcasted = broadcast(*objs, **broadcast_kwargs)
+        broadcasted = tuple(map(to_2d, broadcasted))
+        if is_pandas(broadcasted[0]):
+            concated = pd.concat(broadcasted, axis=1)
+            if as_columns is not None:
+                concated.columns = combine_indices(as_columns, broadcasted[0].columns)
+        else:
+            concated = np.hstack(broadcasted)
+        return concated
+
+    def apply_and_concat(self, ntimes, *args, apply_func=None, as_columns=None, **kwargs):
+        &#34;&#34;&#34;Apply a function n times and concatenate results into a single dataframe.&#34;&#34;&#34;
+        check_not_none(apply_func)
+        if is_numba_func(apply_func):
+            # NOTE: your apply_func must a numba-compiled function and arguments must be numba-compatible
+            # Also NOTE: outputs of apply_func must always be 2-dimensional
+            result = apply_and_concat_nb(np.asarray(self._obj), ntimes, apply_func, *args, **kwargs)
+        else:
+            result = apply_and_concat(np.asarray(self._obj), ntimes, apply_func, *args, **kwargs)
+        # Build column hierarchy
+        if as_columns is not None:
+            new_columns = combine_indices(as_columns, to_2d(self._obj).columns)
+        else:
+            new_columns = tile_index(to_2d(self._obj).columns, ntimes)
+        return self.wrap_array(result, columns=new_columns)
+
+    def combine_with(self, other, *args, combine_func=None, broadcast_kwargs={}, **kwargs):
+        &#34;&#34;&#34;Broadcast with other and combine.
+        
+        The returned shape is the same as broadcasted shape.&#34;&#34;&#34;
+        if isinstance(other, Base_Accessor):
+            other = other._obj
+        check_not_none(combine_func)
+        if is_numba_func(combine_func):
+            # Numba requires writable arrays
+            broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+        new_obj, new_other = broadcast(self._obj, other, **broadcast_kwargs)
+        return new_obj.vbt.wrap_array(combine_func(np.asarray(new_obj), np.asarray(new_other), *args, **kwargs))
+
+    def combine_with_multiple(self, others, *args, combine_func=None, concat=False,
+                              broadcast_kwargs={}, as_columns=None, **kwargs):
+        &#34;&#34;&#34;Broadcast with other objects to the same shape and combine them all pairwise.
+        
+        The returned shape is the same as broadcasted shape if concat is False.
+        The returned shape is concatenation of broadcasted shapes if concat is True.
+        
+        Examples
+        --------
+        Combining without stacking:&#34;&#34;&#34;
+        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        check_not_none(combine_func)
+        check_type(others, Iterable)
+        # Broadcast arguments
+        if is_numba_func(combine_func):
+            # Numba requires writable arrays
+            broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+            # Plus all of our arrays must be in the same order
+            broadcast_kwargs[&#39;copy_kwargs&#39;] = {**dict(order=&#39;C&#39;), **broadcast_kwargs.get(&#39;copy_kwargs&#39;, {})}
+        new_obj, *new_others = broadcast(self._obj, *others, **broadcast_kwargs)
+        broadcasted = tuple(map(np.asarray, (new_obj, *new_others)))
+        if concat:
+            # Concat the results horizontally
+            if is_numba_func(combine_func):
+                for i in range(1, len(broadcasted)):
+                    # NOTE: all inputs must have the same dtype
+                    check_same_meta(broadcasted[i-1], broadcasted[i])
+                result = combine_and_concat_nb(broadcasted[0], broadcasted[1:], combine_func, *args, **kwargs)
+            else:
+                result = combine_and_concat(broadcasted[0], broadcasted[1:], combine_func, *args, **kwargs)
+            if as_columns is not None:
+                new_columns = combine_indices(as_columns, to_2d(new_obj).columns)
+            else:
+                new_columns = tile_index(to_2d(new_obj).columns, len(others))
+            return new_obj.vbt.wrap_array(result, columns=new_columns)
+        else:
+            # Combine arguments pairwise into one object
+            if is_numba_func(combine_func):
+                for i in range(1, len(broadcasted)):
+                    # NOTE: all inputs must have the same dtype
+                    check_same_dtype(broadcasted[i-1], broadcasted[i])
+                result = combine_multiple_nb(broadcasted, combine_func, *args, **kwargs)
+            else:
+                result = combine_multiple(broadcasted, combine_func, *args, **kwargs)
+            return new_obj.vbt.wrap_array(result)
+
+    # Comparison operators
+    def __eq__(self, other): return self.combine_with(other, combine_func=np.equal)
+    def __ne__(self, other): return self.combine_with(other, combine_func=np.not_equal)
+    def __lt__(self, other): return self.combine_with(other, combine_func=np.less)
+    def __gt__(self, other): return self.combine_with(other, combine_func=np.greater)
+    def __le__(self, other): return self.combine_with(other, combine_func=np.less_equal)
+    def __ge__(self, other): return self.combine_with(other, combine_func=np.greater_equal)
+
+    # Binary operators
+    def __add__(self, other): return self.combine_with(other, combine_func=np.add)
+    def __sub__(self, other): return self.combine_with(other, combine_func=np.subtract)
+    def __mul__(self, other): return self.combine_with(other, combine_func=np.multiply)
+    def __div__(self, other): return self.combine_with(other, combine_func=np.divide)
+    __radd__ = __add__
+    __rsub__ = __sub__
+    __rmul__ = __mul__
+    __rdiv__ = __div__
+
+    # Boolean operators
+    def __and__(self, other): return self.combine_with(other, combine_func=np.logical_and)
+    def __or__(self, other): return self.combine_with(other, combine_func=np.logical_or)
+    def __xor__(self, other): return self.combine_with(other, combine_func=np.logical_xor)
+    __rand__ = __and__
+    __ror__ = __or__
+    __rxor__ = __xor__
+
+
+class Base_DFAccessor(Base_Accessor):
+
+    @classmethod
+    def _validate(cls, obj):
+        check_type(obj, pd.DataFrame)
+
+    @classmethod
+    def empty(cls, shape, fill_value=np.nan, index=None, columns=None):
+        return pd.DataFrame(
+            np.full(shape, fill_value),
+            index=index,
+            columns=columns,
+            dtype=cls.dtype)
+
+    @classmethod
+    def empty_like(cls, df, fill_value=np.nan):
+        cls._validate(df)
+
+        return cls.empty(
+            df.shape,
+            fill_value=fill_value,
+            index=df.index,
+            columns=df.columns)
+
+    def wrap_array(self, a, index=None, columns=None, dtype=None):
+        return wrap_array(a,
+                          index=index,
+                          columns=columns,
+                          dtype=dtype,
+                          default_index=self._obj.index,
+                          default_columns=self._obj.columns,
+                          to_ndim=2)
+
+
+class Base_SRAccessor(Base_Accessor):
+    # series is just a dataframe with one column
+    # this way we don&#39;t have to define our custom functions for working with 1d data
+    @classmethod
+    def _validate(cls, obj):
+        check_type(obj, pd.Series)
+
+    @classmethod
+    def empty(cls, size, fill_value=np.nan, index=None, name=None):
+        return pd.Series(
+            np.full(size, fill_value),
+            index=index,
+            name=name,
+            dtype=cls.dtype)
+
+    @classmethod
+    def empty_like(cls, sr, fill_value=np.nan):
+        cls._validate(sr)
+
+        return cls.empty(
+            sr.shape,
+            fill_value=fill_value,
+            index=sr.index,
+            name=sr.name)
+
+    def wrap_array(self, a, index=None, columns=None, dtype=None):
+        return wrap_array(a,
+                          index=index,
+                          columns=columns,
+                          dtype=dtype,
+                          default_index=self._obj.index,
+                          default_columns=[self._obj.name],
+                          to_ndim=1)</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="vectorbt.utils.add_indexing"><code class="name flex">
+<span>def <span class="ident">add_indexing</span></span>(<span>indexing_func)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_indexing(indexing_func):
+    def wrapper(cls):
+        &#34;&#34;&#34;Add iloc, loc and plain brackets indexing to a class.
+
+        Each indexing operation is forwarded to the underlying pandas objects and
+        a new instance of the class with new pandas objects is created using the indexing_func.&#34;&#34;&#34;
+
+        class iLoc:
+            def __init__(self, obj):
+                self.obj = obj
+
+            def __getitem__(self, key):
+                return indexing_func(self.obj, lambda x: x.iloc.__getitem__(key))
+
+        class Loc:
+            def __init__(self, obj):
+                self.obj = obj
+
+            def __getitem__(self, key):
+                return indexing_func(self.obj, lambda x: x.loc.__getitem__(key))
+
+        @property
+        def iloc(self):
+            return self._iloc
+
+        @property
+        def loc(self):
+            return self._loc
+
+        def xs(self, *args, **kwargs):
+            return indexing_func(self, lambda x: x.xs(*args, **kwargs))
+
+        def __getitem__(self, key):
+            return indexing_func(self, lambda x: x.__getitem__(key))
+
+        orig_init_method = copy_func(cls.__init__)
+
+        def __init__(self, *args, **kwargs):
+            orig_init_method(self, *args, **kwargs)
+            self._iloc = iLoc(self)
+            self._loc = Loc(self)
+
+        setattr(cls, &#39;__init__&#39;, __init__)
+        setattr(cls, &#39;__getitem__&#39;, __getitem__)
+        setattr(cls, &#39;iloc&#39;, iloc)
+        setattr(cls, &#39;loc&#39;, loc)
+        setattr(cls, &#39;xs&#39;, xs)
+        return cls
+    return wrapper</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.add_param_indexing"><code class="name flex">
+<span>def <span class="ident">add_param_indexing</span></span>(<span>param_name, indexing_func)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_param_indexing(param_name, indexing_func):
+    def wrapper(cls):
+        &#34;&#34;&#34;Add loc indexing of params to a class.
+
+        Uses a mapper, which is just a pd.Series object that maps columns to params.&#34;&#34;&#34;
+
+        class ParamLoc:
+            def __init__(self, obj, param_mapper, level_names=None):
+                check_type(param_mapper, pd.Series)
+
+                self.obj = obj
+                if param_mapper.dtype == &#39;O&#39;:
+                    # If params are objects, we must cast them to string first
+                    # The original mapper isn&#39;t touched
+                    param_mapper = param_mapper.astype(str)
+                self.param_mapper = param_mapper
+
+            def get_indices(self, key):
+                if self.param_mapper.dtype == &#39;O&#39;:
+                    # We must also cast the key to string
+                    if isinstance(key, slice):
+                        start = str(key.start) if key.start is not None else None
+                        stop = str(key.stop) if key.stop is not None else None
+                        key = slice(start, stop, key.step)
+                    elif isinstance(key, (list, np.ndarray)):
+                        key = list(map(str, key))
+                    else:
+                        # Tuples, objects, etc.
+                        key = str(key)
+                param_mapper = self.param_mapper
+                # Use pandas to perform indexing
+                param_mapper = pd.Series(np.arange(len(param_mapper.index)), index=param_mapper.values)
+                indices = param_mapper.loc.__getitem__(key)
+                if isinstance(indices, pd.Series):
+                    indices = indices.values
+                return indices
+
+            def __getitem__(self, key):
+                indices = self.get_indices(key)
+                is_multiple = isinstance(key, (slice, list, np.ndarray))
+                level_name = self.param_mapper.name  # name of the mapper should contain level names of the params
+
+                def loc_pandas_func(obj):
+                    new_obj = obj.iloc[:, indices]
+                    if not is_multiple:
+                        # If we selected only one param, then remove its columns levels to keep it clean
+                        if level_name is not None:
+                            if is_frame(new_obj):
+                                if isinstance(new_obj.columns, pd.MultiIndex):
+                                    new_obj.columns = drop_levels(new_obj.columns, level_name)
+                    return new_obj
+
+                return indexing_func(self.obj, loc_pandas_func)
+
+        @property
+        def param_loc(self):
+            return getattr(self, f&#39;_{param_name}_loc&#39;)
+
+        orig_init_method = copy_func(cls.__init__)
+
+        def __init__(self, *args, **kwargs):
+            orig_init_method(self, *args, **kwargs)
+            mapper = getattr(self, f&#39;{param_name}_mapper&#39;)
+            setattr(self, f&#39;_{param_name}_loc&#39;, ParamLoc(self, mapper))
+
+        setattr(cls, &#39;__init__&#39;, __init__)
+        setattr(cls, f&#39;{param_name}_loc&#39;, param_loc)
+        return cls
+    return wrapper</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.add_safe_nb_methods"><code class="name flex">
+<span>def <span class="ident">add_safe_nb_methods</span></span>(<span>*nb_funcs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def add_safe_nb_methods(*nb_funcs):
+    def wrapper(cls):
+        &#34;&#34;&#34;Wrap numba functions as methods.&#34;&#34;&#34;
+        for nb_func in nb_funcs:
+            default_kwargs = get_default_args(nb_func)
+
+            def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
+                if &#39;_1d&#39; in nb_func.__name__:
+                    return self.wrap_array(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
+                else:
+                    # We work natively on 2d arrays
+                    return self.wrap_array(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
+            setattr(cls, nb_func.__name__.replace(&#39;_1d&#39;, &#39;&#39;).replace(&#39;_nb&#39;, &#39;&#39;), array_operation)
+        return cls
+    return wrapper</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.align_index_to"><code class="name flex">
+<span>def <span class="ident">align_index_to</span></span>(<span>index1, index2)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Align the first index to the second one. </p>
+<p>Returns integer indices of occurrences and None if aligning not needed.</p>
+<p>The second one must contain all levels from the first (and some more)
+In all these levels, both must share the same elements.
+Only then the first index can be broadcasted to the match the shape of the second one.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def align_index_to(index1, index2):
+    &#34;&#34;&#34;Align the first index to the second one. 
+
+    Returns integer indices of occurrences and None if aligning not needed.
+
+    The second one must contain all levels from the first (and some more)
+    In all these levels, both must share the same elements.
+    Only then the first index can be broadcasted to the match the shape of the second one.&#34;&#34;&#34;
+    if not isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_arrays([index1])
+    if not isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_arrays([index2])
+    if index1.duplicated().any():
+        raise ValueError(&#34;Duplicates index values are not allowed for the first index&#34;)
+
+    if pd.Index.equals(index1, index2):
+        return pd.IndexSlice[:]
+    if len(index1) &lt;= len(index2):
+        if len(index1) == 1:
+            return pd.IndexSlice[np.tile([0])]
+        js = []
+        for i in range(len(index1.names)):
+            for j in range(len(index2.names)):
+                if index1.names[i] == index2.names[j]:
+                    if np.array_equal(index1.levels[i], index2.levels[j]):
+                        js.append(j)
+                        break
+        if len(index1.names) == len(js):
+            new_index = pd.MultiIndex.from_arrays([index2.get_level_values(j) for j in js])
+            xsorted = np.argsort(index1)
+            ypos = np.searchsorted(index1[xsorted], new_index)
+            return pd.IndexSlice[xsorted[ypos]]
+
+    raise ValueError(&#34;Indices could not be aligned together&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.apply_and_concat"><code class="name flex">
+<span>def <span class="ident">apply_and_concat</span></span>(<span>obj, n, apply_func, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_and_concat(obj, n, apply_func, *args, **kwargs):
+    return apply_and_concat_one(n, apply_func, obj, *args, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.apply_and_concat_multiple"><code class="name flex">
+<span>def <span class="ident">apply_and_concat_multiple</span></span>(<span>n, apply_func, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_and_concat_multiple(n, apply_func, *args, **kwargs):
+    outputs = [tuple(map(to_2d, apply_func(i, *args, **kwargs))) for i in range(n)]
+    return list(map(np.hstack, list(zip(*outputs))))</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.apply_and_concat_multiple_nb"><code class="name flex">
+<span>def <span class="ident">apply_and_concat_multiple_nb</span></span>(<span>n, apply_func_nb, *args)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def apply_and_concat_multiple_nb(n, apply_func_nb, *args):  # numba doesn&#39;t accepts **kwargs
+    # NOTE: apply_func_nb must return a homogeneous tuple!
+    outputs = []
+    outputs_0 = to_2d_multiple_nb(apply_func_nb(0, *args))
+    for j in range(len(outputs_0)):
+        outputs.append(np.empty((outputs_0[j].shape[0], n * outputs_0[j].shape[1]), dtype=outputs_0[j].dtype))
+    for i in range(n):
+        if i == 0:
+            outputs_i = outputs_0
+        else:
+            outputs_i = to_2d_multiple_nb(apply_func_nb(i, *args))
+        for j in range(len(outputs_i)):
+            outputs[j][:, i*outputs_i[j].shape[1]:(i+1)*outputs_i[j].shape[1]] = outputs_i[j]
+    return outputs</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.apply_and_concat_nb"><code class="name flex">
+<span>def <span class="ident">apply_and_concat_nb</span></span>(<span>obj, n, apply_func_nb, *args)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def apply_and_concat_nb(obj, n, apply_func_nb, *args):
+    return apply_and_concat_one_nb(n, apply_func_nb, obj, *args)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.apply_and_concat_one"><code class="name flex">
+<span>def <span class="ident">apply_and_concat_one</span></span>(<span>n, apply_func, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>For a range from 0 to n, apply a function and concat the results horizontally.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_and_concat_one(n, apply_func, *args, **kwargs):
+    &#34;&#34;&#34;For a range from 0 to n, apply a function and concat the results horizontally.&#34;&#34;&#34;
+    return np.hstack([to_2d(apply_func(i, *args, **kwargs)) for i in range(n)])</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.apply_and_concat_one_nb"><code class="name flex">
+<span>def <span class="ident">apply_and_concat_one_nb</span></span>(<span>n, apply_func_nb, *args)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def apply_and_concat_one_nb(n, apply_func_nb, *args):  # numba doesn&#39;t accepts **kwargs
+    output_0 = to_2d_one_nb(apply_func_nb(0, *args))
+    output = np.empty((output_0.shape[0], n * output_0.shape[1]), dtype=output_0.dtype)
+    for i in range(n):
+        if i == 0:
+            outputs_i = output_0
+        else:
+            outputs_i = to_2d_one_nb(apply_func_nb(i, *args))
+        output[:, i*outputs_i.shape[1]:(i+1)*outputs_i.shape[1]] = outputs_i
+    return output</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.broadcast"><code class="name flex">
+<span>def <span class="ident">broadcast</span></span>(<span>*args, index_from='default', columns_from='default', writeable=False, copy_kwargs={}, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Bring multiple arguments to the same shape.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def broadcast(*args, index_from=&#39;default&#39;, columns_from=&#39;default&#39;, writeable=False, copy_kwargs={}, **kwargs):
+    &#34;&#34;&#34;Bring multiple arguments to the same shape.&#34;&#34;&#34;
+    is_pd = False
+    is_2d = False
+    args = list(args)
+
+    # Convert to np.ndarray object if not numpy or pandas
+    for i in range(len(args)):
+        if not is_array_like(args[i]):
+            args[i] = np.asarray(args[i])
+        if args[i].ndim &gt; 1:
+            is_2d = True
+        if is_pandas(args[i]):
+            is_pd = True
+
+    if is_pd:
+        # Convert all pd.Series objects to pd.DataFrame
+        if is_2d:
+            for i in range(len(args)):
+                if is_series(args[i]):
+                    args[i] = args[i].to_frame()
+
+        # Decide on index and columns
+        if index_from == &#39;default&#39;:
+            index_from = defaults[&#39;broadcast&#39;][&#39;index_from&#39;]
+        if columns_from == &#39;default&#39;:
+            columns_from = defaults[&#39;broadcast&#39;][&#39;columns_from&#39;]
+        new_index = broadcast_index(*args, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
+        new_columns = broadcast_index(*args, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
+    else:
+        new_index, new_columns = None, None
+
+    # Perform broadcasting operation if needed
+    if is_broadcasting_needed(*args):
+        new_args = np.broadcast_arrays(*args, subok=True)
+        # The problem is that broadcasting creates readonly objects and numba requires writable ones.
+        # So we have to copy all of them, which is ok for small-sized arrays and not ok for large ones.
+
+        # copy kwarg is only applied when broadcasting was done to avoid deprecation warnings
+        # NOTE: If copy=False, then the resulting arrays will be readonly in the future!
+        new_args = list(map(lambda x: np.array(x, copy=writeable, **copy_kwargs), new_args))
+    else:
+        # No copy here, just pandas -&gt; numpy and any order to contiguous
+        new_args = list(map(lambda x: np.array(x, copy=False, **copy_kwargs), args))
+
+    # Bring arrays to their old types (e.g. array -&gt; pandas)
+    for i in range(len(new_args)):
+        new_args[i] = wrap_broadcasted(args[i], new_args[i], is_pd=is_pd, new_index=new_index, new_columns=new_columns)
+
+    return tuple(new_args)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.broadcast_index"><code class="name flex">
+<span>def <span class="ident">broadcast_index</span></span>(<span>*args, index_from=None, axis=0, is_2d=False, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Broadcast index/columns of all arguments.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def broadcast_index(*args, index_from=None, axis=0, is_2d=False, **kwargs):
+    &#34;&#34;&#34;Broadcast index/columns of all arguments.&#34;&#34;&#34;
+    index_str = &#39;columns&#39; if axis == 1 else &#39;index&#39;
+    new_index = None
+    if index_from is not None:
+        if isinstance(index_from, int):
+            # Take index/columns of the object indexed by index_from
+            if axis == 1:
+                new_index = to_2d(args[index_from]).columns
+            else:
+                new_index = args[index_from].index
+        elif isinstance(index_from, str) and index_from in (&#39;stack&#39;, &#39;strict&#39;):
+            # If pandas objects have different index/columns, stack them together
+            # maxlen stores the length of the longest index
+            max_shape = np.lib.stride_tricks._broadcast_shape(*args)
+            if axis == 1 and len(max_shape) == 1:
+                max_shape = (max_shape[0], 1)
+            maxlen = max_shape[1] if axis == 1 else max_shape[0]
+            for arg in args:
+                if is_pandas(arg):
+                    if is_series(arg):
+                        arg = arg.to_frame()  # series name counts as a column
+                    index = arg.columns if axis == 1 else arg.index
+                    if new_index is None:
+                        new_index = index
+                    else:
+                        if index_from == &#39;strict&#39;:
+                            # If pandas objects have different index/columns, raise an exception
+                            if not pd.Index.equals(index, new_index):
+                                raise ValueError(f&#34;Broadcasting {index_str} is not allowed for {index_str}_from=strict&#34;)
+                        # Broadcasting index must follow the rules of a regular broadcasting operation
+                        # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
+                        # 1. rule: if indices are of the same length, they are simply stacked
+                        # 2. rule: if index has one element, it gets repeated and then stacked
+
+                        if pd.Index.equals(index, new_index):
+                            continue
+                        if len(index) != len(new_index):
+                            if len(index) &gt; 1 and len(new_index) &gt; 1:
+                                raise ValueError(&#34;Indices could not be broadcast together&#34;)
+                            if len(index) &gt; len(new_index):
+                                new_index = repeat_index(new_index, len(index))
+                            elif len(index) &lt; len(new_index):
+                                index = repeat_index(index, len(new_index))
+                        new_index = clean_index(stack_indices(new_index, index), **kwargs)
+            if maxlen &gt; len(new_index):
+                if index_from == &#39;strict&#39;:
+                    raise ValueError(f&#34;Broadcasting {index_str} is not allowed for {index_str}_from=strict&#34;)
+                # This happens only when some numpy object is longer than the new pandas index
+                # In this case, new pandas index (one element) should be repeated to match this length.
+                if maxlen &gt; 1 and len(new_index) &gt; 1:
+                    raise ValueError(&#34;Indices could not be broadcast together&#34;)
+                new_index = repeat_index(new_index, maxlen)
+        else:
+            raise ValueError(f&#34;Invalid value {index_from} for {&#39;columns&#39; if axis == 1 else &#39;index&#39;}_from&#34;)
+    return new_index</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.broadcast_to"><code class="name flex">
+<span>def <span class="ident">broadcast_to</span></span>(<span>arg1, arg2, index_from='default', columns_from='default', writeable=False, copy_kwargs={}, raw=False, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Bring first argument to the shape of second argument. </p>
+<p>Closely resembles the other broadcast function.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def broadcast_to(arg1, arg2, index_from=&#39;default&#39;, columns_from=&#39;default&#39;, writeable=False, copy_kwargs={}, raw=False, **kwargs):
+    &#34;&#34;&#34;Bring first argument to the shape of second argument. 
+
+    Closely resembles the other broadcast function.&#34;&#34;&#34;
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+
+    is_2d = arg1.ndim &gt; 1 or arg2.ndim &gt; 1
+    is_pd = is_pandas(arg1) or is_pandas(arg2)
+
+    if is_pd:
+        if is_2d:
+            if is_series(arg1):
+                arg1 = arg1.to_frame()
+            if is_series(arg2):
+                arg2 = arg2.to_frame()
+
+        if index_from == &#39;default&#39;:
+            index_from = defaults[&#39;broadcast_to&#39;][&#39;index_from&#39;]
+        if columns_from == &#39;default&#39;:
+            columns_from = defaults[&#39;broadcast_to&#39;][&#39;columns_from&#39;]
+        new_index = broadcast_index(arg1, arg2, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
+        new_columns = broadcast_index(arg1, arg2, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
+    else:
+        new_index, new_columns = None, None
+
+    if is_broadcasting_needed(arg1, arg2):
+        arg1_new = np.broadcast_to(arg1, arg2.shape, subok=True)
+        arg1_new = np.array(arg1_new, copy=writeable, **copy_kwargs)
+    else:
+        arg1_new = np.array(arg1, copy=False, **copy_kwargs)
+    return wrap_broadcasted(arg1, arg1_new, is_pd=is_pd, new_index=new_index, new_columns=new_columns)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.broadcast_to_array_of"><code class="name flex">
+<span>def <span class="ident">broadcast_to_array_of</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Bring first argument to the shape of an array of second argument.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def broadcast_to_array_of(arg1, arg2):
+    &#34;&#34;&#34;Bring first argument to the shape of an array of second argument.&#34;&#34;&#34;
+    arg1 = np.asarray(arg1)
+    arg2 = np.asarray(arg2)
+    if arg1.ndim == arg2.ndim + 1:
+        if arg1.shape[1:] == arg2.shape:
+            return arg1
+    # From here on arg1 can be only a 1-dim array
+    if arg1.ndim == 0:
+        arg1 = to_1d(arg1)
+    check_ndim(arg1, 1)
+
+    if arg2.ndim == 0:
+        return arg1
+    for i in range(arg2.ndim):
+        arg1 = np.expand_dims(arg1, axis=-1)
+    return np.tile(arg1, (1, *arg2.shape))</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.cached_property"><code class="name flex">
+<span>def <span class="ident">cached_property</span></span>(<span>func)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def cached_property(func):
+    @wraps(func)
+    def wrapper_decorator(*args, **kwargs):
+        &#34;&#34;&#34;Cache property to avoid recalculating it again and again.&#34;&#34;&#34;
+        obj = args[0]
+        attr_name = &#39;_&#39; + func.__name__
+        if hasattr(obj, attr_name):
+            return getattr(obj, attr_name)
+        else:
+            to_be_cached = func(*args, **kwargs)
+            setattr(obj, attr_name, to_be_cached)
+            return to_be_cached
+    return property(wrapper_decorator)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_dtype"><code class="name flex">
+<span>def <span class="ident">check_dtype</span></span>(<span>arg, dtype)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_dtype(arg, dtype):
+    if is_frame(arg):
+        if (arg.dtypes != dtype).any():
+            raise ValueError(f&#34;Data type must be {dtype}, not {arg.dtypes}&#34;)
+    else:
+        if arg.dtype != dtype:
+            raise ValueError(f&#34;Data type must be {dtype}, not {arg.dtype}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_level_not_exists"><code class="name flex">
+<span>def <span class="ident">check_level_not_exists</span></span>(<span>arg, level_name)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_level_not_exists(arg, level_name):
+    if not is_frame(arg):
+        return
+    if isinstance(arg.columns, pd.MultiIndex):
+        names = arg.columns.names
+    else:
+        names = [arg.columns.name]
+    if level_name in names:
+        raise ValueError(f&#34;Level {level_name} already exists in {names}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_ndim"><code class="name flex">
+<span>def <span class="ident">check_ndim</span></span>(<span>arg, ndims)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_ndim(arg, ndims):
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if isinstance(ndims, tuple):
+        if arg.ndim not in ndims:
+            raise ValueError(f&#34;Number of dimensions must be one of {ndims}, not {arg.ndim}&#34;)
+    else:
+        if arg.ndim != ndims:
+            raise ValueError(f&#34;Number of dimensions must be {ndims}, not {arg.ndim}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_not_none"><code class="name flex">
+<span>def <span class="ident">check_not_none</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_not_none(arg):
+    if arg is None:
+        raise TypeError(f&#34;Cannot be None&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_not_type"><code class="name flex">
+<span>def <span class="ident">check_not_type</span></span>(<span>arg, types)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_not_type(arg, types):
+    if isinstance(arg, types):
+        if isinstance(types, tuple):
+            raise TypeError(f&#34;Type cannot be any of {types}&#34;)
+        else:
+            raise TypeError(f&#34;Type cannot be {types}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same"><code class="name flex">
+<span>def <span class="ident">check_same</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same(arg1, arg2):
+    check_same_meta(arg1, arg2)
+    if is_pandas(arg1):
+        if arg1.equals(arg2):
+            return
+    else:
+        arg1 = np.asarray(arg1)
+        arg2 = np.asarray(arg2)
+        if np.array_equal(arg1, arg2):
+            return
+    raise ValueError(f&#34;Values do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_columns"><code class="name flex">
+<span>def <span class="ident">check_same_columns</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_columns(arg1, arg2):
+    if not pd.Index.equals(arg1.columns, arg2.columns):
+        raise ValueError(f&#34;Columns {arg1.columns} and {arg2.columns} do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_dtype"><code class="name flex">
+<span>def <span class="ident">check_same_dtype</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_dtype(arg1, arg2):
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+    if is_frame(arg1):
+        dtypes1 = arg1.dtypes.to_numpy()
+    else:
+        dtypes1 = np.asarray([arg1.dtype])
+    if is_frame(arg2):
+        dtypes2 = arg2.dtypes.to_numpy()
+    else:
+        dtypes2 = np.asarray([arg2.dtype])
+    if len(dtypes1) == len(dtypes2):
+        if (dtypes1 == dtypes2).all():
+            return
+    elif len(np.unique(dtypes1)) == 1 and len(np.unique(dtypes2)) == 1:
+        if (np.unique(dtypes1) == np.unique(dtypes2)).all():
+            return
+    raise ValueError(f&#34;Data types {dtypes1} and {dtypes2} do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_index"><code class="name flex">
+<span>def <span class="ident">check_same_index</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_index(arg1, arg2):
+    if not pd.Index.equals(arg1.index, arg2.index):
+        raise ValueError(f&#34;Indices {arg1.index} and {arg2.index} do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_len"><code class="name flex">
+<span>def <span class="ident">check_same_len</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_len(arg1, arg2):
+    if len(arg1) != len(arg2):
+        raise ValueError(f&#34;Lengths {len(arg1)} and {len(arg2)} do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_meta"><code class="name flex">
+<span>def <span class="ident">check_same_meta</span></span>(<span>arg1, arg2, check_dtype=True)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_meta(arg1, arg2, check_dtype=True):
+    check_same_type(arg1, arg2)
+    check_same_shape(arg1, arg2)
+    if is_pandas(arg1) or is_pandas(arg2):
+        check_same_index(arg1, arg2)
+        check_same_columns(to_2d(arg1), to_2d(arg2))
+    if is_array_like(arg1) or is_array_like(arg2):
+        if check_dtype:
+            check_same_dtype(arg1, arg2)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_shape"><code class="name flex">
+<span>def <span class="ident">check_same_shape</span></span>(<span>arg1, arg2, along_axis=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_shape(arg1, arg2, along_axis=None):
+    if not is_array_like(arg1):
+        arg1 = np.asarray(arg1)
+    if not is_array_like(arg2):
+        arg2 = np.asarray(arg2)
+    if along_axis is None:
+        if arg1.shape != arg2.shape:
+            raise ValueError(f&#34;Shapes {arg1.shape} and {arg2.shape} do not match&#34;)
+    else:
+        if isinstance(along_axis, tuple):
+            if arg1.shape[along_axis[0]] != arg2.shape[along_axis[1]]:
+                raise ValueError(
+                    f&#34;Axis {along_axis[0]} of {arg1.shape} and axis {along_axis[1]} of {arg2.shape} do not match&#34;)
+        else:
+            if arg1.shape[along_axis] != arg2.shape[along_axis]:
+                raise ValueError(f&#34;Axis {along_axis} of {arg1.shape} and {arg2.shape} do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_same_type"><code class="name flex">
+<span>def <span class="ident">check_same_type</span></span>(<span>arg1, arg2)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_same_type(arg1, arg2):
+    if type(arg1) != type(arg2):
+        raise TypeError(f&#34;Types {type(arg1)} and {type(arg2)} do not match&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.check_type"><code class="name flex">
+<span>def <span class="ident">check_type</span></span>(<span>arg, types)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_type(arg, types):
+    if not isinstance(arg, types):
+        if isinstance(types, tuple):
+            raise TypeError(f&#34;Type must be one of {types}, not {type(arg)}&#34;)
+        else:
+            raise TypeError(f&#34;Type must be {types}, not {type(arg)}&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.clean_index"><code class="name flex">
+<span>def <span class="ident">clean_index</span></span>(<span>index, drop_duplicates='default', drop_redundant='default', **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Clean index from redundant and/or duplicate levels.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clean_index(index, drop_duplicates=&#39;default&#39;, drop_redundant=&#39;default&#39;, **kwargs):
+    &#34;&#34;&#34;Clean index from redundant and/or duplicate levels.&#34;&#34;&#34;
+    if drop_duplicates == &#39;default&#39;:
+        drop_duplicates = defaults[&#39;drop_duplicates&#39;]
+    if drop_redundant == &#39;default&#39;:
+        drop_redundant = defaults[&#39;drop_redundant&#39;]
+
+    if drop_duplicates:
+        index = drop_duplicate_levels(index, **kwargs)
+    if drop_redundant:
+        index = drop_redundant_levels(index)
+    return index</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.combine_and_concat"><code class="name flex">
+<span>def <span class="ident">combine_and_concat</span></span>(<span>obj, others, combine_func, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>For each element in others, combine obj and other element and concat the results horizontally.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def combine_and_concat(obj, others, combine_func, *args, **kwargs):
+    &#34;&#34;&#34;For each element in others, combine obj and other element and concat the results horizontally.&#34;&#34;&#34;
+    return apply_and_concat(obj, len(others), select_and_combine, others, combine_func, *args, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.combine_and_concat_nb"><code class="name flex">
+<span>def <span class="ident">combine_and_concat_nb</span></span>(<span>obj, others, combine_func_nb, *args)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def combine_and_concat_nb(obj, others, combine_func_nb, *args):
+    return apply_and_concat_nb(obj, len(others), select_and_combine_nb, others, combine_func_nb, *args)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.combine_indices"><code class="name flex">
+<span>def <span class="ident">combine_indices</span></span>(<span>index1, index2)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Combine indices using Cartesian product.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def combine_indices(index1, index2):
+    &#34;&#34;&#34;Combine indices using Cartesian product.&#34;&#34;&#34;
+    if not isinstance(index1, pd.Index):
+        index1 = pd.Index(index1)
+    if not isinstance(index2, pd.Index):
+        index2 = pd.Index(index2)
+
+    if len(index1) == 1:
+        return index2
+    elif len(index2) == 1:
+        return index1
+
+    tuples1 = np.repeat(index1.to_numpy(), len(index2))
+    tuples2 = np.tile(index2.to_numpy(), len(index1))
+
+    if isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
+    else:
+        index1 = pd.Index(tuples1, name=index1.name)
+    if isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
+    else:
+        index2 = pd.Index(tuples2, name=index2.name)
+
+    return stack_indices(index1, index2)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.combine_multiple"><code class="name flex">
+<span>def <span class="ident">combine_multiple</span></span>(<span>objs, combine_func, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Combine a list of objects pairwise.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def combine_multiple(objs, combine_func, *args, **kwargs):
+    &#34;&#34;&#34;Combine a list of objects pairwise.&#34;&#34;&#34;
+    result = None
+    for i in range(1, len(objs)):
+        if result is None:
+            result = combine_func(objs[i-1], objs[i], *args, **kwargs)
+        else:
+            result = combine_func(result, objs[i], *args, **kwargs)
+    return result</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.combine_multiple_nb"><code class="name flex">
+<span>def <span class="ident">combine_multiple_nb</span></span>(<span>objs, combine_func_nb, *args)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def combine_multiple_nb(objs, combine_func_nb, *args):
+    # NOTE: each time combine_func_nb must return the array of the same type!
+    # Also NOTE: objs must all have the same type and arrays in the same memory order!
+    result = None
+    for i in range(1, len(objs)):
+        if result is None:
+            result = combine_func_nb(objs[i-1], objs[i], *args)
+        else:
+            result = combine_func_nb(result, objs[i], *args)
+    return result</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.copy_func"><code class="name flex">
+<span>def <span class="ident">copy_func</span></span>(<span>f)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Based on <a href="http://stackoverflow.com/a/6528148/190597">http://stackoverflow.com/a/6528148/190597</a> (Glenn Maynard)</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def copy_func(f):
+    &#34;&#34;&#34;Based on http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)&#34;&#34;&#34;
+    g = types.FunctionType(f.__code__, f.__globals__, name=f.__name__,
+                           argdefs=f.__defaults__,
+                           closure=f.__closure__)
+    g = update_wrapper(g, f)
+    g.__kwdefaults__ = f.__kwdefaults__
+    return g</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.drop_duplicate_levels"><code class="name flex">
+<span>def <span class="ident">drop_duplicate_levels</span></span>(<span>index, keep='default')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Drop duplicate levels with the same name and values.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drop_duplicate_levels(index, keep=&#39;default&#39;):
+    &#34;&#34;&#34;Drop duplicate levels with the same name and values.&#34;&#34;&#34;
+    if isinstance(index, pd.Index) and not isinstance(index, pd.MultiIndex):
+        return index
+    check_type(index, pd.MultiIndex)
+
+    levels = []
+    levels_to_drop = []
+    if keep == &#39;default&#39;:
+        keep = defaults[&#39;keep&#39;]
+    if keep == &#39;first&#39;:
+        r = range(0, len(index.levels))
+    elif keep == &#39;last&#39;:
+        r = range(len(index.levels)-1, -1, -1)  # loop backwards
+    for i in r:
+        level = (index.levels[i].name, tuple(index.get_level_values(i).to_numpy().tolist()))
+        if level not in levels:
+            levels.append(level)
+        else:
+            levels_to_drop.append(i)
+    return index.droplevel(levels_to_drop)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.drop_levels"><code class="name flex">
+<span>def <span class="ident">drop_levels</span></span>(<span>index, levels)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Drop levels from index.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drop_levels(index, levels):
+    &#34;&#34;&#34;Drop levels from index.&#34;&#34;&#34;
+    check_type(index, pd.MultiIndex)
+
+    levels_to_drop = []
+    if not isinstance(levels, (tuple, list)):
+        levels = [levels]
+    for level in levels:
+        if level in index.names:
+            levels_to_drop.append(level)
+    if len(levels_to_drop) &lt; len(index.names):
+        # Drop only if there will be some indices left
+        return index.droplevel(levels_to_drop)
+    return index</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.drop_redundant_levels"><code class="name flex">
+<span>def <span class="ident">drop_redundant_levels</span></span>(<span>index)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Drop levels that have a single value.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def drop_redundant_levels(index):
+    &#34;&#34;&#34;Drop levels that have a single value.&#34;&#34;&#34;
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+    if len(index) == 1:
+        return index
+
+    if isinstance(index, pd.MultiIndex):
+        levels_to_drop = []
+        for i, level in enumerate(index.levels):
+            if len(level) == 1:
+                levels_to_drop.append(i)
+            elif level.name is None and (level == np.arange(len(level))).all():  # basic range
+                if len(index.get_level_values(i)) == len(level):
+                    levels_to_drop.append(i)
+        # Remove redundant levels only if there are some non-redundant levels left
+        if len(levels_to_drop) &lt; len(index.levels):
+            return index.droplevel(levels_to_drop)
+    return index</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.get_default_args"><code class="name flex">
+<span>def <span class="ident">get_default_args</span></span>(<span>func)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_default_args(func):
+    return {
+        k: v.default
+        for k, v in signature(func).parameters.items()
+        if v.default is not Parameter.empty
+    }</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.index_from_values"><code class="name flex">
+<span>def <span class="ident">index_from_values</span></span>(<span>values, name=None, value_names=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Create index using array of values.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def index_from_values(values, name=None, value_names=None):
+    &#34;&#34;&#34;Create index using array of values.&#34;&#34;&#34;
+    if value_names is not None:
+        check_same_shape(values, value_names, along_axis=0)
+        return pd.Index(value_names, name=name)  # just return the names
+    value_names = []
+    for i, v in enumerate(values):
+        if not is_array(v):
+            v = np.asarray(v)
+        if np.all(v == v.item(0)):
+            value_names.append(v.item(0))
+        else:
+            value_names.append(&#39;mix_%d&#39; % i)
+    return pd.Index(value_names, name=name)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_array"><code class="name flex">
+<span>def <span class="ident">is_array</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_array(arg):
+    return isinstance(arg, np.ndarray)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_array_like"><code class="name flex">
+<span>def <span class="ident">is_array_like</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_array_like(arg):
+    return is_pandas(arg) or is_array(arg)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_broadcasting_needed"><code class="name flex">
+<span>def <span class="ident">is_broadcasting_needed</span></span>(<span>*args)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Broadcasting may be expensive, do we really need it?</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_broadcasting_needed(*args):
+    &#34;&#34;&#34;Broadcasting may be expensive, do we really need it?&#34;&#34;&#34;
+    args = list(args)
+    shapes = []
+    for i in range(len(args)):
+        if not is_array_like(args[i]):
+            args[i] = np.asarray(args[i])
+        shapes.append(args[i].shape)
+    return len(set(shapes)) &gt; 1</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_frame"><code class="name flex">
+<span>def <span class="ident">is_frame</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_frame(arg):
+    return isinstance(arg, pd.DataFrame)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_numba_func"><code class="name flex">
+<span>def <span class="ident">is_numba_func</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_numba_func(arg):
+    return isinstance(arg, numba.targets.registry.CPUDispatcher)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_pandas"><code class="name flex">
+<span>def <span class="ident">is_pandas</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_pandas(arg):
+    return is_series(arg) or is_frame(arg)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.is_series"><code class="name flex">
+<span>def <span class="ident">is_series</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def is_series(arg):
+    return isinstance(arg, pd.Series)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.loc_mapper"><code class="name flex">
+<span>def <span class="ident">loc_mapper</span></span>(<span>mapper, like_df, loc_pandas_func)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Broadcast mapper series to a dataframe to perform advanced pandas indexing on it.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def loc_mapper(mapper, like_df, loc_pandas_func):
+    &#34;&#34;&#34;Broadcast mapper series to a dataframe to perform advanced pandas indexing on it.&#34;&#34;&#34;
+    df_range_mapper = broadcast_to(np.arange(len(mapper.index)), like_df, index_from=1, columns_from=1)
+    loced_range_mapper = loc_pandas_func(df_range_mapper)
+    new_mapper = mapper.iloc[loced_range_mapper.values[0]]
+    if is_frame(loced_range_mapper):
+        return pd.Series(new_mapper.values, index=loced_range_mapper.columns, name=mapper.name)
+    elif is_series(loced_range_mapper):
+        return pd.Series([new_mapper], index=[loced_range_mapper.name], name=mapper.name)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.make_symmetric"><code class="name flex">
+<span>def <span class="ident">make_symmetric</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Make object symmetric along the diagonal.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def make_symmetric(arg):
+    &#34;&#34;&#34;Make object symmetric along the diagonal.&#34;&#34;&#34;
+    check_type(arg, (pd.Series, pd.DataFrame))
+    arg = to_2d(arg)
+    check_not_type(arg.index, pd.MultiIndex)
+    check_not_type(arg.columns, pd.MultiIndex)
+
+    names = tuple(dict.fromkeys([arg.index.name, arg.columns.name]))
+    if len(names) == 1:
+        names = names[0]
+    unique_index = pd.Index(dict.fromkeys(arg.index.tolist() + arg.columns.tolist()), name=names)
+    df_out = pd.DataFrame(index=unique_index, columns=unique_index)
+    df_out.loc[:, :] = arg
+    df_out[df_out.isnull()] = arg.transpose()
+    return df_out</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.rename_levels"><code class="name flex">
+<span>def <span class="ident">rename_levels</span></span>(<span>index, name_dict)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Rename index/column levels.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def rename_levels(index, name_dict):
+    &#34;&#34;&#34;Rename index/column levels.&#34;&#34;&#34;
+    for k, v in name_dict.items():
+        if isinstance(index, pd.MultiIndex):
+            if k in index.names:
+                index = index.rename(v, level=k)
+        else:
+            if index.name == k:
+                index.name = v
+    return index</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.repeat"><code class="name flex">
+<span>def <span class="ident">repeat</span></span>(<span>arg, n, along_axis=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Repeat array n times along specified axis.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def repeat(arg, n, along_axis=1):
+    &#34;&#34;&#34;Repeat array n times along specified axis.&#34;&#34;&#34;
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if along_axis == 0:
+        if is_pandas(arg):
+            return arg.vbt.wrap_array(
+                np.repeat(arg.values, n, axis=0),
+                index=repeat_index(arg.index, n))
+        return np.repeat(arg, n, axis=0)
+    elif along_axis == 1:
+        arg = to_2d(arg)
+        if is_pandas(arg):
+            return arg.vbt.wrap_array(
+                np.repeat(arg.values, n, axis=1),
+                columns=repeat_index(arg.columns, n))
+        return np.repeat(arg, n, axis=1)
+    else:
+        raise ValueError(&#34;Only axis 0 and 1 are supported&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.repeat_index"><code class="name flex">
+<span>def <span class="ident">repeat_index</span></span>(<span>index, n)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Repeat each element in index n times.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def repeat_index(index, n):
+    &#34;&#34;&#34;Repeat each element in index n times.&#34;&#34;&#34;
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+
+    return np.repeat(index, n)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.select_and_combine"><code class="name flex">
+<span>def <span class="ident">select_and_combine</span></span>(<span>i, obj, others, combine_func, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def select_and_combine(i, obj, others, combine_func, *args, **kwargs):
+    return combine_func(obj, others[i], *args, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.select_and_combine_nb"><code class="name flex">
+<span>def <span class="ident">select_and_combine_nb</span></span>(<span>i, obj, others, combine_func_nb, *args)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def select_and_combine_nb(i, obj, others, combine_func_nb, *args):
+    # NOTE: others must be homogeneuous!
+    return combine_func_nb(obj, others[i], *args)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.soft_broadcast_to_ndim"><code class="name flex">
+<span>def <span class="ident">soft_broadcast_to_ndim</span></span>(<span>arg, ndim)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Try to softly bring the argument to the specified number of dimensions (max 2).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def soft_broadcast_to_ndim(arg, ndim):
+    &#34;&#34;&#34;Try to softly bring the argument to the specified number of dimensions (max 2).&#34;&#34;&#34;
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if ndim == 1:
+        if arg.ndim == 2:
+            if arg.shape[1] == 1:
+                if is_pandas(arg):
+                    return arg.iloc[:, 0]
+                return arg[:, 0]  # downgrade
+    if ndim == 2:
+        if arg.ndim == 1:
+            if is_pandas(arg):
+                return arg.to_frame()
+            return arg[:, None]  # upgrade
+    return arg  # do nothing</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.stack_indices"><code class="name flex">
+<span>def <span class="ident">stack_indices</span></span>(<span>index1, index2)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Stack indices.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def stack_indices(index1, index2):
+    &#34;&#34;&#34;Stack indices.&#34;&#34;&#34;
+    check_same_shape(index1, index2)
+    if not isinstance(index1, pd.MultiIndex):
+        index1 = pd.MultiIndex.from_arrays([index1])
+    if not isinstance(index2, pd.MultiIndex):
+        index2 = pd.MultiIndex.from_arrays([index2])
+
+    levels = []
+    for i in range(len(index1.names)):
+        levels.append(index1.get_level_values(i))
+    for i in range(len(index2.names)):
+        levels.append(index2.get_level_values(i))
+
+    new_index = pd.MultiIndex.from_arrays(levels)
+    return new_index</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.tile"><code class="name flex">
+<span>def <span class="ident">tile</span></span>(<span>arg, n, along_axis=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Tile array n times along specified axis.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def tile(arg, n, along_axis=1):
+    &#34;&#34;&#34;Tile array n times along specified axis.&#34;&#34;&#34;
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if along_axis == 0:
+        if arg.ndim == 1:
+            if is_pandas(arg):
+                return arg.vbt.wrap_array(
+                    np.tile(arg.values, n),
+                    index=tile_index(arg.index, n))
+            return np.tile(arg, n)
+        if arg.ndim == 2:
+            if is_pandas(arg):
+                return arg.vbt.wrap_array(
+                    np.tile(arg.values, (n, 1)),
+                    index=tile_index(arg.index, n))
+            return np.tile(arg, (n, 1))
+    elif along_axis == 1:
+        arg = to_2d(arg)
+        if is_pandas(arg):
+            return arg.vbt.wrap_array(
+                np.tile(arg.values, (1, n)),
+                columns=tile_index(arg.columns, n))
+        return np.tile(arg, (1, n))
+    else:
+        raise ValueError(&#34;Only axis 0 and 1 are supported&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.tile_index"><code class="name flex">
+<span>def <span class="ident">tile_index</span></span>(<span>index, n)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Tile the whole index n times.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def tile_index(index, n):
+    &#34;&#34;&#34;Tile the whole index n times.&#34;&#34;&#34;
+    if not isinstance(index, pd.Index):
+        index = pd.Index(index)
+
+    if isinstance(index, pd.MultiIndex):
+        return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
+    return pd.Index(np.tile(index, n), name=index.name)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.to_1d"><code class="name flex">
+<span>def <span class="ident">to_1d</span></span>(<span>arg, raw=False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Reshape argument to one dimension.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to_1d(arg, raw=False):
+    &#34;&#34;&#34;Reshape argument to one dimension.&#34;&#34;&#34;
+    if raw:
+        arg = np.asarray(arg)
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if arg.ndim == 2:
+        if arg.shape[1] == 1:
+            if is_frame(arg):
+                return arg.iloc[:, 0]
+            return arg[:, 0]
+    if arg.ndim == 1:
+        return arg
+    elif arg.ndim == 0:
+        return arg.reshape((1,))
+    raise ValueError(f&#34;Cannot reshape a {arg.ndim}-dimensional array to 1 dimension&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.to_2d"><code class="name flex">
+<span>def <span class="ident">to_2d</span></span>(<span>arg, raw=False, expand_axis=1)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Reshape argument to two dimensions.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to_2d(arg, raw=False, expand_axis=1):
+    &#34;&#34;&#34;Reshape argument to two dimensions.&#34;&#34;&#34;
+    if raw:
+        arg = np.asarray(arg)
+    if not is_array_like(arg):
+        arg = np.asarray(arg)
+    if arg.ndim == 2:
+        return arg
+    elif arg.ndim == 1:
+        if is_series(arg):
+            if expand_axis == 0:
+                return pd.DataFrame(arg.values[None, :], columns=arg.index)
+            elif expand_axis == 1:
+                return arg.to_frame()
+        return np.expand_dims(arg, expand_axis)
+    elif arg.ndim == 0:
+        return arg.reshape((1, 1))
+    raise ValueError(f&#34;Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions&#34;)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.to_2d_multiple_nb"><code class="name flex">
+<span>def <span class="ident">to_2d_multiple_nb</span></span>(<span>a)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def to_2d_multiple_nb(a):
+    lst = List()
+    for _a in a:
+        lst.append(to_2d_one_nb(_a))
+    return lst</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.to_2d_one_nb"><code class="name flex">
+<span>def <span class="ident">to_2d_one_nb</span></span>(<span>a)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@njit
+def to_2d_one_nb(a):
+    if a.ndim &gt; 1:
+        return a
+    return np.expand_dims(a, axis=1)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.unstack_to_array"><code class="name flex">
+<span>def <span class="ident">unstack_to_array</span></span>(<span>arg)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Reshape object based on multi-index into a multi-dimensional array.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unstack_to_array(arg):
+    &#34;&#34;&#34;Reshape object based on multi-index into a multi-dimensional array.&#34;&#34;&#34;
+    check_type(arg, (pd.Series, pd.DataFrame))
+    if is_frame(arg):
+        if arg.shape[0] == 1:
+            arg = arg.iloc[0, :]
+        elif arg.shape[1] == 1:
+            arg = arg.iloc[:, 0]
+    check_type(arg.index, pd.MultiIndex)
+    sr = to_1d(arg)
+
+    vals_idx_list = []
+    for i in range(len(sr.index.levels)):
+        vals = sr.index.get_level_values(i).to_numpy()
+        unique_vals = np.unique(vals)
+        idx_map = dict(zip(unique_vals, range(len(unique_vals))))
+        vals_idx = list(map(lambda x: idx_map[x], vals))
+        vals_idx_list.append(vals_idx)
+
+    a = np.full(list(map(len, sr.index.levels)), np.nan)
+    a[tuple(zip(vals_idx_list))] = sr.values
+    return a</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.unstack_to_df"><code class="name flex">
+<span>def <span class="ident">unstack_to_df</span></span>(<span>arg, symmetric=False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Reshape object based on multi-index into dataframe.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unstack_to_df(arg, symmetric=False):
+    &#34;&#34;&#34;Reshape object based on multi-index into dataframe.&#34;&#34;&#34;
+    check_type(arg, (pd.Series, pd.DataFrame))
+    if is_frame(arg):
+        if arg.shape[0] == 1:
+            arg = arg.iloc[0, :]
+        elif arg.shape[1] == 1:
+            arg = arg.iloc[:, 0]
+    check_type(arg.index, pd.MultiIndex)
+    sr = to_1d(arg)
+
+    index = sr.index.levels[0]
+    columns = sr.index.levels[1]
+    df = pd.DataFrame(unstack_to_array(sr), index=index, columns=columns)
+    if symmetric:
+        return make_symmetric(df)
+    return df</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.wrap_array"><code class="name flex">
+<span>def <span class="ident">wrap_array</span></span>(<span>arg, index=None, columns=None, dtype=None, default_index=None, default_columns=None, to_ndim=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Wrap array into a series/dataframe.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrap_array(arg, index=None, columns=None, dtype=None, default_index=None, default_columns=None, to_ndim=None):
+    &#34;&#34;&#34;Wrap array into a series/dataframe.&#34;&#34;&#34;
+    if not is_array(arg):
+        arg = np.asarray(arg)
+    if to_ndim is not None:
+        arg = soft_broadcast_to_ndim(arg, to_ndim)
+    if index is None:
+        index = default_index
+    if columns is None:
+        columns = default_columns
+    if columns is not None and len(columns) == 1:
+        name = columns[0]
+    else:
+        name = None
+
+    # Perform checks
+    if index is not None:
+        check_same_shape(arg, index, along_axis=(0, 0))
+    if arg.ndim == 2 and columns is not None:
+        check_same_shape(arg, columns, along_axis=(1, 0))
+
+    if arg.ndim == 1:
+        return pd.Series(arg, index=index, name=name, dtype=dtype)
+    return pd.DataFrame(arg, index=index, columns=columns, dtype=dtype)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.wrap_broadcasted"><code class="name flex">
+<span>def <span class="ident">wrap_broadcasted</span></span>(<span>old_arg, new_arg, is_pd=False, new_index=None, new_columns=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Transform newly broadcasted array to match the type of the original object.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=None):
+    &#34;&#34;&#34;Transform newly broadcasted array to match the type of the original object.&#34;&#34;&#34;
+    if is_pd:
+        if is_pandas(old_arg):
+            if new_index is None:
+                # Take index from original pandas object
+                if old_arg.shape[0] == new_arg.shape[0]:
+                    new_index = old_arg.index
+                else:
+                    new_index = repeat_index(old_arg.index, new_arg.shape[0])
+            if new_columns is None:
+                # Take columns from original pandas object
+                if new_arg.ndim == 2:
+                    if is_series(old_arg):
+                        old_arg = old_arg.to_frame()
+                    if old_arg.shape[1] == new_arg.shape[1]:
+                        new_columns = old_arg.columns
+                    else:
+                        new_columns = repeat_index(old_arg.columns, new_arg.shape[1])
+        else:
+            if new_index is None and new_columns is None:
+                # Return plain numpy array if not pandas and no rules set
+                return new_arg
+        return wrap_array(new_arg, index=new_index, columns=new_columns)
+    return new_arg</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="vectorbt.utils.Base_Accessor"><code class="flex name class">
+<span>class <span class="ident">Base_Accessor</span></span>
+<span>(</span><span>obj)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Base_Accessor():
+    def __init__(self, obj):
+        self._obj = obj._obj  # access pandas object
+        self._validate(self._obj)
+
+    dtype = None
+
+    @classmethod
+    def _validate(cls, obj):
+        pass
+
+    def validate(self):
+        # Don&#39;t override it, just call it for the object to be instantiated
+        pass
+
+    @classmethod
+    def empty(cls, *args, **kwargs):
+        raise NotImplementedError
+
+    @classmethod
+    def empty_like(cls, *args, **kwargs):
+        raise NotImplementedError
+
+    def to_1d_array(self):
+        return to_1d(self._obj, raw=True)
+
+    def to_2d_array(self):
+        return to_2d(self._obj, raw=True)
+
+    def wrap_array(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def plot(self, *args, **kwargs):
+        raise NotImplementedError
+
+    def tile(self, n, as_columns=None):
+        tiled = tile(self._obj, n, along_axis=1)
+        if as_columns is not None:
+            new_columns = combine_indices(as_columns, to_2d(self._obj).columns)
+            return self.wrap_array(tiled.values, columns=new_columns)
+        return tiled
+
+    def repeat(self, n, as_columns=None):
+        repeated = repeat(self._obj, n, along_axis=1)
+        if as_columns is not None:
+            new_columns = combine_indices(to_2d(self._obj).columns, as_columns)
+            return self.wrap_array(repeated.values, columns=new_columns)
+        return repeated
+
+    def align_to(self, other):
+        check_type(other, (pd.Series, pd.DataFrame))
+        obj = to_2d(self._obj)
+        other = to_2d(other)
+
+        aligned_index = align_index_to(obj.index, other.index)
+        aligned_columns = align_index_to(obj.columns, other.columns)
+        obj = obj.iloc[aligned_index, aligned_columns]
+        return self.wrap_array(obj.values, index=other.index, columns=other.columns)
+
+    @class_or_instancemethod
+    def broadcast(self_or_cls, *others, **kwargs):
+        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        if isinstance(self_or_cls, type):
+            return broadcast(*others, **kwargs)
+        return broadcast(self_or_cls._obj, *others, **kwargs)
+
+    def broadcast_to(self, other, **kwargs):
+        if isinstance(other, Base_Accessor):
+            other = other._obj
+        return broadcast_to(self._obj, other, **kwargs)
+
+    def make_symmetric(self):
+        return make_symmetric(self._obj)
+
+    def unstack_to_array(self):
+        return unstack_to_array(self._obj)
+
+    def unstack_to_df(self, **kwargs):
+        return unstack_to_df(self._obj, **kwargs)
+
+    @class_or_instancemethod
+    def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
+        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        if isinstance(self_or_cls, type):
+            objs = others
+        else:
+            objs = (self_or_cls._obj,) + others
+        broadcasted = broadcast(*objs, **broadcast_kwargs)
+        broadcasted = tuple(map(to_2d, broadcasted))
+        if is_pandas(broadcasted[0]):
+            concated = pd.concat(broadcasted, axis=1)
+            if as_columns is not None:
+                concated.columns = combine_indices(as_columns, broadcasted[0].columns)
+        else:
+            concated = np.hstack(broadcasted)
+        return concated
+
+    def apply_and_concat(self, ntimes, *args, apply_func=None, as_columns=None, **kwargs):
+        &#34;&#34;&#34;Apply a function n times and concatenate results into a single dataframe.&#34;&#34;&#34;
+        check_not_none(apply_func)
+        if is_numba_func(apply_func):
+            # NOTE: your apply_func must a numba-compiled function and arguments must be numba-compatible
+            # Also NOTE: outputs of apply_func must always be 2-dimensional
+            result = apply_and_concat_nb(np.asarray(self._obj), ntimes, apply_func, *args, **kwargs)
+        else:
+            result = apply_and_concat(np.asarray(self._obj), ntimes, apply_func, *args, **kwargs)
+        # Build column hierarchy
+        if as_columns is not None:
+            new_columns = combine_indices(as_columns, to_2d(self._obj).columns)
+        else:
+            new_columns = tile_index(to_2d(self._obj).columns, ntimes)
+        return self.wrap_array(result, columns=new_columns)
+
+    def combine_with(self, other, *args, combine_func=None, broadcast_kwargs={}, **kwargs):
+        &#34;&#34;&#34;Broadcast with other and combine.
+        
+        The returned shape is the same as broadcasted shape.&#34;&#34;&#34;
+        if isinstance(other, Base_Accessor):
+            other = other._obj
+        check_not_none(combine_func)
+        if is_numba_func(combine_func):
+            # Numba requires writable arrays
+            broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+        new_obj, new_other = broadcast(self._obj, other, **broadcast_kwargs)
+        return new_obj.vbt.wrap_array(combine_func(np.asarray(new_obj), np.asarray(new_other), *args, **kwargs))
+
+    def combine_with_multiple(self, others, *args, combine_func=None, concat=False,
+                              broadcast_kwargs={}, as_columns=None, **kwargs):
+        &#34;&#34;&#34;Broadcast with other objects to the same shape and combine them all pairwise.
+        
+        The returned shape is the same as broadcasted shape if concat is False.
+        The returned shape is concatenation of broadcasted shapes if concat is True.
+        
+        Examples
+        --------
+        Combining without stacking:&#34;&#34;&#34;
+        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        check_not_none(combine_func)
+        check_type(others, Iterable)
+        # Broadcast arguments
+        if is_numba_func(combine_func):
+            # Numba requires writable arrays
+            broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+            # Plus all of our arrays must be in the same order
+            broadcast_kwargs[&#39;copy_kwargs&#39;] = {**dict(order=&#39;C&#39;), **broadcast_kwargs.get(&#39;copy_kwargs&#39;, {})}
+        new_obj, *new_others = broadcast(self._obj, *others, **broadcast_kwargs)
+        broadcasted = tuple(map(np.asarray, (new_obj, *new_others)))
+        if concat:
+            # Concat the results horizontally
+            if is_numba_func(combine_func):
+                for i in range(1, len(broadcasted)):
+                    # NOTE: all inputs must have the same dtype
+                    check_same_meta(broadcasted[i-1], broadcasted[i])
+                result = combine_and_concat_nb(broadcasted[0], broadcasted[1:], combine_func, *args, **kwargs)
+            else:
+                result = combine_and_concat(broadcasted[0], broadcasted[1:], combine_func, *args, **kwargs)
+            if as_columns is not None:
+                new_columns = combine_indices(as_columns, to_2d(new_obj).columns)
+            else:
+                new_columns = tile_index(to_2d(new_obj).columns, len(others))
+            return new_obj.vbt.wrap_array(result, columns=new_columns)
+        else:
+            # Combine arguments pairwise into one object
+            if is_numba_func(combine_func):
+                for i in range(1, len(broadcasted)):
+                    # NOTE: all inputs must have the same dtype
+                    check_same_dtype(broadcasted[i-1], broadcasted[i])
+                result = combine_multiple_nb(broadcasted, combine_func, *args, **kwargs)
+            else:
+                result = combine_multiple(broadcasted, combine_func, *args, **kwargs)
+            return new_obj.vbt.wrap_array(result)
+
+    # Comparison operators
+    def __eq__(self, other): return self.combine_with(other, combine_func=np.equal)
+    def __ne__(self, other): return self.combine_with(other, combine_func=np.not_equal)
+    def __lt__(self, other): return self.combine_with(other, combine_func=np.less)
+    def __gt__(self, other): return self.combine_with(other, combine_func=np.greater)
+    def __le__(self, other): return self.combine_with(other, combine_func=np.less_equal)
+    def __ge__(self, other): return self.combine_with(other, combine_func=np.greater_equal)
+
+    # Binary operators
+    def __add__(self, other): return self.combine_with(other, combine_func=np.add)
+    def __sub__(self, other): return self.combine_with(other, combine_func=np.subtract)
+    def __mul__(self, other): return self.combine_with(other, combine_func=np.multiply)
+    def __div__(self, other): return self.combine_with(other, combine_func=np.divide)
+    __radd__ = __add__
+    __rsub__ = __sub__
+    __rmul__ = __mul__
+    __rdiv__ = __div__
+
+    # Boolean operators
+    def __and__(self, other): return self.combine_with(other, combine_func=np.logical_and)
+    def __or__(self, other): return self.combine_with(other, combine_func=np.logical_or)
+    def __xor__(self, other): return self.combine_with(other, combine_func=np.logical_xor)
+    __rand__ = __and__
+    __ror__ = __or__
+    __rxor__ = __xor__</code></pre>
+</details>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="vectorbt.utils.Base_DFAccessor" href="#vectorbt.utils.Base_DFAccessor">Base_DFAccessor</a></li>
+<li><a title="vectorbt.utils.Base_SRAccessor" href="#vectorbt.utils.Base_SRAccessor">Base_SRAccessor</a></li>
+</ul>
+<h3>Class variables</h3>
+<dl>
+<dt id="vectorbt.utils.Base_Accessor.dtype"><code class="name">var <span class="ident">dtype</span></code></dt>
+<dd>
+<div class="desc"></div>
+</dd>
+</dl>
+<h3>Static methods</h3>
+<dl>
+<dt id="vectorbt.utils.Base_Accessor.broadcast"><code class="name flex">
+<span>def <span class="ident">broadcast</span></span>(<span>*others, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@class_or_instancemethod
+def broadcast(self_or_cls, *others, **kwargs):
+    others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+    if isinstance(self_or_cls, type):
+        return broadcast(*others, **kwargs)
+    return broadcast(self_or_cls._obj, *others, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.concat"><code class="name flex">
+<span>def <span class="ident">concat</span></span>(<span>*others, as_columns=None, broadcast_kwargs={})</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@class_or_instancemethod
+def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
+    others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+    if isinstance(self_or_cls, type):
+        objs = others
+    else:
+        objs = (self_or_cls._obj,) + others
+    broadcasted = broadcast(*objs, **broadcast_kwargs)
+    broadcasted = tuple(map(to_2d, broadcasted))
+    if is_pandas(broadcasted[0]):
+        concated = pd.concat(broadcasted, axis=1)
+        if as_columns is not None:
+            concated.columns = combine_indices(as_columns, broadcasted[0].columns)
+    else:
+        concated = np.hstack(broadcasted)
+    return concated</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.empty"><code class="name flex">
+<span>def <span class="ident">empty</span></span>(<span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def empty(cls, *args, **kwargs):
+    raise NotImplementedError</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.empty_like"><code class="name flex">
+<span>def <span class="ident">empty_like</span></span>(<span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def empty_like(cls, *args, **kwargs):
+    raise NotImplementedError</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="vectorbt.utils.Base_Accessor.align_to"><code class="name flex">
+<span>def <span class="ident">align_to</span></span>(<span>self, other)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def align_to(self, other):
+    check_type(other, (pd.Series, pd.DataFrame))
+    obj = to_2d(self._obj)
+    other = to_2d(other)
+
+    aligned_index = align_index_to(obj.index, other.index)
+    aligned_columns = align_index_to(obj.columns, other.columns)
+    obj = obj.iloc[aligned_index, aligned_columns]
+    return self.wrap_array(obj.values, index=other.index, columns=other.columns)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.apply_and_concat"><code class="name flex">
+<span>def <span class="ident">apply_and_concat</span></span>(<span>self, ntimes, *args, apply_func=None, as_columns=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Apply a function n times and concatenate results into a single dataframe.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def apply_and_concat(self, ntimes, *args, apply_func=None, as_columns=None, **kwargs):
+    &#34;&#34;&#34;Apply a function n times and concatenate results into a single dataframe.&#34;&#34;&#34;
+    check_not_none(apply_func)
+    if is_numba_func(apply_func):
+        # NOTE: your apply_func must a numba-compiled function and arguments must be numba-compatible
+        # Also NOTE: outputs of apply_func must always be 2-dimensional
+        result = apply_and_concat_nb(np.asarray(self._obj), ntimes, apply_func, *args, **kwargs)
+    else:
+        result = apply_and_concat(np.asarray(self._obj), ntimes, apply_func, *args, **kwargs)
+    # Build column hierarchy
+    if as_columns is not None:
+        new_columns = combine_indices(as_columns, to_2d(self._obj).columns)
+    else:
+        new_columns = tile_index(to_2d(self._obj).columns, ntimes)
+    return self.wrap_array(result, columns=new_columns)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.broadcast_to"><code class="name flex">
+<span>def <span class="ident">broadcast_to</span></span>(<span>self, other, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def broadcast_to(self, other, **kwargs):
+    if isinstance(other, Base_Accessor):
+        other = other._obj
+    return broadcast_to(self._obj, other, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.combine_with"><code class="name flex">
+<span>def <span class="ident">combine_with</span></span>(<span>self, other, *args, combine_func=None, broadcast_kwargs={}, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Broadcast with other and combine.</p>
+<p>The returned shape is the same as broadcasted shape.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def combine_with(self, other, *args, combine_func=None, broadcast_kwargs={}, **kwargs):
+    &#34;&#34;&#34;Broadcast with other and combine.
+    
+    The returned shape is the same as broadcasted shape.&#34;&#34;&#34;
+    if isinstance(other, Base_Accessor):
+        other = other._obj
+    check_not_none(combine_func)
+    if is_numba_func(combine_func):
+        # Numba requires writable arrays
+        broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+    new_obj, new_other = broadcast(self._obj, other, **broadcast_kwargs)
+    return new_obj.vbt.wrap_array(combine_func(np.asarray(new_obj), np.asarray(new_other), *args, **kwargs))</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.combine_with_multiple"><code class="name flex">
+<span>def <span class="ident">combine_with_multiple</span></span>(<span>self, others, *args, combine_func=None, concat=False, broadcast_kwargs={}, as_columns=None, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Broadcast with other objects to the same shape and combine them all pairwise.</p>
+<p>The returned shape is the same as broadcasted shape if concat is False.
+The returned shape is concatenation of broadcasted shapes if concat is True.</p>
+<h2 id="examples">Examples</h2>
+<p>Combining without stacking:</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def combine_with_multiple(self, others, *args, combine_func=None, concat=False,
+                          broadcast_kwargs={}, as_columns=None, **kwargs):
+    &#34;&#34;&#34;Broadcast with other objects to the same shape and combine them all pairwise.
+    
+    The returned shape is the same as broadcasted shape if concat is False.
+    The returned shape is concatenation of broadcasted shapes if concat is True.
+    
+    Examples
+    --------
+    Combining without stacking:&#34;&#34;&#34;
+    others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+    check_not_none(combine_func)
+    check_type(others, Iterable)
+    # Broadcast arguments
+    if is_numba_func(combine_func):
+        # Numba requires writable arrays
+        broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+        # Plus all of our arrays must be in the same order
+        broadcast_kwargs[&#39;copy_kwargs&#39;] = {**dict(order=&#39;C&#39;), **broadcast_kwargs.get(&#39;copy_kwargs&#39;, {})}
+    new_obj, *new_others = broadcast(self._obj, *others, **broadcast_kwargs)
+    broadcasted = tuple(map(np.asarray, (new_obj, *new_others)))
+    if concat:
+        # Concat the results horizontally
+        if is_numba_func(combine_func):
+            for i in range(1, len(broadcasted)):
+                # NOTE: all inputs must have the same dtype
+                check_same_meta(broadcasted[i-1], broadcasted[i])
+            result = combine_and_concat_nb(broadcasted[0], broadcasted[1:], combine_func, *args, **kwargs)
+        else:
+            result = combine_and_concat(broadcasted[0], broadcasted[1:], combine_func, *args, **kwargs)
+        if as_columns is not None:
+            new_columns = combine_indices(as_columns, to_2d(new_obj).columns)
+        else:
+            new_columns = tile_index(to_2d(new_obj).columns, len(others))
+        return new_obj.vbt.wrap_array(result, columns=new_columns)
+    else:
+        # Combine arguments pairwise into one object
+        if is_numba_func(combine_func):
+            for i in range(1, len(broadcasted)):
+                # NOTE: all inputs must have the same dtype
+                check_same_dtype(broadcasted[i-1], broadcasted[i])
+            result = combine_multiple_nb(broadcasted, combine_func, *args, **kwargs)
+        else:
+            result = combine_multiple(broadcasted, combine_func, *args, **kwargs)
+        return new_obj.vbt.wrap_array(result)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.make_symmetric"><code class="name flex">
+<span>def <span class="ident">make_symmetric</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def make_symmetric(self):
+    return make_symmetric(self._obj)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.plot"><code class="name flex">
+<span>def <span class="ident">plot</span></span>(<span>self, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def plot(self, *args, **kwargs):
+    raise NotImplementedError</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.repeat"><code class="name flex">
+<span>def <span class="ident">repeat</span></span>(<span>self, n, as_columns=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def repeat(self, n, as_columns=None):
+    repeated = repeat(self._obj, n, along_axis=1)
+    if as_columns is not None:
+        new_columns = combine_indices(to_2d(self._obj).columns, as_columns)
+        return self.wrap_array(repeated.values, columns=new_columns)
+    return repeated</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.tile"><code class="name flex">
+<span>def <span class="ident">tile</span></span>(<span>self, n, as_columns=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def tile(self, n, as_columns=None):
+    tiled = tile(self._obj, n, along_axis=1)
+    if as_columns is not None:
+        new_columns = combine_indices(as_columns, to_2d(self._obj).columns)
+        return self.wrap_array(tiled.values, columns=new_columns)
+    return tiled</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.to_1d_array"><code class="name flex">
+<span>def <span class="ident">to_1d_array</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to_1d_array(self):
+    return to_1d(self._obj, raw=True)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.to_2d_array"><code class="name flex">
+<span>def <span class="ident">to_2d_array</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to_2d_array(self):
+    return to_2d(self._obj, raw=True)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.unstack_to_array"><code class="name flex">
+<span>def <span class="ident">unstack_to_array</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unstack_to_array(self):
+    return unstack_to_array(self._obj)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.unstack_to_df"><code class="name flex">
+<span>def <span class="ident">unstack_to_df</span></span>(<span>self, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def unstack_to_df(self, **kwargs):
+    return unstack_to_df(self._obj, **kwargs)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.validate"><code class="name flex">
+<span>def <span class="ident">validate</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate(self):
+    # Don&#39;t override it, just call it for the object to be instantiated
+    pass</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_Accessor.wrap_array"><code class="name flex">
+<span>def <span class="ident">wrap_array</span></span>(<span>self, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrap_array(self, *args, **kwargs):
+    raise NotImplementedError</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="vectorbt.utils.Base_DFAccessor"><code class="flex name class">
+<span>class <span class="ident">Base_DFAccessor</span></span>
+<span>(</span><span>obj)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Base_DFAccessor(Base_Accessor):
+
+    @classmethod
+    def _validate(cls, obj):
+        check_type(obj, pd.DataFrame)
+
+    @classmethod
+    def empty(cls, shape, fill_value=np.nan, index=None, columns=None):
+        return pd.DataFrame(
+            np.full(shape, fill_value),
+            index=index,
+            columns=columns,
+            dtype=cls.dtype)
+
+    @classmethod
+    def empty_like(cls, df, fill_value=np.nan):
+        cls._validate(df)
+
+        return cls.empty(
+            df.shape,
+            fill_value=fill_value,
+            index=df.index,
+            columns=df.columns)
+
+    def wrap_array(self, a, index=None, columns=None, dtype=None):
+        return wrap_array(a,
+                          index=index,
+                          columns=columns,
+                          dtype=dtype,
+                          default_index=self._obj.index,
+                          default_columns=self._obj.columns,
+                          to_ndim=2)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="vectorbt.utils.Base_Accessor" href="#vectorbt.utils.Base_Accessor">Base_Accessor</a></li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="vectorbt.accessors.Vbt_DFAccessor" href="accessors.html#vectorbt.accessors.Vbt_DFAccessor">Vbt_DFAccessor</a></li>
+<li>vectorbt.signals.Signals_DFAccessor</li>
+<li>vectorbt.timeseries.TimeSeries_DFAccessor</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="vectorbt.utils.Base_DFAccessor.empty"><code class="name flex">
+<span>def <span class="ident">empty</span></span>(<span>shape, fill_value=nan, index=None, columns=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def empty(cls, shape, fill_value=np.nan, index=None, columns=None):
+    return pd.DataFrame(
+        np.full(shape, fill_value),
+        index=index,
+        columns=columns,
+        dtype=cls.dtype)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_DFAccessor.empty_like"><code class="name flex">
+<span>def <span class="ident">empty_like</span></span>(<span>df, fill_value=nan)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def empty_like(cls, df, fill_value=np.nan):
+    cls._validate(df)
+
+    return cls.empty(
+        df.shape,
+        fill_value=fill_value,
+        index=df.index,
+        columns=df.columns)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="vectorbt.utils.Base_DFAccessor.wrap_array"><code class="name flex">
+<span>def <span class="ident">wrap_array</span></span>(<span>self, a, index=None, columns=None, dtype=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrap_array(self, a, index=None, columns=None, dtype=None):
+    return wrap_array(a,
+                      index=index,
+                      columns=columns,
+                      dtype=dtype,
+                      default_index=self._obj.index,
+                      default_columns=self._obj.columns,
+                      to_ndim=2)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="vectorbt.utils.Base_Accessor" href="#vectorbt.utils.Base_Accessor">Base_Accessor</a></b></code>:
+<ul class="hlist">
+<li><code><a title="vectorbt.utils.Base_Accessor.apply_and_concat" href="#vectorbt.utils.Base_Accessor.apply_and_concat">apply_and_concat</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.combine_with" href="#vectorbt.utils.Base_Accessor.combine_with">combine_with</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.combine_with_multiple" href="#vectorbt.utils.Base_Accessor.combine_with_multiple">combine_with_multiple</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="vectorbt.utils.Base_SRAccessor"><code class="flex name class">
+<span>class <span class="ident">Base_SRAccessor</span></span>
+<span>(</span><span>obj)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Base_SRAccessor(Base_Accessor):
+    # series is just a dataframe with one column
+    # this way we don&#39;t have to define our custom functions for working with 1d data
+    @classmethod
+    def _validate(cls, obj):
+        check_type(obj, pd.Series)
+
+    @classmethod
+    def empty(cls, size, fill_value=np.nan, index=None, name=None):
+        return pd.Series(
+            np.full(size, fill_value),
+            index=index,
+            name=name,
+            dtype=cls.dtype)
+
+    @classmethod
+    def empty_like(cls, sr, fill_value=np.nan):
+        cls._validate(sr)
+
+        return cls.empty(
+            sr.shape,
+            fill_value=fill_value,
+            index=sr.index,
+            name=sr.name)
+
+    def wrap_array(self, a, index=None, columns=None, dtype=None):
+        return wrap_array(a,
+                          index=index,
+                          columns=columns,
+                          dtype=dtype,
+                          default_index=self._obj.index,
+                          default_columns=[self._obj.name],
+                          to_ndim=1)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li><a title="vectorbt.utils.Base_Accessor" href="#vectorbt.utils.Base_Accessor">Base_Accessor</a></li>
+</ul>
+<h3>Subclasses</h3>
+<ul class="hlist">
+<li><a title="vectorbt.accessors.Vbt_SRAccessor" href="accessors.html#vectorbt.accessors.Vbt_SRAccessor">Vbt_SRAccessor</a></li>
+<li>vectorbt.signals.Signals_SRAccessor</li>
+<li>vectorbt.timeseries.TimeSeries_SRAccessor</li>
+</ul>
+<h3>Static methods</h3>
+<dl>
+<dt id="vectorbt.utils.Base_SRAccessor.empty"><code class="name flex">
+<span>def <span class="ident">empty</span></span>(<span>size, fill_value=nan, index=None, name=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def empty(cls, size, fill_value=np.nan, index=None, name=None):
+    return pd.Series(
+        np.full(size, fill_value),
+        index=index,
+        name=name,
+        dtype=cls.dtype)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.utils.Base_SRAccessor.empty_like"><code class="name flex">
+<span>def <span class="ident">empty_like</span></span>(<span>sr, fill_value=nan)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def empty_like(cls, sr, fill_value=np.nan):
+    cls._validate(sr)
+
+    return cls.empty(
+        sr.shape,
+        fill_value=fill_value,
+        index=sr.index,
+        name=sr.name)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="vectorbt.utils.Base_SRAccessor.wrap_array"><code class="name flex">
+<span>def <span class="ident">wrap_array</span></span>(<span>self, a, index=None, columns=None, dtype=None)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrap_array(self, a, index=None, columns=None, dtype=None):
+    return wrap_array(a,
+                      index=index,
+                      columns=columns,
+                      dtype=dtype,
+                      default_index=self._obj.index,
+                      default_columns=[self._obj.name],
+                      to_ndim=1)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Inherited members</h3>
+<ul class="hlist">
+<li><code><b><a title="vectorbt.utils.Base_Accessor" href="#vectorbt.utils.Base_Accessor">Base_Accessor</a></b></code>:
+<ul class="hlist">
+<li><code><a title="vectorbt.utils.Base_Accessor.apply_and_concat" href="#vectorbt.utils.Base_Accessor.apply_and_concat">apply_and_concat</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.combine_with" href="#vectorbt.utils.Base_Accessor.combine_with">combine_with</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.combine_with_multiple" href="#vectorbt.utils.Base_Accessor.combine_with_multiple">combine_with_multiple</a></code></li>
+</ul>
+</li>
+</ul>
+</dd>
+<dt id="vectorbt.utils.Config"><code class="flex name class">
+<span>class <span class="ident">Config</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A simple dict with frozen keys.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Config(dict):
+    &#34;&#34;&#34;A simple dict with frozen keys.&#34;&#34;&#34;
+
+    def __init__(self, *args, **kwargs):
+        self.update(*args, **kwargs)
+        self.default_config = dict(self)
+        for key, value in dict.items(self):
+            if isinstance(value, dict):
+                dict.__setitem__(self, key, Config(value))
+
+    def __setitem__(self, key, val):
+        if key not in self:
+            raise KeyError(f&#34;Key {key} is not a valid parameter&#34;)
+        dict.__setitem__(self, key, val)
+
+    def reset(self):
+        self.update(self.default_config)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.dict</li>
+</ul>
+<h3>Methods</h3>
+<dl>
+<dt id="vectorbt.utils.Config.reset"><code class="name flex">
+<span>def <span class="ident">reset</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def reset(self):
+    self.update(self.default_config)</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="vectorbt.utils.class_or_instancemethod"><code class="flex name class">
+<span>class <span class="ident">class_or_instancemethod</span></span>
+<span>(</span><span>...)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>classmethod(function) -&gt; method</p>
+<p>Convert a function to be a class method.</p>
+<p>A class method receives the class as implicit first argument,
+just like an instance method receives the instance.
+To declare a class method, use this idiom:</p>
+<p>class C:
+@classmethod
+def f(cls, arg1, arg2, &hellip;):
+&hellip;</p>
+<p>It can be called either on the class (e.g. C.f()) or on an instance
+(e.g. C().f()).
+The instance is ignored except for its class.
+If a class method is called for a derived class, the derived class
+object is passed as the implied first argument.</p>
+<p>Class methods are different than C++ or Java static methods.
+If you want those, see the staticmethod builtin.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class class_or_instancemethod(classmethod):
+    def __get__(self, instance, type_):
+        descr_get = super().__get__ if instance is None else self.__func__.__get__
+        return descr_get(instance, type_)</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.classmethod</li>
+</ul>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="vectorbt" href="index.html">vectorbt</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="vectorbt.utils.add_indexing" href="#vectorbt.utils.add_indexing">add_indexing</a></code></li>
+<li><code><a title="vectorbt.utils.add_param_indexing" href="#vectorbt.utils.add_param_indexing">add_param_indexing</a></code></li>
+<li><code><a title="vectorbt.utils.add_safe_nb_methods" href="#vectorbt.utils.add_safe_nb_methods">add_safe_nb_methods</a></code></li>
+<li><code><a title="vectorbt.utils.align_index_to" href="#vectorbt.utils.align_index_to">align_index_to</a></code></li>
+<li><code><a title="vectorbt.utils.apply_and_concat" href="#vectorbt.utils.apply_and_concat">apply_and_concat</a></code></li>
+<li><code><a title="vectorbt.utils.apply_and_concat_multiple" href="#vectorbt.utils.apply_and_concat_multiple">apply_and_concat_multiple</a></code></li>
+<li><code><a title="vectorbt.utils.apply_and_concat_multiple_nb" href="#vectorbt.utils.apply_and_concat_multiple_nb">apply_and_concat_multiple_nb</a></code></li>
+<li><code><a title="vectorbt.utils.apply_and_concat_nb" href="#vectorbt.utils.apply_and_concat_nb">apply_and_concat_nb</a></code></li>
+<li><code><a title="vectorbt.utils.apply_and_concat_one" href="#vectorbt.utils.apply_and_concat_one">apply_and_concat_one</a></code></li>
+<li><code><a title="vectorbt.utils.apply_and_concat_one_nb" href="#vectorbt.utils.apply_and_concat_one_nb">apply_and_concat_one_nb</a></code></li>
+<li><code><a title="vectorbt.utils.broadcast" href="#vectorbt.utils.broadcast">broadcast</a></code></li>
+<li><code><a title="vectorbt.utils.broadcast_index" href="#vectorbt.utils.broadcast_index">broadcast_index</a></code></li>
+<li><code><a title="vectorbt.utils.broadcast_to" href="#vectorbt.utils.broadcast_to">broadcast_to</a></code></li>
+<li><code><a title="vectorbt.utils.broadcast_to_array_of" href="#vectorbt.utils.broadcast_to_array_of">broadcast_to_array_of</a></code></li>
+<li><code><a title="vectorbt.utils.cached_property" href="#vectorbt.utils.cached_property">cached_property</a></code></li>
+<li><code><a title="vectorbt.utils.check_dtype" href="#vectorbt.utils.check_dtype">check_dtype</a></code></li>
+<li><code><a title="vectorbt.utils.check_level_not_exists" href="#vectorbt.utils.check_level_not_exists">check_level_not_exists</a></code></li>
+<li><code><a title="vectorbt.utils.check_ndim" href="#vectorbt.utils.check_ndim">check_ndim</a></code></li>
+<li><code><a title="vectorbt.utils.check_not_none" href="#vectorbt.utils.check_not_none">check_not_none</a></code></li>
+<li><code><a title="vectorbt.utils.check_not_type" href="#vectorbt.utils.check_not_type">check_not_type</a></code></li>
+<li><code><a title="vectorbt.utils.check_same" href="#vectorbt.utils.check_same">check_same</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_columns" href="#vectorbt.utils.check_same_columns">check_same_columns</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_dtype" href="#vectorbt.utils.check_same_dtype">check_same_dtype</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_index" href="#vectorbt.utils.check_same_index">check_same_index</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_len" href="#vectorbt.utils.check_same_len">check_same_len</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_meta" href="#vectorbt.utils.check_same_meta">check_same_meta</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_shape" href="#vectorbt.utils.check_same_shape">check_same_shape</a></code></li>
+<li><code><a title="vectorbt.utils.check_same_type" href="#vectorbt.utils.check_same_type">check_same_type</a></code></li>
+<li><code><a title="vectorbt.utils.check_type" href="#vectorbt.utils.check_type">check_type</a></code></li>
+<li><code><a title="vectorbt.utils.clean_index" href="#vectorbt.utils.clean_index">clean_index</a></code></li>
+<li><code><a title="vectorbt.utils.combine_and_concat" href="#vectorbt.utils.combine_and_concat">combine_and_concat</a></code></li>
+<li><code><a title="vectorbt.utils.combine_and_concat_nb" href="#vectorbt.utils.combine_and_concat_nb">combine_and_concat_nb</a></code></li>
+<li><code><a title="vectorbt.utils.combine_indices" href="#vectorbt.utils.combine_indices">combine_indices</a></code></li>
+<li><code><a title="vectorbt.utils.combine_multiple" href="#vectorbt.utils.combine_multiple">combine_multiple</a></code></li>
+<li><code><a title="vectorbt.utils.combine_multiple_nb" href="#vectorbt.utils.combine_multiple_nb">combine_multiple_nb</a></code></li>
+<li><code><a title="vectorbt.utils.copy_func" href="#vectorbt.utils.copy_func">copy_func</a></code></li>
+<li><code><a title="vectorbt.utils.drop_duplicate_levels" href="#vectorbt.utils.drop_duplicate_levels">drop_duplicate_levels</a></code></li>
+<li><code><a title="vectorbt.utils.drop_levels" href="#vectorbt.utils.drop_levels">drop_levels</a></code></li>
+<li><code><a title="vectorbt.utils.drop_redundant_levels" href="#vectorbt.utils.drop_redundant_levels">drop_redundant_levels</a></code></li>
+<li><code><a title="vectorbt.utils.get_default_args" href="#vectorbt.utils.get_default_args">get_default_args</a></code></li>
+<li><code><a title="vectorbt.utils.index_from_values" href="#vectorbt.utils.index_from_values">index_from_values</a></code></li>
+<li><code><a title="vectorbt.utils.is_array" href="#vectorbt.utils.is_array">is_array</a></code></li>
+<li><code><a title="vectorbt.utils.is_array_like" href="#vectorbt.utils.is_array_like">is_array_like</a></code></li>
+<li><code><a title="vectorbt.utils.is_broadcasting_needed" href="#vectorbt.utils.is_broadcasting_needed">is_broadcasting_needed</a></code></li>
+<li><code><a title="vectorbt.utils.is_frame" href="#vectorbt.utils.is_frame">is_frame</a></code></li>
+<li><code><a title="vectorbt.utils.is_numba_func" href="#vectorbt.utils.is_numba_func">is_numba_func</a></code></li>
+<li><code><a title="vectorbt.utils.is_pandas" href="#vectorbt.utils.is_pandas">is_pandas</a></code></li>
+<li><code><a title="vectorbt.utils.is_series" href="#vectorbt.utils.is_series">is_series</a></code></li>
+<li><code><a title="vectorbt.utils.loc_mapper" href="#vectorbt.utils.loc_mapper">loc_mapper</a></code></li>
+<li><code><a title="vectorbt.utils.make_symmetric" href="#vectorbt.utils.make_symmetric">make_symmetric</a></code></li>
+<li><code><a title="vectorbt.utils.rename_levels" href="#vectorbt.utils.rename_levels">rename_levels</a></code></li>
+<li><code><a title="vectorbt.utils.repeat" href="#vectorbt.utils.repeat">repeat</a></code></li>
+<li><code><a title="vectorbt.utils.repeat_index" href="#vectorbt.utils.repeat_index">repeat_index</a></code></li>
+<li><code><a title="vectorbt.utils.select_and_combine" href="#vectorbt.utils.select_and_combine">select_and_combine</a></code></li>
+<li><code><a title="vectorbt.utils.select_and_combine_nb" href="#vectorbt.utils.select_and_combine_nb">select_and_combine_nb</a></code></li>
+<li><code><a title="vectorbt.utils.soft_broadcast_to_ndim" href="#vectorbt.utils.soft_broadcast_to_ndim">soft_broadcast_to_ndim</a></code></li>
+<li><code><a title="vectorbt.utils.stack_indices" href="#vectorbt.utils.stack_indices">stack_indices</a></code></li>
+<li><code><a title="vectorbt.utils.tile" href="#vectorbt.utils.tile">tile</a></code></li>
+<li><code><a title="vectorbt.utils.tile_index" href="#vectorbt.utils.tile_index">tile_index</a></code></li>
+<li><code><a title="vectorbt.utils.to_1d" href="#vectorbt.utils.to_1d">to_1d</a></code></li>
+<li><code><a title="vectorbt.utils.to_2d" href="#vectorbt.utils.to_2d">to_2d</a></code></li>
+<li><code><a title="vectorbt.utils.to_2d_multiple_nb" href="#vectorbt.utils.to_2d_multiple_nb">to_2d_multiple_nb</a></code></li>
+<li><code><a title="vectorbt.utils.to_2d_one_nb" href="#vectorbt.utils.to_2d_one_nb">to_2d_one_nb</a></code></li>
+<li><code><a title="vectorbt.utils.unstack_to_array" href="#vectorbt.utils.unstack_to_array">unstack_to_array</a></code></li>
+<li><code><a title="vectorbt.utils.unstack_to_df" href="#vectorbt.utils.unstack_to_df">unstack_to_df</a></code></li>
+<li><code><a title="vectorbt.utils.wrap_array" href="#vectorbt.utils.wrap_array">wrap_array</a></code></li>
+<li><code><a title="vectorbt.utils.wrap_broadcasted" href="#vectorbt.utils.wrap_broadcasted">wrap_broadcasted</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="vectorbt.utils.Base_Accessor" href="#vectorbt.utils.Base_Accessor">Base_Accessor</a></code></h4>
+<ul class="">
+<li><code><a title="vectorbt.utils.Base_Accessor.align_to" href="#vectorbt.utils.Base_Accessor.align_to">align_to</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.apply_and_concat" href="#vectorbt.utils.Base_Accessor.apply_and_concat">apply_and_concat</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.broadcast" href="#vectorbt.utils.Base_Accessor.broadcast">broadcast</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.broadcast_to" href="#vectorbt.utils.Base_Accessor.broadcast_to">broadcast_to</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.combine_with" href="#vectorbt.utils.Base_Accessor.combine_with">combine_with</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.combine_with_multiple" href="#vectorbt.utils.Base_Accessor.combine_with_multiple">combine_with_multiple</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.concat" href="#vectorbt.utils.Base_Accessor.concat">concat</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.dtype" href="#vectorbt.utils.Base_Accessor.dtype">dtype</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.empty" href="#vectorbt.utils.Base_Accessor.empty">empty</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.empty_like" href="#vectorbt.utils.Base_Accessor.empty_like">empty_like</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.make_symmetric" href="#vectorbt.utils.Base_Accessor.make_symmetric">make_symmetric</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.plot" href="#vectorbt.utils.Base_Accessor.plot">plot</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.repeat" href="#vectorbt.utils.Base_Accessor.repeat">repeat</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.tile" href="#vectorbt.utils.Base_Accessor.tile">tile</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.to_1d_array" href="#vectorbt.utils.Base_Accessor.to_1d_array">to_1d_array</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.to_2d_array" href="#vectorbt.utils.Base_Accessor.to_2d_array">to_2d_array</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.unstack_to_array" href="#vectorbt.utils.Base_Accessor.unstack_to_array">unstack_to_array</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.unstack_to_df" href="#vectorbt.utils.Base_Accessor.unstack_to_df">unstack_to_df</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.validate" href="#vectorbt.utils.Base_Accessor.validate">validate</a></code></li>
+<li><code><a title="vectorbt.utils.Base_Accessor.wrap_array" href="#vectorbt.utils.Base_Accessor.wrap_array">wrap_array</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="vectorbt.utils.Base_DFAccessor" href="#vectorbt.utils.Base_DFAccessor">Base_DFAccessor</a></code></h4>
+<ul class="">
+<li><code><a title="vectorbt.utils.Base_DFAccessor.empty" href="#vectorbt.utils.Base_DFAccessor.empty">empty</a></code></li>
+<li><code><a title="vectorbt.utils.Base_DFAccessor.empty_like" href="#vectorbt.utils.Base_DFAccessor.empty_like">empty_like</a></code></li>
+<li><code><a title="vectorbt.utils.Base_DFAccessor.wrap_array" href="#vectorbt.utils.Base_DFAccessor.wrap_array">wrap_array</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="vectorbt.utils.Base_SRAccessor" href="#vectorbt.utils.Base_SRAccessor">Base_SRAccessor</a></code></h4>
+<ul class="">
+<li><code><a title="vectorbt.utils.Base_SRAccessor.empty" href="#vectorbt.utils.Base_SRAccessor.empty">empty</a></code></li>
+<li><code><a title="vectorbt.utils.Base_SRAccessor.empty_like" href="#vectorbt.utils.Base_SRAccessor.empty_like">empty_like</a></code></li>
+<li><code><a title="vectorbt.utils.Base_SRAccessor.wrap_array" href="#vectorbt.utils.Base_SRAccessor.wrap_array">wrap_array</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="vectorbt.utils.Config" href="#vectorbt.utils.Config">Config</a></code></h4>
+<ul class="">
+<li><code><a title="vectorbt.utils.Config.reset" href="#vectorbt.utils.Config.reset">reset</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="vectorbt.utils.class_or_instancemethod" href="#vectorbt.utils.class_or_instancemethod">class_or_instancemethod</a></code></h4>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>

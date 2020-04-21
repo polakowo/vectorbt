@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from vectorbt.utils import *
 from vectorbt.accessors import *
 
-__all__ = ['Gauge', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
+__all__ = ['Indicator', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
 
 # You can change this from code using vbt.widgets.layout_defaults[key] = value
 layout_defaults = Config(
@@ -45,7 +45,7 @@ class UpdatableFigureWidget(FigureWidget):
     def update_data(self, *args, **kwargs):
         raise NotImplementedError
 
-# ############# Gauge ############# #
+# ############# Indicator ############# #
 
 
 def rgb_from_cmap(cmap_name, value, value_range):
@@ -58,10 +58,24 @@ def rgb_from_cmap(cmap_name, value, value_range):
     return "rgb(%d,%d,%d)" % tuple(np.round(np.asarray(cmap(norm_value))[:3] * 255))
 
 
-class Gauge(UpdatableFigureWidget):
-    """Accepts a single value and draws an indicator."""
-
+class Indicator(UpdatableFigureWidget):
     def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral', trace_kwargs={}, **layout_kwargs):
+        """Create an updatable indicator plot.
+        
+        Args:
+            value (int or float, optional): The value to be displayed.
+            label (str, optional): The label to be displayed.
+            value_range (list or tuple of 2 values, optional): The value range of the gauge.
+            cmap_name (str, optional): A matplotlib-compatible colormap name, see the [list of available colormaps](https://matplotlib.org/tutorials/colors/colormaps.html).
+            trace_kwargs (dict, optional): Keyword arguments passed to the [`plotly.graph_objects.Indicator`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Indicator.html).
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```
+            vbt.Indicator(value=2, value_range=(1, 3), label='My Indicator')
+            ```
+            ![](img/Indicator.png)
+            """
+
         self._value_range = value_range
         self._cmap_name = cmap_name
 
@@ -82,8 +96,13 @@ class Gauge(UpdatableFigureWidget):
             self.update_data(value)
 
     def update_data(self, value):
+        """Update the data of the plot efficiently.
+        
+        Args:
+            value (int or float): The value to be displayed.
+        """
         # NOTE: If called by Plotly event handler and in case of error, this won't visible in a notebook cell, but in logs!
-        check_type(value, (int, float, complex))
+        check_type(value, (int, float))
 
         # Update value range
         if self._value_range is None:
@@ -105,14 +124,42 @@ class Gauge(UpdatableFigureWidget):
 
 
 class Bar(UpdatableFigureWidget):
-    """Draw a barplot for each value in a series."""
 
-    def __init__(self, x_labels, trace_names, data=None, trace_kwargs={}, **layout_kwargs):
+    def __init__(self, x_labels, trace_names=None, data=None, trace_kwargs={}, **layout_kwargs):
+        """Create an updatable bar plot.
+        
+        Args:
+            x_labels (list of str): X-axis labels, corresponding to index in pandas.
+            trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
+            data (array_like, optional): Data in any format that can be converted to NumPy.
+            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html).
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            One trace:
+            ```
+            vbt.Bar(['x', 'y'], trace_names='a', data=[1, 2])
+
+            # Or the same directly on pandas
+            pd.Series([1, 2], index=['x', 'y'], name='a').vbt.Bar()
+            ```
+            ![](img/Bar.png)
+
+            Multiple traces:
+            ```
+            vbt.Bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
+
+            # Or the same directly on pandas
+            pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Bar()
+            ```
+            ![](img/Bar_mult.png)
+            """
+        if isinstance(trace_names, str) or trace_names is None:
+            trace_names = [trace_names]
         self._x_labels = x_labels
         self._trace_names = trace_names
 
         super().__init__()
-        if len(trace_names) > 1:
+        if len(trace_names) > 1 or trace_names[0] is not None:
             self.update_layout(showlegend=True)
         self.update_layout(**layout_kwargs)
 
@@ -129,6 +176,20 @@ class Bar(UpdatableFigureWidget):
             self.update_data(data)
 
     def update_data(self, data):
+        """Update the data of the plot efficiently.
+        
+        Args:
+            data (array_like): Data in any format that can be converted to NumPy.
+                
+                Must be of shape (`x_labels`, `trace_names`).
+        Examples:
+            ```
+            fig = pd.Series([1, 2], index=['x', 'y'], name='a').vbt.Bar()
+            fig.update_data([2, 1])
+            fig.show()
+            ```
+            ![](img/Bar_updated.png)
+        """
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
@@ -153,21 +214,40 @@ class Bar_Accessor():
         if x_labels is None:
             x_labels = self._obj.index
         if trace_names is None:
-            trace_names = to_2d(self._obj).columns
-        return Bar(x_labels, trace_names, data=self._obj.values, **kwargs)
+            if is_frame(self._obj) or (is_series(self._obj) and self._obj.name is not None):
+                trace_names = to_2d(self._obj).columns
+        return Bar(x_labels, trace_names=trace_names, data=self._obj.values, **kwargs)
 
 # ############# Scatter ############# #
 
 
 class Scatter(UpdatableFigureWidget):
-    """Draws a scatterplot for each column in a dataframe."""
+    def __init__(self, x_labels, trace_names=None, data=None, trace_kwargs={}, **layout_kwargs):
+        """Create an updatable scatter plot.
+        
+        Args:
+            x_labels (list of str): X-axis labels, corresponding to index in pandas.
+            trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
+            data (array_like, optional): Data in any format that can be converted to NumPy.
+            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```
+            vbt.Scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
 
-    def __init__(self, x_labels, trace_names, data=None, trace_kwargs={}, **layout_kwargs):
+            # Or the same directly on pandas
+            pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Scatter()
+            ```
+            ![](img/Scatter.png)
+            """
+
+        if isinstance(trace_names, str) or trace_names is None:
+            trace_names = [trace_names]
         self._x_labels = x_labels
         self._trace_names = trace_names
 
         super().__init__()
-        if len(trace_names) > 1:
+        if len(trace_names) > 1 or trace_names[0] is not None:
             self.update_layout(showlegend=True)
         self.update_layout(**layout_kwargs)
 
@@ -184,6 +264,13 @@ class Scatter(UpdatableFigureWidget):
             self.update_data(data)
 
     def update_data(self, data):
+        """Update the data of the plot efficiently.
+        
+        Args:
+            data (array_like): Data in any format that can be converted to NumPy.
+
+                Must be of shape (`x_labels`, `trace_names`).
+        """
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
@@ -206,21 +293,40 @@ class Scatter_Accessor():
         if x_labels is None:
             x_labels = self._obj.index
         if trace_names is None:
-            trace_names = to_2d(self._obj).columns
-        return Scatter(x_labels, trace_names, data=self._obj.values, **kwargs)
+            if is_frame(self._obj) or (is_series(self._obj) and self._obj.name is not None):
+                trace_names = to_2d(self._obj).columns
+        return Scatter(x_labels, trace_names=trace_names, data=self._obj.values, **kwargs)
 
 # ############# Histogram ############# #
 
 
 class Histogram(UpdatableFigureWidget):
-    """Draws a histogram for each column in a dataframe."""
+    def __init__(self, trace_names=None, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
+        """Create an updatable histogram plot.
+        
+        Args:
+            trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
+            data (array_like, optional): Data in any format that can be converted to NumPy.
+            horizontal (bool): Plot horizontally. Defaults to False.
+            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Histogram`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Histogram.html)
+            **layout_kwargs: Keyword arguments for layout
+        Examples:
+            ```
+            vbt.Histogram(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
 
-    def __init__(self, trace_names, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
+            # Or the same directly on pandas
+            pd.DataFrame({'a': [1, 3, 2], 'b': [2, 4, 1]}).vbt.Histogram()
+            ```
+            ![](img/Histogram.png)
+            """
+
+        if isinstance(trace_names, str) or trace_names is None:
+            trace_names = [trace_names]
         self._trace_names = trace_names
         self._horizontal = horizontal
 
         super().__init__()
-        if len(trace_names) > 1:
+        if len(trace_names) > 1 or trace_names[0] is not None:
             self.update_layout(showlegend=True)
         self.update_layout(barmode='overlay')
         self.update_layout(**layout_kwargs)
@@ -238,6 +344,13 @@ class Histogram(UpdatableFigureWidget):
             self.update_data(data)
 
     def update_data(self, data):
+        """Update the data of the plot efficiently.
+        
+        Args:
+            data (array_like): Data in any format that can be converted to NumPy.
+
+                Must be of shape (any, `trace_names`).
+        """
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
@@ -262,16 +375,34 @@ class Histogram_Accessor():
 
     def __call__(self, trace_names=None, **kwargs):
         if trace_names is None:
-            trace_names = to_2d(self._obj).columns
-        return Histogram(trace_names, data=self._obj.values, **kwargs)
+            if is_frame(self._obj) or (is_series(self._obj) and self._obj.name is not None):
+                trace_names = to_2d(self._obj).columns
+        return Histogram(trace_names=trace_names, data=self._obj.values, **kwargs)
 
 
 # ############# Heatmap ############# #
 
 class Heatmap(UpdatableFigureWidget):
-    """Draw a heatmap of a dataframe."""
-
     def __init__(self, x_labels, y_labels, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
+        """Create an updatable heatmap plot.
+        
+        Args:
+            x_labels (list of str): X-axis labels, corresponding to columns in pandas.
+            y_labels (list of str): Y-axis labels, corresponding to index in pandas.
+            data (array_like, optional): Data in any format that can be converted to NumPy.
+            horizontal (bool): Plot horizontally. Defaults to False.
+            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Heatmap`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Heatmap.html).
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```
+            vbt.Heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
+
+            # Or the same directly on pandas
+            pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Heatmap()
+            ```
+            ![](img/Heatmap.png)
+            """
+
         self._x_labels = x_labels
         self._y_labels = y_labels
         self._horizontal = horizontal
@@ -297,6 +428,13 @@ class Heatmap(UpdatableFigureWidget):
             self.update_data(data)
 
     def update_data(self, data):
+        """Update the data of the plot efficiently.
+        
+        Args:
+            data (array_like): Data in any format that can be converted to NumPy.
+
+                Must be of shape (`y_labels`, `x_labels`).
+        """
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)

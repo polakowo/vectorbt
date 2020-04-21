@@ -1230,7 +1230,9 @@ class Base_Accessor():
         return self.wrap_array(result, columns=new_columns)
 
     def combine_with(self, other, *args, combine_func=None, broadcast_kwargs={}, **kwargs):
-        """Broadcast with other and combine."""
+        """Broadcast with other and combine.
+        
+        The returned shape is the same as broadcasted shape."""
         if isinstance(other, Base_Accessor):
             other = other._obj
         check_not_none(combine_func)
@@ -1242,7 +1244,14 @@ class Base_Accessor():
 
     def combine_with_multiple(self, others, *args, combine_func=None, concat=False,
                               broadcast_kwargs={}, as_columns=None, **kwargs):
-        """Broadcast with others and combine them all pairwise."""
+        """Broadcast with other objects to the same shape and combine them all pairwise.
+        
+        The returned shape is the same as broadcasted shape if concat is False.
+        The returned shape is concatenation of broadcasted shapes if concat is True.
+        
+        Examples
+        --------
+        Combining without stacking:"""
         others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
         check_not_none(combine_func)
         check_type(others, Iterable)

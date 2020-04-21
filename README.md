@@ -156,7 +156,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - Each indicator offers methods for generating signals and plotting
     - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or product
 - Interactive Plotly-based widgets to visualize backtest results ([widgets.py](vectorbt/widgets.py))
-    - Gauge, Bar, Scatter, Histogram and Heatmap
+    - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
 
