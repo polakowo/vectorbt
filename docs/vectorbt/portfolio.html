@@ -1,0 +1,1774 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.8.1" />
+<title>vectorbt.portfolio API documentation</title>
+<meta name="description" content="" />
+<link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
+<link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/github.min.css" rel="stylesheet">
+<style>.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>vectorbt.portfolio</code></h1>
+</header>
+<section id="section-intro">
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">import numpy as np
+import pandas as pd
+from numba import njit, b1, i1, i8, f8
+from numba.types import UniTuple
+import plotly.graph_objects as go
+
+from vectorbt.utils import *
+from vectorbt.accessors import *
+from vectorbt.widgets import FigureWidget
+from vectorbt.timeseries import pct_change_nb, fillna_nb, expanding_max_nb, diff_nb
+
+__all__ = [&#39;Portfolio&#39;]
+
+# You can change default portfolio values from code
+portfolio_defaults = Config(
+    investment=1.,
+    slippage=0.,
+    commission=0.
+)
+
+# ############# Numba functions ############# #
+
+
+@njit(f8(i8, i8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
+def signals_order_func_np(i, col, run_cash, run_shares, entries, exits, volume, accumulate):
+    &#34;&#34;&#34;Order function to buy/sell based on signals.&#34;&#34;&#34;
+    if run_shares &gt; 0:
+        if entries[i, col] and not exits[i, col]:
+            if accumulate:
+                return volume[i, col]
+        elif not entries[i, col] and exits[i, col]:
+            return -volume[i, col]
+    else:
+        if entries[i, col] and not exits[i, col]:
+            return volume[i, col]
+        elif not entries[i, col] and exits[i, col]:
+            if accumulate:
+                return -volume[i, col]
+    return 0.
+
+
+@njit(f8(i8, i8, f8, f8, f8[:, :], b1), cache=True)
+def orders_order_func_np(i, col, run_cash, run_shares, orders, is_target):
+    &#34;&#34;&#34;Buy/sell the amount of shares specified by orders.&#34;&#34;&#34;
+    if is_target:
+        return orders[i, col] - run_shares
+    else:
+        return orders[i, col]
+
+
+@njit
+def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
+    &#34;&#34;&#34;Calculate portfolio value in cash and shares.&#34;&#34;&#34;
+    cash = np.empty_like(ts)
+    shares = np.empty_like(ts)
+
+    for col in range(ts.shape[1]):
+        run_cash = investment
+        run_shares = 0
+        for i in range(ts.shape[0]):
+            volume = order_func_np(i, col, run_cash, run_shares, *args)  # the amount of shares to buy/sell
+            if volume &gt; 0:
+                # Buy volume
+                adj_price = ts[i, col] * (1 + slippage)  # slippage applies on price
+                req_cash = volume * adj_price
+                req_cash /= (1 - commission)  # total cash required for this volume
+                if req_cash &lt;= run_cash:  # sufficient cash
+                    run_shares += volume
+                    run_cash -= req_cash
+                else:  # not sufficient cash, volume will be less than requested
+                    adj_cash = run_cash
+                    adj_cash *= (1 - commission)  # commission in % applies on transaction volume
+                    run_shares += adj_cash / adj_price
+                    run_cash = 0
+            elif volume &lt; 0:
+                # Sell volume
+                adj_price = ts[i, col] * (1 - slippage)
+                adj_shares = min(run_shares, abs(volume))
+                adj_cash = adj_shares * adj_price
+                adj_cash *= (1 - commission)
+                run_shares -= adj_shares
+                run_cash += adj_cash
+            cash[i, col] = run_cash
+            shares[i, col] = run_shares
+
+    return cash, shares
+
+
+@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
+def portfolio_from_signals_np(ts, investment, slippage, commission, entries, exits, volume, accumulate):
+    &#34;&#34;&#34;Calculate portfolio value using signals.&#34;&#34;&#34;
+    return portfolio_np(ts, investment, slippage, commission, signals_order_func_np, entries, exits, volume, accumulate)
+
+
+@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, f8[:, :], b1), cache=True)
+def portfolio_from_orders_np(ts, investment, slippage, commission, orders, is_target):
+    &#34;&#34;&#34;Calculate portfolio value using orders.&#34;&#34;&#34;
+    return portfolio_np(ts, investment, slippage, commission, orders_order_func_np, orders, is_target)
+
+
+@njit(b1(f8[:]), cache=True)
+def detect_order_accumulation_1d_nb(trades):
+    &#34;&#34;&#34;Detect accumulation of orders, that is, position is being increased/decreased gradually.
+
+    When it happens, it&#39;s not easy to calculate P/L of a position anymore.&#34;&#34;&#34;
+    entry_i = -1
+    position = False
+    for i in range(trades.shape[0]):
+        if trades[i] &gt; 0:
+            if position:
+                return True
+            entry_i = i
+            position = True
+        elif trades[i] &lt; 0:
+            if not position:
+                return True
+            if trades[entry_i] != abs(trades[i]):
+                return True
+            position = False
+    return False
+
+
+@njit(b1[:](f8[:, :]), cache=True)
+def detect_order_accumulation_nb(trades):
+    &#34;&#34;&#34;Detect accumulation of orders, that is, position is being increased/decreased gradually.
+
+    When it happens, it&#39;s not easy to calculate P/L of a position anymore.&#34;&#34;&#34;
+    a = np.full(trades.shape[1], False, dtype=b1)
+    for col in range(trades.shape[1]):
+        a[col] = detect_order_accumulation_1d_nb(trades[:, col])
+    return a
+
+
+@njit
+def apply_on_positions(trades, apply_func, *args):
+    &#34;&#34;&#34;Apply a function on each position.&#34;&#34;&#34;
+    if detect_order_accumulation_nb(trades).any():
+        raise ValueError(&#34;Order accumulation detected. Cannot calculate performance per position.&#34;)
+    out = np.full_like(trades, np.nan)
+
+    for col in range(trades.shape[1]):
+        entry_i = -1
+        position = False
+        for i in range(trades.shape[0]):
+            if position and trades[i, col] &lt; 0:
+                out[i, col] = apply_func(entry_i, i, col, trades, *args)
+                position = False
+            elif not position and trades[i, col] &gt; 0:
+                entry_i = i
+                position = True
+            if position and i == trades.shape[0] - 1:  # unrealized
+                out[i, col] = apply_func(entry_i, i, col, trades, *args)
+    return out
+
+
+_profits_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] - equity[entry_i, col])
+_returns_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] / equity[entry_i, col] - 1)
+
+
+@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
+def position_profits_nb(trades, equity):
+    &#34;&#34;&#34;Calculate P/L per position.&#34;&#34;&#34;
+    return apply_on_positions(trades, _profits_nb, equity)
+
+
+@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
+def position_returns_nb(trades, equity):
+    &#34;&#34;&#34;Calculate returns per trade.&#34;&#34;&#34;
+    return apply_on_positions(trades, _returns_nb, equity)
+
+
+@njit
+def apply_on_position_profits_nb(position_profits, apply_func, mask_func):
+    applied = np.zeros(position_profits.shape[1])
+
+    for col in range(position_profits.shape[1]):
+        mask = mask_func(position_profits[:, col])
+        if mask.any():
+            masked = position_profits[:, col][mask]
+            applied[col] = apply_func(masked)
+    return applied
+
+
+_nanmean_nb = njit(lambda x: np.nanmean(x))
+_nansum_nb = njit(lambda x: np.nansum(x))
+_win_mask_nb = njit(lambda x: x &gt; 0)
+_loss_mask_nb = njit(lambda x: x &lt; 0)
+
+
+@njit(f8[:](f8[:, :]))
+def sum_win_nb(position_profits):
+    return apply_on_position_profits_nb(position_profits, _nansum_nb, _win_mask_nb)
+
+
+@njit(f8[:](f8[:, :]))
+def sum_loss_nb(position_profits):
+    return np.abs(apply_on_position_profits_nb(position_profits, _nansum_nb, _loss_mask_nb))
+
+
+@njit(f8[:](f8[:, :]))
+def avg_win_nb(position_profits):
+    return apply_on_position_profits_nb(position_profits, _nanmean_nb, _win_mask_nb)
+
+
+@njit(f8[:](f8[:, :]))
+def avg_loss_nb(position_profits):
+    return np.abs(apply_on_position_profits_nb(position_profits, _nanmean_nb, _loss_mask_nb))
+
+# ############# Custom accessors ############# #
+
+
+def indexing_func(obj, loc_pandas_func):
+    return obj.__class__(
+        loc_pandas_func(obj.ts),
+        loc_pandas_func(obj.cash),
+        loc_pandas_func(obj.shares),
+        obj.investment,
+        obj.slippage,
+        obj.commission
+    )
+
+
+@add_indexing(indexing_func)
+class Portfolio():
+
+    def __init__(self, ts, cash, shares, investment, slippage, commission):
+        check_type(ts, (pd.Series, pd.DataFrame))
+        ts.vbt.timeseries.validate()
+
+        check_same_meta(ts, cash)
+        check_same_meta(ts, shares)
+
+        self.ts = ts
+        self.cash = cash
+        self.shares = shares
+        self.investment = investment
+        self.slippage = slippage
+        self.commission = commission
+
+    # ############# Magic methods ############# #
+
+    def __add__(self, other):
+        check_type(other, self.__class__)
+        check_same(self.ts, other.ts)
+        check_same(self.slippage, other.slippage)
+        check_same(self.commission, other.commission)
+
+        return self.__class__(
+            self.ts,
+            self.cash + other.cash,
+            self.shares + other.shares,
+            self.investment + other.investment,
+            self.slippage,
+            self.commission
+        )
+
+    def __radd__(self, other):
+        return Portfolio.__add__(self, other)
+
+    # ############# Class methods ############# #
+
+    @classmethod
+    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+        &#34;&#34;&#34;Build portfolio based on entry and exit signals and the corresponding volume.
+
+        Set volume to the number of shares to buy/sell.
+        Set volume to np.inf to buy/sell everything.
+        Set accumulate to False to avoid producing new orders if already in the market.&#34;&#34;&#34;
+        if investment is None:
+            investment = portfolio_defaults[&#39;investment&#39;]
+        if slippage is None:
+            slippage = portfolio_defaults[&#39;slippage&#39;]
+        if commission is None:
+            commission = portfolio_defaults[&#39;commission&#39;]
+
+        check_type(ts, (pd.Series, pd.DataFrame))
+        check_type(entries, (pd.Series, pd.DataFrame))
+        check_type(exits, (pd.Series, pd.DataFrame))
+
+        ts.vbt.timeseries.validate()
+        entries.vbt.signals.validate()
+        exits.vbt.signals.validate()
+
+        ts, entries, exits = broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
+
+        volume = broadcast_to(volume, ts, writeable=True, copy_kwargs={&#39;dtype&#39;: np.float64})
+
+        investment = float(investment)
+        slippage = float(slippage)
+        commission = float(commission)
+
+        cash, shares = portfolio_from_signals_np(
+            ts.vbt.to_2d_array(),
+            investment,
+            slippage,
+            commission,
+            entries.vbt.to_2d_array(),
+            exits.vbt.to_2d_array(),
+            volume.vbt.to_2d_array(),
+            accumulate)
+
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
+
+        return cls(ts, cash, shares, investment, slippage, commission)
+
+    @classmethod
+    def from_orders(cls, ts, orders, is_target=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+        &#34;&#34;&#34;Build portfolio based on orders.
+
+        Set an orders element to positive/negative number - a number of shares to buy/sell.
+        Set is_target to True to specify the target amount of shares to hold.&#34;&#34;&#34;
+        if investment is None:
+            investment = portfolio_defaults[&#39;investment&#39;]
+        if slippage is None:
+            slippage = portfolio_defaults[&#39;slippage&#39;]
+        if commission is None:
+            commission = portfolio_defaults[&#39;commission&#39;]
+
+        check_type(ts, (pd.Series, pd.DataFrame))
+        check_type(orders, (pd.Series, pd.DataFrame))
+
+        ts.vbt.timeseries.validate()
+        orders.vbt.timeseries.validate()
+
+        ts, orders = broadcast(ts, orders, **broadcast_kwargs, writeable=True)
+
+        investment = float(investment)
+        slippage = float(slippage)
+        commission = float(commission)
+
+        cash, shares = portfolio_from_orders_np(
+            ts.vbt.to_2d_array(),
+            investment,
+            slippage,
+            commission,
+            orders.vbt.to_2d_array(),
+            is_target)
+
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
+
+        return cls(ts, cash, shares, investment, slippage, commission)
+
+    @classmethod
+    def from_order_func(cls, ts, order_func_np, *args, investment=None, slippage=None, commission=None):
+        &#34;&#34;&#34;Build portfolio based on order function.&#34;&#34;&#34;
+        if investment is None:
+            investment = portfolio_defaults[&#39;investment&#39;]
+        if slippage is None:
+            slippage = portfolio_defaults[&#39;slippage&#39;]
+        if commission is None:
+            commission = portfolio_defaults[&#39;commission&#39;]
+
+        check_type(ts, (pd.Series, pd.DataFrame))
+        ts.vbt.timeseries.validate()
+
+        investment = float(investment)
+        slippage = float(slippage)
+        commission = float(commission)
+
+        cash, shares = portfolio_np(
+            ts.vbt.to_2d_array(),
+            investment,
+            slippage,
+            commission,
+            order_func_np,
+            *args)
+
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
+
+        return cls(ts, cash, shares, investment, slippage, commission)
+
+    # ############# General properties ############# #
+
+    @cached_property
+    def equity(self):
+        return self.ts.vbt.wrap_array(self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def equity_in_shares(self):
+        return self.ts.vbt.wrap_array(self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def returns(self):
+        return self.ts.vbt.wrap_array(pct_change_nb(self.equity.vbt.to_2d_array()))
+
+    @cached_property
+    def drawdown(self):
+        drawdown = 1 - self.equity.vbt.to_2d_array() / expanding_max_nb(self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(drawdown)
+
+    @cached_property
+    def trades(self):
+        shares = self.shares.vbt.to_2d_array()
+        trades = fillna_nb(diff_nb(shares), 0)
+        trades[0, :] = shares[0, :]
+        return self.ts.vbt.wrap_array(trades)
+
+    @cached_property
+    def position_profits(self):
+        position_profits = position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_profits)
+
+    @cached_property
+    def position_returns(self):
+        position_returns = position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_returns)
+
+    @cached_property
+    def win_mask(self):
+        position_profits = self.position_profits.vbt.to_2d_array().copy()
+        position_profits[np.isnan(position_profits)] = 0  # avoid warnings
+        win_mask = position_profits &gt; 0
+        return self.ts.vbt.wrap_array(win_mask)
+
+    @cached_property
+    def loss_mask(self):
+        position_profits = self.position_profits.vbt.to_2d_array().copy()
+        position_profits[np.isnan(position_profits)] = 0
+        loss_mask = position_profits &lt; 0
+        return self.ts.vbt.wrap_array(loss_mask)
+
+    @cached_property
+    def position_mask(self):
+        position_mask = ~np.isnan(self.position_profits.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_mask)
+
+    # ############# Performance metrics ############# #
+
+    def wrap_metric(self, a):
+        if is_frame(self.ts):
+            return pd.Series(a, index=self.ts.columns)
+        # Single value
+        if is_array(a):
+            return a[0]
+        return a
+
+    @cached_property
+    def sum_win(self):
+        &#34;&#34;&#34;Sum of wins.&#34;&#34;&#34;
+        sum_win = sum_win_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(sum_win)
+
+    @cached_property
+    def sum_loss(self):
+        &#34;&#34;&#34;Sum of losses (always positive).&#34;&#34;&#34;
+        sum_loss = sum_loss_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(sum_loss)
+
+    @cached_property
+    def avg_win(self):
+        &#34;&#34;&#34;Average win.&#34;&#34;&#34;
+        avg_win = avg_win_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(avg_win)
+
+    @cached_property
+    def avg_loss(self):
+        &#34;&#34;&#34;Average loss (always positive).&#34;&#34;&#34;
+        avg_loss = avg_loss_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(avg_loss)
+
+    @cached_property
+    def win_rate(self):
+        &#34;&#34;&#34;Fraction of wins.&#34;&#34;&#34;
+        win_rate = np.sum(self.win_mask.vbt.to_2d_array(), axis=0) / \
+            np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+        return self.wrap_metric(win_rate)
+
+    @cached_property
+    def loss_rate(self):
+        &#34;&#34;&#34;Fraction of losses.&#34;&#34;&#34;
+        loss_rate = np.sum(self.loss_mask.vbt.to_2d_array(), axis=0) / \
+            np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+        return self.wrap_metric(loss_rate)
+
+    @cached_property
+    def profit_factor(self):
+        profit_factor = to_1d(self.sum_win, raw=True) / to_1d(self.sum_loss, raw=True)
+        return self.wrap_metric(profit_factor)
+
+    @cached_property
+    def appt(self):
+        &#34;&#34;&#34;Average profitability per trade (APPT)
+
+        For every trade you place, you are likely to win/lose this amount.
+        What matters is that your APPT comes up positive.&#34;&#34;&#34;
+        appt = to_1d(self.win_rate, raw=True) * to_1d(self.avg_win, raw=True) - \
+            to_1d(self.loss_rate, raw=True) * to_1d(self.avg_loss, raw=True)
+        return self.wrap_metric(appt)
+
+    @cached_property
+    def total_profit(self):
+        total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
+        return self.wrap_metric(total_profit)
+
+    @cached_property
+    def total_return(self):
+        total_return = to_1d(self.total_profit, raw=True) / self.investment
+        return self.wrap_metric(total_return)
+
+    @cached_property
+    def mdd(self):
+        &#34;&#34;&#34;A maximum drawdown (MDD) is the maximum observed loss from a peak 
+        to a trough of a portfolio, before a new peak is attained.&#34;&#34;&#34;
+        mdd = np.max(self.drawdown.vbt.to_2d_array(), axis=0)
+        return self.wrap_metric(mdd)
+
+    # ############# Plotting ############# #
+
+    def plot_trades(self,
+                    buy_trace_kwargs={},
+                    sell_trace_kwargs={},
+                    fig=None,
+                    **ts_kwargs):
+        check_type(self.ts, pd.Series)
+        check_type(self.trades, pd.Series)
+        sell_mask = self.trades &lt; 0
+        buy_mask = self.trades &gt; 0
+
+        # Plot TimeSeries
+        fig = self.ts.vbt.timeseries.plot(fig=fig, **ts_kwargs)
+
+        # Plot markets
+        buy_scatter = go.Scatter(
+            x=self.trades.index[buy_mask],
+            y=self.ts[buy_mask],
+            customdata=self.trades[buy_mask],
+            hovertemplate=&#39;(%{x}, %{y})&lt;br&gt;%{customdata:.6g}&#39;,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;triangle-up&#39;,
+                color=&#39;limegreen&#39;,
+                size=10
+            ),
+            name=&#39;Buy&#39;
+        )
+        buy_scatter.update(**buy_trace_kwargs)
+        fig.add_trace(buy_scatter)
+        sell_scatter = go.Scatter(
+            x=self.trades.index[sell_mask],
+            y=self.ts[sell_mask],
+            customdata=self.trades[sell_mask],
+            hovertemplate=&#39;(%{x}, %{y})&lt;br&gt;%{customdata:.6g}&#39;,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;triangle-down&#39;,
+                color=&#39;orangered&#39;,
+                size=10
+            ),
+            name=&#39;Sell&#39;
+        )
+        sell_scatter.update(**sell_trace_kwargs)
+        fig.add_trace(sell_scatter)
+
+        return fig
+
+    def plot_position_profits(self,
+                              profit_trace_kwargs={},
+                              loss_trace_kwargs={},
+                              fig=None,
+                              **layout_kwargs):
+        check_type(self.position_profits, pd.Series)
+        profits = self.position_profits.copy()
+        profits[self.position_profits &lt;= 0] = np.nan
+        losses = self.position_profits.copy()
+        losses[self.position_profits &gt;= 0] = np.nan
+
+        # Set up figure
+        if fig is None:
+            fig = FigureWidget()
+            fig.update_layout(showlegend=True)
+            fig.update_layout(**layout_kwargs)
+
+        # Plot markets
+        profit_scatter = go.Scatter(
+            x=self.position_profits.index,
+            y=profits,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;circle&#39;,
+                color=&#39;green&#39;,
+                size=10
+            ),
+            name=&#39;Profit&#39;
+        )
+        profit_scatter.update(**profit_trace_kwargs)
+        fig.add_trace(profit_scatter)
+        loss_scatter = go.Scatter(
+            x=self.position_profits.index,
+            y=losses,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;circle&#39;,
+                color=&#39;red&#39;,
+                size=10
+            ),
+            name=&#39;Loss&#39;
+        )
+        loss_scatter.update(**loss_trace_kwargs)
+        fig.add_trace(loss_scatter)
+
+        # Set up axes
+        maxval = np.nanmax(np.abs(self.position_profits.vbt.to_2d_array()))
+        space = 0.1 * 2 * maxval
+        fig.update_layout(
+            yaxis=dict(
+                range=[-(maxval+space), maxval+space]
+            ),
+            shapes=[dict(
+                type=&#34;line&#34;,
+                xref=&#34;paper&#34;,
+                yref=&#39;y&#39;,
+                x0=0, x1=1, y0=0, y1=0,
+                line=dict(
+                    color=&#34;grey&#34;,
+                    width=2,
+                    dash=&#34;dot&#34;,
+                ))]
+        )
+
+        return fig</code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="vectorbt.portfolio.Portfolio"><code class="flex name class">
+<span>class <span class="ident">Portfolio</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Portfolio():
+
+    def __init__(self, ts, cash, shares, investment, slippage, commission):
+        check_type(ts, (pd.Series, pd.DataFrame))
+        ts.vbt.timeseries.validate()
+
+        check_same_meta(ts, cash)
+        check_same_meta(ts, shares)
+
+        self.ts = ts
+        self.cash = cash
+        self.shares = shares
+        self.investment = investment
+        self.slippage = slippage
+        self.commission = commission
+
+    # ############# Magic methods ############# #
+
+    def __add__(self, other):
+        check_type(other, self.__class__)
+        check_same(self.ts, other.ts)
+        check_same(self.slippage, other.slippage)
+        check_same(self.commission, other.commission)
+
+        return self.__class__(
+            self.ts,
+            self.cash + other.cash,
+            self.shares + other.shares,
+            self.investment + other.investment,
+            self.slippage,
+            self.commission
+        )
+
+    def __radd__(self, other):
+        return Portfolio.__add__(self, other)
+
+    # ############# Class methods ############# #
+
+    @classmethod
+    def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+        &#34;&#34;&#34;Build portfolio based on entry and exit signals and the corresponding volume.
+
+        Set volume to the number of shares to buy/sell.
+        Set volume to np.inf to buy/sell everything.
+        Set accumulate to False to avoid producing new orders if already in the market.&#34;&#34;&#34;
+        if investment is None:
+            investment = portfolio_defaults[&#39;investment&#39;]
+        if slippage is None:
+            slippage = portfolio_defaults[&#39;slippage&#39;]
+        if commission is None:
+            commission = portfolio_defaults[&#39;commission&#39;]
+
+        check_type(ts, (pd.Series, pd.DataFrame))
+        check_type(entries, (pd.Series, pd.DataFrame))
+        check_type(exits, (pd.Series, pd.DataFrame))
+
+        ts.vbt.timeseries.validate()
+        entries.vbt.signals.validate()
+        exits.vbt.signals.validate()
+
+        ts, entries, exits = broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
+
+        volume = broadcast_to(volume, ts, writeable=True, copy_kwargs={&#39;dtype&#39;: np.float64})
+
+        investment = float(investment)
+        slippage = float(slippage)
+        commission = float(commission)
+
+        cash, shares = portfolio_from_signals_np(
+            ts.vbt.to_2d_array(),
+            investment,
+            slippage,
+            commission,
+            entries.vbt.to_2d_array(),
+            exits.vbt.to_2d_array(),
+            volume.vbt.to_2d_array(),
+            accumulate)
+
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
+
+        return cls(ts, cash, shares, investment, slippage, commission)
+
+    @classmethod
+    def from_orders(cls, ts, orders, is_target=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+        &#34;&#34;&#34;Build portfolio based on orders.
+
+        Set an orders element to positive/negative number - a number of shares to buy/sell.
+        Set is_target to True to specify the target amount of shares to hold.&#34;&#34;&#34;
+        if investment is None:
+            investment = portfolio_defaults[&#39;investment&#39;]
+        if slippage is None:
+            slippage = portfolio_defaults[&#39;slippage&#39;]
+        if commission is None:
+            commission = portfolio_defaults[&#39;commission&#39;]
+
+        check_type(ts, (pd.Series, pd.DataFrame))
+        check_type(orders, (pd.Series, pd.DataFrame))
+
+        ts.vbt.timeseries.validate()
+        orders.vbt.timeseries.validate()
+
+        ts, orders = broadcast(ts, orders, **broadcast_kwargs, writeable=True)
+
+        investment = float(investment)
+        slippage = float(slippage)
+        commission = float(commission)
+
+        cash, shares = portfolio_from_orders_np(
+            ts.vbt.to_2d_array(),
+            investment,
+            slippage,
+            commission,
+            orders.vbt.to_2d_array(),
+            is_target)
+
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
+
+        return cls(ts, cash, shares, investment, slippage, commission)
+
+    @classmethod
+    def from_order_func(cls, ts, order_func_np, *args, investment=None, slippage=None, commission=None):
+        &#34;&#34;&#34;Build portfolio based on order function.&#34;&#34;&#34;
+        if investment is None:
+            investment = portfolio_defaults[&#39;investment&#39;]
+        if slippage is None:
+            slippage = portfolio_defaults[&#39;slippage&#39;]
+        if commission is None:
+            commission = portfolio_defaults[&#39;commission&#39;]
+
+        check_type(ts, (pd.Series, pd.DataFrame))
+        ts.vbt.timeseries.validate()
+
+        investment = float(investment)
+        slippage = float(slippage)
+        commission = float(commission)
+
+        cash, shares = portfolio_np(
+            ts.vbt.to_2d_array(),
+            investment,
+            slippage,
+            commission,
+            order_func_np,
+            *args)
+
+        cash = ts.vbt.wrap_array(cash)
+        shares = ts.vbt.wrap_array(shares)
+
+        return cls(ts, cash, shares, investment, slippage, commission)
+
+    # ############# General properties ############# #
+
+    @cached_property
+    def equity(self):
+        return self.ts.vbt.wrap_array(self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def equity_in_shares(self):
+        return self.ts.vbt.wrap_array(self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def returns(self):
+        return self.ts.vbt.wrap_array(pct_change_nb(self.equity.vbt.to_2d_array()))
+
+    @cached_property
+    def drawdown(self):
+        drawdown = 1 - self.equity.vbt.to_2d_array() / expanding_max_nb(self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(drawdown)
+
+    @cached_property
+    def trades(self):
+        shares = self.shares.vbt.to_2d_array()
+        trades = fillna_nb(diff_nb(shares), 0)
+        trades[0, :] = shares[0, :]
+        return self.ts.vbt.wrap_array(trades)
+
+    @cached_property
+    def position_profits(self):
+        position_profits = position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_profits)
+
+    @cached_property
+    def position_returns(self):
+        position_returns = position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_returns)
+
+    @cached_property
+    def win_mask(self):
+        position_profits = self.position_profits.vbt.to_2d_array().copy()
+        position_profits[np.isnan(position_profits)] = 0  # avoid warnings
+        win_mask = position_profits &gt; 0
+        return self.ts.vbt.wrap_array(win_mask)
+
+    @cached_property
+    def loss_mask(self):
+        position_profits = self.position_profits.vbt.to_2d_array().copy()
+        position_profits[np.isnan(position_profits)] = 0
+        loss_mask = position_profits &lt; 0
+        return self.ts.vbt.wrap_array(loss_mask)
+
+    @cached_property
+    def position_mask(self):
+        position_mask = ~np.isnan(self.position_profits.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(position_mask)
+
+    # ############# Performance metrics ############# #
+
+    def wrap_metric(self, a):
+        if is_frame(self.ts):
+            return pd.Series(a, index=self.ts.columns)
+        # Single value
+        if is_array(a):
+            return a[0]
+        return a
+
+    @cached_property
+    def sum_win(self):
+        &#34;&#34;&#34;Sum of wins.&#34;&#34;&#34;
+        sum_win = sum_win_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(sum_win)
+
+    @cached_property
+    def sum_loss(self):
+        &#34;&#34;&#34;Sum of losses (always positive).&#34;&#34;&#34;
+        sum_loss = sum_loss_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(sum_loss)
+
+    @cached_property
+    def avg_win(self):
+        &#34;&#34;&#34;Average win.&#34;&#34;&#34;
+        avg_win = avg_win_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(avg_win)
+
+    @cached_property
+    def avg_loss(self):
+        &#34;&#34;&#34;Average loss (always positive).&#34;&#34;&#34;
+        avg_loss = avg_loss_nb(self.position_profits.vbt.to_2d_array())
+        return self.wrap_metric(avg_loss)
+
+    @cached_property
+    def win_rate(self):
+        &#34;&#34;&#34;Fraction of wins.&#34;&#34;&#34;
+        win_rate = np.sum(self.win_mask.vbt.to_2d_array(), axis=0) / \
+            np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+        return self.wrap_metric(win_rate)
+
+    @cached_property
+    def loss_rate(self):
+        &#34;&#34;&#34;Fraction of losses.&#34;&#34;&#34;
+        loss_rate = np.sum(self.loss_mask.vbt.to_2d_array(), axis=0) / \
+            np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+        return self.wrap_metric(loss_rate)
+
+    @cached_property
+    def profit_factor(self):
+        profit_factor = to_1d(self.sum_win, raw=True) / to_1d(self.sum_loss, raw=True)
+        return self.wrap_metric(profit_factor)
+
+    @cached_property
+    def appt(self):
+        &#34;&#34;&#34;Average profitability per trade (APPT)
+
+        For every trade you place, you are likely to win/lose this amount.
+        What matters is that your APPT comes up positive.&#34;&#34;&#34;
+        appt = to_1d(self.win_rate, raw=True) * to_1d(self.avg_win, raw=True) - \
+            to_1d(self.loss_rate, raw=True) * to_1d(self.avg_loss, raw=True)
+        return self.wrap_metric(appt)
+
+    @cached_property
+    def total_profit(self):
+        total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
+        return self.wrap_metric(total_profit)
+
+    @cached_property
+    def total_return(self):
+        total_return = to_1d(self.total_profit, raw=True) / self.investment
+        return self.wrap_metric(total_return)
+
+    @cached_property
+    def mdd(self):
+        &#34;&#34;&#34;A maximum drawdown (MDD) is the maximum observed loss from a peak 
+        to a trough of a portfolio, before a new peak is attained.&#34;&#34;&#34;
+        mdd = np.max(self.drawdown.vbt.to_2d_array(), axis=0)
+        return self.wrap_metric(mdd)
+
+    # ############# Plotting ############# #
+
+    def plot_trades(self,
+                    buy_trace_kwargs={},
+                    sell_trace_kwargs={},
+                    fig=None,
+                    **ts_kwargs):
+        check_type(self.ts, pd.Series)
+        check_type(self.trades, pd.Series)
+        sell_mask = self.trades &lt; 0
+        buy_mask = self.trades &gt; 0
+
+        # Plot TimeSeries
+        fig = self.ts.vbt.timeseries.plot(fig=fig, **ts_kwargs)
+
+        # Plot markets
+        buy_scatter = go.Scatter(
+            x=self.trades.index[buy_mask],
+            y=self.ts[buy_mask],
+            customdata=self.trades[buy_mask],
+            hovertemplate=&#39;(%{x}, %{y})&lt;br&gt;%{customdata:.6g}&#39;,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;triangle-up&#39;,
+                color=&#39;limegreen&#39;,
+                size=10
+            ),
+            name=&#39;Buy&#39;
+        )
+        buy_scatter.update(**buy_trace_kwargs)
+        fig.add_trace(buy_scatter)
+        sell_scatter = go.Scatter(
+            x=self.trades.index[sell_mask],
+            y=self.ts[sell_mask],
+            customdata=self.trades[sell_mask],
+            hovertemplate=&#39;(%{x}, %{y})&lt;br&gt;%{customdata:.6g}&#39;,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;triangle-down&#39;,
+                color=&#39;orangered&#39;,
+                size=10
+            ),
+            name=&#39;Sell&#39;
+        )
+        sell_scatter.update(**sell_trace_kwargs)
+        fig.add_trace(sell_scatter)
+
+        return fig
+
+    def plot_position_profits(self,
+                              profit_trace_kwargs={},
+                              loss_trace_kwargs={},
+                              fig=None,
+                              **layout_kwargs):
+        check_type(self.position_profits, pd.Series)
+        profits = self.position_profits.copy()
+        profits[self.position_profits &lt;= 0] = np.nan
+        losses = self.position_profits.copy()
+        losses[self.position_profits &gt;= 0] = np.nan
+
+        # Set up figure
+        if fig is None:
+            fig = FigureWidget()
+            fig.update_layout(showlegend=True)
+            fig.update_layout(**layout_kwargs)
+
+        # Plot markets
+        profit_scatter = go.Scatter(
+            x=self.position_profits.index,
+            y=profits,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;circle&#39;,
+                color=&#39;green&#39;,
+                size=10
+            ),
+            name=&#39;Profit&#39;
+        )
+        profit_scatter.update(**profit_trace_kwargs)
+        fig.add_trace(profit_scatter)
+        loss_scatter = go.Scatter(
+            x=self.position_profits.index,
+            y=losses,
+            mode=&#39;markers&#39;,
+            marker=dict(
+                symbol=&#39;circle&#39;,
+                color=&#39;red&#39;,
+                size=10
+            ),
+            name=&#39;Loss&#39;
+        )
+        loss_scatter.update(**loss_trace_kwargs)
+        fig.add_trace(loss_scatter)
+
+        # Set up axes
+        maxval = np.nanmax(np.abs(self.position_profits.vbt.to_2d_array()))
+        space = 0.1 * 2 * maxval
+        fig.update_layout(
+            yaxis=dict(
+                range=[-(maxval+space), maxval+space]
+            ),
+            shapes=[dict(
+                type=&#34;line&#34;,
+                xref=&#34;paper&#34;,
+                yref=&#39;y&#39;,
+                x0=0, x1=1, y0=0, y1=0,
+                line=dict(
+                    color=&#34;grey&#34;,
+                    width=2,
+                    dash=&#34;dot&#34;,
+                ))]
+        )
+
+        return fig</code></pre>
+</details>
+<h3>Static methods</h3>
+<dl>
+<dt id="vectorbt.portfolio.Portfolio.from_order_func"><code class="name flex">
+<span>def <span class="ident">from_order_func</span></span>(<span>ts, order_func_np, *args, investment=None, slippage=None, commission=None)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Build portfolio based on order function.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def from_order_func(cls, ts, order_func_np, *args, investment=None, slippage=None, commission=None):
+    &#34;&#34;&#34;Build portfolio based on order function.&#34;&#34;&#34;
+    if investment is None:
+        investment = portfolio_defaults[&#39;investment&#39;]
+    if slippage is None:
+        slippage = portfolio_defaults[&#39;slippage&#39;]
+    if commission is None:
+        commission = portfolio_defaults[&#39;commission&#39;]
+
+    check_type(ts, (pd.Series, pd.DataFrame))
+    ts.vbt.timeseries.validate()
+
+    investment = float(investment)
+    slippage = float(slippage)
+    commission = float(commission)
+
+    cash, shares = portfolio_np(
+        ts.vbt.to_2d_array(),
+        investment,
+        slippage,
+        commission,
+        order_func_np,
+        *args)
+
+    cash = ts.vbt.wrap_array(cash)
+    shares = ts.vbt.wrap_array(shares)
+
+    return cls(ts, cash, shares, investment, slippage, commission)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.from_orders"><code class="name flex">
+<span>def <span class="ident">from_orders</span></span>(<span>ts, orders, is_target=False, investment=None, slippage=None, commission=None, broadcast_kwargs={})</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Build portfolio based on orders.</p>
+<p>Set an orders element to positive/negative number - a number of shares to buy/sell.
+Set is_target to True to specify the target amount of shares to hold.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def from_orders(cls, ts, orders, is_target=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+    &#34;&#34;&#34;Build portfolio based on orders.
+
+    Set an orders element to positive/negative number - a number of shares to buy/sell.
+    Set is_target to True to specify the target amount of shares to hold.&#34;&#34;&#34;
+    if investment is None:
+        investment = portfolio_defaults[&#39;investment&#39;]
+    if slippage is None:
+        slippage = portfolio_defaults[&#39;slippage&#39;]
+    if commission is None:
+        commission = portfolio_defaults[&#39;commission&#39;]
+
+    check_type(ts, (pd.Series, pd.DataFrame))
+    check_type(orders, (pd.Series, pd.DataFrame))
+
+    ts.vbt.timeseries.validate()
+    orders.vbt.timeseries.validate()
+
+    ts, orders = broadcast(ts, orders, **broadcast_kwargs, writeable=True)
+
+    investment = float(investment)
+    slippage = float(slippage)
+    commission = float(commission)
+
+    cash, shares = portfolio_from_orders_np(
+        ts.vbt.to_2d_array(),
+        investment,
+        slippage,
+        commission,
+        orders.vbt.to_2d_array(),
+        is_target)
+
+    cash = ts.vbt.wrap_array(cash)
+    shares = ts.vbt.wrap_array(shares)
+
+    return cls(ts, cash, shares, investment, slippage, commission)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.from_signals"><code class="name flex">
+<span>def <span class="ident">from_signals</span></span>(<span>ts, entries, exits, volume=inf, accumulate=False, investment=None, slippage=None, commission=None, broadcast_kwargs={})</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Build portfolio based on entry and exit signals and the corresponding volume.</p>
+<p>Set volume to the number of shares to buy/sell.
+Set volume to np.inf to buy/sell everything.
+Set accumulate to False to avoid producing new orders if already in the market.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@classmethod
+def from_signals(cls, ts, entries, exits, volume=np.inf, accumulate=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+    &#34;&#34;&#34;Build portfolio based on entry and exit signals and the corresponding volume.
+
+    Set volume to the number of shares to buy/sell.
+    Set volume to np.inf to buy/sell everything.
+    Set accumulate to False to avoid producing new orders if already in the market.&#34;&#34;&#34;
+    if investment is None:
+        investment = portfolio_defaults[&#39;investment&#39;]
+    if slippage is None:
+        slippage = portfolio_defaults[&#39;slippage&#39;]
+    if commission is None:
+        commission = portfolio_defaults[&#39;commission&#39;]
+
+    check_type(ts, (pd.Series, pd.DataFrame))
+    check_type(entries, (pd.Series, pd.DataFrame))
+    check_type(exits, (pd.Series, pd.DataFrame))
+
+    ts.vbt.timeseries.validate()
+    entries.vbt.signals.validate()
+    exits.vbt.signals.validate()
+
+    ts, entries, exits = broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
+
+    volume = broadcast_to(volume, ts, writeable=True, copy_kwargs={&#39;dtype&#39;: np.float64})
+
+    investment = float(investment)
+    slippage = float(slippage)
+    commission = float(commission)
+
+    cash, shares = portfolio_from_signals_np(
+        ts.vbt.to_2d_array(),
+        investment,
+        slippage,
+        commission,
+        entries.vbt.to_2d_array(),
+        exits.vbt.to_2d_array(),
+        volume.vbt.to_2d_array(),
+        accumulate)
+
+    cash = ts.vbt.wrap_array(cash)
+    shares = ts.vbt.wrap_array(shares)
+
+    return cls(ts, cash, shares, investment, slippage, commission)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Instance variables</h3>
+<dl>
+<dt id="vectorbt.portfolio.Portfolio.appt"><code class="name">var <span class="ident">appt</span></code></dt>
+<dd>
+<div class="desc"><p>Average profitability per trade (APPT)</p>
+<p>For every trade you place, you are likely to win/lose this amount.
+What matters is that your APPT comes up positive.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def appt(self):
+    &#34;&#34;&#34;Average profitability per trade (APPT)
+
+    For every trade you place, you are likely to win/lose this amount.
+    What matters is that your APPT comes up positive.&#34;&#34;&#34;
+    appt = to_1d(self.win_rate, raw=True) * to_1d(self.avg_win, raw=True) - \
+        to_1d(self.loss_rate, raw=True) * to_1d(self.avg_loss, raw=True)
+    return self.wrap_metric(appt)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.avg_loss"><code class="name">var <span class="ident">avg_loss</span></code></dt>
+<dd>
+<div class="desc"><p>Average loss (always positive).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def avg_loss(self):
+    &#34;&#34;&#34;Average loss (always positive).&#34;&#34;&#34;
+    avg_loss = avg_loss_nb(self.position_profits.vbt.to_2d_array())
+    return self.wrap_metric(avg_loss)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.avg_win"><code class="name">var <span class="ident">avg_win</span></code></dt>
+<dd>
+<div class="desc"><p>Average win.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def avg_win(self):
+    &#34;&#34;&#34;Average win.&#34;&#34;&#34;
+    avg_win = avg_win_nb(self.position_profits.vbt.to_2d_array())
+    return self.wrap_metric(avg_win)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.drawdown"><code class="name">var <span class="ident">drawdown</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def drawdown(self):
+    drawdown = 1 - self.equity.vbt.to_2d_array() / expanding_max_nb(self.equity.vbt.to_2d_array())
+    return self.ts.vbt.wrap_array(drawdown)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.equity"><code class="name">var <span class="ident">equity</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def equity(self):
+    return self.ts.vbt.wrap_array(self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array())</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.equity_in_shares"><code class="name">var <span class="ident">equity_in_shares</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def equity_in_shares(self):
+    return self.ts.vbt.wrap_array(self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array())</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.iloc"><code class="name">var <span class="ident">iloc</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def iloc(self):
+    return self._iloc</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.loc"><code class="name">var <span class="ident">loc</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@property
+def loc(self):
+    return self._loc</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.loss_mask"><code class="name">var <span class="ident">loss_mask</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def loss_mask(self):
+    position_profits = self.position_profits.vbt.to_2d_array().copy()
+    position_profits[np.isnan(position_profits)] = 0
+    loss_mask = position_profits &lt; 0
+    return self.ts.vbt.wrap_array(loss_mask)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.loss_rate"><code class="name">var <span class="ident">loss_rate</span></code></dt>
+<dd>
+<div class="desc"><p>Fraction of losses.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def loss_rate(self):
+    &#34;&#34;&#34;Fraction of losses.&#34;&#34;&#34;
+    loss_rate = np.sum(self.loss_mask.vbt.to_2d_array(), axis=0) / \
+        np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+    return self.wrap_metric(loss_rate)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.mdd"><code class="name">var <span class="ident">mdd</span></code></dt>
+<dd>
+<div class="desc"><p>A maximum drawdown (MDD) is the maximum observed loss from a peak
+to a trough of a portfolio, before a new peak is attained.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def mdd(self):
+    &#34;&#34;&#34;A maximum drawdown (MDD) is the maximum observed loss from a peak 
+    to a trough of a portfolio, before a new peak is attained.&#34;&#34;&#34;
+    mdd = np.max(self.drawdown.vbt.to_2d_array(), axis=0)
+    return self.wrap_metric(mdd)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.position_mask"><code class="name">var <span class="ident">position_mask</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def position_mask(self):
+    position_mask = ~np.isnan(self.position_profits.vbt.to_2d_array())
+    return self.ts.vbt.wrap_array(position_mask)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.position_profits"><code class="name">var <span class="ident">position_profits</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def position_profits(self):
+    position_profits = position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+    return self.ts.vbt.wrap_array(position_profits)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.position_returns"><code class="name">var <span class="ident">position_returns</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def position_returns(self):
+    position_returns = position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+    return self.ts.vbt.wrap_array(position_returns)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.profit_factor"><code class="name">var <span class="ident">profit_factor</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def profit_factor(self):
+    profit_factor = to_1d(self.sum_win, raw=True) / to_1d(self.sum_loss, raw=True)
+    return self.wrap_metric(profit_factor)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.returns"><code class="name">var <span class="ident">returns</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def returns(self):
+    return self.ts.vbt.wrap_array(pct_change_nb(self.equity.vbt.to_2d_array()))</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.sum_loss"><code class="name">var <span class="ident">sum_loss</span></code></dt>
+<dd>
+<div class="desc"><p>Sum of losses (always positive).</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def sum_loss(self):
+    &#34;&#34;&#34;Sum of losses (always positive).&#34;&#34;&#34;
+    sum_loss = sum_loss_nb(self.position_profits.vbt.to_2d_array())
+    return self.wrap_metric(sum_loss)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.sum_win"><code class="name">var <span class="ident">sum_win</span></code></dt>
+<dd>
+<div class="desc"><p>Sum of wins.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def sum_win(self):
+    &#34;&#34;&#34;Sum of wins.&#34;&#34;&#34;
+    sum_win = sum_win_nb(self.position_profits.vbt.to_2d_array())
+    return self.wrap_metric(sum_win)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.total_profit"><code class="name">var <span class="ident">total_profit</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def total_profit(self):
+    total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
+    return self.wrap_metric(total_profit)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.total_return"><code class="name">var <span class="ident">total_return</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def total_return(self):
+    total_return = to_1d(self.total_profit, raw=True) / self.investment
+    return self.wrap_metric(total_return)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.trades"><code class="name">var <span class="ident">trades</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def trades(self):
+    shares = self.shares.vbt.to_2d_array()
+    trades = fillna_nb(diff_nb(shares), 0)
+    trades[0, :] = shares[0, :]
+    return self.ts.vbt.wrap_array(trades)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.win_mask"><code class="name">var <span class="ident">win_mask</span></code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def win_mask(self):
+    position_profits = self.position_profits.vbt.to_2d_array().copy()
+    position_profits[np.isnan(position_profits)] = 0  # avoid warnings
+    win_mask = position_profits &gt; 0
+    return self.ts.vbt.wrap_array(win_mask)</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.win_rate"><code class="name">var <span class="ident">win_rate</span></code></dt>
+<dd>
+<div class="desc"><p>Fraction of wins.</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">@cached_property
+def win_rate(self):
+    &#34;&#34;&#34;Fraction of wins.&#34;&#34;&#34;
+    win_rate = np.sum(self.win_mask.vbt.to_2d_array(), axis=0) / \
+        np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+    return self.wrap_metric(win_rate)</code></pre>
+</details>
+</dd>
+</dl>
+<h3>Methods</h3>
+<dl>
+<dt id="vectorbt.portfolio.Portfolio.plot_position_profits"><code class="name flex">
+<span>def <span class="ident">plot_position_profits</span></span>(<span>self, profit_trace_kwargs={}, loss_trace_kwargs={}, fig=None, **layout_kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def plot_position_profits(self,
+                          profit_trace_kwargs={},
+                          loss_trace_kwargs={},
+                          fig=None,
+                          **layout_kwargs):
+    check_type(self.position_profits, pd.Series)
+    profits = self.position_profits.copy()
+    profits[self.position_profits &lt;= 0] = np.nan
+    losses = self.position_profits.copy()
+    losses[self.position_profits &gt;= 0] = np.nan
+
+    # Set up figure
+    if fig is None:
+        fig = FigureWidget()
+        fig.update_layout(showlegend=True)
+        fig.update_layout(**layout_kwargs)
+
+    # Plot markets
+    profit_scatter = go.Scatter(
+        x=self.position_profits.index,
+        y=profits,
+        mode=&#39;markers&#39;,
+        marker=dict(
+            symbol=&#39;circle&#39;,
+            color=&#39;green&#39;,
+            size=10
+        ),
+        name=&#39;Profit&#39;
+    )
+    profit_scatter.update(**profit_trace_kwargs)
+    fig.add_trace(profit_scatter)
+    loss_scatter = go.Scatter(
+        x=self.position_profits.index,
+        y=losses,
+        mode=&#39;markers&#39;,
+        marker=dict(
+            symbol=&#39;circle&#39;,
+            color=&#39;red&#39;,
+            size=10
+        ),
+        name=&#39;Loss&#39;
+    )
+    loss_scatter.update(**loss_trace_kwargs)
+    fig.add_trace(loss_scatter)
+
+    # Set up axes
+    maxval = np.nanmax(np.abs(self.position_profits.vbt.to_2d_array()))
+    space = 0.1 * 2 * maxval
+    fig.update_layout(
+        yaxis=dict(
+            range=[-(maxval+space), maxval+space]
+        ),
+        shapes=[dict(
+            type=&#34;line&#34;,
+            xref=&#34;paper&#34;,
+            yref=&#39;y&#39;,
+            x0=0, x1=1, y0=0, y1=0,
+            line=dict(
+                color=&#34;grey&#34;,
+                width=2,
+                dash=&#34;dot&#34;,
+            ))]
+    )
+
+    return fig</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.plot_trades"><code class="name flex">
+<span>def <span class="ident">plot_trades</span></span>(<span>self, buy_trace_kwargs={}, sell_trace_kwargs={}, fig=None, **ts_kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def plot_trades(self,
+                buy_trace_kwargs={},
+                sell_trace_kwargs={},
+                fig=None,
+                **ts_kwargs):
+    check_type(self.ts, pd.Series)
+    check_type(self.trades, pd.Series)
+    sell_mask = self.trades &lt; 0
+    buy_mask = self.trades &gt; 0
+
+    # Plot TimeSeries
+    fig = self.ts.vbt.timeseries.plot(fig=fig, **ts_kwargs)
+
+    # Plot markets
+    buy_scatter = go.Scatter(
+        x=self.trades.index[buy_mask],
+        y=self.ts[buy_mask],
+        customdata=self.trades[buy_mask],
+        hovertemplate=&#39;(%{x}, %{y})&lt;br&gt;%{customdata:.6g}&#39;,
+        mode=&#39;markers&#39;,
+        marker=dict(
+            symbol=&#39;triangle-up&#39;,
+            color=&#39;limegreen&#39;,
+            size=10
+        ),
+        name=&#39;Buy&#39;
+    )
+    buy_scatter.update(**buy_trace_kwargs)
+    fig.add_trace(buy_scatter)
+    sell_scatter = go.Scatter(
+        x=self.trades.index[sell_mask],
+        y=self.ts[sell_mask],
+        customdata=self.trades[sell_mask],
+        hovertemplate=&#39;(%{x}, %{y})&lt;br&gt;%{customdata:.6g}&#39;,
+        mode=&#39;markers&#39;,
+        marker=dict(
+            symbol=&#39;triangle-down&#39;,
+            color=&#39;orangered&#39;,
+            size=10
+        ),
+        name=&#39;Sell&#39;
+    )
+    sell_scatter.update(**sell_trace_kwargs)
+    fig.add_trace(sell_scatter)
+
+    return fig</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.wrap_metric"><code class="name flex">
+<span>def <span class="ident">wrap_metric</span></span>(<span>self, a)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def wrap_metric(self, a):
+    if is_frame(self.ts):
+        return pd.Series(a, index=self.ts.columns)
+    # Single value
+    if is_array(a):
+        return a[0]
+    return a</code></pre>
+</details>
+</dd>
+<dt id="vectorbt.portfolio.Portfolio.xs"><code class="name flex">
+<span>def <span class="ident">xs</span></span>(<span>self, *args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def xs(self, *args, **kwargs):
+    return indexing_func(self, lambda x: x.xs(*args, **kwargs))</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="vectorbt" href="index.html">vectorbt</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="vectorbt.portfolio.Portfolio" href="#vectorbt.portfolio.Portfolio">Portfolio</a></code></h4>
+<ul class="">
+<li><code><a title="vectorbt.portfolio.Portfolio.appt" href="#vectorbt.portfolio.Portfolio.appt">appt</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.avg_loss" href="#vectorbt.portfolio.Portfolio.avg_loss">avg_loss</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.avg_win" href="#vectorbt.portfolio.Portfolio.avg_win">avg_win</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.drawdown" href="#vectorbt.portfolio.Portfolio.drawdown">drawdown</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.equity" href="#vectorbt.portfolio.Portfolio.equity">equity</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.equity_in_shares" href="#vectorbt.portfolio.Portfolio.equity_in_shares">equity_in_shares</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.from_order_func" href="#vectorbt.portfolio.Portfolio.from_order_func">from_order_func</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.from_orders" href="#vectorbt.portfolio.Portfolio.from_orders">from_orders</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.from_signals" href="#vectorbt.portfolio.Portfolio.from_signals">from_signals</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.iloc" href="#vectorbt.portfolio.Portfolio.iloc">iloc</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.loc" href="#vectorbt.portfolio.Portfolio.loc">loc</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.loss_mask" href="#vectorbt.portfolio.Portfolio.loss_mask">loss_mask</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.loss_rate" href="#vectorbt.portfolio.Portfolio.loss_rate">loss_rate</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.mdd" href="#vectorbt.portfolio.Portfolio.mdd">mdd</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.plot_position_profits" href="#vectorbt.portfolio.Portfolio.plot_position_profits">plot_position_profits</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.plot_trades" href="#vectorbt.portfolio.Portfolio.plot_trades">plot_trades</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.position_mask" href="#vectorbt.portfolio.Portfolio.position_mask">position_mask</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.position_profits" href="#vectorbt.portfolio.Portfolio.position_profits">position_profits</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.position_returns" href="#vectorbt.portfolio.Portfolio.position_returns">position_returns</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.profit_factor" href="#vectorbt.portfolio.Portfolio.profit_factor">profit_factor</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.returns" href="#vectorbt.portfolio.Portfolio.returns">returns</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.sum_loss" href="#vectorbt.portfolio.Portfolio.sum_loss">sum_loss</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.sum_win" href="#vectorbt.portfolio.Portfolio.sum_win">sum_win</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.total_profit" href="#vectorbt.portfolio.Portfolio.total_profit">total_profit</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.total_return" href="#vectorbt.portfolio.Portfolio.total_return">total_return</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.trades" href="#vectorbt.portfolio.Portfolio.trades">trades</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.win_mask" href="#vectorbt.portfolio.Portfolio.win_mask">win_mask</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.win_rate" href="#vectorbt.portfolio.Portfolio.win_rate">win_rate</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.wrap_metric" href="#vectorbt.portfolio.Portfolio.wrap_metric">wrap_metric</a></code></li>
+<li><code><a title="vectorbt.portfolio.Portfolio.xs" href="#vectorbt.portfolio.Portfolio.xs">xs</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.8.1</a>.</p>
+</footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+<script>hljs.initHighlightingOnLoad()</script>
+</body>
+</html>
