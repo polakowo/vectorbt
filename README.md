@@ -159,10 +159,6 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
-    
-## API reference
-
-https://polakowo.io/vectorbt/
 
 ## Installation
 
@@ -173,6 +169,10 @@ pip install git+https://github.com/polakowo/vectorbt.git
 See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) for Plotly figures.
 
 Note: importing vectorbt for the first time may take a while due to compilation.
+
+## API reference
+
+https://polakowo.io/vectorbt/
 
 ## Examples
 
