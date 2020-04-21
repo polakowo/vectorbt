@@ -159,6 +159,10 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
+    
+## API reference
+
+https://polakowo.io/vectorbt/
 
 ## Installation
 
