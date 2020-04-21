@@ -3,12 +3,11 @@ install:
     - pip install .
     - pip install pdoc3
 script:
-    - pdoc --html --force --output-dir api vectorbt
-    - mv api/vectorbt/* api
-    - mv docs/img api
-    - rmdir api/vectorbt
-    - rm -rf !(api)
-    - echo "<meta http-equiv=\"refresh\" content=\"0; url=./api/index.html\" />" > index.html
+    - pdoc --html --force --output-dir docs vectorbt
+    - mv docs/vectorbt/* docs
+    - rmdir docs/vectorbt
+    - rm -rf !(docs)
+    - echo "<meta http-equiv=\"refresh\" content=\"0; url=./docs/index.html\" />" > index.html
 deploy:
     provider: pages
     skip_cleanup: true
