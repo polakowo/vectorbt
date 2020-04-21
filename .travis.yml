@@ -1,0 +1,14 @@
+language: python
+install:
+    - pip install pdoc3
+script:
+    - pdoc --html --force --output-dir docs vectorbt
+    - mv docs/vectorbt/* docs
+    - rmdir docs/vectorbt
+deploy:
+    provider: pages
+    skip_cleanup: true
+    github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
+    keep_history: true
+    on:
+        branch: master
