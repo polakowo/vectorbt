@@ -7,7 +7,7 @@ script:
     - mv api/vectorbt/* api
     - rmdir api/vectorbt
     - rm -rf !(api)
-    - "<meta http-equiv=\"refresh\" content=\"0; url=./api/index.html\" />" > index.html
+    - echo "<meta http-equiv=\"refresh\" content=\"0; url=./api/index.html\" />" > index.html
 deploy:
     provider: pages
     skip_cleanup: true
