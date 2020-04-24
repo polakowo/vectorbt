@@ -1,8 +1,9 @@
 import numpy as np
 import pandas as pd
 from functools import wraps, reduce, update_wrapper
-from inspect import signature, Parameter
-import types
+import inspect
+import sys
+from types import FunctionType, MethodType
 import itertools
 from collections.abc import Iterable
 import numba
@@ -13,9 +14,10 @@ from numba.typed import List
 
 
 class Config(dict):
-    """A simple dict with frozen keys."""
+    """A simple dict with (optionally) frozen keys."""
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, frozen=True, **kwargs):
+        self.frozen = frozen
         self.update(*args, **kwargs)
         self.default_config = dict(self)
         for key, value in dict.items(self):
@@ -23,7 +25,7 @@ class Config(dict):
                 dict.__setitem__(self, key, Config(value))
 
     def __setitem__(self, key, val):
-        if key not in self:
+        if self.frozen and key not in self:
             raise KeyError(f"Key {key} is not a valid parameter")
         dict.__setitem__(self, key, val)
 
@@ -46,6 +48,48 @@ defaults = Config(
     drop_redundant=True,
     keep='last'
 )
+
+# ############# Documentation ############# #
+
+
+def is_from_module(obj, module_name):
+    """Check if `obj` is from the module named by `module_name`."""
+    mod = inspect.getmodule(inspect.unwrap(obj))
+    return mod is None or mod.__name__ == module_name
+
+
+def list_pdoc_keys(module_name):
+    """List all functions and classes in the module named by `module_name`."""
+    return [name for name, obj in inspect.getmembers(sys.modules[module_name])
+            if not name.startswith("_")
+            and is_from_module(obj, module_name)
+            and ((inspect.isroutine(obj) and callable(obj)) or inspect.isclass(obj))]
+
+
+def generate__pdoc__(module_name, include_keys=None, exclude_keys=None):
+    """Generate a new `__pdoc__` dictionary with keys that are either in `exclude_keys` or not in `include_keys`."""
+    all_keys = list_pdoc_keys(module_name)
+    __pdoc__ = {}
+    if include_keys is not None:
+        for k in all_keys:
+            if k not in include_keys:
+                __pdoc__[k] = False
+    if exclude_keys is not None:
+        for k in all_keys:
+            if k in exclude_keys:
+                __pdoc__[k] = False
+    return __pdoc__
+
+def fix_class_for_pdoc(cls):
+    """Make class attributes that were defined in the superclass appear in the documentation of this class."""
+    for func_name in dir(cls):
+        if not func_name.startswith("_"):
+            func = getattr(cls, func_name)
+            if isinstance(func, FunctionType):
+                setattr(cls, func_name, func)
+            if isinstance(func, property):
+                setattr(cls, func_name, func)
+    
 
 # ############# Checks ############# #
 
@@ -304,49 +348,56 @@ def tile_index(index, n):
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack_indices(index1, index2):
+def stack_indices(*indices):
     """Stack indices."""
-    check_same_shape(index1, index2)
-    if not isinstance(index1, pd.MultiIndex):
-        index1 = pd.MultiIndex.from_arrays([index1])
-    if not isinstance(index2, pd.MultiIndex):
-        index2 = pd.MultiIndex.from_arrays([index2])
+    new_index = indices[0]
+    for i in range(1, len(indices)):
+        index1, index2 = new_index, indices[i]
+        check_same_shape(index1, index2)
+        if not isinstance(index1, pd.MultiIndex):
+            index1 = pd.MultiIndex.from_arrays([index1])
+        if not isinstance(index2, pd.MultiIndex):
+            index2 = pd.MultiIndex.from_arrays([index2])
 
-    levels = []
-    for i in range(len(index1.names)):
-        levels.append(index1.get_level_values(i))
-    for i in range(len(index2.names)):
-        levels.append(index2.get_level_values(i))
+        levels = []
+        for i in range(len(index1.names)):
+            levels.append(index1.get_level_values(i))
+        for i in range(len(index2.names)):
+            levels.append(index2.get_level_values(i))
 
-    new_index = pd.MultiIndex.from_arrays(levels)
+        new_index = pd.MultiIndex.from_arrays(levels)
     return new_index
 
 
-def combine_indices(index1, index2):
+def combine_indices(*indices):
     """Combine indices using Cartesian product."""
-    if not isinstance(index1, pd.Index):
-        index1 = pd.Index(index1)
-    if not isinstance(index2, pd.Index):
-        index2 = pd.Index(index2)
+    new_index = indices[0]
+    for i in range(1, len(indices)):
+        index1, index2 = new_index, indices[i]
+        if not isinstance(index1, pd.Index):
+            index1 = pd.Index(index1)
+        if not isinstance(index2, pd.Index):
+            index2 = pd.Index(index2)
 
-    if len(index1) == 1:
-        return index2
-    elif len(index2) == 1:
-        return index1
+        if len(index1) == 1:
+            return index2
+        elif len(index2) == 1:
+            return index1
 
-    tuples1 = np.repeat(index1.to_numpy(), len(index2))
-    tuples2 = np.tile(index2.to_numpy(), len(index1))
+        tuples1 = np.repeat(index1.to_numpy(), len(index2))
+        tuples2 = np.tile(index2.to_numpy(), len(index1))
 
-    if isinstance(index1, pd.MultiIndex):
-        index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
-    else:
-        index1 = pd.Index(tuples1, name=index1.name)
-    if isinstance(index2, pd.MultiIndex):
-        index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
-    else:
-        index2 = pd.Index(tuples2, name=index2.name)
+        if isinstance(index1, pd.MultiIndex):
+            index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
+        else:
+            index1 = pd.Index(tuples1, name=index1.name)
+        if isinstance(index2, pd.MultiIndex):
+            index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
+        else:
+            index2 = pd.Index(tuples2, name=index2.name)
 
-    return stack_indices(index1, index2)
+        new_index = stack_indices(index1, index2)
+    return new_index
 
 
 def drop_levels(index, levels):
@@ -753,9 +804,9 @@ def broadcast_to_array_of(arg1, arg2):
 
 def copy_func(f):
     """Based on http://stackoverflow.com/a/6528148/190597 (Glenn Maynard)"""
-    g = types.FunctionType(f.__code__, f.__globals__, name=f.__name__,
-                           argdefs=f.__defaults__,
-                           closure=f.__closure__)
+    g = FunctionType(f.__code__, f.__globals__, name=f.__name__,
+                     argdefs=f.__defaults__,
+                     closure=f.__closure__)
     g = update_wrapper(g, f)
     g.__kwdefaults__ = f.__kwdefaults__
     return g
@@ -763,7 +814,7 @@ def copy_func(f):
 
 def add_indexing(indexing_func):
     def wrapper(cls):
-        """Add iloc, loc and plain brackets indexing to a class.
+        """Add iloc, loc and __getitem__ indexing to a class.
 
         Each indexing operation is forwarded to the underlying pandas objects and
         a new instance of the class with new pandas objects is created using the indexing_func."""
@@ -786,12 +837,26 @@ def add_indexing(indexing_func):
         def iloc(self):
             return self._iloc
 
+        iloc.__doc__ = f"""Forwards [`pandas.Series.iloc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iloc.html)/
+        [`pandas.DataFrame.iloc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.iloc.html)
+        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`"""
+
         @property
         def loc(self):
+            """Purely label-location based indexer for selection by label."""
             return self._loc
 
+        loc.__doc__ = f"""Forwards [`pandas.Series.loc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.loc.html)/
+        [`pandas.DataFrame.loc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.loc.html)
+        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`"""
+
         def xs(self, *args, **kwargs):
+            """Returns a cross-section (row(s) or column(s)) from the Series/DataFrame."""
             return indexing_func(self, lambda x: x.xs(*args, **kwargs))
+
+        xs.__doc__ = f"""Forwards [`pandas.Series.xs`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.xs.html)/
+        [`pandas.DataFrame.xs`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.xs.html)
+        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`"""
 
         def __getitem__(self, key):
             return indexing_func(self, lambda x: x.__getitem__(key))
@@ -881,11 +946,17 @@ def add_param_indexing(param_name, indexing_func):
         def param_loc(self):
             return getattr(self, f'_{param_name}_loc')
 
+        param_loc.__doc__ = f"""Access a group of columns by parameter {param_name} using
+        [`pandas.Series.loc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.loc.html).
+        
+        Forwards this operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`
+        """
+
         orig_init_method = copy_func(cls.__init__)
 
         def __init__(self, *args, **kwargs):
             orig_init_method(self, *args, **kwargs)
-            mapper = getattr(self, f'{param_name}_mapper')
+            mapper = getattr(self, f'_{param_name}_mapper')
             setattr(self, f'_{param_name}_loc', ParamLoc(self, mapper))
 
         setattr(cls, '__init__', __init__)
@@ -1064,13 +1135,13 @@ def combine_multiple_nb(objs, combine_func_nb, *args):
     return result
 
 
-# ############# Numba decorators ############# #
+# ############# Class decorators ############# #
 
 def get_default_args(func):
     return {
         k: v.default
-        for k, v in signature(func).parameters.items()
-        if v.default is not Parameter.empty
+        for k, v in inspect.signature(func).parameters.items()
+        if v.default is not inspect.Parameter.empty
     }
 
 
@@ -1231,7 +1302,7 @@ class Base_Accessor():
 
     def combine_with(self, other, *args, combine_func=None, broadcast_kwargs={}, **kwargs):
         """Broadcast with other and combine.
-        
+
         The returned shape is the same as broadcasted shape."""
         if isinstance(other, Base_Accessor):
             other = other._obj
@@ -1245,7 +1316,7 @@ class Base_Accessor():
     def combine_with_multiple(self, others, *args, combine_func=None, concat=False,
                               broadcast_kwargs={}, as_columns=None, **kwargs):
         """Broadcast with other objects to the same shape and combine them all pairwise.
-        
+
         The returned shape is the same as broadcasted shape if concat is False.
         The returned shape is concatenation of broadcasted shapes if concat is True."""
         others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))

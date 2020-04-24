@@ -10,8 +10,6 @@ from vectorbt.utils import *
 from vectorbt.accessors import *
 from vectorbt.widgets import FigureWidget
 
-__all__ = []
-
 # ############# Numba functions ############# #
 
 # Although we don't need most of the following 1d functions here, they are needed by other modules

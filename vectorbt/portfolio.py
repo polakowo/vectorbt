@@ -9,8 +9,6 @@ from vectorbt.accessors import *
 from vectorbt.widgets import FigureWidget
 from vectorbt.timeseries import pct_change_nb, fillna_nb, expanding_max_nb, diff_nb
 
-__all__ = ['Portfolio']
-
 # You can change default portfolio values from code
 portfolio_defaults = Config(
     investment=1.,

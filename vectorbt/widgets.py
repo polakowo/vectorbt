@@ -1,14 +1,42 @@
+"""This module contains a collection of Plotly widgets that can be easily created and updated.
+
+Each widget is based upon [plotly.graph_objects.FigureWidget](https://plotly.com/python-api-reference/generated/plotly.graph_objects.html?highlight=figurewidget#plotly.graph_objects.FigureWidget),
+which is then extended by `vectorbt.widgets.FigureWidget` and `vectorbt.widgets.UpdatableFigureWidget`.
+
+## Default layout
+
+Use `vectorbt.widgets.layout_defaults` dictionary to change the default layout.
+
+For example, to change the default width:
+```py
+import vectorbt as vbt
+
+vbt.widgets.layout_defaults['width'] = 800
+```"""
+
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+import sys
+import inspect
 
 from vectorbt.utils import *
 from vectorbt.accessors import *
+from collections import namedtuple
 
-__all__ = ['Indicator', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
+__pdoc__ = generate__pdoc__(__name__, include_keys=[
+    'FigureWidget',
+    'UpdatableFigureWidget',
+    'Indicator',
+    'Bar',
+    'Scatter',
+    'Histogram',
+    'Heatmap'
+])
 
 # You can change this from code using vbt.widgets.layout_defaults[key] = value
 layout_defaults = Config(
+    frozen=False,
     autosize=False,
     width=700,
     height=300,
@@ -25,31 +53,35 @@ layout_defaults = Config(
 
 
 class FigureWidget(go.FigureWidget):
-    """Subclass of the graph_objects.FigureWidget class with default params."""
-
     def __init__(self):
+        """Subclass of the [`plotly.graph_objects.FigureWidget`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.html?highlight=figurewidget#plotly.graph_objects.FigureWidget) class initialized 
+        with default parameters from `vectorbt.widgets.layout_defaults`."""
         super().__init__()
         # Good default params
         self.update_layout(**layout_defaults)
         # You can then update them using update_layout
 
     def show_png(self):
+        """Display the widget in PNG format."""
         width = self.layout.width
         height = self.layout.height
         self.show(renderer="png", width=width, height=height)
 
 
 class UpdatableFigureWidget(FigureWidget):
-    """Subclass of the FigureWidget class with abstract update method."""
+    def __init__(self):
+        """Subclass of the `vectorbt.FigureWidget` class with an abstract update method."""
+        super().__init__()
 
     def update_data(self, *args, **kwargs):
+        """Abstract method for updating the widget with new data."""
         raise NotImplementedError
 
 # ############# Indicator ############# #
 
 
 def rgb_from_cmap(cmap_name, value, value_range):
-    """Map value_range to colormap and get RGB of the value from that range."""
+    """Map `value_range` to colormap and get RGB of the value from that range."""
     if value_range[0] == value_range[1]:
         norm_value = 0.5
     else:
@@ -61,7 +93,7 @@ def rgb_from_cmap(cmap_name, value, value_range):
 class Indicator(UpdatableFigureWidget):
     def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral', trace_kwargs={}, **layout_kwargs):
         """Create an updatable indicator plot.
-        
+
         Args:
             value (int or float, optional): The value to be displayed.
             label (str, optional): The label to be displayed.
@@ -70,7 +102,7 @@ class Indicator(UpdatableFigureWidget):
             trace_kwargs (dict, optional): Keyword arguments passed to the [`plotly.graph_objects.Indicator`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Indicator.html).
             **layout_kwargs: Keyword arguments for layout.
         Examples:
-            ```
+            ```py
             vbt.Indicator(value=2, value_range=(1, 3), label='My Indicator')
             ```
             ![](img/Indicator.png)
@@ -97,7 +129,7 @@ class Indicator(UpdatableFigureWidget):
 
     def update_data(self, value):
         """Update the data of the plot efficiently.
-        
+
         Args:
             value (int or float): The value to be displayed.
         """
@@ -127,7 +159,7 @@ class Bar(UpdatableFigureWidget):
 
     def __init__(self, x_labels, trace_names=None, data=None, trace_kwargs={}, **layout_kwargs):
         """Create an updatable bar plot.
-        
+
         Args:
             x_labels (list of str): X-axis labels, corresponding to index in pandas.
             trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
@@ -136,7 +168,7 @@ class Bar(UpdatableFigureWidget):
             **layout_kwargs: Keyword arguments for layout.
         Examples:
             One trace:
-            ```
+            ```py
             vbt.Bar(['x', 'y'], trace_names='a', data=[1, 2])
 
             # Or the same directly on pandas
@@ -145,7 +177,7 @@ class Bar(UpdatableFigureWidget):
             ![](img/Bar.png)
 
             Multiple traces:
-            ```
+            ```py
             vbt.Bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
 
             # Or the same directly on pandas
@@ -177,13 +209,13 @@ class Bar(UpdatableFigureWidget):
 
     def update_data(self, data):
         """Update the data of the plot efficiently.
-        
+
         Args:
             data (array_like): Data in any format that can be converted to NumPy.
-                
+
                 Must be of shape (`x_labels`, `trace_names`).
         Examples:
-            ```
+            ```py
             fig = pd.Series([1, 2], index=['x', 'y'], name='a').vbt.Bar()
             fig.update_data([2, 1])
             fig.show()
@@ -224,7 +256,7 @@ class Bar_Accessor():
 class Scatter(UpdatableFigureWidget):
     def __init__(self, x_labels, trace_names=None, data=None, trace_kwargs={}, **layout_kwargs):
         """Create an updatable scatter plot.
-        
+
         Args:
             x_labels (list of str): X-axis labels, corresponding to index in pandas.
             trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
@@ -232,7 +264,7 @@ class Scatter(UpdatableFigureWidget):
             trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
             **layout_kwargs: Keyword arguments for layout.
         Examples:
-            ```
+            ```py
             vbt.Scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
 
             # Or the same directly on pandas
@@ -265,7 +297,7 @@ class Scatter(UpdatableFigureWidget):
 
     def update_data(self, data):
         """Update the data of the plot efficiently.
-        
+
         Args:
             data (array_like): Data in any format that can be converted to NumPy.
 
@@ -303,7 +335,7 @@ class Scatter_Accessor():
 class Histogram(UpdatableFigureWidget):
     def __init__(self, trace_names=None, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
         """Create an updatable histogram plot.
-        
+
         Args:
             trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
             data (array_like, optional): Data in any format that can be converted to NumPy.
@@ -311,7 +343,7 @@ class Histogram(UpdatableFigureWidget):
             trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Histogram`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Histogram.html)
             **layout_kwargs: Keyword arguments for layout
         Examples:
-            ```
+            ```py
             vbt.Histogram(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
 
             # Or the same directly on pandas
@@ -345,7 +377,7 @@ class Histogram(UpdatableFigureWidget):
 
     def update_data(self, data):
         """Update the data of the plot efficiently.
-        
+
         Args:
             data (array_like): Data in any format that can be converted to NumPy.
 
@@ -385,7 +417,7 @@ class Histogram_Accessor():
 class Heatmap(UpdatableFigureWidget):
     def __init__(self, x_labels, y_labels, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
         """Create an updatable heatmap plot.
-        
+
         Args:
             x_labels (list of str): X-axis labels, corresponding to columns in pandas.
             y_labels (list of str): Y-axis labels, corresponding to index in pandas.
@@ -394,7 +426,7 @@ class Heatmap(UpdatableFigureWidget):
             trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Heatmap`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Heatmap.html).
             **layout_kwargs: Keyword arguments for layout.
         Examples:
-            ```
+            ```py
             vbt.Heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
 
             # Or the same directly on pandas
@@ -429,7 +461,7 @@ class Heatmap(UpdatableFigureWidget):
 
     def update_data(self, data):
         """Update the data of the plot efficiently.
-        
+
         Args:
             data (array_like): Data in any format that can be converted to NumPy.
 
