@@ -17,22 +17,10 @@ vbt.widgets.layout_defaults['width'] = 800
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-import sys
-import inspect
 
 from vectorbt.utils import *
 from vectorbt.accessors import *
 from collections import namedtuple
-
-__pdoc__ = generate__pdoc__(__name__, include_keys=[
-    'FigureWidget',
-    'UpdatableFigureWidget',
-    'Indicator',
-    'Bar',
-    'Scatter',
-    'Histogram',
-    'Heatmap'
-])
 
 # You can change this from code using vbt.widgets.layout_defaults[key] = value
 layout_defaults = Config(
@@ -70,7 +58,7 @@ class FigureWidget(go.FigureWidget):
 
 class UpdatableFigureWidget(FigureWidget):
     def __init__(self):
-        """Subclass of the `vectorbt.FigureWidget` class with an abstract update method."""
+        """Subclass of the `vectorbt.widgets.FigureWidget` class with an abstract update method."""
         super().__init__()
 
     def update_data(self, *args, **kwargs):

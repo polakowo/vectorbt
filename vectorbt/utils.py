@@ -52,33 +52,28 @@ defaults = Config(
 # ############# Documentation ############# #
 
 
-def is_from_module(obj, module_name):
+def is_from_module(obj, module):
     """Check if `obj` is from the module named by `module_name`."""
     mod = inspect.getmodule(inspect.unwrap(obj))
-    return mod is None or mod.__name__ == module_name
+    return mod is None or mod.__name__ == module.__name__
 
 
-def list_pdoc_keys(module_name):
+def list_pdoc_keys(module):
     """List all functions and classes in the module named by `module_name`."""
-    return [name for name, obj in inspect.getmembers(sys.modules[module_name])
+    return [name for name, obj in inspect.getmembers(module)
             if not name.startswith("_")
-            and is_from_module(obj, module_name)
+            and is_from_module(obj, module)
             and ((inspect.isroutine(obj) and callable(obj)) or inspect.isclass(obj))]
 
 
-def generate__pdoc__(module_name, include_keys=None, exclude_keys=None):
-    """Generate a new `__pdoc__` dictionary with keys that are either in `exclude_keys` or not in `include_keys`."""
-    all_keys = list_pdoc_keys(module_name)
-    __pdoc__ = {}
-    if include_keys is not None:
+def add_all_from_module(__pdoc__, module, whitelist=None):
+    """Add to `__pdoc__` dictionary keys that are in `whitelist`."""
+    all_keys = list_pdoc_keys(module)
+    if whitelist is not None:
         for k in all_keys:
-            if k not in include_keys:
+            if k not in whitelist:
                 __pdoc__[k] = False
-    if exclude_keys is not None:
-        for k in all_keys:
-            if k in exclude_keys:
-                __pdoc__[k] = False
-    return __pdoc__
+
 
 def fix_class_for_pdoc(cls):
     """Make class attributes that were defined in the superclass appear in the documentation of this class."""
@@ -89,7 +84,7 @@ def fix_class_for_pdoc(cls):
                 setattr(cls, func_name, func)
             if isinstance(func, property):
                 setattr(cls, func_name, func)
-    
+
 
 # ############# Checks ############# #
 

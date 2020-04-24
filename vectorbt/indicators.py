@@ -24,10 +24,6 @@ from vectorbt.accessors import *
 from vectorbt.timeseries import rolling_mean_nb, rolling_std_nb, ewm_mean_nb, \
     ewm_std_nb, diff_nb, set_by_mask_nb, prepend_nb, rolling_min_nb, rolling_max_nb
 
-__pdoc__ = generate__pdoc__(__name__, include_keys=[
-    'from_params_pipeline', 'IndicatorFactory', 'MA', 'DMAC', 'MSTD', 'BollingerBands', 'RSI', 'Stochastic', 'MACD', 'OBV'
-])
-
 # ############# Indicator factory ############# #
 
 
@@ -133,7 +129,7 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     >>> p3_columns = pd.Index(param_list[2], name='p3')
     >>> p_columns = vbt.utils.stack_indices(p1_columns, p2_columns, p3_columns)
     >>> new_columns = vbt.utils.combine_indices(p_columns, ts_list[0].columns)
-    
+
     >>> output_df = pd.DataFrame(output, columns=new_columns)
     >>> print(output_df)
     p1                                        1                        
@@ -707,14 +703,14 @@ class IndicatorFactory():
 
     def from_apply_func(self, apply_func, caching_func=None):
         """Build indicator class around a custom apply function.
-        
+
         `apply_func` is performed on each parameter individually and the results are then concatenated.
         This is a much simpler approach than `IndicatorFactory.from_custom_func`, but less flexible,
         since you can only work with one parameter selection at a time, and can't view all parameters.
 
         !!! note
             If `apply_func` is a Numba-compiled function: 
-            
+
             * All inputs are automatically converted to NumPy arrays
             * Each argument in `*args` must be of a Numba-compatible type
             * You cannot pass keyword arguments
@@ -858,7 +854,7 @@ MA = IndicatorFactory(
 class MA(MA):
     """A moving average (MA) is a widely used indicator in technical analysis that helps smooth out 
     price action by filtering out the “noise” from random short-term price fluctuations. 
-    
+
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp).
 
     Use `MA.from_params` method to run the indicator."""
@@ -866,7 +862,7 @@ class MA(MA):
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
         """Calculate moving average `MA.ma` from time series `ts` and parameters `window` and `ewm`.
-        
+
         Args:
             ts (pandas_like): Time series (such as price).
             window (int or array_like of int): Size of the moving window. Can be one or more values.
@@ -907,7 +903,7 @@ class MA(MA):
              fig=None,
              **layout_kwargs):
         """Plot moving average `MA.ma` against time series `MA.ts`.
-        
+
         Args:
             ts_name (str): Name of trace for `MA.ts`.
             ma_name (str): Name of trace for `MA.ma`.
@@ -919,7 +915,7 @@ class MA(MA):
             ```py
             ma[(10, False)].plot()
             ```
-            
+
             ![](img/MA.png)"""
         check_type(self.ts, pd.Series)
         check_type(self.ma, pd.Series)
