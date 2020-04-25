@@ -685,10 +685,10 @@ class IndicatorFactory():
             CustomIndicator = add_param_indexing('tuple', indexing_func)(CustomIndicator)
 
         # Add user-defined properties
-        for prop_name, prop_func in custom_properties.items():
-            if not isinstance(prop_func, property):
-                prop_func = cached_property(prop_func)
-            setattr(CustomIndicator, prop_name, prop_func)
+        for prop_name, prop in custom_properties.items():
+            if not isinstance(prop, property):
+                prop = cached_property(prop)
+            setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison methods for all inputs, outputs, and user-defined properties
         comparison_attrs = set(ts_names + output_names + list(custom_properties.keys()))
@@ -1032,7 +1032,7 @@ class MA(MA):
              ma_trace_kwargs={},
              fig=None,
              **layout_kwargs):
-        """Plot moving average `MA.ma` against time series `MA.ts`.
+        """Plot `MA.ma` against `MA.ts`.
 
         Args:
             ts_name (str): Name of trace for `MA.ts`.
@@ -1093,8 +1093,40 @@ MSTD = IndicatorFactory(
 
 
 class MSTD(MSTD):
+    """Standard deviation is an indicator that measures the size of an assets recent price moves 
+    in order to predict how volatile the price may be in the future.
+
+    Use `MSTD.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
+        """Calculate moving standard deviation `MSTD.mstd` from time series `ts` and parameters `window` and `ewm`.
+
+        Args:
+            ts (pandas_like): Time series (such as price).
+            window (int or array_like of int): Size of the moving window. Can be one or more values.
+            ewm (bool or array_like of bool): If True, uses exponential moving STD, otherwise 
+                simple moving STD. Can be one or more values. Defaults to False.
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
+        Examples:
+            ```python-repl
+            >>> mstd = vbt.MSTD.from_params(price, [10, 20], ewm=[False, True])
+
+            >>> print(mstd.mstd)
+            mstd_window         10          20
+            mstd_ewm         False        True
+            Date                              
+            2018-12-31         NaN         NaN
+            2019-01-01         NaN         NaN
+            2019-01-02         NaN         NaN
+            ...                ...         ...
+            2019-12-29   96.910551  267.336921
+            2019-12-30   91.462377  254.361497
+            2019-12-31   91.077352  244.531229
+
+            [366 rows x 2 columns]
+            ```
+        """
         return super().from_params(ts, window, ewm, **kwargs)
 
     def plot(self,
@@ -1102,6 +1134,19 @@ class MSTD(MSTD):
              trace_kwargs={},
              fig=None,
              **layout_kwargs):
+        """Plot `MSTD.mstd`.
+
+        Args:
+            name (str): Name of the trace.
+            trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries`.
+            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```py
+            mstd[(10, False)].plot()
+            ```
+
+            ![](img/MSTD.png)"""
         check_type(self.mstd, pd.Series)
 
         if name is None:
