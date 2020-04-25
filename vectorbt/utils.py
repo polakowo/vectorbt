@@ -33,19 +33,13 @@ class Config(dict):
         self.update(self.default_config)
 
 
-# You can change defaults from code
+# You can change broadcasting defaults from code
 # Useful for magic methods that cannot accept keyword arguments
-defaults = Config(
-    broadcast=dict(
-        index_from='strict',
-        columns_from='stack'
-    ),
-    broadcast_to=dict(
-        index_from=1,
-        columns_from=1
-    ),
+broadcast_defaults = Config(
+    index_from='strict',
+    columns_from='stack',
+    ignore_single=True,
     drop_duplicates=True,
-    drop_redundant=True,
     keep='last'
 )
 
@@ -288,7 +282,7 @@ def drop_redundant_levels(index):
     return index
 
 
-def drop_duplicate_levels(index, keep='default'):
+def drop_duplicate_levels(index, keep='last'):
     """Drop duplicate levels with the same name and values."""
     if isinstance(index, pd.Index) and not isinstance(index, pd.MultiIndex):
         return index
@@ -296,8 +290,6 @@ def drop_duplicate_levels(index, keep='default'):
 
     levels = []
     levels_to_drop = []
-    if keep == 'default':
-        keep = defaults['keep']
     if keep == 'first':
         r = range(0, len(index.levels))
     elif keep == 'last':
@@ -309,20 +301,6 @@ def drop_duplicate_levels(index, keep='default'):
         else:
             levels_to_drop.append(i)
     return index.droplevel(levels_to_drop)
-
-
-def clean_index(index, drop_duplicates='default', drop_redundant='default', **kwargs):
-    """Clean index from redundant and/or duplicate levels."""
-    if drop_duplicates == 'default':
-        drop_duplicates = defaults['drop_duplicates']
-    if drop_redundant == 'default':
-        drop_redundant = defaults['drop_redundant']
-
-    if drop_duplicates:
-        index = drop_duplicate_levels(index, **kwargs)
-    if drop_redundant:
-        index = drop_redundant_levels(index)
-    return index
 
 
 def repeat_index(index, n):
@@ -592,10 +570,18 @@ def align_index_to(index1, index2):
     raise ValueError("Indices could not be aligned together")
 
 
-def broadcast_index(*args, index_from=None, axis=0, is_2d=False, **kwargs):
+def broadcast_index(*args, index_from=None, axis=0, is_2d=False, ignore_single='default', drop_duplicates='default', keep='default'):
     """Broadcast index/columns of all arguments."""
+
+    if ignore_single == 'default':
+        ignore_single = broadcast_defaults['ignore_single']
+    if drop_duplicates == 'default':
+        drop_duplicates = broadcast_defaults['drop_duplicates']
+    if keep == 'default':
+        keep = broadcast_defaults['keep']
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
+
     if index_from is not None:
         if isinstance(index_from, int):
             # Take index/columns of the object indexed by index_from
@@ -632,11 +618,19 @@ def broadcast_index(*args, index_from=None, axis=0, is_2d=False, **kwargs):
                         if len(index) != len(new_index):
                             if len(index) > 1 and len(new_index) > 1:
                                 raise ValueError("Indices could not be broadcast together")
-                            if len(index) > len(new_index):
-                                new_index = repeat_index(new_index, len(index))
-                            elif len(index) < len(new_index):
-                                index = repeat_index(index, len(new_index))
-                        new_index = clean_index(stack_indices(new_index, index), **kwargs)
+                            if ignore_single:
+                                # Columns of length 1 should be simply ignored
+                                if len(index) > len(new_index):
+                                    new_index = index
+                                continue
+                            else:
+                                if len(index) > len(new_index):
+                                    new_index = repeat_index(new_index, len(index))
+                                elif len(index) < len(new_index):
+                                    index = repeat_index(index, len(new_index))
+                        new_index = stack_indices(new_index, index)
+                        if drop_duplicates:
+                            new_index = drop_duplicate_levels(new_index, keep=keep)
             if maxlen > len(new_index):
                 if index_from == 'strict':
                     raise ValueError(f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
@@ -712,9 +706,9 @@ def broadcast(*args, index_from='default', columns_from='default', writeable=Fal
 
         # Decide on index and columns
         if index_from == 'default':
-            index_from = defaults['broadcast']['index_from']
+            index_from = broadcast_defaults['index_from']
         if columns_from == 'default':
-            columns_from = defaults['broadcast']['columns_from']
+            columns_from = broadcast_defaults['columns_from']
         new_index = broadcast_index(*args, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
         new_columns = broadcast_index(*args, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
     else:
@@ -740,7 +734,7 @@ def broadcast(*args, index_from='default', columns_from='default', writeable=Fal
     return tuple(new_args)
 
 
-def broadcast_to(arg1, arg2, index_from='default', columns_from='default', writeable=False, copy_kwargs={}, raw=False, **kwargs):
+def broadcast_to(arg1, arg2, index_from=1, columns_from=1, writeable=False, copy_kwargs={}, raw=False, **kwargs):
     """Bring first argument to the shape of second argument. 
 
     Closely resembles the other broadcast function."""
@@ -759,10 +753,6 @@ def broadcast_to(arg1, arg2, index_from='default', columns_from='default', write
             if is_series(arg2):
                 arg2 = arg2.to_frame()
 
-        if index_from == 'default':
-            index_from = defaults['broadcast_to']['index_from']
-        if columns_from == 'default':
-            columns_from = defaults['broadcast_to']['columns_from']
         new_index = broadcast_index(arg1, arg2, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
         new_columns = broadcast_index(arg1, arg2, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
     else:
