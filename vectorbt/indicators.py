@@ -545,7 +545,7 @@ class IndicatorFactory():
                 to `ts_names`, broadcasted parameter arrays corresponding to `param_names`, and other 
                 arguments and keyword arguments, and returns outputs corresponding to `output_names` 
                 and other objects that are then returned with the indicator class instance.
-            pass_lists (bool): If True, passes arguments as lists. Otherwise, passes them using 
+            pass_lists (bool): If True, passes arguments as lists, otherwise passes them using 
                 starred expression. Defaults to False.
         Returns:
             `CustomIndicator`, and optionally other objects that are returned by `custom_func`
@@ -895,8 +895,8 @@ class MA(MA):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like of int): Size of the moving window. Can be one or more values.
-            ewm (bool or array_like of bool): If True, uses exponential moving average, otherwise 
+            window (int or array_like): Size of the moving window. Can be one or more values.
+            ewm (bool or array_like): If True, uses exponential moving average, otherwise 
                 simple moving average. Can be one or more values. Defaults to False.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
@@ -929,7 +929,7 @@ class MA(MA):
             windows (array_like of int): Size of the moving window. Must be multiple.
             r (int): The number of `vectorbt.indicators.MA` instances to combine.
             ewm (bool or array_like of bool): If True, uses exponential moving average, otherwise 
-                simple moving average. Can be one or more values. Defaults to False.
+                uses simple moving average. Can be one or more values. Defaults to False.
             names (list of str, optional): A list of names for each `vectorbt.indicators.MA` instance.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
@@ -1104,9 +1104,10 @@ class MSTD(MSTD):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like of int): Size of the moving window. Can be one or more values.
-            ewm (bool or array_like of bool): If True, uses exponential moving STD, otherwise 
-                simple moving STD. Can be one or more values. Defaults to False.
+            window (int or array_like): Size of the moving window. Can be one or more values.
+            ewm (bool or array_like): If True, uses exponential moving standard deviation, 
+                otherwise uses simple moving standard deviation. Can be one or more values. 
+                Defaults to False.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
             ```python-repl
@@ -1175,49 +1176,175 @@ def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
     ma = np.copy(ma_cache_dict[(window, int(ewm))])
     mstd = np.copy(mstd_cache_dict[(window, int(ewm))])
     # # (MA + Kσ), MA, (MA - Kσ)
-    return ma + alpha * mstd, ma, ma - alpha * mstd
+    return ma, ma + alpha * mstd, ma - alpha * mstd
 
 
 BollingerBands = IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm', 'alpha'],
-    output_names=['upper_band', 'middle_band', 'lower_band'],
+    output_names=['ma', 'upper_band', 'lower_band'],
     name='bb',
     custom_properties=dict(
         percent_b=lambda self: (self.ts - self.lower_band) / (self.upper_band - self.lower_band),
-        bandwidth=lambda self: (self.upper_band - self.lower_band) / self.middle_band
+        bandwidth=lambda self: (self.upper_band - self.lower_band) / self.ma
     )
 ).from_apply_func(bb_apply_func_nb, caching_func=bb_caching_nb)
 
 
 class BollingerBands(BollingerBands):
+    """A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard 
+    deviations (positively and negatively) away from a simple moving average (SMA) of the security's 
+    price, but can be adjusted to user preferences.
+
+    See [Bollinger Band® Definition](https://www.investopedia.com/terms/b/bollingerbands.asp).
+
+    Use `BollingerBands.from_params` method to run the indicator."""
+    
     @classmethod
     def from_params(cls, ts, window=20, ewm=False, alpha=2, **kwargs):
+        """Calculate the moving average `BollingerBands.ma`, the upper Bollinger Band `BollingerBands.upper_band`,
+        the lower Bollinger Band `BollingerBands.lower_band`, the %b `BollingerBands.percent_b` and 
+        the bandwidth `BollingerBands.bandwidth` from time series `ts` and parameters `window`, `ewm` and `alpha`.
+
+        Args:
+            ts (pandas_like): Time series (such as price).
+            window (int or array_like): Size of the moving window. Can be one or more values.
+                Defaults to 20.
+            ewm (bool or array_like): If True, uses exponential moving average and standard deviation, 
+                otherwise uses simple moving average and standard deviation. Can be one or more values. 
+                Defaults to False.
+            alpha (int, float or array_like): Number of standard deviations. Can be one or more values. Defaults to 2.
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
+        Examples:
+            ```python-repl
+            >>> bb = vbt.BollingerBands.from_params(price, 
+            ...     window=[10, 20], alpha=[2, 3], ewm=[False, True])
+
+            >>> print(bb.ma)
+            bb_window         10           20
+            bb_ewm         False         True
+            bb_alpha         2.0          3.0
+            Date                             
+            2018-12-31       NaN          NaN
+            2019-01-01       NaN          NaN
+            2019-01-02       NaN          NaN
+            ...              ...          ...
+            2019-12-29  7314.459  7313.283227
+            2019-12-30  7321.877  7311.351491
+            2019-12-31  7322.121  7300.137063
+
+            [366 rows x 2 columns]
+
+            >>> print(bb.upper_band)
+            bb_window            10           20
+            bb_ewm            False         True
+            bb_alpha            2.0          3.0
+            Date                                
+            2018-12-31          NaN          NaN
+            2019-01-01          NaN          NaN
+            2019-01-02          NaN          NaN
+            ...                 ...          ...
+            2019-12-29  7508.280102  8115.293989
+            2019-12-30  7504.801754  8074.435981
+            2019-12-31  7504.275704  8033.730750
+
+            [366 rows x 2 columns]
+
+            >>> print(bb.lower_band)
+            bb_window            10           20
+            bb_ewm            False         True
+            bb_alpha            2.0          3.0
+            Date                                
+            2018-12-31          NaN          NaN
+            2019-01-01          NaN          NaN
+            2019-01-02          NaN          NaN
+            ...                 ...          ...
+            2019-12-29  7120.637898  6511.272465
+            2019-12-30  7138.952246  6548.267001
+            2019-12-31  7139.966296  6566.543376
+
+            [366 rows x 2 columns]
+
+            >>> print(bb.percent_b)
+            bb_window         10        20
+            bb_ewm         False      True
+            bb_alpha         2.0       3.0
+            Date                          
+            2018-12-31       NaN       NaN
+            2019-01-01       NaN       NaN
+            2019-01-02       NaN       NaN
+            ...              ...       ...
+            2019-12-29  0.779100  0.568183
+            2019-12-30  0.421069  0.487975
+            2019-12-31  0.147220  0.427387
+
+            [366 rows x 2 columns]
+
+            >>> print(bb.bandwidth)
+            bb_window         10        20
+            bb_ewm         False      True
+            bb_alpha         2.0       3.0
+            Date                          
+            2018-12-31       NaN       NaN
+            2019-01-01       NaN       NaN
+            2019-01-02       NaN       NaN
+            ...              ...       ...
+            2019-12-29  0.779100  0.568183
+            2019-12-30  0.421069  0.487975
+            2019-12-31  0.147220  0.427387
+
+            [366 rows x 2 columns]
+            ```
+        """
         alpha = np.asarray(alpha).astype(np.float64)
         return super().from_params(ts, window, ewm, alpha, **kwargs)
 
     def plot(self,
              ts_name=None,
+             ma_name=None,
              upper_band_name=None,
-             middle_band_name=None,
              lower_band_name=None,
              ts_trace_kwargs={},
+             ma_trace_kwargs={},
              upper_band_trace_kwargs={},
-             middle_band_trace_kwargs={},
              lower_band_trace_kwargs={},
              fig=None,
              **layout_kwargs):
+        """Plot `BollingerBands.ma`, `BollingerBands.upper_band` and `BollingerBands.lower_band` against 
+        `BollingerBands.ts`.
+
+        Args:
+            ts_name (str): Name of trace for `BollingerBands.ts`.
+            ma_name (str): Name of trace for `BollingerBands.ma`.
+            upper_band_name (str): Name of trace for `BollingerBands.upper_band`.
+            lower_band_name (str): Name of trace for `BollingerBands.lower_band`.
+            ts_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+                `BollingerBands.ts`.
+            ma_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+                `BollingerBands.ma`.
+            upper_band_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+                `BollingerBands.upper_band`.
+            lower_band_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+                `BollingerBands.lower_band`.
+            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```py
+            bb[(10, False, 2)].plot()
+            ```
+
+            ![](img/BollingerBands.png)"""
         check_type(self.ts, pd.Series)
+        check_type(self.ma, pd.Series)
         check_type(self.upper_band, pd.Series)
-        check_type(self.middle_band, pd.Series)
         check_type(self.lower_band, pd.Series)
 
         if ts_name is None:
             ts_name = f'Price ({self.name})'
+        if ma_name is None:
+            ma_name = f'MA ({self.name})'
         if upper_band_name is None:
             upper_band_name = f'Upper Band ({self.name})'
-        if middle_band_name is None:
-            middle_band_name = f'Middle Band ({self.name})'
         if lower_band_name is None:
             lower_band_name = f'Lower Band ({self.name})'
 
@@ -1226,10 +1353,10 @@ class BollingerBands(BollingerBands):
 
         fig = self.ts.vbt.timeseries.plot(
             name=ts_name, trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.timeseries.plot(
+            name=ma_name, trace_kwargs=ma_trace_kwargs, fig=fig)
         fig = self.upper_band.vbt.timeseries.plot(
             name=upper_band_name, trace_kwargs=upper_band_trace_kwargs, fig=fig)
-        fig = self.middle_band.vbt.timeseries.plot(
-            name=middle_band_name, trace_kwargs=middle_band_trace_kwargs, fig=fig)
         fig = self.lower_band.vbt.timeseries.plot(
             name=lower_band_name, trace_kwargs=lower_band_trace_kwargs, fig=fig)
 
