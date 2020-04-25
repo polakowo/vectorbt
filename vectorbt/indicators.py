@@ -1035,10 +1035,10 @@ class MA(MA):
         """Plot `MA.ma` against `MA.ts`.
 
         Args:
-            ts_name (str): Name of trace for `MA.ts`.
-            ma_name (str): Name of trace for `MA.ma`.
-            ts_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of `MA.ts`.
-            ma_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of `MA.ma`.
+            ts_name (str): Name of the trace for `MA.ts`.
+            ma_name (str): Name of the trace for `MA.ma`.
+            ts_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MA.ts`.
+            ma_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MA.ma`.
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Examples:
@@ -1100,7 +1100,8 @@ class MSTD(MSTD):
 
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
-        """Calculate moving standard deviation `MSTD.mstd` from time series `ts` and parameters `window` and `ewm`.
+        """Calculate moving standard deviation `MSTD.mstd` from time series `ts` and 
+        parameters `window` and `ewm`.
 
         Args:
             ts (pandas_like): Time series (such as price).
@@ -1139,7 +1140,7 @@ class MSTD(MSTD):
 
         Args:
             name (str): Name of the trace.
-            trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries`.
+            trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Examples:
@@ -1202,9 +1203,9 @@ class BollingerBands(BollingerBands):
     
     @classmethod
     def from_params(cls, ts, window=20, ewm=False, alpha=2, **kwargs):
-        """Calculate the moving average `BollingerBands.ma`, the upper Bollinger Band `BollingerBands.upper_band`,
-        the lower Bollinger Band `BollingerBands.lower_band`, the %b `BollingerBands.percent_b` and 
-        the bandwidth `BollingerBands.bandwidth` from time series `ts` and parameters `window`, `ewm` and `alpha`.
+        """Calculate moving average `BollingerBands.ma`, upper Bollinger Band `BollingerBands.upper_band`,
+        lower Bollinger Band `BollingerBands.lower_band`, %b `BollingerBands.percent_b` and 
+        bandwidth `BollingerBands.bandwidth` from time series `ts` and parameters `window`, `ewm` and `alpha`.
 
         Args:
             ts (pandas_like): Time series (such as price).
@@ -1314,17 +1315,17 @@ class BollingerBands(BollingerBands):
         `BollingerBands.ts`.
 
         Args:
-            ts_name (str): Name of trace for `BollingerBands.ts`.
-            ma_name (str): Name of trace for `BollingerBands.ma`.
-            upper_band_name (str): Name of trace for `BollingerBands.upper_band`.
-            lower_band_name (str): Name of trace for `BollingerBands.lower_band`.
-            ts_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+            ts_name (str): Name of the trace for `BollingerBands.ts`.
+            ma_name (str): Name of the trace for `BollingerBands.ma`.
+            upper_band_name (str): Name of the trace for `BollingerBands.upper_band`.
+            lower_band_name (str): Name of the trace for `BollingerBands.lower_band`.
+            ts_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
                 `BollingerBands.ts`.
-            ma_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+            ma_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
                 `BollingerBands.ma`.
-            upper_band_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+            upper_band_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
                 `BollingerBands.upper_band`.
-            lower_band_trace_kwargs (dict, optional): Keyword arguments passed to `pandas.vbt.timeseries` of 
+            lower_band_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
                 `BollingerBands.lower_band`.
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -1405,8 +1406,44 @@ RSI = IndicatorFactory(
 
 
 class RSI(RSI):
+    """
+    The relative strength index (RSI) is a momentum indicator that measures the magnitude of 
+    recent price changes to evaluate overbought or oversold conditions in the price of a stock 
+    or other asset. The RSI is displayed as an oscillator (a line graph that moves between two 
+    extremes) and can have a reading from 0 to 100.
+
+    See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp).
+
+    Use `RSI.from_params` methods to run the indicator."""
     @classmethod
     def from_params(cls, ts, window=14, ewm=False, **kwargs):
+        """Calculate relative strength index `RSI.rsi` from time series `ts` and parameters `window` and `ewm`.
+
+        Args:
+            ts (pandas_like): Time series (such as price).
+            window (int or array_like): Size of the moving window. Can be one or more values.
+            ewm (bool or array_like): If True, uses exponential moving average, otherwise 
+                simple moving average. Can be one or more values. Defaults to False.
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
+        Examples:
+            ```python-repl
+            >>> rsi = vbt.RSI.from_params(price, [10, 20], ewm=[False, True])
+
+            >>> print(rsi.rsi)
+            rsi_window         10         20
+            rsi_ewm         False      True 
+            Date                            
+            2018-12-31        NaN        NaN
+            2019-01-01        NaN        NaN
+            2019-01-02        NaN        NaN
+            ...               ...        ...
+            2019-12-29  63.397004  55.208736
+            2019-12-30  53.970922  49.140169
+            2019-12-31  50.121299  44.953035
+
+            [366 rows x 2 columns]
+            ```
+        """
         return super().from_params(ts, window, ewm, **kwargs)
 
     def plot(self,
@@ -1414,6 +1451,19 @@ class RSI(RSI):
              trace_kwargs={},
              fig=None,
              **layout_kwargs):
+        """Plot `RSI.rsi`.
+
+        Args:
+            name (str): Name of the trace.
+            trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
+            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```py
+            rsi[(10, False)].plot()
+            ```
+
+            ![](img/RSI.png)"""
         check_type(self.rsi, pd.Series)
 
         if name is None:
