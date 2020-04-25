@@ -729,7 +729,7 @@ class IndicatorFactory():
         that accepts a selection of parameters (single values as opposed to multiple values in 
         `IndicatorFactory.from_custom_func`) and does the calculation. It then automatically concatenates
         the results into a single array per output.
-        
+
         While this approach is much more simpler, it is also less flexible, since you can only work with 
         one parameter selection at a time, and can't view all parameters.
 
@@ -801,7 +801,7 @@ class IndicatorFactory():
                 typed_param_tuples = List()
                 for param_tuple in list(zip(*param_list)):
                     typed_param_tuples.append(param_tuple)
-                
+
                 # Caching
                 if cache is None and caching_func is not None:
                     cache = caching_func(*typed_ts_list, *param_list, *args)
@@ -936,7 +936,7 @@ class MA(MA):
             ...     [10, 20, 30], 2, ewm=[False, False, True], names=['fast', 'slow'])
 
             >>> print(fast_ma.ma)
-            
+
             fast_window        10        10        20
             fast_ewm        False     False     False
             2018-01-01        NaN       NaN       NaN
@@ -998,7 +998,7 @@ class MA(MA):
             Notice the new column hierarchy the `MA.ma_above` method created for you. You can use
             it for indexing as follows:
 
-            ```
+            ```py
             fig = entry_signals[(10, False, 20, False)].vbt.signals.plot(name='Entries')
             exit_signals[(10, False, 20, False)].vbt.signals.plot(name='Exits', fig=fig)
             ```
@@ -1143,7 +1143,6 @@ class BollingerBands(BollingerBands):
         return super().from_params(ts, window, ewm, alpha, **kwargs)
 
     def plot(self,
-             plot_ts=True,
              ts_name=None,
              upper_band_name=None,
              middle_band_name=None,
@@ -1171,8 +1170,8 @@ class BollingerBands(BollingerBands):
         upper_band_trace_kwargs = {**dict(line=dict(color='grey')), **upper_band_trace_kwargs}  # default kwargs
         lower_band_trace_kwargs = {**dict(line=dict(color='grey')), **lower_band_trace_kwargs}
 
-        if plot_ts:
-            fig = self.ts.vbt.timeseries.plot(name=ts_name, trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.timeseries.plot(
+            name=ts_name, trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
         fig = self.upper_band.vbt.timeseries.plot(
             name=upper_band_name, trace_kwargs=upper_band_trace_kwargs, fig=fig)
         fig = self.middle_band.vbt.timeseries.plot(
@@ -1312,7 +1311,8 @@ class Stochastic(Stochastic):
 
         fig = self.percent_k.vbt.timeseries.plot(
             name=percent_k_name, trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.percent_d.vbt.timeseries.plot(name=percent_d_name, trace_kwargs=percent_d_trace_kwargs, fig=fig)
+        fig = self.percent_d.vbt.timeseries.plot(
+            name=percent_d_name, trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -1378,7 +1378,8 @@ class MACD(MACD):
 
         fig = self.macd.vbt.timeseries.plot(
             name=macd_name, trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.signal.vbt.timeseries.plot(name=signal_name, trace_kwargs=signal_trace_kwargs, fig=fig)
+        fig = self.signal.vbt.timeseries.plot(
+            name=signal_name, trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 

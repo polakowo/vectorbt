@@ -16,7 +16,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 3 seconds (note: loading vectorbt for the first time may take a while):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 3 seconds (Note: loading vectorbt and plotly may take a while):
 
 ```python
 import vectorbt as vbt
@@ -29,25 +29,29 @@ investment = 100 # in $
 commission = 0.001 # in %
 
 # Prepare data
-msft = yf.Ticker("BTC-USD")
-df = msft.history(period="max")
-price = df['Close']
+ticker = yf.Ticker("BTC-USD")
+price = ticker.history(period="max")['Close']
 
 # Generate signals
-dmac = vbt.DMAC.from_combinations(price, windows)
-entries, exits = dmac.crossover()
+fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2)
+entries = fast_ma.ma_above(slow_ma, crossover=True)
+exits = fast_ma.ma_below(slow_ma, crossover=True)
 
 # Calculate performance
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, investment=investment, commission=commission)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
+    investment=investment, commission=commission)
 performance = portfolio.total_return * 100
 
 # Plot heatmap
-perf_df = performance.vbt.unstack_to_df(symmetric=True)
-perf_df.vbt.Heatmap(
+perf_matrix = performance.vbt.unstack_to_df(
+    index_levels='ma1_window', 
+    column_levels='ma2_window', 
+    symmetric=True)
+perf_matrix.vbt.Heatmap(
     xaxis_title='Slow window', 
     yaxis_title='Fast window', 
     trace_kwargs=dict(colorbar=dict(title='Total return in %')),
-    width=600, height=450).show_png()
+    width=600, height=450)
 ```
 
 ![dmac_heatmap.png](dmac_heatmap.png)
@@ -151,7 +155,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
 - Provides a range of technical indicators with full Numba support ([indicators.py](vectorbt/indicators.py))
-    - Moving average and STD, Dual Moving Average Crossover, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
+    - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
     - Indicator factory for construction of complex technical indicators in a simplified way
     - Each indicator offers methods for generating signals and plotting
     - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or product
@@ -174,9 +178,9 @@ Note: importing vectorbt for the first time may take a while due to compilation.
 
 https://polakowo.io/vectorbt/
 
-## Examples
+## Example notebooks
 
-- [Testing Dual Moving Average Crossover (DMAC) strategy on Bitcoin](examples/Bitcoin-DMAC.ipynb)
-- [Comparing stop-loss and trailing stop orders](examples/StopLoss-vs-TrailingStop.ipynb)
+- [Who beats Bitcoin: Dual moving average crossover, trading randomly or holding?](examples/Bitcoin-DMAC.ipynb)
+- [How stop-loss and trailing stop orders perform on cryptocurrencies?](examples/StopLoss-vs-TrailingStop.ipynb)
 
 Note: you will need to run the notebook to play with widgets.

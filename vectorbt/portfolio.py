@@ -520,7 +520,7 @@ class Portfolio():
         # Plot TimeSeries
         fig = self.ts.vbt.timeseries.plot(fig=fig, **ts_kwargs)
 
-        # Plot markets
+        # Plot markers
         buy_scatter = go.Scatter(
             x=self.trades.index[buy_mask],
             y=self.ts[buy_mask],

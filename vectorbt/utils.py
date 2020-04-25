@@ -401,6 +401,17 @@ def rename_levels(index, name_dict):
     return index
 
 
+def select_index_levels(index, level_names):
+    """Build a new index by selecting one or multiple level names from the index."""
+    check_type(index, pd.MultiIndex)
+    
+    if isinstance(level_names, (list, tuple)):
+        levels = [index.get_level_values(level_name) for level_name in level_names]
+        return pd.MultiIndex.from_arrays(levels)
+    else:
+        return index.get_level_values(level_names)
+
+
 # ############# Broadcasting ############# #
 
 def soft_broadcast_to_ndim(arg, ndim):
@@ -952,7 +963,7 @@ def add_param_indexing(param_name, indexing_func):
 # ############# Stacking ############# #
 
 
-def unstack_to_array(arg):
+def unstack_to_array(arg, levels=None):
     """Reshape object based on multi-index into a multi-dimensional array."""
     check_type(arg, (pd.Series, pd.DataFrame))
     if is_frame(arg):
@@ -963,15 +974,19 @@ def unstack_to_array(arg):
     check_type(arg.index, pd.MultiIndex)
     sr = to_1d(arg)
 
+    unique_idx_list = []
     vals_idx_list = []
-    for i in range(len(sr.index.levels)):
-        vals = sr.index.get_level_values(i).to_numpy()
+    if levels is None:
+        levels = sr.index.names
+    for i in range(len(levels)):
+        vals = select_index_levels(sr.index, levels[i]).to_numpy()
         unique_vals = np.unique(vals)
+        unique_idx_list.append(unique_vals)
         idx_map = dict(zip(unique_vals, range(len(unique_vals))))
         vals_idx = list(map(lambda x: idx_map[x], vals))
         vals_idx_list.append(vals_idx)
 
-    a = np.full(list(map(len, sr.index.levels)), np.nan)
+    a = np.full(list(map(len, unique_idx_list)), np.nan)
     a[tuple(zip(vals_idx_list))] = sr.values
     return a
 
@@ -980,21 +995,39 @@ def make_symmetric(arg):
     """Make object symmetric along the diagonal."""
     check_type(arg, (pd.Series, pd.DataFrame))
     arg = to_2d(arg)
-    check_not_type(arg.index, pd.MultiIndex)
-    check_not_type(arg.columns, pd.MultiIndex)
+    check_same_type(arg.index, arg.columns)
+    if isinstance(arg.index, pd.MultiIndex):
+        check_same_len(arg.index.names, arg.columns.names)
+        names1, names2 = tuple(arg.index.names), tuple(arg.columns.names)
+    else:
+        names1, names2 = arg.index.name, arg.columns.name
 
-    names = tuple(dict.fromkeys([arg.index.name, arg.columns.name]))
-    if len(names) == 1:
-        names = names[0]
-    unique_index = pd.Index(dict.fromkeys(arg.index.tolist() + arg.columns.tolist()), name=names)
+    if names1 == names2:
+        new_name = names1
+    else:
+        if isinstance(arg.index, pd.MultiIndex):
+            new_name = tuple(zip(*[names1, names2]))
+        else:
+            new_name = (names1, names2)
+    idx_vals = np.unique(np.concatenate((arg.index, arg.columns)))
+    arg = arg.copy()
+    if isinstance(arg.index, pd.MultiIndex):
+        unique_index = pd.MultiIndex.from_tuples(idx_vals, names=new_name)
+        arg.index.names = new_name
+        arg.columns.names = new_name
+    else:
+        unique_index = pd.Index(idx_vals, name=new_name)
+        arg.index.name = new_name
+        arg.columns.name = new_name
     df_out = pd.DataFrame(index=unique_index, columns=unique_index)
     df_out.loc[:, :] = arg
     df_out[df_out.isnull()] = arg.transpose()
     return df_out
 
 
-def unstack_to_df(arg, symmetric=False):
+def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     """Reshape object based on multi-index into dataframe."""
+    # Perform checks
     check_type(arg, (pd.Series, pd.DataFrame))
     if is_frame(arg):
         if arg.shape[0] == 1:
@@ -1004,9 +1037,28 @@ def unstack_to_df(arg, symmetric=False):
     check_type(arg.index, pd.MultiIndex)
     sr = to_1d(arg)
 
-    index = sr.index.levels[0]
-    columns = sr.index.levels[1]
-    df = pd.DataFrame(unstack_to_array(sr), index=index, columns=columns)
+    if len(sr.index.levels) > 2:
+        check_not_none(index_levels)
+        check_not_none(column_levels)
+    else:
+        index_levels = 0
+        column_levels = 1
+        
+    # Build new index and column hierarchies
+    new_index = np.unique(select_index_levels(arg.index, index_levels))
+    new_columns = np.unique(select_index_levels(arg.index, column_levels))
+    if isinstance(index_levels, (list, tuple)):
+        new_index = pd.MultiIndex.from_tuples(new_index, names=index_levels)
+    else:
+        new_index = pd.Index(new_index, name=index_levels)
+    if isinstance(column_levels, (list, tuple)):
+        new_columns = pd.MultiIndex.from_tuples(new_columns, names=column_levels)
+    else:
+        new_columns = pd.Index(new_columns, name=column_levels)
+        
+    # Unstack and post-process
+    unstacked = unstack_to_array(sr, levels=(index_levels, column_levels))
+    df = pd.DataFrame(unstacked, index=new_index, columns=new_columns)
     if symmetric:
         return make_symmetric(df)
     return df
@@ -1246,8 +1298,8 @@ class Base_Accessor():
     def make_symmetric(self):
         return make_symmetric(self._obj)
 
-    def unstack_to_array(self):
-        return unstack_to_array(self._obj)
+    def unstack_to_array(self, **kwargs):
+        return unstack_to_array(self._obj, **kwargs)
 
     def unstack_to_df(self, **kwargs):
         return unstack_to_df(self._obj, **kwargs)

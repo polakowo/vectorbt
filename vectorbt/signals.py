@@ -505,3 +505,33 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         fig.add_trace(scatter)
 
         return fig
+
+    def plot_markers(self, ts, name=None, signal_type=None, trace_kwargs={}, fig=None, **layout_kwargs):
+        check_type(ts, pd.Series)
+        ts.vbt.timeseries.validate()
+        check_same_index(self._obj, ts)
+
+        if fig is None:
+            fig = FigureWidget()
+            fig.update_layout(**layout_kwargs)
+
+        # Plot markers
+        scatter = go.Scatter(
+            x=ts.index[self._obj],
+            y=ts[self._obj],
+            mode='markers',
+            marker=dict(
+                size=10
+            )
+        )
+        if signal_type == 'entry':
+            scatter.marker.symbol = 'triangle-up'
+            scatter.marker.color = 'limegreen'
+            scatter.name = 'Entry'
+        if signal_type == 'exit':
+            scatter.marker.symbol = 'triangle-down'
+            scatter.marker.color = 'orangered'
+            scatter.name = 'Exit'
+        scatter.update(**trace_kwargs)
+        fig.add_trace(scatter)
+        return fig
