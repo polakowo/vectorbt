@@ -975,8 +975,10 @@ class MA(MA):
             fast_windows, slow_windows = np.asarray(list(window_combs)).transpose()
             fast_ewms, slow_ewms = np.asarray(list(ewm_combs)).transpose()
 
-            fast_ma = vbt.MA.from_params(price['Close'], fast_windows, fast_ewms, name='fast')
-            slow_ma = vbt.MA.from_params(price['Close'], slow_windows, slow_ewms, name='slow')
+            fast_ma = vbt.MA.from_params(price['Close'], 
+            ...     fast_windows, fast_ewms, name='fast')
+            slow_ma = vbt.MA.from_params(price['Close'], 
+            ...     slow_windows, slow_ewms, name='slow')
             ```
 
             Having this, you can now compare these `vectorbt.indicators.MA` instances:
@@ -1006,9 +1008,9 @@ class MA(MA):
 
             ```py
             fig = price['Close'].vbt.timeseries.plot(name='Price')
-            fig = entry_signals[(10, False, 20, False)]\
+            fig = entry_signals[(10, False, 20, False)]\\
                 .vbt.signals.plot_markers(price['Close'], signal_type='entry', fig=fig)
-            fig = exit_signals[(10, False, 20, False)]\
+            fig = exit_signals[(10, False, 20, False)]\\
                 .vbt.signals.plot_markers(price['Close'], signal_type='exit', fig=fig)
 
             fig.show()
@@ -1412,8 +1414,7 @@ RSI = IndicatorFactory(
 
 
 class RSI(RSI):
-    """
-    The relative strength index (RSI) is a momentum indicator that measures the magnitude of 
+    """The relative strength index (RSI) is a momentum indicator that measures the magnitude of 
     recent price changes to evaluate overbought or oversold conditions in the price of a stock 
     or other asset. The RSI is displayed as an oscillator (a line graph that moves between two 
     extremes) and can have a reading from 0 to 100.
@@ -1454,6 +1455,7 @@ class RSI(RSI):
         return super().from_params(ts, window, ewm, **kwargs)
 
     def plot(self,
+             levels=(30, 70),
              name=None,
              trace_kwargs={},
              fig=None,
@@ -1476,7 +1478,20 @@ class RSI(RSI):
         if name is None:
             name = f'RSI ({self.name})'
 
+        layout_kwargs = {**dict(yaxis=dict(range=[-5, 105])), **layout_kwargs}
         fig = self.rsi.vbt.timeseries.plot(name=name, trace_kwargs=trace_kwargs, fig=fig, **layout_kwargs)
+        for level in levels:
+            fig.add_shape(
+                type="line",
+                x0=self.rsi.index[0],
+                y0=level,
+                x1=self.rsi.index[-1],
+                y1=level,
+                line=dict(
+                    color="grey",
+                    dash="dash",
+                ),
+            )
 
         return fig
 
@@ -1519,11 +1534,9 @@ Stochastic = IndicatorFactory(
 
 
 class Stochastic(Stochastic):
-    """
-    A stochastic oscillator is a momentum indicator comparing a particular closing price of a security 
-    to a range of its prices over a certain period of time. The sensitivity of the oscillator to market 
-    movements is reducible by adjusting that time period or by taking a moving average of the result. 
-    It is used to generate overbought and oversold trading signals, utilizing a 0-100 bounded range of values.
+    """A stochastic oscillator is a momentum indicator comparing a particular closing price of a security 
+    to a range of its prices over a certain period of time. It is used to generate overbought and oversold 
+    trading signals, utilizing a 0-100 bounded range of values.
 
     See [Stochastic Oscillator Definition](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
 
@@ -1598,6 +1611,7 @@ class Stochastic(Stochastic):
         return above_signals, below_signals
 
     def plot(self,
+             levels=(30, 70),
              percent_k_name=None,
              percent_d_name=None,
              percent_k_trace_kwargs={},
@@ -1617,7 +1631,7 @@ class Stochastic(Stochastic):
             **layout_kwargs: Keyword arguments for layout.
         Examples:
             ```py
-            stoch[(10, 2, False)].plot()
+            stoch[(10, 2, False)].plot(levels=(20, 80))
             ```
 
             ![](img/Stochastic.png)"""
@@ -1629,10 +1643,23 @@ class Stochastic(Stochastic):
         if percent_d_name is None:
             percent_d_name = f'%D ({self.name})'
 
+        layout_kwargs = {**dict(yaxis=dict(range=[-5, 105])), **layout_kwargs}
         fig = self.percent_k.vbt.timeseries.plot(
             name=percent_k_name, trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
         fig = self.percent_d.vbt.timeseries.plot(
             name=percent_d_name, trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
+        for level in levels:
+            fig.add_shape(
+                type="line",
+                x0=self.percent_k.index[0],
+                y0=level,
+                x1=self.percent_k.index[-1],
+                y1=level,
+                line=dict(
+                    color="grey",
+                    dash="dash",
+                ),
+            )
 
         return fig
 
@@ -1672,6 +1699,13 @@ MACD = IndicatorFactory(
 
 
 class MACD(MACD):
+    """Moving Average Convergence Divergence (MACD) is a trend-following momentum indicator that 
+    shows the relationship between two moving averages of a security’s price.
+
+    See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp).
+
+    Use `MACD.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, fast_window=26, slow_window=12, signal_window=9, ewm=True, **kwargs):
         return super().from_params(ts, fast_window, slow_window, signal_window, ewm, **kwargs)
