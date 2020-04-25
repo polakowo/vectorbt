@@ -15,9 +15,9 @@ import yfinance as yf
 import vectorbt as vbt
 
 ticker = yf.Ticker("BTC-USD")
-price = ticker.history(start=datetime(2019, 1, 1), end=datetime(2020, 1, 1))['Close']
+price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
 
-price.vbt.timeseries.plot()
+price['Close'].vbt.timeseries.plot()
 ```
 ![](img/Indicators_price.png)
 """
@@ -686,6 +686,7 @@ class IndicatorFactory():
 
         # Add user-defined properties
         for prop_name, prop in custom_properties.items():
+            prop.__name__ = prop_name
             if not isinstance(prop, property):
                 prop = cached_property(prop)
             setattr(CustomIndicator, prop_name, prop)
@@ -901,21 +902,21 @@ class MA(MA):
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
             ```python-repl
-            >>> ma = vbt.MA.from_params(price, [10, 20], ewm=[False, True])
+            >>> ma = vbt.MA.from_params(price['Close'], [10, 20], ewm=[False, True])
 
             >>> print(ma.ma)
-            ma_window         10           20
-            ma_ewm         False         True
-            Date                             
-            2018-12-31       NaN          NaN
-            2019-01-01       NaN          NaN
-            2019-01-02       NaN          NaN
-            ...              ...          ...
-            2019-12-29  7314.459  7313.283227
-            2019-12-30  7321.877  7311.351491
-            2019-12-31  7322.121  7300.137063
+            ma_window          10            20
+            ma_ewm          False          True
+            Date                               
+            2019-02-28        NaN           NaN
+            2019-03-01        NaN           NaN
+            2019-03-02        NaN           NaN
+            ...               ...           ...
+            2019-08-29  10155.972  10330.457140
+            2019-08-30  10039.466  10260.715507
+            2019-08-31   9988.727  10200.710220
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
             ```
         """
         return super().from_params(ts, window, ewm, **kwargs)
@@ -934,36 +935,37 @@ class MA(MA):
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
             ```python-repl
-            >>> fast_ma, slow_ma = vbt.MA.from_combinations(price, 
+            >>> fast_ma, slow_ma = vbt.MA.from_combinations(price['Close'], 
             ...     [10, 20, 30], 2, ewm=[False, False, True], names=['fast', 'slow'])
 
             >>> print(fast_ma.ma)
-            fast_window        10        10         20
-            fast_ewm        False     False      False
-            Date                                      
-            2018-12-31        NaN       NaN        NaN
-            2019-01-01        NaN       NaN        NaN
-            2019-01-02        NaN       NaN        NaN
-            ...               ...       ...        ...
-            2019-12-29   7314.459  7314.459  7224.1280
-            2019-12-30   7321.877  7321.877  7224.8720
-            2019-12-31   7322.121  7322.121  7223.6805
-            
-            [366 rows x 3 columns]
+            fast_window         10         10          20
+            fast_ewm         False      False       False
+            Date                                         
+            2019-02-28         NaN        NaN         NaN
+            2019-03-01         NaN        NaN         NaN
+            2019-03-02         NaN        NaN         NaN
+            ...                ...        ...         ...
+            2019-08-29   10155.972  10155.972  10447.3480
+            2019-08-30   10039.466  10039.466  10359.5555
+            2019-08-31    9988.727   9988.727  10264.9095
+
+            [185 rows x 3 columns]
 
             >>> print(slow_ma.ma)
-            slow_window         20           30           30
-            slow_ewm         False         True         True
-            Date                                            
-            2018-12-31         NaN          NaN          NaN
-            2019-01-01         NaN          NaN          NaN
-            2019-01-02         NaN          NaN          NaN
-            ...                ...          ...          ...
-            2019-12-29   7224.1280  7393.653412  7393.653412
-            2019-12-30   7224.8720  7387.159643  7387.159643
-            2019-12-31   7223.6805  7374.671925  7374.671925
+            slow_window          20            30            30
+            slow_ewm          False          True          True
+            Date                                               
+            2019-02-28          NaN           NaN           NaN
+            2019-03-01          NaN           NaN           NaN
+            2019-03-02          NaN           NaN           NaN
+            ...                 ...           ...           ...
+            2019-08-29   10447.3480  10423.585970  10423.585970
+            2019-08-30   10359.5555  10370.333077  10370.333077
+            2019-08-31   10264.9095  10322.612024  10322.612024
 
-            [366 rows x 3 columns]
+            [185 rows x 3 columns]
+
             ```
 
             The naive way without caching is the follows:
@@ -973,8 +975,8 @@ class MA(MA):
             fast_windows, slow_windows = np.asarray(list(window_combs)).transpose()
             fast_ewms, slow_ewms = np.asarray(list(ewm_combs)).transpose()
 
-            fast_ma = vbt.MA.from_params(price, fast_windows, fast_ewms, name='fast')
-            slow_ma = vbt.MA.from_params(price, slow_windows, slow_ewms, name='slow')
+            fast_ma = vbt.MA.from_params(price['Close'], fast_windows, fast_ewms, name='fast')
+            slow_ma = vbt.MA.from_params(price['Close'], slow_windows, slow_ewms, name='slow')
             ```
 
             Having this, you can now compare these `vectorbt.indicators.MA` instances:
@@ -986,28 +988,28 @@ class MA(MA):
             fast_window     10     10     20
             fast_ewm     False  False  False
             slow_window     20     30     30
-            slow_ewm     False   True   True
+            slow_ewm     False  True    True
             Date                            
-            2018-12-31   False  False  False
-            2019-01-01   False  False  False
-            2019-01-02   False  False  False
+            2019-02-28   False  False  False
+            2019-03-01   False  False  False
+            2019-03-02   False  False  False
             ...            ...    ...    ...
-            2019-12-29   False  False  False
-            2019-12-30   False  False  False
-            2019-12-31   False  False  False
+            2019-08-29   False  False  False
+            2019-08-30   False  False  False
+            2019-08-31   False  False  False
 
-            [366 rows x 3 columns]
+            [185 rows x 3 columns]
             ```
 
             Notice how `MA.ma_above` method created a new column hierarchy for you. You can now use
             it for indexing as follows:
 
             ```py
-            fig = price.vbt.timeseries.plot(name='Price')
+            fig = price['Close'].vbt.timeseries.plot(name='Price')
             fig = entry_signals[(10, False, 20, False)]\
-                .vbt.signals.plot_markers(price, signal_type='entry', fig=fig)
+                .vbt.signals.plot_markers(price['Close'], signal_type='entry', fig=fig)
             fig = exit_signals[(10, False, 20, False)]\
-                .vbt.signals.plot_markers(price, signal_type='exit', fig=fig)
+                .vbt.signals.plot_markers(price['Close'], signal_type='exit', fig=fig)
 
             fig.show()
             ```
@@ -1112,21 +1114,21 @@ class MSTD(MSTD):
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
             ```python-repl
-            >>> mstd = vbt.MSTD.from_params(price, [10, 20], ewm=[False, True])
+            >>> mstd = vbt.MSTD.from_params(price['Close'], [10, 20], ewm=[False, True])
 
             >>> print(mstd.mstd)
-            mstd_window         10          20
-            mstd_ewm         False        True
-            Date                              
-            2018-12-31         NaN         NaN
-            2019-01-01         NaN         NaN
-            2019-01-02         NaN         NaN
-            ...                ...         ...
-            2019-12-29   96.910551  267.336921
-            2019-12-30   91.462377  254.361497
-            2019-12-31   91.077352  244.531229
+            mstd_window          10          20
+            mstd_ewm          False        True
+            Date                               
+            2019-02-28          NaN         NaN
+            2019-03-01          NaN         NaN
+            2019-03-02          NaN         NaN
+            ...                 ...         ...
+            2019-08-29   342.996528  603.191266
+            2019-08-30   310.101037  614.676546
+            2019-08-31   332.853480  614.695088
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
             ```
         """
         return super().from_params(ts, window, ewm, **kwargs)
@@ -1218,83 +1220,87 @@ class BollingerBands(BollingerBands):
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
             ```python-repl
-            >>> bb = vbt.BollingerBands.from_params(price, 
+            >>> bb = vbt.BollingerBands.from_params(price['Close'], 
             ...     window=[10, 20], alpha=[2, 3], ewm=[False, True])
 
             >>> print(bb.ma)
-            bb_window         10           20
-            bb_ewm         False         True
-            bb_alpha         2.0          3.0
-            Date                             
-            2018-12-31       NaN          NaN
-            2019-01-01       NaN          NaN
-            2019-01-02       NaN          NaN
-            ...              ...          ...
-            2019-12-29  7314.459  7313.283227
-            2019-12-30  7321.877  7311.351491
-            2019-12-31  7322.121  7300.137063
+            bb_window          10            20
+            bb_ewm          False          True
+            bb_alpha          2.0           3.0
+            Date                               
+            2019-02-28        NaN           NaN
+            2019-03-01        NaN           NaN
+            2019-03-02        NaN           NaN
+            ...               ...           ...
+            2019-08-29  10155.972  10330.457140
+            2019-08-30  10039.466  10260.715507
+            2019-08-31   9988.727  10200.710220
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
 
             >>> print(bb.upper_band)
-            bb_window            10           20
-            bb_ewm            False         True
-            bb_alpha            2.0          3.0
-            Date                                
-            2018-12-31          NaN          NaN
-            2019-01-01          NaN          NaN
-            2019-01-02          NaN          NaN
-            ...                 ...          ...
-            2019-12-29  7508.280102  8115.293989
-            2019-12-30  7504.801754  8074.435981
-            2019-12-31  7504.275704  8033.730750
+            bb_window             10            20
+            bb_ewm             False          True
+            bb_alpha             2.0           3.0
+            Date                                  
+            2019-02-28           NaN           NaN
+            2019-03-01           NaN           NaN
+            2019-03-02           NaN           NaN
+            ...                  ...           ...
+            2019-08-29  10841.965056  12140.030938
+            2019-08-30  10659.668073  12104.745144
+            2019-08-31  10654.433961  12044.795485
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
 
             >>> print(bb.lower_band)
             bb_window            10           20
             bb_ewm            False         True
             bb_alpha            2.0          3.0
             Date                                
-            2018-12-31          NaN          NaN
-            2019-01-01          NaN          NaN
-            2019-01-02          NaN          NaN
+            2019-02-28          NaN          NaN
+            2019-03-01          NaN          NaN
+            2019-03-02          NaN          NaN
             ...                 ...          ...
-            2019-12-29  7120.637898  6511.272465
-            2019-12-30  7138.952246  6548.267001
-            2019-12-31  7139.966296  6566.543376
+            2019-08-29  9469.978944  8520.883342
+            2019-08-30  9419.263927  8416.685869
+            2019-08-31  9323.020039  8356.624955
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
 
             >>> print(bb.percent_b)
             bb_window         10        20
             bb_ewm         False      True
             bb_alpha         2.0       3.0
             Date                          
-            2018-12-31       NaN       NaN
-            2019-01-01       NaN       NaN
-            2019-01-02       NaN       NaN
+            2019-02-28       NaN       NaN
+            2019-03-01       NaN       NaN
+            2019-03-02       NaN       NaN
             ...              ...       ...
-            2019-12-29  0.779100  0.568183
-            2019-12-30  0.421069  0.487975
-            2019-12-31  0.147220  0.427387
+            2019-08-29  0.029316  0.273356
+            2019-08-30  0.144232  0.320354
+            2019-08-31  0.231063  0.345438
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
 
             >>> print(bb.bandwidth)
             bb_window         10        20
             bb_ewm         False      True
             bb_alpha         2.0       3.0
             Date                          
-            2018-12-31       NaN       NaN
-            2019-01-01       NaN       NaN
-            2019-01-02       NaN       NaN
+            2019-02-28       NaN       NaN
+            2019-03-01       NaN       NaN
+            2019-03-02       NaN       NaN
+            2019-03-03       NaN       NaN
+            2019-03-04       NaN       NaN
             ...              ...       ...
-            2019-12-29  0.779100  0.568183
-            2019-12-30  0.421069  0.487975
-            2019-12-31  0.147220  0.427387
+            2019-08-27  0.107370  0.313212
+            2019-08-28  0.130902  0.325698
+            2019-08-29  0.135092  0.350338
+            2019-08-30  0.123553  0.359435
+            2019-08-31  0.133292  0.361560
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
             ```
         """
         alpha = np.asarray(alpha).astype(np.float64)
@@ -1415,33 +1421,34 @@ class RSI(RSI):
     See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp).
 
     Use `RSI.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window=14, ewm=False, **kwargs):
         """Calculate relative strength index `RSI.rsi` from time series `ts` and parameters `window` and `ewm`.
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like): Size of the moving window. Can be one or more values.
+            window (int or array_like): Size of the moving window. Can be one or more values. Defaults to 14.
             ewm (bool or array_like): If True, uses exponential moving average, otherwise 
                 simple moving average. Can be one or more values. Defaults to False.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
         Examples:
             ```python-repl
-            >>> rsi = vbt.RSI.from_params(price, [10, 20], ewm=[False, True])
+            >>> rsi = vbt.RSI.from_params(price['Close'], [10, 20], ewm=[False, True])
 
             >>> print(rsi.rsi)
             rsi_window         10         20
-            rsi_ewm         False      True 
+            rsi_ewm         False       True
             Date                            
-            2018-12-31        NaN        NaN
-            2019-01-01        NaN        NaN
-            2019-01-02        NaN        NaN
+            2019-02-28        NaN        NaN
+            2019-03-01        NaN        NaN
+            2019-03-02        NaN        NaN
             ...               ...        ...
-            2019-12-29  63.397004  55.208736
-            2019-12-30  53.970922  49.140169
-            2019-12-31  50.121299  44.953035
+            2019-08-29  21.004434  34.001218
+            2019-08-30  25.310248  36.190915
+            2019-08-31  35.640258  37.043562
 
-            [366 rows x 2 columns]
+            [185 rows x 2 columns]
             ```
         """
         return super().from_params(ts, window, ewm, **kwargs)
@@ -1481,7 +1488,7 @@ fix_class_for_pdoc(RSI)
 
 
 @njit(DictType(i8, UniTuple(f8[:, :], 2))(f8[:, :], f8[:, :], f8[:, :], i8[:], i8[:], b1[:]), cache=True)
-def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, ewms):
+def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     cache_dict = dict()
     for i in range(k_windows.shape[0]):
         if k_windows[i] not in cache_dict:
@@ -1492,35 +1499,100 @@ def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, ewms):
 
 
 @njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, i8, b1, DictType(i8, UniTuple(f8[:, :], 2))), cache=True)
-def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, ewm, cache_dict):
+def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
     roll_min, roll_max = cache_dict[k_window]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
-    if ewm:
+    if d_ewm:
         percent_d = ewm_mean_nb(percent_k, d_window)
     else:
         percent_d = rolling_mean_nb(percent_k, d_window)
-    percent_d[:k_window+d_window-2, :] = np.nan  # min_periods for ewm
+    percent_d[:k_window+d_window-2, :] = np.nan  # min_periods
     return percent_k, percent_d
 
 
 Stochastic = IndicatorFactory(
     ts_names=['close_ts', 'high_ts', 'low_ts'],
-    param_names=['k_window', 'd_window', 'ewm'],
+    param_names=['k_window', 'd_window', 'd_ewm'],
     output_names=['percent_k', 'percent_d'],
     name='stoch'
 ).from_apply_func(stoch_apply_func_nb, caching_func=stoch_caching_nb)
 
 
 class Stochastic(Stochastic):
+    """
+    A stochastic oscillator is a momentum indicator comparing a particular closing price of a security 
+    to a range of its prices over a certain period of time. The sensitivity of the oscillator to market 
+    movements is reducible by adjusting that time period or by taking a moving average of the result. 
+    It is used to generate overbought and oversold trading signals, utilizing a 0-100 bounded range of values.
+
+    See [Stochastic Oscillator Definition](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
+
+    Use `Stochastic.from_params` methods to run the indicator."""
+
     @classmethod
-    def from_params(cls, close_ts, high_ts=None, low_ts=None, k_window=14, d_window=3, ewm=False, **kwargs):
+    def from_params(cls, close_ts, high_ts=None, low_ts=None, k_window=14, d_window=3, d_ewm=False, **kwargs):
+        """Calculate %K `Stochastic.percent_k` and %D `Stochastic.percent_d` from time series `close_ts`, 
+        `high_ts`, and `low_ts`, and parameters `k_window`, `d_window` and `d_ewm`.
+
+        Args:
+            close_ts (pandas_like): The last closing price.
+            high_ts (pandas_like, optional): The highest price. If None, uses `close_ts`.
+            low_ts (pandas_like, optional): The lowest price. If None, uses `close_ts`.
+            k_window (int or array_like): Size of the moving window for %K. Can be one or more values. 
+                Defaults to 14.
+            d_window (int or array_like): Size of the moving window for %D. Can be one or more values. 
+                Defaults to 3.
+            d_ewm (bool or array_like): If True, uses exponential moving average for %D, otherwise 
+                simple moving average. Can be one or more values. Defaults to False.
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.from_params_pipeline.`
+        Examples:
+            ```python-repl
+            >>> stoch = vbt.Stochastic.from_params(price['Close'],
+            ...     high_ts=price['High'], low_ts=price['Low'],
+            ...     k_window=[10, 20], d_window=[2, 3], d_ewm=[False, True])
+
+            >>> print(stoch.percent_k)
+            stoch_k_window         10         20
+            stoch_d_window          2          3
+            stoch_d_ewm         False       True
+            Date                                
+            2019-02-28            NaN        NaN
+            2019-03-01            NaN        NaN
+            2019-03-02            NaN        NaN
+            ...                   ...        ...
+            2019-08-29       5.806308   3.551280
+            2019-08-30      12.819694   8.380488
+            2019-08-31      19.164757   9.922813
+
+            [185 rows x 2 columns]
+
+            >>> print(stoch.percent_d)
+            stoch_k_window         10         20
+            stoch_d_window          2          3
+            stoch_d_ewm         False       True
+            Date                                
+            2019-02-28            NaN        NaN
+            2019-03-01            NaN        NaN
+            2019-03-02            NaN        NaN
+            ...                   ...        ...
+            2019-08-29       4.437639   8.498544
+            2019-08-30       9.313001   8.439516
+            2019-08-31      15.992225   9.181164
+
+            [185 rows x 2 columns]
+            ```
+        """
         if high_ts is None:
             high_ts = close_ts
         if low_ts is None:
             low_ts = close_ts
-        return super().from_params(close_ts, high_ts, low_ts, k_window, d_window, ewm, **kwargs)
+        return super().from_params(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, **kwargs)
 
     def crossover(self, **kwargs):
+        """Generate crossover signals between `Stochastic.percent_k` and `Stochastic.percent_d`.
+        
+        For `**kwargs`, see `Stochastic.percent_k_above` and `Stochastic.percent_k_below`.
+        """
         above_signals = self.percent_k_above(self.percent_d, crossover=True, **kwargs)
         below_signals = self.percent_k_below(self.percent_d, crossover=True, **kwargs)
         return above_signals, below_signals
@@ -1532,6 +1604,23 @@ class Stochastic(Stochastic):
              percent_d_trace_kwargs={},
              fig=None,
              **layout_kwargs):
+        """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
+
+        Args:
+            percent_k_name (str): Name of the trace for `Stochastic.percent_k`.
+            percent_d_name (str): Name of the trace for `Stochastic.percent_d`.
+            percent_k_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+                `Stochastic.percent_k`.
+            percent_d_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+                `Stochastic.percent_d`.
+            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Examples:
+            ```py
+            stoch[(10, 2, False)].plot()
+            ```
+
+            ![](img/Stochastic.png)"""
         check_type(self.percent_k, pd.Series)
         check_type(self.percent_d, pd.Series)
 
@@ -1567,7 +1656,7 @@ def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, ewm, cache_d
         signal_ts = ewm_mean_nb(macd_ts, signal_window)
     else:
         signal_ts = rolling_mean_nb(macd_ts, signal_window)
-    signal_ts[:max(fast_window, slow_window)+signal_window-2, :] = np.nan  # min_periods for ewm
+    signal_ts[:max(fast_window, slow_window)+signal_window-2, :] = np.nan  # min_periodd
     return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
 
 
