@@ -3,21 +3,21 @@ Technical indicators are used to see past trends and anticipate future moves. Th
 of such indicators, but also a comprehensive `vectorbt.indicators.IndicatorFactory` for building new indicators
 with ease.
 
-Before running examples, import the following libraries:
+Before running the examples, import the following libraries:
 ```py
 import numpy as np
 import pandas as pd
 from datetime import datetime, timedelta
 import itertools
 from numba import njit
+import yfinance as yf
 
 import vectorbt as vbt
 
-np.random.seed(0)
-price = pd.Series(np.cumsum(np.random.uniform(-0.8, 1, size=(100,))), 
-    index=[datetime(2018, 1, 1) + timedelta(days=i) for i in range(100)])
+ticker = yf.Ticker("BTC-USD")
+price = ticker.history(start=datetime(2019, 1, 1), end=datetime(2020, 1, 1))['Close']
 
-price.vbt.plot()
+price.vbt.timeseries.plot()
 ```
 ![](img/Indicators_price.png)
 """
@@ -903,17 +903,18 @@ class MA(MA):
             >>> ma = vbt.MA.from_params(price, [10, 20], ewm=[False, True])
 
             >>> print(ma.ma)
-            ma_window         10        20
-            ma_ewm         False      True 
-            2018-01-01       NaN       NaN
-            2018-01-02       NaN       NaN
-            2018-01-03       NaN       NaN
-            ...              ...       ...
-            2018-04-08  5.999866  6.141290
-            2018-04-09  6.040747  6.117779
-            2018-04-10  5.915199  6.021119
+            ma_window         10           20
+            ma_ewm         False         True
+            Date                             
+            2018-12-31       NaN          NaN
+            2019-01-01       NaN          NaN
+            2019-01-02       NaN          NaN
+            ...              ...          ...
+            2019-12-29  7314.459  7313.283227
+            2019-12-30  7321.877  7311.351491
+            2019-12-31  7322.121  7300.137063
 
-            [100 rows x 2 columns]
+            [366 rows x 2 columns]
             ```
         """
         return super().from_params(ts, window, ewm, **kwargs)
@@ -936,31 +937,32 @@ class MA(MA):
             ...     [10, 20, 30], 2, ewm=[False, False, True], names=['fast', 'slow'])
 
             >>> print(fast_ma.ma)
-
-            fast_window        10        10        20
-            fast_ewm        False     False     False
-            2018-01-01        NaN       NaN       NaN
-            2018-01-02        NaN       NaN       NaN
-            2018-01-03        NaN       NaN       NaN
-            ...               ...       ...       ...
-            2018-04-08   5.999866  5.999866  5.983928
-            2018-04-09   6.040747  6.040747  5.931313
-            2018-04-10   5.915199  5.915199  5.868436
-
-            [100 rows x 3 columns]
+            fast_window        10        10         20
+            fast_ewm        False     False      False
+            Date                                      
+            2018-12-31        NaN       NaN        NaN
+            2019-01-01        NaN       NaN        NaN
+            2019-01-02        NaN       NaN        NaN
+            ...               ...       ...        ...
+            2019-12-29   7314.459  7314.459  7224.1280
+            2019-12-30   7321.877  7321.877  7224.8720
+            2019-12-31   7322.121  7322.121  7223.6805
+            
+            [366 rows x 3 columns]
 
             >>> print(slow_ma.ma)
-            slow_window        20        30        30
-            slow_ewm        False      True      True 
-            2018-01-01        NaN       NaN       NaN
-            2018-01-02        NaN       NaN       NaN
-            2018-01-03        NaN       NaN       NaN
-            ...               ...       ...       ...
-            2018-04-08   5.983928  6.356696  6.356696
-            2018-04-09   5.931313  6.326833  6.326833
-            2018-04-10   5.868436  6.247768  6.247768
+            slow_window         20           30           30
+            slow_ewm         False         True         True
+            Date                                            
+            2018-12-31         NaN          NaN          NaN
+            2019-01-01         NaN          NaN          NaN
+            2019-01-02         NaN          NaN          NaN
+            ...                ...          ...          ...
+            2019-12-29   7224.1280  7393.653412  7393.653412
+            2019-12-30   7224.8720  7387.159643  7387.159643
+            2019-12-31   7223.6805  7374.671925  7374.671925
 
-            [100 rows x 3 columns]
+            [366 rows x 3 columns]
             ```
 
             The naive way without caching is the follows:
@@ -974,33 +976,39 @@ class MA(MA):
             slow_ma = vbt.MA.from_params(price, slow_windows, slow_ewms, name='slow')
             ```
 
-            Having this, you can then compare those `vectorbt.indicators.MA` instances together:
+            Having this, you can now compare these `vectorbt.indicators.MA` instances:
             ```python-repl
             >>> entry_signals = fast_ma.ma_above(slow_ma, crossover=True)
             >>> exit_signals = fast_ma.ma_below(slow_ma, crossover=True)
 
-            >>> print(fast_signals)
+            >>> print(entry_signals)
             fast_window     10     10     20
             fast_ewm     False  False  False
             slow_window     20     30     30
-            slow_ewm     False  True   True 
-            2018-01-01   False  False  False
-            2018-01-02   False  False  False
-            2018-01-03   False  False  False
+            slow_ewm     False   True   True
+            Date                            
+            2018-12-31   False  False  False
+            2019-01-01   False  False  False
+            2019-01-02   False  False  False
             ...            ...    ...    ...
-            2018-04-08   False  False  False
-            2018-04-09   False  False  False
-            2018-04-10   False  False  False
+            2019-12-29   False  False  False
+            2019-12-30   False  False  False
+            2019-12-31   False  False  False
 
-            [100 rows x 3 columns]
+            [366 rows x 3 columns]
             ```
 
-            Notice the new column hierarchy the `MA.ma_above` method created for you. You can use
+            Notice how `MA.ma_above` method created a new column hierarchy for you. You can now use
             it for indexing as follows:
 
             ```py
-            fig = entry_signals[(10, False, 20, False)].vbt.signals.plot(name='Entries')
-            exit_signals[(10, False, 20, False)].vbt.signals.plot(name='Exits', fig=fig)
+            fig = price.vbt.timeseries.plot(name='Price')
+            fig = entry_signals[(10, False, 20, False)]\
+                .vbt.signals.plot_markers(price, signal_type='entry', fig=fig)
+            fig = exit_signals[(10, False, 20, False)]\
+                .vbt.signals.plot_markers(price, signal_type='exit', fig=fig)
+
+            fig.show()
             ```
             ![](img/MA_from_combinations.png)
         """

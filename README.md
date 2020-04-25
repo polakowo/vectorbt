@@ -155,7 +155,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
 - Provides a range of technical indicators with full Numba support ([indicators.py](vectorbt/indicators.py))
-    - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, Moving Average Convergence Divergence, and On-balance volume
+    - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and OBV
     - Indicator factory for construction of complex technical indicators in a simplified way
     - Each indicator offers methods for generating signals and plotting
     - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or product
