@@ -550,7 +550,7 @@ def align_index_to(index1, index2):
 
     Returns integer indices of occurrences and None if aligning not needed.
 
-    The second one must contain all levels from the first (and some more)
+    The second one must contain all levels from the first (and can have some more)
     In all these levels, both must share the same elements.
     Only then the first index can be broadcasted to the match the shape of the second one."""
     if not isinstance(index1, pd.MultiIndex):

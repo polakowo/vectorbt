@@ -706,6 +706,7 @@ class IndicatorFactory():
                     if crossover:
                         return result.vbt.signals.nst(wait+1, after_false=True)
                     return result
+                comparison_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
                 comparison_method.__doc__ = f"""Returns True when `{attr}` is {func_name} `other`. 
 
                 Set `crossover` to True to return the first True after crossover. Specify `wait` to return 
@@ -921,7 +922,7 @@ class MA(MA):
 
     @classmethod
     def from_combinations(cls, ts, windows, r, ewm=False, names=None, **kwargs):
-        """Calculate multiple moving averages according to `itertools.combinations`.
+        """Create multiple `vectorbt.indicators.MA` combinations according to `itertools.combinations`.
 
         Args:
             ts (pandas_like): Time series (such as price).
