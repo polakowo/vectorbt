@@ -736,9 +736,9 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
             volume = self._obj[self._column_map['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=np.object)
-            marker_colors[(close - open) > 0] = 'green'
-            marker_colors[(close - open) == 0] = 'lightgrey'
-            marker_colors[(close - open) < 0] = 'red'
+            marker_colors[(close.values - open.values) > 0] = 'green'
+            marker_colors[(close.values - open.values) == 0] = 'lightgrey'
+            marker_colors[(close.values - open.values) < 0] = 'red'
             bar = go.Bar(
                 x=self._obj.index,
                 y=volume,
