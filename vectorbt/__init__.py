@@ -1,6 +1,6 @@
 from vectorbt import timeseries, signals, indicators, portfolio, widgets, utils, accessors
 
-from vectorbt.indicators import IndicatorFactory, MA, MSTD, BollingerBands, RSI, Stochastic, MACD, OBV
+from vectorbt.indicators import IndicatorFactory, MA, MSTD, BollingerBands, RSI, Stochastic, MACD, OBV, ATR
 from vectorbt.portfolio import Portfolio
 from vectorbt.widgets import Indicator, Bar, Scatter, Histogram, Heatmap
 
@@ -26,5 +26,6 @@ utils.add_all_from_module(indicators.__pdoc__, indicators, whitelist=[
     'RSI',
     'Stochastic',
     'MACD',
-    'OBV'
+    'OBV',
+    'ATR'
 ])
