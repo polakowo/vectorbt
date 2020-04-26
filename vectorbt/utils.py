@@ -60,13 +60,14 @@ def list_pdoc_keys(module):
             and ((inspect.isroutine(obj) and callable(obj)) or inspect.isclass(obj))]
 
 
-def add_all_from_module(__pdoc__, module, whitelist=None):
+def add_pdoc_to_module(module, __pdoc__={}, whitelist=None):
     """Add to `__pdoc__` dictionary keys that are in `whitelist`."""
     all_keys = list_pdoc_keys(module)
     if whitelist is not None:
         for k in all_keys:
             if k not in whitelist:
                 __pdoc__[k] = False
+    module.__pdoc__ = __pdoc__
 
 
 def fix_class_for_pdoc(cls):

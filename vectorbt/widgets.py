@@ -22,6 +22,8 @@ from vectorbt.utils import *
 from vectorbt.accessors import *
 from collections import namedtuple
 
+__all__ = ['FigureWidget', 'UpdatableFigureWidget', 'Indicator', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
+
 # You can change this from code using vbt.widgets.layout_defaults[key] = value
 layout_defaults = Config(
     frozen=False,
