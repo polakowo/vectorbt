@@ -6,36 +6,35 @@ See [Moving Average Convergence Divergence – MACD](https://www.investopedia.co
 Use `MACD.from_params` methods to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
-from vectorbt.indicators.ma import ma_caching_nb
-from vectorbt.timeseries import ewm_mean_nb, rolling_mean_nb, diff_1d_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
 import plotly.graph_objects as go
 
-__all__ = ['MACD']
+from vectorbt import utils, timeseries, indicators
 
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], i8[:], i8[:], b1[:], b1[:]), cache=True)
 def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
-    return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
+    """Numba-compiled caching function for `MACD`."""
+    return indicators.ma.ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
 
 
 @njit(UniTuple(f8[:, :], 4)(f8[:, :], i8, i8, i8, b1, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
 def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
+    """Numba-compiled apply function for `MACD`."""
     fast_ma = cache_dict[(fast_window, int(macd_ewm))]
     slow_ma = cache_dict[(slow_window, int(macd_ewm))]
     macd_ts = fast_ma - slow_ma
     if signal_ewm:
-        signal_ts = ewm_mean_nb(macd_ts, signal_window)
+        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window)
     else:
-        signal_ts = rolling_mean_nb(macd_ts, signal_window)
+        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window)
     signal_ts[:max(fast_window, slow_window)+signal_window-2, :] = np.nan  # min_periodd
     return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
 
 
-MACD = IndicatorFactory(
+MACD = indicators.factory.IndicatorFactory(
     ts_names=['ts'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
     output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
@@ -65,7 +64,7 @@ class MACD(MACD):
                 simple moving average. Can be one or more values. Defaults to True.
             signal_ewm (bool or array_like): If True, uses exponential moving average for signal, otherwise uses 
                 simple moving average. Can be one or more values. Defaults to True.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             MACD
         Examples:
@@ -187,9 +186,9 @@ class MACD(MACD):
             ```
 
             ![](img/MACD.png)"""
-        check_type(self.macd, pd.Series)
-        check_type(self.signal, pd.Series)
-        check_type(self.histogram, pd.Series)
+        utils.assert_type(self.macd, pd.Series)
+        utils.assert_type(self.signal, pd.Series)
+        utils.assert_type(self.histogram, pd.Series)
 
         macd_trace_kwargs = {**dict(
             name=f'MACD ({self.name})'
@@ -208,7 +207,7 @@ class MACD(MACD):
 
         # Plot histogram
         hist = self.histogram.values
-        hist_diff = diff_1d_nb(hist)
+        hist_diff = timeseries.nb.diff_1d_nb(hist)
         marker_colors = np.full(hist.shape, np.nan, dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
@@ -228,4 +227,4 @@ class MACD(MACD):
         return fig
 
 
-fix_class_for_pdoc(MACD)
+utils.fix_class_for_pdoc(MACD)

@@ -1,212 +1,17 @@
 import numpy as np
 import pandas as pd
-from numba import njit, b1, i1, i8, f8
-from numba.types import UniTuple
 import plotly.graph_objects as go
 
-from vectorbt.utils import *
-from vectorbt.accessors import *
+from vectorbt import utils, timeseries, accessors
+from vectorbt.portfolio import nb
 from vectorbt.widgets import FigureWidget
-from vectorbt.timeseries import pct_change_nb, fillna_nb, expanding_max_nb, diff_nb
-
-__all__ = ['Portfolio']
 
 # You can change default portfolio values from code
-portfolio_defaults = Config(
+portfolio_defaults = utils.Config(
     investment=1.,
     slippage=0.,
     commission=0.
 )
-
-# ############# Numba functions ############# #
-
-
-@njit(f8(i8, i8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
-def signals_order_func_np(i, col, run_cash, run_shares, entries, exits, volume, accumulate):
-    """Order function to buy/sell based on signals."""
-    if run_shares > 0:
-        if entries[i, col] and not exits[i, col]:
-            if accumulate:
-                return volume[i, col]
-        elif not entries[i, col] and exits[i, col]:
-            return -volume[i, col]
-    else:
-        if entries[i, col] and not exits[i, col]:
-            return volume[i, col]
-        elif not entries[i, col] and exits[i, col]:
-            if accumulate:
-                return -volume[i, col]
-    return 0.
-
-
-@njit(f8(i8, i8, f8, f8, f8[:, :], b1), cache=True)
-def orders_order_func_np(i, col, run_cash, run_shares, orders, is_target):
-    """Buy/sell the amount of shares specified by orders."""
-    if is_target:
-        return orders[i, col] - run_shares
-    else:
-        return orders[i, col]
-
-
-@njit
-def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
-    """Calculate portfolio value in cash and shares."""
-    cash = np.empty_like(ts)
-    shares = np.empty_like(ts)
-
-    for col in range(ts.shape[1]):
-        run_cash = investment
-        run_shares = 0
-        for i in range(ts.shape[0]):
-            volume = order_func_np(i, col, run_cash, run_shares, *args)  # the amount of shares to buy/sell
-            if volume > 0:
-                # Buy volume
-                adj_price = ts[i, col] * (1 + slippage)  # slippage applies on price
-                req_cash = volume * adj_price
-                req_cash /= (1 - commission)  # total cash required for this volume
-                if req_cash <= run_cash:  # sufficient cash
-                    run_shares += volume
-                    run_cash -= req_cash
-                else:  # not sufficient cash, volume will be less than requested
-                    adj_cash = run_cash
-                    adj_cash *= (1 - commission)  # commission in % applies on transaction volume
-                    run_shares += adj_cash / adj_price
-                    run_cash = 0
-            elif volume < 0:
-                # Sell volume
-                adj_price = ts[i, col] * (1 - slippage)
-                adj_shares = min(run_shares, abs(volume))
-                adj_cash = adj_shares * adj_price
-                adj_cash *= (1 - commission)
-                run_shares -= adj_shares
-                run_cash += adj_cash
-            cash[i, col] = run_cash
-            shares[i, col] = run_shares
-
-    return cash, shares
-
-
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
-def portfolio_from_signals_np(ts, investment, slippage, commission, entries, exits, volume, accumulate):
-    """Calculate portfolio value using signals."""
-    return portfolio_np(ts, investment, slippage, commission, signals_order_func_np, entries, exits, volume, accumulate)
-
-
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, f8[:, :], b1), cache=True)
-def portfolio_from_orders_np(ts, investment, slippage, commission, orders, is_target):
-    """Calculate portfolio value using orders."""
-    return portfolio_np(ts, investment, slippage, commission, orders_order_func_np, orders, is_target)
-
-
-@njit(b1(f8[:]), cache=True)
-def detect_order_accumulation_1d_nb(trades):
-    """Detect accumulation of orders, that is, position is being increased/decreased gradually.
-
-    When it happens, it's not easy to calculate P/L of a position anymore."""
-    entry_i = -1
-    position = False
-    for i in range(trades.shape[0]):
-        if trades[i] > 0:
-            if position:
-                return True
-            entry_i = i
-            position = True
-        elif trades[i] < 0:
-            if not position:
-                return True
-            if trades[entry_i] != abs(trades[i]):
-                return True
-            position = False
-    return False
-
-
-@njit(b1[:](f8[:, :]), cache=True)
-def detect_order_accumulation_nb(trades):
-    """Detect accumulation of orders, that is, position is being increased/decreased gradually.
-
-    When it happens, it's not easy to calculate P/L of a position anymore."""
-    a = np.full(trades.shape[1], False, dtype=b1)
-    for col in range(trades.shape[1]):
-        a[col] = detect_order_accumulation_1d_nb(trades[:, col])
-    return a
-
-
-@njit
-def apply_on_positions(trades, apply_func, *args):
-    """Apply a function on each position."""
-    if detect_order_accumulation_nb(trades).any():
-        raise ValueError("Order accumulation detected. Cannot calculate performance per position.")
-    out = np.full_like(trades, np.nan)
-
-    for col in range(trades.shape[1]):
-        entry_i = -1
-        position = False
-        for i in range(trades.shape[0]):
-            if position and trades[i, col] < 0:
-                out[i, col] = apply_func(entry_i, i, col, trades, *args)
-                position = False
-            elif not position and trades[i, col] > 0:
-                entry_i = i
-                position = True
-            if position and i == trades.shape[0] - 1:  # unrealized
-                out[i, col] = apply_func(entry_i, i, col, trades, *args)
-    return out
-
-
-_profits_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] - equity[entry_i, col])
-_returns_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] / equity[entry_i, col] - 1)
-
-
-@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
-def position_profits_nb(trades, equity):
-    """Calculate P/L per position."""
-    return apply_on_positions(trades, _profits_nb, equity)
-
-
-@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
-def position_returns_nb(trades, equity):
-    """Calculate returns per trade."""
-    return apply_on_positions(trades, _returns_nb, equity)
-
-
-@njit
-def apply_on_position_profits_nb(position_profits, apply_func, mask_func):
-    applied = np.zeros(position_profits.shape[1])
-
-    for col in range(position_profits.shape[1]):
-        mask = mask_func(position_profits[:, col])
-        if mask.any():
-            masked = position_profits[:, col][mask]
-            applied[col] = apply_func(masked)
-    return applied
-
-
-_nanmean_nb = njit(lambda x: np.nanmean(x))
-_nansum_nb = njit(lambda x: np.nansum(x))
-_win_mask_nb = njit(lambda x: x > 0)
-_loss_mask_nb = njit(lambda x: x < 0)
-
-
-@njit(f8[:](f8[:, :]))
-def sum_win_nb(position_profits):
-    return apply_on_position_profits_nb(position_profits, _nansum_nb, _win_mask_nb)
-
-
-@njit(f8[:](f8[:, :]))
-def sum_loss_nb(position_profits):
-    return np.abs(apply_on_position_profits_nb(position_profits, _nansum_nb, _loss_mask_nb))
-
-
-@njit(f8[:](f8[:, :]))
-def avg_win_nb(position_profits):
-    return apply_on_position_profits_nb(position_profits, _nanmean_nb, _win_mask_nb)
-
-
-@njit(f8[:](f8[:, :]))
-def avg_loss_nb(position_profits):
-    return np.abs(apply_on_position_profits_nb(position_profits, _nanmean_nb, _loss_mask_nb))
-
-# ############# Custom accessors ############# #
 
 
 def indexing_func(obj, loc_pandas_func):
@@ -220,15 +25,15 @@ def indexing_func(obj, loc_pandas_func):
     )
 
 
-@add_indexing(indexing_func)
+@utils.add_indexing(indexing_func)
 class Portfolio():
 
     def __init__(self, ts, cash, shares, investment, slippage, commission):
-        check_type(ts, (pd.Series, pd.DataFrame))
+        utils.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
 
-        check_same_meta(ts, cash)
-        check_same_meta(ts, shares)
+        utils.assert_same_meta(ts, cash)
+        utils.assert_same_meta(ts, shares)
 
         self.ts = ts
         self.cash = cash
@@ -240,10 +45,10 @@ class Portfolio():
     # ############# Magic methods ############# #
 
     def __add__(self, other):
-        check_type(other, self.__class__)
-        check_same(self.ts, other.ts)
-        check_same(self.slippage, other.slippage)
-        check_same(self.commission, other.commission)
+        utils.assert_type(other, self.__class__)
+        utils.assert_same(self.ts, other.ts)
+        utils.assert_same(self.slippage, other.slippage)
+        utils.assert_same(self.commission, other.commission)
 
         return self.__class__(
             self.ts,
@@ -273,23 +78,23 @@ class Portfolio():
         if commission is None:
             commission = portfolio_defaults['commission']
 
-        check_type(ts, (pd.Series, pd.DataFrame))
-        check_type(entries, (pd.Series, pd.DataFrame))
-        check_type(exits, (pd.Series, pd.DataFrame))
+        utils.assert_type(ts, (pd.Series, pd.DataFrame))
+        utils.assert_type(entries, (pd.Series, pd.DataFrame))
+        utils.assert_type(exits, (pd.Series, pd.DataFrame))
 
         ts.vbt.timeseries.validate()
         entries.vbt.signals.validate()
         exits.vbt.signals.validate()
 
-        ts, entries, exits = broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
+        ts, entries, exits = utils.broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
 
-        volume = broadcast_to(volume, ts, writeable=True, copy_kwargs={'dtype': np.float64})
+        volume = utils.broadcast_to(volume, ts, writeable=True, copy_kwargs={'dtype': np.float64})
 
         investment = float(investment)
         slippage = float(slippage)
         commission = float(commission)
 
-        cash, shares = portfolio_from_signals_np(
+        cash, shares = nb.portfolio_from_signals_np(
             ts.vbt.to_2d_array(),
             investment,
             slippage,
@@ -317,19 +122,19 @@ class Portfolio():
         if commission is None:
             commission = portfolio_defaults['commission']
 
-        check_type(ts, (pd.Series, pd.DataFrame))
-        check_type(orders, (pd.Series, pd.DataFrame))
+        utils.assert_type(ts, (pd.Series, pd.DataFrame))
+        utils.assert_type(orders, (pd.Series, pd.DataFrame))
 
         ts.vbt.timeseries.validate()
         orders.vbt.timeseries.validate()
 
-        ts, orders = broadcast(ts, orders, **broadcast_kwargs, writeable=True)
+        ts, orders = utils.broadcast(ts, orders, **broadcast_kwargs, writeable=True)
 
         investment = float(investment)
         slippage = float(slippage)
         commission = float(commission)
 
-        cash, shares = portfolio_from_orders_np(
+        cash, shares = nb.portfolio_from_orders_np(
             ts.vbt.to_2d_array(),
             investment,
             slippage,
@@ -352,14 +157,14 @@ class Portfolio():
         if commission is None:
             commission = portfolio_defaults['commission']
 
-        check_type(ts, (pd.Series, pd.DataFrame))
+        utils.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
 
         investment = float(investment)
         slippage = float(slippage)
         commission = float(commission)
 
-        cash, shares = portfolio_np(
+        cash, shares = nb.portfolio_np(
             ts.vbt.to_2d_array(),
             investment,
             slippage,
@@ -374,55 +179,55 @@ class Portfolio():
 
     # ############# General properties ############# #
 
-    @cached_property
+    @utils.common.cached_property
     def equity(self):
         return self.ts.vbt.wrap_array(self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array())
 
-    @cached_property
+    @utils.common.cached_property
     def equity_in_shares(self):
         return self.ts.vbt.wrap_array(self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array())
 
-    @cached_property
+    @utils.common.cached_property
     def returns(self):
-        return self.ts.vbt.wrap_array(pct_change_nb(self.equity.vbt.to_2d_array()))
+        return self.ts.vbt.wrap_array(timeseries.nb.pct_change_nb(self.equity.vbt.to_2d_array()))
 
-    @cached_property
+    @utils.common.cached_property
     def drawdown(self):
-        drawdown = 1 - self.equity.vbt.to_2d_array() / expanding_max_nb(self.equity.vbt.to_2d_array())
+        drawdown = 1 - self.equity.vbt.to_2d_array() / timeseries.nb.expanding_max_nb(self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(drawdown)
 
-    @cached_property
+    @utils.common.cached_property
     def trades(self):
         shares = self.shares.vbt.to_2d_array()
-        trades = fillna_nb(diff_nb(shares), 0)
+        trades = timeseries.nb.fillna_nb(timeseries.nb.diff_nb(shares), 0)
         trades[0, :] = shares[0, :]
         return self.ts.vbt.wrap_array(trades)
 
-    @cached_property
+    @utils.common.cached_property
     def position_profits(self):
-        position_profits = position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        position_profits = nb.position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_profits)
 
-    @cached_property
+    @utils.common.cached_property
     def position_returns(self):
-        position_returns = position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        position_returns = nb.position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_returns)
 
-    @cached_property
+    @utils.common.cached_property
     def win_mask(self):
         position_profits = self.position_profits.vbt.to_2d_array().copy()
         position_profits[np.isnan(position_profits)] = 0  # avoid warnings
         win_mask = position_profits > 0
         return self.ts.vbt.wrap_array(win_mask)
 
-    @cached_property
+    @utils.common.cached_property
     def loss_mask(self):
         position_profits = self.position_profits.vbt.to_2d_array().copy()
         position_profits[np.isnan(position_profits)] = 0
         loss_mask = position_profits < 0
         return self.ts.vbt.wrap_array(loss_mask)
 
-    @cached_property
+    @utils.common.cached_property
     def position_mask(self):
         position_mask = ~np.isnan(self.position_profits.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_mask)
@@ -430,77 +235,77 @@ class Portfolio():
     # ############# Performance metrics ############# #
 
     def wrap_metric(self, a):
-        if is_frame(self.ts):
+        if utils.is_frame(self.ts):
             return pd.Series(a, index=self.ts.columns)
         # Single value
-        if is_array(a):
+        if utils.is_array(a):
             return a[0]
         return a
 
-    @cached_property
+    @utils.common.cached_property
     def sum_win(self):
         """Sum of wins."""
-        sum_win = sum_win_nb(self.position_profits.vbt.to_2d_array())
+        sum_win = nb.sum_win_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(sum_win)
 
-    @cached_property
+    @utils.common.cached_property
     def sum_loss(self):
         """Sum of losses (always positive)."""
-        sum_loss = sum_loss_nb(self.position_profits.vbt.to_2d_array())
+        sum_loss = nb.sum_loss_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(sum_loss)
 
-    @cached_property
+    @utils.common.cached_property
     def avg_win(self):
         """Average win."""
-        avg_win = avg_win_nb(self.position_profits.vbt.to_2d_array())
+        avg_win = nb.avg_win_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(avg_win)
 
-    @cached_property
+    @utils.common.cached_property
     def avg_loss(self):
         """Average loss (always positive)."""
-        avg_loss = avg_loss_nb(self.position_profits.vbt.to_2d_array())
+        avg_loss = nb.avg_loss_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(avg_loss)
 
-    @cached_property
+    @utils.common.cached_property
     def win_rate(self):
         """Fraction of wins."""
         win_rate = np.sum(self.win_mask.vbt.to_2d_array(), axis=0) / \
             np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
         return self.wrap_metric(win_rate)
 
-    @cached_property
+    @utils.common.cached_property
     def loss_rate(self):
         """Fraction of losses."""
         loss_rate = np.sum(self.loss_mask.vbt.to_2d_array(), axis=0) / \
             np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
         return self.wrap_metric(loss_rate)
 
-    @cached_property
+    @utils.common.cached_property
     def profit_factor(self):
-        profit_factor = to_1d(self.sum_win, raw=True) / to_1d(self.sum_loss, raw=True)
+        profit_factor = utils.to_1d(self.sum_win, raw=True) / utils.to_1d(self.sum_loss, raw=True)
         return self.wrap_metric(profit_factor)
 
-    @cached_property
+    @utils.common.cached_property
     def appt(self):
         """Average profitability per trade (APPT)
 
         For every trade you place, you are likely to win/lose this amount.
         What matters is that your APPT comes up positive."""
-        appt = to_1d(self.win_rate, raw=True) * to_1d(self.avg_win, raw=True) - \
-            to_1d(self.loss_rate, raw=True) * to_1d(self.avg_loss, raw=True)
+        appt = utils.to_1d(self.win_rate, raw=True) * utils.to_1d(self.avg_win, raw=True) - \
+            utils.to_1d(self.loss_rate, raw=True) * utils.to_1d(self.avg_loss, raw=True)
         return self.wrap_metric(appt)
 
-    @cached_property
+    @utils.common.cached_property
     def total_profit(self):
         total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
         return self.wrap_metric(total_profit)
 
-    @cached_property
+    @utils.common.cached_property
     def total_return(self):
-        total_return = to_1d(self.total_profit, raw=True) / self.investment
+        total_return = utils.to_1d(self.total_profit, raw=True) / self.investment
         return self.wrap_metric(total_return)
 
-    @cached_property
+    @utils.common.cached_property
     def mdd(self):
         """A maximum drawdown (MDD) is the maximum observed loss from a peak 
         to a trough of a portfolio, before a new peak is attained."""
@@ -514,8 +319,8 @@ class Portfolio():
                     sell_trace_kwargs={},
                     fig=None,
                     **ts_kwargs):
-        check_type(self.ts, pd.Series)
-        check_type(self.trades, pd.Series)
+        utils.assert_type(self.ts, pd.Series)
+        utils.assert_type(self.trades, pd.Series)
         sell_mask = self.trades < 0
         buy_mask = self.trades > 0
 
@@ -561,7 +366,7 @@ class Portfolio():
                               loss_trace_kwargs={},
                               fig=None,
                               **layout_kwargs):
-        check_type(self.position_profits, pd.Series)
+        utils.assert_type(self.position_profits, pd.Series)
         profits = self.position_profits.copy()
         profits[self.position_profits <= 0] = np.nan
         losses = self.position_profits.copy()

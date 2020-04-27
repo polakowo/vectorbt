@@ -22,10 +22,8 @@ from vectorbt.utils import *
 from vectorbt.accessors import *
 from collections import namedtuple
 
-__all__ = ['FigureWidget', 'UpdatableFigureWidget', 'Indicator', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
-
 # You can change this from code using vbt.widgets.layout_defaults[key] = value
-layout_defaults = Config(
+layout_defaults = common.Config(
     frozen=False,
     autosize=False,
     width=700,
@@ -124,7 +122,7 @@ class Indicator(UpdatableFigureWidget):
             value (int or float): The value to be displayed.
         """
         # NOTE: If called by Plotly event handler and in case of error, this won't visible in a notebook cell, but in logs!
-        check_type(value, (int, float))
+        assert_type(value, (int, float))
 
         # Update value range
         if self._value_range is None:
@@ -215,8 +213,8 @@ class Bar(UpdatableFigureWidget):
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
-        check_same_shape(data, self._x_labels, along_axis=(0, 0))
-        check_same_shape(data, self._trace_names, along_axis=(1, 0))
+        assert_same_shape(data, self._x_labels, along_axis=(0, 0))
+        assert_same_shape(data, self._trace_names, along_axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -296,8 +294,8 @@ class Scatter(UpdatableFigureWidget):
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
-        check_same_shape(data, self._x_labels, along_axis=(0, 0))
-        check_same_shape(data, self._trace_names, along_axis=(1, 0))
+        assert_same_shape(data, self._x_labels, along_axis=(0, 0))
+        assert_same_shape(data, self._trace_names, along_axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -376,7 +374,7 @@ class Histogram(UpdatableFigureWidget):
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
-        check_same_shape(data, self._trace_names, along_axis=(1, 0))
+        assert_same_shape(data, self._trace_names, along_axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -460,8 +458,8 @@ class Heatmap(UpdatableFigureWidget):
         if not is_array(data):
             data = np.asarray(data)
         data = to_2d(data)
-        check_same_shape(data, self._x_labels, along_axis=(1, 0))
-        check_same_shape(data, self._y_labels, along_axis=(0, 0))
+        assert_same_shape(data, self._x_labels, along_axis=(1, 0))
+        assert_same_shape(data, self._y_labels, along_axis=(0, 0))
 
         # Update traces
         with self.batch_update():

@@ -4,34 +4,34 @@ in order to predict how volatile the price may be in the future.
 Use `MSTD.from_params` method to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
-from vectorbt.timeseries import ewm_std_nb, rolling_std_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
 
-__all__ = ['MSTD']
+from vectorbt import utils, timeseries, indicators
 
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
 def mstd_caching_nb(ts, windows, ewms):
+    """Numba-compiled caching function for `MSTD`."""
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                mstd = ewm_std_nb(ts, windows[i])
+                mstd = timeseries.nb.ewm_std_nb(ts, windows[i])
             else:
-                mstd = rolling_std_nb(ts, windows[i])
+                mstd = timeseries.nb.rolling_std_nb(ts, windows[i])
             cache_dict[(windows[i], int(ewms[i]))] = mstd
     return cache_dict
 
 
 @njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
 def mstd_apply_func_nb(ts, window, ewm, cache_dict):
+    """Numba-compiled apply function for `MSTD`."""
     return cache_dict[(window, int(ewm))]
 
 
-MSTD = IndicatorFactory(
+MSTD = indicators.factory.IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['mstd'],
@@ -51,7 +51,7 @@ class MSTD(MSTD):
             ewm (bool or array_like): If True, uses exponential moving standard deviation, 
                 otherwise uses simple moving standard deviation. Can be one or more values. 
                 Defaults to False.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             MSTD
         Examples:
@@ -93,7 +93,7 @@ class MSTD(MSTD):
             ```
 
             ![](img/MSTD.png)"""
-        check_type(self.mstd, pd.Series)
+        utils.assert_type(self.mstd, pd.Series)
 
         mstd_trace_kwargs = {**dict(
             name=f'MSTD ({self.name})'
@@ -104,4 +104,4 @@ class MSTD(MSTD):
         return fig
 
 
-fix_class_for_pdoc(MSTD)
+utils.fix_class_for_pdoc(MSTD)

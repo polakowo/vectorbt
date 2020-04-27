@@ -6,49 +6,40 @@ See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
 Use `ATR.from_params` method to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType, Tuple
-from vectorbt.timeseries import ewm_mean_nb, rolling_mean_nb, fshift_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
 
-__all__ = ['ATR']
-
-
-@njit(f8[:, :](f8[:, :, :]), cache=True)
-def nanmax_cube_axis0_nb(a):
-    b = np.empty((a.shape[1], a.shape[2]), dtype=a.dtype)
-    for i in range(a.shape[1]):
-        for j in range(a.shape[2]):
-            b[i, j] = np.nanmax(a[:, i, j])
-    return b
+from vectorbt import utils, timeseries, indicators
 
 
 @njit(Tuple((f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])))(f8[:, :], f8[:, :], f8[:, :], i8[:], b1[:]), cache=True)
 def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
+    """Numba-compiled caching function for `ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_func_nb
     tr0 = high_ts - low_ts
-    tr1 = np.abs(high_ts - fshift_nb(close_ts, 1))
-    tr2 = np.abs(low_ts - fshift_nb(close_ts, 1))
-    tr = nanmax_cube_axis0_nb(np.stack((tr0, tr1, tr2)))
+    tr1 = np.abs(high_ts - timeseries.nb.fshift_nb(close_ts, 1))
+    tr2 = np.abs(low_ts - timeseries.nb.fshift_nb(close_ts, 1))
+    tr = timeseries.nb.nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
 
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                atr = ewm_mean_nb(tr, windows[i])
+                atr = timeseries.nb.ewm_mean_nb(tr, windows[i])
             else:
-                atr = rolling_mean_nb(tr, windows[i])
+                atr = timeseries.nb.rolling_mean_nb(tr, windows[i])
             cache_dict[(windows[i], int(ewms[i]))] = atr
     return tr, cache_dict
 
 
 @njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, b1, f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
 def atr_apply_func_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
+    """Numba-compiled apply function for `ATR`."""
     return tr, cache_dict[(window, int(ewm))]
 
 
-ATR = IndicatorFactory(
+ATR = indicators.factory.IndicatorFactory(
     ts_names=['close_ts', 'high_ts', 'low_ts'],
     param_names=['window', 'ewm'],
     output_names=['tr', 'atr'],
@@ -70,7 +61,7 @@ class ATR(ATR):
                 Defaults to 14.
             ewm (bool or array_like): If True, uses exponential moving average, otherwise 
                 simple moving average. Can be one or more values. Defaults to True.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             ATR
         Examples:
@@ -129,8 +120,8 @@ class ATR(ATR):
             ```
 
             ![](img/ATR.png)"""
-        check_type(self.tr, pd.Series)
-        check_type(self.atr, pd.Series)
+        utils.assert_type(self.tr, pd.Series)
+        utils.assert_type(self.atr, pd.Series)
 
         tr_trace_kwargs = {**dict(
             name=f'TR ({self.name})'
@@ -145,4 +136,4 @@ class ATR(ATR):
         return fig
 
 
-fix_class_for_pdoc(ATR)
+utils.fix_class_for_pdoc(ATR)

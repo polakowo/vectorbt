@@ -7,39 +7,39 @@ See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscil
 Use `Stochastic.from_params` methods to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
-from vectorbt.timeseries import rolling_min_nb, rolling_max_nb, ewm_mean_nb, rolling_mean_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
 
-__all__ = ['Stochastic']
+from vectorbt import utils, timeseries, indicators
 
 
 @njit(DictType(i8, UniTuple(f8[:, :], 2))(f8[:, :], f8[:, :], f8[:, :], i8[:], i8[:], b1[:]), cache=True)
 def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
+    """Numba-compiled caching function for `Stochastic`."""
     cache_dict = dict()
     for i in range(k_windows.shape[0]):
         if k_windows[i] not in cache_dict:
-            roll_min = rolling_min_nb(low_ts, k_windows[i])
-            roll_max = rolling_max_nb(high_ts, k_windows[i])
+            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i])
+            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i])
             cache_dict[k_windows[i]] = roll_min, roll_max
     return cache_dict
 
 
 @njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, i8, b1, DictType(i8, UniTuple(f8[:, :], 2))), cache=True)
 def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
+    """Numba-compiled apply function for `Stochastic`."""
     roll_min, roll_max = cache_dict[k_window]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
     if d_ewm:
-        percent_d = ewm_mean_nb(percent_k, d_window)
+        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window)
     else:
-        percent_d = rolling_mean_nb(percent_k, d_window)
+        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window)
     percent_d[:k_window+d_window-2, :] = np.nan  # min_periods
     return percent_k, percent_d
 
 
-Stochastic = IndicatorFactory(
+Stochastic = indicators.factory.IndicatorFactory(
     ts_names=['close_ts', 'high_ts', 'low_ts'],
     param_names=['k_window', 'd_window', 'd_ewm'],
     output_names=['percent_k', 'percent_d'],
@@ -63,7 +63,7 @@ class Stochastic(Stochastic):
                 Defaults to 3.
             d_ewm (bool or array_like): If True, uses exponential moving average for %D, otherwise 
                 simple moving average. Can be one or more values. Defaults to False.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             Stochastic
         Examples:
@@ -132,8 +132,8 @@ class Stochastic(Stochastic):
             ```
 
             ![](img/Stochastic.png)"""
-        check_type(self.percent_k, pd.Series)
-        check_type(self.percent_d, pd.Series)
+        utils.assert_type(self.percent_k, pd.Series)
+        utils.assert_type(self.percent_d, pd.Series)
 
         percent_k_trace_kwargs = {**dict(
             name=f'%K ({self.name})'
@@ -165,4 +165,4 @@ class Stochastic(Stochastic):
         return fig
 
 
-fix_class_for_pdoc(Stochastic)
+utils.fix_class_for_pdoc(Stochastic)
