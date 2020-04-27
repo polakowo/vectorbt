@@ -8,44 +8,45 @@ See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp
 Use `RSI.from_params` methods to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
-from vectorbt.timeseries import ewm_mean_nb, rolling_mean_nb, diff_nb, set_by_mask_nb, prepend_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
 
-__all__ = ['RSI']
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(DictType(UniTuple(i8, 2), UniTuple(f8[:, :], 2))(f8[:, :], i8[:], b1[:]), cache=True)
 def rsi_caching_nb(ts, windows, ewms):
-    delta = diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
+    """Numba-compiled caching function for `RSI`."""
+    delta = timeseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
-    up = set_by_mask_nb(up, up < 0, 0)
-    down = np.abs(set_by_mask_nb(down, down > 0, 0))
+    up = timeseries.nb.set_by_mask_nb(up, up < 0, 0)
+    down = np.abs(timeseries.nb.set_by_mask_nb(down, down > 0, 0))
     # Cache
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                roll_up = ewm_mean_nb(up, windows[i])
-                roll_down = ewm_mean_nb(down, windows[i])
+                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i])
+                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i])
             else:
-                roll_up = rolling_mean_nb(up, windows[i])
-                roll_down = rolling_mean_nb(down, windows[i])
-            roll_up = prepend_nb(roll_up, 1, np.nan)  # bring to old shape
-            roll_down = prepend_nb(roll_down, 1, np.nan)
+                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i])
+                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i])
+            roll_up = timeseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
+            roll_down = timeseries.nb.prepend_nb(roll_down, 1, np.nan)
             cache_dict[(windows[i], int(ewms[i]))] = roll_up, roll_down
     return cache_dict
 
 
 @njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), UniTuple(f8[:, :], 2))), cache=True)
 def rsi_apply_func_nb(ts, window, ewm, cache_dict):
+    """Numba-compiled apply function for `RSI`."""
     roll_up, roll_down = cache_dict[(window, int(ewm))]
     return 100 - 100 / (1 + roll_up / roll_down)
 
 
-RSI = IndicatorFactory(
+RSI = indicators.factory.IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['rsi'],
@@ -63,7 +64,7 @@ class RSI(RSI):
             window (int or array_like): Size of the moving window. Can be one or more values. Defaults to 14.
             ewm (bool or array_like): If True, uses exponential moving average, otherwise 
                 simple moving average. Can be one or more values. Defaults to False.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             RSI
         Examples:
@@ -106,7 +107,7 @@ class RSI(RSI):
             ```
 
             ![](img/RSI.png)"""
-        check_type(self.rsi, pd.Series)
+        checks.assert_type(self.rsi, pd.Series)
 
         rsi_trace_kwargs = {**dict(
             name=f'RSI ({self.name})'
@@ -133,4 +134,4 @@ class RSI(RSI):
         return fig
 
 
-fix_class_for_pdoc(RSI)
+common.fix_class_for_pdoc(RSI)

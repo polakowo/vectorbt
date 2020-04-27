@@ -6,34 +6,36 @@ See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp
 Use `MA.from_params` or `MA.from_combinations` methods to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
-from vectorbt.timeseries import ewm_mean_nb, rolling_mean_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
+import itertools
 
-__all__ = ['MA']
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common, reshape_fns
 
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
 def ma_caching_nb(ts, windows, ewms):
+    """Numba-compiled caching function for `MA`."""
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                ma = ewm_mean_nb(ts, windows[i])
+                ma = timeseries.nb.ewm_mean_nb(ts, windows[i])
             else:
-                ma = rolling_mean_nb(ts, windows[i])
+                ma = timeseries.nb.rolling_mean_nb(ts, windows[i])
             cache_dict[(windows[i], int(ewms[i]))] = ma
     return cache_dict
 
 
 @njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
 def ma_apply_func_nb(ts, window, ewm, cache_dict):
+    """Numba-compiled apply function for `MA`."""
     return cache_dict[(window, int(ewm))]
 
 
-MA = IndicatorFactory(
+MA = indicators.factory.IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['ma'],
@@ -51,7 +53,7 @@ class MA(MA):
             window (int or array_like): Size of the moving window. Can be one or more values.
             ewm (bool or array_like): If True, uses exponential moving average, otherwise 
                 simple moving average. Can be one or more values. Defaults to False.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             MA
         Examples:
@@ -86,7 +88,7 @@ class MA(MA):
             ewm (bool or array_like of bool): If True, uses exponential moving average, otherwise 
                 uses simple moving average. Can be one or more values. Defaults to False.
             names (list of str, optional): A list of names for each `MA` instance.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             tuple of MA
         Examples:
@@ -176,7 +178,7 @@ class MA(MA):
 
         if names is None:
             names = ['ma' + str(i+1) for i in range(r)]
-        windows, ewm = broadcast(windows, ewm, writeable=True)
+        windows, ewm = reshape_fns.broadcast(windows, ewm, writeable=True)
         cache_dict = cls.from_params(ts, windows, ewm=ewm, return_cache=True, **kwargs)
         param_lists = zip(*itertools.combinations(zip(windows, ewm), r))
         mas = []
@@ -205,8 +207,8 @@ class MA(MA):
             ```
 
             ![](img/MA.png)"""
-        check_type(self.ts, pd.Series)
-        check_type(self.ma, pd.Series)
+        checks.assert_type(self.ts, pd.Series)
+        checks.assert_type(self.ma, pd.Series)
 
         ts_trace_kwargs = {**dict(
             name=f'Price ({self.name})'
@@ -221,4 +223,4 @@ class MA(MA):
         return fig
 
 
-fix_class_for_pdoc(MA)
+common.fix_class_for_pdoc(MA)

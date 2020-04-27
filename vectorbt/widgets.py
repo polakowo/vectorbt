@@ -11,21 +11,19 @@ For example, to change the default width:
 ```py
 import vectorbt as vbt
 
-vbt.widgets.layout_defaults['width'] = 800
+vbt.layout_defaults['width'] = 800
 ```"""
 
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 
-from vectorbt.utils import *
-from vectorbt.accessors import *
+from vectorbt import accessors
+from vectorbt.utils import common, checks, reshape_fns
 from collections import namedtuple
 
-__all__ = ['FigureWidget', 'UpdatableFigureWidget', 'Indicator', 'Bar', 'Scatter', 'Histogram', 'Heatmap']
-
-# You can change this from code using vbt.widgets.layout_defaults[key] = value
-layout_defaults = Config(
+# You can change this from code
+layout_defaults = common.Config(
     frozen=False,
     autosize=False,
     width=700,
@@ -124,7 +122,7 @@ class Indicator(UpdatableFigureWidget):
             value (int or float): The value to be displayed.
         """
         # NOTE: If called by Plotly event handler and in case of error, this won't visible in a notebook cell, but in logs!
-        check_type(value, (int, float))
+        checks.assert_type(value, (int, float))
 
         # Update value range
         if self._value_range is None:
@@ -160,18 +158,12 @@ class Bar(UpdatableFigureWidget):
             One trace:
             ```py
             vbt.Bar(['x', 'y'], trace_names='a', data=[1, 2])
-
-            # Or the same directly on pandas
-            pd.Series([1, 2], index=['x', 'y'], name='a').vbt.Bar()
             ```
             ![](img/Bar.png)
 
             Multiple traces:
             ```py
             vbt.Bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
-
-            # Or the same directly on pandas
-            pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Bar()
             ```
             ![](img/Bar_mult.png)
             """
@@ -212,11 +204,11 @@ class Bar(UpdatableFigureWidget):
             ```
             ![](img/Bar_updated.png)
         """
-        if not is_array(data):
+        if not checks.is_array(data):
             data = np.asarray(data)
-        data = to_2d(data)
-        check_same_shape(data, self._x_labels, along_axis=(0, 0))
-        check_same_shape(data, self._trace_names, along_axis=(1, 0))
+        data = reshape_fns.to_2d(data)
+        checks.assert_same_shape(data, self._x_labels, along_axis=(0, 0))
+        checks.assert_same_shape(data, self._trace_names, along_axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -226,9 +218,15 @@ class Bar(UpdatableFigureWidget):
                     bar.marker.color = data[:, i]
 
 
-@register_dataframe_accessor('Bar')
-@register_series_accessor('Bar')
+@accessors.register_dataframe_accessor('Bar')
+@accessors.register_series_accessor('Bar')
 class Bar_Accessor():
+    """
+    Allows calling `Bar` using a pandas accessor function `pandas.vbt.Bar`.
+    ```py
+    pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Bar()
+    ```
+    """
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
 
@@ -236,8 +234,8 @@ class Bar_Accessor():
         if x_labels is None:
             x_labels = self._obj.index
         if trace_names is None:
-            if is_frame(self._obj) or (is_series(self._obj) and self._obj.name is not None):
-                trace_names = to_2d(self._obj).columns
+            if checks.is_frame(self._obj) or (checks.is_series(self._obj) and self._obj.name is not None):
+                trace_names = reshape_fns.to_2d(self._obj).columns
         return Bar(x_labels, trace_names=trace_names, data=self._obj.values, **kwargs)
 
 # ############# Scatter ############# #
@@ -256,9 +254,6 @@ class Scatter(UpdatableFigureWidget):
         Examples:
             ```py
             vbt.Scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
-
-            # Or the same directly on pandas
-            pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Scatter()
             ```
             ![](img/Scatter.png)
             """
@@ -293,11 +288,11 @@ class Scatter(UpdatableFigureWidget):
 
                 Must be of shape (`x_labels`, `trace_names`).
         """
-        if not is_array(data):
+        if not checks.is_array(data):
             data = np.asarray(data)
-        data = to_2d(data)
-        check_same_shape(data, self._x_labels, along_axis=(0, 0))
-        check_same_shape(data, self._trace_names, along_axis=(1, 0))
+        data = reshape_fns.to_2d(data)
+        checks.assert_same_shape(data, self._x_labels, along_axis=(0, 0))
+        checks.assert_same_shape(data, self._trace_names, along_axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -305,9 +300,15 @@ class Scatter(UpdatableFigureWidget):
                 scatter.y = data[:, i]
 
 
-@register_dataframe_accessor('Scatter')
-@register_series_accessor('Scatter')
+@accessors.register_dataframe_accessor('Scatter')
+@accessors.register_series_accessor('Scatter')
 class Scatter_Accessor():
+    """
+    Allows calling `Scatter` using a pandas accessor function `pandas.vbt.Scatter`.
+    ```py
+    pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Scatter()
+    ```
+    """
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
 
@@ -315,8 +316,8 @@ class Scatter_Accessor():
         if x_labels is None:
             x_labels = self._obj.index
         if trace_names is None:
-            if is_frame(self._obj) or (is_series(self._obj) and self._obj.name is not None):
-                trace_names = to_2d(self._obj).columns
+            if checks.is_frame(self._obj) or (checks.is_series(self._obj) and self._obj.name is not None):
+                trace_names = reshape_fns.to_2d(self._obj).columns
         return Scatter(x_labels, trace_names=trace_names, data=self._obj.values, **kwargs)
 
 # ############# Histogram ############# #
@@ -335,9 +336,6 @@ class Histogram(UpdatableFigureWidget):
         Examples:
             ```py
             vbt.Histogram(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
-
-            # Or the same directly on pandas
-            pd.DataFrame({'a': [1, 3, 2], 'b': [2, 4, 1]}).vbt.Histogram()
             ```
             ![](img/Histogram.png)
             """
@@ -373,10 +371,10 @@ class Histogram(UpdatableFigureWidget):
 
                 Must be of shape (any, `trace_names`).
         """
-        if not is_array(data):
+        if not checks.is_array(data):
             data = np.asarray(data)
-        data = to_2d(data)
-        check_same_shape(data, self._trace_names, along_axis=(1, 0))
+        data = reshape_fns.to_2d(data)
+        checks.assert_same_shape(data, self._trace_names, along_axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -389,16 +387,22 @@ class Histogram(UpdatableFigureWidget):
                     histogram.y = None
 
 
-@register_dataframe_accessor('Histogram')
-@register_series_accessor('Histogram')
+@accessors.register_dataframe_accessor('Histogram')
+@accessors.register_series_accessor('Histogram')
 class Histogram_Accessor():
+    """
+    Allows calling `Histogram` using a pandas accessor function `pandas.vbt.Histogram`.
+    ```py
+    pd.DataFrame({'a': [1, 3, 2], 'b': [2, 4, 1]}).vbt.Histogram()
+    ```
+    """
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
 
     def __call__(self, trace_names=None, **kwargs):
         if trace_names is None:
-            if is_frame(self._obj) or (is_series(self._obj) and self._obj.name is not None):
-                trace_names = to_2d(self._obj).columns
+            if checks.is_frame(self._obj) or (checks.is_series(self._obj) and self._obj.name is not None):
+                trace_names = reshape_fns.to_2d(self._obj).columns
         return Histogram(trace_names=trace_names, data=self._obj.values, **kwargs)
 
 
@@ -418,9 +422,6 @@ class Heatmap(UpdatableFigureWidget):
         Examples:
             ```py
             vbt.Heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
-
-            # Or the same directly on pandas
-            pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Heatmap()
             ```
             ![](img/Heatmap.png)
             """
@@ -457,11 +458,11 @@ class Heatmap(UpdatableFigureWidget):
 
                 Must be of shape (`y_labels`, `x_labels`).
         """
-        if not is_array(data):
+        if not checks.is_array(data):
             data = np.asarray(data)
-        data = to_2d(data)
-        check_same_shape(data, self._x_labels, along_axis=(1, 0))
-        check_same_shape(data, self._y_labels, along_axis=(0, 0))
+        data = reshape_fns.to_2d(data)
+        checks.assert_same_shape(data, self._x_labels, along_axis=(1, 0))
+        checks.assert_same_shape(data, self._y_labels, along_axis=(0, 0))
 
         # Update traces
         with self.batch_update():
@@ -472,15 +473,21 @@ class Heatmap(UpdatableFigureWidget):
                 heatmap.z = data
 
 
-@register_dataframe_accessor('Heatmap')
-@register_series_accessor('Heatmap')
+@accessors.register_dataframe_accessor('Heatmap')
+@accessors.register_series_accessor('Heatmap')
 class Heatmap_Accessor():
+    """
+    Allows calling `Heatmap` using a pandas accessor function `pandas.vbt.Heatmap`.
+    ```py
+    pd.DataFrame({'a': [1, 3], 'b': [2, 4]}, index=['x', 'y']).vbt.Heatmap()
+    ```
+    """
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
 
     def __call__(self, x_labels=None, y_labels=None, **kwargs):
         if x_labels is None:
-            x_labels = to_2d(self._obj).columns
+            x_labels = reshape_fns.to_2d(self._obj).columns
         if y_labels is None:
             y_labels = self._obj.index
         return Heatmap(x_labels, y_labels, data=self._obj.values, **kwargs)

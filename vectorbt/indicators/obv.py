@@ -6,16 +6,17 @@ See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolu
 Use `OBV.from_params` methods to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import f8
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.utils import *
 
-__all__ = ['OBV']
+from vectorbt import utils, timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(f8[:, :](f8[:, :], f8[:, :]))
 def obv_custom_func_nb(close_ts, volume_ts):
+    """Numba-compiled custom calculation function for `OBV`."""
     obv = np.full_like(close_ts, np.nan)
     for col in range(close_ts.shape[1]):
         cumsum = 0
@@ -31,10 +32,11 @@ def obv_custom_func_nb(close_ts, volume_ts):
 
 
 def obv_custom_func(close_ts, volume_ts):
+    """Custom calculation function for `OBV`."""
     return obv_custom_func_nb(close_ts.vbt.to_2d_array(), volume_ts.vbt.to_2d_array())
 
 
-OBV = IndicatorFactory(
+OBV = indicators.factory.IndicatorFactory(
     ts_names=['close_ts', 'volume_ts'],
     param_names=[],
     output_names=['obv'],
@@ -50,7 +52,7 @@ class OBV(OBV):
         Args:
             close_ts (pandas_like): The last closing price.
             volume_ts (pandas_like): The volume.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             OBV
         Examples:
@@ -93,7 +95,7 @@ class OBV(OBV):
             ```
 
             ![](img/OBV.png)"""
-        check_type(self.obv, pd.Series)
+        checks.assert_type(self.obv, pd.Series)
 
         obv_trace_kwargs = {**dict(
             name=f'OBV ({self.name})'
@@ -104,4 +106,4 @@ class OBV(OBV):
         return fig
 
 
-fix_class_for_pdoc(OBV)
+common.fix_class_for_pdoc(OBV)

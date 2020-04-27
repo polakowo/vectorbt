@@ -7,26 +7,25 @@ See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp).
 Use `BollingerBands.from_params` method to run the indicator."""
 
 import numpy as np
+import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
-from vectorbt.indicators.ma import ma_caching_nb
-from vectorbt.indicators.mstd import mstd_caching_nb
-from vectorbt.indicators.indicator_factory import IndicatorFactory
-from vectorbt.widgets import layout_defaults
-from vectorbt.utils import *
 
-__all__ = ['BollingerBands']
+from vectorbt import timeseries, indicators, widgets
+from vectorbt.utils import checks, common
 
 
 @njit(UniTuple(DictType(UniTuple(i8, 2), f8[:, :]), 2)(f8[:, :], i8[:], b1[:], f8[:]), cache=True)
 def bb_caching_nb(ts, windows, ewms, alphas):
-    ma_cache_dict = ma_caching_nb(ts, windows, ewms)
-    mstd_cache_dict = mstd_caching_nb(ts, windows, ewms)
+    """Numba-compiled caching function for `BollingerBands`."""
+    ma_cache_dict = indicators.ma.ma_caching_nb(ts, windows, ewms)
+    mstd_cache_dict = indicators.mstd.mstd_caching_nb(ts, windows, ewms)
     return ma_cache_dict, mstd_cache_dict
 
 
 @njit(UniTuple(f8[:, :], 3)(f8[:, :], i8, b1, f8, DictType(UniTuple(i8, 2), f8[:, :]), DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
 def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
+    """Numba-compiled apply function for `BollingerBands`."""
     # Calculate lower, middle and upper bands
     ma = np.copy(ma_cache_dict[(window, int(ewm))])
     mstd = np.copy(mstd_cache_dict[(window, int(ewm))])
@@ -34,7 +33,7 @@ def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
     return ma, ma + alpha * mstd, ma - alpha * mstd
 
 
-BollingerBands = IndicatorFactory(
+BollingerBands = indicators.factory.IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm', 'alpha'],
     output_names=['ma', 'upper_band', 'lower_band'],
@@ -63,7 +62,7 @@ class BollingerBands(BollingerBands):
                 otherwise uses simple moving average and standard deviation. Can be one or more values. 
                 Defaults to False.
             alpha (int, float or array_like): Number of standard deviations. Can be one or more values. Defaults to 2.
-            **kwargs: Keyword arguments passed to `vectorbt.indicators.indicator_factory.from_params_pipeline.`
+            **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             BollingerBands
         Examples:
@@ -183,10 +182,10 @@ class BollingerBands(BollingerBands):
             ```
 
             ![](img/BollingerBands.png)"""
-        check_type(self.ts, pd.Series)
-        check_type(self.ma, pd.Series)
-        check_type(self.upper_band, pd.Series)
-        check_type(self.lower_band, pd.Series)
+        checks.assert_type(self.ts, pd.Series)
+        checks.assert_type(self.ma, pd.Series)
+        checks.assert_type(self.upper_band, pd.Series)
+        checks.assert_type(self.lower_band, pd.Series)
 
         lower_band_trace_kwargs = {**dict(
             name=f'Lower Band ({self.name})',
@@ -202,11 +201,11 @@ class BollingerBands(BollingerBands):
         ), **upper_band_trace_kwargs}  # default kwargs
         ma_trace_kwargs = {**dict(
             name=f'MA ({self.name})',
-            line=dict(color=layout_defaults['colorway'][1])
+            line=dict(color=widgets.layout_defaults['colorway'][1])
         ), **ma_trace_kwargs}
         ts_trace_kwargs = {**dict(
             name=f'Price ({self.name})',
-            line=dict(color=layout_defaults['colorway'][0])
+            line=dict(color=widgets.layout_defaults['colorway'][0])
         ), **ts_trace_kwargs}
 
         fig = self.lower_band.vbt.timeseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
@@ -217,4 +216,4 @@ class BollingerBands(BollingerBands):
         return fig
 
 
-fix_class_for_pdoc(BollingerBands)
+common.fix_class_for_pdoc(BollingerBands)
