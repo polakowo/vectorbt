@@ -11,6 +11,7 @@ from numba import njit
 from numba.types import f8
 
 from vectorbt import utils, timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(f8[:, :](f8[:, :], f8[:, :]))
@@ -94,7 +95,7 @@ class OBV(OBV):
             ```
 
             ![](img/OBV.png)"""
-        utils.assert_type(self.obv, pd.Series)
+        checks.assert_type(self.obv, pd.Series)
 
         obv_trace_kwargs = {**dict(
             name=f'OBV ({self.name})'
@@ -105,4 +106,4 @@ class OBV(OBV):
         return fig
 
 
-utils.fix_class_for_pdoc(OBV)
+common.fix_class_for_pdoc(OBV)

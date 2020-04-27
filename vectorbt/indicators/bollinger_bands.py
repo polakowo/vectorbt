@@ -11,7 +11,8 @@ import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
 
-from vectorbt import utils, timeseries, indicators, widgets
+from vectorbt import timeseries, indicators, widgets
+from vectorbt.utils import checks, common
 
 
 @njit(UniTuple(DictType(UniTuple(i8, 2), f8[:, :]), 2)(f8[:, :], i8[:], b1[:], f8[:]), cache=True)
@@ -181,10 +182,10 @@ class BollingerBands(BollingerBands):
             ```
 
             ![](img/BollingerBands.png)"""
-        utils.assert_type(self.ts, pd.Series)
-        utils.assert_type(self.ma, pd.Series)
-        utils.assert_type(self.upper_band, pd.Series)
-        utils.assert_type(self.lower_band, pd.Series)
+        checks.assert_type(self.ts, pd.Series)
+        checks.assert_type(self.ma, pd.Series)
+        checks.assert_type(self.upper_band, pd.Series)
+        checks.assert_type(self.lower_band, pd.Series)
 
         lower_band_trace_kwargs = {**dict(
             name=f'Lower Band ({self.name})',
@@ -215,4 +216,4 @@ class BollingerBands(BollingerBands):
         return fig
 
 
-utils.fix_class_for_pdoc(BollingerBands)
+common.fix_class_for_pdoc(BollingerBands)

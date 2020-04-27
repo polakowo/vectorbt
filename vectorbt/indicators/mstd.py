@@ -8,7 +8,8 @@ import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
 
-from vectorbt import utils, timeseries, indicators
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
@@ -93,7 +94,7 @@ class MSTD(MSTD):
             ```
 
             ![](img/MSTD.png)"""
-        utils.assert_type(self.mstd, pd.Series)
+        checks.assert_type(self.mstd, pd.Series)
 
         mstd_trace_kwargs = {**dict(
             name=f'MSTD ({self.name})'
@@ -104,4 +105,4 @@ class MSTD(MSTD):
         return fig
 
 
-utils.fix_class_for_pdoc(MSTD)
+common.fix_class_for_pdoc(MSTD)

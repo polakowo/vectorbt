@@ -11,7 +11,8 @@ from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
 import plotly.graph_objects as go
 
-from vectorbt import utils, timeseries, indicators
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], i8[:], i8[:], b1[:], b1[:]), cache=True)
@@ -186,9 +187,9 @@ class MACD(MACD):
             ```
 
             ![](img/MACD.png)"""
-        utils.assert_type(self.macd, pd.Series)
-        utils.assert_type(self.signal, pd.Series)
-        utils.assert_type(self.histogram, pd.Series)
+        checks.assert_type(self.macd, pd.Series)
+        checks.assert_type(self.signal, pd.Series)
+        checks.assert_type(self.histogram, pd.Series)
 
         macd_trace_kwargs = {**dict(
             name=f'MACD ({self.name})'
@@ -227,4 +228,4 @@ class MACD(MACD):
         return fig
 
 
-utils.fix_class_for_pdoc(MACD)
+common.fix_class_for_pdoc(MACD)

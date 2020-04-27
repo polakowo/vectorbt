@@ -10,7 +10,8 @@ import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType, Tuple
 
-from vectorbt import utils, timeseries, indicators
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(Tuple((f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])))(f8[:, :], f8[:, :], f8[:, :], i8[:], b1[:]), cache=True)
@@ -120,8 +121,8 @@ class ATR(ATR):
             ```
 
             ![](img/ATR.png)"""
-        utils.assert_type(self.tr, pd.Series)
-        utils.assert_type(self.atr, pd.Series)
+        checks.assert_type(self.tr, pd.Series)
+        checks.assert_type(self.atr, pd.Series)
 
         tr_trace_kwargs = {**dict(
             name=f'TR ({self.name})'
@@ -136,4 +137,4 @@ class ATR(ATR):
         return fig
 
 
-utils.fix_class_for_pdoc(ATR)
+common.fix_class_for_pdoc(ATR)

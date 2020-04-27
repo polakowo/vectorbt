@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from numba.targets.registry import CPUDispatcher
 
-from vectorbt.utils import reshape
+from vectorbt.utils import reshape_fns
 
 # ############# Checks ############# #
 
@@ -140,7 +140,7 @@ def assert_same_meta(arg1, arg2, assert_dtype=True):
     assert_same_shape(arg1, arg2)
     if is_pandas(arg1) or is_pandas(arg2):
         assert_same_index(arg1, arg2)
-        assert_same_columns(reshape.to_2d(arg1), reshape.to_2d(arg2))
+        assert_same_columns(reshape_fns.to_2d(arg1), reshape_fns.to_2d(arg2))
     if is_array_like(arg1) or is_array_like(arg2):
         if assert_dtype:
             assert_same_dtype(arg1, arg2)

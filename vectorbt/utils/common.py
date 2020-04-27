@@ -16,7 +16,7 @@ class Config(dict):
         self.default_config = dict(self)
         for key, value in dict.items(self):
             if isinstance(value, dict):
-                dict.__setitem__(self, key, Config(value))
+                dict.__setitem__(self, key, Config(value, frozen=frozen))
 
     def __setitem__(self, key, val):
         if self.frozen and key not in self:

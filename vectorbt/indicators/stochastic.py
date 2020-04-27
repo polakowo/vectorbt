@@ -11,7 +11,8 @@ import pandas as pd
 from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
 
-from vectorbt import utils, timeseries, indicators
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common
 
 
 @njit(DictType(i8, UniTuple(f8[:, :], 2))(f8[:, :], f8[:, :], f8[:, :], i8[:], i8[:], b1[:]), cache=True)
@@ -132,8 +133,8 @@ class Stochastic(Stochastic):
             ```
 
             ![](img/Stochastic.png)"""
-        utils.assert_type(self.percent_k, pd.Series)
-        utils.assert_type(self.percent_d, pd.Series)
+        checks.assert_type(self.percent_k, pd.Series)
+        checks.assert_type(self.percent_d, pd.Series)
 
         percent_k_trace_kwargs = {**dict(
             name=f'%K ({self.name})'
@@ -165,4 +166,4 @@ class Stochastic(Stochastic):
         return fig
 
 
-utils.fix_class_for_pdoc(Stochastic)
+common.fix_class_for_pdoc(Stochastic)

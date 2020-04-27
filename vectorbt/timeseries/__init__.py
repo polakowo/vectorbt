@@ -3,12 +3,13 @@ import pandas as pd
 import plotly.graph_objects as go
 import itertools
 
-from vectorbt import utils, accessors
+from vectorbt import accessors, utils
+from vectorbt.utils import common, checks, reshape_fns, index_fns
 from vectorbt.timeseries import nb
 from vectorbt.widgets import FigureWidget
 
 
-@utils.common.add_safe_nb_methods(
+@common.add_safe_nb_methods(
     nb.fillna_nb,
     nb.fshift_nb,
     nb.diff_nb,
@@ -31,7 +32,7 @@ class TimeSeries_Accessor():
     @classmethod
     def _validate(cls, obj):
         if cls.dtype is not None:
-            utils.assert_dtype(obj, cls.dtype)
+            checks.assert_dtype(obj, cls.dtype)
 
     def groupby_apply(self, by, apply_func_nb, on_2d=False):
         groups, applied = nb.groupby_apply_nb(self.to_2d_array(), by, apply_func_nb, on_2d=on_2d)
@@ -39,10 +40,10 @@ class TimeSeries_Accessor():
 
     def resample_apply(self, freq, apply_func_nb, on_2d=False, **kwargs):
         resampled = self._obj.resample(freq, **kwargs)
-        # Build a mask that acts as a map between new and old indexes
-        # It works on resampled.indexes instead of resampled.groups, so there is no redundancy
+        # Build a mask that acts as a map between new and old index
+        # It works on resampled.indices instead of resampled.groups, so there is no redundancy
         maxlen = self._obj.shape[0]
-        ll = list(resampled.indexes.values())
+        ll = list(resampled.indices.values())
         mask = np.full((len(ll), maxlen), False, bool)
         mask_idxs = np.array(list(itertools.zip_longest(*ll, fillvalue=np.nan))).T
         mask_idxs = (np.arange(mask_idxs.shape[0])[:, None] * maxlen + mask_idxs).flatten()
@@ -50,10 +51,10 @@ class TimeSeries_Accessor():
         mask_idxs = mask_idxs.astype(int)
         mask_idxs = np.unravel_index(mask_idxs.astype(int), mask.shape)
         mask[mask_idxs] = True
-        # Apply a function on each group of values from the old dataframe indexed by new mask
+        # Apply a function on each group of values from the old dataframe index by new mask
         applied = nb.apply_by_mask_nb(self.to_2d_array(), mask, apply_func_nb, on_2d=on_2d)
         # Finally, map output to the new dataframe using resampled.groups
-        applied_obj = self.wrap_array(applied, index=list(resampled.indexes.keys()))
+        applied_obj = self.wrap_array(applied, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrap_array(resampled_arr, index=pd.Index(list(resampled.groups.keys()), freq=freq))
         resampled_obj.loc[applied_obj.index] = applied_obj.values
@@ -68,7 +69,7 @@ class TimeSeries_Accessor():
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
         range_columns = pd.Index(self._obj.index[idxs], name='start_date')
-        new_columns = utils.combine(range_columns, utils.to_2d(self._obj).columns)
+        new_columns = index_fns.combine(range_columns, reshape_fns.to_2d(self._obj).columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
 

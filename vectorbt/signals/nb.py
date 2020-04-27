@@ -1,7 +1,8 @@
 from numba.types.containers import UniTuple
 from numba import njit, f8, i8, b1, optional
 import numpy as np
-from vectorbt import timeseries, utils
+from vectorbt import timeseries
+from vectorbt.utils import combine_fns
 
 # ############# Random signal generation ############# #
 
@@ -301,4 +302,4 @@ def apply_stop_loss_nb(i, entries, ts, stops, relative, only_first, trailing):
 @njit(b1[:, :](b1[:, :], f8[:, :], f8[:, :, :], b1, b1, b1), cache=True)
 def stop_loss_exits_nb(entries, ts, stops, relative, only_first, trailing):
     """Calculate exit signals based on stop loss strategy."""
-    return utils.apply_and_concat_one_nb(len(stops), apply_stop_loss_nb, entries, ts, stops, relative, only_first, trailing)
+    return combine_fns.apply_and_concat_one_nb(len(stops), apply_stop_loss_nb, entries, ts, stops, relative, only_first, trailing)

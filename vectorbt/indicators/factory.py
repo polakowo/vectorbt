@@ -207,29 +207,30 @@ import numpy as np
 import pandas as pd
 from numba import njit
 from numba.typed import List
+import itertools
 
-from vectorbt import utils
+from vectorbt.utils import checks, index_fns, reshape_fns, indexing, common, combine_fns
 
 
 def build_column_hierarchy(param_list, level_names, ts_columns):
     """For each parameter in `param_list`, create a new column level with parameter values. 
     Combine this level with columns `ts_columns` using Cartesian product."""
-    utils.assert_same_shape(param_list, level_names, along_axis=0)
-    param_indexes = [utils.from_values(param_list[i], name=level_names[i]) for i in range(len(param_list))]
+    checks.assert_same_shape(param_list, level_names, along_axis=0)
+    param_indexes = [index_fns.from_values(param_list[i], name=level_names[i]) for i in range(len(param_list))]
     param_columns = None
     for param_index in param_indexes:
         if param_columns is None:
             param_columns = param_index
         else:
-            param_columns = utils.stack(param_columns, param_index)
+            param_columns = index_fns.stack(param_columns, param_index)
     if param_columns is not None:
-        return utils.combine(param_columns, ts_columns)
+        return index_fns.combine(param_columns, ts_columns)
     return ts_columns
 
 
 def build_mapper(params, ts, new_columns, level_name):
     """Build a mapper that maps parameter values in `params` to columns in `new_columns`."""
-    params_mapper = np.repeat(params, len(utils.to_2d(ts).columns))
+    params_mapper = np.repeat(params, len(reshape_fns.to_2d(ts).columns))
     params_mapper = pd.Series(params_mapper, index=new_columns, name=level_name)
     return params_mapper
 
@@ -248,8 +249,8 @@ def wrap_output(output, ts, new_columns):
 
 def broadcast_ts(ts, params_len, new_columns):
     """Broadcast time series `ts` to match the length of `new_columns` through tiling."""
-    if utils.is_series(ts) or len(new_columns) > ts.shape[1]:
-        return ts.vbt.wrap_array(utils.tile(ts.values, params_len, along_axis=1), columns=new_columns)
+    if checks.is_series(ts) or len(new_columns) > ts.shape[1]:
+        return ts.vbt.wrap_array(reshape_fns.tile(ts.values, params_len, along_axis=1), columns=new_columns)
     else:
         return ts.vbt.wrap_array(ts, columns=new_columns)
 
@@ -267,7 +268,7 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
     >>> ts_list = [sr, df]
 
-    >>> ts_list = vbt.utils.broadcast(*ts_list)
+    >>> ts_list = vbt.utils.reshape_fns.broadcast(*ts_list)
     >>> print(ts_list[0])
        a  b
     x  1  1
@@ -285,7 +286,7 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     >>> p1, p2, p3 = 1, [2, 3, 4], [False]
     >>> param_list = [p1, p2, p3]
 
-    >>> param_list = vbt.utils.broadcast(*param_list)
+    >>> param_list = vbt.utils.reshape_fns.broadcast(*param_list)
     >>> print(param_list[0])
     array([1, 1, 1])
     >>> print(param_list[1])
@@ -317,8 +318,8 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     >>> p1_columns = pd.Index(param_list[0], name='p1')
     >>> p2_columns = pd.Index(param_list[1], name='p2')
     >>> p3_columns = pd.Index(param_list[2], name='p3')
-    >>> p_columns = vbt.utils.stack(p1_columns, p2_columns, p3_columns)
-    >>> new_columns = vbt.utils.combine(p_columns, ts_list[0].columns)
+    >>> p_columns = vbt.utils.index_fns.stack(p1_columns, p2_columns, p3_columns)
+    >>> new_columns = vbt.utils.index_fns.combine(p_columns, ts_list[0].columns)
 
     >>> output_df = pd.DataFrame(output, columns=new_columns)
     >>> print(output_df)
@@ -361,7 +362,8 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
         *args: Arguments passed to the `custom_func`.
         pass_lists (bool): If True, arguments are passed to the `custom_func` as lists. Defaults to False.
         param_product (bool): If True, builds a Cartesian product out of all parameters. Defaults to False.
-        broadcast_kwargs (dict, optional): Keyword arguments passed to the `vectorbt.utils.broadcast` on time series objects.
+        broadcast_kwargs (dict, optional): Keyword arguments passed to the `vectorbt.utils.reshape_fns.broadcast` 
+            on time series objects.
         return_raw (bool): If True, returns the raw output without post-processing. Defaults to False.
         **kwargs: Keyword arguments passed to the `custom_func`.
 
@@ -374,30 +376,30 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
         a list of other generated outputs that are outside of  `num_outputs`.
     """
     # Check time series objects
-    utils.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
+    checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
     for i in range(1, len(ts_list)):
         ts_list[i].vbt.timeseries.validate()
     if len(ts_list) > 1:
         # Broadcast time series
-        ts_list = utils.broadcast(*ts_list, **broadcast_kwargs, writeable=True)
+        ts_list = reshape_fns.broadcast(*ts_list, **broadcast_kwargs, writeable=True)
     # Check level names
-    utils.assert_type(level_names, (list, tuple))
-    utils.assert_same_len(param_list, level_names)
+    checks.assert_type(level_names, (list, tuple))
+    checks.assert_same_len(param_list, level_names)
     for ts in ts_list:
         # Every time series object should be free of the specified level names in its columns
         for level_name in level_names:
-            utils.assert_level_not_exists(ts, level_name)
+            checks.assert_level_not_exists(ts, level_name)
     # Convert params to 1-dim arrays
-    param_list = list(map(utils.to_1d, param_list))
+    param_list = list(map(reshape_fns.to_1d, param_list))
     if len(param_list) > 1:
         if param_product:
             # Make Cartesian product out of all params
-            param_list = list(map(utils.to_1d, param_list))
+            param_list = list(map(reshape_fns.to_1d, param_list))
             param_list = list(zip(*list(itertools.product(*param_list))))
             param_list = list(map(np.asarray, param_list))
         else:
             # Broadcast such that each array has the same length
-            param_list = utils.broadcast(*param_list, writeable=True)
+            param_list = reshape_fns.broadcast(*param_list, writeable=True)
     # Perform main calculation
     if pass_lists:
         output_list = custom_func(ts_list, param_list, *args, **kwargs)
@@ -418,14 +420,14 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     output_list = output_list[:num_outputs]
     if len(param_list) > 0:
         # Build new column levels on top of time series levels
-        new_columns = build_column_hierarchy(param_list, level_names, utils.to_2d(ts_list[0]).columns)
+        new_columns = build_column_hierarchy(param_list, level_names, reshape_fns.to_2d(ts_list[0]).columns)
         # Wrap into new pandas objects both time series and output objects
         new_ts_list = list(map(lambda x: broadcast_ts(x, param_list[0].shape[0], new_columns), ts_list))
         # Build mappers to easily map between parameters and columns
         mapper_list = [build_mapper(x, ts_list[0], new_columns, level_names[i]) for i, x in enumerate(param_list)]
     else:
         # Some indicators don't have any params
-        new_columns = utils.to_2d(ts_list[0]).columns
+        new_columns = reshape_fns.to_2d(ts_list[0]).columns
         new_ts_list = list(ts_list)
         mapper_list = []
     output_list = list(map(lambda x: wrap_output(x, ts_list[0], new_columns), output_list))
@@ -439,16 +441,16 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
 def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
     """Perform checks on objects created by running or slicing an indicator."""
     for ts in ts_list:
-        utils.assert_type(ts, (pd.Series, pd.DataFrame))
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
     for i in range(1, len(ts_list) + len(output_list)):
-        utils.assert_same_meta((ts_list + output_list)[i-1], (ts_list + output_list)[i])
+        checks.assert_same_meta((ts_list + output_list)[i-1], (ts_list + output_list)[i])
     for i in range(1, len(param_list)):
-        utils.assert_same_shape(param_list[i-1], param_list[i])
+        checks.assert_same_shape(param_list[i-1], param_list[i])
     for mapper in mapper_list:
-        utils.assert_type(mapper, pd.Series)
-        utils.assert_same_index(utils.to_2d(ts_list[0]).iloc[0, :], mapper)
-    utils.assert_type(name, str)
+        checks.assert_type(mapper, pd.Series)
+        checks.assert_same_index(reshape_fns.to_2d(ts_list[0]).iloc[0, :], mapper)
+    checks.assert_type(name, str)
 
 def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None, **kwargs):
     """Compares `obj` to `other` to generate signals.
@@ -459,7 +461,7 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
     For more details, see `vectorbt.utils.Base_Accessor.combine_with`."""
     if multiple:
         if as_columns is None:
-            as_columns = utils.from_values(other, name=name)
+            as_columns = index_fns.from_values(other, name=name)
         return obj.vbt.combine_with_multiple(other, combine_func=compare_func, as_columns=as_columns, concat=True, **kwargs)
     return obj.vbt.combine_with(other, combine_func=compare_func, **kwargs)
 
@@ -500,9 +502,10 @@ class IndicatorFactory():
             convert all inputs into NumPy arrays, and then pass them to your Numba-compiled function.
 
             Also, in contrast to `IndicatorFactory.from_apply_func`, it's up to you to handle caching
-            and concatenate columns for each parameter (for example, by using `vectorbt.utils.apply_and_concat_one`).
-            Also, you must ensure that each output array has an appropriate number of columns, which
-            is the number of columns in input time series multiplied by the number of parameter values.
+            and concatenate columns for each parameter (for example, by using 
+            `vectorbt.utils.combine_fns.apply_and_concat_one`). Also, you must ensure that each output 
+            array has an appropriate number of columns, which is the number of columns in input time 
+            series multiplied by the number of parameter values.
 
         Args:
             custom_func (function): A function that takes broadcasted time series corresponding 
@@ -523,8 +526,9 @@ class IndicatorFactory():
             ...     return ts1 * p1[i] + arg1, ts2 * p2[i] + arg1
 
             >>> def custom_func(ts1, ts2, p1, p2, *args):
-            ...     return vbt.utils.apply_and_concat_multiple_nb(len(p1), apply_func_nb, 
-            ...         ts1.vbt.to_2d_array(), ts2.vbt.to_2d_array(), p1, p2, *args)
+            ...     return vbt.utils.combine_fns.apply_and_concat_multiple_nb(
+            ...         len(p1), apply_func_nb, ts1.vbt.to_2d_array(), 
+            ...         ts2.vbt.to_2d_array(), p1, p2, *args)
 
             >>> MyInd = vbt.IndicatorFactory(
             ...     ts_names=['ts1', 'ts2'],
@@ -632,26 +636,26 @@ class IndicatorFactory():
                 param_list.append(getattr(obj, f'_{param_name}_array'))
             mapper_list = []
             for param_name in param_names:
-                mapper_list.append(utils.loc_mapper(
+                mapper_list.append(indexing.loc_mapper(
                     getattr(obj, f'_{param_name}_mapper'),
                     getattr(obj, ts_names[0]), loc_pandas_func))
             if len(param_names) > 1:
-                mapper_list.append(utils.loc_mapper(
+                mapper_list.append(indexing.loc_mapper(
                     obj._tuple_mapper, getattr(obj, ts_names[0]), loc_pandas_func))
 
             return obj.__class__(ts_list, output_list, param_list, mapper_list, obj.name)
 
-        CustomIndicator = utils.add_indexing(indexing_func)(CustomIndicator)
+        CustomIndicator = indexing.add_indexing(indexing_func)(CustomIndicator)
         for i, param_name in enumerate(param_names):
-            CustomIndicator = utils.add_param_indexing(param_name, indexing_func)(CustomIndicator)
+            CustomIndicator = indexing.add_param_indexing(param_name, indexing_func)(CustomIndicator)
         if len(param_names) > 1:
-            CustomIndicator = utils.add_param_indexing('tuple', indexing_func)(CustomIndicator)
+            CustomIndicator = indexing.add_param_indexing('tuple', indexing_func)(CustomIndicator)
 
         # Add user-defined properties
         for prop_name, prop in custom_properties.items():
             prop.__name__ = prop_name
             if not isinstance(prop, property):
-                prop = utils.cached_property(prop)
+                prop = common.cached_property(prop)
             setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison methods for all inputs, outputs, and user-defined properties
@@ -751,8 +755,11 @@ class IndicatorFactory():
 
         num_outputs = len(output_names)
 
-        if utils.is_numba_func(apply_func):
-            apply_and_concat_func = utils.apply_and_concat_multiple_nb if num_outputs > 1 else utils.apply_and_concat_one_nb
+        if checks.is_numba_func(apply_func):
+            if num_outputs > 1:
+                apply_and_concat_func = combine_fns.apply_and_concat_multiple_nb
+            else:
+                apply_and_concat_func = combine_fns.apply_and_concat_one_nb
 
             @njit
             def select_params_func_nb(i, apply_func, ts_list, param_tuples, *args):
@@ -785,17 +792,20 @@ class IndicatorFactory():
                     *args,
                     *cache)
         else:
-            apply_and_concat_func = utils.apply_and_concat_multiple if num_outputs > 1 else utils.apply_and_concat_one
+            if num_outputs > 1:
+                apply_and_concat_func = combine_fns.apply_and_concat_multiple
+            else:
+                apply_and_concat_func = combine_fns.apply_and_concat_one
 
             def select_params_func(i, apply_func, ts_list, param_list, *args, **kwargs):
                     # Select the next tuple of parameters
                 param_is = list(map(lambda x: x[i], param_list))
                 return apply_func(*ts_list, *param_is, *args, **kwargs)
 
-            def custom_func(ts_list, param_list, *args, return_cache=False, **kwargs):
+            def custom_func(ts_list, param_list, *args, return_cache=False, cache=None, **kwargs):
                 # Caching
                 if cache is None and caching_func is not None:
-                    cache = caching_func(*typed_ts_list, *param_list, *args, **kwargs)
+                    cache = caching_func(*ts_list, *param_list, *args, **kwargs)
                 if return_cache:
                     return cache
                 if cache is None:

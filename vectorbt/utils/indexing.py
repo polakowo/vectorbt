@@ -4,7 +4,7 @@ from functools import update_wrapper
 import inspect
 from types import FunctionType
 
-from vectorbt.utils import checks, indexes, reshape
+from vectorbt.utils import checks, index_fns, reshape_fns
 
 
 def copy_func(f):
@@ -84,7 +84,7 @@ def add_indexing(indexing_func):
 
 def loc_mapper(mapper, like_df, loc_pandas_func):
     """Broadcast mapper series to a dataframe to perform advanced pandas indexing on it."""
-    df_range_mapper = reshape.broadcast_to(np.arange(len(mapper.index)), like_df, index_from=1, columns_from=1)
+    df_range_mapper = reshape_fns.broadcast_to(np.arange(len(mapper.index)), like_df, index_from=1, columns_from=1)
     loced_range_mapper = loc_pandas_func(df_range_mapper)
     new_mapper = mapper.iloc[loced_range_mapper.values[0]]
     if checks.is_frame(loced_range_mapper):
@@ -142,7 +142,7 @@ def add_param_indexing(param_name, indexing_func):
                         if level_name is not None:
                             if checks.is_frame(new_obj):
                                 if isinstance(new_obj.columns, pd.MultiIndex):
-                                    new_obj.columns = indexes.drop_levels(new_obj.columns, level_name)
+                                    new_obj.columns = index_fns.drop_levels(new_obj.columns, level_name)
                     return new_obj
 
                 return indexing_func(self.obj, loc_pandas_func)

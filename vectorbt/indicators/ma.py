@@ -11,7 +11,8 @@ from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType
 import itertools
 
-from vectorbt import utils, timeseries, indicators
+from vectorbt import timeseries, indicators
+from vectorbt.utils import checks, common, reshape_fns
 
 
 @njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
@@ -177,7 +178,7 @@ class MA(MA):
 
         if names is None:
             names = ['ma' + str(i+1) for i in range(r)]
-        windows, ewm = utils.broadcast(windows, ewm, writeable=True)
+        windows, ewm = reshape_fns.broadcast(windows, ewm, writeable=True)
         cache_dict = cls.from_params(ts, windows, ewm=ewm, return_cache=True, **kwargs)
         param_lists = zip(*itertools.combinations(zip(windows, ewm), r))
         mas = []
@@ -206,8 +207,8 @@ class MA(MA):
             ```
 
             ![](img/MA.png)"""
-        utils.assert_type(self.ts, pd.Series)
-        utils.assert_type(self.ma, pd.Series)
+        checks.assert_type(self.ts, pd.Series)
+        checks.assert_type(self.ma, pd.Series)
 
         ts_trace_kwargs = {**dict(
             name=f'Price ({self.name})'
@@ -222,4 +223,4 @@ class MA(MA):
         return fig
 
 
-utils.fix_class_for_pdoc(MA)
+common.fix_class_for_pdoc(MA)

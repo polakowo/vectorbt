@@ -3,11 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt import utils, timeseries, accessors
+from vectorbt.utils import indexing, checks, common, reshape_fns
 from vectorbt.portfolio import nb
 from vectorbt.widgets import FigureWidget
 
-# You can change default portfolio values from code
-portfolio_defaults = utils.Config(
+# You can change this from code
+portfolio_defaults = common.Config(
     investment=1.,
     slippage=0.,
     commission=0.
@@ -25,15 +26,15 @@ def indexing_func(obj, loc_pandas_func):
     )
 
 
-@utils.add_indexing(indexing_func)
+@indexing.add_indexing(indexing_func)
 class Portfolio():
 
     def __init__(self, ts, cash, shares, investment, slippage, commission):
-        utils.assert_type(ts, (pd.Series, pd.DataFrame))
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
 
-        utils.assert_same_meta(ts, cash)
-        utils.assert_same_meta(ts, shares)
+        checks.assert_same_meta(ts, cash)
+        checks.assert_same_meta(ts, shares)
 
         self.ts = ts
         self.cash = cash
@@ -45,10 +46,10 @@ class Portfolio():
     # ############# Magic methods ############# #
 
     def __add__(self, other):
-        utils.assert_type(other, self.__class__)
-        utils.assert_same(self.ts, other.ts)
-        utils.assert_same(self.slippage, other.slippage)
-        utils.assert_same(self.commission, other.commission)
+        checks.assert_type(other, self.__class__)
+        checks.assert_same(self.ts, other.ts)
+        checks.assert_same(self.slippage, other.slippage)
+        checks.assert_same(self.commission, other.commission)
 
         return self.__class__(
             self.ts,
@@ -78,17 +79,17 @@ class Portfolio():
         if commission is None:
             commission = portfolio_defaults['commission']
 
-        utils.assert_type(ts, (pd.Series, pd.DataFrame))
-        utils.assert_type(entries, (pd.Series, pd.DataFrame))
-        utils.assert_type(exits, (pd.Series, pd.DataFrame))
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
+        checks.assert_type(entries, (pd.Series, pd.DataFrame))
+        checks.assert_type(exits, (pd.Series, pd.DataFrame))
 
         ts.vbt.timeseries.validate()
         entries.vbt.signals.validate()
         exits.vbt.signals.validate()
 
-        ts, entries, exits = utils.broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
+        ts, entries, exits = reshape_fns.broadcast(ts, entries, exits, **broadcast_kwargs, writeable=True)
 
-        volume = utils.broadcast_to(volume, ts, writeable=True, copy_kwargs={'dtype': np.float64})
+        volume = reshape_fns.broadcast_to(volume, ts, writeable=True, copy_kwargs={'dtype': np.float64})
 
         investment = float(investment)
         slippage = float(slippage)
@@ -122,13 +123,13 @@ class Portfolio():
         if commission is None:
             commission = portfolio_defaults['commission']
 
-        utils.assert_type(ts, (pd.Series, pd.DataFrame))
-        utils.assert_type(orders, (pd.Series, pd.DataFrame))
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
+        checks.assert_type(orders, (pd.Series, pd.DataFrame))
 
         ts.vbt.timeseries.validate()
         orders.vbt.timeseries.validate()
 
-        ts, orders = utils.broadcast(ts, orders, **broadcast_kwargs, writeable=True)
+        ts, orders = reshape_fns.broadcast(ts, orders, **broadcast_kwargs, writeable=True)
 
         investment = float(investment)
         slippage = float(slippage)
@@ -157,7 +158,7 @@ class Portfolio():
         if commission is None:
             commission = portfolio_defaults['commission']
 
-        utils.assert_type(ts, (pd.Series, pd.DataFrame))
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
 
         investment = float(investment)
@@ -179,55 +180,55 @@ class Portfolio():
 
     # ############# General properties ############# #
 
-    @utils.common.cached_property
+    @common.cached_property
     def equity(self):
         return self.ts.vbt.wrap_array(self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array())
 
-    @utils.common.cached_property
+    @common.cached_property
     def equity_in_shares(self):
         return self.ts.vbt.wrap_array(self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array())
 
-    @utils.common.cached_property
+    @common.cached_property
     def returns(self):
         return self.ts.vbt.wrap_array(timeseries.nb.pct_change_nb(self.equity.vbt.to_2d_array()))
 
-    @utils.common.cached_property
+    @common.cached_property
     def drawdown(self):
         drawdown = 1 - self.equity.vbt.to_2d_array() / timeseries.nb.expanding_max_nb(self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(drawdown)
 
-    @utils.common.cached_property
+    @common.cached_property
     def trades(self):
         shares = self.shares.vbt.to_2d_array()
         trades = timeseries.nb.fillna_nb(timeseries.nb.diff_nb(shares), 0)
         trades[0, :] = shares[0, :]
         return self.ts.vbt.wrap_array(trades)
 
-    @utils.common.cached_property
+    @common.cached_property
     def position_profits(self):
         position_profits = nb.position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_profits)
 
-    @utils.common.cached_property
+    @common.cached_property
     def position_returns(self):
         position_returns = nb.position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_returns)
 
-    @utils.common.cached_property
+    @common.cached_property
     def win_mask(self):
         position_profits = self.position_profits.vbt.to_2d_array().copy()
         position_profits[np.isnan(position_profits)] = 0  # avoid warnings
         win_mask = position_profits > 0
         return self.ts.vbt.wrap_array(win_mask)
 
-    @utils.common.cached_property
+    @common.cached_property
     def loss_mask(self):
         position_profits = self.position_profits.vbt.to_2d_array().copy()
         position_profits[np.isnan(position_profits)] = 0
         loss_mask = position_profits < 0
         return self.ts.vbt.wrap_array(loss_mask)
 
-    @utils.common.cached_property
+    @common.cached_property
     def position_mask(self):
         position_mask = ~np.isnan(self.position_profits.vbt.to_2d_array())
         return self.ts.vbt.wrap_array(position_mask)
@@ -235,77 +236,77 @@ class Portfolio():
     # ############# Performance metrics ############# #
 
     def wrap_metric(self, a):
-        if utils.is_frame(self.ts):
+        if checks.is_frame(self.ts):
             return pd.Series(a, index=self.ts.columns)
         # Single value
-        if utils.is_array(a):
+        if checks.is_array(a):
             return a[0]
         return a
 
-    @utils.common.cached_property
+    @common.cached_property
     def sum_win(self):
         """Sum of wins."""
         sum_win = nb.sum_win_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(sum_win)
 
-    @utils.common.cached_property
+    @common.cached_property
     def sum_loss(self):
         """Sum of losses (always positive)."""
         sum_loss = nb.sum_loss_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(sum_loss)
 
-    @utils.common.cached_property
+    @common.cached_property
     def avg_win(self):
         """Average win."""
         avg_win = nb.avg_win_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(avg_win)
 
-    @utils.common.cached_property
+    @common.cached_property
     def avg_loss(self):
         """Average loss (always positive)."""
         avg_loss = nb.avg_loss_nb(self.position_profits.vbt.to_2d_array())
         return self.wrap_metric(avg_loss)
 
-    @utils.common.cached_property
+    @common.cached_property
     def win_rate(self):
         """Fraction of wins."""
         win_rate = np.sum(self.win_mask.vbt.to_2d_array(), axis=0) / \
             np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
         return self.wrap_metric(win_rate)
 
-    @utils.common.cached_property
+    @common.cached_property
     def loss_rate(self):
         """Fraction of losses."""
         loss_rate = np.sum(self.loss_mask.vbt.to_2d_array(), axis=0) / \
             np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
         return self.wrap_metric(loss_rate)
 
-    @utils.common.cached_property
+    @common.cached_property
     def profit_factor(self):
-        profit_factor = utils.to_1d(self.sum_win, raw=True) / utils.to_1d(self.sum_loss, raw=True)
+        profit_factor = reshape_fns.to_1d(self.sum_win, raw=True) / reshape_fns.to_1d(self.sum_loss, raw=True)
         return self.wrap_metric(profit_factor)
 
-    @utils.common.cached_property
+    @common.cached_property
     def appt(self):
         """Average profitability per trade (APPT)
 
         For every trade you place, you are likely to win/lose this amount.
         What matters is that your APPT comes up positive."""
-        appt = utils.to_1d(self.win_rate, raw=True) * utils.to_1d(self.avg_win, raw=True) - \
-            utils.to_1d(self.loss_rate, raw=True) * utils.to_1d(self.avg_loss, raw=True)
+        appt = reshape_fns.to_1d(self.win_rate, raw=True) * reshape_fns.to_1d(self.avg_win, raw=True) - \
+            reshape_fns.to_1d(self.loss_rate, raw=True) * reshape_fns.to_1d(self.avg_loss, raw=True)
         return self.wrap_metric(appt)
 
-    @utils.common.cached_property
+    @common.cached_property
     def total_profit(self):
         total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.investment
         return self.wrap_metric(total_profit)
 
-    @utils.common.cached_property
+    @common.cached_property
     def total_return(self):
-        total_return = utils.to_1d(self.total_profit, raw=True) / self.investment
+        total_return = reshape_fns.to_1d(self.total_profit, raw=True) / self.investment
         return self.wrap_metric(total_return)
 
-    @utils.common.cached_property
+    @common.cached_property
     def mdd(self):
         """A maximum drawdown (MDD) is the maximum observed loss from a peak 
         to a trough of a portfolio, before a new peak is attained."""
@@ -319,8 +320,8 @@ class Portfolio():
                     sell_trace_kwargs={},
                     fig=None,
                     **ts_kwargs):
-        utils.assert_type(self.ts, pd.Series)
-        utils.assert_type(self.trades, pd.Series)
+        checks.assert_type(self.ts, pd.Series)
+        checks.assert_type(self.trades, pd.Series)
         sell_mask = self.trades < 0
         buy_mask = self.trades > 0
 
@@ -366,7 +367,7 @@ class Portfolio():
                               loss_trace_kwargs={},
                               fig=None,
                               **layout_kwargs):
-        utils.assert_type(self.position_profits, pd.Series)
+        checks.assert_type(self.position_profits, pd.Series)
         profits = self.position_profits.copy()
         profits[self.position_profits <= 0] = np.nan
         losses = self.position_profits.copy()

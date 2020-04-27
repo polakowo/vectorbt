@@ -3,11 +3,12 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt import utils, accessors, timeseries
+from vectorbt.utils import common, checks, reshape_fns, index_fns
 from vectorbt.signals import nb
 from vectorbt.widgets import FigureWidget
 
 
-@utils.add_safe_nb_methods(
+@common.add_safe_nb_methods(
     nb.shuffle_nb,
     nb.fshift_nb)
 class Signals_Accessor():
@@ -16,10 +17,10 @@ class Signals_Accessor():
     @classmethod
     def _validate(cls, obj):
         if cls.dtype is not None:
-            utils.assert_dtype(obj, cls.dtype)
+            checks.assert_dtype(obj, cls.dtype)
 
     def random_exits(self, n, every_nth=1, seed=None):
-        return self.wrap_array(nb.random_exits_nb(self.to_2d_array(), utils.to_1d(n), every_nth, seed))
+        return self.wrap_array(nb.random_exits_nb(self.to_2d_array(), reshape_fns.to_1d(n), every_nth, seed))
 
     def random_exits_by_func(self, choice_func_nb, *args, seed=None):
         return self.wrap_array(nb.random_exits_by_func_nb(self.to_2d_array(), choice_func_nb, seed, *args))
@@ -29,11 +30,11 @@ class Signals_Accessor():
 
     def stop_loss_exits(self, ts, stops, relative=True, only_first=True, trailing=False, as_columns=None, broadcast_kwargs={}):
         entries = self._obj
-        utils.assert_type(ts, (pd.Series, pd.DataFrame))
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
 
-        entries, ts = utils.broadcast(entries, ts, **broadcast_kwargs, writeable=True)
-        stops = utils.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
+        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs, writeable=True)
+        stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
         stops = stops.astype(np.float64)
 
         exits = nb.stop_loss_exits_nb(
@@ -46,8 +47,8 @@ class Signals_Accessor():
             param_columns = as_columns
         else:
             name = 'trail_stop' if trailing else 'stop_loss'
-            param_columns = utils.from_values(stops, name=name)
-        columns = utils.combine(param_columns, utils.to_2d(entries).columns)
+            param_columns = index_fns.from_values(stops, name=name)
+        columns = index_fns.combine(param_columns, reshape_fns.to_2d(entries).columns)
         return entries.vbt.wrap_array(exits, columns=columns)
 
     def AND(self, *others):
@@ -60,13 +61,13 @@ class Signals_Accessor():
     def XOR(self, *others):
         return self.combine_with_multiple(others, combine_func=np.logical_xor)
 
-    @utils.cached_property
+    @common.cached_property
     def num_signals(self):
         return self._obj.sum(axis=0)
 
-    @utils.cached_property
+    @common.cached_property
     def avg_distance(self):
-        sr = pd.Series(nb.avg_distance_nb(self.to_2d_array()), index=utils.to_2d(self._obj).columns)
+        sr = pd.Series(nb.avg_distance_nb(self.to_2d_array()), index=reshape_fns.to_2d(self._obj).columns)
         if isinstance(self._obj, pd.Series):
             return sr.iloc[0]
         return sr
@@ -75,25 +76,25 @@ class Signals_Accessor():
         return self.map_reduce_between(other=other, map_func_nb=nb.diff_map_nb, reduce_func_nb=nb.avg_reduce_nb, **kwargs)
 
     def map_reduce_between(self, *args, other=None, map_func_nb=None, reduce_func_nb=None, broadcast_kwargs={}):
-        utils.assert_not_none(map_func_nb)
-        utils.assert_not_none(reduce_func_nb)
+        checks.assert_not_none(map_func_nb)
+        checks.assert_not_none(reduce_func_nb)
         if other is None:
             result = nb.map_reduce_between_one_nb(self.to_2d_array(), map_func_nb, reduce_func_nb, *args)
             if isinstance(self._obj, pd.Series):
                 return result[0]
-            return pd.Series(result, index=utils.to_2d(self._obj).columns)
+            return pd.Series(result, index=reshape_fns.to_2d(self._obj).columns)
         else:
-            obj, other = utils.broadcast(self._obj, other, **broadcast_kwargs)
+            obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
             other.vbt.signals.validate()
             result = nb.map_reduce_between_two_nb(
                 self.to_2d_array(), other.vbt.to_2d_array(), map_func_nb, reduce_func_nb, *args)
             if isinstance(obj, pd.Series):
                 return result[0]
-            return pd.Series(result, index=utils.to_2d(obj).columns)
+            return pd.Series(result, index=reshape_fns.to_2d(obj).columns)
 
     def rank(self, reset_signals=None, after_false=False, allow_gaps=False, broadcast_kwargs={}):
         if reset_signals is not None:
-            obj, reset_signals = utils.broadcast(self._obj, reset_signals, **broadcast_kwargs)
+            obj, reset_signals = reshape_fns.broadcast(self._obj, reset_signals, **broadcast_kwargs)
             reset_signals = reset_signals.vbt.to_2d_array()
         else:
             obj = self._obj
@@ -127,7 +128,7 @@ class Signals_DFAccessor(Signals_Accessor, utils.Base_DFAccessor):
 
     @classmethod
     def random(cls, shape, n, every_nth=1, seed=None, multiple=False, name='random_n', **kwargs):
-        return pd.DataFrame(nb.random_nb(shape, utils.to_1d(n), every_nth, seed), **kwargs)
+        return pd.DataFrame(nb.random_nb(shape, reshape_fns.to_1d(n), every_nth, seed), **kwargs)
 
     @classmethod
     def random_by_func(cls, shape, choice_func_nb, *args, seed=None, **kwargs):
@@ -162,7 +163,7 @@ class Signals_SRAccessor(Signals_Accessor, utils.Base_SRAccessor):
 
     @classmethod
     def random(cls, size, n, every_nth=1, seed=None, **kwargs):
-        return pd.Series(nb.random_nb((size, 1), utils.to_1d(n), every_nth, seed)[:, 0], **kwargs)
+        return pd.Series(nb.random_nb((size, 1), reshape_fns.to_1d(n), every_nth, seed)[:, 0], **kwargs)
 
     @classmethod
     def random_by_func(cls, size, choice_func_nb, *args, seed=None, **kwargs):
@@ -202,9 +203,9 @@ class Signals_SRAccessor(Signals_Accessor, utils.Base_SRAccessor):
         return fig
 
     def plot_markers(self, ts, name=None, signal_type=None, trace_kwargs={}, fig=None, **layout_kwargs):
-        utils.assert_type(ts, pd.Series)
+        checks.assert_type(ts, pd.Series)
         ts.vbt.timeseries.validate()
-        utils.assert_same_index(self._obj, ts)
+        checks.assert_same_index(self._obj, ts)
 
         if fig is None:
             fig = FigureWidget()
