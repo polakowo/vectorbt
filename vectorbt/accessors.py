@@ -1,6 +1,6 @@
 import pandas as pd
 from pandas.core.accessor import _register_accessor, DirNamesMixin
-from vectorbt.utils import Base_DFAccessor, Base_SRAccessor
+from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
 
 
 @pd.api.extensions.register_dataframe_accessor("vbt")

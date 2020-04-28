@@ -3,7 +3,7 @@ install:
     - pip install .
     - pip install pdoc3
 script:
-    - pdoc --html --force --output-dir docs vectorbt --config show_inherited_members=True --template-dir docs/templates
+    - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
     - mv docs/vectorbt/* docs
     - rmdir docs/vectorbt
     - rm -rf !(docs)
