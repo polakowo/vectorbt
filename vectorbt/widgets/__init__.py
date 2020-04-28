@@ -8,18 +8,18 @@ For more details on using Plotly, see [Getting Started with Plotly in Python](ht
 
 ## Default layout
 
-Use `vectorbt.widgets.layout_defaults` dictionary to change the default layout.
+Use `vectorbt.defaults.layout` dictionary to change the default layout.
 
 For example, to change the default width:
 ```py
 import vectorbt as vbt
 
-vbt.widgets.layout_defaults['width'] = 800
+vbt.defaults.layout['width'] = 800
 ```"""
 
 from vectorbt.widgets import widgets, common, accessors
 
-from vectorbt.widgets.common import layout_defaults, FigureWidget, UpdatableFigureWidget
+from vectorbt.widgets.common import FigureWidget, UpdatableFigureWidget
 from vectorbt.widgets.widgets import Indicator, Bar, Scatter, Histogram, Heatmap
 
 

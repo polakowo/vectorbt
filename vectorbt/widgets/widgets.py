@@ -1,4 +1,4 @@
-"""A collection of custom Plotly widgets for basic charts."""
+"""A collection of custom Plotly widgets."""
 
 import numpy as np
 import plotly.graph_objects as go

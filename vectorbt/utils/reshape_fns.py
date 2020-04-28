@@ -1,18 +1,8 @@
 import numpy as np
 import pandas as pd
 
+from vectorbt import defaults
 from vectorbt.utils import checks, index_fns
-from vectorbt.utils.common import Config
-
-# You can change this from code
-# Useful for magic methods that cannot accept keyword arguments
-broadcast_defaults = Config(
-    index_from='strict',
-    columns_from='stack',
-    ignore_single=True,
-    drop_duplicates=True,
-    keep='last'
-)
 
 
 def soft_broadcast_to_ndim(arg, ndim):
@@ -150,11 +140,11 @@ def broadcast_index(*args, index_from=None, axis=0, is_2d=False, ignore_single='
     """Broadcast index/columns of all arguments."""
 
     if ignore_single == 'default':
-        ignore_single = broadcast_defaults['ignore_single']
+        ignore_single = defaults.broadcast['ignore_single']
     if drop_duplicates == 'default':
-        drop_duplicates = broadcast_defaults['drop_duplicates']
+        drop_duplicates = defaults.broadcast['drop_duplicates']
     if keep == 'default':
-        keep = broadcast_defaults['keep']
+        keep = defaults.broadcast['keep']
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
 
@@ -282,9 +272,9 @@ def broadcast(*args, index_from='default', columns_from='default', writeable=Fal
 
         # Decide on index and columns
         if index_from == 'default':
-            index_from = broadcast_defaults['index_from']
+            index_from = defaults.broadcast['index_from']
         if columns_from == 'default':
-            columns_from = broadcast_defaults['columns_from']
+            columns_from = defaults.broadcast['columns_from']
         new_index = broadcast_index(*args, index_from=index_from, axis=0, is_2d=is_2d, **kwargs)
         new_columns = broadcast_index(*args, index_from=columns_from, axis=1, is_2d=is_2d, **kwargs)
     else:

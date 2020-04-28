@@ -1,4 +1,4 @@
-"""A collection of indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
+"""A collection of custom indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
 Before running the examples, import the following libraries:
 ```py
@@ -24,7 +24,7 @@ from numba import njit
 from numba.types import UniTuple, f8, i8, b1, DictType, Tuple
 import itertools
 
-from vectorbt import timeseries, indicators, widgets
+from vectorbt import timeseries, indicators, defaults
 from vectorbt.utils import checks, reshape_fns
 from vectorbt.utils.common import fix_class_for_pdoc
 
@@ -222,7 +222,7 @@ class MA(MA):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             ma[(10, False)].plot()
@@ -329,7 +329,7 @@ class MSTD(MSTD):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             mstd[(10, False)].plot()
@@ -519,7 +519,7 @@ class BollingerBands(BollingerBands):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             bb[(10, False, 2)].plot()
@@ -545,11 +545,11 @@ class BollingerBands(BollingerBands):
         ), **upper_band_trace_kwargs}  # default kwargs
         ma_trace_kwargs = {**dict(
             name=f'MA ({self.name})',
-            line=dict(color=widgets.layout_defaults['colorway'][1])
+            line=dict(color=defaults.layout['colorway'][1])
         ), **ma_trace_kwargs}
         ts_trace_kwargs = {**dict(
             name=f'Price ({self.name})',
-            line=dict(color=widgets.layout_defaults['colorway'][0])
+            line=dict(color=defaults.layout['colorway'][0])
         ), **ts_trace_kwargs}
 
         fig = self.lower_band.vbt.timeseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
@@ -657,7 +657,7 @@ class RSI(RSI):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             rsi[(10, False)].plot()
@@ -814,7 +814,7 @@ class Stochastic(Stochastic):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             stoch[(10, 2, False)].plot(levels=(20, 80))
@@ -1030,7 +1030,7 @@ class MACD(MACD):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             macd[(10, 20, 30, False, True)].plot()
@@ -1189,7 +1189,7 @@ class ATR(ATR):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             atr[(10, False)].plot()
@@ -1297,7 +1297,7 @@ class OBV(OBV):
             fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.FigureWidget
+            vectorbt.widgets.common.FigureWidget
         Examples:
             ```py
             obv.plot()

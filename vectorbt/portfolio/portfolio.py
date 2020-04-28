@@ -2,18 +2,11 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from vectorbt import timeseries, accessors
+from vectorbt import timeseries, accessors, defaults
 from vectorbt.utils import indexing, checks, reshape_fns
-from vectorbt.utils.common import Config, cached_property
+from vectorbt.utils.common import cached_property
 from vectorbt.portfolio import nb
 from vectorbt.widgets import FigureWidget
-
-# You can change this from code
-portfolio_defaults = Config(
-    investment=1.,
-    slippage=0.,
-    commission=0.
-)
 
 
 def indexing_func(obj, loc_pandas_func):
@@ -74,11 +67,11 @@ class Portfolio():
         Set volume to np.inf to buy/sell everything.
         Set accumulate to False to avoid producing new orders if already in the market."""
         if investment is None:
-            investment = portfolio_defaults['investment']
+            investment = defaults.portfolio['investment']
         if slippage is None:
-            slippage = portfolio_defaults['slippage']
+            slippage = defaults.portfolio['slippage']
         if commission is None:
-            commission = portfolio_defaults['commission']
+            commission = defaults.portfolio['commission']
 
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
         checks.assert_type(entries, (pd.Series, pd.DataFrame))
@@ -118,11 +111,11 @@ class Portfolio():
         Set an orders element to positive/negative number - a number of shares to buy/sell.
         Set is_target to True to specify the target amount of shares to hold."""
         if investment is None:
-            investment = portfolio_defaults['investment']
+            investment = defaults.portfolio['investment']
         if slippage is None:
-            slippage = portfolio_defaults['slippage']
+            slippage = defaults.portfolio['slippage']
         if commission is None:
-            commission = portfolio_defaults['commission']
+            commission = defaults.portfolio['commission']
 
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
         checks.assert_type(orders, (pd.Series, pd.DataFrame))
@@ -153,11 +146,11 @@ class Portfolio():
     def from_order_func(cls, ts, order_func_np, *args, investment=None, slippage=None, commission=None):
         """Build portfolio based on order function."""
         if investment is None:
-            investment = portfolio_defaults['investment']
+            investment = defaults.portfolio['investment']
         if slippage is None:
-            slippage = portfolio_defaults['slippage']
+            slippage = defaults.portfolio['slippage']
         if commission is None:
-            commission = portfolio_defaults['commission']
+            commission = defaults.portfolio['commission']
 
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
         ts.vbt.timeseries.validate()
