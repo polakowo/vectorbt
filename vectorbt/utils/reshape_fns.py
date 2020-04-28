@@ -1,11 +1,12 @@
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import checks, index_fns, common
+from vectorbt.utils import checks, index_fns
+from vectorbt.utils.common import Config
 
 # You can change this from code
 # Useful for magic methods that cannot accept keyword arguments
-broadcast_defaults = common.Config(
+broadcast_defaults = Config(
     index_from='strict',
     columns_from='stack',
     ignore_single=True,
@@ -362,21 +363,15 @@ def broadcast_to_array_of(arg1, arg2):
 
 def unstack_to_array(arg, levels=None):
     """Reshape object based on multi-index into a multi-dimensional array."""
-    checks.assert_type(arg, (pd.Series, pd.DataFrame))
-    if checks.is_frame(arg):
-        if arg.shape[0] == 1:
-            arg = arg.iloc[0, :]
-        elif arg.shape[1] == 1:
-            arg = arg.iloc[:, 0]
+    checks.assert_type(arg, pd.Series)
     checks.assert_type(arg.index, pd.MultiIndex)
-    sr = to_1d(arg)
 
     unique_idx_list = []
     vals_idx_list = []
     if levels is None:
-        levels = sr.index.names
+        levels = arg.index.names
     for i in range(len(levels)):
-        vals = index_fns.select_levels(sr.index, levels[i]).to_numpy()
+        vals = index_fns.select_levels(arg.index, levels[i]).to_numpy()
         unique_vals = np.unique(vals)
         unique_idx_list.append(unique_vals)
         idx_map = dict(zip(unique_vals, range(len(unique_vals))))
@@ -384,7 +379,7 @@ def unstack_to_array(arg, levels=None):
         vals_idx_list.append(vals_idx)
 
     a = np.full(list(map(len, unique_idx_list)), np.nan)
-    a[tuple(zip(vals_idx_list))] = sr.values
+    a[tuple(zip(vals_idx_list))] = arg.values
     return a
 
 

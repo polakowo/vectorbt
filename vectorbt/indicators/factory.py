@@ -1,4 +1,5 @@
-"""
+"""An indicator factory `vectorbt.indicators.factory.IndicatorFactory` for building new indicators with ease.
+
 Each indicator is basically a pipeline that
 
 * Accepts a set of time-series objects (for example, OHLCV data)
@@ -209,7 +210,8 @@ from numba import njit
 from numba.typed import List
 import itertools
 
-from vectorbt.utils import checks, index_fns, reshape_fns, indexing, common, combine_fns
+from vectorbt.utils import checks, index_fns, reshape_fns, indexing, combine_fns
+from vectorbt.utils.common import cached_property
 
 
 def build_column_hierarchy(param_list, level_names, ts_columns):
@@ -458,7 +460,7 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
     Both will be broadcasted together. Set `multiple` to True to compare with multiple arguments. In this case,
     a new column level will be created with the name `name`.
     
-    For more details, see `vectorbt.utils.Base_Accessor.combine_with`."""
+    For more details, see `vectorbt.utils.accessors.Base_Accessor.combine_with`."""
     if multiple:
         if as_columns is None:
             as_columns = index_fns.from_values(other, name=name)
@@ -655,7 +657,7 @@ class IndicatorFactory():
         for prop_name, prop in custom_properties.items():
             prop.__name__ = prop_name
             if not isinstance(prop, property):
-                prop = common.cached_property(prop)
+                prop = cached_property(prop)
             setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison methods for all inputs, outputs, and user-defined properties

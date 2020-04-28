@@ -142,24 +142,23 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
 
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
-- Provides a collection of utility functions for working with data ([utils.py](vectorbt/utils.py))
-- Extensive input and output validation during execution (data type, shape, etc.)
-- Implements NumPy broadcasting for pandas
-    - Supports different modes for broadcasting index/columns
-- `vbt.timeseries` accessor for working with time-series data ([timeseries.py](vectorbt/timeseries.py))
+- Provides a collection of utility functions for working with data
+- Extensive input and output validation during runtime (data type, shape, etc.)
+- Implements NumPy broadcasting for pandas with different modes
+- `vbt.timeseries` accessor for working with time-series data
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
-- `vbt.signals` accessor for working with signals data ([signals.py](vectorbt/signals.py))
+- `vbt.signals` accessor for working with signals data
     - Entry, exit and random signal generation, ranking and distance functions
     - Generation of stop loss and trailing stop order signals
-- `vbt.portfolio` accessor for modeling portfolio performance ([portfolio.py](vectorbt/portfolio.py))
+- `vbt.portfolio` accessor for modeling portfolio performance
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
-- Provides a range of technical indicators with full Numba support ([indicators.py](vectorbt/indicators.py))
+- Provides a range of technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and OBV
-    - Indicator factory for construction of complex technical indicators in a simplified way
     - Each indicator offers methods for generating signals and plotting
-    - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or product
-- Interactive Plotly-based widgets to visualize backtest results ([widgets.py](vectorbt/widgets.py))
+    - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or Cartesian product
+    - Indicator factory for construction of complex technical indicators in a simplified way
+- Interactive Plotly-based widgets to visualize backtest results
     - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
