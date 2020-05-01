@@ -1,19 +1,19 @@
-"""A collection of custom Plotly widgets."""
+"""Custom Plotly widgets."""
 
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
+import inspect
 
-from vectorbt.widgets.common import UpdatableFigureWidget, FigureWidget
+from vectorbt.widgets.common import DefaultFigureWidget
 from vectorbt.utils import checks, reshape_fns
 from collections import namedtuple
 
 
 # ############# Indicator ############# #
 
-
 def rgb_from_cmap(cmap_name, value, value_range):
-    """Map `value_range` to colormap and get RGB of the value from that range."""
+    """Map `value_range` to colormap with name `cmap_name` and get RGB of the `value` from that range."""
     if value_range[0] == value_range[1]:
         norm_value = 0.5
     else:
@@ -22,18 +22,18 @@ def rgb_from_cmap(cmap_name, value, value_range):
     return "rgb(%d,%d,%d)" % tuple(np.round(np.asarray(cmap(norm_value))[:3] * 255))
 
 
-class Indicator(UpdatableFigureWidget):
+class Indicator(DefaultFigureWidget):
     def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral', trace_kwargs={}, **layout_kwargs):
         """Create an updatable indicator plot.
 
         Args:
-            value (int or float, optional): The value to be displayed.
-            label (str, optional): The label to be displayed.
-            value_range (list or tuple of 2 values, optional): The value range of the gauge.
-            cmap_name (str, optional): A matplotlib-compatible colormap name, see the [list of available colormaps](https://matplotlib.org/tutorials/colors/colormaps.html).
-            trace_kwargs (dict, optional): Keyword arguments passed to the [`plotly.graph_objects.Indicator`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Indicator.html).
+            value (int or float): The value to be displayed.
+            label (str): The label to be displayed.
+            value_range (list or tuple of 2 values): The value range of the gauge.
+            cmap_name (str): A matplotlib-compatible colormap name, see the [list of available colormaps](https://matplotlib.org/tutorials/colors/colormaps.html).
+            trace_kwargs (dict): Keyword arguments passed to the [`plotly.graph_objects.Indicator`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Indicator.html).
             **layout_kwargs: Keyword arguments for layout.
-        Examples:
+        Example:
             ```py
             vbt.Indicator(value=2, value_range=(1, 3), label='My Indicator')
             ```
@@ -87,18 +87,18 @@ class Indicator(UpdatableFigureWidget):
 # ############# Bar ############# #
 
 
-class Bar(UpdatableFigureWidget):
+class Bar(DefaultFigureWidget):
 
     def __init__(self, x_labels, trace_names=None, data=None, trace_kwargs={}, **layout_kwargs):
         """Create an updatable bar plot.
 
         Args:
             x_labels (list of str): X-axis labels, corresponding to index in pandas.
-            trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
-            data (array_like, optional): Data in any format that can be converted to NumPy.
-            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html).
+            trace_names (str or list of str): Trace names, corresponding to columns in pandas.
+            data (array_like): Data in any format that can be converted to NumPy.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to each [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html).
             **layout_kwargs: Keyword arguments for layout.
-        Examples:
+        Example:
             One trace:
             ```py
             vbt.Bar(['x', 'y'], trace_names='a', data=[1, 2])
@@ -140,7 +140,7 @@ class Bar(UpdatableFigureWidget):
             data (array_like): Data in any format that can be converted to NumPy.
 
                 Must be of shape (`x_labels`, `trace_names`).
-        Examples:
+        Example:
             ```py
             fig = pd.Series([1, 2], index=['x', 'y'], name='a').vbt.Bar()
             fig.update_data([2, 1])
@@ -148,11 +148,10 @@ class Bar(UpdatableFigureWidget):
             ```
             ![](img/Bar_updated.png)
         """
-        if not checks.is_array(data):
-            data = np.asarray(data)
+        data = np.asarray(data)
         data = reshape_fns.to_2d(data)
-        checks.assert_same_shape(data, self._x_labels, along_axis=(0, 0))
-        checks.assert_same_shape(data, self._trace_names, along_axis=(1, 0))
+        checks.assert_same_shape(data, self._x_labels, axis=(0, 0))
+        checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -165,17 +164,17 @@ class Bar(UpdatableFigureWidget):
 # ############# Scatter ############# #
 
 
-class Scatter(UpdatableFigureWidget):
+class Scatter(DefaultFigureWidget):
     def __init__(self, x_labels, trace_names=None, data=None, trace_kwargs={}, **layout_kwargs):
         """Create an updatable scatter plot.
 
         Args:
             x_labels (list of str): X-axis labels, corresponding to index in pandas.
-            trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
-            data (array_like, optional): Data in any format that can be converted to NumPy.
-            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
+            trace_names (str or list of str): Trace names, corresponding to columns in pandas.
+            data (array_like): Data in any format that can be converted to NumPy.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to each [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
             **layout_kwargs: Keyword arguments for layout.
-        Examples:
+        Example:
             ```py
             vbt.Scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
             ```
@@ -212,11 +211,10 @@ class Scatter(UpdatableFigureWidget):
 
                 Must be of shape (`x_labels`, `trace_names`).
         """
-        if not checks.is_array(data):
-            data = np.asarray(data)
+        data = np.asarray(data)
         data = reshape_fns.to_2d(data)
-        checks.assert_same_shape(data, self._x_labels, along_axis=(0, 0))
-        checks.assert_same_shape(data, self._trace_names, along_axis=(1, 0))
+        checks.assert_same_shape(data, self._x_labels, axis=(0, 0))
+        checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -227,17 +225,17 @@ class Scatter(UpdatableFigureWidget):
 # ############# Histogram ############# #
 
 
-class Histogram(UpdatableFigureWidget):
+class Histogram(DefaultFigureWidget):
     def __init__(self, trace_names=None, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
         """Create an updatable histogram plot.
 
         Args:
-            trace_names (str or list of str, optional): Trace names, corresponding to columns in pandas.
-            data (array_like, optional): Data in any format that can be converted to NumPy.
-            horizontal (bool): Plot horizontally. Defaults to False.
-            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Histogram`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Histogram.html)
+            trace_names (str or list of str): Trace names, corresponding to columns in pandas.
+            data (array_like): Data in any format that can be converted to NumPy.
+            horizontal (bool): Plot horizontally.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to each [`plotly.graph_objects.Histogram`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Histogram.html)
             **layout_kwargs: Keyword arguments for layout
-        Examples:
+        Example:
             ```py
             vbt.Histogram(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
             ```
@@ -275,10 +273,9 @@ class Histogram(UpdatableFigureWidget):
 
                 Must be of shape (any, `trace_names`).
         """
-        if not checks.is_array(data):
-            data = np.asarray(data)
+        data = np.asarray(data)
         data = reshape_fns.to_2d(data)
-        checks.assert_same_shape(data, self._trace_names, along_axis=(1, 0))
+        checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
 
         # Update traces
         with self.batch_update():
@@ -291,21 +288,20 @@ class Histogram(UpdatableFigureWidget):
                     histogram.y = None
 
 
-
 # ############# Heatmap ############# #
 
-class Heatmap(UpdatableFigureWidget):
+class Heatmap(DefaultFigureWidget):
     def __init__(self, x_labels, y_labels, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
         """Create an updatable heatmap plot.
 
         Args:
             x_labels (list of str): X-axis labels, corresponding to columns in pandas.
             y_labels (list of str): Y-axis labels, corresponding to index in pandas.
-            data (array_like, optional): Data in any format that can be converted to NumPy.
-            horizontal (bool): Plot horizontally. Defaults to False.
-            trace_kwargs (dict or list of dict, optional): Keyword arguments passed to each [`plotly.graph_objects.Heatmap`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Heatmap.html).
+            data (array_like): Data in any format that can be converted to NumPy.
+            horizontal (bool): Plot horizontally.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to each [`plotly.graph_objects.Heatmap`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Heatmap.html).
             **layout_kwargs: Keyword arguments for layout.
-        Examples:
+        Example:
             ```py
             vbt.Heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
             ```
@@ -344,11 +340,10 @@ class Heatmap(UpdatableFigureWidget):
 
                 Must be of shape (`y_labels`, `x_labels`).
         """
-        if not checks.is_array(data):
-            data = np.asarray(data)
+        data = np.asarray(data)
         data = reshape_fns.to_2d(data)
-        checks.assert_same_shape(data, self._x_labels, along_axis=(1, 0))
-        checks.assert_same_shape(data, self._y_labels, along_axis=(0, 0))
+        checks.assert_same_shape(data, self._x_labels, axis=(1, 0))
+        checks.assert_same_shape(data, self._y_labels, axis=(0, 0))
 
         # Update traces
         with self.batch_update():
@@ -357,4 +352,3 @@ class Heatmap(UpdatableFigureWidget):
                 heatmap.z = data.transpose()
             else:
                 heatmap.z = data
-

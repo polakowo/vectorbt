@@ -1,3 +1,5 @@
+"""Default parameters for various parts of `vectorbt`."""
+
 from vectorbt.utils.common import Config
 
 # Layout
@@ -16,6 +18,9 @@ layout = Config(
         "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
     ]
 )
+"""Default Plotly layout.
+
+Used by `vectorbt.widgets.common.DefaultFigureWidget`."""
 
 # Portfolio
 portfolio = Config(
@@ -23,6 +28,9 @@ portfolio = Config(
     slippage=0.,
     commission=0.
 )
+"""Default portfolio parameters.
+
+Used by `vectorbt.portfolio.portfolio.Portfolio`."""
 
 # Broadcasting
 broadcast = Config(
@@ -32,3 +40,6 @@ broadcast = Config(
     drop_duplicates=True,
     keep='last'
 )
+"""Default broadcasting rules for index and columns.
+
+Used by `vectorbt.utils.reshape_fns.broadcast_index`."""

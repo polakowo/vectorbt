@@ -191,7 +191,7 @@ def rank_nb(a, reset_b=None, after_false=False, allow_gaps=False):
 
 @njit
 def map_reduce_between_one_nb(a, map_func_nb, reduce_func_nb, *args):
-    """Map and reduce pairwise between True values in one array."""
+    """Map and reduce pairwise between `True` values in one array."""
     b = np.full((a.shape[1],), np.nan)
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -212,13 +212,13 @@ avg_reduce_nb = njit(lambda a: np.nanmean(a))
 
 @njit(f8[:](b1[:, :]), cache=True)
 def avg_distance_nb(a):
-    """Average distance between True values in the same array."""
+    """Average distance between `True` values in the same array."""
     return map_reduce_between_one_nb(a, diff_map_nb, avg_reduce_nb)
 
 
 @njit
 def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
-    """Map and reduce pairwise between True values in two arrays.
+    """Map and reduce pairwise between `True` values in two arrays.
 
     Applies a mapper function on each pair (a_prev, a_prev <= b < a_next).
     Applies a reducer function on all mapper results in a column."""

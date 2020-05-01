@@ -7,7 +7,7 @@ from vectorbt.utils import checks, reshape_fns, index_fns
 from vectorbt.utils.common import add_safe_nb_methods, cached_property
 from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
 from vectorbt.signals import nb
-from vectorbt.widgets import FigureWidget
+from vectorbt.widgets import DefaultFigureWidget
 
 
 @add_safe_nb_methods(
@@ -179,7 +179,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         # Set up figure
         if fig is None:
-            fig = FigureWidget()
+            fig = DefaultFigureWidget()
             fig.update_layout(
                 yaxis=dict(
                     tickmode='array',
@@ -210,7 +210,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         checks.assert_same_index(self._obj, ts)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = DefaultFigureWidget()
             fig.update_layout(**layout_kwargs)
 
         # Plot markers

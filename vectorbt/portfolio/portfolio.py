@@ -6,21 +6,21 @@ from vectorbt import timeseries, accessors, defaults
 from vectorbt.utils import indexing, checks, reshape_fns
 from vectorbt.utils.common import cached_property
 from vectorbt.portfolio import nb
-from vectorbt.widgets import FigureWidget
+from vectorbt.widgets import DefaultFigureWidget
 
 
-def indexing_func(obj, loc_pandas_func):
+def indexing_func(obj, pd_indexing_func):
     return obj.__class__(
-        loc_pandas_func(obj.ts),
-        loc_pandas_func(obj.cash),
-        loc_pandas_func(obj.shares),
+        pd_indexing_func(obj.ts),
+        pd_indexing_func(obj.cash),
+        pd_indexing_func(obj.shares),
         obj.investment,
         obj.slippage,
         obj.commission
     )
 
 
-@indexing.add_indexing(indexing_func)
+@indexing.add_pd_indexing(indexing_func)
 class Portfolio():
 
     def __init__(self, ts, cash, shares, investment, slippage, commission):
@@ -65,7 +65,7 @@ class Portfolio():
 
         Set volume to the number of shares to buy/sell.
         Set volume to np.inf to buy/sell everything.
-        Set accumulate to False to avoid producing new orders if already in the market."""
+        Set accumulate to `False` to avoid producing new orders if already in the market."""
         if investment is None:
             investment = defaults.portfolio['investment']
         if slippage is None:
@@ -109,7 +109,7 @@ class Portfolio():
         """Build portfolio based on orders.
 
         Set an orders element to positive/negative number - a number of shares to buy/sell.
-        Set is_target to True to specify the target amount of shares to hold."""
+        Set is_target to `True` to specify the target amount of shares to hold."""
         if investment is None:
             investment = defaults.portfolio['investment']
         if slippage is None:
@@ -233,7 +233,7 @@ class Portfolio():
         if checks.is_frame(self.ts):
             return pd.Series(a, index=self.ts.columns)
         # Single value
-        if checks.is_array(a):
+        if not checks.is_series(a):
             return a[0]
         return a
 
@@ -369,7 +369,7 @@ class Portfolio():
 
         # Set up figure
         if fig is None:
-            fig = FigureWidget()
+            fig = DefaultFigureWidget()
             fig.update_layout(showlegend=True)
             fig.update_layout(**layout_kwargs)
 

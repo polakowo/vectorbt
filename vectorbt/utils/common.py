@@ -1,3 +1,5 @@
+"""Common utility functions and classes."""
+
 import numpy as np
 import pandas as pd
 from functools import wraps
@@ -24,19 +26,36 @@ class Config(dict):
         dict.__setitem__(self, key, val)
 
     def reset(self):
+        """Reset dictionary to the one passed at instantiation."""
         self.update(self.default_config)
+
+
+def deep_replace_by(x, y):
+    """Replace entries in `x` by entries from `y`."""
+    z = {}
+    overlapping_keys = x.keys() & y.keys()
+    for key in overlapping_keys:
+        if isinstance(x[key], dict) and isinstance(y[key], dict):
+            z[key] = dict_of_dicts_merge(x[key], y[key])
+        else:
+            z[key] = y[key]
+    for key in x.keys() - overlapping_keys:
+        z[key] = x[key]
+    for key in y.keys() - overlapping_keys:
+        z[key] = y[key]
+    return z
 
 # ############# Documentation ############# #
 
 
 def is_from_module(obj, module):
-    """Check if `obj` is from the module named by `module_name`."""
+    """Return whether `obj` is from module `module`."""
     mod = inspect.getmodule(inspect.unwrap(obj))
     return mod is None or mod.__name__ == module.__name__
 
 
 def list_valid_module_keys(module):
-    """List all functions and classes defined in the `module`."""
+    """List all public functions and classes defined in the `module`."""
     return [name for name, obj in inspect.getmembers(module)
             if not name.startswith("_")
             and is_from_module(obj, module)
@@ -44,7 +63,7 @@ def list_valid_module_keys(module):
 
 
 def add__all__to_module(module, blacklist=[]):
-    """Add to `__all__` list keys that are in `module` and not in `blacklist`."""
+    """Add keys that are in `module` and not in `blacklist` to `__all__`."""
     __all__ = getattr(module, '__all__', [])
     all_keys = list_valid_module_keys(module)
     for k in all_keys:
@@ -54,7 +73,8 @@ def add__all__to_module(module, blacklist=[]):
 
 
 def fix_class_for_pdoc(cls):
-    """Make class attributes that were defined in the superclass appear in the documentation of this class."""
+    """Make functions and properties that were defined in any superclass of `cls` visible 
+    in the documentation of `cls`."""
     for func_name in dir(cls):
         if not func_name.startswith("_"):
             func = getattr(cls, func_name)
@@ -65,7 +85,9 @@ def fix_class_for_pdoc(cls):
 
 # ############# Decorators ############# #
 
-def get_default_args(func):
+
+def get_kwargs(func):
+    """Get names and default values of keyword arguments from the signature of `func`."""
     return {
         k: v.default
         for k, v in inspect.signature(func).parameters.items()
@@ -73,11 +95,11 @@ def get_default_args(func):
     }
 
 
-def add_safe_nb_methods(*nb_funcs):
+def add_safe_nb_methods(*nb_funcs, module_name=None):
+    """Class decorator to wrap each Numba function in `nb_funcs` as a method of that class."""
     def wrapper(cls):
-        """Wrap numba functions as methods."""
         for nb_func in nb_funcs:
-            default_kwargs = get_default_args(nb_func)
+            default_kwargs = get_kwargs(nb_func)
 
             def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
                 if '_1d' in nb_func.__name__:
@@ -85,15 +107,24 @@ def add_safe_nb_methods(*nb_funcs):
                 else:
                     # We work natively on 2d arrays
                     return self.wrap_array(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
+            # Replace the function's signature with the original one
+            sig = inspect.signature(nb_func)
+            self_arg = tuple(inspect.signature(array_operation).parameters.values())[0]
+            sig = sig.replace(parameters=(self_arg,)+tuple(sig.parameters.values())[1:])
+            array_operation.__signature__ = sig
+            if module_name is not None:
+                array_operation.__doc__ = f"See `{module_name}.{nb_func.__name__}`"
+            else:
+                array_operation.__doc__ = f"See `{nb_func.__name__}`"
             setattr(cls, nb_func.__name__.replace('_1d', '').replace('_nb', ''), array_operation)
         return cls
     return wrapper
 
 
 def cached_property(func):
+    """Function decorator similar to `property` but with caching."""
     @wraps(func)
     def wrapper_decorator(*args, **kwargs):
-        """Cache property to avoid recalculating it again and again."""
         obj = args[0]
         attr_name = '_' + func.__name__
         if hasattr(obj, attr_name):
@@ -106,6 +137,9 @@ def cached_property(func):
 
 
 class class_or_instancemethod(classmethod):
+    """Function decorator that binds `self` to a class if the function is called as class method, 
+    otherwise to an instance."""
+
     def __get__(self, instance, type_):
         descr_get = super().__get__ if instance is None else self.__func__.__get__
         return descr_get(instance, type_)
