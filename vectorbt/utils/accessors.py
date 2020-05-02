@@ -1,4 +1,4 @@
-"""Base accessors with utility functions.
+"""Custom pandas accessors with utility methods.
 
 Accessible through `pandas.vbt`, `pandas.vbt.timeseries` and `pandas.vbt.signals`."""
 

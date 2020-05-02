@@ -32,7 +32,7 @@ from vectorbt.utils.common import fix_class_for_pdoc
 # ############# MA ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def ma_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `MA`."""
     cache_dict = dict()
@@ -46,7 +46,7 @@ def ma_caching_nb(ts, windows, ewms):
     return cache_dict
 
 
-@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def ma_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `MA`."""
     return cache_dict[(window, int(ewm))]
@@ -251,7 +251,7 @@ fix_class_for_pdoc(MA)
 # ############# MSTD ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def mstd_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `MSTD`."""
     cache_dict = dict()
@@ -265,7 +265,7 @@ def mstd_caching_nb(ts, windows, ewms):
     return cache_dict
 
 
-@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def mstd_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `MSTD`."""
     return cache_dict[(window, int(ewm))]
@@ -352,7 +352,7 @@ fix_class_for_pdoc(MSTD)
 # ############# BollingerBands ############# #
 
 
-@njit(UniTuple(DictType(UniTuple(i8, 2), f8[:, :]), 2)(f8[:, :], i8[:], b1[:], f8[:]), cache=True)
+@njit(cache=True)
 def bb_caching_nb(ts, windows, ewms, alphas):
     """Numba-compiled caching function for `BollingerBands`."""
     ma_cache_dict = ma_caching_nb(ts, windows, ewms)
@@ -360,7 +360,7 @@ def bb_caching_nb(ts, windows, ewms, alphas):
     return ma_cache_dict, mstd_cache_dict
 
 
-@njit(UniTuple(f8[:, :], 3)(f8[:, :], i8, b1, f8, DictType(UniTuple(i8, 2), f8[:, :]), DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
     """Numba-compiled apply function for `BollingerBands`."""
     # Calculate lower, middle and upper bands
@@ -563,7 +563,7 @@ fix_class_for_pdoc(BollingerBands)
 # ############# RSI ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), UniTuple(f8[:, :], 2))(f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def rsi_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `RSI`."""
     delta = timeseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
@@ -586,7 +586,7 @@ def rsi_caching_nb(ts, windows, ewms):
     return cache_dict
 
 
-@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), UniTuple(f8[:, :], 2))), cache=True)
+@njit(cache=True)
 def rsi_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `RSI`."""
     roll_up, roll_down = cache_dict[(window, int(ewm))]
@@ -694,7 +694,7 @@ fix_class_for_pdoc(RSI)
 # ############# Stochastic ############# #
 
 
-@njit(DictType(i8, UniTuple(f8[:, :], 2))(f8[:, :], f8[:, :], f8[:, :], i8[:], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     """Numba-compiled caching function for `Stochastic`."""
     cache_dict = dict()
@@ -706,7 +706,7 @@ def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     return cache_dict
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, i8, b1, DictType(i8, UniTuple(f8[:, :], 2))), cache=True)
+@njit(cache=True)
 def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
     """Numba-compiled apply function for `Stochastic`."""
     roll_min, roll_max = cache_dict[k_window]
@@ -854,13 +854,13 @@ fix_class_for_pdoc(Stochastic)
 # ############# MACD ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], i8[:], i8[:], b1[:], b1[:]), cache=True)
+@njit(cache=True)
 def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
     """Numba-compiled caching function for `MACD`."""
     return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
 
 
-@njit(UniTuple(f8[:, :], 4)(f8[:, :], i8, i8, i8, b1, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
     """Numba-compiled apply function for `MACD`."""
     fast_ma = cache_dict[(fast_window, int(macd_ewm))]
@@ -1075,7 +1075,7 @@ fix_class_for_pdoc(MACD)
 # ############# ATR ############# #
 
 
-@njit(Tuple((f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])))(f8[:, :], f8[:, :], f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     """Numba-compiled caching function for `ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_func_nb
@@ -1095,7 +1095,7 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     return tr, cache_dict
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, b1, f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def atr_apply_func_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
     """Numba-compiled apply function for `ATR`."""
     return tr, cache_dict[(window, int(ewm))]
@@ -1208,7 +1208,7 @@ fix_class_for_pdoc(ATR)
 # ############# OBV ############# #
 
 
-@njit(f8[:, :](f8[:, :], f8[:, :]))
+@njit(cache=True)
 def obv_custom_func_nb(close_ts, volume_ts):
     """Numba-compiled custom calculation function for `OBV`."""
     obv = np.full_like(close_ts, np.nan)

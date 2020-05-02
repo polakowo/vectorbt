@@ -1,4 +1,4 @@
-"""Custom pandas accessors for widgets."""
+"""Custom pandas accessors for displaying widgets."""
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks, reshape_fns

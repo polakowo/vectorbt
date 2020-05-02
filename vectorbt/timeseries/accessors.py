@@ -1,9 +1,9 @@
-"""Accessors with functions for working with time series data.
+"""Custom pandas accessors for working with time series.
 
-Accessible through `pandas.vbt.timeseries`.
+Accessible through `pandas.vbt.timeseries` and `pandas.vbt.ohlcv`.
 
 !!! note
-    All Series/DataFrames must be `numpy.float64`."""
+    Input can be of any data type, but output is always `numpy.float64`."""
 
 import numpy as np
 import pandas as pd
@@ -41,12 +41,6 @@ from vectorbt.widgets.common import DefaultFigureWidget
     module_name='vectorbt.timeseries.nb')
 class TimeSeries_Accessor():
     """Accessor with methods for both Series and DataFrames."""
-    dtype = np.float64
-
-    @classmethod
-    def _validate(cls, obj):
-        if cls.dtype is not None:
-            checks.assert_dtype(obj, cls.dtype)
 
     def groupby_apply(self, by, apply_func_nb, on_2d=False):
         """See `vectorbt.timeseries.nb.groupby_apply_nb`."""
@@ -184,11 +178,14 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
 @register_dataframe_accessor('ohlcv')
 class OHLCV_DFAccessor(TimeSeries_DFAccessor):
+    """Accessor with methods for DataFrames only."""
+
     def __init__(self, obj):
         super().__init__(obj)
         self()  # set column map
 
     def __call__(self, open='Open', high='High', low='Low', close='Close', volume='Volume'):
+        """Accessor is callable to be able to provide column names."""
         self._column_map = dict(
             open=open,
             high=high,
@@ -201,8 +198,25 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
     def plot(self,
              display_volume=True,
              candlestick_kwargs={},
-             trace_kwargs={},
+             bar_kwargs={},
              **layout_kwargs):
+        """Plot OHLCV data.
+
+        Args:
+            display_volume (bool): If `True`, displays volume as bar chart.
+            candlestick_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Candlestick`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Candlestick.html).
+            bar_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html).
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Example:
+            ```py
+            import vectorbt as vbt
+            import yfinance as yf
+
+            yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
+            ```
+
+            ![](img/ohlcv.png)"""
         open = self._obj[self._column_map['open']]
         high = self._obj[self._column_map['high']]
         low = self._obj[self._column_map['low']]
@@ -237,7 +251,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
                 yaxis="y",
                 xaxis="x"
             )
-            bar.update(**trace_kwargs)
+            bar.update(**bar_kwargs)
             fig.add_trace(bar)
             fig.update_layout(
                 yaxis2=dict(

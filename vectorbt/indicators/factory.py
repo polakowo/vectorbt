@@ -25,184 +25,185 @@ On top of this pipeline, it also does the following:
 * Adds user-defined properties
 * Adds common comparison methods for all inputs, outputs and properties, e.g., crossovers
 
-Consider the following smaller price DataFrame `price_sm`:
+Example:
+    Consider the following smaller price DataFrame `price_sm`:
 
-```python-repl
->>> index = pd.Index([
-...     datetime(2018, 1, 1),
-...     datetime(2018, 1, 2),
-...     datetime(2018, 1, 3),
-...     datetime(2018, 1, 4),
-...     datetime(2018, 1, 5),
-... ])
->>> price_sm = pd.DataFrame({
-...     'a': [1, 2, 3, 4, 5], 
-...     'b': [5, 4, 3, 2, 1]}, index=index).astype(float)
->>> print(price_sm)
-              a    b
-2018-01-01  1.0  5.0
-2018-01-02  2.0  4.0
-2018-01-03  3.0  3.0
-2018-01-04  4.0  2.0
-2018-01-05  5.0  1.0
-```
+    ```python-repl
+    >>> index = pd.Index([
+    ...     datetime(2018, 1, 1),
+    ...     datetime(2018, 1, 2),
+    ...     datetime(2018, 1, 3),
+    ...     datetime(2018, 1, 4),
+    ...     datetime(2018, 1, 5),
+    ... ])
+    >>> price_sm = pd.DataFrame({
+    ...     'a': [1, 2, 3, 4, 5], 
+    ...     'b': [5, 4, 3, 2, 1]}, index=index).astype(float)
+    >>> print(price_sm)
+                a    b
+    2018-01-01  1.0  5.0
+    2018-01-02  2.0  4.0
+    2018-01-03  3.0  3.0
+    2018-01-04  4.0  2.0
+    2018-01-05  5.0  1.0
+    ```
 
-For each column in the DataFrame, let's calculate a simple moving average and get signals 
-of price crossing it. In particular, we want to test two different window sizes: 2 and 3.
+    For each column in the DataFrame, let's calculate a simple moving average and get signals 
+    of price crossing it. In particular, we want to test two different window sizes: 2 and 3.
 
-A naive way of doing this:
+    A naive way of doing this:
 
-```python-repl
->>> ma_df = pd.DataFrame.vbt.concat(
-...     price_sm.rolling(window=2).mean(), 
-...     price_sm.rolling(window=3).mean(), 
-...     as_columns=pd.Index([2, 3], name='ma_window'))
->>> print(ma_df)
-ma_window          2         3
-              a    b    a    b
-2018-01-01  NaN  NaN  NaN  NaN
-2018-01-02  1.5  4.5  NaN  NaN
-2018-01-03  2.5  3.5  2.0  4.0
-2018-01-04  3.5  2.5  3.0  3.0
-2018-01-05  4.5  1.5  4.0  2.0
+    ```python-repl
+    >>> ma_df = pd.DataFrame.vbt.concat(
+    ...     price_sm.rolling(window=2).mean(), 
+    ...     price_sm.rolling(window=3).mean(), 
+    ...     as_columns=pd.Index([2, 3], name='ma_window'))
+    >>> print(ma_df)
+    ma_window          2         3
+                a    b    a    b
+    2018-01-01  NaN  NaN  NaN  NaN
+    2018-01-02  1.5  4.5  NaN  NaN
+    2018-01-03  2.5  3.5  2.0  4.0
+    2018-01-04  3.5  2.5  3.0  3.0
+    2018-01-05  4.5  1.5  4.0  2.0
 
->>> above_signals = (price_sm.vbt.tile(2).vbt > ma_df)
->>> above_signals = above_signals.vbt.signals.first(after_false=True)
->>> print(above_signals)
-ma_window              2             3
-                a      b      a      b
-2018-01-01  False  False  False  False
-2018-01-02   True  False  False  False
-2018-01-03  False  False   True  False
-2018-01-04  False  False  False  False
-2018-01-05  False  False  False  False
+    >>> above_signals = (price_sm.vbt.tile(2).vbt > ma_df)
+    >>> above_signals = above_signals.vbt.signals.first(after_false=True)
+    >>> print(above_signals)
+    ma_window              2             3
+                    a      b      a      b
+    2018-01-01  False  False  False  False
+    2018-01-02   True  False  False  False
+    2018-01-03  False  False   True  False
+    2018-01-04  False  False  False  False
+    2018-01-05  False  False  False  False
 
->>> below_signals = (price_sm.vbt.tile(2).vbt < ma_df)
->>> below_signals = below_signals.vbt.signals.first(after_false=True)
->>> print(below_signals)
-ma_window              2             3
-                a      b      a      b
-2018-01-01  False  False  False  False
-2018-01-02  False   True  False  False
-2018-01-03  False  False  False   True
-2018-01-04  False  False  False  False
-2018-01-05  False  False  False  False
-```
+    >>> below_signals = (price_sm.vbt.tile(2).vbt < ma_df)
+    >>> below_signals = below_signals.vbt.signals.first(after_false=True)
+    >>> print(below_signals)
+    ma_window              2             3
+                    a      b      a      b
+    2018-01-01  False  False  False  False
+    2018-01-02  False   True  False  False
+    2018-01-03  False  False  False   True
+    2018-01-04  False  False  False  False
+    2018-01-05  False  False  False  False
+    ```
 
-Now the same using `IndicatorFactory`:
+    Now the same using `IndicatorFactory`:
 
-```python-repl
->>> MyMA = vbt.IndicatorFactory(
-...     ts_names=['price_sm'],
-...     param_names=['window'],
-...     output_names=['ma'],
-...     name='myma'
-... ).from_apply_func(vbt.timeseries.nb.rolling_mean_nb)
+    ```python-repl
+    >>> MyMA = vbt.IndicatorFactory(
+    ...     ts_names=['price_sm'],
+    ...     param_names=['window'],
+    ...     output_names=['ma'],
+    ...     name='myma'
+    ... ).from_apply_func(vbt.timeseries.nb.rolling_mean_nb)
 
->>> myma = MyMA.from_params(price_sm, [2, 3])
->>> above_signals = myma.price_sm_above(myma.ma, crossover=True)
->>> below_signals = myma.price_sm_below(myma.ma, crossover=True)
-```
+    >>> myma = MyMA.from_params(price_sm, [2, 3])
+    >>> above_signals = myma.price_sm_above(myma.ma, crossover=True)
+    >>> below_signals = myma.price_sm_below(myma.ma, crossover=True)
+    ```
 
-It not only produced the handy `from_params` method, but generated a whole infrastructure to be run with
-an arbitrary number of windows. 
+    It not only produced the handy `from_params` method, but generated a whole infrastructure to be run with
+    an arbitrary number of windows. 
 
-For all our inputs in `ts_names` and outputs in `output_names`, it created a bunch of comparison methods 
-for generating signals, such as `above`, `below` and `equal` (use `doc()`): 
+    For all our inputs in `ts_names` and outputs in `output_names`, it created a bunch of comparison methods 
+    for generating signals, such as `above`, `below` and `equal` (use `doc()`): 
 
-```python-repl
-'ma_above'
-'ma_below'
-'ma_equal'
-'price_sm_above'
-'price_sm_below'
-'price_sm_equal'
-```
+    ```python-repl
+    'ma_above'
+    'ma_below'
+    'ma_equal'
+    'price_sm_above'
+    'price_sm_below'
+    'price_sm_equal'
+    ```
 
-Each of these methods uses vectorbt's own broadcasting, so you can compare time series objects with an 
-arbitrary array-like object, given their shapes can be broadcasted together. You can also compare them
-to multiple objects at once, for example:
+    Each of these methods uses vectorbt's own broadcasting, so you can compare time series objects with an 
+    arbitrary array-like object, given their shapes can be broadcasted together. You can also compare them
+    to multiple objects at once, for example:
 
-```python-repl
->>> myma.ma_above([1.5, 2.5], multiple=True)
-myma_ma_above                         1.5                         2.5
-myma_window               2             3             2             3
-                   a      b      a      b      a      b      a      b
-2018-01-01     False  False  False  False  False  False  False  False
-2018-01-02     False   True  False  False  False   True  False  False
-2018-01-03      True   True   True   True  False   True  False   True
-2018-01-04      True   True   True   True   True  False   True   True
-2018-01-05      True  False   True   True   True  False   True  False
-```
+    ```python-repl
+    >>> myma.ma_above([1.5, 2.5], multiple=True)
+    myma_ma_above                         1.5                         2.5
+    myma_window               2             3             2             3
+                    a      b      a      b      a      b      a      b
+    2018-01-01     False  False  False  False  False  False  False  False
+    2018-01-02     False   True  False  False  False   True  False  False
+    2018-01-03      True   True   True   True  False   True  False   True
+    2018-01-04      True   True   True   True   True  False   True   True
+    2018-01-05      True  False   True   True   True  False   True  False
+    ```
 
-`IndicatorFactory` also attached pandas indexing to the indicator class: 
+    `IndicatorFactory` also attached pandas indexing to the indicator class: 
 
-```python-repl
-'iloc'
-'loc'
-'window_loc'
-'xs'
-```
+    ```python-repl
+    'iloc'
+    'loc'
+    'window_loc'
+    'xs'
+    ```
 
-This makes accessing rows and columns by labels, integer positions, and parameters much easier.
+    This makes accessing rows and columns by labels, integer positions, and parameters much easier.
 
-The other advantage of using `IndicatorFactory` is broadcasting:
+    The other advantage of using `IndicatorFactory` is broadcasting:
 
-* Passing multiple time series objects will broadcast them to the same shape and index/columns
+    * Passing multiple time series objects will broadcast them to the same shape and index/columns
 
-```python-repl
->>> price_sm2 = price_sm.copy() + 1
->>> price_sm2.columns = ['a2', 'b2']
+    ```python-repl
+    >>> price_sm2 = price_sm.copy() + 1
+    >>> price_sm2.columns = ['a2', 'b2']
 
->>> MyInd = vbt.IndicatorFactory(
-...     ts_names=['price_sm', 'price_sm2'],
-...     param_names=['p1', 'p2']
-... ).from_apply_func(
-...     lambda price_sm, price_sm2, p1, p2: price_sm * p1 + price_sm2 * p2
-... )
+    >>> MyInd = vbt.IndicatorFactory(
+    ...     ts_names=['price_sm', 'price_sm2'],
+    ...     param_names=['p1', 'p2']
+    ... ).from_apply_func(
+    ...     lambda price_sm, price_sm2, p1, p2: price_sm * p1 + price_sm2 * p2
+    ... )
 
->>> myInd = MyInd.from_params(price_sm, price_sm2, 1, 2)
->>> print(myInd.price_sm)
-              a    b
-             a2   b2
-2018-01-01  1.0  5.0
-2018-01-02  2.0  4.0
-2018-01-03  3.0  3.0
-2018-01-04  4.0  2.0
-2018-01-05  5.0  1.0
->>> print(myInd.price_sm2)
-              a    b
-             a2   b2
-2018-01-01  2.0  6.0
-2018-01-02  3.0  5.0
-2018-01-03  4.0  4.0
-2018-01-04  5.0  3.0
-2018-01-05  6.0  2.0
-```
+    >>> myInd = MyInd.from_params(price_sm, price_sm2, 1, 2)
+    >>> print(myInd.price_sm)
+                a    b
+                a2   b2
+    2018-01-01  1.0  5.0
+    2018-01-02  2.0  4.0
+    2018-01-03  3.0  3.0
+    2018-01-04  4.0  2.0
+    2018-01-05  5.0  1.0
+    >>> print(myInd.price_sm2)
+                a    b
+                a2   b2
+    2018-01-01  2.0  6.0
+    2018-01-02  3.0  5.0
+    2018-01-03  4.0  4.0
+    2018-01-04  5.0  3.0
+    2018-01-05  6.0  2.0
+    ```
 
-* Passing multiple parameters will broadcast them to arrays of the same shape
+    * Passing multiple parameters will broadcast them to arrays of the same shape
 
-```python-repl
->>> myInd = MyInd.from_params(price_sm, price_sm2, 1, 2)
->>> print(myInd._p1_array)
->>> print(myInd._p2_array)
-[1]
-[2]
+    ```python-repl
+    >>> myInd = MyInd.from_params(price_sm, price_sm2, 1, 2)
+    >>> print(myInd._p1_array)
+    >>> print(myInd._p2_array)
+    [1]
+    [2]
 
->>> myInd = MyInd.from_params(price_sm, price_sm2, 1, [2, 3])
->>> print(myInd._p1_array)
->>> print(myInd._p2_array)
-[1 1]
-[2 3]
+    >>> myInd = MyInd.from_params(price_sm, price_sm2, 1, [2, 3])
+    >>> print(myInd._p1_array)
+    >>> print(myInd._p2_array)
+    [1 1]
+    [2 3]
 
->>> myInd = MyInd.from_params(price_sm, price_sm2, [1, 2], [3, 4], param_product=True)
->>> print(myInd._p1_array)
->>> print(myInd._p2_array)
-[1 1 2 2]
-[3 4 3 4]
-```
+    >>> myInd = MyInd.from_params(price_sm, price_sm2, [1, 2], [3, 4], param_product=True)
+    >>> print(myInd._p1_array)
+    >>> print(myInd._p2_array)
+    [1 1 2 2]
+    [3 4 3 4]
+    ```
 
-This way, you can define parameter combinations of any order and shape. 
+    This way, you can define parameter combinations of any order and shape. 
 """
 import numpy as np
 import pandas as pd

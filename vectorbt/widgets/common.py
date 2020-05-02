@@ -1,4 +1,4 @@
-"""Common functions and classes for working with widgets."""
+"""Common functions and classes for displaying widgets."""
 
 import plotly.graph_objects as go
 
