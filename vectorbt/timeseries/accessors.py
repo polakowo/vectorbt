@@ -1,9 +1,32 @@
 """Custom pandas accessors for working with time series.
 
-Accessible through `pandas.vbt.timeseries` and `pandas.vbt.ohlcv`.
-
 !!! note
-    Input can be of any data type, but output is always `numpy.float64`."""
+    Input arrays can be of any data type, but output arrays are always `numpy.float64`.
+    
+Before running the examples below:
+```py
+import vectorbt as vbt
+import numpy as np
+import pandas as pd
+from numba import njit
+from datetime import datetime
+
+index = pd.Index([
+    datetime(2018, 1, 1),
+    datetime(2018, 1, 2),
+    datetime(2018, 1, 3),
+    datetime(2018, 1, 4),
+    datetime(2018, 1, 5)
+])
+columns = ['a', 'b', 'c']
+df = pd.DataFrame([
+    [1, 5, 1],
+    [2, 4, 2],
+    [3, 3, 3],
+    [4, 2, 2],
+    [5, 1, 1]
+], index=index, columns=columns)
+```"""
 
 import numpy as np
 import pandas as pd
@@ -12,13 +35,13 @@ import itertools
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks, reshape_fns, index_fns
-from vectorbt.utils.common import add_safe_nb_methods
+from vectorbt.utils.common import add_nb_methods
 from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
 from vectorbt.timeseries import nb
 from vectorbt.widgets.common import DefaultFigureWidget
 
 
-@add_safe_nb_methods(
+@add_nb_methods(
     nb.fillna_nb,
     nb.fshift_nb,
     nb.diff_nb,
@@ -40,10 +63,34 @@ from vectorbt.widgets.common import DefaultFigureWidget
     nb.expanding_apply_nb,
     module_name='vectorbt.timeseries.nb')
 class TimeSeries_Accessor():
-    """Accessor with methods for both Series and DataFrames."""
+    """Accessor with methods for both Series and DataFrames.
+    
+    Accessible through `pandas.Series.vbt.timeseries` and `pandas.DataFrame.vbt.timeseries`."""
 
     def groupby_apply(self, by, apply_func_nb, on_2d=False):
-        """See `vectorbt.timeseries.nb.groupby_apply_nb`."""
+        """See `vectorbt.timeseries.nb.groupby_apply_nb`.
+        
+        Example:
+            ```python-repl
+            >>> mean_reduce_nb = njit(lambda a: np.nanmean(a))
+
+            >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3], 
+            ...     mean_reduce_nb))
+                 a    b    c
+            1  1.5  4.5  1.5
+            2  3.5  2.5  2.5
+            3  5.0  1.0  1.0
+            >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3], 
+            ...     mean_reduce_nb, on_2d=True))
+                      a         b         c
+            1  2.500000  2.500000  2.500000
+            2  2.833333  2.833333  2.833333
+            3  2.333333  2.333333  2.333333
+            ```"""
+        by = np.asarray(by)
+        checks.assert_same_shape(self._obj, by, axis=0)
+        checks.assert_numba_func(apply_func_nb)
+
         groups, applied = nb.groupby_apply_nb(self.to_2d_array(), by, apply_func_nb, on_2d=on_2d)
         return self.wrap_array(applied, index=groups)
 
@@ -52,7 +99,25 @@ class TimeSeries_Accessor():
 
         Numba equivalent to `pd.Series(a).resample(freq).apply(apply_func_nb, raw=True)`.
 
-        If `on_2d` is `True`, will apply to all columns as matrix, otherwise to each column individually."""
+        If `on_2d` is `True`, will apply to all columns as matrix, otherwise to each column individually.
+        
+        Example:
+            ```python-repl
+            >>> mean_reduce_nb = njit(lambda a: np.nanmean(a))
+
+            >>> print(df.vbt.timeseries.resample_apply('2d', mean_reduce_nb))
+                          a    b    c
+            2018-01-01  1.5  4.5  1.5
+            2018-01-03  3.5  2.5  2.5
+            2018-01-05  5.0  1.0  1.0
+            >>> print(df.vbt.timeseries.resample_apply('2d', mean_reduce_nb, on_2d=True))
+                               a         b         c
+            2018-01-01  2.500000  2.500000  2.500000
+            2018-01-03  2.833333  2.833333  2.833333
+            2018-01-05  2.333333  2.333333  2.333333
+            ```"""
+        checks.assert_numba_func(apply_func_nb)
+
         resampled = self._obj.resample(freq, **kwargs)
         # Build a mask that acts as a map between new and old index
         # It works on resampled.indices instead of resampled.groups, so there is no redundancy
@@ -82,17 +147,11 @@ class TimeSeries_Accessor():
 
         Example:
             ```python-repl
-            >>> import pandas as pd
-            >>> df = pd.DataFrame({
-            ...     'a': [1., 2., 3., 4.], 
-            ...     'b': [5., 6., 7., 8.]
-            ... }, index=['w', 'x', 'y', 'z'])
-
-            >>> print(df.vbt.timeseries.rolling_window(2))
-                                    a              b          
-            start_date    w    x    y    w    x    y
-            0           1.0  2.0  3.0  5.0  6.0  7.0
-            1           2.0  3.0  4.0  6.0  7.0  8.0
+            >>> print(df.vbt.timeseries.rolling_window(2, n=2))
+                                a                     b                     c           
+            start_date 2018-01-01 2018-01-04 2018-01-01 2018-01-04 2018-01-01 2018-01-04
+            0                 1.0        4.0        5.0        2.0        1.0        2.0
+            1                 2.0        5.0        4.0        1.0        2.0        1.0 
             ```"""
         cube = nb.rolling_window_nb(self.to_2d_array(), window)
         if n is not None:
@@ -101,17 +160,19 @@ class TimeSeries_Accessor():
         else:
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
-        range_columns = pd.Index(self._obj.index[idxs], name='start_date')
-        new_columns = index_fns.combine(reshape_fns.to_2d(self._obj).columns, range_columns)
+        range_columns = pd.Index(self.index[idxs], name='start_date')
+        new_columns = index_fns.combine(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
 
 @register_series_accessor('timeseries')
 class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
-    """Accessor with methods for Series only."""
+    """Accessor with methods for Series only.
+    
+    Accessible through `pandas.Series.vbt.timeseries`."""
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
-        """Plot time series as a line.
+        """Plot Series as a line.
 
         Args:
             name (str): Name of the trace.
@@ -135,8 +196,8 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             fig.update_layout(showlegend=True)
 
         scatter = go.Scatter(
-            x=self._obj.index,
-            y=self._obj.values,
+            x=self.index,
+            y=self.to_array(),
             mode='lines',
             name=str(name) if name is not None else None
         )
@@ -148,10 +209,12 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
 @register_dataframe_accessor('timeseries')
 class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
-    """Accessor with methods for DataFrames only."""
+    """Accessor with methods for DataFrames only.
+    
+    Accessible through `pandas.DataFrame.vbt.timeseries`."""
 
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
-        """Plot each column in time series as a line.
+        """Plot each column in DataFrame as a line.
 
         Args:
             trace_kwargs (dict or list of dict): Keyword arguments passed to each [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
@@ -178,7 +241,9 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
 @register_dataframe_accessor('ohlcv')
 class OHLCV_DFAccessor(TimeSeries_DFAccessor):
-    """Accessor with methods for DataFrames only."""
+    """Accessor with methods for DataFrames only.
+    
+    Accessible through `pandas.DataFrame.vbt.ohlcv`."""
 
     def __init__(self, obj):
         super().__init__(obj)
@@ -224,7 +289,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
 
         fig = DefaultFigureWidget()
         candlestick = go.Candlestick(
-            x=self._obj.index,
+            x=self.index,
             open=open,
             high=high,
             low=low,
@@ -243,7 +308,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
             marker_colors[(close.values - open.values) == 0] = 'lightgrey'
             marker_colors[(close.values - open.values) < 0] = 'red'
             bar = go.Bar(
-                x=self._obj.index,
+                x=self.index,
                 y=volume,
                 marker_color=marker_colors,
                 marker_line_width=0,

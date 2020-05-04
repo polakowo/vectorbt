@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from numba.targets.registry import CPUDispatcher
+from numba.core.registry import CPUDispatcher
 
 from vectorbt.utils import reshape_fns
 
@@ -35,6 +35,11 @@ def is_numba_func(arg):
 
 
 # ############# Asserts ############# #
+
+def assert_numba_func(func):
+    """Raise exception if `func` is not Numba-compiled."""
+    if not is_numba_func(func):
+        raise TypeError(f"Function {func} must be Numba compiled")
 
 
 def assert_not_none(arg):
@@ -115,7 +120,9 @@ def assert_ndim(arg, ndims):
 
 
 def assert_same_len(arg1, arg2):
-    """Raise exception if `arg1` and `arg2` have different length."""
+    """Raise exception if `arg1` and `arg2` have different length.
+    
+    Does not transform arguments to NumPy arrays."""
     if len(arg1) != len(arg2):
         raise ValueError(f"Lengths {len(arg1)} and {len(arg2)} do not match")
 

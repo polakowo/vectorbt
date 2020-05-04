@@ -1,9 +1,9 @@
 import numpy as np
 from numba import njit, b1, i1, i8, f8
-from numba.types import UniTuple
+from numba.core.types import UniTuple
 
 
-@njit(f8(i8, i8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
+@njit(cache=True)
 def signals_order_func_np(i, col, run_cash, run_shares, entries, exits, volume, accumulate):
     """Order function to buy/sell based on signals."""
     if run_shares > 0:
@@ -21,7 +21,7 @@ def signals_order_func_np(i, col, run_cash, run_shares, entries, exits, volume, 
     return 0.
 
 
-@njit(f8(i8, i8, f8, f8, f8[:, :], b1), cache=True)
+@njit(cache=True)
 def orders_order_func_np(i, col, run_cash, run_shares, orders, is_target):
     """Buy/sell the amount of shares specified by orders."""
     if is_target:
@@ -68,19 +68,19 @@ def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
     return cash, shares
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
+@njit(cache=True)
 def portfolio_from_signals_np(ts, investment, slippage, commission, entries, exits, volume, accumulate):
     """Calculate portfolio value using signals."""
     return portfolio_np(ts, investment, slippage, commission, signals_order_func_np, entries, exits, volume, accumulate)
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, f8[:, :], b1), cache=True)
+@njit(cache=True)
 def portfolio_from_orders_np(ts, investment, slippage, commission, orders, is_target):
     """Calculate portfolio value using orders."""
     return portfolio_np(ts, investment, slippage, commission, orders_order_func_np, orders, is_target)
 
 
-@njit(b1(f8[:]), cache=True)
+@njit(cache=True)
 def detect_order_accumulation_1d_nb(trades):
     """Detect accumulation of orders, that is, position is being increased/decreased gradually.
 
@@ -102,7 +102,7 @@ def detect_order_accumulation_1d_nb(trades):
     return False
 
 
-@njit(b1[:](f8[:, :]), cache=True)
+@njit(cache=True)
 def detect_order_accumulation_nb(trades):
     """Detect accumulation of orders, that is, position is being increased/decreased gradually.
 
@@ -139,13 +139,13 @@ _profits_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, c
 _returns_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] / equity[entry_i, col] - 1)
 
 
-@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
+@njit(cache=True)
 def position_profits_nb(trades, equity):
     """Calculate P/L per position."""
     return apply_on_positions(trades, _profits_nb, equity)
 
 
-@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
+@njit(cache=True)
 def position_returns_nb(trades, equity):
     """Calculate returns per trade."""
     return apply_on_positions(trades, _returns_nb, equity)
@@ -169,21 +169,21 @@ _win_mask_nb = njit(lambda x: x > 0)
 _loss_mask_nb = njit(lambda x: x < 0)
 
 
-@njit(f8[:](f8[:, :]))
+@njit(cache=True)
 def sum_win_nb(position_profits):
     return apply_on_position_profits_nb(position_profits, _nansum_nb, _win_mask_nb)
 
 
-@njit(f8[:](f8[:, :]))
+@njit(cache=True)
 def sum_loss_nb(position_profits):
     return np.abs(apply_on_position_profits_nb(position_profits, _nansum_nb, _loss_mask_nb))
 
 
-@njit(f8[:](f8[:, :]))
+@njit(cache=True)
 def avg_win_nb(position_profits):
     return apply_on_position_profits_nb(position_profits, _nanmean_nb, _win_mask_nb)
 
 
-@njit(f8[:](f8[:, :]))
+@njit(cache=True)
 def avg_loss_nb(position_profits):
     return np.abs(apply_on_position_profits_nb(position_profits, _nanmean_nb, _loss_mask_nb))

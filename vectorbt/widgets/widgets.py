@@ -148,8 +148,7 @@ class Bar(DefaultFigureWidget):
             ```
             ![](img/Bar_updated.png)
         """
-        data = np.asarray(data)
-        data = reshape_fns.to_2d(data)
+        data = reshape_fns.to_2d(np.asarray(data))
         checks.assert_same_shape(data, self._x_labels, axis=(0, 0))
         checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
 
@@ -211,8 +210,7 @@ class Scatter(DefaultFigureWidget):
 
                 Must be of shape (`x_labels`, `trace_names`).
         """
-        data = np.asarray(data)
-        data = reshape_fns.to_2d(data)
+        data = reshape_fns.to_2d(np.asarray(data))
         checks.assert_same_shape(data, self._x_labels, axis=(0, 0))
         checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
 
@@ -273,8 +271,7 @@ class Histogram(DefaultFigureWidget):
 
                 Must be of shape (any, `trace_names`).
         """
-        data = np.asarray(data)
-        data = reshape_fns.to_2d(data)
+        data = reshape_fns.to_2d(np.asarray(data))
         checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
 
         # Update traces
@@ -340,8 +337,7 @@ class Heatmap(DefaultFigureWidget):
 
                 Must be of shape (`y_labels`, `x_labels`).
         """
-        data = np.asarray(data)
-        data = reshape_fns.to_2d(data)
+        data = reshape_fns.to_2d(np.asarray(data))
         checks.assert_same_shape(data, self._x_labels, axis=(1, 0))
         checks.assert_same_shape(data, self._y_labels, axis=(0, 0))
 

@@ -297,7 +297,7 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
 
                 Numba requires arrays to be writable.
 
-        copy_kwargs (dict): Keyword arguments passed to `numpy.array`. For example, to specify `order`.
+        copy_kwargs (dict): Keyword arguments passed to `np.array`. For example, to specify `order`.
 
             !!! note
                 Has effect on every array, independent from whether broadcasting was needed or not.

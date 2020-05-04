@@ -233,7 +233,7 @@ def build_column_hierarchy(param_list, level_names, ts_columns):
 
 def build_mapper(params, ts, new_columns, level_name):
     """Build a mapper that maps parameter values in `params` to columns in `new_columns`."""
-    params_mapper = np.repeat(params, len(reshape_fns.to_2d(ts).columns))
+    params_mapper = np.repeat(params, len(ts.vbt.columns))
     params_mapper = pd.Series(params_mapper, index=new_columns, name=level_name)
     return params_mapper
 
@@ -381,8 +381,6 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     """
     # Check time series objects
     checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
-    for i in range(1, len(ts_list)):
-        ts_list[i].vbt.timeseries.validate()
     if len(ts_list) > 1:
         # Broadcast time series
         ts_list = reshape_fns.broadcast(*ts_list, **broadcast_kwargs, writeable=True)
@@ -428,14 +426,14 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     output_list = output_list[:num_outputs]
     if len(param_list) > 0:
         # Build new column levels on top of time series levels
-        new_columns = build_column_hierarchy(param_list, level_names, reshape_fns.to_2d(ts_list[0]).columns)
+        new_columns = build_column_hierarchy(param_list, level_names, ts_list[0].vbt.columns)
         # Wrap into new pandas objects both time series and output objects
         new_ts_list = list(map(lambda x: broadcast_ts(x, param_list[0].shape[0], new_columns), ts_list))
         # Build mappers to easily map between parameters and columns
         mapper_list = [build_mapper(x, ts_list[0], new_columns, level_names[i]) for i, x in enumerate(param_list)]
     else:
         # Some indicators don't have any params
-        new_columns = reshape_fns.to_2d(ts_list[0]).columns
+        new_columns = ts_list[0].vbt.columns
         new_ts_list = list(ts_list)
         mapper_list = []
     output_list = list(map(lambda x: wrap_output(x, ts_list[0], new_columns), output_list))
@@ -450,7 +448,6 @@ def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
     """Perform checks on objects created by running or slicing an indicator."""
     for ts in ts_list:
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
-        ts.vbt.timeseries.validate()
     for i in range(1, len(ts_list) + len(output_list)):
         checks.assert_same_meta((ts_list + output_list)[i-1], (ts_list + output_list)[i])
     for i in range(1, len(param_list)):
@@ -466,7 +463,7 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
     Both will be broadcasted together. Set `multiple` to `True` to compare with multiple arguments. In this case,
     a new column level will be created with the name `name`.
     
-    For more details, see `vectorbt.utils.accessors.Base_Accessor.combine_with`."""
+    See `vectorbt.utils.accessors.Base_Accessor.combine_with`."""
     if multiple:
         if as_columns is None:
             as_columns = index_fns.from_values(other, name=name)
@@ -682,7 +679,7 @@ class IndicatorFactory():
                 Set `crossover` to `True` to return the first `True` after crossover. Specify `wait` to return 
                 `True` only when `{attr}` is {func_name} for a number of time steps in a row after crossover.
 
-                For more details, see `vectorbt.indicators.factory.compare`."""
+                See `vectorbt.indicators.factory.compare`."""
                 setattr(CustomIndicator, f'{attr}_{func_name}', comparison_method)
 
             assign_comparison_method('above', np.greater)

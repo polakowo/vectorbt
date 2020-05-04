@@ -1,6 +1,4 @@
-"""Custom pandas accessors with utility methods.
-
-Accessible through `pandas.vbt`, `pandas.vbt.timeseries` and `pandas.vbt.signals`."""
+"""Custom pandas accessors with utility methods."""
 
 import numpy as np
 import pandas as pd
@@ -13,6 +11,8 @@ from vectorbt.utils.common import class_or_instancemethod, fix_class_for_pdoc
 class Base_Accessor():
     """Accessor with methods for both Series and DataFrames.
 
+    Accessible through `pandas.Series.vbt` and `pandas.DataFrame.vbt`, and all child accessors.
+
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1D data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
     by using `Base_Accessor.wrap_array`, we will convert the 2D output back to a Series."""
@@ -20,9 +20,6 @@ class Base_Accessor():
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
         self._validate(self._obj)
-
-    dtype = None
-    """Class attribute used for validation of the data type by subclasses."""
 
     @classmethod
     def _validate(cls, obj):
@@ -32,6 +29,32 @@ class Base_Accessor():
     def validate(self):
         """Call this method to instantiate the accessor and invoke `Base_Accessor._validate`."""
         pass
+
+    @classmethod
+    def empty(cls, shape, fill_value=np.nan, **kwargs):
+        """Generate an empty Series/DataFrame of shape `shape` and fill with `fill_value`."""
+        if not isinstance(shape, tuple) or (isinstance(shape, tuple) and len(shape) == 1):
+            return pd.Series(np.full(shape, fill_value), **kwargs)
+        return pd.DataFrame(np.full(shape, fill_value), **kwargs)
+
+    @classmethod
+    def empty_like(cls, other, fill_value=np.nan):
+        """Generate an empty Series/DataFrame like `other` and fill with `fill_value`."""
+        if checks.is_series(other):
+            return cls.empty(other.shape, fill_value=fill_value, index=other.index, name=other.name)
+        return cls.empty(other.shape, fill_value=fill_value, index=other.index, columns=other.columns)
+
+    @property
+    def index(self):
+        """Return index of Series/DataFrame."""
+        return self._obj.index
+
+    @property
+    def columns(self):
+        """Return `[name]` of Series and `columns` of DataFrame."""
+        if checks.is_series(self._obj):
+            return pd.Index([self._obj.name])
+        return self._obj.columns
 
     def to_array(self):
         """Convert to NumPy array."""
@@ -59,7 +82,7 @@ class Base_Accessor():
         Use `as_columns` as a top-level column level."""
         tiled = reshape_fns.tile(self._obj, n, axis=1)
         if as_columns is not None:
-            new_columns = index_fns.combine(as_columns, reshape_fns.to_2d(self._obj).columns)
+            new_columns = index_fns.combine(as_columns, self.columns)
             return self.wrap_array(tiled.values, columns=new_columns)
         return tiled
 
@@ -69,7 +92,7 @@ class Base_Accessor():
         Use `as_columns` as a top-level column level."""
         repeated = reshape_fns.repeat(self._obj, n, axis=1)
         if as_columns is not None:
-            new_columns = index_fns.combine(reshape_fns.to_2d(self._obj).columns, as_columns)
+            new_columns = index_fns.combine(self.columns, as_columns)
             return self.wrap_array(repeated.values, columns=new_columns)
         return repeated
 
@@ -128,9 +151,8 @@ class Base_Accessor():
     def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
         """Concatenate with `others` along columns.
 
-        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`.
-
-        Use `as_columns` as a top-level column level.
+        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        with `broadcast_kwargs`. Use `as_columns` as a top-level column level.
 
         Example:
             ```python-repl
@@ -190,17 +212,17 @@ class Base_Accessor():
         else:
             result = combine_fns.apply_and_concat(obj_arr, ntimes, apply_func, *args, **kwargs)
         # Build column hierarchy
-        columns = reshape_fns.to_2d(self._obj).columns
         if as_columns is not None:
-            new_columns = index_fns.combine(as_columns, columns)
+            new_columns = index_fns.combine(as_columns, self.columns)
         else:
-            new_columns = index_fns.tile(columns, ntimes)
-        return reshape_fns.wrap_array_as(result, self._obj, columns=new_columns)
+            new_columns = index_fns.tile(self.columns, ntimes)
+        return self.wrap_array(result, columns=new_columns)
 
     def combine_with(self, other, *args, combine_func=None, pass_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
 
-        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`.
+        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        with `broadcast_kwargs`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`.
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
@@ -217,7 +239,7 @@ class Base_Accessor():
             y  7  8
             ```
 
-            It is also used by magic methods such as `__add__` directly on `pandas.vbt`:
+            It is also used by magic methods such as `__add__` directly on accessor:
 
             ```python-repl
             >>> print(sr.vbt + df)
@@ -240,13 +262,14 @@ class Base_Accessor():
             new_obj_arr = np.asarray(new_obj)
             new_other_arr = np.asarray(new_other)
         result = combine_func(new_obj_arr, new_other_arr, *args, **kwargs)
-        return reshape_fns.wrap_array_as(result, new_obj)
+        return new_obj.vbt.wrap_array(result)
 
     def combine_with_multiple(self, others, *args, combine_func=None, pass_2d=False,
                               concat=False, broadcast_kwargs={}, as_columns=None, **kwargs):
         """Combine with `others` using `combine_func`.
 
-        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`.
+        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        with `broadcast_kwargs`.
 
         If `concat` is `True`, concatenate the results along columns, 
         see `vectorbt.utils.combine_fns.combine_and_concat`.
@@ -307,12 +330,12 @@ class Base_Accessor():
                 result = combine_fns.combine_and_concat_nb(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
-            columns = reshape_fns.to_2d(new_obj).columns
+            columns = new_obj.vbt.columns
             if as_columns is not None:
                 new_columns = index_fns.combine(as_columns, columns)
             else:
                 new_columns = index_fns.tile(columns, len(others))
-            return reshape_fns.wrap_array_as(result, new_obj, columns=new_columns)
+            return new_obj.vbt.wrap_array(result, columns=new_columns)
         else:
             # Combine arguments pairwise into one object
             if checks.is_numba_func(combine_func):
@@ -321,7 +344,7 @@ class Base_Accessor():
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
-            return reshape_fns.wrap_array_as(result, new_obj)
+            return new_obj.vbt.wrap_array(result)
 
     # Comparison operators
     def __eq__(self, other): return self.combine_with(other, combine_func=np.equal)
@@ -351,56 +374,37 @@ class Base_Accessor():
 
 
 class Base_SRAccessor(Base_Accessor):
-    """Accessor with methods for Series only."""
+    """Accessor with methods for Series only.
+
+    Accessible through `pandas.Series.vbt` and all child accessors."""
 
     @classmethod
     def _validate(cls, obj):
         checks.assert_type(obj, pd.Series)
 
-    @classmethod
-    def empty(cls, size, fill_value=np.nan, index=None, name=None):
-        """Generate an empty Series of size `size` and fill with `fill_value`."""
-        return pd.Series(
-            np.full(size, fill_value),
-            index=index,
-            name=name,
-            dtype=cls.dtype)
+    @class_or_instancemethod
+    def is_series(self_or_cls):
+        return True
 
-    @classmethod
-    def empty_like(cls, sr, fill_value=np.nan):
-        """Generate an empty Series like `sr` and fill with `fill_value`."""
-        cls._validate(sr)
-
-        return cls.empty(
-            sr.shape,
-            fill_value=fill_value,
-            index=sr.index,
-            name=sr.name)
+    @class_or_instancemethod
+    def is_frame(self_or_cls):
+        return False
 
 
 class Base_DFAccessor(Base_Accessor):
-    """Accessor with methods for DataFrames only."""
+    """Accessor with methods for DataFrames only.
+
+    Accessible through `pandas.DataFrame.vbt` and all child accessors."""
+    pd_type = pd.DataFrame
 
     @classmethod
     def _validate(cls, obj):
         checks.assert_type(obj, pd.DataFrame)
 
-    @classmethod
-    def empty(cls, shape, fill_value=np.nan, index=None, columns=None):
-        """Generate an empty DataFrame of shape `shape` and fill with `fill_value`."""
-        return pd.DataFrame(
-            np.full(shape, fill_value),
-            index=index,
-            columns=columns,
-            dtype=cls.dtype)
+    @class_or_instancemethod
+    def is_series(self_or_cls):
+        return False
 
-    @classmethod
-    def empty_like(cls, df, fill_value=np.nan):
-        """Generate an empty DataFrame like `df` and fill with `fill_value`."""
-        cls._validate(df)
-
-        return cls.empty(
-            df.shape,
-            fill_value=fill_value,
-            index=df.index,
-            columns=df.columns)
+    @class_or_instancemethod
+    def is_frame(self_or_cls):
+        return True

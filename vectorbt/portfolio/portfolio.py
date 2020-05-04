@@ -25,7 +25,6 @@ class Portfolio():
 
     def __init__(self, ts, cash, shares, investment, slippage, commission):
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
-        ts.vbt.timeseries.validate()
 
         checks.assert_same_meta(ts, cash)
         checks.assert_same_meta(ts, shares)
@@ -77,7 +76,6 @@ class Portfolio():
         checks.assert_type(entries, (pd.Series, pd.DataFrame))
         checks.assert_type(exits, (pd.Series, pd.DataFrame))
 
-        ts.vbt.timeseries.validate()
         entries.vbt.signals.validate()
         exits.vbt.signals.validate()
 
@@ -120,9 +118,6 @@ class Portfolio():
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
         checks.assert_type(orders, (pd.Series, pd.DataFrame))
 
-        ts.vbt.timeseries.validate()
-        orders.vbt.timeseries.validate()
-
         ts, orders = reshape_fns.broadcast(ts, orders, **broadcast_kwargs, writeable=True)
 
         investment = float(investment)
@@ -153,7 +148,6 @@ class Portfolio():
             commission = defaults.portfolio['commission']
 
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
-        ts.vbt.timeseries.validate()
 
         investment = float(investment)
         slippage = float(slippage)

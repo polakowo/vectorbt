@@ -95,8 +95,8 @@ def get_kwargs(func):
     }
 
 
-def add_safe_nb_methods(*nb_funcs, module_name=None):
-    """Class decorator to wrap each Numba function in `nb_funcs` as a method of that class."""
+def add_nb_methods(*nb_funcs, module_name=None):
+    """Class decorator to wrap each Numba function in `nb_funcs` as a method of this class."""
     def wrapper(cls):
         for nb_func in nb_funcs:
             default_kwargs = get_kwargs(nb_func)

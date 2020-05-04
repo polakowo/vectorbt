@@ -1,6 +1,6 @@
 """Custom indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
-Before running the examples, import the following libraries:
+Before running the examples below:
 ```py
 import numpy as np
 import pandas as pd
@@ -21,7 +21,7 @@ price['Close'].vbt.timeseries.plot()
 import numpy as np
 import pandas as pd
 from numba import njit
-from numba.types import UniTuple, f8, i8, b1, DictType, Tuple
+from numba.core.types import UniTuple, f8, i8, b1, DictType, Tuple
 import itertools
 import plotly.graph_objects as go
 
@@ -480,11 +480,7 @@ class BollingerBands(BollingerBands):
             2019-02-28       NaN       NaN
             2019-03-01       NaN       NaN
             2019-03-02       NaN       NaN
-            2019-03-03       NaN       NaN
-            2019-03-04       NaN       NaN
             ...              ...       ...
-            2019-08-27  0.107370  0.313212
-            2019-08-28  0.130902  0.325698
             2019-08-29  0.135092  0.350338
             2019-08-30  0.123553  0.359435
             2019-08-31  0.133292  0.361560
@@ -1259,11 +1255,7 @@ class OBV(OBV):
             2019-02-28             NaN
             2019-03-01    7.661248e+09
             2019-03-02    1.524003e+10
-            2019-03-03    7.986476e+09
-            2019-03-04   -1.042700e+09
-                                   ...     
-            2019-08-27    5.613088e+11
-            2019-08-28    5.437050e+11
+                                   ...
             2019-08-29    5.266592e+11
             2019-08-30    5.402544e+11
             2019-08-31    5.517092e+11
