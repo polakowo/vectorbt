@@ -87,15 +87,15 @@ class Portfolio():
         slippage = float(slippage)
         commission = float(commission)
 
-        cash, shares = nb.portfolio_from_signals_np(
+        cash, shares = nb.portfolio_np(
             ts.vbt.to_2d_array(),
             investment,
             slippage,
             commission,
+            nb.signals_order_func_np,
             entries.vbt.to_2d_array(),
             exits.vbt.to_2d_array(),
-            volume.vbt.to_2d_array(),
-            accumulate)
+            volume.vbt.to_2d_array())
 
         cash = ts.vbt.wrap_array(cash)
         shares = ts.vbt.wrap_array(shares)
@@ -103,10 +103,10 @@ class Portfolio():
         return cls(ts, cash, shares, investment, slippage, commission)
 
     @classmethod
-    def from_orders(cls, ts, orders, is_target=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
-        """Build portfolio based on orders.
+    def from_volume(cls, ts, volume, is_target=False, investment=None, slippage=None, commission=None, broadcast_kwargs={}):
+        """Build portfolio based on volume.
 
-        Set an orders element to positive/negative number - a number of shares to buy/sell.
+        Set an volume element to positive/negative number - a number of shares to buy/sell.
         Set is_target to `True` to specify the target amount of shares to hold."""
         if investment is None:
             investment = defaults.portfolio['investment']
@@ -116,20 +116,21 @@ class Portfolio():
             commission = defaults.portfolio['commission']
 
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
-        checks.assert_type(orders, (pd.Series, pd.DataFrame))
+        checks.assert_type(volume, (pd.Series, pd.DataFrame))
 
-        ts, orders = reshape_fns.broadcast(ts, orders, **broadcast_kwargs, writeable=True)
+        ts, volume = reshape_fns.broadcast(ts, volume, **broadcast_kwargs, writeable=True)
 
         investment = float(investment)
         slippage = float(slippage)
         commission = float(commission)
 
-        cash, shares = nb.portfolio_from_orders_np(
+        cash, shares = nb.portfolio_np(
             ts.vbt.to_2d_array(),
             investment,
             slippage,
             commission,
-            orders.vbt.to_2d_array(),
+            nb.volume_order_func_np,
+            volume.vbt.to_2d_array(),
             is_target)
 
         cash = ts.vbt.wrap_array(cash)
@@ -170,15 +171,23 @@ class Portfolio():
 
     @cached_property
     def equity(self):
-        return self.ts.vbt.wrap_array(self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array())
+        equity = self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.ts.vbt.to_2d_array()
+        return self.ts.vbt.wrap_array(equity)
 
     @cached_property
     def equity_in_shares(self):
-        return self.ts.vbt.wrap_array(self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array())
+        equity_in_shares = self.equity.vbt.to_2d_array() / self.ts.vbt.to_2d_array()
+        return self.ts.vbt.wrap_array(equity_in_shares)
 
     @cached_property
     def returns(self):
-        return self.ts.vbt.wrap_array(timeseries.nb.pct_change_nb(self.equity.vbt.to_2d_array()))
+        returns = timeseries.nb.pct_change_nb(self.equity.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(returns)
+
+    @cached_property
+    def returns_in_shares(self):
+        returns_in_shares = timeseries.nb.pct_change_nb(self.equity_in_shares.vbt.to_2d_array())
+        return self.ts.vbt.wrap_array(returns_in_shares)
 
     @cached_property
     def drawdown(self):
@@ -193,33 +202,26 @@ class Portfolio():
         return self.ts.vbt.wrap_array(trades)
 
     @cached_property
-    def position_profits(self):
-        position_profits = nb.position_profits_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
-        return self.ts.vbt.wrap_array(position_profits)
+    def position_pnl(self):
+        position_pnl = nb.map_positions_nb(
+            self.shares.vbt.to_2d_array(),
+            nb.pnl_map_func_nb,
+            self.ts.vbt.to_2d_array(),
+            self.cash.vbt.to_2d_array(),
+            self.shares.vbt.to_2d_array(),
+            self.investment)
+        return self.ts.vbt.wrap_array(position_pnl)
 
     @cached_property
     def position_returns(self):
-        position_returns = nb.position_returns_nb(self.trades.vbt.to_2d_array(), self.equity.vbt.to_2d_array())
+        position_returns = nb.map_positions_nb(
+            self.shares.vbt.to_2d_array(),
+            nb.returns_map_func_nb,
+            self.ts.vbt.to_2d_array(),
+            self.cash.vbt.to_2d_array(),
+            self.shares.vbt.to_2d_array(),
+            self.investment)
         return self.ts.vbt.wrap_array(position_returns)
-
-    @cached_property
-    def win_mask(self):
-        position_profits = self.position_profits.vbt.to_2d_array().copy()
-        position_profits[np.isnan(position_profits)] = 0  # avoid warnings
-        win_mask = position_profits > 0
-        return self.ts.vbt.wrap_array(win_mask)
-
-    @cached_property
-    def loss_mask(self):
-        position_profits = self.position_profits.vbt.to_2d_array().copy()
-        position_profits[np.isnan(position_profits)] = 0
-        loss_mask = position_profits < 0
-        return self.ts.vbt.wrap_array(loss_mask)
-
-    @cached_property
-    def position_mask(self):
-        position_mask = ~np.isnan(self.position_profits.vbt.to_2d_array())
-        return self.ts.vbt.wrap_array(position_mask)
 
     # ############# Performance metrics ############# #
 
@@ -232,46 +234,38 @@ class Portfolio():
         return a
 
     @cached_property
-    def sum_win(self):
-        """Sum of wins."""
-        sum_win = nb.sum_win_nb(self.position_profits.vbt.to_2d_array())
-        return self.wrap_metric(sum_win)
+    def win_sum(self):
+        win_sum = nb.reduce_map_results(self.position_pnl.vbt.to_2d_array(), nb.win_sum_reduce_func_nb)
+        return self.wrap_metric(win_sum)
 
     @cached_property
-    def sum_loss(self):
-        """Sum of losses (always positive)."""
-        sum_loss = nb.sum_loss_nb(self.position_profits.vbt.to_2d_array())
-        return self.wrap_metric(sum_loss)
+    def loss_sum(self):
+        loss_sum = nb.reduce_map_results(self.position_pnl.vbt.to_2d_array(), nb.loss_sum_reduce_func_nb)
+        return self.wrap_metric(loss_sum)
 
     @cached_property
-    def avg_win(self):
-        """Average win."""
-        avg_win = nb.avg_win_nb(self.position_profits.vbt.to_2d_array())
-        return self.wrap_metric(avg_win)
+    def win_mean(self):
+        win_mean = nb.reduce_map_results(self.position_pnl.vbt.to_2d_array(), nb.win_mean_reduce_func_nb)
+        return self.wrap_metric(win_mean)
 
     @cached_property
-    def avg_loss(self):
-        """Average loss (always positive)."""
-        avg_loss = nb.avg_loss_nb(self.position_profits.vbt.to_2d_array())
-        return self.wrap_metric(avg_loss)
+    def loss_mean(self):
+        loss_mean = nb.reduce_map_results(self.position_pnl.vbt.to_2d_array(), nb.loss_mean_reduce_func_nb)
+        return self.wrap_metric(loss_mean)
 
     @cached_property
     def win_rate(self):
-        """Fraction of wins."""
-        win_rate = np.sum(self.win_mask.vbt.to_2d_array(), axis=0) / \
-            np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+        win_rate = nb.reduce_map_results(self.position_pnl.vbt.to_2d_array(), nb.win_rate_reduce_func_nb)
         return self.wrap_metric(win_rate)
 
     @cached_property
     def loss_rate(self):
-        """Fraction of losses."""
-        loss_rate = np.sum(self.loss_mask.vbt.to_2d_array(), axis=0) / \
-            np.sum(self.position_mask.vbt.to_2d_array(), axis=0)
+        loss_rate = nb.reduce_map_results(self.position_pnl.vbt.to_2d_array(), nb.loss_rate_reduce_func_nb)
         return self.wrap_metric(loss_rate)
 
     @cached_property
     def profit_factor(self):
-        profit_factor = reshape_fns.to_1d(self.sum_win, raw=True) / reshape_fns.to_1d(self.sum_loss, raw=True)
+        profit_factor = reshape_fns.to_1d(self.win_sum, raw=True) / reshape_fns.to_1d(self.loss_sum, raw=True)
         return self.wrap_metric(profit_factor)
 
     @cached_property
@@ -280,8 +274,8 @@ class Portfolio():
 
         For every trade you place, you are likely to win/lose this amount.
         What matters is that your APPT comes up positive."""
-        appt = reshape_fns.to_1d(self.win_rate, raw=True) * reshape_fns.to_1d(self.avg_win, raw=True) - \
-            reshape_fns.to_1d(self.loss_rate, raw=True) * reshape_fns.to_1d(self.avg_loss, raw=True)
+        appt = reshape_fns.to_1d(self.win_rate, raw=True) * reshape_fns.to_1d(self.win_mean, raw=True) - \
+            reshape_fns.to_1d(self.loss_rate, raw=True) * reshape_fns.to_1d(self.loss_mean, raw=True)
         return self.wrap_metric(appt)
 
     @cached_property
@@ -350,16 +344,16 @@ class Portfolio():
 
         return fig
 
-    def plot_position_profits(self,
-                              profit_trace_kwargs={},
-                              loss_trace_kwargs={},
-                              fig=None,
-                              **layout_kwargs):
-        checks.assert_type(self.position_profits, pd.Series)
-        profits = self.position_profits.copy()
-        profits[self.position_profits <= 0] = np.nan
-        losses = self.position_profits.copy()
-        losses[self.position_profits >= 0] = np.nan
+    def plot_position_pnl(self,
+                          profit_trace_kwargs={},
+                          loss_trace_kwargs={},
+                          fig=None,
+                          **layout_kwargs):
+        checks.assert_type(self.position_pnl, pd.Series)
+        profits = self.position_pnl.copy()
+        profits[self.position_pnl <= 0] = np.nan
+        losses = self.position_pnl.copy()
+        losses[self.position_pnl >= 0] = np.nan
 
         # Set up figure
         if fig is None:
@@ -369,7 +363,7 @@ class Portfolio():
 
         # Plot markets
         profit_scatter = go.Scatter(
-            x=self.position_profits.index,
+            x=self.position_pnl.index,
             y=profits,
             mode='markers',
             marker=dict(
@@ -382,7 +376,7 @@ class Portfolio():
         profit_scatter.update(**profit_trace_kwargs)
         fig.add_trace(profit_scatter)
         loss_scatter = go.Scatter(
-            x=self.position_profits.index,
+            x=self.position_pnl.index,
             y=losses,
             mode='markers',
             marker=dict(
@@ -396,7 +390,7 @@ class Portfolio():
         fig.add_trace(loss_scatter)
 
         # Set up axes
-        maxval = np.nanmax(np.abs(self.position_profits.vbt.to_2d_array()))
+        maxval = np.nanmax(np.abs(self.position_pnl.vbt.to_2d_array()))
         space = 0.1 * 2 * maxval
         fig.update_layout(
             yaxis=dict(

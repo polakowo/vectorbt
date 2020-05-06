@@ -237,15 +237,6 @@ class Base_Accessor():
                a  b
             x  4  5
             y  7  8
-            ```
-
-            It is also used by magic methods such as `__add__` directly on accessor:
-
-            ```python-repl
-            >>> print(sr.vbt + df)
-               a  b
-            x  4  5
-            y  7  8
             ```"""
         if isinstance(other, Base_Accessor):
             other = other._obj
@@ -395,7 +386,6 @@ class Base_DFAccessor(Base_Accessor):
     """Accessor with methods for DataFrames only.
 
     Accessible through `pandas.DataFrame.vbt` and all child accessors."""
-    pd_type = pd.DataFrame
 
     @classmethod
     def _validate(cls, obj):

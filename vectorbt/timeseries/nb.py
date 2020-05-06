@@ -1,11 +1,11 @@
 """Numba-compiled 1D and 2D functions for working with time series.
 
 !!! note
-    Input arrays can be of any data type, but output arrays are always `numpy.float64`.
-
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
-    2-dimensional. Functions that work exclusively on 1-dimensional arrays have suffix `_1d`. 
+    2D, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0).
+    
+    Input arrays can be of any data type, but output arrays are always `numpy.float64`.
     
     Rolling functions by default have `minp` set to the window size."""
 

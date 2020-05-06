@@ -2,9 +2,8 @@
 
 !!! note
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
-    2-dimensional. Functions that work exclusively on 1-dimensional arrays have suffix `_1d`. 
-    Data is processed along index (axis 0).
-"""
+    2D, unless function has suffix `_1d` or is meant to be input to another function. 
+    Data is processed along index (axis 0)."""
 
 from numba import njit, f8, i8, b1, optional
 import numpy as np
@@ -25,7 +24,24 @@ def generate_nb(shape, choice_func_nb, *args):
     !!! note
         All indices must be absolute.
 
-        `choice_func_nb` must be Numba-compiled."""
+        `choice_func_nb` must be Numba-compiled.
+
+    Example:
+        ```python-repl
+        >>> from numba import njit
+        >>> from vectorbt.signals.nb import generate_nb
+
+        >>> @njit
+        ... def choice_func_nb(col, from_i, to_i):
+        ...     return from_i + col
+
+        >>> print(generate_nb((5, 3), choice_func_nb))
+        [[ True False False]
+         [False  True False]
+         [False False  True]
+         [False False False]
+         [False False False]]
+        ```"""
     result = np.full(shape, False, dtype=b1)
 
     for col in range(result.shape[1]):
@@ -38,7 +54,7 @@ def generate_nb(shape, choice_func_nb, *args):
 def generate_after_nb(a, choice_func_nb, *args):
     """Pick `True` values using `choice_func_nb` after each `True` in `a`.
 
-    `choice_func_nb` is same as for `generate_nb`, but must also accept `a` before `*args`."""
+    `choice_func_nb` is same as for `generate_nb`."""
     result = np.full_like(a, False)
 
     for col in range(a.shape[1]):
@@ -53,7 +69,7 @@ def generate_after_nb(a, choice_func_nb, *args):
             if prev_idx < a.shape[0] - 1:
                 if next_idx - prev_idx > 1:
                     # Run the UDF
-                    idxs = choice_func_nb(col, prev_idx+1, next_idx-1, a, *args)
+                    idxs = choice_func_nb(col, prev_idx+1, next_idx-1, *args)
                     result[idxs, col] = True
     return result
 
@@ -62,10 +78,9 @@ def generate_after_nb(a, choice_func_nb, *args):
 def generate_iteratively_nb(shape, choice_func1_nb, choice_func2_nb, *args):
     """Pick `True` values using `choice_func1_nb` and `choice_func2_nb` one after another.
 
-    `choice_func1_nb` and `choice_func2_nb` are same as for `generate_nb`, but must also 
-    accept `temp1` and `temp2` (temporary results at time `from_i`) before `*args`."""
-    temp1 = np.full(shape, False)
-    temp2 = np.full(shape, False)
+    `choice_func1_nb` and `choice_func2_nb` are same as for `generate_nb`."""
+    result1 = np.full(shape, False)
+    result2 = np.full(shape, False)
 
     for col in range(shape[1]):
         prev_idx = -1
@@ -73,17 +88,17 @@ def generate_iteratively_nb(shape, choice_func1_nb, choice_func2_nb, *args):
         while prev_idx < shape[0] - 1:
             if i % 2 == 0:
                 # Cannot assign two functions to a var in numba
-                idxs = choice_func1_nb(col, prev_idx+1, shape[0]-1, temp1, temp2, *args)
-                a = temp1
+                idxs = choice_func1_nb(col, prev_idx+1, shape[0]-1, *args)
+                a = result1
             else:
-                idxs = choice_func2_nb(col, prev_idx+1, shape[0]-1, temp1, temp2, *args)
-                a = temp2
+                idxs = choice_func2_nb(col, prev_idx+1, shape[0]-1, *args)
+                a = result2
             if len(idxs) == 0:
                 break
             a[idxs, col] = True
             prev_idx = np.flatnonzero(a[:, col])[-1]
             i += 1
-    return temp1, temp2
+    return result1, result2
 
 
 # ############# Random ############# #
@@ -104,7 +119,7 @@ def shuffle_nb(a, seed=None):
     Specify seed to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    result = np.empty_like(a)
+    result = np.empty_like(a, dtype=b1)
 
     for col in range(a.shape[1]):
         result[:, col] = np.random.permutation(a[:, col])
@@ -113,13 +128,12 @@ def shuffle_nb(a, seed=None):
 
 @njit(cache=True)
 def random_choice_func_nb(col, from_i, to_i, n_range, n_prob, min_space):
-    """Function `choice_func_nb` for randomly picking values from range `[from_i, to_i]`.
+    """`choice_func_nb` to randomly pick values from range `[from_i, to_i]`.
 
     The size of the sample will also be picked randomly from `n_range` with probabilities `n_prob`.
     Separate generated signals apart by `min_space` positions.
 
-    `n_range` must be of same shape as `n_prob`.
-    """
+    `n_range` must be of same shape as `n_prob`."""
     from_range = np.arange(from_i, to_i+1)
     if min_space is not None:
         # Pick at every (min_space+1)-th position
@@ -147,25 +161,19 @@ def generate_random_nb(shape, n_range, n_prob=None, min_space=None, seed=None):
 
 
 @njit(cache=True)
-def random_choice_after_func_nb(col, from_i, to_i, a, n_range, n_prob, min_space):
-    """Same as `random_choice_func_nb` but adapted for `generate_after_nb`."""
-    return random_choice_func_nb(col, from_i, to_i, n_range, n_prob, min_space)
-
-
-@njit(cache=True)
 def generate_random_after_nb(a, n_range, n_prob=None, min_space=None, seed=None):
     """Pick `True` values randomly after each `True` in `a`.
 
     See `generate_random_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    return generate_after_nb(a, random_choice_after_func_nb, n_range, n_prob, min_space)
+    return generate_after_nb(a, random_choice_func_nb, n_range, n_prob, min_space)
 
 # ############# Stop-loss ############# #
 
 
 @njit(cache=True)
-def stop_loss_choice_func_nb(col, from_i, to_i, entries, ts, stop, trailing):
+def stop_loss_choice_func_nb(col, from_i, to_i, ts, stop, trailing):
     """Return index of the first `ts` value that is below `stop` defined at `from_i-1`."""
     # Set range starting from last entry until next entry
     ts = ts[from_i-1:to_i+1, col]
@@ -195,7 +203,26 @@ def generate_stop_loss_nb(entries, ts, stops, trailing):
 
     `stops` must be a 3D array - an array out of 2D arrays each of `ts` shape. Each of 
     these arrays will correspond to a different stop loss configuration. Set `trailing` to
-    `True` to use trailing stop."""
+    `True` to use trailing stop.
+    
+    Example:
+        ```python-repl
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> from vectorbt.signals.nb import generate_stop_loss_nb
+        >>> from vectorbt.utils.reshape_fns import broadcast_to_array_of
+
+        >>> entries = np.asarray([False, True, False, False, False])[:, None]
+        >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
+        >>> stops = broadcast_to_array_of([0.1, 0.5], ts)
+
+        >>> print(generate_stop_loss_nb(entries, ts, stops, True))
+        [[False False]
+         [False False]
+         [False False]
+         [ True False]
+         [False  True]]
+        ```"""
     return combine_fns.apply_and_concat_one_nb(len(stops), apply_stop_loss_nb, entries, ts, stops, trailing)
 
 # ############# Map and reduce ############# #
@@ -206,28 +233,48 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive 
     pair of `True` values in `a`.
 
-    Applies `map_func_nb` on each pair `(prev_i, next_i)`. Must accept the current column index, 
+    Applies `map_func_nb` on each pair `(prev_i, next_i)`. Must accept index of the current column, 
     index of previous `True`, index of next `True`, and `*args`. 
 
-    Applies `reduce_func_nb` on all mapper results in a column. Must accept the current column index, 
-    an array of results from `map_func_nb` for this column, and `*args`.
+    Applies `reduce_func_nb` on all mapper results in a column. Must accept index of the 
+    current column, the array of results from `map_func_nb` for that column, and `*args`.
 
     !!! note
         All indices must be absolute.
 
-        `map_func_nb` and `reduce_func_nb` must be Numba-compiled."""
-    result = np.full((a.shape[1],), np.nan, dtype=f8)
+        `map_func_nb` and `reduce_func_nb` must be Numba-compiled.
+
+    Example:
+        ```python-repl
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> from vectorbt.signals.nb import map_reduce_between_nb
+
+        >>> @njit
+        ... def map_func_nb(col, prev_i, next_i):
+        ...     return next_i - prev_i
+        >>> @njit
+        ... def reduce_func_nb(col, map_res):
+        ...     return np.nanmean(map_res)
+        >>> a = np.asarray([False, True, True, False, True])[:, None]
+
+        >>> print(map_reduce_between_nb(a, map_func_nb, reduce_func_nb))
+        [1.5]
+        ```"""
+    result = np.full(a.shape[1], np.nan, dtype=f8)
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
         if a_idxs.shape[0] > 1:
-            map_results = np.full(a_idxs.shape[0], np.nan)
+            map_res = np.empty(a_idxs.shape[0])
+            k = 0
             for j in range(1, a_idxs.shape[0]):
                 prev_i = a_idxs[j-1]
                 next_i = a_idxs[j]
-                map_results[j] = map_func_nb(col, prev_i, next_i, *args)
-            if len(map_results) > 0:
-                result[col] = reduce_func_nb(col, map_results, *args)
+                map_res[k] = map_func_nb(col, prev_i, next_i, *args)
+                k += 1
+            if k > 0:
+                result[col] = reduce_func_nb(col, map_res[:k], *args)
     return result
 
 
@@ -245,13 +292,16 @@ def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
         if a_idxs.shape[0] > 0:
             b_idxs = np.flatnonzero(b[:, col])
             if b_idxs.shape[0] > 0:
-                map_results = np.full(b_idxs.shape, np.nan)
+                map_res = np.empty(b_idxs.shape)
+                k = 0
                 for j, b_i in enumerate(b_idxs):
                     valid_a_idxs = a_idxs[b_i >= a_idxs]
                     if len(valid_a_idxs) > 0:
                         a_i = valid_a_idxs[-1]  # last preceding a
-                        map_results[j] = map_func_nb(col, a_i, b_i, *args)
-                result[col] = reduce_func_nb(col, map_results, *args)
+                        map_res[k] = map_func_nb(col, a_i, b_i, *args)
+                        k += 1
+                if k > 0:
+                    result[col] = reduce_func_nb(col, map_res[:k], *args)
     return result
 
 

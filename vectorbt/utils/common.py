@@ -6,32 +6,13 @@ from functools import wraps
 import inspect
 from types import FunctionType
 
+from vectorbt import defaults
+
 # ############# Configuration ############# #
 
 
-class Config(dict):
-    """A simple dict with (optionally) frozen keys."""
-
-    def __init__(self, *args, frozen=True, **kwargs):
-        self.frozen = frozen
-        self.update(*args, **kwargs)
-        self.default_config = dict(self)
-        for key, value in dict.items(self):
-            if isinstance(value, dict):
-                dict.__setitem__(self, key, Config(value, frozen=frozen))
-
-    def __setitem__(self, key, val):
-        if self.frozen and key not in self:
-            raise KeyError(f"Key {key} is not a valid parameter")
-        dict.__setitem__(self, key, val)
-
-    def reset(self):
-        """Reset dictionary to the one passed at instantiation."""
-        self.update(self.default_config)
-
-
-def deep_replace_by(x, y):
-    """Replace entries in `x` by entries from `y`."""
+def merge_kwargs(x, y):
+    """Replace conflicting entries in `x` by entries from `y`."""
     z = {}
     overlapping_keys = x.keys() & y.keys()
     for key in overlapping_keys:
@@ -127,7 +108,7 @@ def cached_property(func):
     def wrapper_decorator(*args, **kwargs):
         obj = args[0]
         attr_name = '_' + func.__name__
-        if hasattr(obj, attr_name):
+        if defaults.cached_property and hasattr(obj, attr_name):
             return getattr(obj, attr_name)
         else:
             to_be_cached = func(*args, **kwargs)

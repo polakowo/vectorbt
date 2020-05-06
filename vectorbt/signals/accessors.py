@@ -175,10 +175,10 @@ class Signals_Accessor():
             
             ```python-repl
             >>> @njit
-            ... def choice_func1_nb(col, from_i, to_i, temp1, temp2):
+            ... def choice_func1_nb(col, from_i, to_i):
             ...     return np.array([from_i])
             >>> @njit
-            ... def choice_func2_nb(col, from_i, to_i, temp1, temp2):
+            ... def choice_func2_nb(col, from_i, to_i):
             ...     return np.array([from_i])
 
             >>> entries, exits = pd.DataFrame.vbt.signals.generate_iteratively(
@@ -220,7 +220,7 @@ class Signals_Accessor():
             
             ```python-repl
             >>> @njit
-            ... def choice_func_nb(col, from_i, to_i, df):
+            ... def choice_func_nb(col, from_i, to_i):
             ...     return np.arange(from_i, to_i+1)
 
             >>> print(df.vbt.signals.generate_after(choice_func_nb))
@@ -572,6 +572,27 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         return fig
 
     def plot_markers(self, ts, name=None, signal_type=None, trace_kwargs={}, fig=None, **layout_kwargs):
+        """Plot Series as markers.
+
+        Args:
+            ts (pandas.Series): Time series to plot markers on.
+
+                !!! note
+                    Doesn't plot `ts` itself.
+
+            name (str): Name of the trace.
+            signal_type (str): Can be either `'entry'` for green markers, `'exit'` for red markers, or `None`.
+            trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Example:
+            ```py
+            fig = ts['a'].vbt.timeseries.plot()
+            df['a'].vbt.signals.plot_markers(ts['a'], signal_type='entry', fig=fig)
+            df['b'].vbt.signals.plot_markers(ts['a'], signal_type='exit', fig=fig)
+            ```
+
+            ![](img/signals_plot_markers.png)"""
         checks.assert_type(ts, pd.Series)
         checks.assert_same_index(self._obj, ts)
 

@@ -71,7 +71,7 @@ While there is a subset of pandas functionality that is already compiled with Cy
 Moreover, compared to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
 
 ```
-a = np.random.randint(10, size=(1000, 1000)).astype(float)
+a = np.random.uniform(size=(1000, 1000))
 a_df = pd.DataFrame(a)
 
 >>> %timeit np.diff(a, axis=0) / a[:-1, :]
