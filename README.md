@@ -25,8 +25,8 @@ import yfinance as yf
 
 # Define params
 windows = np.arange(2, 101)
-investment = 100 # in $
-commission = 0.001 # in %
+init_capital = 100 # in $
+fees = 0.001 # in %
 
 # Prepare data
 ticker = yf.Ticker("BTC-USD")
@@ -39,7 +39,7 @@ exits = fast_ma.ma_below(slow_ma, crossover=True)
 
 # Calculate performance
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
-    investment=investment, commission=commission)
+    init_capital=init_capital, fees=fees)
 performance = portfolio.total_return * 100
 
 # Plot heatmap

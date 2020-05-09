@@ -218,8 +218,8 @@ class MA(MA):
         """Plot `MA.ma` against `MA.ts`.
 
         Args:
-            ts_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MA.ts`.
-            ma_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MA.ma`.
+            ts_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `MA.ts`.
+            ma_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `MA.ma`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
@@ -325,7 +325,7 @@ class MSTD(MSTD):
         """Plot `MSTD.mstd`.
 
         Args:
-            mstd_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MSTD.mstd`.
+            mstd_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `MSTD.mstd`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
@@ -502,13 +502,13 @@ class BollingerBands(BollingerBands):
         `BollingerBands.ts`.
 
         Args:
-            ts_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            ts_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.ts`.
-            ma_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            ma_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.ma`.
-            upper_band_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            upper_band_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.upper_band`.
-            lower_band_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            lower_band_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.lower_band`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -647,7 +647,7 @@ class RSI(RSI):
         """Plot `RSI.rsi`.
 
         Args:
-            trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `RSI.rsi`.
+            trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `RSI.rsi`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
@@ -798,9 +798,9 @@ class Stochastic(Stochastic):
         """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
 
         Args:
-            percent_k_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            percent_k_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `Stochastic.percent_k`.
-            percent_d_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            percent_d_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `Stochastic.percent_d`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -1009,11 +1009,11 @@ class MACD(MACD):
         """Plot `MACD.macd`, `MACD.signal` and `MACD.histogram`.
 
         Args:
-            macd_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            macd_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `MACD.macd`.
-            signal_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            signal_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `MACD.signal`.
-            histogram_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html) of 
+            histogram_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html) for 
                 `MACD.histogram`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -1271,7 +1271,7 @@ class OBV(OBV):
         """Plot `OBV.obv`.
 
         Args:
-            obv_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `OBV.obv`.
+            obv_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `OBV.obv`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:

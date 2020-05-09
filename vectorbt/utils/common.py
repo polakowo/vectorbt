@@ -12,12 +12,14 @@ from vectorbt import defaults
 
 
 def merge_kwargs(x, y):
-    """Replace conflicting entries in `x` by entries from `y`."""
+    """Merge dictionaries `x` and `y`.
+    
+    By conflicts, `y` wins."""
     z = {}
     overlapping_keys = x.keys() & y.keys()
     for key in overlapping_keys:
         if isinstance(x[key], dict) and isinstance(y[key], dict):
-            z[key] = dict_of_dicts_merge(x[key], y[key])
+            z[key] = merge_kwargs(x[key], y[key])
         else:
             z[key] = y[key]
     for key in x.keys() - overlapping_keys:

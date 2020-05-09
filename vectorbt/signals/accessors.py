@@ -40,7 +40,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks, reshape_fns, index_fns
+from vectorbt.utils import checks, reshape_fns, index_fns, common
 from vectorbt.utils.common import add_nb_methods, cached_property
 from vectorbt.utils.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.signals import nb
@@ -63,7 +63,7 @@ class Signals_Accessor():
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
         """`vectorbt.utils.accessors.Base_Accessor.empty` with `fill_value=False`.
-        
+
         Example:
             ```python-repl
             >>> print(pd.DataFrame.vbt.signals.empty((5, 3), 
@@ -80,7 +80,7 @@ class Signals_Accessor():
     @classmethod
     def empty_like(cls, *args, fill_value=False, **kwargs):
         """`vectorbt.utils.accessors.Base_Accessor.empty_like` with `fill_value=False`.
-        
+
         Example:
             ```python-repl
             >>> print(pd.DataFrame.vbt.signals.empty_like(df))
@@ -98,7 +98,7 @@ class Signals_Accessor():
         """See `vectorbt.signals.nb.generate_nb`.
 
         `**kwargs` will be passed to pandas constructor.
-        
+
         Example:
             Generate random signals manually:
 
@@ -134,11 +134,11 @@ class Signals_Accessor():
         """See `vectorbt.signals.nb.generate_random_nb`.
 
         `**kwargs` will be passed to pandas constructor.
-        
+
         Example:
             For each column, generate either 1 (with 30% probability) or 2 (with 70% probability)
             signals randomly. Leave one position free between signals:
-            
+
             ```python-repl
             >>> print(pd.DataFrame.vbt.signals.generate_random((5, 3), [1, 2], 
             ...     n_prob=[0.3, 0.7], min_space=1, seed=42, index=index, columns=columns))
@@ -169,10 +169,10 @@ class Signals_Accessor():
         """See `vectorbt.signals.nb.generate_iteratively_nb`.
 
         `**kwargs` will be passed to pandas constructor.
-        
+
         Example:
             Generate entry and exit signals one after another:
-            
+
             ```python-repl
             >>> @njit
             ... def choice_func1_nb(col, from_i, to_i):
@@ -214,10 +214,10 @@ class Signals_Accessor():
 
     def generate_after(self, choice_func_nb, *args):
         """See `vectorbt.signals.nb.generate_after_nb`.
-        
+
         Example:
             Fill all space between signals in `df`:
-            
+
             ```python-repl
             >>> @njit
             ... def choice_func_nb(col, from_i, to_i):
@@ -237,10 +237,10 @@ class Signals_Accessor():
 
     def generate_random_after(self, n_range, n_prob=None, min_space=None, seed=None):
         """See `vectorbt.signals.nb.generate_random_after_nb`.
-        
+
         Example:
             Generate exactly one random signal after each signal in `df`:
-            
+
             ```python-repl
             >>> print(df.vbt.signals.generate_random_after(1, seed=42))
                             a      b      c
@@ -264,7 +264,7 @@ class Signals_Accessor():
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
         Use `as_columns` as a top-level column level.
-        
+
         Example:
             For each entry in `df`, set stop-loss order for 10% and 20% below the price `ts`:
 
@@ -301,10 +301,10 @@ class Signals_Accessor():
 
         Arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
         with `broadcast_kwargs`.
-        
+
         Example:
             Get maximum distance between signals in `df`:
-            
+
             ```python-repl
             >>> distance_map_nb = njit(lambda col, prev_i, next_i: next_i - prev_i)
             >>> max_reduce_nb = njit(lambda col, a: np.nanmax(a))
@@ -340,7 +340,7 @@ class Signals_Accessor():
     @cached_property
     def num_signals(self):
         """Sum up `True` values.
-        
+
         Example:
             ```python-repl
             >>> print(df.vbt.signals.num_signals)
@@ -357,9 +357,9 @@ class Signals_Accessor():
     @cached_property
     def avg_distance(self):
         """Calculate the average distance between `True` values.
-        
+
         See `Signals_Accessor.map_reduce_between`.
-        
+
         Example:
             ```python-repl
             >>> print(df.vbt.signals.avg_distance)
@@ -372,12 +372,12 @@ class Signals_Accessor():
 
     def avg_distance_to(self, other, **kwargs):
         """Calculate the average distance between `True` values in `self` and `other`.
-        
+
         See `Signals_Accessor.map_reduce_between`.
-        
+
         Example:
             Get average distance of `df` to `df` shifted by one:
-            
+
             ```python-repl
             >>> print(df.vbt.signals.avg_distance_to(df.vbt.signals.fshift(1)))
             a    1.0
@@ -389,10 +389,10 @@ class Signals_Accessor():
 
     def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.rank_nb`.
-        
+
         Example:
             Rank `False` values in `df`:
-            
+
             ```python-repl
             >>> not_df = ~df
             >>> print(not_df.vbt.signals.rank())
@@ -438,9 +438,9 @@ class Signals_Accessor():
 
     def first(self, **kwargs):
         """For each partition of `True` values, get the first `True`.
-        
+
         See `vectorbt.signals.nb.rank_nb`.
-        
+
         Example:
             ```python-repl
             >>> not_df = ~df
@@ -456,9 +456,9 @@ class Signals_Accessor():
 
     def nst(self, n, **kwargs):
         """For each partition of `True` values, get the nst `True`.
-        
+
         See `vectorbt.signals.nb.rank_nb`.
-        
+
         Example:
             ```python-repl
             >>> not_df = ~df
@@ -474,9 +474,9 @@ class Signals_Accessor():
 
     def from_nst(self, n, **kwargs):
         """For each partition of `True` values, get the nst `True` and beyond.
-        
+
         See `vectorbt.signals.nb.rank_nb`.
-        
+
         Example:
             ```python-repl
             >>> not_df = ~df
@@ -492,17 +492,17 @@ class Signals_Accessor():
 
     def AND(self, *others, **kwargs):
         """Combine with each in `*others` using logical AND.
-        
+
         See `vectorbt.utils.accessors.Base_Accessor.combine_with_multiple`.
-        
+
         """
         return self.combine_with_multiple(others, combine_func=np.logical_and, **kwargs)
 
     def OR(self, *others, **kwargs):
         """Combine with each in `*others` using logical OR.
-        
+
         See `vectorbt.utils.accessors.Base_Accessor.combine_with_multiple`.
-        
+
         Example:
             ```python-repl
             >>> print(df.vbt.signals.OR(ts > 1, ts > 2, 
@@ -519,7 +519,7 @@ class Signals_Accessor():
 
     def XOR(self, *others, **kwargs):
         """Combine with each in `*others` using logical XOR.
-        
+
         See `vectorbt.utils.accessors.Base_Accessor.combine_with_multiple`."""
         return self.combine_with_multiple(others, combine_func=np.logical_xor, **kwargs)
 
@@ -534,7 +534,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         """Plot Series as a line.
 
         Args:
-            name (str): Name of the trace.
+            name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -557,21 +557,20 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
             fig.update_layout(**layout_kwargs)
         if name is None:
             name = self._obj.name
-        if name is not None:
-            fig.update_layout(showlegend=True)
 
         scatter = go.Scatter(
             x=self.index,
             y=self.to_array(),
             mode='lines',
-            name=str(name) if name is not None else None
+            name=str(name),
+            showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
         fig.add_trace(scatter)
 
         return fig
 
-    def plot_markers(self, ts, name=None, signal_type=None, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot_markers(self, ts, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot Series as markers.
 
         Args:
@@ -580,16 +579,15 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
                 !!! note
                     Doesn't plot `ts` itself.
 
-            name (str): Name of the trace.
-            signal_type (str): Can be either `'entry'` for green markers, `'exit'` for red markers, or `None`.
+            name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
             fig = ts['a'].vbt.timeseries.plot()
-            df['a'].vbt.signals.plot_markers(ts['a'], signal_type='entry', fig=fig)
-            df['b'].vbt.signals.plot_markers(ts['a'], signal_type='exit', fig=fig)
+            df['a'].vbt.signals.plot_entry_markers(ts['a'], fig=fig)
+            df['b'].vbt.signals.plot_exit_markers(ts['a'], fig=fig)
             ```
 
             ![](img/signals_plot_markers.png)"""
@@ -599,6 +597,8 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         if fig is None:
             fig = DefaultFigureWidget()
             fig.update_layout(**layout_kwargs)
+        if name is None:
+            name = self._obj.name
 
         # Plot markers
         scatter = go.Scatter(
@@ -607,19 +607,37 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
             mode='markers',
             marker=dict(
                 size=10
-            )
+            ),
+            name=str(name),
+            showlegend=name is not None
         )
-        if signal_type == 'entry':
-            scatter.marker.symbol = 'triangle-up'
-            scatter.marker.color = 'limegreen'
-            scatter.name = 'Entry'
-        if signal_type == 'exit':
-            scatter.marker.symbol = 'triangle-down'
-            scatter.marker.color = 'orangered'
-            scatter.name = 'Exit'
         scatter.update(**trace_kwargs)
         fig.add_trace(scatter)
         return fig
+
+    def plot_entry_markers(self, *args, name='Entry', trace_kwargs={}, **kwargs):
+        """Plot signals as entry markers.
+        
+        See `Signals_SRAccessor.plot_markers`."""
+        trace_kwargs = common.merge_kwargs(dict(
+            marker=dict(
+                symbol='triangle-up',
+                color='limegreen'
+            )
+        ), trace_kwargs)
+        return self.plot_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
+
+    def plot_exit_markers(self, *args, name='Exit', trace_kwargs={}, **kwargs):
+        """Plot signals as exit markers.
+        
+        See `Signals_SRAccessor.plot_markers`."""
+        trace_kwargs = common.merge_kwargs(dict(
+            marker=dict(
+                symbol='triangle-down',
+                color='orangered'
+            )
+        ), trace_kwargs)
+        return self.plot_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
 
 
 @register_dataframe_accessor('signals')

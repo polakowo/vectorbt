@@ -487,7 +487,7 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
     return new_args[0]
 
 
-def broadcast_to(arg1, arg2, **kwargs):
+def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **kwargs):
     """Broadcast `arg1` to `arg2`.
     
     Keyword arguments `**kwargs` are passed to `broadcast`.
@@ -514,13 +514,14 @@ def broadcast_to(arg1, arg2, **kwargs):
         arg1 = np.asarray(arg1)
     if not checks.is_array(arg2):
         arg2 = np.asarray(arg2)
-    index_from = None
-    columns_from = None
-    to_pd = checks.is_pandas(arg2)
+    if to_pd is None:
+        to_pd = checks.is_pandas(arg2)
     if to_pd:
         # Take index and columns from arg2
-        index_from = arg2.index
-        columns_from = to_2d(arg2).columns
+        if index_from is None:
+            index_from = arg2.index
+        if columns_from is None:
+            columns_from = to_2d(arg2).columns
     return broadcast(arg1, to_shape=arg2.shape, to_pd=to_pd, index_from=index_from, columns_from=columns_from, **kwargs)
 
 

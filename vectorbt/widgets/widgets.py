@@ -117,15 +117,14 @@ class Bar(DefaultFigureWidget):
         self._trace_names = trace_names
 
         super().__init__()
-        if len(trace_names) > 1 or trace_names[0] is not None:
-            self.update_layout(showlegend=True)
         self.update_layout(**layout_kwargs)
 
         # Add traces
         for i, trace_name in enumerate(trace_names):
             bar = go.Bar(
                 x=x_labels,
-                name=trace_name
+                name=trace_name,
+                showlegend=trace_name is not None
             )
             bar.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
             self.add_trace(bar)
@@ -186,15 +185,14 @@ class Scatter(DefaultFigureWidget):
         self._trace_names = trace_names
 
         super().__init__()
-        if len(trace_names) > 1 or trace_names[0] is not None:
-            self.update_layout(showlegend=True)
         self.update_layout(**layout_kwargs)
 
         # Add traces
         for i, trace_name in enumerate(trace_names):
             scatter = go.Scatter(
                 x=x_labels,
-                name=trace_name
+                name=trace_name,
+                showlegend=trace_name is not None
             )
             scatter.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
             self.add_trace(scatter)
@@ -246,16 +244,15 @@ class Histogram(DefaultFigureWidget):
         self._horizontal = horizontal
 
         super().__init__()
-        if len(trace_names) > 1 or trace_names[0] is not None:
-            self.update_layout(showlegend=True)
         self.update_layout(barmode='overlay')
         self.update_layout(**layout_kwargs)
 
         # Add traces
         for i, trace_name in enumerate(trace_names):
             histogram = go.Histogram(
+                opacity=0.75 if len(trace_names) > 1 else 1,
                 name=trace_name,
-                opacity=0.75 if len(trace_names) > 1 else 1
+                showlegend=trace_name is not None
             )
             histogram.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
             self.add_trace(histogram)

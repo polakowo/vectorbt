@@ -44,9 +44,9 @@ Used by `vectorbt.widgets.common.DefaultFigureWidget`."""
 
 # Portfolio
 portfolio = Config(
-    investment=1.,
-    slippage=0.,
-    commission=0.
+    init_capital=1.,
+    fees=0.,
+    slippage=0.
 )
 """Default portfolio parameters.
 

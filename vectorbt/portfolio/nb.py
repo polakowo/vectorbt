@@ -9,18 +9,21 @@ import numpy as np
 from numba import njit, b1, i1, i8, f8
 from numba.core.types import UniTuple
 
+from vectorbt import timeseries
+
 
 @njit
-def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
+def portfolio_np(ts, init_capital, fees, slippage, order_func_np, *args):
     """Calculate portfolio value in cash and shares based on `order_func_np`.
 
-    Incorporates price `ts`, initial `investment`, and basic transaction costs `slippage`
-    and `commission` to calculate the running cash and shares. At each time point `i`,
-    runs the function `order_func_np` to get the exact amount of shares to buy/sell.
-    Tries then to fulfill that order. If unsuccessful due to insufficient cash/shares,
-    always buys/sells the available fraction.
+    Incorporates price `ts`, initial `init_capital`, and basic transaction costs `fees`
+    and `slippage`. Returns running cash, shares, paid fees and paid slippage.
 
-    `slippage` must be in % of price and `commission` in % of transaction volume.
+    `slippage` must be in % of price and `fees` in % of transaction volume.
+
+    At each time point `i`, runs the function `order_func_np` to get the exact amount of 
+    shares to buy/sell. Tries then to fulfill that order. If unsuccessful due to insufficient 
+    cash/shares, always buys/sells the available fraction. 
 
     `order_func_np` must accept index of the current column `col`, the time step `i`,
     the amount of cash `run_cash` and shares `run_shares` held at the time step `i`, and `*args`.
@@ -47,66 +50,107 @@ def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
         ... def order_func_nb(col, i, run_cash, run_shares):
         ...     return 1 if i == 0 else 0
 
-        >>> cash, shares = portfolio_np(price, 100, 0, 0.1, order_func_nb)
+        >>> cash, shares, paid_fees, paid_slippage = \\
+        ...     portfolio_np(price, 100, 0.1, 0.1, order_func_nb)
         >>> print(cash)
-        [[98.9 94.5 98.9]
-         [98.9 94.5 98.9]
-         [98.9 94.5 98.9]
-         [98.9 94.5 98.9]
-         [98.9 94.5 98.9]]
+        [[98.79  93.95  98.79]
+         [100.   100.   100. ]
+         [100.   100.   100. ]
+         [100.   100.   100. ]
+         [100.   100.   100. ]]
         >>> print(shares)
         [[1. 1. 1.]
-         [1. 1. 1.]
-         [1. 1. 1.]
-         [1. 1. 1.]
-         [1. 1. 1.]]
-        >>> equity = cash + shares * price
-        >>> print(equity)
-        [[ 99.9  99.5  99.9]
-         [100.9  98.5 100.9]
-         [101.9  97.5 101.9]
-         [102.9  96.5 100.9]
-         [103.9  95.5  99.9]]
+         [0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]]
+        >>> print(paid_fees)
+        [[0.11 0.55 0.11]
+         [0.   0.   0.  ]
+         [0.   0.   0.  ]
+         [0.   0.   0.  ]
+         [0.   0.   0.  ]]
+        >>> print(paid_slippage)
+        [[0.1 0.5 0.1]
+         [0.  0.  0. ]
+         [0.  0.  0. ]
+         [0.  0.  0. ]
+         [0.  0.  0. ]]
         ```
     """
     cash = np.empty_like(ts, dtype=f8)
     shares = np.empty_like(ts, dtype=f8)
+    paid_fees = np.zeros_like(ts, dtype=f8)
+    paid_slippage = np.zeros_like(ts, dtype=f8)
 
     for col in range(ts.shape[1]):
-        run_cash = investment
+        run_cash = init_capital
         run_shares = 0
         for i in range(ts.shape[0]):
             volume = order_func_np(col, i, run_cash, run_shares, *args)  # the amount of shares to buy/sell
             if volume > 0:
                 # Buy volume
-                adj_price = ts[i, col] * (1 + slippage)  # slippage in % applies on price
-                req_cash = volume * adj_price
-                req_cash *= (1 + commission)  # commission in % applies on transaction volume
-                if req_cash <= run_cash:  # sufficient cash
-                    run_shares += volume
-                    run_cash -= req_cash
-                else:  # insufficient cash, volume will be less than requested
-                    # For commission of 10%, you can buy shares for 90.9$ to spend 100$ in total
-                    adj_cash = run_cash / (1 + commission)
-                    run_shares += adj_cash / adj_price
-                    run_cash = 0
+                run_cash, run_shares, paid_fees[i, col], paid_slippage[i, col] = buy_volume(
+                    run_cash, run_shares, volume, ts[i, col], fees[i, col], slippage[i, col])
             elif volume < 0:
                 # Sell volume
-                adj_price = ts[i, col] * (1 - slippage)
-                adj_shares = min(run_shares, abs(volume))
-                adj_cash = adj_shares * adj_price
-                adj_cash *= (1 - commission)
-                run_shares -= adj_shares
-                run_cash += adj_cash
-            cash[i, col] = run_cash
-            shares[i, col] = run_shares
+                run_cash, run_shares, paid_fees[i, col], paid_slippage[i, col] = sell_volume(
+                    run_cash, run_shares, volume, ts[i, col], fees[i, col], slippage[i, col])
+            cash[i, col], shares[i, col] = run_cash, run_shares
 
-    return cash, shares
+    return cash, shares, paid_fees, paid_slippage
+
+
+@njit(cache=True)
+def buy_volume(run_cash, run_shares, volume, ts, fees, slippage):
+    """Buy volume and return updated `run_cash` and `run_shares`, but also paid fees and slippage."""
+    # Slippage in % applies on price
+    adj_price = ts * (1 + slippage)
+    req_cash = volume * adj_price
+    # Fees in % applies on transaction volume
+    req_cash_wcom = req_cash * (1 + fees)
+    if req_cash_wcom <= run_cash:
+        # Sufficient cash
+        new_run_shares = run_shares + volume
+        new_run_cash = run_cash - req_cash_wcom
+        paid_fees = req_cash_wcom - req_cash
+    else:
+        # Insufficient cash, volume will be less than requested
+        # For fees of 10%, you can buy shares for 90.9$ to spend 100$ in total
+        run_cash_wcom = run_cash / (1 + fees)
+        new_run_shares = run_shares + run_cash_wcom / adj_price
+        new_run_cash = 0
+        paid_fees = run_cash - run_cash_wcom
+    # Difference in equity is the total cost of transaction = paid_fees + paid_slippage
+    old_equity = run_cash + ts * run_shares
+    new_equity = new_run_cash + ts * new_run_shares
+    paid_slippage = old_equity - new_equity - paid_fees
+    return new_run_cash, new_run_shares, paid_fees, paid_slippage
+
+
+@njit(cache=True)
+def sell_volume(run_cash, run_shares, volume, ts, fees, slippage):
+    """Sell volume and return updated `run_cash` and `run_shares`, but also paid fees and slippage."""
+    # Slippage in % applies on price
+    adj_price = ts * (1 - slippage)
+    # If insufficient volume, sell what's left
+    adj_shares = min(run_shares, abs(volume))
+    adj_cash = adj_shares * adj_price
+    # Fees in % applies on transaction volume
+    adj_cash_wcom = adj_cash * (1 - fees)
+    new_run_shares = run_shares - adj_shares
+    new_run_cash = run_cash + adj_cash_wcom
+    paid_fees = adj_cash - adj_cash_wcom
+    # Difference in equity is the total cost of transaction = paid_fees + paid_slippage
+    old_equity = run_cash + ts * run_shares
+    new_equity = new_run_cash + ts * new_run_shares
+    paid_slippage = old_equity - new_equity - paid_fees
+    return new_run_cash, new_run_shares, paid_fees, paid_slippage
 
 
 @njit(cache=True)
 def signals_order_func_np(col, i, run_cash, run_shares, entries, exits, volume):
-    """`order_func_np` to buy/sell based on signals `entries` and `exits`.
+    """`order_func_np` that buys/sells based on signals `entries` and `exits`.
 
     At each entry/exit it buys/sells `volume` shares."""
     if entries[i, col] and not exits[i, col]:
@@ -118,7 +162,7 @@ def signals_order_func_np(col, i, run_cash, run_shares, entries, exits, volume):
 
 @njit(cache=True)
 def volume_order_func_np(col, i, run_cash, run_shares, volume, is_target):
-    """`order_func_np` to buy/sell amount specified in `volume`.
+    """`order_func_np` that buys/sells amount specified in `volume`.
 
     If `is_target` is `True`, will buy/sell the difference between current and target volume."""
     if is_target:
@@ -127,9 +171,17 @@ def volume_order_func_np(col, i, run_cash, run_shares, volume, is_target):
         return volume[i, col]
 
 
+OPEN = 0
+"""Open position."""
+CLOSED = 1
+"""Closed position."""
+
+
 @njit
-def map_positions_nb(positions, map_func_nb, *args):
+def map_positions_nb(positions, pos_type, map_func_nb, *args):
     """Apply `map_func_nb` on each position in `positions`.
+
+    `pos_type` can be either `None`, `OPEN` or `CLOSED`.
 
     For each position in range `[entry_i, exit_i]`, `map_func_nb` must return a number
     that is then stored either at index `exit_i` or the last index if position is still open.
@@ -140,7 +192,7 @@ def map_positions_nb(positions, map_func_nb, *args):
         `order_func_np` must be Numba-compiled.
 
     Example:
-        Calculate length of each closed position:
+        Map each closed position to its duration:
         ```python-repl
         >>> import numpy as np
         >>> from numba import njit
@@ -158,7 +210,7 @@ def map_positions_nb(positions, map_func_nb, *args):
         ...     [1, 0, 4],
         ...     [0, 1, 5]
         ... ])
-        >>> print(map_positions_nb(positions, map_func_nb))
+        >>> print(map_positions_nb(positions, None, map_func_nb))
         [[nan nan nan]
          [nan nan nan]
          [ 2. nan nan]
@@ -172,24 +224,26 @@ def map_positions_nb(positions, map_func_nb, *args):
         in_market = positions[0, col] > 0
         for i in range(1, positions.shape[0]):
             if in_market and positions[i, col] == 0:
-                result[i, col] = map_func_nb(col, entry_i, i, *args)
+                if pos_type is None or pos_type == CLOSED:
+                    result[i, col] = map_func_nb(col, entry_i, i, *args)
                 in_market = False
             elif not in_market and positions[i, col] > 0:
                 entry_i = i
                 in_market = True
             if in_market and i == positions.shape[0] - 1:  # unrealized
-                result[i, col] = map_func_nb(col, entry_i, None, *args)
+                if pos_type is None or pos_type == OPEN:
+                    result[i, col] = map_func_nb(col, entry_i, None, *args)
     return result
 
 
 @njit(cache=True)
-def get_position_equities_nb(col, entry_i, exit_i, ts, cash, shares, investment):
+def get_position_equities_nb(col, entry_i, exit_i, ts, cash, shares, init_capital):
     """Get equity before purchase at `entry_i` and after sale at `exit_i`.
 
     !!! note
         The index `exit_i` will be `None` if position is still open."""
     if entry_i == 0:
-        equity_before = investment
+        equity_before = init_capital
     else:
         # We can't use equity at time entry_i, since it already has purchase cost applied
         # Instead apply price at entry_i to the cash and shares immediately before purchase
@@ -204,7 +258,7 @@ def get_position_equities_nb(col, entry_i, exit_i, ts, cash, shares, investment)
 
 @njit(cache=True)
 def pnl_map_func_nb(*args):
-    """`map_func_nb` to calculate the P/L of a position`.
+    """`map_func_nb` that returns P/L of the position`.
 
     Based on `get_position_equities_nb`."""
     equity_before, equity_after = get_position_equities_nb(*args)
@@ -213,25 +267,95 @@ def pnl_map_func_nb(*args):
 
 @njit(cache=True)
 def returns_map_func_nb(*args):
-    """`map_func_nb` to calculate the return of a position`.
+    """`map_func_nb` that returns return of the position`.
 
     Based on `get_position_equities_nb`."""
     equity_before, equity_after = get_position_equities_nb(*args)
     return equity_after / equity_before - 1
 
 
+@njit(cache=True)
+def status_map_func_nb(col, entry_i, exit_i):
+    """`map_func_nb` that returns whether the position is open or closed."""
+    if exit_i is None:
+        return 0
+    return 1
+
+
+@njit(cache=True)
+def duration_map_func_nb(col, entry_i, exit_i, shape):
+    """`map_func_nb` that returns duration of the position."""
+    if exit_i is None:
+        return shape[0] - entry_i
+    return exit_i - entry_i
+
+@njit
+def filter_map_results(map_results, filter_func_nb, *args):
+    """Filter map results using `filter_func_nb`.
+
+    Applies `filter_func_nb` on all map results in a column. Must accept index
+    of the current column, index of the current element, the element itself, and `*args`.
+
+    !!! note
+        `filter_func_nb` must be Numba-compiled.
+
+    Example:
+        Filter out the positions of duration less than 2:
+        ```python-repl
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> from vectorbt.portfolio.nb import filter_map_results
+
+        >>> @njit
+        ... def filter_func_nb(col, i, map_result):
+        ...     return map_result > 1
+        >>> map_results = np.asarray([
+        ...     [np.nan, np.nan, np.nan],
+        ...     [np.nan, np.nan, np.nan],
+        ...     [2., np.nan, np.nan],
+        ...     [np.nan, 2., np.nan],
+        ...     [1., np.nan, np.nan]
+        ... ])
+        >>> print(filter_map_results(map_results, filter_func_nb))
+        [[nan nan nan]
+         [nan nan nan]
+         [ 2. nan nan]
+         [nan  2. nan]
+         [nan nan nan]]
+        ```"""
+    result = np.copy(map_results)
+
+    for col in range(result.shape[1]):
+        idxs = np.flatnonzero(~np.isnan(map_results[:, col]))
+        for i in idxs:
+            if ~filter_func_nb(col, i, map_results[i, col], *args):
+                result[i, col] = np.nan
+    return result
+
+@njit(cache=True)
+def winning_filter_func_nb(col, i, map_result, pnl):
+    """`filter_func_nb` that includes only winning positions."""
+    return pnl[i, col] > 0
+
+
+@njit(cache=True)
+def losing_filter_func_nb(col, i, map_result, pnl):
+    """`filter_func_nb` that includes only losing positions."""
+    return pnl[i, col] < 0
+
+
 @njit
 def reduce_map_results(map_results, reduce_func_nb, *args):
-    """Reduce results of `map_positions_nb` using `reduce_func_nb`.
+    """Reduce map results of each column into a single value using `reduce_func_nb`.
 
-    Applies `reduce_func_nb` on all mapper results in a column. Must accept index
-    of the current column, the array of mapper results for that column, and `*args`.
+    Applies `reduce_func_nb` on all map results in a column. Must accept index
+    of the current column, the array of map results for that column, and `*args`.
 
     !!! note
         `reduce_func_nb` must be Numba-compiled.
 
     Example:
-        Calculate length of each closed position:
+        Return the average duration of the positions in each column:
         ```python-repl
         >>> import numpy as np
         >>> from numba import njit
@@ -260,22 +384,22 @@ def reduce_map_results(map_results, reduce_func_nb, *args):
 
 
 @njit(cache=True)
-def win_sum_reduce_func_nb(col, map_results):
-    """`reduce_func_nb` to sum up profits."""
+def pos_sum_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that sums up positive results."""
     return np.sum(map_results[map_results > 0])
 
 
 @njit(cache=True)
-def loss_sum_reduce_func_nb(col, map_results):
-    """`reduce_func_nb` to sum up losses.
+def neg_sum_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that sums up negative results.
 
     Returns an absolute number."""
     return np.abs(np.sum(map_results[map_results < 0]))
 
 
 @njit(cache=True)
-def win_mean_reduce_func_nb(col, map_results):
-    """`reduce_func_nb` to take average of profits."""
+def pos_mean_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that takes average of positive results."""
     wins = map_results[map_results > 0]
     if len(wins) > 0:
         return np.mean(wins)
@@ -283,8 +407,8 @@ def win_mean_reduce_func_nb(col, map_results):
 
 
 @njit(cache=True)
-def loss_mean_reduce_func_nb(col, map_results):
-    """`reduce_func_nb` to take average of losses.
+def neg_mean_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that takes average of negative results.
 
     Returns an absolute number."""
     losses = map_results[map_results < 0]
@@ -294,15 +418,89 @@ def loss_mean_reduce_func_nb(col, map_results):
 
 
 @njit(cache=True)
-def win_rate_reduce_func_nb(col, map_results):
-    """`reduce_func_nb` to calculate win rate."""
+def pos_rate_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that returns fraction of positive results."""
     return len(map_results[map_results > 0]) / len(map_results)
 
 
 @njit(cache=True)
-def loss_rate_reduce_func_nb(col, map_results):
-    """`reduce_func_nb` to calculate loss rate."""
+def neg_rate_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that returns fraction of negative results."""
     return len(map_results[map_results < 0]) / len(map_results)
+
+
+@njit(cache=True)
+def open_cnt_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that counts open positions."""
+    return len(map_results[map_results == OPEN])
+
+
+@njit(cache=True)
+def closed_cnt_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that counts closed positions."""
+    return len(map_results[map_results == CLOSED])
+
+
+@njit(cache=True)
+def cnt_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that counts all results."""
+    return len(map_results)
+
+
+@njit(cache=True)
+def mean_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that returns average of all results."""
+    return np.mean(map_results)
+
+
+@njit(cache=True)
+def sum_reduce_func_nb(col, map_results):
+    """`reduce_func_nb` that sums up all results."""
+    return np.sum(map_results)
+
+
+@njit
+def mult_reduce_map_results(map_results, mult_reduce_func_nb, *args):
+    """Reduce map results of each column into an array using `mult_reduce_func_nb`.
+
+    `mult_reduce_func_nb` same as for `reduce_map_results` but must return an array.
+
+    !!! note
+        * `mult_reduce_func_nb` must be Numba-compiled
+        * Output of `mult_reduce_func_nb` must be strictly homogeneous"""
+    from_col = -1
+    for col in range(map_results.shape[1]):
+        filled = map_results[~np.isnan(map_results[:, col]), col]
+        if len(filled) > 0:
+            result0 = mult_reduce_func_nb(col, filled, *args)
+            from_col = col
+            break
+    if from_col == -1:
+        raise ValueError("All map results are NA")
+    result = np.full((result0.shape[0], map_results.shape[1]), np.nan, dtype=f8)
+    for col in range(from_col, map_results.shape[1]):
+        filled = map_results[~np.isnan(map_results[:, col]), col]
+        if len(filled) > 0:
+            result[:, col] = mult_reduce_func_nb(col, filled, *args)
+    return result
+
+
+@njit(cache=True)
+def describe_mult_reduce_func_nb(col, map_results, percentiles):
+    """`mult_reduce_func_nb` that describes results using statistics."""
+    result = np.empty(5 + len(percentiles), dtype=f8)
+    result[0] = len(map_results)
+    result[1] = np.mean(map_results)
+    rcount = max(len(map_results) - 1, 0)
+    if rcount == 0:
+        result[2] = np.nan
+    else:
+        result[2] = np.std(map_results) * np.sqrt(len(map_results) / rcount)
+    result[3] = np.min(map_results)
+    for i, percentile in enumerate(percentiles):
+        result[4:-1] = np.percentile(map_results, percentiles * 100)
+    result[4+len(percentiles)] = np.max(map_results)
+    return result
 
 
 @njit(cache=True)
@@ -323,3 +521,9 @@ def is_accumulated_nb(positions):
     for col in range(positions.shape[1]):
         result[col] = is_accumulated_1d_nb(positions[:, col])
     return result
+
+
+@njit(cache=True)
+def total_return_apply_func_nb(returns):
+    """Calculate total return from returns."""
+    return timeseries.nb.product_1d_nb(returns + 1) - 1
