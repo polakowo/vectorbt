@@ -172,7 +172,7 @@ See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-
 
 Note: importing vectorbt for the first time may take a while due to compilation.
 
-## API reference
+## Documentation
 
 https://polakowo.io/vectorbt/
 
