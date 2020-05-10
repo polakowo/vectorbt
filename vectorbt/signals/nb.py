@@ -1,8 +1,8 @@
-"""Numba-compiled functions for working with signals.
+"""Numba-compiled functions for signals.
 
 !!! note
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
-    2D, unless function has suffix `_1d` or is meant to be input to another function. 
+    2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0)."""
 
 from numba import njit, f8, i8, b1, optional
@@ -149,7 +149,7 @@ def random_choice_func_nb(col, from_i, to_i, n_range, n_prob, min_space):
     return np.random.choice(from_range, size=size, replace=False)
 
 
-@njit(cache=True)
+@njit
 def generate_random_nb(shape, n_range, n_prob=None, min_space=None, seed=None):
     """Create a boolean matrix of `shape` and pick `True` values randomly.
 
@@ -160,7 +160,7 @@ def generate_random_nb(shape, n_range, n_prob=None, min_space=None, seed=None):
     return generate_nb(shape, random_choice_func_nb, n_range, n_prob, min_space)
 
 
-@njit(cache=True)
+@njit
 def generate_random_after_nb(a, n_range, n_prob=None, min_space=None, seed=None):
     """Pick `True` values randomly after each `True` in `a`.
 
@@ -191,17 +191,17 @@ def stop_loss_choice_func_nb(col, from_i, to_i, ts, stop, trailing):
         return from_i + np.flatnonzero(ts[1:] < stop_val)[:1]
 
 
-@njit(cache=True)
-def apply_stop_loss_nb(i, entries, ts, stops, trailing):
+@njit
+def stop_loss_apply_func_nb(i, entries, ts, stops, trailing):
     """`apply_func_nb` for `vectorbt.utils.combine_fns.apply_and_concat_one_nb` for stop loss."""
     return generate_after_nb(entries, stop_loss_choice_func_nb, ts, stops[i, :, :], trailing)
 
 
-@njit(cache=True)
+@njit
 def generate_stop_loss_nb(entries, ts, stops, trailing):
     """For each `True` in `entries`, find the first value in `ts` that is below the (trailing) stop.
 
-    `stops` must be a 3D array - an array out of 2D arrays each of `ts` shape. Each of 
+    `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape. Each of 
     these arrays will correspond to a different stop loss configuration. Set `trailing` to
     `True` to use trailing stop.
     
@@ -223,7 +223,7 @@ def generate_stop_loss_nb(entries, ts, stops, trailing):
          [ True False]
          [False  True]]
         ```"""
-    return combine_fns.apply_and_concat_one_nb(len(stops), apply_stop_loss_nb, entries, ts, stops, trailing)
+    return combine_fns.apply_and_concat_one_nb(len(stops), stop_loss_apply_func_nb, entries, ts, stops, trailing)
 
 # ############# Map and reduce ############# #
 

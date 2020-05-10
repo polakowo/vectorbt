@@ -13,9 +13,9 @@ class Base_Accessor():
 
     Accessible through `pandas.Series.vbt` and `pandas.DataFrame.vbt`, and all child accessors.
 
-    Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1D data,
+    Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
-    by using `Base_Accessor.wrap_array`, we will convert the 2D output back to a Series."""
+    by using `Base_Accessor.wrap_array`, we will convert the 2-dim output back to a Series."""
 
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
@@ -61,13 +61,13 @@ class Base_Accessor():
         return np.asarray(self._obj)
 
     def to_1d_array(self):
-        """Convert to 1D NumPy array
+        """Convert to 1-dim NumPy array
 
         See `vectorbt.utils.reshape_fns.to_1d`."""
         return reshape_fns.to_1d(self._obj, raw=True)
 
     def to_2d_array(self):
-        """Convert to 2D NumPy array.
+        """Convert to 2-dim NumPy array.
 
         See `vectorbt.utils.reshape_fns.to_2d`."""
         return reshape_fns.to_2d(self._obj, raw=True)

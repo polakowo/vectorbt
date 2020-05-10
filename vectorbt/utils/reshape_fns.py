@@ -54,14 +54,19 @@ def wrap_array(arg, index=None, columns=None, dtype=None, default_index=None, de
 
 def wrap_array_as(arg1, arg2, **kwargs):
     """Wrap array `arg1` to be as `arg2`."""
-    return wrap_array(arg1, default_index=arg2.index, default_columns=to_2d(arg2).columns, to_ndim=arg2.ndim, **kwargs)
+    default_index = arg2.index
+    if checks.is_frame(arg2):
+        default_columns = arg2.columns
+    else:
+        default_columns = [arg2.name]
+    return wrap_array(arg1, default_index=default_index, default_columns=default_columns, to_ndim=arg2.ndim, **kwargs)
 
 
 def to_1d(arg, raw=False):
     """Reshape argument to one dimension. 
 
     If `raw` is `True`, returns NumPy array.
-    If 2D, will collapse along axis 1 (i.e., DataFrame with one column to Series)."""
+    If 2-dim, will collapse along axis 1 (i.e., DataFrame with one column to Series)."""
     if raw or not checks.is_array(arg):
         arg = np.asarray(arg)
     if arg.ndim == 2:
@@ -80,7 +85,7 @@ def to_2d(arg, raw=False, expand_axis=1):
     """Reshape argument to two dimensions. 
 
     If `raw` is `True`, returns NumPy array.
-    If 1D, will expand along axis 1 (i.e., Series to DataFrame with one column)."""
+    If 1-dim, will expand along axis 1 (i.e., Series to DataFrame with one column)."""
     if raw or not checks.is_array(arg):
         arg = np.asarray(arg)
     if arg.ndim == 2:
@@ -207,7 +212,8 @@ def broadcast_index(*args, to_shape=None, index_from=None, axis=0, ignore_single
                             if index_from == 'strict':
                                 # If pandas objects have different index/columns, raise an exception
                                 if not pd.Index.equals(index, new_index):
-                                    raise ValueError(f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
+                                    raise ValueError(
+                                        f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
                             # Broadcasting index must follow the rules of a regular broadcasting operation
                             # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
                             # 1. rule: if indexes are of the same length, they are simply stacked
@@ -489,9 +495,9 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
 
 def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **kwargs):
     """Broadcast `arg1` to `arg2`.
-    
+
     Keyword arguments `**kwargs` are passed to `broadcast`.
-    
+
     Example:
         ```python-repl
         >>> import numpy as np
@@ -527,7 +533,7 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
 
 def broadcast_to_array_of(arg1, arg2):
     """Broadcast `arg1` to the shape `(1, *arg2.shape)`.
-    
+
     Example:
         ```python-repl
         >>> import numpy as np
@@ -561,7 +567,7 @@ def unstack_to_array(arg, levels=None):
     """Reshape `arg` based on its multi-index into a multi-dimensional array.
 
     Use `levels` to specify what index levels to unstack and in which order.
-    
+
     Example:
         ```python-repl
         >>> import pandas as pd
@@ -580,7 +586,7 @@ def unstack_to_array(arg, levels=None):
 
          [[nan nan  3. nan]
         [nan nan nan  4.]]]
-        
+
         >>> print(unstack_to_array(sr, levels=(2, 0)))
         [[ 1. nan]
          [ 2. nan]
@@ -609,11 +615,11 @@ def unstack_to_array(arg, levels=None):
 
 def make_symmetric(arg):
     """Make `arg` symmetric.
-    
+
     The index and columns of the resulting DataFrame will be identical.
-    
+
     Requires the index and columns to have the same number of levels.
-    
+
     Example:
         ```python-repl
         >>> import pandas as pd
@@ -662,10 +668,10 @@ def make_symmetric(arg):
 
 def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     """Reshape `arg` based on its multi-index into a DataFrame.
-    
+
     Use `index_levels` to specify what index levels will form new index, and `column_levels` 
     for new columns. Set `symmetric` to `True` to make DataFrame symmetric.
-    
+
     Example:
         ```python-repl
         >>> import pandas as pd

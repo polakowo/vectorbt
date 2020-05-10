@@ -1,4 +1,4 @@
-"""Numba-compiled 1D and 2-dim functions for working with time series.
+"""Numba-compiled 1-dim and 2-dim functions for time series.
 
 !!! note
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
@@ -675,7 +675,7 @@ def rolling_apply_nb(a, window, apply_func_nb, *args):
 
     `apply_func_nb` must accept index of the current column, index of the current row, 
     the array, and `*args`. Must return a single value.
-    
+
     !!! note
         `apply_func_nb` must be Numba-compiled."""
     result = np.empty_like(a, dtype=f8)
@@ -692,7 +692,7 @@ def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
 
     `apply_func_nb` must accept index of the current row, the 2-dim array, and `*args`. 
     Must return a single value or an array of shape `a.shape[1]`.
-    
+
     !!! note
         `apply_func_nb` must be Numba-compiled."""
     result = np.empty_like(a, dtype=f8)
@@ -724,7 +724,7 @@ def groupby_apply_nb(a, groups, apply_func_nb, *args):
 
     `apply_func_nb` must accept index of the current column, indices of the current group, 
     the array, and `*args`. Must return a single value.
-    
+
     !!! note
         `apply_func_nb` must be Numba-compiled."""
     result = np.empty((len(groups), a.shape[1]), dtype=f8)
@@ -740,7 +740,7 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
 
     `apply_func_nb` must accept indices of the current group, the 2-dim array, and `*args`. 
     Must return a single value or an array of shape `a.shape[1]`.
-    
+
     !!! note
         `apply_func_nb` must be Numba-compiled."""
     result = np.empty((len(groups), a.shape[1]), dtype=f8)
@@ -748,61 +748,7 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
         result[i, :] = apply_func_nb(idxs, a[idxs, :], *args)
     return result
 
-# ############# Describe ############# #
-
-
-@njit(cache=True)
-def describe_1d_nb(a, percentiles):
-    """Return descriptive statistics.
-
-    Numba equivalent to `pd.Series(a).describe(percentiles)`."""
-    a = a[~np.isnan(a)]
-    result = np.empty(5 + len(percentiles), dtype=f8)
-    result[0] = len(a)
-    if len(a) > 0:
-        result[1] = np.mean(a)
-        rcount = max(len(a) - 1, 0)
-        if rcount == 0:
-            result[2] = np.nan
-        else:
-            result[2] = np.std(a) * np.sqrt(len(a) / rcount)
-        result[3] = np.min(a)
-        for i, percentile in enumerate(percentiles):
-            result[4:-1] = np.percentile(a, percentiles * 100)
-        result[4+len(percentiles)] = np.max(a)
-    else:
-        result[1:] = np.nan
-    return result
-
-
-@njit(cache=True)
-def describe_nb(a, percentiles):
-    """2-dim version of `describe_1d_nb`."""
-    result = np.empty((5 + len(percentiles), a.shape[1]), dtype=f8)
-    for col in range(a.shape[1]):
-        result[:, col] = describe_1d_nb(a[:, col], percentiles)
-    return result
-
 # ############# Map, filter and reduce ############# #
-
-@njit
-def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
-    """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
-
-    `apply_func_nb` must accept index of the current column, the column itself, and `*args`. 
-    Must return an array.
-
-    `reduce_func_nb` must accept index of the current column, the array of results from 
-    `apply_func_nb` for that column, and `*args`. Must return a single value.
-
-    !!! note
-        `apply_func_nb` and `reduce_func_nb` must be Numba-compiled."""
-    result = np.full(a.shape[1], np.nan, dtype=f8)
-
-    for col in range(a.shape[1]):
-        mapped = apply_func_nb(col, a[:, col], *args)
-        result[col] = reduce_func_nb(col, mapped, *args)
-    return result
 
 
 @njit
@@ -844,44 +790,76 @@ def filter_nb(a, filter_func_nb, *args):
 
 
 @njit
-def reduce_nb(a, reduce_func_nb, *args):
-    """Reduce non-NA elements of each column into a single value using `reduce_func_nb`.
+def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
+    """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
 
-    `reduce_func_nb` must accept index of the current column, array of the non-NA elements, 
-    and `*args`. Must return a single value.
+    `apply_func_nb` must accept index of the current column, the column itself, and `*args`. 
+    Must return an array.
+
+    `reduce_func_nb` must accept index of the current column, the array of results from 
+    `apply_func_nb` for that column, and `*args`. Must return a single value.
+
+    !!! note
+        `apply_func_nb` and `reduce_func_nb` must be Numba-compiled."""
+    result = np.full(a.shape[1], np.nan, dtype=f8)
+
+    for col in range(a.shape[1]):
+        mapped = apply_func_nb(col, a[:, col], *args)
+        result[col] = reduce_func_nb(col, mapped, *args)
+    return result
+
+
+@njit
+def reduce_nb(a, reduce_func_nb, *args):
+    """Reduce each column into a single value using `reduce_func_nb`.
+
+    `reduce_func_nb` must accept index of the current column, the array, and `*args`. 
+    Must return a single value.
 
     !!! note
         `reduce_func_nb` must be Numba-compiled."""
     result = np.full(a.shape[1], np.nan, dtype=f8)
 
     for col in range(a.shape[1]):
-        filled = a[~np.isnan(a[:, col]), col]
-        if len(filled) > 0:
-            result[col] = reduce_func_nb(col, filled, *args)
+        result[col] = reduce_func_nb(col, a[:, col], *args)
     return result
 
 
 @njit
 def reduce_to_array_nb(a, reduce_func_nb, *args):
-    """Reduce non-NA elements of each column into an array of values using `reduce_func_nb`.
+    """Reduce each column into an array of values using `reduce_func_nb`.
 
     `reduce_func_nb` same as for `reduce_a` but must return an array.
 
     !!! note
         * `reduce_func_nb` must be Numba-compiled
         * Output of `reduce_func_nb` must be strictly homogeneous"""
-    from_col = -1
-    for col in range(a.shape[1]):
-        filled = a[~np.isnan(a[:, col]), col]
-        if len(filled) > 0:
-            result0 = reduce_func_nb(col, filled, *args)
-            from_col = col
-            break
-    if from_col == -1:
-        raise ValueError("Cannot reduce. All elements are NA.")
+    result0 = reduce_func_nb(0, a[:, 0], *args)
     result = np.full((result0.shape[0], a.shape[1]), np.nan, dtype=f8)
-    for col in range(from_col, a.shape[1]):
-        filled = a[~np.isnan(a[:, col]), col]
-        if len(filled) > 0:
-            result[:, col] = reduce_func_nb(col, filled, *args)
+    for col in range(a.shape[1]):
+        result[:, col] = reduce_func_nb(col, a[:, col], *args)
+    return result
+
+
+@njit(cache=True)
+def describe_reduce_func_nb(col, a, percentiles):
+    """Return descriptive statistics.
+
+    Numba equivalent to `pd.Series(a).describe(percentiles)`."""
+    a = a[~np.isnan(a)]
+    result = np.empty(5 + len(percentiles), dtype=f8)
+    result[0] = len(a)
+    if len(a) > 0:
+        result[1] = np.mean(a)
+        rcount = max(len(a) - 1, 0)
+        if rcount == 0:
+            result[2] = np.nan
+        else:
+            result[2] = np.std(a) * np.sqrt(len(a) / rcount)  # ddof = 1
+        result[3] = np.min(a)
+        for i, percentile in enumerate(percentiles):
+            result[4:-1] = np.percentile(a, percentiles * 100)
+        result[4+len(percentiles)] = np.max(a)
+    else:
+        result[1:] = np.nan
     return result

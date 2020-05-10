@@ -16,7 +16,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 3 seconds (Note: loading vectorbt and plotly may take a while):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 5 seconds (Note: compiling with Numba may take some time):
 
 ```python
 import vectorbt as vbt
@@ -38,8 +38,7 @@ entries = fast_ma.ma_above(slow_ma, crossover=True)
 exits = fast_ma.ma_below(slow_ma, crossover=True)
 
 # Calculate performance
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
-    init_capital=init_capital, fees=fees)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_capital=init_capital, fees=fees)
 performance = portfolio.total_return * 100
 
 # Plot heatmap

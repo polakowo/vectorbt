@@ -12,7 +12,7 @@ def apply_and_concat_one(n, apply_func, *args, **kwargs):
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`, 
     and concat the results along axis 1. 
     
-    The result of `apply_func` must be a single 1D or 2D array.
+    The result of `apply_func` must be a single 1-dim or 2-dim array.
     
     `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
     return np.hstack([reshape_fns.to_2d(apply_func(i, *args, **kwargs)) for i in range(n)])
@@ -51,7 +51,7 @@ def apply_and_concat_one_nb(n, apply_func_nb, *args):  # numba doesn't accepts *
 
 def apply_and_concat_multiple(n, apply_func, *args, **kwargs):
     """Identical to `apply_and_concat_one`, except that the result of `apply_func` must be 
-    multiple 1D or 2D arrays. Each of these arrays at `i` will be concatenated with the
+    multiple 1-dim or 2-dim arrays. Each of these arrays at `i` will be concatenated with the
     array at the same position at `i+1`."""
     outputs = [tuple(map(reshape_fns.to_2d, apply_func(i, *args, **kwargs))) for i in range(n)]
     return list(map(np.hstack, list(zip(*outputs))))

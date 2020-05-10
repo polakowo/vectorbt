@@ -1,6 +1,6 @@
 """Custom indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
-Before running the examples below:
+Before running the examples:
 ```py
 import numpy as np
 import pandas as pd
@@ -106,7 +106,7 @@ class MA(MA):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            windows (array_like of int): Size of the moving window. Must be multiple.
+            windows (array_like of int): Size of the moving window.
             r (int): The number of `MA` instances to combine.
             ewm (bool or array_like of bool): If `True`, uses exponential moving average, otherwise 
                 uses simple moving average.

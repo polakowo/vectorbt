@@ -3,7 +3,7 @@
 !!! note
     Input arrays can be of any data type, but output arrays are always `numpy.float64`.
     
-Before running the examples below:
+Before running the examples:
 ```py
 import vectorbt as vbt
 import numpy as np
@@ -26,7 +26,6 @@ df = pd.DataFrame([
     [4, 2, 2],
     [5, 1, 1]
 ], index=index, columns=columns)
-mean_reduce_nb = njit(lambda a: np.nanmean(a))
 ```"""
 
 import numpy as np
@@ -34,6 +33,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import itertools
 from numba.typed import Dict
+from datetime import timedelta
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks, reshape_fns, index_fns
@@ -150,7 +150,7 @@ class TimeSeries_Accessor():
             1  1.5  4.5  1.5
             2  3.5  2.5  2.5
             3  5.0  1.0  1.0
-            
+
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
             >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3], 
             ...     mean_matrix_nb, on_matrix=True))
@@ -235,53 +235,6 @@ class TimeSeries_Accessor():
         new_columns = index_fns.combine(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
-    def describe(self, percentiles=[0.25, 0.5, 0.75]):
-        """See `vectorbt.timeseries.nb.describe_nb`.
-
-        For `percentiles`, see [pandas.DataFrame.describe](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.describe.html).
-
-        Example:
-            ```python-repl
-            >>> print(df.vbt.timeseries.describe())
-                           a         b        c
-            count   5.000000  5.000000  5.00000
-            mean    3.000000  3.000000  1.80000
-            std     1.581139  1.581139  0.83666
-            min     1.000000  1.000000  1.00000
-            25.00%  2.000000  2.000000  1.00000
-            50.00%  3.000000  3.000000  2.00000
-            75.00%  4.000000  4.000000  2.00000
-            max     5.000000  5.000000  3.00000
-            ```"""
-        if percentiles is not None:
-            percentiles = reshape_fns.to_1d(percentiles)
-        else:
-            percentiles = np.empty(0)
-        result = nb.describe_nb(self.to_2d_array(), percentiles)
-        index = pd.Index(['count', 'mean', 'std', 'min', *map(lambda x: '%.2f%%' % (x * 100), percentiles), 'max'])
-        return self.wrap_array(result, index=index)
-
-    def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args):
-        """See `vectorbt.timeseries.nb.apply_and_reduce_nb`.
-
-        Example:
-            ```python-repl
-            >>> greater_nb = njit(lambda col, a: a[a > 2])
-            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(df.vbt.timeseries.apply_and_reduce(greater_nb, mean_nb))
-            a    4.0
-            b    4.0
-            c    3.0
-            dtype: float64
-            ```"""
-        checks.assert_numba_func(apply_func_nb)
-        checks.assert_numba_func(reduce_func_nb)
-
-        result = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, reduce_func_nb, *args)
-        if self.is_frame():
-            return pd.Series(result, index=self.columns)
-        return result[0]
-
     def applymap(self, apply_func_nb, *args):
         """See `vectorbt.timeseries.nb.applymap_nb`.
 
@@ -320,8 +273,61 @@ class TimeSeries_Accessor():
         result = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
         return self.wrap_array(result)
 
-    def reduce(self, reduce_func_nb, *args):
+    def to_time_units(self, time_delta):
+        """Multiply each element with `time_delta` to get result in time units."""
+        total_seconds = pd.Timedelta(time_delta).total_seconds()
+        def to_td(x): return timedelta(seconds=x * total_seconds) if ~np.isnan(x) else np.nan
+        to_td = np.vectorize(to_td, otypes=[np.object])
+        return self.wrap_array(to_td(self.to_array()))
+
+    def wrap_reduced_array(self, a, index=None, time_units=False):
+        """Wrap result of reduction.
+
+        If `time_units` is `True`, calls `TimeSeries_Accessor.to_time_units`"""
+        if a.ndim == 1:
+            # Each column reduced to a single value
+            a_obj = pd.Series(a, index=self.columns)
+            if time_units:
+                checks.assert_type(self.index, pd.DatetimeIndex)
+                a_obj = a_obj.vbt.timeseries.to_time_units(self.index[1] - self.index[0])
+            if self.is_frame():
+                return a_obj
+            return a_obj.iloc[0]
+        else:
+            # Each column reduced to an array
+            if index is None:
+                index = pd.Index(range(a.shape[0]))
+            a_obj = self.wrap_array(a, index=index)
+            if time_units:
+                checks.assert_type(self.index, pd.DatetimeIndex)
+                a_obj = a_obj.vbt.timeseries.to_time_units(self.index[1] - self.index[0])
+            return a_obj
+
+    def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
+        """See `vectorbt.timeseries.nb.apply_and_reduce_nb`.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
+
+        Example:
+            ```python-repl
+            >>> greater_nb = njit(lambda col, a: a[a > 2])
+            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
+            >>> print(df.vbt.timeseries.apply_and_reduce(greater_nb, mean_nb))
+            a    4.0
+            b    4.0
+            c    3.0
+            dtype: float64
+            ```"""
+        checks.assert_numba_func(apply_func_nb)
+        checks.assert_numba_func(reduce_func_nb)
+
+        result = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, reduce_func_nb, *args)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def reduce(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.reduce_nb`.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
 
         Example:
             ```python-repl
@@ -335,16 +341,16 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.reduce_nb(self.to_2d_array(), reduce_func_nb, *args)
-        if self.is_frame():
-            return pd.Series(result, index=self.columns)
-        return result[0]
+        return self.wrap_reduced_array(result, **kwargs)
 
-    def reduce_to_array(self, reduce_func_nb, *args, index=None):
+    def reduce_to_array(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.reduce_to_array_nb`.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
 
         Example:
             ```python-repl
-            >>> min_max_nb = njit(lambda col, a: np.array([np.min(a), np.max(a)]))
+            >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
             >>> print(df.vbt.timeseries.reduce_to_array(min_max_nb, index=['min', 'max']))
                    a    b    c
             min  1.0  1.0  1.0
@@ -353,9 +359,76 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.reduce_to_array_nb(self.to_2d_array(), reduce_func_nb, *args)
-        if index is None:
-            index = pd.Index(range(result.shape[0]))
-        return self.wrap_array(result, index=index)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def min(self, **kwargs):
+        """Return min of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = np.nanmin(self.to_2d_array(), axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def max(self, **kwargs):
+        """Return max of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = np.nanmax(self.to_2d_array(), axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def mean(self, **kwargs):
+        """Return mean of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = np.nanmean(self.to_2d_array(), axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def std(self, ddof=1, **kwargs):
+        """Return standard deviation of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = np.nanstd(self.to_2d_array(), ddof=ddof, axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def count(self, **kwargs):
+        """Return count of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = np.sum(~np.isnan(self.to_2d_array()), axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def sum(self, **kwargs):
+        """Return sum of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = np.nansum(self.to_2d_array(), axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def describe(self, percentiles=[0.25, 0.5, 0.75], **kwargs):
+        """See `vectorbt.timeseries.nb.describe_nb`.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
+
+        For `percentiles`, see [pandas.DataFrame.describe](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.describe.html).
+
+        Example:
+            ```python-repl
+            >>> print(df.vbt.timeseries.describe())
+                           a         b        c
+            count   5.000000  5.000000  5.00000
+            mean    3.000000  3.000000  1.80000
+            std     1.581139  1.581139  0.83666
+            min     1.000000  1.000000  1.00000
+            25.00%  2.000000  2.000000  1.00000
+            50.00%  3.000000  3.000000  2.00000
+            75.00%  4.000000  4.000000  2.00000
+            max     5.000000  5.000000  3.00000
+            ```"""
+        if percentiles is not None:
+            percentiles = reshape_fns.to_1d(percentiles)
+        else:
+            percentiles = np.empty(0)
+        index = pd.Index(['count', 'mean', 'std', 'min', *map(lambda x: '%.2f%%' % (x * 100), percentiles), 'max'])
+        return self.reduce_to_array(nb.describe_reduce_func_nb, percentiles, index=index, **kwargs)
 
 
 @register_series_accessor('timeseries')
@@ -487,7 +560,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
         )
         below_scatter.update(**below_trace_kwargs)
         fig.add_trace(below_scatter)
-        
+
         equal_scatter = go.Scatter(
             x=equal_obj.index,
             y=equal_obj,

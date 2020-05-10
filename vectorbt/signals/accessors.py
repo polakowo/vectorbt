@@ -3,7 +3,7 @@
 !!! note
     Input arrays must be `numpy.bool`.
     
-Before running the examples below:
+Before running the examples:
 ```py
 import vectorbt as vbt
 import numpy as np
@@ -19,7 +19,7 @@ index = pd.Index([
     datetime(2018, 1, 5)
 ])
 columns = ['a', 'b', 'c']
-df = pd.DataFrame([
+signals = pd.DataFrame([
     [True, False, False],
     [False, True, False],
     [False, False, True],
@@ -83,7 +83,7 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> print(pd.DataFrame.vbt.signals.empty_like(df))
+            >>> print(pd.DataFrame.vbt.signals.empty_like(signals))
                             a      b      c
             2018-01-01  False  False  False
             2018-01-02  False  False  False
@@ -216,14 +216,14 @@ class Signals_Accessor():
         """See `vectorbt.signals.nb.generate_after_nb`.
 
         Example:
-            Fill all space between signals in `df`:
+            Fill all space between signals in `signals`:
 
             ```python-repl
             >>> @njit
             ... def choice_func_nb(col, from_i, to_i):
             ...     return np.arange(from_i, to_i+1)
 
-            >>> print(df.vbt.signals.generate_after(choice_func_nb))
+            >>> print(signals.vbt.signals.generate_after(choice_func_nb))
                             a      b      c
             2018-01-01  False  False  False
             2018-01-02   True  False  False
@@ -239,10 +239,10 @@ class Signals_Accessor():
         """See `vectorbt.signals.nb.generate_random_after_nb`.
 
         Example:
-            Generate exactly one random signal after each signal in `df`:
+            Generate exactly one random signal after each signal in `signals`:
 
             ```python-repl
-            >>> print(df.vbt.signals.generate_random_after(1, seed=42))
+            >>> print(signals.vbt.signals.generate_random_after(1, seed=42))
                             a      b      c
             2018-01-01  False  False  False
             2018-01-02  False  False  False
@@ -266,7 +266,7 @@ class Signals_Accessor():
         Use `as_columns` as a top-level column level.
 
         Example:
-            For each entry in `df`, set stop-loss order for 10% and 20% below the price `ts`:
+            For each entry in `signals`, set stop-loss order for 10% and 20% below the price `ts`:
 
             ```python-repl
             >>> print(entries.vbt.signals.generate_stop_loss(ts, [0.1, 0.2]))
@@ -303,13 +303,13 @@ class Signals_Accessor():
         with `broadcast_kwargs`.
 
         Example:
-            Get maximum distance between signals in `df`:
+            Get maximum distance between signals in `signals`:
 
             ```python-repl
             >>> distance_map_nb = njit(lambda col, prev_i, next_i: next_i - prev_i)
             >>> max_reduce_nb = njit(lambda col, a: np.nanmax(a))
 
-            >>> print(df.vbt.signals.map_reduce_between(
+            >>> print(signals.vbt.signals.map_reduce_between(
             ...     map_func_nb=distance_map_nb, reduce_func_nb=max_reduce_nb))
             a    3.0
             b    3.0
@@ -343,7 +343,7 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> print(df.vbt.signals.num_signals)
+            >>> print(signals.vbt.signals.num_signals)
             a    2
             b    2
             c    1
@@ -362,7 +362,7 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> print(df.vbt.signals.avg_distance)
+            >>> print(signals.vbt.signals.avg_distance)
             a    3.0
             b    3.0
             c    NaN
@@ -376,10 +376,10 @@ class Signals_Accessor():
         See `Signals_Accessor.map_reduce_between`.
 
         Example:
-            Get average distance of `df` to `df` shifted by one:
+            Get average distance of `signals` to `signals` shifted by one:
 
             ```python-repl
-            >>> print(df.vbt.signals.avg_distance_to(df.vbt.signals.fshift(1)))
+            >>> print(signals.vbt.signals.avg_distance_to(signals.vbt.signals.fshift(1)))
             a    1.0
             b    1.0
             c    1.0
@@ -391,32 +391,32 @@ class Signals_Accessor():
         """See `vectorbt.signals.nb.rank_nb`.
 
         Example:
-            Rank `False` values in `df`:
+            Rank `False` values in `signals`:
 
             ```python-repl
-            >>> not_df = ~df
-            >>> print(not_df.vbt.signals.rank())
+            >>> not_signals = ~signals
+            >>> print(not_signals.vbt.signals.rank())
                         a  b  c
             2018-01-01  0  1  1
             2018-01-02  1  0  2
             2018-01-03  2  1  0
             2018-01-04  0  2  1
             2018-01-05  1  0  2
-            >>> print(not_df.vbt.signals.rank(after_false=True))
+            >>> print(not_signals.vbt.signals.rank(after_false=True))
                         a  b  c
             2018-01-01  0  0  0
             2018-01-02  1  0  1
             2018-01-03  2  1  0
             2018-01-04  0  2  1
             2018-01-05  1  0  2
-            >>> print(not_df.vbt.signals.rank(allow_gaps=True))
+            >>> print(not_signals.vbt.signals.rank(allow_gaps=True))
                         a  b  c
             2018-01-01  0  1  1
             2018-01-02  1  0  2
             2018-01-03  2  2  0
             2018-01-04  0  3  3
             2018-01-05  3  0  4
-            >>> print(not_df.vbt.signals.rank(reset_by=df, allow_gaps=True))
+            >>> print(not_signals.vbt.signals.rank(reset_by=signals, allow_gaps=True))
                         a  b  c
             2018-01-01  0  1  1
             2018-01-02  1  0  2
@@ -443,8 +443,8 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> not_df = ~df
-            >>> print(not_df.vbt.signals.first())
+            >>> not_signals = ~signals
+            >>> print(not_signals.vbt.signals.first())
                             a      b      c
             2018-01-01  False   True   True
             2018-01-02   True  False  False
@@ -461,8 +461,8 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> not_df = ~df
-            >>> print(not_df.vbt.signals.nst(2, allow_gaps=True))
+            >>> not_signals = ~signals
+            >>> print(not_signals.vbt.signals.nst(2, allow_gaps=True))
                             a      b      c
             2018-01-01  False  False  False
             2018-01-02  False  False   True
@@ -479,8 +479,8 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> not_df = ~df
-            >>> print(not_df.vbt.signals.from_nst(2, allow_gaps=True))
+            >>> not_signals = ~signals
+            >>> print(not_signals.vbt.signals.from_nst(2, allow_gaps=True))
                             a      b      c
             2018-01-01  False  False  False
             2018-01-02  False  False   True
@@ -505,7 +505,7 @@ class Signals_Accessor():
 
         Example:
             ```python-repl
-            >>> print(df.vbt.signals.OR(ts > 1, ts > 2, 
+            >>> print(signals.vbt.signals.OR(ts > 1, ts > 2, 
             ...     concat=True, as_columns=['>1', '>2']))
                                        >1                   >2
                            a     b      c      a      b      c
@@ -540,7 +540,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            df['a'].vbt.signals.plot()
+            signals['a'].vbt.signals.plot()
             ```
 
             ![](img/signals_sr_plot.png)"""
@@ -586,8 +586,8 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         Example:
             ```py
             fig = ts['a'].vbt.timeseries.plot()
-            df['a'].vbt.signals.plot_entry_markers(ts['a'], fig=fig)
-            df['b'].vbt.signals.plot_exit_markers(ts['a'], fig=fig)
+            signals['a'].vbt.signals.plot_entry_markers(ts['a'], fig=fig)
+            signals['b'].vbt.signals.plot_exit_markers(ts['a'], fig=fig)
             ```
 
             ![](img/signals_plot_markers.png)"""
@@ -655,10 +655,10 @@ class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            df[['a', 'c']].vbt.signals.plot().show_png()
+            signals[['a', 'c']].vbt.signals.plot().show_png()
             ```
 
-            ![](img/signals_df_plot.png)"""
+            ![](img/signals_signals_plot.png)"""
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.signals.plot(
                 trace_kwargs=trace_kwargs,
