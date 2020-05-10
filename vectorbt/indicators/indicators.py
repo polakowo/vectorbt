@@ -1,6 +1,6 @@
-"""A collection of custom indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
+"""Custom indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
-Before running the examples, import the following libraries:
+Before running the examples:
 ```py
 import numpy as np
 import pandas as pd
@@ -21,8 +21,9 @@ price['Close'].vbt.timeseries.plot()
 import numpy as np
 import pandas as pd
 from numba import njit
-from numba.types import UniTuple, f8, i8, b1, DictType, Tuple
+from numba.core.types import UniTuple, f8, i8, b1, DictType, Tuple
 import itertools
+import plotly.graph_objects as go
 
 from vectorbt import timeseries, indicators, defaults
 from vectorbt.utils import checks, reshape_fns
@@ -31,21 +32,21 @@ from vectorbt.utils.common import fix_class_for_pdoc
 # ############# MA ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def ma_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `MA`."""
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                ma = timeseries.nb.ewm_mean_nb(ts, windows[i])
+                ma = timeseries.nb.ewm_mean_nb(ts, windows[i], minp=windows[i])
             else:
-                ma = timeseries.nb.rolling_mean_nb(ts, windows[i])
+                ma = timeseries.nb.rolling_mean_nb(ts, windows[i], minp=windows[i])
             cache_dict[(windows[i], int(ewms[i]))] = ma
     return cache_dict
 
 
-@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def ma_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `MA`."""
     return cache_dict[(window, int(ewm))]
@@ -72,13 +73,13 @@ class MA(MA):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like): Size of the moving window. Can be one or more values.
-            ewm (bool or array_like): If True, uses exponential moving average, otherwise 
-                simple moving average. Can be one or more values. Defaults to False.
+            window (int or array_like): Size of the moving window.
+            ewm (bool or array_like): If `True`, uses exponential moving average, otherwise 
+                simple moving average.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             MA
-        Examples:
+        Example:
             ```python-repl
             >>> ma = vbt.MA.from_params(price['Close'], [10, 20], ewm=[False, True])
 
@@ -105,21 +106,21 @@ class MA(MA):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            windows (array_like of int): Size of the moving window. Must be multiple.
+            windows (array_like of int): Size of the moving window.
             r (int): The number of `MA` instances to combine.
-            ewm (bool or array_like of bool): If True, uses exponential moving average, otherwise 
-                uses simple moving average. Can be one or more values. Defaults to False.
-            names (list of str, optional): A list of names for each `MA` instance.
+            ewm (bool or array_like of bool): If `True`, uses exponential moving average, otherwise 
+                uses simple moving average.
+            names (list of str): A list of names for each `MA` instance.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             tuple of MA
-        Examples:
+        Example:
             ```python-repl
             >>> fast_ma, slow_ma = vbt.MA.from_combinations(price['Close'], 
             ...     [10, 20, 30], 2, ewm=[False, False, True], names=['fast', 'slow'])
 
             >>> print(fast_ma.ma)
-            fast_window         10         10          20
+            fast_window                    10          20
             fast_ewm         False      False       False
             Date                                         
             2019-02-28         NaN        NaN         NaN
@@ -133,7 +134,7 @@ class MA(MA):
             [185 rows x 3 columns]
 
             >>> print(slow_ma.ma)
-            slow_window          20            30            30
+            slow_window          20                          30
             slow_ewm          False          True          True
             Date                                               
             2019-02-28          NaN           NaN           NaN
@@ -167,10 +168,10 @@ class MA(MA):
             >>> exit_signals = fast_ma.ma_below(slow_ma, crossover=True)
 
             >>> print(entry_signals)
-            fast_window     10     10     20
+            fast_window            10     20
             fast_ewm     False  False  False
-            slow_window     20     30     30
-            slow_ewm     False  True    True
+            slow_window     20            30
+            slow_ewm     False   True   True
             Date                            
             2019-02-28   False  False  False
             2019-03-01   False  False  False
@@ -217,13 +218,13 @@ class MA(MA):
         """Plot `MA.ma` against `MA.ts`.
 
         Args:
-            ts_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MA.ts`.
-            ma_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MA.ma`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            ts_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `MA.ts`.
+            ma_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `MA.ma`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             ma[(10, False)].plot()
             ```
@@ -250,21 +251,21 @@ fix_class_for_pdoc(MA)
 # ############# MSTD ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def mstd_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `MSTD`."""
     cache_dict = dict()
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                mstd = timeseries.nb.ewm_std_nb(ts, windows[i])
+                mstd = timeseries.nb.ewm_std_nb(ts, windows[i], minp=windows[i])
             else:
-                mstd = timeseries.nb.rolling_std_nb(ts, windows[i])
+                mstd = timeseries.nb.rolling_std_nb(ts, windows[i], minp=windows[i])
             cache_dict[(windows[i], int(ewms[i]))] = mstd
     return cache_dict
 
 
-@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def mstd_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `MSTD`."""
     return cache_dict[(window, int(ewm))]
@@ -290,14 +291,13 @@ class MSTD(MSTD):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like): Size of the moving window. Can be one or more values.
-            ewm (bool or array_like): If True, uses exponential moving standard deviation, 
-                otherwise uses simple moving standard deviation. Can be one or more values. 
-                Defaults to False.
+            window (int or array_like): Size of the moving window.
+            ewm (bool or array_like): If `True`, uses exponential moving standard deviation, 
+                otherwise uses simple moving standard deviation.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             MSTD
-        Examples:
+        Example:
             ```python-repl
             >>> mstd = vbt.MSTD.from_params(price['Close'], [10, 20], ewm=[False, True])
 
@@ -325,12 +325,12 @@ class MSTD(MSTD):
         """Plot `MSTD.mstd`.
 
         Args:
-            mstd_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `MSTD.mstd`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            mstd_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `MSTD.mstd`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             mstd[(10, False)].plot()
             ```
@@ -352,7 +352,7 @@ fix_class_for_pdoc(MSTD)
 # ############# BollingerBands ############# #
 
 
-@njit(UniTuple(DictType(UniTuple(i8, 2), f8[:, :]), 2)(f8[:, :], i8[:], b1[:], f8[:]), cache=True)
+@njit(cache=True)
 def bb_caching_nb(ts, windows, ewms, alphas):
     """Numba-compiled caching function for `BollingerBands`."""
     ma_cache_dict = ma_caching_nb(ts, windows, ewms)
@@ -360,7 +360,7 @@ def bb_caching_nb(ts, windows, ewms, alphas):
     return ma_cache_dict, mstd_cache_dict
 
 
-@njit(UniTuple(f8[:, :], 3)(f8[:, :], i8, b1, f8, DictType(UniTuple(i8, 2), f8[:, :]), DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
     """Numba-compiled apply function for `BollingerBands`."""
     # Calculate lower, middle and upper bands
@@ -400,16 +400,14 @@ class BollingerBands(BollingerBands):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like): Size of the moving window. Can be one or more values.
-                Defaults to 20.
-            ewm (bool or array_like): If True, uses exponential moving average and standard deviation, 
-                otherwise uses simple moving average and standard deviation. Can be one or more values. 
-                Defaults to False.
-            alpha (int, float or array_like): Number of standard deviations. Can be one or more values. Defaults to 2.
+            window (int or array_like): Size of the moving window.
+            ewm (bool or array_like): If `True`, uses exponential moving average and standard deviation, 
+                otherwise uses simple moving average and standard deviation.
+            alpha (int, float or array_like): Number of standard deviations.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             BollingerBands
-        Examples:
+        Example:
             ```python-repl
             >>> bb = vbt.BollingerBands.from_params(price['Close'], 
             ...     window=[10, 20], alpha=[2, 3], ewm=[False, True])
@@ -482,11 +480,7 @@ class BollingerBands(BollingerBands):
             2019-02-28       NaN       NaN
             2019-03-01       NaN       NaN
             2019-03-02       NaN       NaN
-            2019-03-03       NaN       NaN
-            2019-03-04       NaN       NaN
             ...              ...       ...
-            2019-08-27  0.107370  0.313212
-            2019-08-28  0.130902  0.325698
             2019-08-29  0.135092  0.350338
             2019-08-30  0.123553  0.359435
             2019-08-31  0.133292  0.361560
@@ -508,19 +502,19 @@ class BollingerBands(BollingerBands):
         `BollingerBands.ts`.
 
         Args:
-            ts_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            ts_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.ts`.
-            ma_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            ma_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.ma`.
-            upper_band_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            upper_band_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.upper_band`.
-            lower_band_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            lower_band_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `BollingerBands.lower_band`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             bb[(10, False, 2)].plot()
             ```
@@ -565,7 +559,7 @@ fix_class_for_pdoc(BollingerBands)
 # ############# RSI ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), UniTuple(f8[:, :], 2))(f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def rsi_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `RSI`."""
     delta = timeseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
@@ -577,18 +571,18 @@ def rsi_caching_nb(ts, windows, ewms):
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i])
-                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i])
+                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i], minp=windows[i])
+                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i], minp=windows[i])
             else:
-                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i])
-                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i])
+                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i], minp=windows[i])
+                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i], minp=windows[i])
             roll_up = timeseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
             roll_down = timeseries.nb.prepend_nb(roll_down, 1, np.nan)
             cache_dict[(windows[i], int(ewms[i]))] = roll_up, roll_down
     return cache_dict
 
 
-@njit(f8[:, :](f8[:, :], i8, b1, DictType(UniTuple(i8, 2), UniTuple(f8[:, :], 2))), cache=True)
+@njit(cache=True)
 def rsi_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `RSI`."""
     roll_up, roll_down = cache_dict[(window, int(ewm))]
@@ -618,13 +612,13 @@ class RSI(RSI):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            window (int or array_like): Size of the moving window. Can be one or more values. Defaults to 14.
-            ewm (bool or array_like): If True, uses exponential moving average, otherwise 
-                simple moving average. Can be one or more values. Defaults to False.
+            window (int or array_like): Size of the moving window.
+            ewm (bool or array_like): If `True`, uses exponential moving average, otherwise 
+                simple moving average.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             RSI
-        Examples:
+        Example:
             ```python-repl
             >>> rsi = vbt.RSI.from_params(price['Close'], [10, 20], ewm=[False, True])
 
@@ -653,12 +647,12 @@ class RSI(RSI):
         """Plot `RSI.rsi`.
 
         Args:
-            trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `RSI.rsi`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `RSI.rsi`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             rsi[(10, False)].plot()
             ```
@@ -696,28 +690,27 @@ fix_class_for_pdoc(RSI)
 # ############# Stochastic ############# #
 
 
-@njit(DictType(i8, UniTuple(f8[:, :], 2))(f8[:, :], f8[:, :], f8[:, :], i8[:], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     """Numba-compiled caching function for `Stochastic`."""
     cache_dict = dict()
     for i in range(k_windows.shape[0]):
         if k_windows[i] not in cache_dict:
-            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i])
-            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i])
+            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i], minp=1) # min_periods=1
+            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i], minp=1)
             cache_dict[k_windows[i]] = roll_min, roll_max
     return cache_dict
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, i8, b1, DictType(i8, UniTuple(f8[:, :], 2))), cache=True)
+@njit(cache=True)
 def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
     """Numba-compiled apply function for `Stochastic`."""
     roll_min, roll_max = cache_dict[k_window]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
     if d_ewm:
-        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window)
+        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window, minp=d_window)
     else:
-        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window)
-    percent_d[:k_window+d_window-2, :] = np.nan  # min_periods
+        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window, minp=d_window)
     return percent_k, percent_d
 
 
@@ -744,18 +737,16 @@ class Stochastic(Stochastic):
 
         Args:
             close_ts (pandas_like): The last closing price.
-            high_ts (pandas_like, optional): The highest price. If None, uses `close_ts`.
-            low_ts (pandas_like, optional): The lowest price. If None, uses `close_ts`.
-            k_window (int or array_like): Size of the moving window for %K. Can be one or more values. 
-                Defaults to 14.
-            d_window (int or array_like): Size of the moving window for %D. Can be one or more values. 
-                Defaults to 3.
-            d_ewm (bool or array_like): If True, uses exponential moving average for %D, otherwise 
-                simple moving average. Can be one or more values. Defaults to False.
+            high_ts (pandas_like): The highest price. If None, uses `close_ts`.
+            low_ts (pandas_like): The lowest price. If None, uses `close_ts`.
+            k_window (int or array_like): Size of the moving window for %K.
+            d_window (int or array_like): Size of the moving window for %D.
+            d_ewm (bool or array_like): If `True`, uses exponential moving average for %D, otherwise 
+                simple moving average.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             Stochastic
-        Examples:
+        Example:
             ```python-repl
             >>> stoch = vbt.Stochastic.from_params(price['Close'],
             ...     high_ts=price['High'], low_ts=price['Low'],
@@ -807,15 +798,15 @@ class Stochastic(Stochastic):
         """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
 
         Args:
-            percent_k_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            percent_k_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `Stochastic.percent_k`.
-            percent_d_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            percent_d_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `Stochastic.percent_d`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             stoch[(10, 2, False)].plot(levels=(20, 80))
             ```
@@ -859,22 +850,22 @@ fix_class_for_pdoc(Stochastic)
 # ############# MACD ############# #
 
 
-@njit(DictType(UniTuple(i8, 2), f8[:, :])(f8[:, :], i8[:], i8[:], i8[:], b1[:], b1[:]), cache=True)
+@njit(cache=True)
 def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
     """Numba-compiled caching function for `MACD`."""
     return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
 
 
-@njit(UniTuple(f8[:, :], 4)(f8[:, :], i8, i8, i8, b1, b1, DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
     """Numba-compiled apply function for `MACD`."""
     fast_ma = cache_dict[(fast_window, int(macd_ewm))]
     slow_ma = cache_dict[(slow_window, int(macd_ewm))]
     macd_ts = fast_ma - slow_ma
     if signal_ewm:
-        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window)
+        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window, minp=signal_window)
     else:
-        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window)
+        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window, minp=signal_window)
     signal_ts[:max(fast_window, slow_window)+signal_window-2, :] = np.nan  # min_periodd
     return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
 
@@ -905,20 +896,17 @@ class MACD(MACD):
 
         Args:
             ts (pandas_like): Time series (such as price).
-            fast_window (int or array_like): Size of the fast moving window for MACD. Can be one or more values.
-                Defaults to 26.
-            slow_window (int or array_like): Size of the slow moving window for MACD. Can be one or more values.
-                Defaults to 12.
-            signal_window (int or array_like): Size of the moving window for signal. Can be one or more values.
-                Defaults to 9.
-            macd_ewm (bool or array_like): If True, uses exponential moving average for MACD, otherwise uses 
-                simple moving average. Can be one or more values. Defaults to True.
-            signal_ewm (bool or array_like): If True, uses exponential moving average for signal, otherwise uses 
-                simple moving average. Can be one or more values. Defaults to True.
+            fast_window (int or array_like): Size of the fast moving window for MACD.
+            slow_window (int or array_like): Size of the slow moving window for MACD.
+            signal_window (int or array_like): Size of the moving window for signal.
+            macd_ewm (bool or array_like): If `True`, uses exponential moving average for MACD, otherwise uses 
+                simple moving average.
+            signal_ewm (bool or array_like): If `True`, uses exponential moving average for signal, otherwise uses 
+                simple moving average.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             MACD
-        Examples:
+        Example:
             ```python-repl
             >>> macd = vbt.MACD.from_params(price['Close'], 
             ...     fast_window=[10, 20], slow_window=[20, 30], signal_window=[30, 40], 
@@ -1021,17 +1009,17 @@ class MACD(MACD):
         """Plot `MACD.macd`, `MACD.signal` and `MACD.histogram`.
 
         Args:
-            macd_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            macd_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `MACD.macd`.
-            signal_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of 
+            signal_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for 
                 `MACD.signal`.
-            histogram_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html) of 
+            histogram_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html) for 
                 `MACD.histogram`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             macd[(10, 20, 30, False, True)].plot()
             ```
@@ -1083,7 +1071,7 @@ fix_class_for_pdoc(MACD)
 # ############# ATR ############# #
 
 
-@njit(Tuple((f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])))(f8[:, :], f8[:, :], f8[:, :], i8[:], b1[:]), cache=True)
+@njit(cache=True)
 def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     """Numba-compiled caching function for `ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_func_nb
@@ -1096,14 +1084,14 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     for i in range(windows.shape[0]):
         if (windows[i], int(ewms[i])) not in cache_dict:
             if ewms[i]:
-                atr = timeseries.nb.ewm_mean_nb(tr, windows[i])
+                atr = timeseries.nb.ewm_mean_nb(tr, windows[i], minp=windows[i])
             else:
-                atr = timeseries.nb.rolling_mean_nb(tr, windows[i])
+                atr = timeseries.nb.rolling_mean_nb(tr, windows[i], minp=windows[i])
             cache_dict[(windows[i], int(ewms[i]))] = atr
     return tr, cache_dict
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8[:, :], f8[:, :], i8, b1, f8[:, :], DictType(UniTuple(i8, 2), f8[:, :])), cache=True)
+@njit(cache=True)
 def atr_apply_func_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
     """Numba-compiled apply function for `ATR`."""
     return tr, cache_dict[(window, int(ewm))]
@@ -1131,16 +1119,15 @@ class ATR(ATR):
 
         Args:
             close_ts (pandas_like): The last closing price.
-            high_ts (pandas_like, optional): The highest price. If None, uses `close_ts`.
-            low_ts (pandas_like, optional): The lowest price. If None, uses `close_ts`.
-            window (int or array_like): Size of the moving window. Can be one or more values. 
-                Defaults to 14.
-            ewm (bool or array_like): If True, uses exponential moving average, otherwise 
-                simple moving average. Can be one or more values. Defaults to True.
+            high_ts (pandas_like): The highest price.
+            low_ts (pandas_like): The lowest price.
+            window (int or array_like): Size of the moving window.
+            ewm (bool or array_like): If `True`, uses exponential moving average, otherwise 
+                simple moving average.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             ATR
-        Examples:
+        Example:
             ```python-repl
             >>> atr = vbt.ATR.from_params(price['Close'], 
             ...     price['High'], price['Low'], [20, 30], [False, True])
@@ -1184,13 +1171,13 @@ class ATR(ATR):
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
-            tr_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `ATR.tr`.
-            atr_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `ATR.atr`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            tr_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `ATR.tr`.
+            atr_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `ATR.atr`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             atr[(10, False)].plot()
             ```
@@ -1217,7 +1204,7 @@ fix_class_for_pdoc(ATR)
 # ############# OBV ############# #
 
 
-@njit(f8[:, :](f8[:, :], f8[:, :]))
+@njit(cache=True)
 def obv_custom_func_nb(close_ts, volume_ts):
     """Numba-compiled custom calculation function for `OBV`."""
     obv = np.full_like(close_ts, np.nan)
@@ -1234,17 +1221,12 @@ def obv_custom_func_nb(close_ts, volume_ts):
     return obv
 
 
-def obv_custom_func(close_ts, volume_ts):
-    """Custom calculation function for `OBV`."""
-    return obv_custom_func_nb(close_ts.vbt.to_2d_array(), volume_ts.vbt.to_2d_array())
-
-
 OBV = indicators.factory.IndicatorFactory(
     ts_names=['close_ts', 'volume_ts'],
     param_names=[],
     output_names=['obv'],
     name='obv'
-).from_custom_func(obv_custom_func)
+).from_custom_func(obv_custom_func_nb)
 
 
 class OBV(OBV):
@@ -1264,7 +1246,7 @@ class OBV(OBV):
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
             OBV
-        Examples:
+        Example:
             ```python-repl
             >>> obv = vbt.OBV.from_params(price['Close'], price['Volume'])
 
@@ -1273,11 +1255,7 @@ class OBV(OBV):
             2019-02-28             NaN
             2019-03-01    7.661248e+09
             2019-03-02    1.524003e+10
-            2019-03-03    7.986476e+09
-            2019-03-04   -1.042700e+09
-                                   ...     
-            2019-08-27    5.613088e+11
-            2019-08-28    5.437050e+11
+                                   ...
             2019-08-29    5.266592e+11
             2019-08-30    5.402544e+11
             2019-08-31    5.517092e+11
@@ -1293,12 +1271,12 @@ class OBV(OBV):
         """Plot `OBV.obv`.
 
         Args:
-            obv_trace_kwargs (dict, optional): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) of `OBV.obv`.
-            fig (plotly.graph_objects.Figure, optional): Figure to add traces to.
+            obv_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `OBV.obv`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Returns:
-            vectorbt.widgets.common.FigureWidget
-        Examples:
+            vectorbt.widgets.common.DefaultFigureWidget
+        Example:
             ```py
             obv.plot()
             ```

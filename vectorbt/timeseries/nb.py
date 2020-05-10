@@ -1,196 +1,360 @@
-from numba import njit, f8, i8, b1
+"""Numba-compiled 1-dim and 2-dim functions for time series.
+
+!!! note
+    `vectorbt` treats matrices as first-class citizens and expects input arrays to be
+    2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
+    Data is processed along index (axis 0).
+    
+    Input arrays can be of any data type, but output arrays are always `numpy.float64`.
+    
+    Rolling functions with `minp=None` have `min_periods` set to the window size."""
+
+from numba import njit, f8, i8, b1, optional
 import numpy as np
 
 
-@njit(f8[:](f8[:], i8, f8), cache=True)
+@njit(cache=True)
 def prepend_1d_nb(a, n, value):
-    """Prepend n values to the array."""
-    b = np.full(a.shape[0]+n, value)
-    b[n:] = a
-    return b
+    """Prepend value `n` times."""
+    result = np.empty(a.shape[0]+n, dtype=f8)
+    result[:n] = value
+    result[n:] = a
+    return result
 
 
-@njit(f8[:, :](f8[:, :], i8, f8), cache=True)
+@njit(cache=True)
 def prepend_nb(a, n, value):
-    b = np.full((a.shape[0]+n, a.shape[1]), value)
-    b[n:, :] = a
-    return b
+    """2-dim version of `prepend_1d_nb`."""
+    result = np.empty((a.shape[0]+n, a.shape[1]), dtype=f8)
+    result[:n, :] = value
+    result[n:, :] = a
+    return result
 
 
-@njit(f8[:, :](f8[:], i8), cache=True)
-def rolling_window_1d_nb(a, window):
-    """Stack and return all windows rolled over the array."""
-    width = a.shape[0] - window + 1
-    b = np.empty((window, width))
-    for col in range(b.shape[1]):
-        b[:, col] = a[col:col+window]
-    return b
-
-
-@njit(f8[:, :, :](f8[:, :], i8), cache=True)
-def rolling_window_nb(a, window):
-    b = np.empty((a.shape[1], window, a.shape[0] - window + 1))
-    for col in range(a.shape[1]):
-        b[col, :, :] = rolling_window_1d_nb(a[:, col], window)
-    return b
-
-# Functions below have shape in = shape out
-
-
-@njit(f8[:](f8[:], b1[:], f8), cache=True)
+@njit(cache=True)
 def set_by_mask_1d_nb(a, mask, value):
-    """Set value by boolean mask."""
-    b = a.copy()
-    b[mask] = value
-    return b
+    """Set each element to a value by boolean mask."""
+    result = a.astype(f8)
+    result[mask] = value
+    return result
 
 
-@njit(f8[:, :](f8[:, :], b1[:, :], f8), cache=True)
+@njit(cache=True)
 def set_by_mask_nb(a, mask, value):
-    b = a.copy()
-    for col in range(b.shape[1]):
-        b[mask[:, col], col] = value
-    return b
+    """2-dim version of `set_by_mask_1d_nb`."""
+    result = a.astype(f8)
+    for col in range(a.shape[1]):
+        result[mask[:, col], col] = value
+    return result
 
 
-@njit(f8[:](f8[:], b1[:], f8[:]), cache=True)
+@njit(cache=True)
 def set_by_mask_mult_1d_nb(a, mask, values):
-    """Set values by boolean mask."""
-    b = a.copy()
-    b[mask] = values[mask]
-    return b
+    """Set each element in one array to the corresponding element in another by boolean mask.
+
+    `values` must be of the same shape as in `a`."""
+    result = a.astype(f8)
+    result[mask] = values[mask]
+    return result
 
 
-@njit(f8[:, :](f8[:, :], b1[:, :], f8[:, :]), cache=True)
+@njit(cache=True)
 def set_by_mask_mult_nb(a, mask, values):
-    b = a.copy()
-    for col in range(b.shape[1]):
-        b[mask[:, col], col] = values[mask[:, col], col]
-    return b
+    """2-dim version of `set_by_mask_mult_1d_nb`."""
+    result = a.astype(f8)
+    for col in range(a.shape[1]):
+        result[mask[:, col], col] = values[mask[:, col], col]
+    return result
 
 
-@njit(f8[:](f8[:], f8), cache=True)
+@njit(cache=True)
 def fillna_1d_nb(a, value):
-    """Fill NaNs with value."""
+    """Replace NaNs with value.
+
+    Numba equivalent to `pd.Series(a).fillna(value)`."""
     return set_by_mask_1d_nb(a, np.isnan(a), value)
 
 
-@njit(f8[:, :](f8[:, :], f8), cache=True)
+@njit(cache=True)
 def fillna_nb(a, value):
+    """2-dim version of `fillna_1d_nb`."""
     return set_by_mask_nb(a, np.isnan(a), value)
 
 
-@njit(f8[:](f8[:], i8), cache=True)
+@njit(cache=True)
 def fshift_1d_nb(a, n):
-    """Shift forward by n."""
-    b = np.full_like(a, np.nan)
-    b[n:] = a[:-n]
-    return b
+    """Shift forward by `n` positions.
+
+    Numba equivalent to `pd.Series(a).shift(value)`."""
+    result = np.empty_like(a, dtype=f8)
+    result[:n] = np.nan
+    result[n:] = a[:-n]
+    return result
 
 
-@njit(f8[:, :](f8[:, :], i8), cache=True)
+@njit(cache=True)
 def fshift_nb(a, n):
-    b = np.full_like(a, np.nan)
-    b[n:, :] = a[:-n, :]
-    return b
+    """2-dim version of `fshift_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    result[:n, :] = np.nan
+    result[n:, :] = a[:-n, :]
+    return result
 
 
-@njit(f8[:](f8[:]), cache=True)
+@njit(cache=True)
 def diff_1d_nb(a):
-    """Calculate the 1-th discrete difference."""
-    b = np.full_like(a, np.nan)
-    b[1:] = a[1:] - a[:-1]
-    return b
+    """Return the 1-th discrete difference.
+
+    Numba equivalent to `pd.Series(a).diff()`."""
+    result = np.empty_like(a, dtype=f8)
+    result[0] = np.nan
+    result[1:] = a[1:] - a[:-1]
+    return result
 
 
-@njit(f8[:, :](f8[:, :]), cache=True)
+@njit(cache=True)
 def diff_nb(a):
-    b = np.full_like(a, np.nan)
-    b[1:, :] = a[1:, :] - a[:-1, :]
-    return b
+    """2-dim version of `diff_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    result[0, :] = np.nan
+    result[1:, :] = a[1:, :] - a[:-1, :]
+    return result
 
 
-@njit(f8[:](f8[:]), cache=True)
+@njit(cache=True)
 def pct_change_1d_nb(a):
-    """Compute the percentage change."""
-    b = np.full_like(a, np.nan)
-    b[1:] = a[1:] / a[:-1] - 1
-    return b
+    """Return the percentage change.
+
+    Numba equivalent to `pd.Series(a).pct_change()`."""
+    result = np.empty_like(a, dtype=f8)
+    result[0] = np.nan
+    result[1:] = a[1:] / a[:-1] - 1
+    return result
 
 
-@njit(f8[:, :](f8[:, :]), cache=True)
+@njit(cache=True)
 def pct_change_nb(a):
-    b = np.full_like(a, np.nan)
-    b[1:, :] = a[1:, :] / a[:-1, :] - 1
-    return b
+    """2-dim version of `pct_change_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    result[0, :] = np.nan
+    result[1:, :] = a[1:, :] / a[:-1, :] - 1
+    return result
 
 
-@njit(f8[:](f8[:]), cache=True)
+@njit(cache=True)
 def ffill_1d_nb(a):
-    """Fill NaNs with the last value."""
-    b = np.full_like(a, np.nan)
-    maxval = a[0]
+    """Fill NaNs by propagating last valid observation forward.
+
+    Numba equivalent to `pd.Series(a).fillna(method='ffill')`."""
+    result = np.empty_like(a, dtype=f8)
+    lastval = a[0]
     for i in range(a.shape[0]):
         if np.isnan(a[i]):
-            b[i] = maxval
+            result[i] = lastval
         else:
-            b[i] = a[i]
-            maxval = b[i]
-    return b
+            result[i] = a[i]
+            lastval = result[i]
+    return result
 
 
-@njit(f8[:, :](f8[:, :]), cache=True)
+@njit(cache=True)
 def ffill_nb(a):
-    b = np.empty_like(a)
+    """2-dim version of `ffill_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = ffill_1d_nb(a[:, col])
-    return b
+        result[:, col] = ffill_1d_nb(a[:, col])
+    return result
 
 
-@njit(f8[:](f8[:]), cache=True)
+@njit(cache=True)
+def product_1d_nb(a):
+    """Return product.
+
+    Numba equivalent to `pd.Series(a).prod()`."""
+    result = a[0]
+    for i in range(1, a.shape[0]):
+        if ~np.isnan(a[i]):
+            if np.isnan(result):
+                result = a[i]
+            else:
+                result *= a[i]
+    return result
+
+
+@njit(cache=True)
+def product_nb(a):
+    """2-dim version of `product_1d_nb`."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = product_1d_nb(a[:, col])
+    return result
+
+
+@njit(cache=True)
 def cumsum_1d_nb(a):
-    """Cumulative sum."""
-    b = np.full_like(a, np.nan)
+    """Return cumulative sum.
+
+    Numba equivalent to `pd.Series(a).cumsum()`."""
+    result = np.empty_like(a, dtype=f8)
     cumsum = 0
     for i in range(a.shape[0]):
         if ~np.isnan(a[i]):
             cumsum += a[i]
-            b[i] = cumsum
-    return b
+            result[i] = cumsum
+        else:
+            result[i] = np.nan
+    return result
 
 
-@njit(f8[:, :](f8[:, :]), cache=True)
+@njit(cache=True)
 def cumsum_nb(a):
-    b = np.empty_like(a)
+    """2-dim version of `cumsum_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = cumsum_1d_nb(a[:, col])
-    return b
+        result[:, col] = cumsum_1d_nb(a[:, col])
+    return result
 
 
-@njit(f8[:](f8[:]), cache=True)
+@njit(cache=True)
 def cumprod_1d_nb(a):
-    """Cumulative product."""
-    b = np.full_like(a, np.nan)
+    """Return cumulative product.
+
+    Numba equivalent to `pd.Series(a).cumprod()`."""
+    result = np.empty_like(a, dtype=f8)
     cumprod = 1
     for i in range(a.shape[0]):
         if ~np.isnan(a[i]):
             cumprod *= a[i]
-            b[i] = cumprod
-    return b
+            result[i] = cumprod
+        else:
+            result[i] = np.nan
+    return result
 
 
-@njit(f8[:, :](f8[:, :]), cache=True)
+@njit(cache=True)
 def cumprod_nb(a):
-    b = np.empty_like(a)
+    """2-dim version of `cumprod_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = cumprod_1d_nb(a[:, col])
-    return b
+        result[:, col] = cumprod_1d_nb(a[:, col])
+    return result
 
 
-@njit(f8[:](f8[:], i8), cache=True)
-def rolling_mean_1d_nb(a, window):
-    """Rolling mean."""
-    b = np.full_like(a, np.nan)
+@njit(cache=True)
+def nanmax_cube_nb(a):
+    """Return max of a cube by reducing the axis 0."""
+    result = np.empty((a.shape[1], a.shape[2]), dtype=f8)
+    for i in range(a.shape[1]):
+        for j in range(a.shape[2]):
+            result[i, j] = np.nanmax(a[:, i, j])
+    return result
+
+# ############# Rolling functions ############# #
+
+
+@njit(cache=True)
+def rolling_window_1d_nb(a, window):
+    """Roll a window.
+
+    Creates a matrix of rolled windows with first axis being window size."""
+    width = a.shape[0] - window + 1
+    result = np.empty((window, width), dtype=f8)
+    for col in range(width):
+        result[:, col] = a[col:col+window]
+    return result
+
+
+@njit(cache=True)
+def rolling_window_nb(a, window):
+    """2-dim version of `rolling_window_1d_nb`.
+
+    Creates a cube of rolled windows with first axis being columns and second axis being window size."""
+    result = np.empty((a.shape[1], window, a.shape[0] - window + 1), dtype=f8)
+    for col in range(a.shape[1]):
+        result[col, :, :] = rolling_window_1d_nb(a[:, col], window)
+    return result
+
+
+@njit(cache=True)
+def rolling_min_1d_nb(a, window, minp=None):
+    """Return rolling min.
+
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).min()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    result = np.empty_like(a, dtype=f8)
+    for i in range(a.shape[0]):
+        minv = a[i]
+        cnt = 0
+        for j in range(max(i-window+1, 0), i+1):
+            if np.isnan(a[j]):
+                continue
+            if np.isnan(minv) or a[j] < minv:
+                minv = a[j]
+            cnt += 1
+        if cnt < minp:
+            result[i] = np.nan
+        else:
+            result[i] = minv
+    return result
+
+
+@njit(cache=True)
+def rolling_min_nb(a, window, minp=None):
+    """2-dim version of `rolling_min_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    for col in range(a.shape[1]):
+        result[:, col] = rolling_min_1d_nb(a[:, col], window, minp=minp)
+    return result
+
+
+@njit(cache=True)
+def rolling_max_1d_nb(a, window, minp=None):
+    """Return rolling max.
+
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).max()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    result = np.empty_like(a, dtype=f8)
+    for i in range(a.shape[0]):
+        maxv = a[i]
+        cnt = 0
+        for j in range(max(i-window+1, 0), i+1):
+            if np.isnan(a[j]):
+                continue
+            if np.isnan(maxv) or a[j] > maxv:
+                maxv = a[j]
+            cnt += 1
+        if cnt < minp:
+            result[i] = np.nan
+        else:
+            result[i] = maxv
+    return result
+
+
+@njit(cache=True)
+def rolling_max_nb(a, window, minp=None):
+    """2-dim version of `rolling_max_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    for col in range(a.shape[1]):
+        result[:, col] = rolling_max_1d_nb(a[:, col], window, minp=minp)
+    return result
+
+
+@njit(cache=True)
+def rolling_mean_1d_nb(a, window, minp=None):
+    """Return rolling mean.
+
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).mean()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    result = np.empty_like(a, dtype=f8)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
     nancnt_arr = np.zeros_like(a)
@@ -202,36 +366,40 @@ def rolling_mean_1d_nb(a, window):
             cumsum = cumsum + a[i]
         nancnt_arr[i] = nancnt
         cumsum_arr[i] = cumsum
-        if i < window - 1:
-            continue
         if i < window:
-            if nancnt > 0:
-                continue
-            window_len = i + 1
+            window_len = i + 1 - nancnt
             window_cumsum = cumsum
         else:
-            if nancnt - nancnt_arr[i-window] > 0:
-                continue
-            window_len = window
+            window_len = window - (nancnt - nancnt_arr[i-window])
             window_cumsum = cumsum - cumsum_arr[i-window]
-        if window_len == 0:
-            continue
-        b[i] = window_cumsum / window_len
-    return b
+        if window_len < minp:
+            result[i] = np.nan
+        else:
+            result[i] = window_cumsum / window_len
+    return result
 
 
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def rolling_mean_nb(a, window):
-    b = np.empty_like(a)
+@njit(cache=True)
+def rolling_mean_nb(a, window, minp=None):
+    """2-dim version of `rolling_mean_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = rolling_mean_1d_nb(a[:, col], window)
-    return b
+        result[:, col] = rolling_mean_1d_nb(a[:, col], window, minp=minp)
+    return result
 
 
-@njit(f8[:](f8[:], i8), cache=True)
-def rolling_std_1d_nb(a, window):
-    """Rolling std for ddof = 0."""
-    b = np.full_like(a, np.nan)
+@njit(cache=True)
+def rolling_std_1d_nb(a, window, minp=None):
+    """Return rolling standard deviation.
+
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std()`."""
+    if minp is None:
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
+    if minp == 1:
+        minp = 2
+    result = np.empty_like(a, dtype=f8)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
     cumsum_sq_arr = np.zeros_like(a)
@@ -248,129 +416,61 @@ def rolling_std_1d_nb(a, window):
         nancnt_arr[i] = nancnt
         cumsum_arr[i] = cumsum
         cumsum_sq_arr[i] = cumsum_sq
-        if i < window - 1:
-            continue
         if i < window:
-            if nancnt > 0:
-                continue
-            window_len = i + 1
+            window_len = i + 1 - nancnt
             window_cumsum = cumsum
             window_cumsum_sq = cumsum_sq
         else:
-            if nancnt - nancnt_arr[i-window] > 0:
-                continue
             window_len = window - (nancnt - nancnt_arr[i-window])
             window_cumsum = cumsum - cumsum_arr[i-window]
             window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i-window]
-        if window_len == 0:
-            continue
-        mean = window_cumsum / window_len
-        b[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum * mean + window_len * mean ** 2) / (window_len - 1))
-    return b
-
-
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def rolling_std_nb(a, window):
-    b = np.empty_like(a)
-    for col in range(a.shape[1]):
-        b[:, col] = rolling_std_1d_nb(a[:, col], window)
-    return b
-
-
-@njit(f8[:](f8[:], i8), cache=True)
-def rolling_min_1d_nb(a, window):
-    """Rolling min."""
-    b = np.empty_like(a)
-    for i in range(a.shape[0]):
-        minv = a[i]
-        for j in range(max(i-window+1, 0), i+1):
-            if np.isnan(a[j]):
-                minv = np.nan
-                continue
-            if a[j] < minv:
-                minv = a[j]
-        b[i] = minv
-    b[:(window-1)] = np.nan
-    return b
-
-
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def rolling_min_nb(a, window):
-    b = np.empty_like(a)
-    for col in range(a.shape[1]):
-        b[:, col] = rolling_min_1d_nb(a[:, col], window)
-    return b
-
-
-@njit(f8[:](f8[:], i8), cache=True)
-def rolling_max_1d_nb(a, window):
-    """Rolling max."""
-    b = np.empty_like(a)
-    for i in range(a.shape[0]):
-        maxv = a[i]
-        for j in range(max(i-window+1, 0), i+1):
-            if np.isnan(a[j]):
-                maxv = np.nan
-                continue
-            if a[j] > maxv:
-                maxv = a[j]
-        b[i] = maxv
-    b[:(window-1)] = np.nan
-    return b
-
-
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def rolling_max_nb(a, window):
-    b = np.empty_like(a)
-    for col in range(a.shape[1]):
-        b[:, col] = rolling_max_1d_nb(a[:, col], window)
-    return b
-
-
-@njit(f8[:](f8[:]), cache=True)
-def expanding_max_1d_nb(a):
-    """Expanding max."""
-    b = np.empty_like(a)
-    maxv = np.nan
-    for i in range(a.shape[0]):
-        if np.isnan(a[i]):
-            if np.isnan(maxv):
-                b[i] = np.nan
-                continue
+        if window_len < minp:
+            result[i] = np.nan
         else:
-            if np.isnan(maxv) or a[i] > maxv:
-                maxv = a[i]
-        b[i] = maxv
-    return b
+            mean = window_cumsum / window_len
+            result[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum *
+                                       mean + window_len * mean ** 2) / (window_len - 1))
+    return result
 
 
-@njit(f8[:, :](f8[:, :]), cache=True)
-def expanding_max_nb(a):
-    b = np.empty_like(a)
+@njit(cache=True)
+def rolling_std_nb(a, window, minp=None):
+    """2-dim version of `rolling_std_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = expanding_max_1d_nb(a[:, col])
-    return b
+        result[:, col] = rolling_std_1d_nb(a[:, col], window, minp=minp)
+    return result
 
 
-@njit(f8[:](f8[:], i8), cache=True)
-def ewm_mean_1d_nb(vals, span):
-    """Adaptation of pandas._libs.window.aggregations.window_aggregations.ewma with default params."""
-    N = len(vals)
-    output = np.empty(N, dtype=f8)
+@njit(cache=True)
+def ewm_mean_1d_nb(a, span, minp=None):
+    """Return exponential weighted average.
+
+    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).mean()`.
+
+    Adaptation of `pandas._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
+    if minp is None:
+        minp = span
+    if minp > span:
+        raise ValueError("minp must be <= span")
+    N = len(a)
+    result = np.empty(N, dtype=f8)
     if N == 0:
-        return output
+        return result
     com = (span - 1) / 2.0
     alpha = 1. / (1. + com)
     old_wt_factor = 1. - alpha
     new_wt = 1.
-    weighted_avg = vals[0]
+    weighted_avg = a[0]
     is_observation = (weighted_avg == weighted_avg)
-    output[0] = weighted_avg
+    nobs = int(is_observation)
+    result[0] = weighted_avg if (nobs >= minp) else np.nan
     old_wt = 1.
 
     for i in range(1, N):
-        cur = vals[i]
+        cur = a[i]
         is_observation = (cur == cur)
+        nobs += is_observation
         if weighted_avg == weighted_avg:
             old_wt *= old_wt_factor
             if is_observation:
@@ -380,47 +480,54 @@ def ewm_mean_1d_nb(vals, span):
                 old_wt += new_wt
         elif is_observation:
             weighted_avg = cur
-        output[i] = weighted_avg
-    output[:(span-1)] = np.nan
-    return output
+        result[i] = weighted_avg if (nobs >= minp) else np.nan
+    return result
 
 
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def ewm_mean_nb(a, span):
-    b = np.empty_like(a)
+@njit(cache=True)
+def ewm_mean_nb(a, span, minp=None):
+    """2-dim version of `ewm_mean_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = ewm_mean_1d_nb(a[:, col], span)
-    return b
+        result[:, col] = ewm_mean_1d_nb(a[:, col], span, minp=minp)
+    return result
 
 
-@njit(f8[:](f8[:], i8), cache=True)
-def ewm_std_1d_nb(vals, span):
-    """Adaptation of pandas._libs.window.aggregations.window_aggregations.ewmcov with default params."""
-    N = len(vals)
-    output = np.empty(N, dtype=f8)
+@njit(cache=True)
+def ewm_std_1d_nb(a, span, minp=None):
+    """Return exponential weighted standard deviation.
+
+    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std()`.
+
+    Adaptation of `pandas._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
+    if minp is None:
+        minp = span
+    if minp > span:
+        raise ValueError("minp must be <= span")
+    N = len(a)
+    result = np.empty(N, dtype=f8)
     if N == 0:
-        return output
+        return result
     com = (span - 1) / 2.0
-    minp = 1.
     alpha = 1. / (1. + com)
     old_wt_factor = 1. - alpha
     new_wt = 1.
-    mean_x = vals[0]
-    mean_y = vals[0]
+    mean_x = a[0]
+    mean_y = a[0]
     is_observation = ((mean_x == mean_x) and (mean_y == mean_y))
     nobs = int(is_observation)
     if not is_observation:
         mean_x = np.nan
         mean_y = np.nan
-    output[0] = np.nan
+    result[0] = np.nan
     cov = 0.
     sum_wt = 1.
     sum_wt2 = 1.
     old_wt = 1.
 
     for i in range(1, N):
-        cur_x = vals[i]
-        cur_y = vals[i]
+        cur_x = a[i]
+        cur_y = a[i]
         is_observation = ((cur_x == cur_x) and (cur_y == cur_y))
         nobs += is_observation
         if mean_x == mean_x:
@@ -455,131 +562,304 @@ def ewm_std_1d_nb(vals, span):
             numerator = sum_wt * sum_wt
             denominator = numerator - sum_wt2
             if (denominator > 0.):
-                output[i] = ((numerator / denominator) * cov)
+                result[i] = ((numerator / denominator) * cov)
             else:
-                output[i] = np.nan
+                result[i] = np.nan
         else:
-            output[i] = np.nan
-
-    output[:(span-1)] = np.nan
-    return np.sqrt(output)
+            result[i] = np.nan
+    return np.sqrt(result)
 
 
-@njit(f8[:, :](f8[:, :], i8), cache=True)
-def ewm_std_nb(a, span):
-    b = np.empty_like(a)
+@njit(cache=True)
+def ewm_std_nb(a, span, minp=None):
+    """2-dim version of `ewm_std_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
-        b[:, col] = ewm_std_1d_nb(a[:, col], span)
-    return b
+        result[:, col] = ewm_std_1d_nb(a[:, col], span, minp=minp)
+    return result
+
+# ############# Expanding functions ############# #
 
 
-@njit
-def rolling_apply_1d_nb(a, window, apply_func_nb):
-    """Rolling apply."""
-    b = np.empty_like(a)
+@njit(cache=True)
+def expanding_min_1d_nb(a, minp=1):
+    """Return expanding min.
+
+    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).min()`."""
+    result = np.empty_like(a, dtype=f8)
+    minv = a[0]
+    cnt = 0
     for i in range(a.shape[0]):
-        b[i] = apply_func_nb(a[max(0, i+1-window):i+1])
-    b[:(window-1)] = np.nan
-    return b
-
-
-@njit
-def rolling_apply_nb(a, window, apply_func_nb, on_2d=False):
-    """Use on_2d=True to pass rolling matrix to the apply_func_nb."""
-    b = np.empty_like(a)
-    if on_2d:
-        for i in range(a.shape[0]):
-            b[i, :] = apply_func_nb(a[max(0, i+1-window):i+1, :])
-            b[:(window-1)] = np.nan
-    else:
-        for col in range(a.shape[1]):
-            b[:, col] = rolling_apply_1d_nb(a[:, col], window, apply_func_nb)
-    return b
-
-
-@njit
-def expanding_apply_1d_nb(a, apply_func_nb):
-    """Expanding apply."""
-    b = np.empty_like(a)
-    for i in range(a.shape[0]):
-        b[i] = apply_func_nb(a[0:i+1])
-    return b
-
-
-@njit
-def expanding_apply_nb(a, apply_func_nb, on_2d=False):
-    b = np.empty_like(a)
-    if on_2d:
-        for i in range(a.shape[0]):
-            b[i, :] = apply_func_nb(a[0:i+1, :])
-    else:
-        for col in range(a.shape[1]):
-            b[:, col] = expanding_apply_1d_nb(a[:, col], apply_func_nb)
-    return b
-
-
-@njit
-def groupby_apply_1d_nb(a, by_b, apply_func_nb):
-    """Group array by another array and apply a function."""
-    groups = np.unique(by_b)
-    group_idxs = []
-    for i in range(len(groups)):
-        idx_lst = []
-        for j in range(len(by_b)):
-            if by_b[j] == groups[i]:
-                idx_lst.append(j)
-        group_idxs.append(np.asarray(idx_lst))
-    b = np.empty(len(groups))
-    for i, idxs in enumerate(group_idxs):
-        b[i] = apply_func_nb(a[idxs])
-    return groups, b
-
-
-@njit
-def groupby_apply_nb(a, by_b, apply_func_nb, on_2d=False):
-    groups = np.unique(by_b)
-    group_idxs = []
-    for i in range(len(groups)):
-        idx_lst = []
-        for j in range(len(by_b)):
-            if by_b[j] == groups[i]:
-                idx_lst.append(j)
-        group_idxs.append(np.asarray(idx_lst))
-    b = np.empty((len(groups), a.shape[1]))
-    for i, idxs in enumerate(group_idxs):
-        if on_2d:
-            b[i, :] = apply_func_nb(a[idxs, :])
+        if np.isnan(minv) or a[i] < minv:
+            minv = a[i]
+        if ~np.isnan(a[i]):
+            cnt += 1
+        if cnt < minp:
+            result[i] = np.nan
         else:
-            for col in range(a.shape[1]):
-                b[i, col] = apply_func_nb(a[idxs, col])
-    return groups, b
+            result[i] = minv
+    return result
+
+
+@njit(cache=True)
+def expanding_min_nb(a, minp=1):
+    """2-dim version of `expanding_min_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    for col in range(a.shape[1]):
+        result[:, col] = expanding_min_1d_nb(a[:, col], minp=minp)
+    return result
+
+
+@njit(cache=True)
+def expanding_max_1d_nb(a, minp=1):
+    """Return expanding max.
+
+    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).max()`."""
+    result = np.empty_like(a, dtype=f8)
+    maxv = a[0]
+    cnt = 0
+    for i in range(a.shape[0]):
+        if np.isnan(maxv) or a[i] > maxv:
+            maxv = a[i]
+        if ~np.isnan(a[i]):
+            cnt += 1
+        if cnt < minp:
+            result[i] = np.nan
+        else:
+            result[i] = maxv
+    return result
+
+
+@njit(cache=True)
+def expanding_max_nb(a, minp=1):
+    """2-dim version of `expanding_max_1d_nb`."""
+    result = np.empty_like(a, dtype=f8)
+    for col in range(a.shape[1]):
+        result[:, col] = expanding_max_1d_nb(a[:, col], minp=minp)
+    return result
+
+
+@njit(cache=True)
+def expanding_mean_1d_nb(a, minp=1):
+    """Return expanding mean.
+
+    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).mean()`."""
+    return rolling_mean_1d_nb(a, a.shape[0], minp=minp)
+
+
+@njit(cache=True)
+def expanding_mean_nb(a, minp=1):
+    """2-dim version of `expanding_mean_1d_nb`."""
+    return rolling_mean_nb(a, a.shape[0], minp=minp)
+
+
+@njit(cache=True)
+def expanding_std_1d_nb(a, minp=1):
+    """Return expanding standard deviation.
+
+    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).std()`."""
+    return rolling_std_1d_nb(a, a.shape[0], minp=minp)
+
+
+@njit(cache=True)
+def expanding_std_nb(a, minp=1):
+    """2-dim version of `expanding_std_1d_nb`."""
+    return rolling_std_nb(a, a.shape[0], minp=minp)
+
+# ############# Apply functions ############# #
 
 
 @njit
-def apply_by_mask_1d_nb(a, mask, apply_func_nb):
-    """Apply a function on masked array."""
-    b = np.empty(mask.shape[0])
-    for i in range(mask.shape[0]):
-        b[i] = apply_func_nb(a[mask[i, :]])
-    return b
+def rolling_apply_nb(a, window, apply_func_nb, *args):
+    """Provide rolling window calculations.
+
+    `apply_func_nb` must accept index of the current column, index of the current row, 
+    the array, and `*args`. Must return a single value.
+
+    !!! note
+        `apply_func_nb` must be Numba-compiled."""
+    result = np.empty_like(a, dtype=f8)
+    for col in range(a.shape[1]):
+        for i in range(a.shape[0]):
+            window_a = a[max(0, i+1-window):i+1, col]
+            result[i, col] = apply_func_nb(col, i, window_a, *args)
+    return result
 
 
 @njit
-def apply_by_mask_nb(a, mask, apply_func_nb, on_2d=False):
-    b = np.empty((mask.shape[0], a.shape[1]))
-    if on_2d:
-        for i in range(mask.shape[0]):
-            b[i, :] = apply_func_nb(a[mask[i, :], :])
+def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
+    """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
+
+    `apply_func_nb` must accept index of the current row, the 2-dim array, and `*args`. 
+    Must return a single value or an array of shape `a.shape[1]`.
+
+    !!! note
+        `apply_func_nb` must be Numba-compiled."""
+    result = np.empty_like(a, dtype=f8)
+    for i in range(a.shape[0]):
+        window_a = a[max(0, i+1-window):i+1, :]
+        result[i, :] = apply_func_nb(i, window_a, *args)
+    return result
+
+
+@njit
+def expanding_apply_nb(a, apply_func_nb, *args):
+    """Expanding version of `rolling_apply_nb`."""
+    return rolling_apply_nb(a, a.shape[0], apply_func_nb, *args)
+
+
+@njit
+def expanding_apply_matrix_nb(a, apply_func_nb, *args):
+    """Expanding version of `rolling_apply_matrix_nb`."""
+    return rolling_apply_matrix_nb(a, a.shape[0], apply_func_nb, *args)
+
+
+@njit
+def groupby_apply_nb(a, groups, apply_func_nb, *args):
+    """Provide group-by calculations.
+
+    `groups` must be a dictionary, where each key is an index that points to an element in the new array 
+    where a group-by result will be stored, while the value should be an array of indices in `a`
+    to apply `apply_func_nb` on.
+
+    `apply_func_nb` must accept index of the current column, indices of the current group, 
+    the array, and `*args`. Must return a single value.
+
+    !!! note
+        `apply_func_nb` must be Numba-compiled."""
+    result = np.empty((len(groups), a.shape[1]), dtype=f8)
+    for col in range(a.shape[1]):
+        for i, idxs in groups.items():
+            result[i, col] = apply_func_nb(col, idxs, a[idxs, col], *args)
+    return result
+
+
+@njit
+def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
+    """`groupby_apply_nb` with `apply_func_nb` being applied on all columns at once.
+
+    `apply_func_nb` must accept indices of the current group, the 2-dim array, and `*args`. 
+    Must return a single value or an array of shape `a.shape[1]`.
+
+    !!! note
+        `apply_func_nb` must be Numba-compiled."""
+    result = np.empty((len(groups), a.shape[1]), dtype=f8)
+    for i, idxs in groups.items():
+        result[i, :] = apply_func_nb(idxs, a[idxs, :], *args)
+    return result
+
+# ############# Map, filter and reduce ############# #
+
+
+@njit
+def applymap_nb(a, map_func_nb, *args):
+    """Map non-NA elements elementwise using `map_func_nb`.
+
+    `map_func_nb` must accept index of the current column, index of the current element, 
+    the element itself, and `*args`. Must return an array of same size.
+
+    !!! note
+        `map_func_nb` must be Numba-compiled."""
+    result = np.full_like(a, np.nan, dtype=f8)
+
+    for col in range(result.shape[1]):
+        idxs = np.flatnonzero(~np.isnan(a[:, col]))
+        for i in idxs:
+            result[i, col] = map_func_nb(col, i, a[i, col], *args)
+    return result
+
+
+@njit
+def filter_nb(a, filter_func_nb, *args):
+    """Filter non-NA elements elementwise using `filter_func_nb`. 
+    The filtered out elements will become NA.
+
+    `filter_func_nb` must accept index of the current column, index of the current element, 
+    the element itself, and `*args`. Must return a boolean value.
+
+    !!! note
+        `filter_func_nb` must be Numba-compiled."""
+    result = a.astype(f8)
+
+    for col in range(result.shape[1]):
+        idxs = np.flatnonzero(~np.isnan(a[:, col]))
+        for i in idxs:
+            if ~filter_func_nb(col, i, a[i, col], *args):
+                result[i, col] = np.nan
+    return result
+
+
+@njit
+def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
+    """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
+
+    `apply_func_nb` must accept index of the current column, the column itself, and `*args`. 
+    Must return an array.
+
+    `reduce_func_nb` must accept index of the current column, the array of results from 
+    `apply_func_nb` for that column, and `*args`. Must return a single value.
+
+    !!! note
+        `apply_func_nb` and `reduce_func_nb` must be Numba-compiled."""
+    result = np.full(a.shape[1], np.nan, dtype=f8)
+
+    for col in range(a.shape[1]):
+        mapped = apply_func_nb(col, a[:, col], *args)
+        result[col] = reduce_func_nb(col, mapped, *args)
+    return result
+
+
+@njit
+def reduce_nb(a, reduce_func_nb, *args):
+    """Reduce each column into a single value using `reduce_func_nb`.
+
+    `reduce_func_nb` must accept index of the current column, the array, and `*args`. 
+    Must return a single value.
+
+    !!! note
+        `reduce_func_nb` must be Numba-compiled."""
+    result = np.full(a.shape[1], np.nan, dtype=f8)
+
+    for col in range(a.shape[1]):
+        result[col] = reduce_func_nb(col, a[:, col], *args)
+    return result
+
+
+@njit
+def reduce_to_array_nb(a, reduce_func_nb, *args):
+    """Reduce each column into an array of values using `reduce_func_nb`.
+
+    `reduce_func_nb` same as for `reduce_a` but must return an array.
+
+    !!! note
+        * `reduce_func_nb` must be Numba-compiled
+        * Output of `reduce_func_nb` must be strictly homogeneous"""
+    result0 = reduce_func_nb(0, a[:, 0], *args)
+    result = np.full((result0.shape[0], a.shape[1]), np.nan, dtype=f8)
+    for col in range(a.shape[1]):
+        result[:, col] = reduce_func_nb(col, a[:, col], *args)
+    return result
+
+
+@njit(cache=True)
+def describe_reduce_func_nb(col, a, percentiles):
+    """Return descriptive statistics.
+
+    Numba equivalent to `pd.Series(a).describe(percentiles)`."""
+    a = a[~np.isnan(a)]
+    result = np.empty(5 + len(percentiles), dtype=f8)
+    result[0] = len(a)
+    if len(a) > 0:
+        result[1] = np.mean(a)
+        rcount = max(len(a) - 1, 0)
+        if rcount == 0:
+            result[2] = np.nan
+        else:
+            result[2] = np.std(a) * np.sqrt(len(a) / rcount)  # ddof = 1
+        result[3] = np.min(a)
+        for i, percentile in enumerate(percentiles):
+            result[4:-1] = np.percentile(a, percentiles * 100)
+        result[4+len(percentiles)] = np.max(a)
     else:
-        for col in range(a.shape[1]):
-            b[:, col] = apply_by_mask_1d_nb(a[:, col], mask, apply_func_nb)
-    return b
-
-
-@njit(f8[:, :](f8[:, :, :]), cache=True)
-def nanmax_cube_nb(a):
-    b = np.empty((a.shape[1], a.shape[2]), dtype=a.dtype)
-    for i in range(a.shape[1]):
-        for j in range(a.shape[2]):
-            b[i, j] = np.nanmax(a[:, i, j])
-    return b
+        result[1:] = np.nan
+    return result

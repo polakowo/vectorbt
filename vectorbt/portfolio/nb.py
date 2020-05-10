@@ -1,189 +1,345 @@
+"""Numba-compiled functions for portfolio.
+
+!!! note
+    `vectorbt` treats matrices as first-class citizens and expects input arrays to be
+    2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
+    Data is processed along index (axis 0)."""
+
 import numpy as np
 from numba import njit, b1, i1, i8, f8
-from numba.types import UniTuple
+from numba.core.types import UniTuple
+
+from vectorbt import timeseries
+
+# ############# Portfolio ############# #
 
 
-@njit(f8(i8, i8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
-def signals_order_func_np(i, col, run_cash, run_shares, entries, exits, volume, accumulate):
-    """Order function to buy/sell based on signals."""
-    if run_shares > 0:
-        if entries[i, col] and not exits[i, col]:
-            if accumulate:
-                return volume[i, col]
-        elif not entries[i, col] and exits[i, col]:
-            return -volume[i, col]
+@njit
+def portfolio_nb(price, init_capital, fees, slippage, order_func_nb, *args):
+    """Calculate portfolio value in cash and shares based on `order_func_nb`.
+
+    Incorporates price `price`, initial `init_capital`, and basic transaction costs `fees`
+    and `slippage`. Returns running cash, shares, paid fees and paid slippage.
+
+    `slippage` must be in % of price and `fees` in % of transaction amount, and
+    both must have the same shape as `price`.
+
+    At each time point `i`, runs the function `order_func_nb` to get the exact amount of 
+    shares to order. Tries then to fulfill that order. If unsuccessful due to insufficient 
+    cash/shares, always orders the available fraction. 
+
+    `order_func_nb` must accept index of the current column `col`, the time step `i`,
+    the amount of cash `run_cash` and shares `run_shares` held at the time step `i`, and `*args`.
+    It must return a positive/negative number to buy/sell. Return 0 to do nothing.
+
+    !!! note
+        `order_func_nb` must be Numba-compiled.
+
+    Example:
+        Calculate portfolio value for buy-and-hold strategy:
+        ```python-repl
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> from vectorbt.portfolio.nb import portfolio_nb
+
+        >>> price = np.asarray([
+        ...     [1, 5, 1],
+        ...     [2, 4, 2],
+        ...     [3, 3, 3],
+        ...     [4, 2, 2],
+        ...     [5, 1, 1]
+        ... ])
+        >>> @njit
+        ... def order_func_nb(col, i, run_cash, run_shares):
+        ...     return 1 if i == 0 else 0 # buy and hold
+
+        >>> cash, shares, paid_fees, paid_slippage = \\
+        ...     portfolio_nb(price, 100, 0.1, 0.1, order_func_nb)
+        >>> print(cash)
+        [[98.79  93.95  98.79]
+         [100.   100.   100. ]
+         [100.   100.   100. ]
+         [100.   100.   100. ]
+         [100.   100.   100. ]]
+        >>> print(shares)
+        [[1. 1. 1.]
+         [0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]]
+        >>> print(paid_fees)
+        [[0.11 0.55 0.11]
+         [0.   0.   0.  ]
+         [0.   0.   0.  ]
+         [0.   0.   0.  ]
+         [0.   0.   0.  ]]
+        >>> print(paid_slippage)
+        [[0.1 0.5 0.1]
+         [0.  0.  0. ]
+         [0.  0.  0. ]
+         [0.  0.  0. ]
+         [0.  0.  0. ]]
+        ```
+    """
+    cash = np.empty_like(price, dtype=f8)
+    shares = np.empty_like(price, dtype=f8)
+    paid_fees = np.zeros_like(price, dtype=f8)
+    paid_slippage = np.zeros_like(price, dtype=f8)
+
+    for col in range(price.shape[1]):
+        run_cash = init_capital
+        run_shares = 0
+        for i in range(price.shape[0]):
+            amount = order_func_nb(col, i, run_cash, run_shares, *args)  # the amount of shares to order
+            if amount > 0:
+                # Buy amount
+                run_cash, run_shares, paid_fees[i, col], paid_slippage[i, col] = buy(
+                    run_cash, run_shares, amount, price[i, col], fees[i, col], slippage[i, col])
+            elif amount < 0:
+                # Sell amount
+                run_cash, run_shares, paid_fees[i, col], paid_slippage[i, col] = sell(
+                    run_cash, run_shares, amount, price[i, col], fees[i, col], slippage[i, col])
+            cash[i, col], shares[i, col] = run_cash, run_shares
+
+    return cash, shares, paid_fees, paid_slippage
+
+
+@njit(cache=True)
+def buy(run_cash, run_shares, amount, price, fees, slippage):
+    """Buy `amount` of shares and return updated `run_cash` and `run_shares`, but also paid fees and slippage."""
+    # Slippage in % applies on price
+    adj_price = price * (1 + slippage)
+    req_cash = amount * adj_price
+    # Fees in % applies on transaction amount
+    req_cash_wcom = req_cash * (1 + fees)
+    if req_cash_wcom <= run_cash:
+        # Sufficient cash
+        new_run_shares = run_shares + amount
+        new_run_cash = run_cash - req_cash_wcom
+        paid_fees = req_cash_wcom - req_cash
     else:
-        if entries[i, col] and not exits[i, col]:
-            return volume[i, col]
-        elif not entries[i, col] and exits[i, col]:
-            if accumulate:
-                return -volume[i, col]
+        # Insufficient cash, amount will be less than requested
+        # For fees of 10%, you can buy shares for 90.9$ to spend 100$ in total
+        run_cash_wcom = run_cash / (1 + fees)
+        new_run_shares = run_shares + run_cash_wcom / adj_price
+        new_run_cash = 0
+        paid_fees = run_cash - run_cash_wcom
+    # Difference in equity is the total cost of transaction = paid_fees + paid_slippage
+    old_equity = run_cash + price * run_shares
+    new_equity = new_run_cash + price * new_run_shares
+    if slippage == 0:
+        paid_slippage = 0. # otherwise you will get numbers such as 7.105427e-15
+    else:
+        paid_slippage = old_equity - new_equity - paid_fees
+    return new_run_cash, new_run_shares, paid_fees, paid_slippage
+
+
+@njit(cache=True)
+def sell(run_cash, run_shares, amount, price, fees, slippage):
+    """Sell `amount` of shares and return updated `run_cash` and `run_shares`, but also paid fees and slippage."""
+    # Slippage in % applies on price
+    adj_price = price * (1 - slippage)
+    # If insufficient shares, sell what's left
+    adj_shares = min(run_shares, abs(amount))
+    adj_cash = adj_shares * adj_price
+    # Fees in % applies on transaction amount
+    adj_cash_wcom = adj_cash * (1 - fees)
+    new_run_shares = run_shares - adj_shares
+    new_run_cash = run_cash + adj_cash_wcom
+    paid_fees = adj_cash - adj_cash_wcom
+    # Difference in equity is the total cost of transaction = paid_fees + paid_slippage
+    old_equity = run_cash + price * run_shares
+    new_equity = new_run_cash + price * new_run_shares
+    if slippage == 0:
+        paid_slippage = 0.
+    else:
+        paid_slippage = old_equity - new_equity - paid_fees
+    return new_run_cash, new_run_shares, paid_fees, paid_slippage
+
+
+@njit(cache=True)
+def signals_order_func_nb(col, i, run_cash, run_shares, entries, exits, amount):
+    """`order_func_nb` that orders based on signals `entries` and `exits`.
+
+    At each entry/exit it buys/sells `amount` of shares."""
+    if entries[i, col] and not exits[i, col]:
+        return amount[i, col]
+    if not entries[i, col] and exits[i, col]:
+        return -amount[i, col]
     return 0.
 
 
-@njit(f8(i8, i8, f8, f8, f8[:, :], b1), cache=True)
-def orders_order_func_np(i, col, run_cash, run_shares, orders, is_target):
-    """Buy/sell the amount of shares specified by orders."""
+@njit(cache=True)
+def amount_order_func_nb(col, i, run_cash, run_shares, amount, is_target):
+    """`order_func_nb` that orders the amount specified in `amount`.
+
+    If `is_target` is `True`, will order the difference between current and target amount."""
     if is_target:
-        return orders[i, col] - run_shares
+        return amount[i, col] - run_shares
     else:
-        return orders[i, col]
+        return amount[i, col]
+
+# ############# Mappers ############# #
+
+
+OPEN = 0
+"""Open position."""
+CLOSED = 1
+"""Closed position."""
 
 
 @njit
-def portfolio_np(ts, investment, slippage, commission, order_func_np, *args):
-    """Calculate portfolio value in cash and shares."""
-    cash = np.empty_like(ts)
-    shares = np.empty_like(ts)
+def map_positions_nb(positions, pos_type, map_func_nb, *args):
+    """Apply `map_func_nb` on each position in `positions`.
 
-    for col in range(ts.shape[1]):
-        run_cash = investment
-        run_shares = 0
-        for i in range(ts.shape[0]):
-            volume = order_func_np(i, col, run_cash, run_shares, *args)  # the amount of shares to buy/sell
-            if volume > 0:
-                # Buy volume
-                adj_price = ts[i, col] * (1 + slippage)  # slippage applies on price
-                req_cash = volume * adj_price
-                req_cash /= (1 - commission)  # total cash required for this volume
-                if req_cash <= run_cash:  # sufficient cash
-                    run_shares += volume
-                    run_cash -= req_cash
-                else:  # not sufficient cash, volume will be less than requested
-                    adj_cash = run_cash
-                    adj_cash *= (1 - commission)  # commission in % applies on transaction volume
-                    run_shares += adj_cash / adj_price
-                    run_cash = 0
-            elif volume < 0:
-                # Sell volume
-                adj_price = ts[i, col] * (1 - slippage)
-                adj_shares = min(run_shares, abs(volume))
-                adj_cash = adj_shares * adj_price
-                adj_cash *= (1 - commission)
-                run_shares -= adj_shares
-                run_cash += adj_cash
-            cash[i, col] = run_cash
-            shares[i, col] = run_shares
+    `pos_type` can be either `None`, `OPEN` or `CLOSED`.
 
-    return cash, shares
+    For each position in range `[entry_i, exit_i]`, `map_func_nb` must return a number
+    that is then stored either at index `exit_i` or the last index if position is still open.
+    `map_func_nb` must accept index of the current column `col`, index of the entry `entry_i`,
+    index of the exit `exit_i`, and `*args`. The index `exit_i` will be `None` if position is open.
+
+    !!! note
+        `order_func_nb` must be Numba-compiled.
+
+    Example:
+        Map each closed position to its duration:
+        ```python-repl
+        >>> import numpy as np
+        >>> from numba import njit
+        >>> from vectorbt.portfolio.nb import map_positions_nb
+
+        >>> @njit
+        ... def map_func_nb(col, entry_i, exit_i):
+        ...     if exit_i is not None:
+        ...         return exit_i - entry_i
+        ...     return np.nan # ignore open positions
+        >>> positions = np.asarray([
+        ...     [1, 0, 1],
+        ...     [2, 1, 2],
+        ...     [0, 2, 3],
+        ...     [1, 0, 4],
+        ...     [0, 1, 5]
+        ... ])
+        >>> print(map_positions_nb(positions, None, map_func_nb))
+        [[nan nan nan]
+         [nan nan nan]
+         [ 2. nan nan]
+         [nan  2. nan]
+         [ 1. nan nan]]
+        ```"""
+    result = np.full_like(positions, np.nan, dtype=f8)
+
+    for col in range(positions.shape[1]):
+        entry_i = 0
+        in_market = positions[0, col] > 0
+        for i in range(1, positions.shape[0]):
+            if in_market and positions[i, col] == 0:
+                if pos_type is None or pos_type == CLOSED:
+                    result[i, col] = map_func_nb(col, entry_i, i, *args)
+                in_market = False
+            elif not in_market and positions[i, col] > 0:
+                entry_i = i
+                in_market = True
+            if in_market and i == positions.shape[0] - 1:  # unrealized
+                if pos_type is None or pos_type == OPEN:
+                    result[i, col] = map_func_nb(col, entry_i, None, *args)
+    return result
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, b1[:, :], b1[:, :], f8[:, :], b1), cache=True)
-def portfolio_from_signals_np(ts, investment, slippage, commission, entries, exits, volume, accumulate):
-    """Calculate portfolio value using signals."""
-    return portfolio_np(ts, investment, slippage, commission, signals_order_func_np, entries, exits, volume, accumulate)
+@njit(cache=True)
+def get_position_equities_nb(col, entry_i, exit_i, price, cash, shares, init_capital):
+    """Get equity before purchase at `entry_i` and after sale at `exit_i`.
+
+    !!! note
+        The index `exit_i` will be `None` if position is still open."""
+    if entry_i == 0:
+        equity_before = init_capital
+    else:
+        # We can't use equity at time entry_i, since it already has purchase cost applied
+        # Instead apply price at entry_i to the cash and shares immediately before purchase
+        equity_before = cash[entry_i-1, col] + shares[entry_i-1, col] * price[entry_i, col]
+    if exit_i is not None:
+        equity_after = cash[exit_i, col] + shares[exit_i, col] * price[exit_i, col]
+    else:
+        # A bit optimistic, since it doesn't include sale cost
+        equity_after = cash[price.shape[0]-1, col] + shares[price.shape[0]-1, col] * price[price.shape[0]-1, col]
+    return equity_before, equity_after
 
 
-@njit(UniTuple(f8[:, :], 2)(f8[:, :], f8, f8, f8, f8[:, :], b1), cache=True)
-def portfolio_from_orders_np(ts, investment, slippage, commission, orders, is_target):
-    """Calculate portfolio value using orders."""
-    return portfolio_np(ts, investment, slippage, commission, orders_order_func_np, orders, is_target)
+@njit(cache=True)
+def pnl_map_func_nb(*args):
+    """`map_func_nb` that returns P/L of the position`.
+
+    Based on `get_position_equities_nb`."""
+    equity_before, equity_after = get_position_equities_nb(*args)
+    return equity_after - equity_before
 
 
-@njit(b1(f8[:]), cache=True)
-def detect_order_accumulation_1d_nb(trades):
-    """Detect accumulation of orders, that is, position is being increased/decreased gradually.
+@njit(cache=True)
+def returns_map_func_nb(*args):
+    """`map_func_nb` that returns return of the position`.
 
-    When it happens, it's not easy to calculate P/L of a position anymore."""
-    entry_i = -1
-    position = False
-    for i in range(trades.shape[0]):
-        if trades[i] > 0:
-            if position:
+    Based on `get_position_equities_nb`."""
+    equity_before, equity_after = get_position_equities_nb(*args)
+    return equity_after / equity_before - 1
+
+
+@njit(cache=True)
+def status_map_func_nb(col, entry_i, exit_i):
+    """`map_func_nb` that returns whether the position is open or closed."""
+    if exit_i is None:
+        return 0
+    return 1
+
+
+@njit(cache=True)
+def duration_map_func_nb(col, entry_i, exit_i, shape):
+    """`map_func_nb` that returns duration of the position."""
+    if exit_i is None:
+        return shape[0] - entry_i
+    return exit_i - entry_i
+
+# ############# Filters ############# #
+
+
+@njit(cache=True)
+def winning_filter_func_nb(col, i, map_result, pnl):
+    """`filter_func_nb` that includes only winning positions."""
+    return pnl[i, col] > 0
+
+
+@njit(cache=True)
+def losing_filter_func_nb(col, i, map_result, pnl):
+    """`filter_func_nb` that includes only losing positions."""
+    return pnl[i, col] < 0
+
+# ############# Appliers ############# #
+
+
+@njit(cache=True)
+def total_return_apply_func_nb(col, idxs, returns):
+    """Calculate total return from returns."""
+    return timeseries.nb.product_1d_nb(returns + 1) - 1
+
+# ############# Accumulation ############# #
+
+
+@njit(cache=True)
+def is_accumulated_1d_nb(positions):
+    """Detect accumulation, that is, position is being increased/decreased gradually."""
+    for i in range(1, positions.shape[0]):
+        if (positions[i-1] > 0 and positions[i] > 0) or \
+                (positions[i-1] < 0 and positions[i] < 0):
+            if positions[i-1] != positions[i]:
                 return True
-            entry_i = i
-            position = True
-        elif trades[i] < 0:
-            if not position:
-                return True
-            if trades[entry_i] != abs(trades[i]):
-                return True
-            position = False
     return False
 
 
-@njit(b1[:](f8[:, :]), cache=True)
-def detect_order_accumulation_nb(trades):
-    """Detect accumulation of orders, that is, position is being increased/decreased gradually.
-
-    When it happens, it's not easy to calculate P/L of a position anymore."""
-    a = np.full(trades.shape[1], False, dtype=b1)
-    for col in range(trades.shape[1]):
-        a[col] = detect_order_accumulation_1d_nb(trades[:, col])
-    return a
-
-
-@njit
-def apply_on_positions(trades, apply_func, *args):
-    """Apply a function on each position."""
-    if detect_order_accumulation_nb(trades).any():
-        raise ValueError("Order accumulation detected. Cannot calculate performance per position.")
-    out = np.full_like(trades, np.nan)
-
-    for col in range(trades.shape[1]):
-        entry_i = -1
-        position = False
-        for i in range(trades.shape[0]):
-            if position and trades[i, col] < 0:
-                out[i, col] = apply_func(entry_i, i, col, trades, *args)
-                position = False
-            elif not position and trades[i, col] > 0:
-                entry_i = i
-                position = True
-            if position and i == trades.shape[0] - 1:  # unrealized
-                out[i, col] = apply_func(entry_i, i, col, trades, *args)
-    return out
-
-
-_profits_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] - equity[entry_i, col])
-_returns_nb = njit(lambda entry_i, exit_i, col, trades, equity: equity[exit_i, col] / equity[entry_i, col] - 1)
-
-
-@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
-def position_profits_nb(trades, equity):
-    """Calculate P/L per position."""
-    return apply_on_positions(trades, _profits_nb, equity)
-
-
-@njit(f8[:, :](f8[:, :], f8[:, :]), cache=True)
-def position_returns_nb(trades, equity):
-    """Calculate returns per trade."""
-    return apply_on_positions(trades, _returns_nb, equity)
-
-
-@njit
-def apply_on_position_profits_nb(position_profits, apply_func, mask_func):
-    applied = np.zeros(position_profits.shape[1])
-
-    for col in range(position_profits.shape[1]):
-        mask = mask_func(position_profits[:, col])
-        if mask.any():
-            masked = position_profits[:, col][mask]
-            applied[col] = apply_func(masked)
-    return applied
-
-
-_nanmean_nb = njit(lambda x: np.nanmean(x))
-_nansum_nb = njit(lambda x: np.nansum(x))
-_win_mask_nb = njit(lambda x: x > 0)
-_loss_mask_nb = njit(lambda x: x < 0)
-
-
-@njit(f8[:](f8[:, :]))
-def sum_win_nb(position_profits):
-    return apply_on_position_profits_nb(position_profits, _nansum_nb, _win_mask_nb)
-
-
-@njit(f8[:](f8[:, :]))
-def sum_loss_nb(position_profits):
-    return np.abs(apply_on_position_profits_nb(position_profits, _nansum_nb, _loss_mask_nb))
-
-
-@njit(f8[:](f8[:, :]))
-def avg_win_nb(position_profits):
-    return apply_on_position_profits_nb(position_profits, _nanmean_nb, _win_mask_nb)
-
-
-@njit(f8[:](f8[:, :]))
-def avg_loss_nb(position_profits):
-    return np.abs(apply_on_position_profits_nb(position_profits, _nanmean_nb, _loss_mask_nb))
+@njit(cache=True)
+def is_accumulated_nb(positions):
+    """2-dim version of `is_accumulated_1d_nb`."""
+    result = np.empty(positions.shape[1], b1)
+    for col in range(positions.shape[1]):
+        result[col] = is_accumulated_1d_nb(positions[:, col])
+    return result

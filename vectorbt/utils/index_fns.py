@@ -1,18 +1,21 @@
+"""Utility functions for working with index/columns."""
+
 import numpy as np
 import pandas as pd
+from collections.abc import Iterable
 
 from vectorbt.utils import checks
 
 
-def from_values(values, name=None, value_names=None):
-    """Create index using array of values."""
-    if value_names is not None:
-        checks.assert_same_shape(values, value_names, along_axis=0)
-        return pd.Index(value_names, name=name)  # just return the names
+def from_values(values, name=None):
+    """Create a new `pd.Index` with `name` by parsing an iterable `values`.
+    
+    Each in `values` will correspond to an element in the new index."""
+    checks.assert_type(values, Iterable)
+
     value_names = []
     for i, v in enumerate(values):
-        if not checks.is_array(v):
-            v = np.asarray(v)
+        v = np.asarray(v)
         if np.all(v == v.item(0)):
             value_names.append(v.item(0))
         else:
@@ -21,7 +24,7 @@ def from_values(values, name=None, value_names=None):
 
 
 def repeat(index, n):
-    """Repeat each element in index n times."""
+    """Repeat each element in `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
 
@@ -29,7 +32,7 @@ def repeat(index, n):
 
 
 def tile(index, n):
-    """Tile the whole index n times."""
+    """Tile the whole `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
 
@@ -39,7 +42,7 @@ def tile(index, n):
 
 
 def stack(*indexes):
-    """Stack indexes."""
+    """Stack each index in `indexes` on top of each other."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
         index1, index2 = new_index, indexes[i]
@@ -60,7 +63,7 @@ def stack(*indexes):
 
 
 def combine(*indexes):
-    """Combine indexes using Cartesian product."""
+    """Combine each index in `indexes` using Cartesian product."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
         index1, index2 = new_index, indexes[i]
@@ -91,7 +94,7 @@ def combine(*indexes):
 
 
 def drop_levels(index, levels):
-    """Drop levels from index."""
+    """Drop `levels` in `index` by name/position."""
     checks.assert_type(index, pd.MultiIndex)
 
     levels_to_drop = []
@@ -107,7 +110,7 @@ def drop_levels(index, levels):
 
 
 def rename_levels(index, name_dict):
-    """Rename index/column levels."""
+    """Rename levels in `index` by `name_dict`."""
     for k, v in name_dict.items():
         if isinstance(index, pd.MultiIndex):
             if k in index.names:
@@ -119,7 +122,7 @@ def rename_levels(index, name_dict):
 
 
 def select_levels(index, level_names):
-    """Build a new index by selecting one or multiple level names from the index."""
+    """Build a new index by selecting one or multiple `level_names` from `index`."""
     checks.assert_type(index, pd.MultiIndex)
 
     if isinstance(level_names, (list, tuple)):
@@ -130,7 +133,7 @@ def select_levels(index, level_names):
 
 
 def drop_redundant_levels(index):
-    """Drop levels that have a single value."""
+    """Drop levels in `index` that either have a single value or a range from 0 to n."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
     if len(index) == 1:
@@ -151,7 +154,9 @@ def drop_redundant_levels(index):
 
 
 def drop_duplicate_levels(index, keep='last'):
-    """Drop duplicate levels with the same name and values."""
+    """Drop levels in `index` with the same name and values.
+    
+    Set `keep` to 'last' to keep last levels, otherwise 'first'."""
     if isinstance(index, pd.Index) and not isinstance(index, pd.MultiIndex):
         return index
     checks.assert_type(index, pd.MultiIndex)
@@ -172,13 +177,12 @@ def drop_duplicate_levels(index, keep='last'):
 
 
 def align_to(index1, index2):
-    """Align the first index to the second one. 
+    """Align `index1` to have the same shape of `index2`.
 
-    Returns integer indexes of occurrences and None if aligning not needed.
+    Returns integer indices of occurrences and None if aligning not needed.
 
-    The second one must contain all levels from the first (and can have some more)
-    In all these levels, both must share the same elements.
-    Only then the first index can be broadcasted to the match the shape of the second one."""
+    The second one must contain all levels from the first (and can have some more). In all these levels, 
+    both must share the same elements."""
     if not isinstance(index1, pd.MultiIndex):
         index1 = pd.MultiIndex.from_arrays([index1])
     if not isinstance(index2, pd.MultiIndex):

@@ -16,7 +16,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 3 seconds (Note: loading vectorbt and plotly may take a while):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 5 seconds (Note: compiling with Numba may take some time):
 
 ```python
 import vectorbt as vbt
@@ -25,8 +25,8 @@ import yfinance as yf
 
 # Define params
 windows = np.arange(2, 101)
-investment = 100 # in $
-commission = 0.001 # in %
+init_capital = 100 # in $
+fees = 0.001 # in %
 
 # Prepare data
 ticker = yf.Ticker("BTC-USD")
@@ -38,8 +38,7 @@ entries = fast_ma.ma_above(slow_ma, crossover=True)
 exits = fast_ma.ma_below(slow_ma, crossover=True)
 
 # Calculate performance
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, 
-    investment=investment, commission=commission)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_capital=init_capital, fees=fees)
 performance = portfolio.total_return * 100
 
 # Plot heatmap
@@ -60,9 +59,9 @@ perf_matrix.vbt.Heatmap(
 
 vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries.
 
-It natively works on pandas objects, while performing all calculations using NumPy and Numba under the hood. It introduces a namespace (accessor) to pandas objects (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). This way, user can easily switch betweeen native pandas functionality such as indexing, and highly-performant vectorbt methods. Moreover, each vectorbt method is flexible and can work on both series and dataframes.
+It natively works on pandas objects, while performing all calculations using NumPy and Numba under the hood. It introduces a namespace (accessor) to pandas objects (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). This way, user can easily switch betweeen native pandas functionality such as indexing, and highly-performant vectorbt methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
 
-In contrast to most other vectorized backtesting libraries where backtesting is limited to simple arrays (think of an array for price, an array for signals, an array for equity, etc.), vectorbt is optimized for working with 2-dimensional data: it treats each index of a dataframe as time axis and each column as a distinct feature that should be backtested, and performs calculations on the entire matrix at once. This way, user can construct huge matrices with millions of columns and calculate the performance for each one with a single matrix operation, without any Pythonic loops. This is the magic behind backtesting thousands of window combinations at once, as we did above.
+In contrast to most other vectorized backtesting libraries where backtesting is limited to simple arrays (think of an array for price, an array for signals, an array for equity, etc.), vectorbt is optimized for working with 2-dimensional data: it treats each index of a DataFrame as time axis and each column as a distinct feature that should be backtested, and performs calculations on the entire matrix at once. This way, user can construct huge matrices with millions of columns and calculate the performance for each one with a single matrix operation, without any Pythonic loops. This is the magic behind backtesting thousands of window combinations at once, as we did above.
 
 ### Why not only pandas?
 
@@ -71,7 +70,7 @@ While there is a subset of pandas functionality that is already compiled with Cy
 Moreover, compared to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
 
 ```
-a = np.random.randint(10, size=(1000, 1000)).astype(float)
+a = np.random.uniform(size=(1000, 1000))
 a_df = pd.DataFrame(a)
 
 >>> %timeit np.diff(a, axis=0) / a[:-1, :]
@@ -85,11 +84,11 @@ Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline
 
 #### Broadcasting and indexing
 
-The other problem relies in broadcasting rules implemented in pandas: they are less flexible than in NumPy. Also, pandas follows strict rules regarding indexing; for example, you will have issues using multiple dataframes with different index/columns in the same operation, but such operations are quite common in backtesting (think of combining signals from different indicators, each having columns of the same cardinality but different labels).
+The other problem relies in broadcasting rules implemented in pandas: they are less flexible than in NumPy. Also, pandas follows strict rules regarding indexing; for example, you will have issues using multiple DataFrames with different index/columns in the same operation, but such operations are quite common in backtesting (think of combining signals from different indicators, each having columns of the same cardinality but different labels).
 
 To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object.
 
-For example, consider the following dataframes with different index/columns:
+For example, consider the following DataFrames with different index/columns:
 
 ```python
 df = pd.DataFrame(
@@ -145,7 +144,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
 - Provides a collection of utility functions for working with data
 - Extensive input and output validation during runtime (data type, shape, etc.)
 - Implements NumPy broadcasting for pandas with different modes
-- `vbt.timeseries` accessor for working with time-series data
+- `vbt.timeseries` accessor for working with time series data
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data
     - Entry, exit and random signal generation, ranking and distance functions
@@ -154,7 +153,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
 - Provides a range of technical indicators with full Numba support
-    - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and OBV
+    - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
     - Each indicator accepts arbitrary parameter combinations, such as single values, arrays, or Cartesian product
     - Indicator factory for construction of complex technical indicators in a simplified way
