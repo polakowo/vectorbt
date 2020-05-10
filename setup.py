@@ -1,4 +1,4 @@
-from setuptools import setup
+from setuptools import setup, find_packages
 
 setup(
     name='vectorbt',
@@ -7,6 +7,6 @@ setup(
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
     url='https://github.com/polakowo/vectorbt',
-    packages=['vectorbt'],
+    packages=find_packages(),
     install_requires=['numpy', 'pandas', 'matplotlib', 'ipywidgets', 'plotly', 'numba>=0.49.0']
 )
