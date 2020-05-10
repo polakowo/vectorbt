@@ -193,7 +193,7 @@ class BasePositions(ArrayWrapper):
             portfolio.positions.plot_pnl()
             ```
 
-            ![](img/positions_plot_pnl.png)"""
+            ![](/vectorbt/docs/img/positions_plot_pnl.png)"""
         checks.assert_type(self.pnl, pd.Series)
 
         above_trace_kwargs = {**dict(name='Profit'), **profit_trace_kwargs}
@@ -791,7 +791,7 @@ class Portfolio(ArrayWrapper):
             vbt.Portfolio.from_orders(price, price.diff(), init_capital=100).plot_trades()
             ```
 
-            ![](img/portfolio_plot_trades.png)"""
+            ![](/vectorbt/docs/img/portfolio_plot_trades.png)"""
         checks.assert_type(self.price, pd.Series)
         checks.assert_type(self.trades, pd.Series)
         sell_mask = self.trades < 0

@@ -543,7 +543,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
             signals['a'].vbt.signals.plot()
             ```
 
-            ![](img/signals_sr_plot.png)"""
+            ![](/vectorbt/docs/img/signals_sr_plot.png)"""
         # Set up figure
         if fig is None:
             fig = DefaultFigureWidget()
@@ -590,7 +590,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
             signals['b'].vbt.signals.plot_exit_markers(ts['a'], fig=fig)
             ```
 
-            ![](img/signals_plot_markers.png)"""
+            ![](/vectorbt/docs/img/signals_plot_markers.png)"""
         checks.assert_type(ts, pd.Series)
         checks.assert_same_index(self._obj, ts)
 
@@ -658,7 +658,7 @@ class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
             signals[['a', 'c']].vbt.signals.plot().show_png()
             ```
 
-            ![](img/signals_signals_plot.png)"""
+            ![](/vectorbt/docs/img/signals_signals_plot.png)"""
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.signals.plot(
                 trace_kwargs=trace_kwargs,
