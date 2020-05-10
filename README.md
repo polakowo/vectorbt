@@ -1,4 +1,4 @@
-![](https://travis-ci.org/polakowo/vectorbt.svg?branch=master&status=passed) ![](https://img.shields.io/badge/version-0.5-blue)
+![](https://travis-ci.org/polakowo/vectorbt.svg?branch=master&status=passed) ![](https://img.shields.io/badge/version-0.6-blue)
 
 # vectorbt
 
