@@ -450,7 +450,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             df['a'].vbt.timeseries.plot()
             ```
 
-            ![](img/timeseries_sr_plot.png)"""
+            ![](/vectorbt/docs/img/timeseries_sr_plot.png)"""
         if fig is None:
             fig = DefaultFigureWidget()
             fig.update_layout(**layout_kwargs)
@@ -489,7 +489,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             df['a'].vbt.timeseries.plot_against(3)
             ```
 
-            ![](img/timeseries_plot_against_line.png)
+            ![](/vectorbt/docs/img/timeseries_plot_against_line.png)
 
             But also against other time series.
 
@@ -497,7 +497,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             df['a'].vbt.timeseries.plot_against(df['b'])
             ```
 
-            ![](img/timeseries_plot_against_series.png)"""
+            ![](/vectorbt/docs/img/timeseries_plot_against_series.png)"""
         if name is None:
             name = self._obj.name
         if other_name is None:
@@ -618,7 +618,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
             df[['a', 'b']].vbt.timeseries.plot()
             ```
 
-            ![](img/timeseries_df_plot.png)"""
+            ![](/vectorbt/docs/img/timeseries_df_plot.png)"""
 
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.timeseries.plot(
@@ -672,7 +672,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
             yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
             ```
 
-            ![](img/ohlcv.png)"""
+            ![](/vectorbt/docs/img/ohlcv.png)"""
         open = self._obj[self._column_map['open']]
         high = self._obj[self._column_map['high']]
         low = self._obj[self._column_map['low']]

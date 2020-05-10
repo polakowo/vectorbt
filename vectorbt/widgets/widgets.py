@@ -37,7 +37,7 @@ class Indicator(DefaultFigureWidget):
             ```py
             vbt.Indicator(value=2, value_range=(1, 3), label='My Indicator')
             ```
-            ![](img/Indicator.png)
+            ![](/vectorbt/docs/img/Indicator.png)
             """
 
         self._value_range = value_range
@@ -103,13 +103,13 @@ class Bar(DefaultFigureWidget):
             ```py
             vbt.Bar(['x', 'y'], trace_names='a', data=[1, 2])
             ```
-            ![](img/Bar.png)
+            ![](/vectorbt/docs/img/Bar.png)
 
             Multiple traces:
             ```py
             vbt.Bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
             ```
-            ![](img/Bar_mult.png)
+            ![](/vectorbt/docs/img/Bar_mult.png)
             """
         if isinstance(trace_names, str) or trace_names is None:
             trace_names = [trace_names]
@@ -145,7 +145,7 @@ class Bar(DefaultFigureWidget):
             fig.update_data([2, 1])
             fig.show()
             ```
-            ![](img/Bar_updated.png)
+            ![](/vectorbt/docs/img/Bar_updated.png)
         """
         data = reshape_fns.to_2d(np.asarray(data))
         checks.assert_same_shape(data, self._x_labels, axis=(0, 0))
@@ -176,7 +176,7 @@ class Scatter(DefaultFigureWidget):
             ```py
             vbt.Scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
             ```
-            ![](img/Scatter.png)
+            ![](/vectorbt/docs/img/Scatter.png)
             """
 
         if isinstance(trace_names, str) or trace_names is None:
@@ -235,7 +235,7 @@ class Histogram(DefaultFigureWidget):
             ```py
             vbt.Histogram(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
             ```
-            ![](img/Histogram.png)
+            ![](/vectorbt/docs/img/Histogram.png)
             """
 
         if isinstance(trace_names, str) or trace_names is None:
@@ -299,7 +299,7 @@ class Heatmap(DefaultFigureWidget):
             ```py
             vbt.Heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
             ```
-            ![](img/Heatmap.png)
+            ![](/vectorbt/docs/img/Heatmap.png)
             """
 
         self._x_labels = x_labels

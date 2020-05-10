@@ -16,7 +16,7 @@ price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
 
 price['Close'].vbt.timeseries.plot()
 ```
-![](img/Indicators_price.png)"""
+![](/vectorbt/docs/img/Indicators_price.png)"""
 
 import numpy as np
 import pandas as pd
@@ -196,7 +196,7 @@ class MA(MA):
 
             fig.show()
             ```
-            ![](img/MA_from_combinations.png)
+            ![](/vectorbt/docs/img/MA_from_combinations.png)
         """
 
         if names is None:
@@ -229,7 +229,7 @@ class MA(MA):
             ma[(10, False)].plot()
             ```
 
-            ![](img/MA.png)"""
+            ![](/vectorbt/docs/img/MA.png)"""
         checks.assert_type(self.ts, pd.Series)
         checks.assert_type(self.ma, pd.Series)
 
@@ -335,7 +335,7 @@ class MSTD(MSTD):
             mstd[(10, False)].plot()
             ```
 
-            ![](img/MSTD.png)"""
+            ![](/vectorbt/docs/img/MSTD.png)"""
         checks.assert_type(self.mstd, pd.Series)
 
         mstd_trace_kwargs = {**dict(
@@ -519,7 +519,7 @@ class BollingerBands(BollingerBands):
             bb[(10, False, 2)].plot()
             ```
 
-            ![](img/BollingerBands.png)"""
+            ![](/vectorbt/docs/img/BollingerBands.png)"""
         checks.assert_type(self.ts, pd.Series)
         checks.assert_type(self.ma, pd.Series)
         checks.assert_type(self.upper_band, pd.Series)
@@ -657,7 +657,7 @@ class RSI(RSI):
             rsi[(10, False)].plot()
             ```
 
-            ![](img/RSI.png)"""
+            ![](/vectorbt/docs/img/RSI.png)"""
         checks.assert_type(self.rsi, pd.Series)
 
         rsi_trace_kwargs = {**dict(
@@ -811,7 +811,7 @@ class Stochastic(Stochastic):
             stoch[(10, 2, False)].plot(levels=(20, 80))
             ```
 
-            ![](img/Stochastic.png)"""
+            ![](/vectorbt/docs/img/Stochastic.png)"""
         checks.assert_type(self.percent_k, pd.Series)
         checks.assert_type(self.percent_d, pd.Series)
 
@@ -1024,7 +1024,7 @@ class MACD(MACD):
             macd[(10, 20, 30, False, True)].plot()
             ```
 
-            ![](img/MACD.png)"""
+            ![](/vectorbt/docs/img/MACD.png)"""
         checks.assert_type(self.macd, pd.Series)
         checks.assert_type(self.signal, pd.Series)
         checks.assert_type(self.histogram, pd.Series)
@@ -1182,7 +1182,7 @@ class ATR(ATR):
             atr[(10, False)].plot()
             ```
 
-            ![](img/ATR.png)"""
+            ![](/vectorbt/docs/img/ATR.png)"""
         checks.assert_type(self.tr, pd.Series)
         checks.assert_type(self.atr, pd.Series)
 
@@ -1281,7 +1281,7 @@ class OBV(OBV):
             obv.plot()
             ```
 
-            ![](img/OBV.png)"""
+            ![](/vectorbt/docs/img/OBV.png)"""
         checks.assert_type(self.obv, pd.Series)
 
         obv_trace_kwargs = {**dict(
