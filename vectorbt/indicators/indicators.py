@@ -37,19 +37,21 @@ def ma_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `MA`."""
     cache_dict = dict()
     for i in range(windows.shape[0]):
-        if (windows[i], int(ewms[i])) not in cache_dict:
+        h = hash((windows[i], ewms[i]))
+        if h not in cache_dict:
             if ewms[i]:
                 ma = timeseries.nb.ewm_mean_nb(ts, windows[i], minp=windows[i])
             else:
                 ma = timeseries.nb.rolling_mean_nb(ts, windows[i], minp=windows[i])
-            cache_dict[(windows[i], int(ewms[i]))] = ma
+            cache_dict[h] = ma
     return cache_dict
 
 
 @njit(cache=True)
 def ma_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `MA`."""
-    return cache_dict[(window, int(ewm))]
+    h = hash((window, ewm))
+    return cache_dict[h]
 
 
 MA = indicators.factory.IndicatorFactory(
@@ -256,19 +258,21 @@ def mstd_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `MSTD`."""
     cache_dict = dict()
     for i in range(windows.shape[0]):
-        if (windows[i], int(ewms[i])) not in cache_dict:
+        h = hash((windows[i], ewms[i]))
+        if h not in cache_dict:
             if ewms[i]:
                 mstd = timeseries.nb.ewm_std_nb(ts, windows[i], minp=windows[i])
             else:
                 mstd = timeseries.nb.rolling_std_nb(ts, windows[i], minp=windows[i])
-            cache_dict[(windows[i], int(ewms[i]))] = mstd
+            cache_dict[h] = mstd
     return cache_dict
 
 
 @njit(cache=True)
 def mstd_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `MSTD`."""
-    return cache_dict[(window, int(ewm))]
+    h = hash((window, ewm))
+    return cache_dict[h]
 
 
 MSTD = indicators.factory.IndicatorFactory(
@@ -364,8 +368,9 @@ def bb_caching_nb(ts, windows, ewms, alphas):
 def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
     """Numba-compiled apply function for `BollingerBands`."""
     # Calculate lower, middle and upper bands
-    ma = np.copy(ma_cache_dict[(window, int(ewm))])
-    mstd = np.copy(mstd_cache_dict[(window, int(ewm))])
+    h = hash((window, ewm))
+    ma = np.copy(ma_cache_dict[h])
+    mstd = np.copy(mstd_cache_dict[h])
     # # (MA + Kσ), MA, (MA - Kσ)
     return ma, ma + alpha * mstd, ma - alpha * mstd
 
@@ -569,7 +574,8 @@ def rsi_caching_nb(ts, windows, ewms):
     # Cache
     cache_dict = dict()
     for i in range(windows.shape[0]):
-        if (windows[i], int(ewms[i])) not in cache_dict:
+        h = hash((windows[i], ewms[i]))
+        if h not in cache_dict:
             if ewms[i]:
                 roll_up = timeseries.nb.ewm_mean_nb(up, windows[i], minp=windows[i])
                 roll_down = timeseries.nb.ewm_mean_nb(down, windows[i], minp=windows[i])
@@ -578,14 +584,15 @@ def rsi_caching_nb(ts, windows, ewms):
                 roll_down = timeseries.nb.rolling_mean_nb(down, windows[i], minp=windows[i])
             roll_up = timeseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
             roll_down = timeseries.nb.prepend_nb(roll_down, 1, np.nan)
-            cache_dict[(windows[i], int(ewms[i]))] = roll_up, roll_down
+            cache_dict[h] = roll_up, roll_down
     return cache_dict
 
 
 @njit(cache=True)
 def rsi_apply_func_nb(ts, window, ewm, cache_dict):
     """Numba-compiled apply function for `RSI`."""
-    roll_up, roll_down = cache_dict[(window, int(ewm))]
+    h = hash((window, ewm))
+    roll_up, roll_down = cache_dict[h]
     return 100 - 100 / (1 + roll_up / roll_down)
 
 
@@ -695,17 +702,19 @@ def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     """Numba-compiled caching function for `Stochastic`."""
     cache_dict = dict()
     for i in range(k_windows.shape[0]):
-        if k_windows[i] not in cache_dict:
+        h = hash(k_windows[i])
+        if h not in cache_dict:
             roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i], minp=1) # min_periods=1
             roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i], minp=1)
-            cache_dict[k_windows[i]] = roll_min, roll_max
+            cache_dict[h] = roll_min, roll_max
     return cache_dict
 
 
 @njit(cache=True)
 def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
     """Numba-compiled apply function for `Stochastic`."""
-    roll_min, roll_max = cache_dict[k_window]
+    h = hash(k_window)
+    roll_min, roll_max = cache_dict[h]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
     if d_ewm:
         percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window, minp=d_window)
@@ -859,8 +868,9 @@ def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, s
 @njit(cache=True)
 def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
     """Numba-compiled apply function for `MACD`."""
-    fast_ma = cache_dict[(fast_window, int(macd_ewm))]
-    slow_ma = cache_dict[(slow_window, int(macd_ewm))]
+    h = hash((fast_window, macd_ewm))
+    fast_ma = cache_dict[h]
+    slow_ma = cache_dict[h]
     macd_ts = fast_ma - slow_ma
     if signal_ewm:
         signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window, minp=signal_window)
@@ -1082,19 +1092,21 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
 
     cache_dict = dict()
     for i in range(windows.shape[0]):
-        if (windows[i], int(ewms[i])) not in cache_dict:
+        h = hash((windows[i], ewms[i]))
+        if h not in cache_dict:
             if ewms[i]:
                 atr = timeseries.nb.ewm_mean_nb(tr, windows[i], minp=windows[i])
             else:
                 atr = timeseries.nb.rolling_mean_nb(tr, windows[i], minp=windows[i])
-            cache_dict[(windows[i], int(ewms[i]))] = atr
+            cache_dict[h] = atr
     return tr, cache_dict
 
 
 @njit(cache=True)
 def atr_apply_func_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
     """Numba-compiled apply function for `ATR`."""
-    return tr, cache_dict[(window, int(ewm))]
+    h = hash((window, ewm))
+    return tr, cache_dict[h]
 
 
 ATR = indicators.factory.IndicatorFactory(
