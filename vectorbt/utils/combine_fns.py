@@ -1,4 +1,4 @@
-"""Utility functions for combining arrays."""
+"""Utilities for combining arrays."""
 
 import numpy as np
 import pandas as pd

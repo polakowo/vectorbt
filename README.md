@@ -1,10 +1,10 @@
-![](https://travis-ci.org/polakowo/vectorbt.svg?branch=master&status=passed) ![](https://img.shields.io/badge/version-0.6-blue)
+![](https://travis-ci.org/polakowo/vectorbt.svg?branch=master&status=passed) ![](https://img.shields.io/badge/version-0.7-blue)
 
 # vectorbt
 
 ![Made by Vectors Market](logo.png)
 
-vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy, and is accelerated by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at speed and scale. 
+vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy, and is accelerated by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at speed and scale :fire:
 
 It follows a unique approach to backtesting that builds upon vectorized matrix calculations and fast iterative processing with Numba for event-driven backtesting. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to process data on the fly and thus enable the user to interact with data-hungry widgets without significant delays.
 
@@ -148,7 +148,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data
     - Entry, exit and random signal generation, ranking and distance functions
-    - Generation of stop loss and trailing stop order signals
+    - Generation of stop loss, trailing stop and take profit signals
 - `vbt.portfolio` accessor for modeling portfolio performance
     - From signals, orders, or custom order function
     - A range of performance time series, metrics, and plotting functions
@@ -169,8 +169,6 @@ pip install git+https://github.com/polakowo/vectorbt.git
 ```
 
 See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) for Plotly figures.
-
-Note: importing vectorbt for the first time may take a while due to compilation.
 
 ## Documentation
 

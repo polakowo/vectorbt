@@ -1,4 +1,4 @@
-"""Class decorators for indexing."""
+"""Utilities for indexing."""
 
 import numpy as np
 import pandas as pd
@@ -82,26 +82,23 @@ def add_pd_indexing(indexing_func):
         def iloc(self):
             return self._iloc
 
-        iloc.__doc__ = f"""Forwards [`pandas.Series.iloc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.iloc.html)/
-        [`pandas.DataFrame.iloc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.iloc.html)
-        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`"""
+        iloc.__doc__ = f"""Forwards `pandas.Series.iloc`/`pandas.DataFrame.iloc`
+        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`."""
 
         @property
         def loc(self):
             """Purely label-location based indexer for selection by label."""
             return self._loc
 
-        loc.__doc__ = f"""Forwards [`pandas.Series.loc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.loc.html)/
-        [`pandas.DataFrame.loc`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.loc.html)
-        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`"""
+        loc.__doc__ = f"""Forwards `pandas.Series.loc`/`pandas.DataFrame.loc`
+        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`."""
 
         def xs(self, *args, **kwargs):
             """Returns a cross-section (row(s) or column(s)) from the Series/DataFrame."""
             return indexing_func(self, lambda x: x.xs(*args, **kwargs))
 
-        xs.__doc__ = f"""Forwards [`pandas.Series.xs`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.Series.xs.html)/
-        [`pandas.DataFrame.xs`](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.xs.html)
-        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`"""
+        xs.__doc__ = f"""Forwards `pandas.Series.xs`/`pandas.DataFrame.xs`
+        operation to each Series/DataFrame and returns a new instance of `{cls.__name__}`."""
 
         def __getitem__(self, key):
             return indexing_func(self, lambda x: x.__getitem__(key))

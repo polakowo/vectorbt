@@ -1,4 +1,4 @@
-"""Common functions and classes for displaying widgets."""
+"""Common functions and classes."""
 
 import plotly.graph_objects as go
 
@@ -6,7 +6,7 @@ from vectorbt import defaults
 
 class DefaultFigureWidget(go.FigureWidget):
     def __init__(self, *args, **kwargs):
-        """Subclass of the [`plotly.graph_objects.FigureWidget`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.html?highlight=figurewidget#plotly.graph_objects.FigureWidget) class initialized 
+        """Subclass of the `plotly.graph_objects.FigureWidget` class initialized 
         with default parameters from `vectorbt.defaults.layout`."""
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)

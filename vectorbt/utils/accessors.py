@@ -1,11 +1,12 @@
-"""Custom pandas accessors with utility methods."""
+"""Custom pandas accessors."""
 
 import numpy as np
 import pandas as pd
 from collections.abc import Iterable
 
 from vectorbt.utils import checks, combine_fns, index_fns, reshape_fns
-from vectorbt.utils.common import class_or_instancemethod, fix_class_for_pdoc
+from vectorbt.utils.common import fix_class_for_pdoc
+from vectorbt.utils.decorators import class_or_instancemethod
 
 
 class Base_Accessor():
@@ -82,7 +83,7 @@ class Base_Accessor():
         Use `as_columns` as a top-level column level."""
         tiled = reshape_fns.tile(self._obj, n, axis=1)
         if as_columns is not None:
-            new_columns = index_fns.combine(as_columns, self.columns)
+            new_columns = index_fns.combine_indexes(as_columns, self.columns)
             return self.wrap_array(tiled.values, columns=new_columns)
         return tiled
 
@@ -92,7 +93,7 @@ class Base_Accessor():
         Use `as_columns` as a top-level column level."""
         repeated = reshape_fns.repeat(self._obj, n, axis=1)
         if as_columns is not None:
-            new_columns = index_fns.combine(self.columns, as_columns)
+            new_columns = index_fns.combine_indexes(self.columns, as_columns)
             return self.wrap_array(repeated.values, columns=new_columns)
         return repeated
 
@@ -116,8 +117,8 @@ class Base_Accessor():
         obj = reshape_fns.to_2d(self._obj)
         other = reshape_fns.to_2d(other)
 
-        aligned_index = index_fns.align_to(obj.index, other.index)
-        aligned_columns = index_fns.align_to(obj.columns, other.columns)
+        aligned_index = index_fns.align_index_to(obj.index, other.index)
+        aligned_columns = index_fns.align_index_to(obj.columns, other.columns)
         obj = obj.iloc[aligned_index, aligned_columns]
         return self.wrap_array(obj.values, index=other.index, columns=other.columns)
 
@@ -176,7 +177,7 @@ class Base_Accessor():
         if checks.is_pandas(broadcasted[0]):
             concated = pd.concat(broadcasted, axis=1)
             if as_columns is not None:
-                concated.columns = index_fns.combine(as_columns, broadcasted[0].columns)
+                concated.columns = index_fns.combine_indexes(as_columns, broadcasted[0].columns)
         else:
             concated = np.hstack(broadcasted)
         return concated
@@ -213,9 +214,9 @@ class Base_Accessor():
             result = combine_fns.apply_and_concat(obj_arr, ntimes, apply_func, *args, **kwargs)
         # Build column hierarchy
         if as_columns is not None:
-            new_columns = index_fns.combine(as_columns, self.columns)
+            new_columns = index_fns.combine_indexes(as_columns, self.columns)
         else:
-            new_columns = index_fns.tile(self.columns, ntimes)
+            new_columns = index_fns.tile_index(self.columns, ntimes)
         return self.wrap_array(result, columns=new_columns)
 
     def combine_with(self, other, *args, combine_func=None, pass_2d=False, broadcast_kwargs={}, **kwargs):
@@ -323,9 +324,9 @@ class Base_Accessor():
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             columns = new_obj.vbt.columns
             if as_columns is not None:
-                new_columns = index_fns.combine(as_columns, columns)
+                new_columns = index_fns.combine_indexes(as_columns, columns)
             else:
-                new_columns = index_fns.tile(columns, len(others))
+                new_columns = index_fns.tile_index(columns, len(others))
             return new_obj.vbt.wrap_array(result, columns=new_columns)
         else:
             # Combine arguments pairwise into one object

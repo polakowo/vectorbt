@@ -1,4 +1,4 @@
-"""An indicator factory `vectorbt.indicators.factory.IndicatorFactory` for building new indicators with ease.
+"""An indicator factory for building new indicators with ease.
 
 Each indicator is basically a pipeline that
 
@@ -13,12 +13,6 @@ On top of this pipeline, it also does the following:
 
 * Creates a new indicator class
 * Creates an `__init__` method where it stores all inputs, outputs, and other artifacts
-
-!!! note
-    The `__init__` method is never used for running the indicator, for this use `from_params`.
-    The reason for this is indexing, which requires a clean `__init__` method for creating 
-    a new indicator object with newly indexed attributes.
-
 * Creates a `from_params` method that runs the main pipeline using `from_params_pipeline`
 * Adds pandas indexing, i.e., you can use `iloc`, `loc`, `xs`, and `__getitem__` on the class itself
 * Adds parameter indexing, i.e., use `*your_param*_loc` on the class to slice using parameters
@@ -212,22 +206,22 @@ from numba.typed import List
 import itertools
 
 from vectorbt.utils import checks, index_fns, reshape_fns, indexing, combine_fns
-from vectorbt.utils.common import cached_property
+from vectorbt.utils.decorators import cached_property
 
 
 def build_column_hierarchy(param_list, level_names, ts_columns):
     """For each parameter in `param_list`, create a new column level with parameter values. 
     Combine this level with columns `ts_columns` using Cartesian product."""
     checks.assert_same_shape(param_list, level_names, axis=0)
-    param_indexes = [index_fns.from_values(param_list[i], name=level_names[i]) for i in range(len(param_list))]
+    param_indexes = [index_fns.index_from_values(param_list[i], name=level_names[i]) for i in range(len(param_list))]
     param_columns = None
     for param_index in param_indexes:
         if param_columns is None:
             param_columns = param_index
         else:
-            param_columns = index_fns.stack(param_columns, param_index)
+            param_columns = index_fns.stack_indexes(param_columns, param_index)
     if param_columns is not None:
-        return index_fns.combine(param_columns, ts_columns)
+        return index_fns.combine_indexes(param_columns, ts_columns)
     return ts_columns
 
 
@@ -321,8 +315,8 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
     >>> p1_columns = pd.Index(param_list[0], name='p1')
     >>> p2_columns = pd.Index(param_list[1], name='p2')
     >>> p3_columns = pd.Index(param_list[2], name='p3')
-    >>> p_columns = vbt.utils.index_fns.stack(p1_columns, p2_columns, p3_columns)
-    >>> new_columns = vbt.utils.index_fns.combine(p_columns, ts_list[0].columns)
+    >>> p_columns = vbt.utils.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
+    >>> new_columns = vbt.utils.index_fns.combine_indexes(p_columns, ts_list[0].columns)
 
     >>> output_df = pd.DataFrame(output, columns=new_columns)
     >>> print(output_df)
@@ -379,11 +373,11 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
         a list of parameter arrays (`numpy.ndarray`), a list of parameter mappers (`pandas.Series`),
         a list of other generated outputs that are outside of  `num_outputs`.
     """
-    # Check time series objects
-    checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
     if len(ts_list) > 1:
         # Broadcast time series
         ts_list = reshape_fns.broadcast(*ts_list, **broadcast_kwargs, writeable=True)
+    # Check time series objects
+    checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
     # Check level names
     checks.assert_type(level_names, (list, tuple))
     checks.assert_same_len(param_list, level_names)
@@ -446,12 +440,11 @@ def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_f
 
 def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
     """Perform checks on objects created by running or slicing an indicator."""
-    for ts in ts_list:
-        checks.assert_type(ts, (pd.Series, pd.DataFrame))
-    for i in range(1, len(ts_list) + len(output_list)):
-        checks.assert_same_meta((ts_list + output_list)[i-1], (ts_list + output_list)[i])
-    for i in range(1, len(param_list)):
-        checks.assert_same_shape(param_list[i-1], param_list[i])
+    checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
+    for ts in ts_list + output_list:
+        checks.assert_same_meta(ts_list[0], ts)
+    for params in param_list:
+        checks.assert_same_shape(param_list[0], params)
     for mapper in mapper_list:
         checks.assert_type(mapper, pd.Series)
         checks.assert_same_index(reshape_fns.to_2d(ts_list[0]).iloc[0, :], mapper)
@@ -466,7 +459,7 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
     See `vectorbt.utils.accessors.Base_Accessor.combine_with`."""
     if multiple:
         if as_columns is None:
-            as_columns = index_fns.from_values(other, name=name)
+            as_columns = index_fns.index_from_values(other, name=name)
         return obj.vbt.combine_with_multiple(other, combine_func=compare_func, as_columns=as_columns, concat=True, **kwargs)
     return obj.vbt.combine_with(other, combine_func=compare_func, **kwargs)
 
@@ -476,7 +469,7 @@ class IndicatorFactory():
                  param_names=['param'],
                  output_names=['output'],
                  name='custom',
-                 custom_properties={}):
+                 custom_outputs={}):
         """A factory for creating new indicators.
 
         Args:
@@ -484,14 +477,19 @@ class IndicatorFactory():
             param_names (list of str): A list of names of parameters.
             output_names (list of str): A list of names of outputs time series objects.
             name (str): A short name of the indicator.
-            custom_properties (dict): A dictionary with user-defined functions that will be
+            custom_outputs (dict): A dictionary with user-defined functions that will be
                 bound to the indicator class and wrapped with `@cached_property`.
+
+        !!! note
+            The `__init__` method is never used for running the indicator, for this use `from_params`.
+            The reason for this is indexing, which requires a clean `__init__` method for creating 
+            a new indicator object with newly indexed attributes.
         """
         self.ts_names = ts_names
         self.param_names = param_names
         self.output_names = output_names
         self.name = name
-        self.custom_properties = custom_properties
+        self.custom_outputs = custom_outputs
 
     def from_custom_func(self, custom_func, **pipeline_kwargs):
         """Build indicator class around a custom calculation function.
@@ -561,7 +559,7 @@ class IndicatorFactory():
         param_names = self.param_names
         output_names = self.output_names
         name = self.name
-        custom_properties = self.custom_properties
+        custom_outputs = self.custom_outputs
 
         # For name and each input and output, create read-only properties
         prop = property(lambda self: self._name)
@@ -578,7 +576,7 @@ class IndicatorFactory():
             prop.__doc__ = f"""Output time series (read-only)."""
             setattr(CustomIndicator, output_name, prop)
 
-        for prop in custom_properties.values():
+        for prop in custom_outputs.values():
             if prop.__doc__ is None:
                 prop.__doc__ = f"""Custom property."""
 
@@ -650,15 +648,15 @@ class IndicatorFactory():
         if len(param_names) > 1:
             CustomIndicator = indexing.add_param_indexing('tuple', indexing_func)(CustomIndicator)
 
-        # Add user-defined properties
-        for prop_name, prop in custom_properties.items():
+        # Add user-defined outputs
+        for prop_name, prop in custom_outputs.items():
             prop.__name__ = prop_name
-            if not isinstance(prop, property):
+            if not isinstance(prop, (property, cached_property)):
                 prop = cached_property(prop)
             setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison methods for all inputs, outputs, and user-defined properties
-        comparison_attrs = set(ts_names + output_names + list(custom_properties.keys()))
+        comparison_attrs = set(ts_names + output_names + list(custom_outputs.keys()))
         for attr in comparison_attrs:
             def assign_comparison_method(func_name, compare_func, attr=attr):
                 def comparison_method(self, other, crossover=False, wait=0, name=None, **kwargs):

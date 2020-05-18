@@ -1,4 +1,4 @@
-"""Utility functions for validation during runtime."""
+"""Utilities for validation during runtime."""
 
 import numpy as np
 import pandas as pd
@@ -10,28 +10,37 @@ from vectorbt.utils import reshape_fns
 
 
 def is_series(arg):
-    """Return whether `arg` is `pandas.Series`."""
+    """Determine whether `arg` is `pandas.Series`."""
     return isinstance(arg, pd.Series)
 
 
 def is_frame(arg):
-    """Return whether `arg` is `pandas.DataFrame`."""
+    """Determine whether `arg` is `pandas.DataFrame`."""
     return isinstance(arg, pd.DataFrame)
 
 
 def is_pandas(arg):
-    """Return whether `arg` is `pandas.Series` or `pandas.DataFrame`."""
+    """Determine whether `arg` is `pandas.Series` or `pandas.DataFrame`."""
     return is_series(arg) or is_frame(arg)
 
 
 def is_array(arg):
-    """Return whether `arg` is any of `numpy.ndarray`, `pandas.Series` or `pandas.DataFrame`."""
+    """Determine whether `arg` is any of `numpy.ndarray`, `pandas.Series` or `pandas.DataFrame`."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
 
 def is_numba_func(arg):
-    """Return whether `arg` is a Numba-compiled function."""
+    """Determine whether `arg` is a Numba-compiled function."""
     return isinstance(arg, CPUDispatcher)
+
+
+def is_hashable(arg):
+    """Determine whether `arg` can be hashed."""
+    try:
+        hash(arg)
+    except TypeError:
+        return False
+    return True
 
 
 # ############# Asserts ############# #
@@ -121,7 +130,7 @@ def assert_ndim(arg, ndims):
 
 def assert_same_len(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different length.
-    
+
     Does not transform arguments to NumPy arrays."""
     if len(arg1) != len(arg2):
         raise ValueError(f"Lengths {len(arg1)} and {len(arg2)} do not match")

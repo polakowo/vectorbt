@@ -1,11 +1,11 @@
-"""Numba-compiled 1-dim and 2-dim functions for time series.
+"""Numba-compiled 1-dim and 2-dim functions.
 
 !!! note
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0).
     
-    Input arrays can be of any data type, but output arrays are always `numpy.float64`.
+    Input arrays can be of any data type, but most output arrays are `numpy.float64`.
     
     Rolling functions with `minp=None` have `min_periods` set to the window size."""
 
@@ -247,6 +247,71 @@ def nanmax_cube_nb(a):
     for i in range(a.shape[1]):
         for j in range(a.shape[2]):
             result[i, j] = np.nanmax(a[:, i, j])
+    return result
+
+
+@njit(cache=True)
+def nancnt_nb(a):
+    """Compute count while ignoring NaNs."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = np.sum(~np.isnan(a[:, col]))
+    return result
+
+
+@njit(cache=True)
+def nansum_nb(a):
+    """Compute sum while ignoring NaNs."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = np.nansum(a[:, col])
+    return result
+
+
+@njit(cache=True)
+def nanmin_nb(a):
+    """Compute minimum while ignoring NaNs."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = np.nanmin(a[:, col])
+    return result
+
+
+@njit(cache=True)
+def nanmax_nb(a):
+    """Compute maximum while ignoring NaNs."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = np.nanmax(a[:, col])
+    return result
+
+
+@njit(cache=True)
+def nanmean_nb(a):
+    """Compute mean while ignoring NaNs."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = np.nanmean(a[:, col])
+    return result
+
+
+@njit(cache=True)
+def nanstd_1d_nb(a, ddof=1):
+    """Compute the standard deviation while ignoring NaNs."""
+    a = a[~np.isnan(a)]
+    rcount = max(a.shape[0] - ddof, 0)
+    if rcount == 0:
+        return np.nan
+    else:
+        return np.std(a) * np.sqrt(a.shape[0] / rcount)
+
+
+@njit(cache=True)
+def nanstd_nb(a, ddof=1):
+    """2-dim version of `nanstd_1d_nb`."""
+    result = np.empty(a.shape[1], dtype=f8)
+    for col in range(a.shape[1]):
+        result[col] = nanstd_1d_nb(a[:, col], ddof=ddof)
     return result
 
 # ############# Rolling functions ############# #
@@ -851,11 +916,7 @@ def describe_reduce_func_nb(col, a, percentiles):
     result[0] = len(a)
     if len(a) > 0:
         result[1] = np.mean(a)
-        rcount = max(len(a) - 1, 0)
-        if rcount == 0:
-            result[2] = np.nan
-        else:
-            result[2] = np.std(a) * np.sqrt(len(a) / rcount)  # ddof = 1
+        result[2] = nanstd_1d_nb(a, ddof=1)
         result[3] = np.min(a)
         for i, percentile in enumerate(percentiles):
             result[4:-1] = np.percentile(a, percentiles * 100)

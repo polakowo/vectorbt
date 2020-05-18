@@ -1,4 +1,4 @@
-"""Root pandas accessors for `vectorbt`."""
+"""Root pandas accessors."""
 
 import pandas as pd
 from pandas.core.accessor import _register_accessor, DirNamesMixin

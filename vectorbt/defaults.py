@@ -1,26 +1,6 @@
-"""Default parameters for various parts of `vectorbt`."""
+"""Global defaults."""
 
-
-class Config(dict):
-    """A simple dict with (optionally) frozen keys."""
-
-    def __init__(self, *args, frozen=True, **kwargs):
-        self.frozen = frozen
-        self.update(*args, **kwargs)
-        self.default_config = dict(self)
-        for key, value in dict.items(self):
-            if isinstance(value, dict):
-                dict.__setitem__(self, key, Config(value, frozen=frozen))
-
-    def __setitem__(self, key, val):
-        if self.frozen and key not in self:
-            raise KeyError(f"Key {key} is not a valid parameter")
-        dict.__setitem__(self, key, val)
-
-    def reset(self):
-        """Reset dictionary to the one passed at instantiation."""
-        self.update(self.default_config)
-
+from vectorbt.utils.common import Config
 
 # Layout
 layout = Config(
@@ -38,36 +18,32 @@ layout = Config(
         "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
     ]
 )
-"""Default Plotly layout.
-
-Used by `vectorbt.widgets.common.DefaultFigureWidget`."""
+"""Default Plotly layout."""
 
 # Portfolio
 portfolio = Config(
     init_capital=1.,
     fees=0.,
-    slippage=0.
+    slippage=0.,
+    year_freq='1Y',
+    risk_free=0.,
+    required_return=0.,
+    cutoff=0.05
 )
-"""Default portfolio parameters.
-
-Used by `vectorbt.portfolio.portfolio.Portfolio`."""
+"""Default portfolio parameters."""
 
 # Broadcasting
-broadcast = Config(
+broadcasting = Config(
     index_from='strict',
     columns_from='stack',
     ignore_single=True,
     drop_duplicates=True,
     keep='last'
 )
-"""Default broadcasting rules for index and columns.
-
-Used by `vectorbt.utils.reshape_fns.broadcast_index`."""
+"""Default broadcasting rules for index and columns.."""
 
 # Cache
-cached_property = True
-"""If `True`, will cache properties decorated with `@cached_property`.
-
-Used by `vectorbt.utils.common.cached_property`.
+caching = True
+"""If `True`, will cache properties and methods decorated accordingly.
 
 Disable for performance tests."""

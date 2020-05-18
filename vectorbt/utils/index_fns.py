@@ -1,4 +1,4 @@
-"""Utility functions for working with index/columns."""
+"""Utilities for working with index/columns."""
 
 import numpy as np
 import pandas as pd
@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from vectorbt.utils import checks
 
 
-def from_values(values, name=None):
+def index_from_values(values, name=None):
     """Create a new `pd.Index` with `name` by parsing an iterable `values`.
     
     Each in `values` will correspond to an element in the new index."""
@@ -23,7 +23,7 @@ def from_values(values, name=None):
     return pd.Index(value_names, name=name)
 
 
-def repeat(index, n):
+def repeat_index(index, n):
     """Repeat each element in `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
@@ -31,7 +31,7 @@ def repeat(index, n):
     return np.repeat(index, n)
 
 
-def tile(index, n):
+def tile_index(index, n):
     """Tile the whole `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
@@ -41,7 +41,7 @@ def tile(index, n):
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack(*indexes):
+def stack_indexes(*indexes):
     """Stack each index in `indexes` on top of each other."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
@@ -62,7 +62,7 @@ def stack(*indexes):
     return new_index
 
 
-def combine(*indexes):
+def combine_indexes(*indexes):
     """Combine each index in `indexes` using Cartesian product."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
@@ -89,7 +89,7 @@ def combine(*indexes):
         else:
             index2 = pd.Index(tuples2, name=index2.name)
 
-        new_index = stack(index1, index2)
+        new_index = stack_indexes(index1, index2)
     return new_index
 
 
@@ -176,7 +176,7 @@ def drop_duplicate_levels(index, keep='last'):
     return index.droplevel(levels_to_drop)
 
 
-def align_to(index1, index2):
+def align_index_to(index1, index2):
     """Align `index1` to have the same shape of `index2`.
 
     Returns integer indices of occurrences and None if aligning not needed.

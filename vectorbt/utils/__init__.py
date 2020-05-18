@@ -1,3 +1,3 @@
-"""Utility functions and classes for various parts of `vectorbt`."""
+"""Package with utilities."""
 
-from vectorbt.utils import checks, combine_fns, common, index_fns, indexing, reshape_fns, accessors
+from vectorbt.utils import checks, combine_fns, common, index_fns, indexing, reshape_fns, accessors, decorators

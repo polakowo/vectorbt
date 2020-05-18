@@ -1,4 +1,4 @@
-"""Numba-compiled functions for signals.
+"""Numba-compiled 1-dim and 2-dim functions.
 
 !!! note
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
@@ -173,38 +173,60 @@ def generate_random_after_nb(a, n_range, n_prob=None, min_space=None, seed=None)
 
 
 @njit(cache=True)
-def stop_loss_choice_func_nb(col, from_i, to_i, ts, stop, trailing):
-    """Return index of the first `ts` value that is below `stop` defined at `from_i-1`."""
-    # Set range starting from last entry until next entry
+def stop_loss_choice_func_nb(col, from_i, to_i, ts, stop, trailing, relative):
+    """`choice_func_nb` that returns the first index of `ts` being below `stop` defined at `from_i-1`."""
     ts = ts[from_i-1:to_i+1, col]
     stop = stop[from_i-1:to_i+1, col]
     if trailing:
         # Propagate the maximum value from the entry using expanding max
         peak_ts = timeseries.nb.expanding_max_1d_nb(ts)
-        stop = (1 - stop) * peak_ts
-        # Get the absolute index of the first value below that stop
-        return from_i + np.flatnonzero(ts[1:] < stop[1:])[:1]
+        if relative:
+            stop = (1 - stop) * peak_ts
+            # Get the absolute index of the first ts being below that stop
+        return from_i + np.flatnonzero(ts[1:] <= stop[1:])[:1]
     else:
-        # Calculate the stop
-        stop_val = (1 - stop[0]) * ts[0]
-        # Get the absolute index of the first value below that stop
-        return from_i + np.flatnonzero(ts[1:] < stop_val)[:1]
+        if relative:
+            stop_val = (1 - stop[0]) * ts[0]
+        else:
+            stop_val = stop[0]
+        return from_i + np.flatnonzero(ts[1:] <= stop_val)[:1]
+
+
+@njit(cache=True)
+def take_profit_choice_func_nb(col, from_i, to_i, ts, stop, relative):
+    """`choice_func_nb` that returns the first index of `ts` being above `stop` defined at `from_i-1`."""
+    ts = ts[from_i-1:to_i+1, col]
+    stop = stop[from_i-1:to_i+1, col]
+    if relative:
+        stop_val = (1 + stop[0]) * ts[0]
+    else:
+        stop_val = stop[0]
+    return from_i + np.flatnonzero(ts[1:] >= stop_val)[:1]
 
 
 @njit
-def stop_loss_apply_func_nb(i, entries, ts, stops, trailing):
-    """`apply_func_nb` for `vectorbt.utils.combine_fns.apply_and_concat_one_nb` for stop loss."""
-    return generate_after_nb(entries, stop_loss_choice_func_nb, ts, stops[i, :, :], trailing)
+def stop_loss_apply_func_nb(i, entries, ts, stops, trailing, relative):
+    """`apply_func_nb` for stop loss used in `vectorbt.utils.combine_fns.apply_and_concat_one_nb`."""
+    return generate_after_nb(entries, stop_loss_choice_func_nb, ts, stops[i, :, :], trailing, relative)
 
 
 @njit
-def generate_stop_loss_nb(entries, ts, stops, trailing):
+def take_profit_apply_func_nb(i, entries, ts, stops, relative):
+    """`apply_func_nb` for take profit used in `vectorbt.utils.combine_fns.apply_and_concat_one_nb`."""
+    return generate_after_nb(entries, take_profit_choice_func_nb, ts, stops[i, :, :], relative)
+
+
+@njit
+def generate_stop_loss_nb(entries, ts, stops, trailing, relative):
     """For each `True` in `entries`, find the first value in `ts` that is below the (trailing) stop.
 
-    `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape. Each of 
-    these arrays will correspond to a different stop loss configuration. Set `trailing` to
-    `True` to use trailing stop.
-    
+    Set `trailing` to `True` to use trailing stop. 
+    Set `relative` to `True` to define stop in percentage of `ts`.
+
+    !!! note
+        `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape. Each of 
+        these arrays will correspond to a different stop configuration.
+        
     Example:
         ```python-repl
         >>> import numpy as np
@@ -216,14 +238,28 @@ def generate_stop_loss_nb(entries, ts, stops, trailing):
         >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
         >>> stops = broadcast_to_array_of([0.1, 0.5], ts)
 
-        >>> print(generate_stop_loss_nb(entries, ts, stops, True))
+        >>> print(generate_stop_loss_nb(entries, ts, stops, True, True))
         [[False False]
          [False False]
          [False False]
          [ True False]
          [False  True]]
         ```"""
-    return combine_fns.apply_and_concat_one_nb(len(stops), stop_loss_apply_func_nb, entries, ts, stops, trailing)
+    return combine_fns.apply_and_concat_one_nb(
+        len(stops), stop_loss_apply_func_nb, entries, ts, stops, trailing, relative)
+
+
+@njit
+def generate_take_profit_nb(entries, ts, stops, relative):
+    """For each `True` in `entries`, find the first value in `ts` that is above the stop.
+
+    Set `relative` to `True` to define stop in percentage of `ts`.
+
+    !!! note
+        `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape. Each of 
+        these arrays will correspond to a different stop configuration."""
+    return combine_fns.apply_and_concat_one_nb(
+        len(stops), take_profit_apply_func_nb, entries, ts, stops, relative)
 
 # ############# Map and reduce ############# #
 
@@ -325,7 +361,25 @@ def rank_nb(a, reset_by=None, after_false=False, allow_gaps=False):
 
     Partition is some number of `True` values in a row. You can reset partitions by `True` values 
     from `reset_by` (must have the same shape). If `after_false` is `True`, the first partition 
-    must come after at least one `False`. If `allow_gaps` is `True`, ignores gaps between partitions."""
+    must come after at least one `False`. If `allow_gaps` is `True`, ignores gaps between partitions.
+    
+    Example:
+        ```python-repl
+        >>> import numpy as np
+        >>> from vectorbt.signals.nb import rank_nb
+
+        >>> signals = np.asarray([True, True, False, True, True, True, False])[:, None]
+        >>> reset_by = np.asarray([False, False, True, False, False, False, False])[:, None]
+
+        >>> print(rank_nb(signals)[:, 0])
+        [1 2 0 1 2 3 0]
+        >>> print(rank_nb(signals, after_false=True)[:, 0])
+        [0 0 0 1 2 3 0]
+        >>> print(rank_nb(signals, allow_gaps=True)[:, 0])
+        [1 2 0 3 4 5 0]
+        >>> print(rank_nb(signals, allow_gaps=True, reset_by=reset_by)[:, 0])
+        [1 2 0 1 2 3 0]
+        ```"""
     result = np.zeros(a.shape, dtype=i8)
 
     for col in range(a.shape[1]):
@@ -337,9 +391,10 @@ def rank_nb(a, reset_by=None, after_false=False, allow_gaps=False):
                     # Signal in b_ref resets rank
                     false_seen = ~after_false
                     inc = 0
-            if a[i, col] and false_seen:
-                inc += 1
-                result[i, col] = inc
+            if a[i, col]:
+                if false_seen:
+                    inc += 1
+                    result[i, col] = inc
             else:
                 false_seen = True
                 if not allow_gaps:

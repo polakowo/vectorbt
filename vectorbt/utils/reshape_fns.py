@@ -1,4 +1,4 @@
-"""Utility functions for reshaping arrays."""
+"""Utilities for reshaping arrays."""
 
 import numpy as np
 import pandas as pd
@@ -110,14 +110,14 @@ def repeat(arg, n, axis=1):
         if checks.is_pandas(arg):
             return arg.vbt.wrap_array(
                 np.repeat(arg.values, n, axis=0),
-                index=index_fns.repeat(arg.index, n))
+                index=index_fns.repeat_index(arg.index, n))
         return np.repeat(arg, n, axis=0)
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
             return arg.vbt.wrap_array(
                 np.repeat(arg.values, n, axis=1),
-                columns=index_fns.repeat(arg.columns, n))
+                columns=index_fns.repeat_index(arg.columns, n))
         return np.repeat(arg, n, axis=1)
     else:
         raise ValueError("Only axis 0 and 1 are supported")
@@ -132,20 +132,20 @@ def tile(arg, n, axis=1):
             if checks.is_pandas(arg):
                 return arg.vbt.wrap_array(
                     np.tile(arg.values, n),
-                    index=index_fns.tile(arg.index, n))
+                    index=index_fns.tile_index(arg.index, n))
             return np.tile(arg, n)
         if arg.ndim == 2:
             if checks.is_pandas(arg):
                 return arg.vbt.wrap_array(
                     np.tile(arg.values, (n, 1)),
-                    index=index_fns.tile(arg.index, n))
+                    index=index_fns.tile_index(arg.index, n))
             return np.tile(arg, (n, 1))
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
             return arg.vbt.wrap_array(
                 np.tile(arg.values, (1, n)),
-                columns=index_fns.tile(arg.columns, n))
+                columns=index_fns.tile_index(arg.columns, n))
         return np.tile(arg, (1, n))
     else:
         raise ValueError("Only axis 0 and 1 are supported")
@@ -161,11 +161,11 @@ def broadcast_index(*args, to_shape=None, index_from=None, axis=0, ignore_single
 
             Accepts the following values:
 
-            * `'default'` - take the value from `vectorbt.defaults.broadcast`
+            * `'default'` - take the value from `vectorbt.defaults.broadcasting`
             * `None` - use the original index/columns of the objects in `args`
             * `int` - use the index/columns of the i-nth object in `args`
             * `'strict'` - ensure that all pandas objects have the same index/columns
-            * `'stack'` - stack different indexes/columns using `vectorbt.utils.index_fns.stack`
+            * `'stack'` - stack different indexes/columns using `vectorbt.utils.index_fns.stack_indexes`
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
@@ -173,14 +173,16 @@ def broadcast_index(*args, to_shape=None, index_from=None, axis=0, ignore_single
             to match the length of the longest index/columns (can lead to pollution of levels).
         drop_duplicates (bool): See `vectorbt.utils.index_fns.drop_duplicate_levels`.
         keep (bool): See `vectorbt.utils.index_fns.drop_duplicate_levels`.
+
+    For defaults, see `vectorbt.defaults.broadcasting`.
     """
 
     if ignore_single == 'default':
-        ignore_single = defaults.broadcast['ignore_single']
+        ignore_single = defaults.broadcasting['ignore_single']
     if drop_duplicates == 'default':
-        drop_duplicates = defaults.broadcast['drop_duplicates']
+        drop_duplicates = defaults.broadcasting['drop_duplicates']
     if keep == 'default':
-        keep = defaults.broadcast['keep']
+        keep = defaults.broadcasting['keep']
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
 
@@ -231,10 +233,10 @@ def broadcast_index(*args, to_shape=None, index_from=None, axis=0, ignore_single
                                     continue
                                 else:
                                     if len(index) > len(new_index):
-                                        new_index = index_fns.repeat(new_index, len(index))
+                                        new_index = index_fns.repeat_index(new_index, len(index))
                                     elif len(index) < len(new_index):
-                                        index = index_fns.repeat(index, len(new_index))
-                            new_index = index_fns.stack(new_index, index)
+                                        index = index_fns.repeat_index(index, len(new_index))
+                            new_index = index_fns.stack_indexes(new_index, index)
                             if drop_duplicates:
                                 new_index = index_fns.drop_duplicate_levels(new_index, keep=keep)
                 if maxlen > len(new_index):
@@ -244,7 +246,7 @@ def broadcast_index(*args, to_shape=None, index_from=None, axis=0, ignore_single
                     # In this case, new pandas index (one element) should be repeated to match this length.
                     if maxlen > 1 and len(new_index) > 1:
                         raise ValueError("Indexes could not be broadcast together")
-                    new_index = index_fns.repeat(new_index, maxlen)
+                    new_index = index_fns.repeat_index(new_index, maxlen)
             else:
                 raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
         else:
@@ -262,7 +264,7 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
                 if old_arg.shape[0] == new_arg.shape[0]:
                     new_index = old_arg.index
                 else:
-                    new_index = index_fns.repeat(old_arg.index, new_arg.shape[0])
+                    new_index = index_fns.repeat_index(old_arg.index, new_arg.shape[0])
             if new_columns is None:
                 # Take columns from original pandas object
                 if new_arg.ndim == 2:
@@ -271,7 +273,7 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
                     if old_arg.shape[1] == new_arg.shape[1]:
                         new_columns = old_arg.columns
                     else:
-                        new_columns = index_fns.repeat(old_arg.columns, new_arg.shape[1])
+                        new_columns = index_fns.repeat_index(old_arg.columns, new_arg.shape[1])
         else:
             if new_index is None and new_columns is None:
                 # Return plain numpy array if not pandas and no rules set
@@ -309,6 +311,8 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
                 Has effect on every array, independent from whether broadcasting was needed or not.
 
         **kwargs: Keyword arguments passed to `broadcast_index`.
+
+    For defaults, see `vectorbt.defaults.broadcasting`.
 
     Example:
         Without broadcasting index and columns:
@@ -428,9 +432,9 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
     is_2d = False
     args = list(args)
     if isinstance(index_from, str) and index_from == 'default':
-        index_from = defaults.broadcast['index_from']
+        index_from = defaults.broadcasting['index_from']
     if isinstance(columns_from, str) and columns_from == 'default':
-        columns_from = defaults.broadcast['columns_from']
+        columns_from = defaults.broadcasting['columns_from']
 
     # Convert to np.ndarray object if not numpy or pandas
     # Also check whether we broadcast to pandas and whether work on 2-dim data

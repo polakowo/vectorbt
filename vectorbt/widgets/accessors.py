@@ -1,13 +1,13 @@
-"""Custom pandas accessors for displaying widgets."""
+"""Custom pandas accessors."""
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.widgets import widgets
+from vectorbt.widgets import basic
 
 
 @register_dataframe_accessor('Bar')
 @register_series_accessor('Bar')
 class Bar_Accessor():
-    """Allows calling `vectorbt.widgets.widgets.Bar` using `pandas.Series.vbt.Bar` and `pandas.DataFrame.vbt.Bar`."""
+    """Allows calling `vectorbt.widgets.basic.Bar` using `pandas.Series.vbt.Bar` and `pandas.DataFrame.vbt.Bar`."""
 
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
@@ -19,13 +19,13 @@ class Bar_Accessor():
         if trace_names is None:
             if obj.vbt.is_frame() or (obj.vbt.is_series() and obj.name is not None):
                 trace_names = obj.vbt.columns
-        return widgets.Bar(x_labels, trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
+        return basic.Bar(x_labels, trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
 @register_dataframe_accessor('Scatter')
 @register_series_accessor('Scatter')
 class Scatter_Accessor():
-    """Allows calling `vectorbt.widgets.widgets.Scatter` using `pandas.Series.vbt.Scatter` and `pandas.DataFrame.vbt.Scatter`."""
+    """Allows calling `vectorbt.widgets.basic.Scatter` using `pandas.Series.vbt.Scatter` and `pandas.DataFrame.vbt.Scatter`."""
 
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
@@ -37,13 +37,13 @@ class Scatter_Accessor():
         if trace_names is None:
             if obj.vbt.is_frame() or (obj.vbt.is_series() and obj.name is not None):
                 trace_names = obj.vbt.columns
-        return widgets.Scatter(x_labels, trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
+        return basic.Scatter(x_labels, trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
 @register_dataframe_accessor('Histogram')
 @register_series_accessor('Histogram')
 class Histogram_Accessor():
-    """Allows calling `vectorbt.widgets.widgets.Histogram` using `pandas.Series.vbt.Histogram` and `pandas.DataFrame.vbt.Histogram`."""
+    """Allows calling `vectorbt.widgets.basic.Histogram` using `pandas.Series.vbt.Histogram` and `pandas.DataFrame.vbt.Histogram`."""
 
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
@@ -53,13 +53,13 @@ class Histogram_Accessor():
         if trace_names is None:
             if obj.vbt.is_frame() or (obj.vbt.is_series() and obj.name is not None):
                 trace_names = obj.vbt.columns
-        return widgets.Histogram(trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
+        return basic.Histogram(trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
 @register_dataframe_accessor('Heatmap')
 @register_series_accessor('Heatmap')
 class Heatmap_Accessor():
-    """Allows calling `vectorbt.widgets.widgets.Heatmap` using `pandas.Series.vbt.Heatmap` and `pandas.DataFrame.vbt.Heatmap`."""
+    """Allows calling `vectorbt.widgets.basic.Heatmap` using `pandas.Series.vbt.Heatmap` and `pandas.DataFrame.vbt.Heatmap`."""
 
     def __init__(self, obj):
         self._obj = obj._obj  # access pandas object
@@ -70,4 +70,4 @@ class Heatmap_Accessor():
             x_labels = obj.vbt.columns
         if y_labels is None:
             y_labels = obj.index
-        return widgets.Heatmap(x_labels, y_labels, data=obj.vbt.to_2d_array(), **kwargs)
+        return basic.Heatmap(x_labels, y_labels, data=obj.vbt.to_2d_array(), **kwargs)

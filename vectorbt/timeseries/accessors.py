@@ -1,9 +1,8 @@
-"""Custom pandas accessors for working with time series.
+"""Custom pandas accessors.
 
 !!! note
-    Input arrays can be of any data type, but output arrays are always `numpy.float64`.
+    Input arrays can be of any data type, but most output arrays are `numpy.float64`.
     
-Before running the examples:
 ```py
 import vectorbt as vbt
 import numpy as np
@@ -35,11 +34,35 @@ import itertools
 from numba.typed import Dict
 from datetime import timedelta
 
+try:
+    # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
+    import bottleneck as bn
+
+    nanmean = bn.nanmean
+    nanstd = bn.nanstd
+    nansum = bn.nansum
+    nanmax = bn.nanmax
+    nanmin = bn.nanmin
+    nanargmax = bn.nanargmax
+    nanargmin = bn.nanargmin
+except ImportError:
+    # slower numpy
+    nanmean = np.nanmean
+    nanstd = np.nanstd
+    nansum = np.nansum
+    nanmax = np.nanmax
+    nanmin = np.nanmin
+    nanargmax = np.nanargmax
+    nanargmin = np.nanargmin
+
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks, reshape_fns, index_fns
-from vectorbt.utils.common import add_nb_methods
+from vectorbt.utils import checks
+from vectorbt.utils.decorators import add_nb_methods
+from vectorbt.utils.index_fns import combine_indexes
+from vectorbt.utils.reshape_fns import to_1d, broadcast_to
 from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
 from vectorbt.timeseries import nb
+from vectorbt.timeseries.common import to_time_units
 from vectorbt.widgets.common import DefaultFigureWidget
 
 
@@ -64,8 +87,6 @@ from vectorbt.widgets.common import DefaultFigureWidget
     module_name='vectorbt.timeseries.nb')
 class TimeSeries_Accessor():
     """Accessor with methods for both Series and DataFrames.
-
-    Numba equivalent to `pd.Series(a).resample(freq).apply(apply_func_nb, raw=True)`.
 
     Accessible through `pandas.Series.vbt.timeseries` and `pandas.DataFrame.vbt.timeseries`."""
 
@@ -139,7 +160,7 @@ class TimeSeries_Accessor():
         """See `vectorbt.timeseries.nb.groupby_apply_nb` and 
         `vectorbt.timeseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
-        For `by`, see [pandas.DataFrame.groupby](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.groupby.html).
+        For `by`, see `pandas.DataFrame.groupby`.
 
         Example:
             ```python-repl
@@ -175,7 +196,7 @@ class TimeSeries_Accessor():
         """See `vectorbt.timeseries.nb.groupby_apply_nb` and 
         `vectorbt.timeseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
-        For `freq`, see [pandas.DataFrame.resample](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.resample.html).
+        For `freq`, see `pandas.DataFrame.resample`.
 
         Example:
             ```python-repl
@@ -232,7 +253,7 @@ class TimeSeries_Accessor():
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
         range_columns = pd.Index(self.index[idxs], name='start_date')
-        new_columns = index_fns.combine(self.columns, range_columns)
+        new_columns = combine_indexes(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
     def applymap(self, apply_func_nb, *args):
@@ -273,23 +294,28 @@ class TimeSeries_Accessor():
         result = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
         return self.wrap_array(result)
 
-    def to_time_units(self, time_delta):
-        """Multiply each element with `time_delta` to get result in time units."""
-        total_seconds = pd.Timedelta(time_delta).total_seconds()
-        def to_td(x): return timedelta(seconds=x * total_seconds) if ~np.isnan(x) else np.nan
-        to_td = np.vectorize(to_td, otypes=[np.object])
-        return self.wrap_array(to_td(self.to_array()))
+    @property
+    def timedelta(self):
+        """Return time delta of the index frequency."""
+        checks.assert_type(self.index, (pd.DatetimeIndex, pd.PeriodIndex))
+        
+        if self.index.freq is not None:
+            return pd.to_timedelta(pd.tseries.frequencies.to_offset(self.index.freq))
+        elif self.index.inferred_freq is not None:
+            return pd.to_timedelta(pd.tseries.frequencies.to_offset(self.index.inferred_freq))
+        return (self.index[1:] - self.index[:-1]).min()
 
     def wrap_reduced_array(self, a, index=None, time_units=False):
         """Wrap result of reduction.
 
-        If `time_units` is `True`, calls `TimeSeries_Accessor.to_time_units`"""
+        If `time_units` is set, calls `vectorbt.timeseries.common.to_time_units`."""
         if a.ndim == 1:
             # Each column reduced to a single value
             a_obj = pd.Series(a, index=self.columns)
             if time_units:
-                checks.assert_type(self.index, pd.DatetimeIndex)
-                a_obj = a_obj.vbt.timeseries.to_time_units(self.index[1] - self.index[0])
+                if isinstance(time_units, bool):
+                    time_units = self.timedelta
+                a_obj = to_time_units(a_obj, time_units)
             if self.is_frame():
                 return a_obj
             return a_obj.iloc[0]
@@ -299,8 +325,9 @@ class TimeSeries_Accessor():
                 index = pd.Index(range(a.shape[0]))
             a_obj = self.wrap_array(a, index=index)
             if time_units:
-                checks.assert_type(self.index, pd.DatetimeIndex)
-                a_obj = a_obj.vbt.timeseries.to_time_units(self.index[1] - self.index[0])
+                if isinstance(time_units, bool):
+                    time_units = self.timedelta
+                a_obj = to_time_units(a_obj, time_units)
             return a_obj
 
     def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
@@ -365,28 +392,28 @@ class TimeSeries_Accessor():
         """Return min of non-NaN elements.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
-        result = np.nanmin(self.to_2d_array(), axis=0)
+        result = nanmin(self.to_2d_array(), axis=0)
         return self.wrap_reduced_array(result, **kwargs)
 
     def max(self, **kwargs):
         """Return max of non-NaN elements.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
-        result = np.nanmax(self.to_2d_array(), axis=0)
+        result = nanmax(self.to_2d_array(), axis=0)
         return self.wrap_reduced_array(result, **kwargs)
 
     def mean(self, **kwargs):
         """Return mean of non-NaN elements.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
-        result = np.nanmean(self.to_2d_array(), axis=0)
+        result = nanmean(self.to_2d_array(), axis=0)
         return self.wrap_reduced_array(result, **kwargs)
 
     def std(self, ddof=1, **kwargs):
         """Return standard deviation of non-NaN elements.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
-        result = np.nanstd(self.to_2d_array(), ddof=ddof, axis=0)
+        result = nanstd(self.to_2d_array(), ddof=ddof, axis=0)
         return self.wrap_reduced_array(result, **kwargs)
 
     def count(self, **kwargs):
@@ -400,15 +427,29 @@ class TimeSeries_Accessor():
         """Return sum of non-NaN elements.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
-        result = np.nansum(self.to_2d_array(), axis=0)
+        result = nansum(self.to_2d_array(), axis=0)
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def argmin(self, **kwargs):
+        """Return index of min of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = self.index[nanargmin(self.to_2d_array(), axis=0)]
+        return self.wrap_reduced_array(result, **kwargs)
+
+    def argmax(self, **kwargs):
+        """Return index of max of non-NaN elements.
+
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        result = self.index[nanargmax(self.to_2d_array(), axis=0)]
         return self.wrap_reduced_array(result, **kwargs)
 
     def describe(self, percentiles=[0.25, 0.5, 0.75], **kwargs):
-        """See `vectorbt.timeseries.nb.describe_nb`.
+        """See `vectorbt.timeseries.nb.describe_reduce_func_nb`.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
 
-        For `percentiles`, see [pandas.DataFrame.describe](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.describe.html).
+        For `percentiles`, see `pandas.DataFrame.describe`.
 
         Example:
             ```python-repl
@@ -424,7 +465,7 @@ class TimeSeries_Accessor():
             max     5.000000  5.000000  3.00000
             ```"""
         if percentiles is not None:
-            percentiles = reshape_fns.to_1d(percentiles)
+            percentiles = to_1d(percentiles)
         else:
             percentiles = np.empty(0)
         index = pd.Index(['count', 'mean', 'std', 'min', *map(lambda x: '%.2f%%' % (x * 100), percentiles), 'max'])
@@ -442,7 +483,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
         Args:
             name (str): Name of the time series.
-            trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
+            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -477,10 +518,10 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             other (float, int, or array_like): The other time series/value.
             name (str): Name of the time series.
             other_name (str): Name of the other time series/value.
-            other_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for `other`.
-            above_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for values above `other`.
-            below_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for values below `other`.
-            equal_trace_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html) for values equal `other`.
+            other_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `other`.
+            above_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for values above `other`.
+            below_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for values below `other`.
+            equal_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for values equal `other`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -504,8 +545,8 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             other_name = getattr(other, 'name', None)
 
         # Prepare data
-        other = reshape_fns.to_1d(other)
-        other = reshape_fns.broadcast_to(other, self._obj)
+        other = to_1d(other)
+        other = broadcast_to(other, self._obj)
         above_obj = self._obj[self._obj > other]
         below_obj = self._obj[self._obj < other]
         equal_obj = self._obj[self._obj == other]
@@ -610,7 +651,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
         """Plot each column in DataFrame as a line.
 
         Args:
-            trace_kwargs (dict or list of dict): Keyword arguments passed to each [`plotly.graph_objects.Scatter`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Scatter.html).
+            trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Scatter`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -660,8 +701,8 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
 
         Args:
             display_volume (bool): If `True`, displays volume as bar chart.
-            candlestick_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Candlestick`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Candlestick.html).
-            bar_kwargs (dict): Keyword arguments passed to [`plotly.graph_objects.Bar`](https://plotly.com/python-api-reference/generated/plotly.graph_objects.Bar.html).
+            candlestick_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Candlestick`.
+            bar_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
