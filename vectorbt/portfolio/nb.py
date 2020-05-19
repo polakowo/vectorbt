@@ -9,9 +9,8 @@ import numpy as np
 from numba import njit, b1, i1, i8, f8
 from numba.core.types import UniTuple
 
-from vectorbt.utils.common import list_module_keys
-from vectorbt.portfolio.common import PositionType
 from vectorbt import timeseries
+from vectorbt.portfolio.const import PositionType
 
 # ############# Portfolio ############# #
 
@@ -738,5 +737,3 @@ def down_capture_nb(returns, factor_returns, ann_factor):
         result[col] = down_capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
     return result
 
-
-__all__ = list_module_keys(__name__, blacklist=['OPEN', 'CLOSED'])

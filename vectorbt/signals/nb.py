@@ -7,6 +7,7 @@
 
 from numba import njit, f8, i8, b1, optional
 import numpy as np
+
 from vectorbt import timeseries
 from vectorbt.utils import combine_fns
 
@@ -226,7 +227,7 @@ def generate_stop_loss_nb(entries, ts, stops, trailing, relative):
     !!! note
         `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape. Each of 
         these arrays will correspond to a different stop configuration.
-        
+
     Example:
         ```python-repl
         >>> import numpy as np
@@ -245,8 +246,7 @@ def generate_stop_loss_nb(entries, ts, stops, trailing, relative):
          [ True False]
          [False  True]]
         ```"""
-    return combine_fns.apply_and_concat_one_nb(
-        len(stops), stop_loss_apply_func_nb, entries, ts, stops, trailing, relative)
+    return combine_fns.apply_and_concat_one_nb(len(stops), stop_loss_apply_func_nb, entries, ts, stops, trailing, relative)
 
 
 @njit
@@ -258,8 +258,7 @@ def generate_take_profit_nb(entries, ts, stops, relative):
     !!! note
         `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape. Each of 
         these arrays will correspond to a different stop configuration."""
-    return combine_fns.apply_and_concat_one_nb(
-        len(stops), take_profit_apply_func_nb, entries, ts, stops, relative)
+    return combine_fns.apply_and_concat_one_nb(len(stops), take_profit_apply_func_nb, entries, ts, stops, relative)
 
 # ############# Map and reduce ############# #
 
@@ -362,7 +361,7 @@ def rank_nb(a, reset_by=None, after_false=False, allow_gaps=False):
     Partition is some number of `True` values in a row. You can reset partitions by `True` values 
     from `reset_by` (must have the same shape). If `after_false` is `True`, the first partition 
     must come after at least one `False`. If `allow_gaps` is `True`, ignores gaps between partitions.
-    
+
     Example:
         ```python-repl
         >>> import numpy as np

@@ -5,7 +5,6 @@ import pandas as pd
 from collections.abc import Iterable
 
 from vectorbt.utils import checks, combine_fns, index_fns, reshape_fns
-from vectorbt.utils.common import fix_class_for_pdoc
 from vectorbt.utils.decorators import class_or_instancemethod
 
 

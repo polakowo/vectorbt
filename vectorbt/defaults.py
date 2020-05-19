@@ -1,6 +1,6 @@
 """Global defaults."""
 
-from vectorbt.utils.common import Config
+from vectorbt.utils.config import Config
 
 # Layout
 layout = Config(

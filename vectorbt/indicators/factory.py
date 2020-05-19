@@ -450,18 +450,20 @@ def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
         checks.assert_same_index(reshape_fns.to_2d(ts_list[0]).iloc[0, :], mapper)
     checks.assert_type(name, str)
 
+
 def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None, **kwargs):
     """Compares `obj` to `other` to generate signals.
-    
+
     Both will be broadcasted together. Set `multiple` to `True` to compare with multiple arguments. In this case,
     a new column level will be created with the name `name`.
-    
+
     See `vectorbt.utils.accessors.Base_Accessor.combine_with`."""
     if multiple:
         if as_columns is None:
             as_columns = index_fns.index_from_values(other, name=name)
         return obj.vbt.combine_with_multiple(other, combine_func=compare_func, as_columns=as_columns, concat=True, **kwargs)
     return obj.vbt.combine_with(other, combine_func=compare_func, **kwargs)
+
 
 class IndicatorFactory():
     def __init__(self,
@@ -605,7 +607,7 @@ class IndicatorFactory():
             ts_list = args[:len(ts_names)]
             param_list = args[len(ts_names):len(ts_names)+len(param_names)]
             new_args = args[len(ts_names)+len(param_names):]
-            kwargs = {**pipeline_kwargs, **kwargs} # overwirte default pipeline kwargs
+            kwargs = {**pipeline_kwargs, **kwargs}  # overwirte default pipeline kwargs
             results = from_params_pipeline(
                 ts_list, param_list, level_names, len(output_names),
                 custom_func, *new_args, return_raw=return_raw, **kwargs)

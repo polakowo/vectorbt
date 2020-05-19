@@ -1,4 +1,4 @@
-"""Class for measuring performance of positions.
+"""Classes for measuring performance of positions.
 
 ```py
 import vectorbt as vbt
@@ -24,15 +24,9 @@ from inspect import isfunction
 from vectorbt import timeseries
 from vectorbt.utils import checks, reshape_fns
 from vectorbt.portfolio import nb
-from vectorbt.utils.common import list_module_keys
-from vectorbt.portfolio.common import (
-    ArrayWrapper,
-    timeseries_property,
-    metric_property,
-    group_property,
-    PositionType,
-    OutputFormat
-)
+from vectorbt.portfolio.common import ArrayWrapper
+from vectorbt.portfolio.props import timeseries_property, metric_property, group_property
+from vectorbt.portfolio.const import PositionType, OutputFormat
 
 class BasePositions(ArrayWrapper):
     """Exposes a range of attributes on top of positions in a `Portfolio` instance.
@@ -313,5 +307,3 @@ class Positions(PnLPositions):
 
         closed_rate = closed_count / count
         return self.wrap_reduced_array(closed_rate)
-
-__all__ = list_module_keys(__name__)

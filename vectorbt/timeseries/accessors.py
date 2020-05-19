@@ -34,6 +34,13 @@ import itertools
 from numba.typed import Dict
 from datetime import timedelta
 
+from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
+from vectorbt.utils import checks, index_fns, reshape_fns
+from vectorbt.utils.decorators import add_nb_methods
+from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
+from vectorbt.timeseries import nb
+from vectorbt.widgets.common import DefaultFigureWidget
+
 try:
     # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
     import bottleneck as bn
@@ -55,15 +62,13 @@ except ImportError:
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
-from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks
-from vectorbt.utils.decorators import add_nb_methods
-from vectorbt.utils.index_fns import combine_indexes
-from vectorbt.utils.reshape_fns import to_1d, broadcast_to
-from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
-from vectorbt.timeseries import nb
-from vectorbt.timeseries.common import to_time_units
-from vectorbt.widgets.common import DefaultFigureWidget
+
+def to_time_units(obj, time_delta):
+    """Multiply each element with `time_delta` to get result in time units."""
+    total_seconds = pd.Timedelta(time_delta).total_seconds()
+    def to_td(x): return timedelta(seconds=x * total_seconds) if ~np.isnan(x) else np.nan
+    to_td = np.vectorize(to_td, otypes=[np.object])
+    return obj.vbt.wrap_array(to_td(obj.vbt.to_array()))
 
 
 @add_nb_methods(
@@ -253,7 +258,7 @@ class TimeSeries_Accessor():
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
         range_columns = pd.Index(self.index[idxs], name='start_date')
-        new_columns = combine_indexes(self.columns, range_columns)
+        new_columns = index_fns.combine_indexes(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
     def applymap(self, apply_func_nb, *args):
@@ -298,7 +303,7 @@ class TimeSeries_Accessor():
     def timedelta(self):
         """Return time delta of the index frequency."""
         checks.assert_type(self.index, (pd.DatetimeIndex, pd.PeriodIndex))
-        
+
         if self.index.freq is not None:
             return pd.to_timedelta(pd.tseries.frequencies.to_offset(self.index.freq))
         elif self.index.inferred_freq is not None:
@@ -465,7 +470,7 @@ class TimeSeries_Accessor():
             max     5.000000  5.000000  3.00000
             ```"""
         if percentiles is not None:
-            percentiles = to_1d(percentiles)
+            percentiles = reshape_fns.to_1d(percentiles)
         else:
             percentiles = np.empty(0)
         index = pd.Index(['count', 'mean', 'std', 'min', *map(lambda x: '%.2f%%' % (x * 100), percentiles), 'max'])
@@ -545,8 +550,8 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             other_name = getattr(other, 'name', None)
 
         # Prepare data
-        other = to_1d(other)
-        other = broadcast_to(other, self._obj)
+        other = reshape_fns.to_1d(other)
+        other = reshape_fns.broadcast_to(other, self._obj)
         above_obj = self._obj[self._obj > other]
         below_obj = self._obj[self._obj < other]
         equal_obj = self._obj[self._obj == other]

@@ -1,3 +1,13 @@
 """Package with utilities."""
 
-from vectorbt.utils import checks, combine_fns, common, index_fns, indexing, reshape_fns, accessors, decorators
+from vectorbt.utils import (
+    checks, 
+    combine_fns, 
+    pdoc, 
+    config, 
+    index_fns, 
+    indexing, 
+    reshape_fns, 
+    accessors, 
+    decorators
+)

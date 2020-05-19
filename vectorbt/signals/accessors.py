@@ -39,7 +39,8 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks, reshape_fns, index_fns, common
+from vectorbt.utils import checks, reshape_fns, index_fns
+from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.decorators import add_nb_methods, cached_property
 from vectorbt.utils.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.signals import nb
@@ -596,7 +597,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         """Plot signals as entry markers.
         
         See `Signals_SRAccessor.plot_markers`."""
-        trace_kwargs = common.merge_kwargs(dict(
+        trace_kwargs = merge_kwargs(dict(
             marker=dict(
                 symbol='triangle-up',
                 color='limegreen'
@@ -608,7 +609,7 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
         """Plot signals as exit markers.
         
         See `Signals_SRAccessor.plot_markers`."""
-        trace_kwargs = common.merge_kwargs(dict(
+        trace_kwargs = merge_kwargs(dict(
             marker=dict(
                 symbol='triangle-down',
                 color='orangered'

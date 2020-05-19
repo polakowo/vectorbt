@@ -1,7 +1,5 @@
 """Package for working with portfolios."""
 
-from vectorbt.portfolio import nb, portfolio, positions, common
+from vectorbt.portfolio import common, const, nb, portfolio, positions, props
 
-from vectorbt.portfolio.common import *
-from vectorbt.portfolio.portfolio import *
-from vectorbt.portfolio.positions import *
+from vectorbt.portfolio.portfolio import Portfolio

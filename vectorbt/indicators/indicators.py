@@ -1,4 +1,4 @@
-"""Basic indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
+"""Indicators built with `vectorbt.IndicatorFactory`.
 
 ```py
 import numpy as np
@@ -24,9 +24,10 @@ from numba.core.types import UniTuple, f8, i8, b1, DictType, Tuple
 import itertools
 import plotly.graph_objects as go
 
-from vectorbt import timeseries, indicators, defaults
+from vectorbt import timeseries, defaults
 from vectorbt.utils import checks, reshape_fns
-from vectorbt.utils.common import fix_class_for_pdoc
+from vectorbt.utils.pdoc import fix_class_for_pdoc
+from vectorbt.indicators.factory import IndicatorFactory
 
 # ############# MA ############# #
 
@@ -53,7 +54,7 @@ def ma_apply_func_nb(ts, window, ewm, cache_dict):
     return cache_dict[h]
 
 
-MA = indicators.factory.IndicatorFactory(
+MA = IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['ma'],
@@ -274,7 +275,7 @@ def mstd_apply_func_nb(ts, window, ewm, cache_dict):
     return cache_dict[h]
 
 
-MSTD = indicators.factory.IndicatorFactory(
+MSTD = IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['mstd'],
@@ -374,7 +375,7 @@ def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
     return ma, ma + alpha * mstd, ma - alpha * mstd
 
 
-BollingerBands = indicators.factory.IndicatorFactory(
+BollingerBands = IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm', 'alpha'],
     output_names=['ma', 'upper_band', 'lower_band'],
@@ -591,7 +592,7 @@ def rsi_apply_func_nb(ts, window, ewm, cache_dict):
     return 100 - 100 / (1 + roll_up / roll_down)
 
 
-RSI = indicators.factory.IndicatorFactory(
+RSI = IndicatorFactory(
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['rsi'],
@@ -718,7 +719,7 @@ def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, ca
     return percent_k, percent_d
 
 
-Stochastic = indicators.factory.IndicatorFactory(
+Stochastic = IndicatorFactory(
     ts_names=['close_ts', 'high_ts', 'low_ts'],
     param_names=['k_window', 'd_window', 'd_ewm'],
     output_names=['percent_k', 'percent_d'],
@@ -873,7 +874,7 @@ def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, si
     return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
 
 
-MACD = indicators.factory.IndicatorFactory(
+MACD = IndicatorFactory(
     ts_names=['ts'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
     output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
@@ -1099,7 +1100,7 @@ def atr_apply_func_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
     return tr, cache_dict[h]
 
 
-ATR = indicators.factory.IndicatorFactory(
+ATR = IndicatorFactory(
     ts_names=['close_ts', 'high_ts', 'low_ts'],
     param_names=['window', 'ewm'],
     output_names=['tr', 'atr'],
@@ -1223,7 +1224,7 @@ def obv_custom_func_nb(close_ts, volume_ts):
     return obv
 
 
-OBV = indicators.factory.IndicatorFactory(
+OBV = IndicatorFactory(
     ts_names=['close_ts', 'volume_ts'],
     param_names=[],
     output_names=['obv'],

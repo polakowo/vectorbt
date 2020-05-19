@@ -34,10 +34,10 @@ would have re-calculated everything starting from equity, each time.
 ### Property hierarchy
 
 All those properties are building a hierarchy with time series and metrics as leafs, and group 
-objects as nodes. By implementing custom cachable property classes `vectorbt.portfolio.common.timeseries_property` 
-and `vectorbt.portfolio.common.metric_property`, we are also able to encode information into each property, 
+objects as nodes. By implementing custom cachable property classes `vectorbt.portfolio.properties.timeseries_property` 
+and `vectorbt.portfolio.properties.metric_property`, we are also able to encode information into each property, 
 such as the full name of a metric and its display format. And by defining the group properties with 
-`vectorbt.portfolio.common.group_property`, we are able to define gateaway points that can be easily traversed.
+`vectorbt.portfolio.properties.group_property`, we are able to define gateaway points that can be easily traversed.
 
 ```plaintext
 Portfolio
@@ -50,7 +50,7 @@ Portfolio
 
 This way, the `Portfolio` class acts as an extendable tree data structure for properties with 
 annotations. Instead of hard-coding the list of available time series and metrics with something 
-like `_PERFORMANCE_METRICS_PROPS`, we can call `vectorbt.portfolio.common.traverse_timeseries` 
+like `_PERFORMANCE_METRICS_PROPS`, we can call `vectorbt.portfolio.properties.traverse_timeseries` 
 and build the list on the fly.
 
 !!! note
@@ -125,16 +125,18 @@ from datetime import timedelta
 from scipy import stats
 
 from vectorbt import timeseries, accessors, defaults
-from vectorbt.utils import indexing, checks, reshape_fns, common
-from vectorbt.utils.common import list_module_keys
+from vectorbt.utils import indexing, checks, reshape_fns
+from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.positions import Positions
-from vectorbt.portfolio.common import (
-    ArrayWrapper,
+from vectorbt.portfolio.common import ArrayWrapper
+from vectorbt.portfolio.const import OutputFormat
+from vectorbt.portfolio.props import (
     timeseries_property,
     metric_property,
     group_property,
-    OutputFormat
+    traverse_properties
 )
 
 
@@ -720,7 +722,7 @@ class Portfolio(ArrayWrapper):
         # Plot time series
         fig = self.price.vbt.timeseries.plot(fig=fig, **layout_kwargs)
         # Plot markers
-        buy_trace_kwargs = common.merge_kwargs(dict(
+        buy_trace_kwargs = merge_kwargs(dict(
             customdata=self.trades[buy_mask],
             hovertemplate='(%{x}, %{y})<br>%{customdata:.6g}',
             marker=dict(
@@ -730,7 +732,7 @@ class Portfolio(ArrayWrapper):
         ), buy_trace_kwargs)
         buy_mask.vbt.signals.plot_markers(
             self.price, name='Buy', trace_kwargs=buy_trace_kwargs, fig=fig, **layout_kwargs)
-        sell_trace_kwargs = common.merge_kwargs(dict(
+        sell_trace_kwargs = merge_kwargs(dict(
             customdata=self.trades[sell_mask],
             hovertemplate='(%{x}, %{y})<br>%{customdata:.6g}',
             marker=dict(
@@ -959,5 +961,22 @@ class Portfolio(ArrayWrapper):
         """Kurtosis of returns."""
         return self.wrap_reduced_array(stats.kurtosis(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))
 
+    # ############# Properties traversal ############# #
 
-__all__ = list_module_keys(__name__, blacklist=['portfolio_indexing_func'])
+    @class_or_instancemethod
+    def traverse_properties(self_or_cls, property_cls):
+        """Traverse this class and its group properties for any properties of type `property_cls`."""
+        if isinstance(self_or_cls, type):
+            return traverse_properties(self_or_cls, property_cls)
+        return traverse_properties(self_or_cls.__class__, property_cls)
+
+    @class_or_instancemethod
+    def traverse_timeseries(self_or_cls):
+        """Traverse this class and its group properties for time series."""
+        return self_or_cls.traverse_properties(timeseries_property)
+
+    @class_or_instancemethod
+    def traverse_metrics(self_or_cls):
+        """Traverse this class and its group properties for metrics."""
+        return self_or_cls.traverse_properties(metric_property)
+
