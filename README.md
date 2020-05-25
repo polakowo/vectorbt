@@ -34,8 +34,8 @@ price = ticker.history(period="max")['Close']
 
 # Generate signals
 fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2)
-entries = fast_ma.ma_above(slow_ma, crossover=True)
-exits = fast_ma.ma_below(slow_ma, crossover=True)
+entries = fast_ma.ma_above(slow_ma, crossed=True)
+exits = fast_ma.ma_below(slow_ma, crossed=True)
 
 # Calculate performance
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_capital=init_capital, fees=fees)

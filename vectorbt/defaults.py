@@ -24,6 +24,7 @@ layout = Config(
 portfolio = Config(
     init_capital=1.,
     fees=0.,
+    fixed_fees=0.,
     slippage=0.,
     year_freq='1Y',
     risk_free=0.,

@@ -166,8 +166,8 @@ class MA(MA):
 
             Having this, you can now compare these `MA` instances:
             ```python-repl
-            >>> entry_signals = fast_ma.ma_above(slow_ma, crossover=True)
-            >>> exit_signals = fast_ma.ma_below(slow_ma, crossover=True)
+            >>> entry_signals = fast_ma.ma_above(slow_ma, crossed=True)
+            >>> exit_signals = fast_ma.ma_below(slow_ma, crossed=True)
 
             >>> print(entry_signals)
             fast_window            10     20

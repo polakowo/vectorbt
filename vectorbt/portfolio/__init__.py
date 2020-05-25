@@ -1,5 +1,5 @@
-"""Package for working with portfolios."""
+"""Package for building portfolios."""
 
-from vectorbt.portfolio import common, const, nb, portfolio, positions, props
+from vectorbt.portfolio import common, enums, nb, portfolio, positions, events
 
 from vectorbt.portfolio.portfolio import Portfolio

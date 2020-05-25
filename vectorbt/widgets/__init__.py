@@ -1,4 +1,4 @@
-"""Package for working with widgets.
+"""Package for creating and displaying widgets.
 
 Figure widgets enable interactive data visualization in Jupyter Notebook and JupyterLab environments.
 

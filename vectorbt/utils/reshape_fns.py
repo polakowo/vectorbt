@@ -455,13 +455,13 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
         if len(to_shape) > 1:
             is_2d = True
 
-    if is_pd:
-        # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
-        if is_2d:
-            for i in range(len(args)):
-                if checks.is_series(args[i]):
-                    args[i] = args[i].to_frame()
+    # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
+    if is_2d:
+        for i in range(len(args)):
+            if checks.is_series(args[i]):
+                args[i] = args[i].to_frame()
 
+    if is_pd:
         # Decide on index and columns
         new_index = broadcast_index(*args, to_shape=to_shape, index_from=index_from, axis=0, **kwargs)
         new_columns = broadcast_index(*args, to_shape=to_shape, index_from=columns_from, axis=1, **kwargs)

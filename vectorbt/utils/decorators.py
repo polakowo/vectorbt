@@ -65,12 +65,17 @@ class cached_property(custom_property):
     """Custom cacheable property.
 
     Similar to `functools.cached_property`, but without changing the original attribute.
-    Disables caching if `vectorbt.defaults.caching` is `False`."""
+    
+    Disables caching if 
+    
+    * `vectorbt.defaults.caching` is `False`, or
+    * `disabled` attribute is to `True`."""
 
-    def __init__(self, func, **kwargs):
+    def __init__(self, func, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
         self.attrname = None
         self.lock = RLock()
+        self.disabled = disabled
 
     def clear_cache(self, instance):
         """Clear the cache for this property belonging to `instance`."""
@@ -83,7 +88,7 @@ class cached_property(custom_property):
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
-        if not defaults.caching: # you can manually disable cache here
+        if not defaults.caching or self.disabled: # you can manually disable cache here
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         val = cache.get(self.attrname, _NOT_FOUND)
@@ -123,14 +128,18 @@ class custom_method():
 class cached_method(custom_method):
     """Custom cacheable method.
     
-    Disables caching if `vectorbt.defaults.caching` is `False` or 
-    if a non-hashable object was passed as positional or keyword argument."""
-    def __init__(self, func, maxsize=128, typed=False, **kwargs):
+    Disables caching if 
+    
+    * `vectorbt.defaults.caching` is `False`,
+    * `disabled` attribute is to `True`, or
+    * a non-hashable object was passed as positional or keyword argument."""
+    def __init__(self, func, maxsize=128, typed=False, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
         self.maxsize = maxsize
         self.typed = typed
         self.attrname = None
         self.lock = RLock()
+        self.disabled = disabled
 
     def clear_cache(self, instance):
         """Clear the cache for this method belonging to `instance`."""
@@ -143,7 +152,7 @@ class cached_method(custom_method):
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
-        if not defaults.caching: # you can manually disable cache here
+        if not defaults.caching or self.disabled: # you can manually disable cache here
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         func = cache.get(self.attrname, _NOT_FOUND)
