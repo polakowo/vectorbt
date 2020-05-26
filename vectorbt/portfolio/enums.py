@@ -68,7 +68,51 @@ __pdoc__['Position.close_fees'] = __pdoc__['Event.close_fees']
 __pdoc__['Position.status'] = "See `PositionStatus`."
 
 # Create enums using named tuples to be accepted as globals by Numba
-TradeType = namedtuple('TradeType', ['Buy', 'Sell'])(0, 1)
+
+TradeType = namedtuple('TradeType', [
+    'Buy', 
+    'Sell'
+])(*range(2))
 """Buy or Sell."""
-PositionStatus = namedtuple('PositionStatus', ['Open', 'Closed'])(0, 1)
+
+PositionStatus = namedtuple('PositionStatus', [
+    'Open', 
+    'Closed'
+])(*range(2))
 """Open or Closed."""
+
+EventRecord = namedtuple('Event', [
+    'Column',
+    'Size', 
+    'OpenAt',
+    'OpenPrice',
+    'OpenFees',
+    'CloseAt',
+    'ClosePrice',
+    'CloseFees',
+    'PnL',
+    'Return'
+])
+
+__pdoc__['EventRecord'] = "A named tuple representing an event, such as trade or position."
+__pdoc__['EventRecord.Column'] = "Column index."
+__pdoc__['EventRecord.Size'] = "Size in shares."
+__pdoc__['EventRecord.OpenAt'] = "Opening index."
+__pdoc__['EventRecord.OpenPrice'] = "Opening price."
+__pdoc__['EventRecord.OpenFees'] = "Opening fees."
+__pdoc__['EventRecord.CloseAt'] = "Closing index."
+__pdoc__['EventRecord.ClosePrice'] = "Closing price."
+__pdoc__['EventRecord.CloseFees'] = "Closing fees."
+__pdoc__['EventRecord.PnL'] = "Total P&L."
+__pdoc__['EventRecord.Return'] = "Total return."
+
+TradeRecord = namedtuple('TradeRecord', [
+    *EventRecord._fields,
+    'Type',
+    'Position'
+])(*range(12))
+
+PositionRecord = namedtuple('PositionRecord', [
+    *EventRecord._fields,
+    'Status'
+])(*range(11))

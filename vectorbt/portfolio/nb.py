@@ -12,9 +12,9 @@ from numba import njit, b1, i1, i8, f8
 from numba.core.types import UniTuple
 
 from vectorbt import timeseries
-from vectorbt.portfolio.enums import TradeType, PositionStatus, Order, Trade, Position
+from vectorbt.portfolio.enums import TradeType, PositionStatus, Order, Trade, Position, EventRecord, TradeRecord, PositionRecord
 
-# ############# Portfolio ############# #
+# ############# Simulation ############# #
 
 
 @njit(cache=True)
@@ -324,42 +324,45 @@ def size_order_func_nb(run_shares, size, price, fees, fixed_fees, slippage, is_t
 # ############# Trades ############# #
 
 
-@njit
-def map_trades_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *args):
-    """Map each trade to a value using `map_func_nb`. 
-
-    The value is then stored at the index of the trade.
-
-    `map_func_nb` must accept a position of type `vectorbt.portfolio.enums.Trade`.
+@njit(cache=True)
+def trade_records_nb(trade_size, trade_price, trade_fees):
+    """Map each trade to an array of information.
 
     Example:
-        Map each trade to its value:
+        Build an array with trade metrics:
         ```python-repl
         >>> import numpy as np
+        >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio.nb import map_trades_nb
+        >>> from vectorbt.portfolio.nb import trade_records_nb
+        >>> from vectorbt.portfolio.enums import TradeRecord
 
-        >>> trade_price = np.asarray([1, 2, 3, 4, 5])[:, None]
-        >>> trade_size = np.asarray([1, 0, -1, 1, 1])[:, None]
-        >>> trade_fees = np.asarray([0, 0, 0, 0, 0])[:, None]
-        >>> @njit
-        ... def map_func_nb(trade):
-        ...     return trade.size * trade.price
+        >>> trade_price = np.arange(1, 6)[:, None]
+        >>> trade_size = np.asarray([0, 1, -1, 1, 1])[:, None]
+        >>> trade_fees = np.full(5, 0.01)[:, None]
 
-        >>> print(map_trades_nb(trade_size, trade_price, trade_fees, map_func_nb))
-        [[ 1.]
-         [nan]
-         [ 3.]
-         [ 4.]
-         [ 5.]]
+        >>> records = trade_records_nb(trade_size, trade_price, trade_fees)
+        >>> print(pd.DataFrame(records, columns=TradeRecord._fields))
+           Column  Size  OpenAt  OpenPrice  OpenFees  CloseAt  ClosePrice  CloseFees  \\
+        0     0.0   1.0     1.0        2.0      0.01      NaN         NaN        NaN   
+        1     0.0   1.0     1.0        2.0      0.01      2.0         3.0       0.01   
+        2     0.0   1.0     3.0        4.0      0.01      NaN         NaN        NaN   
+        3     0.0   1.0     4.0        5.0      0.01      NaN         NaN        NaN   
+
+            PnL    Return  Type  Position  
+        0   NaN       NaN   0.0       0.0  
+        1  0.98  0.487562   1.0       0.0  
+        2   NaN       NaN   0.0       1.0  
+        3   NaN       NaN   0.0       1.0 
         ```"""
-    result = np.full_like(trade_size, np.nan, dtype=f8)
+    result = np.empty((trade_size.shape[0] * trade_size.shape[1], len(TradeRecord)), dtype=f8)
+    position_idx = -1
+    j = 0
 
     for col in range(trade_size.shape[1]):
         buy_size_sum = 0.
         buy_gross_sum = 0.
         buy_fees_sum = 0.
-        position_idx = 0
 
         for i in range(trade_size.shape[0]):
             sig_size = trade_size[i, col]
@@ -372,24 +375,39 @@ def map_trades_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *args
                     # Position increased
                     if buy_size_sum == 0.:
                         position_start = i
+                        position_idx += 1
 
                     buy_size_sum += size
                     buy_gross_sum += size * price
                     buy_fees_sum += fees
 
-                    # There is no counterpart for a buy operation
-                    open_i = np.nan
-                    avg_buy_price = np.nan
-                    frac_buy_fees = np.nan
+                    # Information for buy operation
+                    open_at = i
+                    open_price = price
+                    open_fees = fees
+                    close_at = np.nan
+                    close_price = np.nan
+                    close_fees = np.nan
+                    pnl = np.nan
+                    ret = np.nan
                     trade_type = TradeType.Buy
+
                 elif sig_size < 0.:
-                    # Counterpart operation for sell is a buy
-                    open_i = position_start
+                    # Information for sell operation
+                    open_at = position_start
                     # Measure average buy price and fees
                     # A size-weighted average over all purchase prices
-                    avg_buy_price = buy_gross_sum / buy_size_sum
+                    open_price = buy_gross_sum / buy_size_sum
                     # A size-weighted average over all purchase fees
-                    frac_buy_fees = size / buy_size_sum * buy_fees_sum
+                    open_fees = size / buy_size_sum * buy_fees_sum
+                    close_at = i
+                    close_price = price
+                    close_fees = fees
+                    # Calculate P&L and return
+                    buy_val = size * open_price + open_fees
+                    sell_val = size * close_price - close_fees
+                    pnl = sell_val - buy_val
+                    ret = (sell_val - buy_val) / buy_val
                     trade_type = TradeType.Sell
 
                     # Position decreased, previous purchases have now less impact
@@ -398,79 +416,54 @@ def map_trades_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *args
                     buy_gross_sum *= size_fraction
                     buy_fees_sum *= size_fraction
 
-                # Map trade
-                trade = Trade(
-                    col=col,
-                    size=size,
-                    open_i=open_i,
-                    open_price=avg_buy_price,
-                    open_fees=frac_buy_fees,
-                    close_i=i,
-                    close_price=price,
-                    close_fees=fees,
-                    type=trade_type,
-                    position_idx=position_idx)
-                result[i, col] = map_func_nb(trade, *args)
-
-                if buy_size_sum == 0.:
-                    position_idx += 1
-    return result
-
-
-@njit(cache=True)
-def trade_type_map_func_nb(trade):
-    """`map_func_nb` that returns type of the trade.
-
-    See `vectorbt.portfolio.enums.TradeType`."""
-    return trade.type
-
-@njit(cache=True)
-def buy_filter_func_nb(col, i, value, trade_type):
-    """`filter_func_nb` that includes only buy operations."""
-    return trade_type[i, col] == TradeType.Buy
-
-
-@njit(cache=True)
-def sell_filter_func_nb(col, i, value, trade_type):
-    """`filter_func_nb` that includes only sell operations."""
-    return trade_type[i, col] == TradeType.Sell
+                # Save trade to the cube
+                result[j, TradeRecord.Column] = col
+                result[j, TradeRecord.Size] = size
+                result[j, TradeRecord.OpenAt] = open_at
+                result[j, TradeRecord.OpenPrice] = open_price
+                result[j, TradeRecord.OpenFees] = open_fees
+                result[j, TradeRecord.CloseAt] = close_at
+                result[j, TradeRecord.ClosePrice] = close_price
+                result[j, TradeRecord.CloseFees] = close_fees
+                result[j, TradeRecord.PnL] = pnl
+                result[j, TradeRecord.Return] = ret
+                result[j, TradeRecord.Type] = trade_type
+                result[j, TradeRecord.Position] = position_idx
+                j += 1
+    return result[:j, :]
 
 # ############# Positions ############# #
 
 
-@njit
-def map_positions_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *args):
-    """Map each position to a value using `map_func_nb`. 
-
-    The value is then stored at the last index of the position.
-
-    `map_func_nb` must accept a position of type `vectorbt.portfolio.enums.Position`.
+@njit(cache=True)
+def position_records_nb(price, trade_size, trade_price, trade_fees):
+    """Map each position to an array of information.
 
     Example:
-        Map each closed position to its duration:
+        Build an array with position metrics:
         ```python-repl
         >>> import numpy as np
+        >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio.nb import map_positions_nb
-        >>> from vectorbt.portfolio.enums import PositionStatus
+        >>> from vectorbt.portfolio.nb import position_records_nb
+        >>> from vectorbt.portfolio.enums import PositionRecord
 
-        >>> trade_price = price = np.asarray([1, 2, 3, 4, 5])[:, None]
-        >>> trade_size = np.asarray([1, 0, -1, 1, 1])[:, None]
-        >>> trade_fees = np.asarray([0, 0, 0, 0, 0])[:, None]
-        >>> @njit
-        ... def map_func_nb(position):
-        ...     if position.status == PositionStatus.Closed:
-        ...          return position.close_i - position.open_i
-        ...     return np.nan
+        >>> trade_price = price = np.arange(1, 6)[:, None]
+        >>> trade_size = np.asarray([0, 1, -1, 1, 1])[:, None]
+        >>> trade_fees = np.full(5, 0.01)[:, None]
 
-        >>> print(map_positions_nb(price, trade_size, trade_price, trade_fees, map_func_nb))
-        [[nan]
-         [nan]
-         [ 2.]
-         [nan]
-         [nan]]
+        >>> records = position_records_nb(price, trade_size, trade_price, trade_fees)
+        >>> print(pd.DataFrame(records, columns=PositionRecord._fields))
+           Column  Size  OpenAt  OpenPrice  OpenFees  CloseAt  ClosePrice  CloseFees  \\
+        0     0.0   1.0     1.0        2.0      0.01      2.0         3.0       0.01   
+        1     0.0   2.0     3.0        4.5      0.02      4.0         5.0       0.00   
+
+            PnL    Return  Status  
+        0  0.98  0.487562     1.0  
+        1  0.98  0.108647     0.0  
         ```"""
-    result = np.full_like(price, np.nan, dtype=f8)
+    result = np.empty((trade_size.shape[0] * trade_size.shape[1], len(PositionRecord)), dtype=f8)
+    j = 0
 
     for col in range(price.shape[1]):
         buy_size_sum = 0.
@@ -491,7 +484,7 @@ def map_positions_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *a
                 if sig_tsize > 0.:
                     # Position increased
                     if buy_size_sum == 0.:
-                        open_i = i
+                        open_at = i
 
                     buy_size_sum += tsize
                     buy_gross_sum += tsize * tprice
@@ -508,7 +501,7 @@ def map_positions_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *a
                     status = PositionStatus.Closed
                     store_position = True
 
-            if i == price.shape[0] - 1 and buy_size_sum > sell_gross_sum:
+            if i == price.shape[0] - 1 and buy_size_sum > sell_size_sum:
                 # If position hasn't been closed, calculate its unrealized metrics
                 sell_size_sum += buy_size_sum
                 sell_gross_sum += buy_size_sum * price[i, col]
@@ -520,20 +513,24 @@ def map_positions_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *a
                 # Calculate PnL and return
                 avg_buy_price = buy_gross_sum / buy_size_sum
                 avg_sell_price = sell_gross_sum / sell_size_sum
+                buy_val = buy_size_sum * avg_buy_price + buy_fees_sum
+                sell_val = buy_size_sum * avg_sell_price - sell_fees_sum
+                pnl = sell_val - buy_val
+                ret = (sell_val - buy_val) / buy_val
 
-                # Map position
-                position = Position(
-                    col=col,
-                    size=buy_size_sum,
-                    open_i=open_i,
-                    open_price=avg_buy_price,
-                    open_fees=buy_fees_sum,
-                    close_i=i,
-                    close_price=avg_sell_price,
-                    close_fees=sell_fees_sum,
-                    status=status
-                )
-                result[i, col] = map_func_nb(position, *args)
+                # Save position to the cube
+                result[j, PositionRecord.Column] = col
+                result[j, PositionRecord.Size] = buy_size_sum
+                result[j, PositionRecord.OpenAt] = open_at
+                result[j, PositionRecord.OpenPrice] = avg_buy_price
+                result[j, PositionRecord.OpenFees] = buy_fees_sum
+                result[j, PositionRecord.CloseAt] = i
+                result[j, PositionRecord.ClosePrice] = avg_sell_price
+                result[j, PositionRecord.CloseFees] = sell_fees_sum
+                result[j, PositionRecord.PnL] = pnl
+                result[j, PositionRecord.Return] = ret
+                result[j, PositionRecord.Status] = status
+                j += 1
 
                 # Create a new position
                 buy_size_sum = 0.
@@ -543,100 +540,101 @@ def map_positions_nb(price, trade_size, trade_price, trade_fees, map_func_nb, *a
                 sell_gross_sum = 0.
                 sell_fees_sum = 0.
                 store_position = False
+    return result[:j, :]
+
+# ############# Filtering ############# #
+
+
+@njit
+def filter_records_nb(records, filter_func_nb, *args):
+    """`filter_func_nb` that includes only buy operations."""
+    valid_idxs = np.empty(records.shape[0], dtype=i8)
+    j = 0
+    for i in range(records.shape[0]):
+        if filter_func_nb(records[i, :], *args):
+            valid_idxs[j] = i
+            j += 1
+    return records[valid_idxs[:j], :]
+
+
+@njit(cache=True)
+def buy_filter_func_nb(record):
+    """`filter_func_nb` that includes only buy records."""
+    return record[TradeRecord.Type] == TradeType.Buy
+
+
+@njit(cache=True)
+def sell_filter_func_nb(record):
+    """`filter_func_nb` that includes only sell records."""
+    return record[TradeRecord.Type] == TradeType.Sell
+
+
+@njit(cache=True)
+def open_filter_func_nb(record):
+    """`filter_func_nb` that includes only open records."""
+    return record[PositionRecord.Status] == PositionStatus.Open
+
+
+@njit(cache=True)
+def closed_filter_func_nb(record):
+    """`filter_func_nb` that includes only closed records."""
+    return record[PositionRecord.Status] == PositionStatus.Closed
+
+
+@njit(cache=True)
+def winning_filter_func_nb(record):
+    """`filter_func_nb` that includes only winning records."""
+    return record[EventRecord.PnL] > 0
+
+
+@njit(cache=True)
+def losing_filter_func_nb(record):
+    """`filter_func_nb` that includes only losing records."""
+    return record[EventRecord.PnL] < 0
+
+
+# ############# Accumulation ############# #
+
+
+@njit(cache=True)
+def is_accumulated_nb(trade_records, position_records):
+    """Detect accumulation, that is, position is being increased/decreased gradually.
+    
+    !!! note
+        Both records must be in order they were created."""
+    result = np.full(position_records.shape[0], False, dtype=b1)
+    buy_size_sum = 0.
+    pos_idx = -1
+    ignore_pos_idx = -1
+    for i in range(trade_records.shape[0]):
+        trade_pos_idx = int(trade_records[i, TradeRecord.Position])
+        if trade_pos_idx == ignore_pos_idx:
+            continue
+        if trade_pos_idx != pos_idx:
+            buy_size_sum = 0.
+            pos_idx = trade_pos_idx
+            ignore_pos_idx = -1
+        trade_size = trade_records[i, TradeRecord.Size]
+        trade_type = trade_records[i, TradeRecord.Type]
+        if trade_type == TradeType.Buy:
+            buy_size_sum += trade_size
+            if buy_size_sum != trade_size:
+                result[pos_idx] = True
+                ignore_pos_idx = pos_idx
+        elif trade_type == TradeType.Sell:
+            buy_size_sum -= trade_size
+            if buy_size_sum != 0.:
+                result[pos_idx] = True
+                ignore_pos_idx = pos_idx
     return result
 
-
-@njit(cache=True)
-def pos_status_map_func_nb(position):
-    """`map_func_nb` that returns status of the position.
-
-    See `vectorbt.portfolio.enums.PositionStatus`."""
-    return position.status
-
-
-@njit(cache=True)
-def open_filter_func_nb(col, i, value, status):
-    """`filter_func_nb` that includes only open positions."""
-    return status[i, col] == PositionStatus.Open
-
-
-@njit(cache=True)
-def closed_filter_func_nb(col, i, value, status):
-    """`filter_func_nb` that includes only closed positions."""
-    return status[i, col] == PositionStatus.Closed
-
-# ############# Events ############# #
-
-
-@njit(cache=True)
-def event_duration_map_func_nb(position):
-    """`map_func_nb` that returns duration of the event."""
-    return position.close_i - position.open_i
-
-
-@njit(cache=True)
-def event_pnl_map_func_nb(trade):
-    """`map_func_nb` that returns total PnL of the event."""
-    buy_val = trade.size * trade.open_price + trade.open_fees
-    sell_val = trade.size * trade.close_price - trade.close_fees
-    return sell_val - buy_val
-
-
-@njit(cache=True)
-def event_return_map_func_nb(trade):
-    """`map_func_nb` that returns total return of the event."""
-    buy_val = trade.size * trade.open_price + trade.open_fees
-    sell_val = trade.size * trade.close_price - trade.close_fees
-    return (sell_val - buy_val) / buy_val
-
-
-@njit(cache=True)
-def winning_filter_func_nb(col, i, value, pnl):
-    """`filter_func_nb` that includes only winning events."""
-    return pnl[i, col] > 0
-
-
-@njit(cache=True)
-def losing_filter_func_nb(col, i, value, pnl):
-    """`filter_func_nb` that includes only losing events."""
-    return pnl[i, col] < 0
-
-# ############# Appliers ############# #
+# ############# Financial risk and performance metrics ############# #
 
 
 @njit(cache=True)
 def total_return_apply_func_nb(col, idxs, returns):
     """Calculate total return from returns."""
     return timeseries.nb.product_1d_nb(returns + 1) - 1
-
-# ############# Accumulation ############# #
-
-
-@njit(cache=True)
-def is_accumulated_1d_nb(trade_size):
-    """Detect accumulation, that is, position is being increased/decreased gradually."""
-    buy_size_sum = 0.
-    for i in range(trade_size.shape[0]):
-        if trade_size[i] > 0.:
-            buy_size_sum += trade_size[i]
-            if buy_size_sum != trade_size[i]:
-                return True
-        elif trade_size[i] < 0.:
-            buy_size_sum += trade_size[i]
-            if buy_size_sum != 0.:
-                return True
-    return False
-
-
-@njit(cache=True)
-def is_accumulated_nb(trade_size):
-    """2-dim version of `is_accumulated_1d_nb`."""
-    result = np.empty(trade_size.shape[1], b1)
-    for col in range(trade_size.shape[1]):
-        result[col] = is_accumulated_1d_nb(trade_size[:, col])
-    return result
-
-# ############# Financial risk and performance metrics ############# #
 
 # Functions from empyrical but Numba-compiled
 
