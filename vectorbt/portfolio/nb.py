@@ -382,12 +382,12 @@ def trade_records_nb(trade_size, trade_price, trade_fees):
                     buy_fees_sum += fees
 
                     # Information for buy operation
-                    open_at = i
-                    open_price = price
-                    open_fees = fees
-                    close_at = np.nan
-                    close_price = np.nan
-                    close_fees = np.nan
+                    open_at = np.nan
+                    open_price = np.nan
+                    open_fees = np.nan
+                    close_at = i
+                    close_price = price
+                    close_fees = fees
                     pnl = np.nan
                     ret = np.nan
                     trade_type = TradeType.Buy
@@ -542,56 +542,65 @@ def position_records_nb(price, trade_size, trade_price, trade_fees):
                 store_position = False
     return result[:j, :]
 
-# ############# Filtering ############# #
+
+# ############# Mapping to matrix ############# #
+
+@njit
+def map_records_to_matrix_nb(records, target_shape, map_func_nb, *args):
+    """Map each record to a value and place it to the matrix.
+    The position of the value will be `(EventRecord.CloseAt, EventRecord.Column)`.
+
+    `records` must follow the layout of `EventRecord`."""
+    result = np.full(target_shape, np.nan, dtype=f8)
+    for i in range(records.shape[0]):
+        record = records[i, :]
+        col = int(record[EventRecord.Column])
+        i = int(record[EventRecord.CloseAt])
+        result[i, col] = map_func_nb(record, *args)
+    return result
+
+
+@njit(cache=True)
+def field_map_func_nb(record, field):
+    """`map_func_nb` that returns the specified field of the record."""
+    return record[field]
+
+
+@njit(cache=True)
+def duration_map_func_nb(record):
+    """`map_func_nb` that returns duration of the event."""
+    return record[EventRecord.CloseAt] - record[EventRecord.OpenAt]
+
+
+# ############# Reducing ############# #
 
 
 @njit
-def filter_records_nb(records, filter_func_nb, *args):
-    """`filter_func_nb` that includes only buy operations."""
-    valid_idxs = np.empty(records.shape[0], dtype=i8)
-    j = 0
+def reduce_records_nb(records, target_shape, reduce_func_nb, *args):
+    """Reduce a series of records of each column into a value.
+
+    Faster than `map_records_to_matrix_nb` and `vbt.timeseries.*` used together, and also
+    requires less memory. But does not take advantage of caching.
+
+    !!! note
+        `EventRecord.Column` of each record must be in ascending order."""
+    result = np.full(target_shape, np.nan, dtype=f8)
+    from_i = 0
+    col = -1
     for i in range(records.shape[0]):
-        if filter_func_nb(records[i, :], *args):
-            valid_idxs[j] = i
-            j += 1
-    return records[valid_idxs[:j], :]
-
-
-@njit(cache=True)
-def buy_filter_func_nb(record):
-    """`filter_func_nb` that includes only buy records."""
-    return record[TradeRecord.Type] == TradeType.Buy
-
-
-@njit(cache=True)
-def sell_filter_func_nb(record):
-    """`filter_func_nb` that includes only sell records."""
-    return record[TradeRecord.Type] == TradeType.Sell
-
-
-@njit(cache=True)
-def open_filter_func_nb(record):
-    """`filter_func_nb` that includes only open records."""
-    return record[PositionRecord.Status] == PositionStatus.Open
-
-
-@njit(cache=True)
-def closed_filter_func_nb(record):
-    """`filter_func_nb` that includes only closed records."""
-    return record[PositionRecord.Status] == PositionStatus.Closed
-
-
-@njit(cache=True)
-def winning_filter_func_nb(record):
-    """`filter_func_nb` that includes only winning records."""
-    return record[EventRecord.PnL] > 0
-
-
-@njit(cache=True)
-def losing_filter_func_nb(record):
-    """`filter_func_nb` that includes only losing records."""
-    return record[EventRecord.PnL] < 0
-
+        record = records[i, :]
+        record_col = int(record[EventRecord.Column])
+        if record_col != col:
+            if record_col < col:
+                raise ValueError("Column of each record must be in ascending order")
+            if col != -1:
+                # At the beginning of second column do reduce on the first
+                result[col] = reduce_func_nb(records[from_i:i, :], *args)
+            from_i = i
+            col = record_col
+        if i == len(records) - 1:
+            result[col] = reduce_func_nb(records[from_i:i+1, :], *args)
+    return result
 
 # ############# Accumulation ############# #
 
@@ -599,9 +608,9 @@ def losing_filter_func_nb(record):
 @njit(cache=True)
 def is_accumulated_nb(trade_records, position_records):
     """Detect accumulation, that is, position is being increased/decreased gradually.
-    
+
     !!! note
-        Both records must be in order they were created."""
+        `trade_records` and `position_records` must be in order they were created."""
     result = np.full(position_records.shape[0], False, dtype=b1)
     buy_size_sum = 0.
     pos_idx = -1
@@ -611,6 +620,8 @@ def is_accumulated_nb(trade_records, position_records):
         if trade_pos_idx == ignore_pos_idx:
             continue
         if trade_pos_idx != pos_idx:
+            if trade_pos_idx < pos_idx:
+                raise ValueError("Positions must be in ascending order")
             buy_size_sum = 0.
             pos_idx = trade_pos_idx
             ignore_pos_idx = -1

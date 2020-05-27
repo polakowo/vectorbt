@@ -25,41 +25,49 @@ def soft_broadcast_to_ndim(arg, ndim):
     return arg  # do nothing
 
 
-def wrap_array(arg, index=None, columns=None, dtype=None, default_index=None, default_columns=None, to_ndim=None):
-    """Wrap array `arg` into a Series/DataFrame with `index` (or `default_index` if None), `columns` 
-    (or `default_columns` if None) and `dtype`. Also tries to bring the array to `to_ndim` 
-    dimensions softly."""
-    arg = np.asarray(arg)
-    if to_ndim is not None:
-        arg = soft_broadcast_to_ndim(arg, to_ndim)
-    if index is None:
-        index = default_index
-    if columns is None:
-        columns = default_columns
-    if columns is not None and len(columns) == 1:
-        name = columns[0]
-    else:
-        name = None
+class ArrayWrapper():
+    """Class that stores index, columns and shape metadata for wrapping NumPy arrays."""
+    def __init__(self, index=None, columns=None, ndim=None):
+        self.index = index
+        self.columns = columns
+        self.ndim = ndim
+        
+    @classmethod
+    def from_obj(cls, obj):
+        """Derive metadata from an object."""
+        index = obj.index
+        if checks.is_frame(obj):
+            columns = obj.columns
+        else:
+            columns = [obj.name]
+        ndim = obj.ndim
+        return cls(index=index, columns=columns, ndim=ndim)
+        
+    def wrap(self, arg, index=None, columns=None, ndim=None, dtype=None):
+        """Wrap a NumPy array using the stored metadata."""
+        arg = np.asarray(arg)
+        if ndim is None:
+            ndim = self.ndim
+        if ndim is not None:
+            arg = soft_broadcast_to_ndim(arg, self.ndim)
+        if index is None:
+            index = self.index
+        if columns is None:
+            columns = self.columns
+        if columns is not None and len(columns) == 1:
+            name = columns[0]
+        else:
+            name = None
 
-    # Perform checks
-    if index is not None:
-        checks.assert_same_shape(arg, index, axis=(0, 0))
-    if arg.ndim == 2 and columns is not None:
-        checks.assert_same_shape(arg, columns, axis=(1, 0))
+        # Perform checks
+        if index is not None:
+            checks.assert_same_shape(arg, index, axis=(0, 0))
+        if arg.ndim == 2 and columns is not None:
+            checks.assert_same_shape(arg, columns, axis=(1, 0))
 
-    if arg.ndim == 1:
-        return pd.Series(arg, index=index, name=name, dtype=dtype)
-    return pd.DataFrame(arg, index=index, columns=columns, dtype=dtype)
-
-
-def wrap_array_as(arg1, arg2, **kwargs):
-    """Wrap array `arg1` to be as `arg2`."""
-    default_index = arg2.index
-    if checks.is_frame(arg2):
-        default_columns = arg2.columns
-    else:
-        default_columns = [arg2.name]
-    return wrap_array(arg1, default_index=default_index, default_columns=default_columns, to_ndim=arg2.ndim, **kwargs)
+        if arg.ndim == 1:
+            return pd.Series(arg, index=index, name=name, dtype=dtype)
+        return pd.DataFrame(arg, index=index, columns=columns, dtype=dtype)
 
 
 def to_1d(arg, raw=False):
@@ -108,16 +116,14 @@ def repeat(arg, n, axis=1):
         arg = np.asarray(arg)
     if axis == 0:
         if checks.is_pandas(arg):
-            return arg.vbt.wrap_array(
-                np.repeat(arg.values, n, axis=0),
-                index=index_fns.repeat_index(arg.index, n))
+            return ArrayWrapper.from_obj(arg).wrap(
+                np.repeat(arg.values, n, axis=0), index=index_fns.repeat_index(arg.index, n))
         return np.repeat(arg, n, axis=0)
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
-            return arg.vbt.wrap_array(
-                np.repeat(arg.values, n, axis=1),
-                columns=index_fns.repeat_index(arg.columns, n))
+            return ArrayWrapper.from_obj(arg).wrap(
+                np.repeat(arg.values, n, axis=1), columns=index_fns.repeat_index(arg.columns, n))
         return np.repeat(arg, n, axis=1)
     else:
         raise ValueError("Only axis 0 and 1 are supported")
@@ -130,22 +136,19 @@ def tile(arg, n, axis=1):
     if axis == 0:
         if arg.ndim == 1:
             if checks.is_pandas(arg):
-                return arg.vbt.wrap_array(
-                    np.tile(arg.values, n),
-                    index=index_fns.tile_index(arg.index, n))
+                return ArrayWrapper.from_obj(arg).wrap(
+                    np.tile(arg.values, n), index=index_fns.tile_index(arg.index, n))
             return np.tile(arg, n)
         if arg.ndim == 2:
             if checks.is_pandas(arg):
-                return arg.vbt.wrap_array(
-                    np.tile(arg.values, (n, 1)),
-                    index=index_fns.tile_index(arg.index, n))
+                return ArrayWrapper.from_obj(arg).wrap(
+                    np.tile(arg.values, (n, 1)), index=index_fns.tile_index(arg.index, n))
             return np.tile(arg, (n, 1))
     elif axis == 1:
         arg = to_2d(arg)
         if checks.is_pandas(arg):
-            return arg.vbt.wrap_array(
-                np.tile(arg.values, (1, n)),
-                columns=index_fns.tile_index(arg.columns, n))
+            return ArrayWrapper.from_obj(arg).wrap(
+                    np.tile(arg.values, (1, n)), columns=index_fns.tile_index(arg.columns, n))
         return np.tile(arg, (1, n))
     else:
         raise ValueError("Only axis 0 and 1 are supported")
@@ -278,7 +281,7 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
             if new_index is None and new_columns is None:
                 # Return plain numpy array if not pandas and no rules set
                 return new_arg
-        return wrap_array(new_arg, index=new_index, columns=new_columns)
+        return ArrayWrapper(index=new_index, columns=new_columns).wrap(new_arg)
     return new_arg
 
 

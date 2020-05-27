@@ -39,6 +39,7 @@ from vectorbt.utils import checks, index_fns, reshape_fns
 from vectorbt.utils.decorators import add_nb_methods
 from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
 from vectorbt.timeseries import nb
+from vectorbt.timeseries.common import TSArrayWrapper
 from vectorbt.widgets.common import DefaultFigureWidget
 
 try:
@@ -63,14 +64,6 @@ except ImportError:
     nanargmin = np.nanargmin
 
 
-def to_time_units(obj, time_delta):
-    """Multiply each element with `time_delta` to get result in time units."""
-    total_seconds = pd.Timedelta(time_delta).total_seconds()
-    def to_td(x): return timedelta(seconds=x * total_seconds) if ~np.isnan(x) else np.nan
-    to_td = np.vectorize(to_td, otypes=[np.object])
-    return obj.vbt.wrap_array(to_td(obj.vbt.to_array()))
-
-
 @add_nb_methods(
     nb.fillna_nb,
     nb.fshift_nb,
@@ -90,10 +83,17 @@ def to_time_units(obj, time_delta):
     nb.expanding_mean_nb,
     nb.expanding_std_nb,
     module_name='vectorbt.timeseries.nb')
-class TimeSeries_Accessor():
+class TimeSeries_Accessor(TSArrayWrapper):
     """Accessor with methods for both Series and DataFrames.
 
     Accessible through `pandas.Series.vbt.timeseries` and `pandas.DataFrame.vbt.timeseries`."""
+
+    def __init__(self, parent):
+        self._obj = parent._obj  # access pandas object
+
+        # Initialize array wrapper
+        wrapper = TSArrayWrapper.from_obj(self._obj)
+        TSArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
 
     def rolling_apply(self, window, apply_func_nb, *args, on_matrix=False):
         """See `vectorbt.timeseries.nb.rolling_apply_nb` and 
@@ -126,7 +126,7 @@ class TimeSeries_Accessor():
             result = nb.rolling_apply_matrix_nb(self.to_2d_array(), window, apply_func_nb, *args)
         else:
             result = nb.rolling_apply_nb(self.to_2d_array(), window, apply_func_nb, *args)
-        return self.wrap_array(result)
+        return self.wrap(result)
 
     def expanding_apply(self, apply_func_nb, *args, on_matrix=False):
         """See `vectorbt.timeseries.nb.expanding_apply_nb` and 
@@ -159,7 +159,7 @@ class TimeSeries_Accessor():
             result = nb.expanding_apply_matrix_nb(self.to_2d_array(), apply_func_nb, *args)
         else:
             result = nb.expanding_apply_nb(self.to_2d_array(), apply_func_nb, *args)
-        return self.wrap_array(result)
+        return self.wrap(result)
 
     def groupby_apply(self, by, apply_func_nb, *args, on_matrix=False, **kwargs):
         """See `vectorbt.timeseries.nb.groupby_apply_nb` and 
@@ -195,7 +195,7 @@ class TimeSeries_Accessor():
             result = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             result = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        return self.wrap_array(result, index=list(regrouped.indices.keys()))
+        return self.wrap(result, index=list(regrouped.indices.keys()))
 
     def resample_apply(self, freq, apply_func_nb, *args, on_matrix=False, **kwargs):
         """See `vectorbt.timeseries.nb.groupby_apply_nb` and 
@@ -230,9 +230,9 @@ class TimeSeries_Accessor():
             result = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             result = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        result_obj = self.wrap_array(result, index=list(resampled.indices.keys()))
+        result_obj = self.wrap(result, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
-        resampled_obj = self.wrap_array(resampled_arr, index=pd.Index(list(resampled.groups.keys()), freq=freq))
+        resampled_obj = self.wrap(resampled_arr, index=pd.Index(list(resampled.groups.keys()), freq=freq))
         resampled_obj.loc[result_obj.index] = result_obj.values
         return resampled_obj
 
@@ -278,7 +278,7 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(apply_func_nb)
 
         result = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
-        return self.wrap_array(result)
+        return self.wrap(result)
 
     def filter(self, filter_func_nb, *args):
         """See `vectorbt.timeseries.nb.filter_nb`.
@@ -297,48 +297,13 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(filter_func_nb)
 
         result = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
-        return self.wrap_array(result)
-
-    @property
-    def timedelta(self):
-        """Return time delta of the index frequency."""
-        checks.assert_type(self.index, (pd.DatetimeIndex, pd.PeriodIndex))
-
-        if self.index.freq is not None:
-            return pd.to_timedelta(pd.tseries.frequencies.to_offset(self.index.freq))
-        elif self.index.inferred_freq is not None:
-            return pd.to_timedelta(pd.tseries.frequencies.to_offset(self.index.inferred_freq))
-        return (self.index[1:] - self.index[:-1]).min()
-
-    def wrap_reduced_array(self, a, index=None, time_units=False):
-        """Wrap result of reduction.
-
-        If `time_units` is set, calls `vectorbt.timeseries.common.to_time_units`."""
-        if a.ndim == 1:
-            # Each column reduced to a single value
-            a_obj = pd.Series(a, index=self.columns)
-            if time_units:
-                if isinstance(time_units, bool):
-                    time_units = self.timedelta
-                a_obj = to_time_units(a_obj, time_units)
-            if self.is_frame():
-                return a_obj
-            return a_obj.iloc[0]
-        else:
-            # Each column reduced to an array
-            if index is None:
-                index = pd.Index(range(a.shape[0]))
-            a_obj = self.wrap_array(a, index=index)
-            if time_units:
-                if isinstance(time_units, bool):
-                    time_units = self.timedelta
-                a_obj = to_time_units(a_obj, time_units)
-            return a_obj
+        return self.wrap(result)
+    
 
     def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.apply_and_reduce_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
         Example:
             ```python-repl
@@ -354,12 +319,12 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, reduce_func_nb, *args)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def reduce(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.reduce_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
         Example:
             ```python-repl
@@ -373,12 +338,12 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.reduce_nb(self.to_2d_array(), reduce_func_nb, *args)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def reduce_to_array(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.reduce_to_array_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
         Example:
             ```python-repl
@@ -391,68 +356,52 @@ class TimeSeries_Accessor():
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.reduce_to_array_nb(self.to_2d_array(), reduce_func_nb, *args)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def min(self, **kwargs):
-        """Return min of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return min of non-NaN elements."""
         result = nanmin(self.to_2d_array(), axis=0)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def max(self, **kwargs):
-        """Return max of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return max of non-NaN elements."""
         result = nanmax(self.to_2d_array(), axis=0)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def mean(self, **kwargs):
-        """Return mean of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return mean of non-NaN elements."""
         result = nanmean(self.to_2d_array(), axis=0)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def std(self, ddof=1, **kwargs):
-        """Return standard deviation of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return standard deviation of non-NaN elements."""
         result = nanstd(self.to_2d_array(), ddof=ddof, axis=0)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def count(self, **kwargs):
-        """Return count of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return count of non-NaN elements."""
         result = np.sum(~np.isnan(self.to_2d_array()), axis=0)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def sum(self, **kwargs):
-        """Return sum of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return sum of non-NaN elements."""
         result = nansum(self.to_2d_array(), axis=0)
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def argmin(self, **kwargs):
-        """Return index of min of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return index of min of non-NaN elements."""
         result = self.index[nanargmin(self.to_2d_array(), axis=0)]
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def argmax(self, **kwargs):
-        """Return index of max of non-NaN elements.
-
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`."""
+        """Return index of max of non-NaN elements."""
         result = self.index[nanargmax(self.to_2d_array(), axis=0)]
-        return self.wrap_reduced_array(result, **kwargs)
+        return self.wrap_reduced(result, **kwargs)
 
     def describe(self, percentiles=[0.25, 0.5, 0.75], **kwargs):
         """See `vectorbt.timeseries.nb.describe_reduce_func_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced_array`.
+        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
         For `percentiles`, see `pandas.DataFrame.describe`.
 
@@ -482,6 +431,10 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
     """Accessor with methods for Series only.
 
     Accessible through `pandas.Series.vbt.timeseries`."""
+
+    def __init__(self, parent):
+        Base_SRAccessor.__init__(self, parent)
+        TimeSeries_Accessor.__init__(self, parent)
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot Series as a line.
@@ -652,6 +605,10 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
     Accessible through `pandas.DataFrame.vbt.timeseries`."""
 
+    def __init__(self, parent):
+        Base_DFAccessor.__init__(self, parent)
+        TimeSeries_Accessor.__init__(self, parent)
+
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot each column in DataFrame as a line.
 
@@ -682,8 +639,9 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
 
     Accessible through `pandas.DataFrame.vbt.ohlcv`."""
 
-    def __init__(self, obj):
-        super().__init__(obj)
+    def __init__(self, parent):
+        TimeSeries_DFAccessor.__init__(self, parent)
+
         self()  # set column map
 
     def __call__(self, open='Open', high='High', low='Low', close='Close', volume='Volume'):

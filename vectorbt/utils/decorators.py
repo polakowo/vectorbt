@@ -4,7 +4,7 @@ from functools import wraps, lru_cache, RLock
 import inspect
 
 from vectorbt import defaults
-from vectorbt.utils import checks
+from vectorbt.utils import checks, reshape_fns
 
 
 def get_kwargs(func):
@@ -17,17 +17,17 @@ def get_kwargs(func):
 
 
 def add_nb_methods(*nb_funcs, module_name=None):
-    """Class decorator to wrap each Numba function in `nb_funcs` as a method of this class."""
+    """Class decorator to wrap each Numba function in `nb_funcs` as a method of an accessor class."""
     def wrapper(cls):
         for nb_func in nb_funcs:
             default_kwargs = get_kwargs(nb_func)
 
             def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
                 if '_1d' in nb_func.__name__:
-                    return self.wrap_array(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
+                    return self.wrap(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
                 else:
                     # We work natively on 2d arrays
-                    return self.wrap_array(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
+                    return self.wrap(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
             # Replace the function's signature with the original one
             sig = inspect.signature(nb_func)
             self_arg = tuple(inspect.signature(array_operation).parameters.values())[0]

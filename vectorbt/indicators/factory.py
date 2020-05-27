@@ -207,6 +207,7 @@ import itertools
 
 from vectorbt.utils import checks, index_fns, reshape_fns, indexing, combine_fns
 from vectorbt.utils.decorators import cached_property
+from vectorbt.timeseries.common import TSArrayWrapper
 
 
 def build_column_hierarchy(param_list, level_names, ts_columns):
@@ -241,15 +242,15 @@ def build_tuple_mapper(mappers_list, new_columns, level_names):
 
 def wrap_output(output, ts, new_columns):
     """Wrap a NumPy array into a pandas object with meta from `ts` and `new_columns`."""
-    return ts.vbt.wrap_array(output, columns=new_columns)
+    return ts.vbt.wrap(output, columns=new_columns)
 
 
 def broadcast_ts(ts, params_len, new_columns):
     """Broadcast time series `ts` to match the length of `new_columns` through tiling."""
     if checks.is_series(ts) or len(new_columns) > ts.shape[1]:
-        return ts.vbt.wrap_array(reshape_fns.tile(ts.values, params_len, axis=1), columns=new_columns)
+        return ts.vbt.wrap(reshape_fns.tile(ts.values, params_len, axis=1), columns=new_columns)
     else:
-        return ts.vbt.wrap_array(ts, columns=new_columns)
+        return ts.vbt.wrap(ts, columns=new_columns)
 
 
 def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_func, *args, pass_lists=False,
@@ -613,6 +614,7 @@ class IndicatorFactory():
 
             for i, ts_name in enumerate(ts_names):
                 setattr(self, f'_{ts_name}', ts_list[i])
+            self.ts_wrapper = TSArrayWrapper.from_obj(ts_list[0])
             for i, output_name in enumerate(output_names):
                 setattr(self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):

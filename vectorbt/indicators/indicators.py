@@ -381,9 +381,9 @@ BollingerBands = IndicatorFactory(
     output_names=['ma', 'upper_band', 'lower_band'],
     name='bb',
     custom_outputs=dict(
-        percent_b=lambda self: self.ts.vbt.wrap_array(
+        percent_b=lambda self: self.ts_wrapper.wrap(
             (self.ts.values - self.lower_band.values) / (self.upper_band.values - self.lower_band.values)),
-        bandwidth=lambda self: self.ts.vbt.wrap_array(
+        bandwidth=lambda self: self.ts_wrapper.wrap(
             (self.upper_band.values - self.lower_band.values) / self.ma.values)
     )
 ).from_apply_func(bb_apply_func_nb, caching_func=bb_caching_nb)
@@ -880,7 +880,7 @@ MACD = IndicatorFactory(
     output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
     name='macd',
     custom_outputs=dict(
-        histogram=lambda self: self.ts.vbt.wrap_array(self.macd.values - self.signal.values),
+        histogram=lambda self: self.ts_wrapper.wrap(self.macd.values - self.signal.values),
     )
 ).from_apply_func(macd_apply_func_nb, caching_func=macd_caching_nb)
 

@@ -7,21 +7,15 @@ from inspect import isfunction
 from vectorbt import timeseries
 from vectorbt.utils import checks, reshape_fns
 from vectorbt.portfolio import nb
-from vectorbt.portfolio.common import ArrayWrapper, timeseries_property, metric_property, group_property
-from vectorbt.portfolio.enums import PositionStatus
+from vectorbt.portfolio.common import timeseries_property, metric_property, group_property
+from vectorbt.portfolio.enums import PositionStatus, PositionRecord
 from vectorbt.portfolio.events import Events
 
 
 class Positions(Events):
     """Extends `vectorbt.portfolio.events.Events` with position-related properties.
 
-    Args:
-        price (pandas_like): Main price of the asset.
-        trade_size (pandas_like): Trade size at each time step.
-        trade_price (pandas_like): Trade price at each time step.
-        trade_fees (pandas_like): Trade fees at each time step.
-        filter: See `vectorbt.portfolio.events.EventMapper`.
-        use_cached: See `vectorbt.portfolio.events.BaseEvents`.
+    Requires records of type `vectorbt.portfolio.enums.PositionRecord`.
 
     Example:
         Get the average PnL of closed positions with duration over 2 days:
@@ -60,48 +54,30 @@ class Positions(Events):
         -2.0
         ```"""
 
-    def __init__(self, price, trade_size, trade_price, trade_fees, filter=None, use_cached=None):
-        self.price = price
-        self.trade_size = trade_size
-        self.trade_price = trade_price
-        self.trade_fees = trade_fees
+    def __init__(self, ts_wrapper, records):
+        # Check that records have position layout
+        checks.assert_same_shape(records, PositionRecord, axis=(1, 0))
 
-        mapper = (
-            nb.map_positions_nb,
-            price.vbt.to_2d_array(),
-            trade_size.vbt.to_2d_array(),
-            trade_price.vbt.to_2d_array(),
-            trade_fees.vbt.to_2d_array()
-        )
-        super().__init__(price, mapper, filter=filter, use_cached=use_cached)
+        super().__init__(ts_wrapper, records)
 
     @timeseries_property('Status')
     def status(self):
         """Status.
 
         See `vectorbt.portfolio.enums.PositionStatus`."""
-        if self.use_cached is not None:
-            return self._filter(self.use_cached.status)
-
-        return self.map(nb.pos_status_map_func_nb)
+        return self.map_to_matrix(nb.field_map_func_nb, PositionRecord.Status)
 
     @group_property('Open', Events)
     def open(self):
         """Open positions of type `Events`."""
-        filter = (
-            nb.open_filter_func_nb,
-            self.status.vbt.to_2d_array()
-        )
-        return Events(self.price, self.event_mapper, filter=filter, use_cached=self)
+        filter_mask = self.records[:, PositionRecord.Status] == PositionStatus.Open
+        return Events(self.ts_wrapper, self.records[filter_mask, :])
 
     @group_property('Closed', Events)
     def closed(self):
         """Closed positions of type `Events`."""
-        filter = (
-            nb.closed_filter_func_nb,
-            self.status.vbt.to_2d_array()
-        )
-        return Events(self.price, self.event_mapper, filter=filter, use_cached=self)
+        filter_mask = self.records[:, PositionRecord.Status] == PositionStatus.Closed
+        return Events(self.ts_wrapper, self.records[filter_mask, :])
 
     @metric_property('Closed rate')
     def closed_rate(self):
@@ -110,4 +86,4 @@ class Positions(Events):
         count = reshape_fns.to_1d(self.count, raw=True)
 
         closed_rate = closed_count / count
-        return self.wrap_metric(closed_rate)
+        return self.ts_wrapper.wrap_reduced(closed_rate)

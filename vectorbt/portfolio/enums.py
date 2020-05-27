@@ -81,7 +81,7 @@ PositionStatus = namedtuple('PositionStatus', [
 ])(*range(2))
 """Open or Closed."""
 
-EventRecord = namedtuple('Event', [
+EventRecord = namedtuple('EventRecord', [
     'Column',
     'Size', 
     'OpenAt',
@@ -92,7 +92,7 @@ EventRecord = namedtuple('Event', [
     'CloseFees',
     'PnL',
     'Return'
-])
+])(*range(10))
 
 __pdoc__['EventRecord'] = "A named tuple representing an event, such as trade or position."
 __pdoc__['EventRecord.Column'] = "Column index."

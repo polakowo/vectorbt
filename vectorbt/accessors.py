@@ -12,12 +12,16 @@ class Vbt_DFAccessor(DirNamesMixin, Base_DFAccessor):
     def __init__(self, obj):
         self._obj = obj
 
+        Base_DFAccessor.__init__(self, self)
+
 
 @pd.api.extensions.register_series_accessor("vbt")
 class Vbt_SRAccessor(DirNamesMixin, Base_SRAccessor):
     """The main `vectorbt` accessor for `pandas.Series`."""
     def __init__(self, obj):
         self._obj = obj
+        
+        Base_SRAccessor.__init__(self, self)
 
 
 def register_dataframe_accessor(name):
