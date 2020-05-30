@@ -1,5 +1,7 @@
-"""Package for working with portfolios."""
+"""Package for working with portfolios.
 
-from vectorbt.portfolio import common, const, nb, portfolio, positions, props
+Use the `vectorbt.portfolio.main.Portfolio` class to model portfolio performance."""
 
-from vectorbt.portfolio.portfolio import Portfolio
+from vectorbt.portfolio import common, enums, main, nb, records
+
+from vectorbt.portfolio.main import Portfolio

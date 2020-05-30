@@ -7,7 +7,9 @@
     
     Input arrays can be of any data type, but most output arrays are `numpy.float64`.
     
-    Rolling functions with `minp=None` have `min_periods` set to the window size."""
+    Rolling functions with `minp=None` have `min_periods` set to the window size.
+    
+    All functions passed as argument must be Numba-compiled."""
 
 from numba import njit, f8, i8, b1, optional
 import numpy as np
@@ -739,10 +741,7 @@ def rolling_apply_nb(a, window, apply_func_nb, *args):
     """Provide rolling window calculations.
 
     `apply_func_nb` must accept index of the current column, index of the current row, 
-    the array, and `*args`. Must return a single value.
-
-    !!! note
-        `apply_func_nb` must be Numba-compiled."""
+    the array, and `*args`. Must return a single value."""
     result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
         for i in range(a.shape[0]):
@@ -756,10 +755,7 @@ def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
     `apply_func_nb` must accept index of the current row, the 2-dim array, and `*args`. 
-    Must return a single value or an array of shape `a.shape[1]`.
-
-    !!! note
-        `apply_func_nb` must be Numba-compiled."""
+    Must return a single value or an array of shape `a.shape[1]`."""
     result = np.empty_like(a, dtype=f8)
     for i in range(a.shape[0]):
         window_a = a[max(0, i+1-window):i+1, :]
@@ -788,10 +784,7 @@ def groupby_apply_nb(a, groups, apply_func_nb, *args):
     to apply `apply_func_nb` on.
 
     `apply_func_nb` must accept index of the current column, indices of the current group, 
-    the array, and `*args`. Must return a single value.
-
-    !!! note
-        `apply_func_nb` must be Numba-compiled."""
+    the array, and `*args`. Must return a single value."""
     result = np.empty((len(groups), a.shape[1]), dtype=f8)
     for col in range(a.shape[1]):
         for i, idxs in groups.items():
@@ -804,10 +797,7 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
     """`groupby_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
     `apply_func_nb` must accept indices of the current group, the 2-dim array, and `*args`. 
-    Must return a single value or an array of shape `a.shape[1]`.
-
-    !!! note
-        `apply_func_nb` must be Numba-compiled."""
+    Must return a single value or an array of shape `a.shape[1]`."""
     result = np.empty((len(groups), a.shape[1]), dtype=f8)
     for i, idxs in groups.items():
         result[i, :] = apply_func_nb(idxs, a[idxs, :], *args)
@@ -821,10 +811,7 @@ def applymap_nb(a, map_func_nb, *args):
     """Map non-NA elements elementwise using `map_func_nb`.
 
     `map_func_nb` must accept index of the current column, index of the current element, 
-    the element itself, and `*args`. Must return an array of same size.
-
-    !!! note
-        `map_func_nb` must be Numba-compiled."""
+    the element itself, and `*args`. Must return an array of same size."""
     result = np.full_like(a, np.nan, dtype=f8)
 
     for col in range(result.shape[1]):
@@ -840,10 +827,7 @@ def filter_nb(a, filter_func_nb, *args):
     The filtered out elements will become NA.
 
     `filter_func_nb` must accept index of the current column, index of the current element, 
-    the element itself, and `*args`. Must return a boolean value.
-
-    !!! note
-        `filter_func_nb` must be Numba-compiled."""
+    the element itself, and `*args`. Must return a boolean value."""
     result = a.astype(f8)
 
     for col in range(result.shape[1]):
@@ -862,10 +846,7 @@ def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
     Must return an array.
 
     `reduce_func_nb` must accept index of the current column, the array of results from 
-    `apply_func_nb` for that column, and `*args`. Must return a single value.
-
-    !!! note
-        `apply_func_nb` and `reduce_func_nb` must be Numba-compiled."""
+    `apply_func_nb` for that column, and `*args`. Must return a single value."""
     result = np.full(a.shape[1], np.nan, dtype=f8)
 
     for col in range(a.shape[1]):
@@ -879,10 +860,7 @@ def reduce_nb(a, reduce_func_nb, *args):
     """Reduce each column into a single value using `reduce_func_nb`.
 
     `reduce_func_nb` must accept index of the current column, the array, and `*args`. 
-    Must return a single value.
-
-    !!! note
-        `reduce_func_nb` must be Numba-compiled."""
+    Must return a single value."""
     result = np.full(a.shape[1], np.nan, dtype=f8)
 
     for col in range(a.shape[1]):
@@ -897,7 +875,6 @@ def reduce_to_array_nb(a, reduce_func_nb, *args):
     `reduce_func_nb` same as for `reduce_a` but must return an array.
 
     !!! note
-        * `reduce_func_nb` must be Numba-compiled
         * Output of `reduce_func_nb` must be strictly homogeneous"""
     result0 = reduce_func_nb(0, a[:, 0], *args)
     result = np.full((result0.shape[0], a.shape[1]), np.nan, dtype=f8)

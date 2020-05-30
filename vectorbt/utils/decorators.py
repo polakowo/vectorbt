@@ -4,7 +4,7 @@ from functools import wraps, lru_cache, RLock
 import inspect
 
 from vectorbt import defaults
-from vectorbt.utils import checks
+from vectorbt.utils import checks, reshape_fns
 
 
 def get_kwargs(func):
@@ -17,17 +17,17 @@ def get_kwargs(func):
 
 
 def add_nb_methods(*nb_funcs, module_name=None):
-    """Class decorator to wrap each Numba function in `nb_funcs` as a method of this class."""
+    """Class decorator to wrap each Numba function in `nb_funcs` as a method of an accessor class."""
     def wrapper(cls):
         for nb_func in nb_funcs:
             default_kwargs = get_kwargs(nb_func)
 
             def array_operation(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
                 if '_1d' in nb_func.__name__:
-                    return self.wrap_array(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
+                    return self.wrap(nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs}))
                 else:
                     # We work natively on 2d arrays
-                    return self.wrap_array(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
+                    return self.wrap(nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs}))
             # Replace the function's signature with the original one
             sig = inspect.signature(nb_func)
             self_arg = tuple(inspect.signature(array_operation).parameters.values())[0]
@@ -65,12 +65,17 @@ class cached_property(custom_property):
     """Custom cacheable property.
 
     Similar to `functools.cached_property`, but without changing the original attribute.
-    Disables caching if `vectorbt.defaults.caching` is `False`."""
+    
+    Disables caching if 
+    
+    * `vectorbt.defaults.caching` is `False`, or
+    * `disabled` attribute is to `True`."""
 
-    def __init__(self, func, **kwargs):
+    def __init__(self, func, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
         self.attrname = None
         self.lock = RLock()
+        self.disabled = disabled
 
     def clear_cache(self, instance):
         """Clear the cache for this property belonging to `instance`."""
@@ -78,12 +83,12 @@ class cached_property(custom_property):
             delattr(instance, self.attrname)
 
     def __set_name__(self, owner, name):
-        self.attrname = '_' + name # here is the difference
+        self.attrname = '__cache_' + name # here is the difference
 
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
-        if not defaults.caching: # you can manually disable cache here
+        if not defaults.caching or self.disabled: # you can manually disable cache here
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         val = cache.get(self.attrname, _NOT_FOUND)
@@ -123,14 +128,18 @@ class custom_method():
 class cached_method(custom_method):
     """Custom cacheable method.
     
-    Disables caching if `vectorbt.defaults.caching` is `False` or 
-    if a non-hashable object was passed as positional or keyword argument."""
-    def __init__(self, func, maxsize=128, typed=False, **kwargs):
+    Disables caching if 
+    
+    * `vectorbt.defaults.caching` is `False`,
+    * `disabled` attribute is to `True`, or
+    * a non-hashable object was passed as positional or keyword argument."""
+    def __init__(self, func, maxsize=128, typed=False, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
         self.maxsize = maxsize
         self.typed = typed
         self.attrname = None
         self.lock = RLock()
+        self.disabled = disabled
 
     def clear_cache(self, instance):
         """Clear the cache for this method belonging to `instance`."""
@@ -138,12 +147,12 @@ class cached_method(custom_method):
             delattr(instance, self.attrname)
 
     def __set_name__(self, owner, name):
-        self.attrname = '_' + name # here is the difference
+        self.attrname = '__cache_' + name # here is the difference
 
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
-        if not defaults.caching: # you can manually disable cache here
+        if not defaults.caching or self.disabled: # you can manually disable cache here
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         func = cache.get(self.attrname, _NOT_FOUND)

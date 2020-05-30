@@ -5,30 +5,25 @@ import pandas as pd
 from collections.abc import Iterable
 
 from vectorbt.utils import checks, combine_fns, index_fns, reshape_fns
+from vectorbt.utils.reshape_fns import ArrayWrapper
 from vectorbt.utils.decorators import class_or_instancemethod
 
 
-class Base_Accessor():
+class Base_Accessor(ArrayWrapper):
     """Accessor with methods for both Series and DataFrames.
 
     Accessible through `pandas.Series.vbt` and `pandas.DataFrame.vbt`, and all child accessors.
 
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
-    by using `Base_Accessor.wrap_array`, we will convert the 2-dim output back to a Series."""
+    by using `Base_Accessor.wrap`, we will convert the 2-dim output back to a Series."""
 
-    def __init__(self, obj):
-        self._obj = obj._obj  # access pandas object
-        self._validate(self._obj)
+    def __init__(self, parent):
+        self._obj = parent._obj  # access pandas object
 
-    @classmethod
-    def _validate(cls, obj):
-        """Define your validation logic here."""
-        pass
-
-    def validate(self):
-        """Call this method to instantiate the accessor and invoke `Base_Accessor._validate`."""
-        pass
+        # Initialize array wrapper
+        wrapper = ArrayWrapper.from_obj(self._obj)
+        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
 
     @classmethod
     def empty(cls, shape, fill_value=np.nan, **kwargs):
@@ -43,18 +38,6 @@ class Base_Accessor():
         if checks.is_series(other):
             return cls.empty(other.shape, fill_value=fill_value, index=other.index, name=other.name)
         return cls.empty(other.shape, fill_value=fill_value, index=other.index, columns=other.columns)
-
-    @property
-    def index(self):
-        """Return index of Series/DataFrame."""
-        return self._obj.index
-
-    @property
-    def columns(self):
-        """Return `[name]` of Series and `columns` of DataFrame."""
-        if checks.is_series(self._obj):
-            return pd.Index([self._obj.name])
-        return self._obj.columns
 
     def to_array(self):
         """Convert to NumPy array."""
@@ -72,10 +55,6 @@ class Base_Accessor():
         See `vectorbt.utils.reshape_fns.to_2d`."""
         return reshape_fns.to_2d(self._obj, raw=True)
 
-    def wrap_array(self, a, **kwargs):
-        """See `vectorbt.utils.reshape_fns.wrap_array_as`."""
-        return reshape_fns.wrap_array_as(a, self._obj, **kwargs)
-
     def tile(self, n, as_columns=None):
         """See `vectorbt.utils.reshape_fns.tile`.
 
@@ -83,7 +62,7 @@ class Base_Accessor():
         tiled = reshape_fns.tile(self._obj, n, axis=1)
         if as_columns is not None:
             new_columns = index_fns.combine_indexes(as_columns, self.columns)
-            return self.wrap_array(tiled.values, columns=new_columns)
+            return self.wrap(tiled.values, columns=new_columns)
         return tiled
 
     def repeat(self, n, as_columns=None):
@@ -93,7 +72,7 @@ class Base_Accessor():
         repeated = reshape_fns.repeat(self._obj, n, axis=1)
         if as_columns is not None:
             new_columns = index_fns.combine_indexes(self.columns, as_columns)
-            return self.wrap_array(repeated.values, columns=new_columns)
+            return self.wrap(repeated.values, columns=new_columns)
         return repeated
 
     def align_to(self, other):
@@ -119,7 +98,7 @@ class Base_Accessor():
         aligned_index = index_fns.align_index_to(obj.index, other.index)
         aligned_columns = index_fns.align_index_to(obj.columns, other.columns)
         obj = obj.iloc[aligned_index, aligned_columns]
-        return self.wrap_array(obj.values, index=other.index, columns=other.columns)
+        return self.wrap(obj.values, index=other.index, columns=other.columns)
 
     @class_or_instancemethod
     def broadcast(self_or_cls, *others, **kwargs):
@@ -216,7 +195,7 @@ class Base_Accessor():
             new_columns = index_fns.combine_indexes(as_columns, self.columns)
         else:
             new_columns = index_fns.tile_index(self.columns, ntimes)
-        return self.wrap_array(result, columns=new_columns)
+        return self.wrap(result, columns=new_columns)
 
     def combine_with(self, other, *args, combine_func=None, pass_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
@@ -253,7 +232,7 @@ class Base_Accessor():
             new_obj_arr = np.asarray(new_obj)
             new_other_arr = np.asarray(new_other)
         result = combine_func(new_obj_arr, new_other_arr, *args, **kwargs)
-        return new_obj.vbt.wrap_array(result)
+        return new_obj.vbt.wrap(result)
 
     def combine_with_multiple(self, others, *args, combine_func=None, pass_2d=False,
                               concat=False, broadcast_kwargs={}, as_columns=None, **kwargs):
@@ -326,7 +305,7 @@ class Base_Accessor():
                 new_columns = index_fns.combine_indexes(as_columns, columns)
             else:
                 new_columns = index_fns.tile_index(columns, len(others))
-            return new_obj.vbt.wrap_array(result, columns=new_columns)
+            return new_obj.vbt.wrap(result, columns=new_columns)
         else:
             # Combine arguments pairwise into one object
             if checks.is_numba_func(combine_func):
@@ -335,7 +314,7 @@ class Base_Accessor():
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
-            return new_obj.vbt.wrap_array(result)
+            return new_obj.vbt.wrap(result)
 
     # Comparison operators
     def __eq__(self, other): return self.combine_with(other, combine_func=np.equal)
@@ -369,9 +348,10 @@ class Base_SRAccessor(Base_Accessor):
 
     Accessible through `pandas.Series.vbt` and all child accessors."""
 
-    @classmethod
-    def _validate(cls, obj):
-        checks.assert_type(obj, pd.Series)
+    def __init__(self, parent):
+        checks.assert_type(parent._obj, pd.Series)
+
+        Base_Accessor.__init__(self, parent)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -387,9 +367,10 @@ class Base_DFAccessor(Base_Accessor):
 
     Accessible through `pandas.DataFrame.vbt` and all child accessors."""
 
-    @classmethod
-    def _validate(cls, obj):
-        checks.assert_type(obj, pd.DataFrame)
+    def __init__(self, parent):
+        checks.assert_type(parent._obj, pd.DataFrame)
+
+        Base_Accessor.__init__(self, parent)
 
     @class_or_instancemethod
     def is_series(self_or_cls):

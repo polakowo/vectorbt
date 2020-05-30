@@ -56,9 +56,8 @@ class Signals_Accessor():
 
     Accessible through `pandas.Series.vbt.signals` and `pandas.DataFrame.vbt.signals`."""
 
-    @classmethod
-    def _validate(cls, obj):
-        checks.assert_dtype(obj, np.bool)
+    def __init__(self, parent):
+        self._obj = parent._obj  # access pandas object
 
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
@@ -233,7 +232,7 @@ class Signals_Accessor():
             ```"""
         checks.assert_numba_func(choice_func_nb)
 
-        return self.wrap_array(nb.generate_after_nb(self.to_2d_array(), choice_func_nb, *args))
+        return self.wrap(nb.generate_after_nb(self.to_2d_array(), choice_func_nb, *args))
 
     def generate_random_after(self, n_range, n_prob=None, min_space=None, seed=None):
         """See `vectorbt.signals.nb.generate_random_after_nb`.
@@ -254,7 +253,7 @@ class Signals_Accessor():
         if n_prob is not None:
             n_prob = reshape_fns.to_1d(n_prob)
             checks.assert_same_shape(n_range, n_prob)
-        return self.wrap_array(nb.generate_random_after_nb(
+        return self.wrap(nb.generate_random_after_nb(
             self.to_2d_array(), n_range, n_prob=n_prob, min_space=min_space, seed=seed))
 
     def generate_stop_loss(self, ts, stops, trailing=False, relative=True, as_columns=None, broadcast_kwargs={}):
@@ -295,7 +294,7 @@ class Signals_Accessor():
             name = 'trail_stop' if trailing else 'stop_loss'
             param_columns = index_fns.index_from_values(stops, name=name)
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
-        return entries.vbt.wrap_array(exits, columns=columns)
+        return entries.vbt.wrap(exits, columns=columns)
 
     def generate_take_profit(self, ts, stops, relative=True, as_columns=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_take_profit_nb`.
@@ -334,7 +333,7 @@ class Signals_Accessor():
         else:
             param_columns = index_fns.index_from_values(stops, name='take_profit')
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
-        return entries.vbt.wrap_array(exits, columns=columns)
+        return entries.vbt.wrap(exits, columns=columns)
 
     def map_reduce_between(self, *args, other=None, map_func_nb=None, reduce_func_nb=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.map_reduce_between_nb`. 
@@ -372,7 +371,7 @@ class Signals_Accessor():
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
-            other.vbt.signals.validate()
+            checks.assert_dtype(other, np.bool_)
             result = nb.map_reduce_between_two_nb(
                 self.to_2d_array(), other.vbt.to_2d_array(), map_func_nb, reduce_func_nb, *args)
             if isinstance(obj, pd.Series):
@@ -454,19 +453,19 @@ class Signals_Accessor():
             reset_by=reset_by,
             after_false=after_false,
             allow_gaps=allow_gaps)
-        return obj.vbt.wrap_array(ranked)
+        return obj.vbt.wrap(ranked)
 
     def first(self, **kwargs):
         """`vectorbt.signals.nb.rank_nb` == 1."""
-        return self.wrap_array(self.rank(**kwargs).values == 1)
+        return self.wrap(self.rank(**kwargs).values == 1)
 
     def nst(self, n, **kwargs):
         """`vectorbt.signals.nb.rank_nb` == n."""
-        return self.wrap_array(self.rank(**kwargs).values == n)
+        return self.wrap(self.rank(**kwargs).values == n)
 
     def from_nst(self, n, **kwargs):
         """`vectorbt.signals.nb.rank_nb` >= n."""
-        return self.wrap_array(self.rank(**kwargs).values >= n)
+        return self.wrap(self.rank(**kwargs).values >= n)
 
     def AND(self, *others, **kwargs):
         """Combine with each in `*others` using logical AND.
@@ -507,6 +506,12 @@ class Signals_SRAccessor(Signals_Accessor, Base_SRAccessor):
     """Accessor with methods for Series only.
 
     Accessible through `pandas.Series.vbt.signals`."""
+
+    def __init__(self, parent):
+        checks.assert_dtype(parent._obj, np.bool)
+
+        Base_SRAccessor.__init__(self, parent)
+        Signals_Accessor.__init__(self, parent)
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot Series as a line.
@@ -623,6 +628,12 @@ class Signals_DFAccessor(Signals_Accessor, Base_DFAccessor):
     """Accessor with methods for DataFrames only.
 
     Accessible through `pandas.DataFrame.vbt.signals`."""
+
+    def __init__(self, parent):
+        checks.assert_dtype(parent._obj, np.bool)
+
+        Base_DFAccessor.__init__(self, parent)
+        Signals_Accessor.__init__(self, parent)
 
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot each column in DataFrame as a line.

@@ -1,4 +1,4 @@
-"""Indicators built with `vectorbt.IndicatorFactory`.
+"""Indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
 ```py
 import numpy as np
@@ -166,8 +166,8 @@ class MA(MA):
 
             Having this, you can now compare these `MA` instances:
             ```python-repl
-            >>> entry_signals = fast_ma.ma_above(slow_ma, crossover=True)
-            >>> exit_signals = fast_ma.ma_below(slow_ma, crossover=True)
+            >>> entry_signals = fast_ma.ma_above(slow_ma, crossed=True)
+            >>> exit_signals = fast_ma.ma_below(slow_ma, crossed=True)
 
             >>> print(entry_signals)
             fast_window            10     20
@@ -381,9 +381,9 @@ BollingerBands = IndicatorFactory(
     output_names=['ma', 'upper_band', 'lower_band'],
     name='bb',
     custom_outputs=dict(
-        percent_b=lambda self: self.ts.vbt.wrap_array(
+        percent_b=lambda self: self.wrapper.wrap(
             (self.ts.values - self.lower_band.values) / (self.upper_band.values - self.lower_band.values)),
-        bandwidth=lambda self: self.ts.vbt.wrap_array(
+        bandwidth=lambda self: self.wrapper.wrap(
             (self.upper_band.values - self.lower_band.values) / self.ma.values)
     )
 ).from_apply_func(bb_apply_func_nb, caching_func=bb_caching_nb)
@@ -870,7 +870,6 @@ def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, si
         signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window, minp=signal_window)
     else:
         signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window, minp=signal_window)
-    signal_ts[:max(fast_window, slow_window)+signal_window-2, :] = np.nan  # min_periodd
     return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
 
 
@@ -880,7 +879,7 @@ MACD = IndicatorFactory(
     output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
     name='macd',
     custom_outputs=dict(
-        histogram=lambda self: self.ts.vbt.wrap_array(self.macd.values - self.signal.values),
+        histogram=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
 ).from_apply_func(macd_apply_func_nb, caching_func=macd_caching_nb)
 

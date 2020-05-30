@@ -3,7 +3,9 @@
 !!! note
     `vectorbt` treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
-    Data is processed along index (axis 0)."""
+    Data is processed along index (axis 0).
+    
+    All functions passed as argument must be Numba-compiled."""
 
 from numba import njit, f8, i8, b1, optional
 import numpy as np
@@ -24,8 +26,6 @@ def generate_nb(shape, choice_func_nb, *args):
 
     !!! note
         All indices must be absolute.
-
-        `choice_func_nb` must be Numba-compiled.
 
     Example:
         ```python-repl
@@ -276,8 +276,6 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
 
     !!! note
         All indices must be absolute.
-
-        `map_func_nb` and `reduce_func_nb` must be Numba-compiled.
 
     Example:
         ```python-repl

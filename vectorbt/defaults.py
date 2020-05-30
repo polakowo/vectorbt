@@ -1,6 +1,10 @@
 """Global defaults."""
 
+import json
+
 from vectorbt.utils.config import Config
+
+__pdoc__ = {}
 
 # Layout
 layout = Config(
@@ -18,19 +22,34 @@ layout = Config(
         "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
     ]
 )
-"""Default Plotly layout."""
+"""_"""
+
+__pdoc__['layout'] = f"""Default Plotly layout.
+
+```plaintext
+{json.dumps(layout, indent=2)}
+```
+"""
 
 # Portfolio
 portfolio = Config(
-    init_capital=1.,
+    init_capital=100.,
     fees=0.,
+    fixed_fees=0.,
     slippage=0.,
     year_freq='1Y',
     risk_free=0.,
     required_return=0.,
     cutoff=0.05
 )
-"""Default portfolio parameters."""
+"""_"""
+
+__pdoc__['portfolio'] = f"""Default portfolio parameters.
+
+```plaintext
+{json.dumps(portfolio, indent=2)}
+```
+"""
 
 # Broadcasting
 broadcasting = Config(
@@ -40,7 +59,14 @@ broadcasting = Config(
     drop_duplicates=True,
     keep='last'
 )
-"""Default broadcasting rules for index and columns.."""
+"""_"""
+
+__pdoc__['broadcasting'] = f"""Default broadcasting rules for index and columns.
+
+```plaintext
+{json.dumps(broadcasting, indent=2)}
+```
+"""
 
 # Cache
 caching = True

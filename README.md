@@ -1,4 +1,5 @@
-![](https://travis-ci.org/polakowo/vectorbt.svg?branch=master&status=passed) ![](https://img.shields.io/badge/version-0.8-blue)
+![](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)
+![](https://img.shields.io/badge/version-0.9-blue?style=for-the-badge)
 
 # vectorbt
 
@@ -16,7 +17,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 5 seconds (Note: compiling with Numba may take some time):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in under 5 seconds (Note: compiling with Numba may take a while):
 
 ```python
 import vectorbt as vbt
@@ -34,8 +35,8 @@ price = ticker.history(period="max")['Close']
 
 # Generate signals
 fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2)
-entries = fast_ma.ma_above(slow_ma, crossover=True)
-exits = fast_ma.ma_below(slow_ma, crossover=True)
+entries = fast_ma.ma_above(slow_ma, crossed=True)
+exits = fast_ma.ma_below(slow_ma, crossed=True)
 
 # Calculate performance
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_capital=init_capital, fees=fees)
@@ -142,16 +143,15 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
 - Provides a collection of utility functions for working with data
-- Extensive input and output validation during runtime (data type, shape, etc.)
-- Implements NumPy broadcasting for pandas with different modes
+    - Implements NumPy-like broadcasting for pandas, among other features.
 - `vbt.timeseries` accessor for working with time series data
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data
     - Entry, exit and random signal generation, ranking and distance functions
     - Generation of stop loss, trailing stop and take profit signals
 - `vbt.portfolio` accessor for modeling portfolio performance
-    - From signals, orders, or custom order function
-    - A range of performance time series, metrics, and plotting functions
+    - Accepts signals, orders, or custom order function
+    - Provides common financial risk and performance metrics for returns, orders, trades and positions
 - Provides a range of technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
@@ -170,13 +170,15 @@ pip install git+https://github.com/polakowo/vectorbt.git
 
 See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) for Plotly figures.
 
-## Documentation
-
-https://polakowo.io/vectorbt/
+## [Documentation](https://polakowo.io/vectorbt/)
 
 ## Example notebooks
 
 - [Who beats Bitcoin: Dual moving average crossover, trading randomly or holding?](examples/Bitcoin-DMAC.ipynb)
-- [How stop-loss and trailing stop orders perform on cryptocurrencies?](examples/StopLoss-vs-TrailingStop.ipynb)
+- [How stop-loss and trailing stop orders perform on crypto?](examples/StopLoss-vs-TrailingStop.ipynb)
 
 Note: you will need to run the notebook to play with widgets.
+
+## Credits
+
+- Logo made by [Freepik](https://www.flaticon.com/authors/freepik) from [Flaticon](www.flaticon.com)

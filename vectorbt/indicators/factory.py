@@ -95,8 +95,8 @@ Example:
     ... ).from_apply_func(vbt.timeseries.nb.rolling_mean_nb)
 
     >>> myma = MyMA.from_params(price_sm, [2, 3])
-    >>> above_signals = myma.price_sm_above(myma.ma, crossover=True)
-    >>> below_signals = myma.price_sm_below(myma.ma, crossover=True)
+    >>> above_signals = myma.price_sm_above(myma.ma, crossed=True)
+    >>> below_signals = myma.price_sm_below(myma.ma, crossed=True)
     ```
 
     It not only produced the handy `from_params` method, but generated a whole infrastructure to be run with
@@ -207,6 +207,7 @@ import itertools
 
 from vectorbt.utils import checks, index_fns, reshape_fns, indexing, combine_fns
 from vectorbt.utils.decorators import cached_property
+from vectorbt.timeseries.common import TSArrayWrapper
 
 
 def build_column_hierarchy(param_list, level_names, ts_columns):
@@ -241,15 +242,15 @@ def build_tuple_mapper(mappers_list, new_columns, level_names):
 
 def wrap_output(output, ts, new_columns):
     """Wrap a NumPy array into a pandas object with meta from `ts` and `new_columns`."""
-    return ts.vbt.wrap_array(output, columns=new_columns)
+    return ts.vbt.wrap(output, columns=new_columns)
 
 
 def broadcast_ts(ts, params_len, new_columns):
     """Broadcast time series `ts` to match the length of `new_columns` through tiling."""
     if checks.is_series(ts) or len(new_columns) > ts.shape[1]:
-        return ts.vbt.wrap_array(reshape_fns.tile(ts.values, params_len, axis=1), columns=new_columns)
+        return ts.vbt.wrap(reshape_fns.tile(ts.values, params_len, axis=1), columns=new_columns)
     else:
-        return ts.vbt.wrap_array(ts, columns=new_columns)
+        return ts.vbt.wrap(ts, columns=new_columns)
 
 
 def from_params_pipeline(ts_list, param_list, level_names, num_outputs, custom_func, *args, pass_lists=False,
@@ -555,13 +556,38 @@ class IndicatorFactory():
             2018-01-05  130.0  106.0  140.0  108.0
             ```
         """
-
-        CustomIndicator = type('CustomIndicator', (), {})
         ts_names = self.ts_names
         param_names = self.param_names
         output_names = self.output_names
         name = self.name
         custom_outputs = self.custom_outputs
+
+        # Add indexing methods
+        def indexing_func(obj, pd_indexing_func):
+            ts_list = []
+            for ts_name in ts_names:
+                ts_list.append(pd_indexing_func(getattr(obj, ts_name)))
+            output_list = []
+            for output_name in output_names:
+                output_list.append(pd_indexing_func(getattr(obj, output_name)))
+            param_list = []
+            for param_name in param_names:
+                # TODO: adapt params array according to the indexing operation
+                param_list.append(getattr(obj, f'_{param_name}_array'))
+            mapper_list = []
+            for param_name in param_names:
+                mapper_list.append(indexing.mapper_indexing_func(
+                    getattr(obj, f'_{param_name}_mapper'),
+                    getattr(obj, ts_names[0]), pd_indexing_func))
+            if len(param_names) > 1:
+                mapper_list.append(indexing.mapper_indexing_func(
+                    obj._tuple_mapper, getattr(obj, ts_names[0]), pd_indexing_func))
+
+            return obj.__class__(ts_list, output_list, param_list, mapper_list, obj.name)
+
+        PandasIndexer = indexing.PandasIndexing(indexing_func)
+        ParamIndexer = indexing.ParamIndexing(param_names + (['tuple'] if len(param_names) > 1 else []), indexing_func)
+        CustomIndicator = type('CustomIndicator', (PandasIndexer, ParamIndexer), {})
 
         # For name and each input and output, create read-only properties
         prop = property(lambda self: self._name)
@@ -588,6 +614,7 @@ class IndicatorFactory():
 
             for i, ts_name in enumerate(ts_names):
                 setattr(self, f'_{ts_name}', ts_list[i])
+            self.wrapper = TSArrayWrapper.from_obj(ts_list[0])
             for i, output_name in enumerate(output_names):
                 setattr(self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):
@@ -596,6 +623,10 @@ class IndicatorFactory():
             if len(param_names) > 1:
                 setattr(self, '_tuple_mapper', mapper_list[-1])
             setattr(self, '_name', name)
+
+            # Initialize indexers
+            PandasIndexer.__init__(self)
+            ParamIndexer.__init__(self, mapper_list)
 
         setattr(CustomIndicator, '__init__', __init__)
 
@@ -621,35 +652,6 @@ class IndicatorFactory():
 
         setattr(CustomIndicator, 'from_params', from_params)
 
-        # Add indexing methods
-        def indexing_func(obj, pd_indexing_func):
-            ts_list = []
-            for ts_name in ts_names:
-                ts_list.append(pd_indexing_func(getattr(obj, ts_name)))
-            output_list = []
-            for output_name in output_names:
-                output_list.append(pd_indexing_func(getattr(obj, output_name)))
-            param_list = []
-            for param_name in param_names:
-                # TODO: adapt params array according to the indexing operation
-                param_list.append(getattr(obj, f'_{param_name}_array'))
-            mapper_list = []
-            for param_name in param_names:
-                mapper_list.append(indexing.mapper_indexing_func(
-                    getattr(obj, f'_{param_name}_mapper'),
-                    getattr(obj, ts_names[0]), pd_indexing_func))
-            if len(param_names) > 1:
-                mapper_list.append(indexing.mapper_indexing_func(
-                    obj._tuple_mapper, getattr(obj, ts_names[0]), pd_indexing_func))
-
-            return obj.__class__(ts_list, output_list, param_list, mapper_list, obj.name)
-
-        CustomIndicator = indexing.add_pd_indexing(indexing_func)(CustomIndicator)
-        for i, param_name in enumerate(param_names):
-            CustomIndicator = indexing.add_param_indexing(param_name, indexing_func)(CustomIndicator)
-        if len(param_names) > 1:
-            CustomIndicator = indexing.add_param_indexing('tuple', indexing_func)(CustomIndicator)
-
         # Add user-defined outputs
         for prop_name, prop in custom_outputs.items():
             prop.__name__ = prop_name
@@ -661,7 +663,7 @@ class IndicatorFactory():
         comparison_attrs = set(ts_names + output_names + list(custom_outputs.keys()))
         for attr in comparison_attrs:
             def assign_comparison_method(func_name, compare_func, attr=attr):
-                def comparison_method(self, other, crossover=False, wait=0, name=None, **kwargs):
+                def comparison_method(self, other, crossed=False, wait=0, name=None, **kwargs):
                     if isinstance(other, self.__class__):
                         other = getattr(other, attr)
                     if name is None:
@@ -670,13 +672,13 @@ class IndicatorFactory():
                         else:
                             name = f'{self.name}_{attr}_{func_name}'
                     result = compare(getattr(self, attr), other, compare_func, name=name, **kwargs)
-                    if crossover:
+                    if crossed:
                         return result.vbt.signals.nst(wait+1, after_false=True)
                     return result
                 comparison_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
                 comparison_method.__doc__ = f"""Return `True` for each element where `{attr}` is {func_name} `other`. 
 
-                Set `crossover` to `True` to return the first `True` after crossover. Specify `wait` to return 
+                Set `crossed` to `True` to return the first `True` after crossover. Specify `wait` to return 
                 `True` only when `{attr}` is {func_name} for a number of time steps in a row after crossover.
 
                 See `vectorbt.indicators.factory.compare`."""
