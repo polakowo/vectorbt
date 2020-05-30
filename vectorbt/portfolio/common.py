@@ -7,10 +7,8 @@ from vectorbt.timeseries.common import TSArrayWrapper
 from vectorbt.utils.decorators import class_or_instancemethod, custom_property, cached_property
 
 
-class PArrayWrapper(TSArrayWrapper):
-    """Introduces convenient portfolio methods on top of `vectorbt.timeseries.common.TSArrayWrapper`."""
-    wrap_timeseries = TSArrayWrapper.wrap
-    wrap_metric = TSArrayWrapper.wrap_reduced
+class TSRArrayWrapper(TSArrayWrapper):
+    """Extends `vectorbt.timeseries.common.TSArrayWrapper` with a wrapper for records."""
     
     def wrap_records(self, records, layout):
         return pd.DataFrame(records, columns=layout._fields)
@@ -23,6 +21,9 @@ class timeseries_property():
         self.name = name
 
     def __call__(self, func):
+        func.__doc__ += """
+        
+        <span class="badge badge-pill badge-primary">timeseries</span>"""
         return cached_property(func, property_cls=self.__class__, name=self.name)
 
 
@@ -33,6 +34,9 @@ class metric_property():
         self.name = name
 
     def __call__(self, func):
+        func.__doc__ += """
+        
+        <span class="badge badge-pill badge-success">metric</span>"""
         return cached_property(func, property_cls=self.__class__, name=self.name)
 
 
@@ -43,6 +47,9 @@ class records_property():
         self.name = name
 
     def __call__(self, func):
+        func.__doc__ += """
+        
+        <span class="badge badge-pill badge-warning">records</span>"""
         return cached_property(func, property_cls=self.__class__, name=self.name)
 
 
@@ -56,6 +63,9 @@ class group_property():
         self.cls = cls
 
     def __call__(self, func):
+        func.__doc__ += """
+        
+        <span class="badge badge-pill badge-info">group</span>"""
         return cached_property(func, property_cls=self.__class__, name=self.name, cls=self.cls)
 
 

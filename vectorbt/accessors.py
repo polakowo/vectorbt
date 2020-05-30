@@ -12,6 +12,7 @@ class Vbt_DFAccessor(DirNamesMixin, Base_DFAccessor):
     def __init__(self, obj):
         self._obj = obj
 
+        DirNamesMixin.__init__(self)
         Base_DFAccessor.__init__(self, self)
 
 
@@ -21,6 +22,7 @@ class Vbt_SRAccessor(DirNamesMixin, Base_SRAccessor):
     def __init__(self, obj):
         self._obj = obj
         
+        DirNamesMixin.__init__(self)
         Base_SRAccessor.__init__(self, self)
 
 

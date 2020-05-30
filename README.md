@@ -1,4 +1,5 @@
-![](https://travis-ci.org/polakowo/vectorbt.svg?branch=master&status=passed) ![](https://img.shields.io/badge/version-0.8-blue)
+![](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)
+![](https://img.shields.io/badge/version-0.9-blue?style=for-the-badge)
 
 # vectorbt
 
@@ -16,7 +17,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in about 5 seconds (Note: compiling with Numba may take some time):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in under 5 seconds (Note: compiling with Numba may take some time):
 
 ```python
 import vectorbt as vbt
@@ -180,3 +181,7 @@ https://polakowo.io/vectorbt/
 - [How stop-loss and trailing stop orders perform on cryptocurrencies?](examples/StopLoss-vs-TrailingStop.ipynb)
 
 Note: you will need to run the notebook to play with widgets.
+
+## Credits
+
+- Logo made by [Freepik](https://www.flaticon.com/authors/freepik) from [Flaticon](www.flaticon.com)

@@ -26,15 +26,6 @@ class Base_Accessor(ArrayWrapper):
         ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
 
     @classmethod
-    def _validate(cls, obj):
-        """Define your validation logic here."""
-        pass
-
-    def validate(self):
-        """Call this method to instantiate the accessor and invoke `Base_Accessor._validate`."""
-        pass
-
-    @classmethod
     def empty(cls, shape, fill_value=np.nan, **kwargs):
         """Generate an empty Series/DataFrame of shape `shape` and fill with `fill_value`."""
         if not isinstance(shape, tuple) or (isinstance(shape, tuple) and len(shape) == 1):

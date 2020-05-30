@@ -404,7 +404,7 @@ def trade_records_nb(price, order_records):
             avg_buy_price = buy_gross_sum / buy_size_sum
             # Opening fees are the size-weighted average over all purchase fees
             frac_buy_fees = order_size / buy_size_sum * buy_fees_sum
-            # Calculate P&L and return
+            # Calculate PnL and return
             buy_val = order_size * avg_buy_price + frac_buy_fees
             sell_val = order_size * order_price - order_fees
             pnl = sell_val - buy_val
@@ -558,7 +558,7 @@ def position_records_nb(price, order_records):
 
 @njit
 def map_records_to_matrix_nb(records, target_shape, col_field, row_field, map_func_nb, *args):
-    """Reshape records into a matrix.
+    """Map each record to a value that is then stored in a matrix.
 
     Maps each record to a value at `(row_field, col_field)`.
 

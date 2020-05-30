@@ -51,6 +51,7 @@ try:
     nansum = bn.nansum
     nanmax = bn.nanmax
     nanmin = bn.nanmin
+    nanmedian = bn.nanmedian
     nanargmax = bn.nanargmax
     nanargmin = bn.nanargmin
 except ImportError:
@@ -60,6 +61,7 @@ except ImportError:
     nansum = np.nansum
     nanmax = np.nanmax
     nanmin = np.nanmin
+    nanmedian = np.nanmedian
     nanargmax = np.nanargmax
     nanargmin = np.nanargmin
 
@@ -298,7 +300,6 @@ class TimeSeries_Accessor(TSArrayWrapper):
 
         result = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
         return self.wrap(result)
-    
 
     def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.apply_and_reduce_nb`.
@@ -360,43 +361,39 @@ class TimeSeries_Accessor(TSArrayWrapper):
 
     def min(self, **kwargs):
         """Return min of non-NaN elements."""
-        result = nanmin(self.to_2d_array(), axis=0)
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(nanmin(self.to_2d_array(), axis=0), **kwargs)
 
     def max(self, **kwargs):
         """Return max of non-NaN elements."""
-        result = nanmax(self.to_2d_array(), axis=0)
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(nanmax(self.to_2d_array(), axis=0), **kwargs)
 
     def mean(self, **kwargs):
         """Return mean of non-NaN elements."""
-        result = nanmean(self.to_2d_array(), axis=0)
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(nanmean(self.to_2d_array(), axis=0), **kwargs)
+
+    def median(self, **kwargs):
+        """Return median of non-NaN elements."""
+        return self.wrap_reduced(nanmedian(self.to_2d_array(), axis=0), **kwargs)
 
     def std(self, ddof=1, **kwargs):
         """Return standard deviation of non-NaN elements."""
-        result = nanstd(self.to_2d_array(), ddof=ddof, axis=0)
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(nanstd(self.to_2d_array(), ddof=ddof, axis=0), **kwargs)
 
     def count(self, **kwargs):
         """Return count of non-NaN elements."""
-        result = np.sum(~np.isnan(self.to_2d_array()), axis=0)
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **kwargs)
 
     def sum(self, **kwargs):
         """Return sum of non-NaN elements."""
-        result = nansum(self.to_2d_array(), axis=0)
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(nansum(self.to_2d_array(), axis=0), **kwargs)
 
     def argmin(self, **kwargs):
         """Return index of min of non-NaN elements."""
-        result = self.index[nanargmin(self.to_2d_array(), axis=0)]
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(self.index[nanargmin(self.to_2d_array(), axis=0)], **kwargs)
 
     def argmax(self, **kwargs):
         """Return index of max of non-NaN elements."""
-        result = self.index[nanargmax(self.to_2d_array(), axis=0)]
-        return self.wrap_reduced(result, **kwargs)
+        return self.wrap_reduced(self.index[nanargmax(self.to_2d_array(), axis=0)], **kwargs)
 
     def describe(self, percentiles=[0.25, 0.5, 0.75], **kwargs):
         """See `vectorbt.timeseries.nb.describe_reduce_func_nb`.

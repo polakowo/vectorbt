@@ -1,4 +1,4 @@
-"""Indicators built with `vectorbt.IndicatorFactory`.
+"""Indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
 ```py
 import numpy as np
@@ -870,7 +870,6 @@ def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, si
         signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window, minp=signal_window)
     else:
         signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window, minp=signal_window)
-    signal_ts[:max(fast_window, slow_window)+signal_window-2, :] = np.nan  # min_periodd
     return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
 
 

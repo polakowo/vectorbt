@@ -371,7 +371,7 @@ class Signals_Accessor():
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
-            other.vbt.signals.validate()
+            checks.assert_dtype(other, np.bool_)
             result = nb.map_reduce_between_two_nb(
                 self.to_2d_array(), other.vbt.to_2d_array(), map_func_nb, reduce_func_nb, *args)
             if isinstance(obj, pd.Series):

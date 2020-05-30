@@ -1,12 +1,13 @@
-"""Enumerated types."""
+"""Named tuples and enumerated types."""
 
 from collections import namedtuple
+import json
 
 __pdoc__ = {}
 
 # We use namedtuple for enums and classes to be able to use them in Numba
 
-# ############# Classes ############# #
+# ############# Named tuples ############# #
 
 Order = namedtuple('Order', [
     'size',
@@ -35,13 +36,35 @@ __pdoc__['FilledOrder.size'] = "Filled size in shares."
 __pdoc__['FilledOrder.price'] = "Filled price per share, adjusted with slippage."
 __pdoc__['FilledOrder.side'] = "See `OrderSide`."
 
-# ############# Constants ############# #
+# ############# Enums ############# #
 
 OrderSide = namedtuple('OrderSide', [
-    'Buy', 
+    'Buy',
     'Sell'
 ])(*range(2))
-"""An enum representing the side of an order."""
+"""_"""
+
+__pdoc__['OrderSide'] = f"""An enum representing the side of an order.
+
+```plaintext
+{json.dumps(dict(zip(OrderSide._fields, OrderSide)), indent=2)}
+```
+"""
+
+PositionStatus = namedtuple('PositionStatus', [
+    'Open',
+    'Closed'
+])(*range(2))
+"""_"""
+
+__pdoc__['PositionStatus'] = f"""An enum representing the status of a position.
+
+```plaintext
+{json.dumps(dict(zip(PositionStatus._fields, PositionStatus)), indent=2)}
+```
+"""
+
+# ############# Record field enums ############# #
 
 OrderRecord = namedtuple('OrderRecord', [
     'Column',
@@ -51,17 +74,18 @@ OrderRecord = namedtuple('OrderRecord', [
     'Fees',
     'Side'
 ])(*range(6))
-"""An enum representing an order record."""
+"""_"""
 
-PositionStatus = namedtuple('PositionStatus', [
-    'Open', 
-    'Closed'
-])(*range(2))
-"""An enum representing the status of a position."""
+__pdoc__['OrderRecord'] = f"""An enum representing fields of an order record.
+
+```plaintext
+{json.dumps(dict(zip(OrderRecord._fields, OrderRecord)), indent=2)}
+```
+"""
 
 EventRecord = namedtuple('EventRecord', [
     'Column',
-    'Size', 
+    'Size',
     'OpenAt',
     'OpenPrice',
     'OpenFees',
@@ -71,16 +95,39 @@ EventRecord = namedtuple('EventRecord', [
     'PnL',
     'Return'
 ])(*range(10))
-"""An enum representing an event such as trade or position."""
+"""_"""
+
+__pdoc__['EventRecord'] = f"""An enum representing fields of an event record. 
+
+An event can be anything that fits the following schema (e.g. trade and position):
+
+```plaintext
+{json.dumps(dict(zip(EventRecord._fields, EventRecord)), indent=2)}
+```
+"""
 
 TradeRecord = namedtuple('TradeRecord', [
     *EventRecord._fields,
     'Position'
 ])(*range(11))
-"""An enum representing a trade. Follows `EventRecord`."""
+"""_"""
+
+__pdoc__['TradeRecord'] = f"""An enum representing fields of a trade record. Follows `EventRecord`.
+
+```plaintext
+{json.dumps(dict(zip(TradeRecord._fields, TradeRecord)), indent=2)}
+```
+"""
 
 PositionRecord = namedtuple('PositionRecord', [
     *EventRecord._fields,
     'Status'
 ])(*range(11))
-"""An enum representing a position. Follows `EventRecord`."""
+"""_"""
+
+__pdoc__['PositionRecord'] = f"""An enum representing fields of a position record. Follows `EventRecord`.
+
+```plaintext
+{json.dumps(dict(zip(PositionRecord._fields, PositionRecord)), indent=2)}
+```
+"""
