@@ -143,16 +143,14 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
 - Provides a collection of utility functions for working with data
-- Extensive input and output validation during runtime (data type, shape, etc.)
-- Implements NumPy broadcasting for pandas with different modes
 - `vbt.timeseries` accessor for working with time series data
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data
     - Entry, exit and random signal generation, ranking and distance functions
     - Generation of stop loss, trailing stop and take profit signals
 - `vbt.portfolio` accessor for modeling portfolio performance
-    - From signals, orders, or custom order function
-    - A range of performance time series, metrics, and plotting functions
+    - Accepts signals, orders, or custom order function
+    - Provides common financial risk and performance metrics for returns, orders, trades and positions
 - Provides a range of technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
@@ -173,7 +171,7 @@ See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-
 
 ## Documentation
 
-https://polakowo.io/vectorbt/
+[polakowo.io/vectorbt](https://polakowo.io/vectorbt/)
 
 ## Example notebooks
 
