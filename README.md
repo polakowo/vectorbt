@@ -143,6 +143,7 @@ The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5d
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done stricly using NumPy and Numba 
 - Provides a collection of utility functions for working with data
+    - Implements NumPy-like broadcasting for pandas, among other features.
 - `vbt.timeseries` accessor for working with time series data
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
 - `vbt.signals` accessor for working with signals data
@@ -176,7 +177,7 @@ See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-
 ## Example notebooks
 
 - [Who beats Bitcoin: Dual moving average crossover, trading randomly or holding?](examples/Bitcoin-DMAC.ipynb)
-- [How stop-loss and trailing stop orders perform on cryptocurrencies?](examples/StopLoss-vs-TrailingStop.ipynb)
+- [How stop-loss and trailing stop orders perform on crypto?](examples/StopLoss-vs-TrailingStop.ipynb)
 
 Note: you will need to run the notebook to play with widgets.
 
