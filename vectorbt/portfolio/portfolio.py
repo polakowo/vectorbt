@@ -6,9 +6,24 @@ The job of the `Portfolio` class is to create a series of positions allocated
     position/profit metrics and drawdown information.
 
 Depending upon the class method, it takes some input, and for each column in this input, 
-it calculates the portfolio value by tracking the price, the amount of cash held, the 
-amount of shares held, but also the costs spent at each time step. It then passes these 
-time series to the `__init__` method to create an instance of the `Portfolio` class.
+it records orders, the amount of cash held, and the amount of shares held at each time step. 
+It then passes these to the `__init__` method to create an instance of the `Portfolio` class.
+
+```py
+import vectorbt as vbt
+import numpy as np
+import pandas as pd
+from numba import njit
+from datetime import datetime
+index = pd.Index([
+    datetime(2018, 1, 1),
+    datetime(2018, 1, 2),
+    datetime(2018, 1, 3),
+    datetime(2018, 1, 4),
+    datetime(2018, 1, 5)
+])
+price = pd.Series([1, 2, 3, 2, 1], index=index, name='a')
+```
 
 ## Properties
 
@@ -30,7 +45,7 @@ would have re-calculated everything starting from equity, each time.
 !!! note
     `Portfolio` class is meant to be immutable due to caching, thus each public attribute is
     marked as read-only. To change an attribute, you need to create a new Portfolio instance.
-
+    
 ### Property hierarchy
 
 All those properties are building a hierarchy with time series and metrics as leafs, and group 
@@ -43,9 +58,13 @@ such as the full name of a metric and its display format. And by defining the gr
 Portfolio
 +-- @timeseries_property
 +-- @metric_property
++-- @records_property
++-- ...
 +-- @group_property
     +-- @timeseries_property
     +-- @metric_property
+    +-- @records_property
+    +-- ...
 ```
 
 This way, the `Portfolio` class acts as an extendable tree data structure for properties with 
@@ -56,72 +75,7 @@ and build the list on the fly.
 !!! note
     Hierarchy and annotations are only visible when traversing the class, not the class instance.
     To add a new attribute to the hierarchy, you need to subclass `Portfolio` and define your
-    properties there. Each property must be a subclass of `vectorbt.utils.decorators.custom_property`.
-
-## Indexing
-
-In addition, you can use pandas indexing on the `Portfolio` class itself, which forwards
-indexing operation to each `__init__` argument with pandas type (see `portfolio_indexing_func`):
-
-```python-repl
->>> import vectorbt as vbt
->>> import numpy as np
->>> import pandas as pd
->>> from numba import njit
->>> from datetime import datetime
-
->>> index = pd.Index([
-...     datetime(2018, 1, 1),
-...     datetime(2018, 1, 2),
-...     datetime(2018, 1, 3),
-...     datetime(2018, 1, 4),
-...     datetime(2018, 1, 5)
-... ])
->>> price = pd.Series([1, 2, 3, 2, 1], index=index, name='a')
-
->>> portfolio = vbt.Portfolio.from_orders(price, price.diff(), init_capital=100)
-
->>> print(portfolio.equity)
-2018-01-01    100.0
-2018-01-02    100.0
-2018-01-03    101.0
-2018-01-04     99.0
-2018-01-05     98.0
-Name: a, dtype: float64
->>> print(portfolio.loc['2018-01-03':].equity)
-2018-01-03    101.0
-2018-01-04     99.0
-2018-01-05     98.0
-Name: a, dtype: float64
-```
-
-Note that for the new `Portfolio` instance, date `'2018-01-03'` will be the new start date.
-
-## Addition
-
-You can also add multiple `Portfolio` instances together to combine portfolios:
-
-```python-repl
->>> portfolio1 = vbt.Portfolio.from_orders(price, price.diff(), init_capital=100)
->>> portfolio2 = vbt.Portfolio.from_orders(price, price.diff()*2, init_capital=20)
->>> portfolio = portfolio1 + portfolio2
-
->>> print(portfolio.init_capital)
-120.0
->>> print(portfolio.equity)
-2018-01-01    120.0
-2018-01-02    120.0
-2018-01-03    123.0
-2018-01-04    117.0
-2018-01-05    114.0
-Name: a, dtype: float64
-```
-
-The only requirement is that both portfolios must have the same metadata.
-
-!!! warning
-    If both portfolios have trades with opposite directions at the same time step, it may cause problems. 
-    For example, if two trades cancel each other, it will produce a price of `np.inf`."""
+    properties there. Each property must be a subclass of `vectorbt.utils.decorators.custom_property`."""
 
 import numpy as np
 import pandas as pd
@@ -129,54 +83,30 @@ from datetime import timedelta
 from scipy import stats
 
 from vectorbt import timeseries, accessors, defaults
-from vectorbt.utils import indexing, checks, reshape_fns
+from vectorbt.utils import checks, reshape_fns
 from vectorbt.utils.config import merge_kwargs
-from vectorbt.timeseries.common import TSArrayWrapper
 from vectorbt.portfolio import nb
+from vectorbt.portfolio.orders import Orders
+from vectorbt.portfolio.trades import Trades
 from vectorbt.portfolio.positions import Positions
+from vectorbt.portfolio.enums import OrderRecord, TradeRecord, PositionRecord
 from vectorbt.portfolio.common import (
+    PArrayWrapper,
     timeseries_property,
     metric_property,
-    group_property
+    records_property,
+    group_property,
+    PropertyTraverser
 )
 
 
-def _indexing_func(obj, pd_indexing_func):
-    """Perform indexing on `Portfolio`. 
-
-    See `vectorbt.utils.indexing.PandasIndexing`."""
-    factor_returns = obj.factor_returns
-    if factor_returns is not None:
-        factor_returns = pd_indexing_func(obj.factor_returns)
-    return obj.__class__(
-        pd_indexing_func(obj.price),
-        obj.init_capital,
-        pd_indexing_func(obj.trade_size),
-        pd_indexing_func(obj.trade_price),
-        pd_indexing_func(obj.trade_fees),
-        pd_indexing_func(obj.cash),
-        pd_indexing_func(obj.shares),
-        data_freq=obj.data_freq,
-        year_freq=obj.year_freq,
-        risk_free=obj.risk_free,
-        required_return=obj.required_return,
-        cutoff=obj.cutoff,
-        factor_returns=factor_returns
-    )
-
-
-_PandasIndexer = indexing.PandasIndexing(_indexing_func)
-
-
-class Portfolio(_PandasIndexer):
+class Portfolio(PropertyTraverser):
     """Class for building a portfolio and measuring its performance.
 
     Args:
         price (pandas_like): Main price of the asset.
         init_capital (int or float): The initial capital.
-        trade_size (pandas_like): Trade size at each time step.
-        trade_price (pandas_like): Trade price at each time step.
-        trade_fees (pandas_like): Trade fees at each time step.
+        order_records (array_like): Records of type `vectorbt.portfolio.enums.OrderRecord`.
         cash (pandas_like): Cash held at each time step.
         shares (pandas_like): Shares held at each time step.
         data_freq (any): Data frequency in case `price.index` is not datetime-like. 
@@ -198,21 +128,19 @@ class Portfolio(_PandasIndexer):
 
         All array objects must have the same metadata as `price`."""
 
-    def __init__(self, price, init_capital, trade_size, trade_price, trade_fees, cash, shares, data_freq=None,
+    def __init__(self, price, init_capital, order_records, cash, shares, data_freq=None,
                  year_freq=None, risk_free=None, required_return=None, cutoff=None, factor_returns=None):
+        # Perform checks
         checks.assert_type(price, (pd.Series, pd.DataFrame))
-        checks.assert_same_meta(price, trade_size)
-        checks.assert_same_meta(price, trade_price)
-        checks.assert_same_meta(price, trade_fees)
+        checks.assert_type(order_records, np.ndarray)
+        checks.assert_same_shape(order_records, OrderRecord, axis=(1, 0))
         checks.assert_same_meta(price, cash)
         checks.assert_same_meta(price, shares)
 
         # Main parameters
         self._price = price
         self._init_capital = init_capital
-        self._trade_size = trade_size
-        self._trade_price = trade_price
-        self._trade_fees = trade_fees
+        self._order_records = order_records
         self._cash = cash
         self._shares = shares
 
@@ -234,44 +162,7 @@ class Portfolio(_PandasIndexer):
         self._factor_returns = factor_returns
 
         # Supercharge
-        self.ts_wrapper = TSArrayWrapper.from_obj(price)
-        _PandasIndexer.__init__(self)
-
-    # ############# Magic methods ############# #
-
-    def __add__(self, other):
-        checks.assert_type(other, self.__class__)
-        checks.assert_same(self.price, other.price)
-        checks.assert_same(self.data_freq, other.data_freq)
-        checks.assert_same(self.year_freq, other.year_freq)
-        checks.assert_same(self.risk_free, other.risk_free)
-        checks.assert_same(self.required_return, other.required_return)
-        checks.assert_same(self.cutoff, other.cutoff)
-        checks.assert_same(self.factor_returns, other.factor_returns)
-
-        # NOTE: The following approach results in information loss + sizes can cancel each other
-        # If you bought 10 for 20$ and sold 10 for 40$, final size will be 0. and price np.inf
-        sum_trade_size = self.trade_size + other.trade_size
-        avg_trade_price = (self.trade_size * self.trade_price + other.trade_size * other.trade_price) / sum_trade_size
-
-        return self.__class__(
-            self.price,
-            self.init_capital + other.init_capital,
-            sum_trade_size,
-            avg_trade_price,
-            self.trade_fees + other.trade_fees,
-            self.cash + other.cash,
-            self.shares + other.shares,
-            data_freq=self.data_freq,
-            year_freq=self.year_freq,
-            risk_free=self.risk_free,
-            required_return=self.required_return,
-            cutoff=self.cutoff,
-            factor_returns=self.factor_returns
-        )
-
-    def __radd__(self, other):
-        return Portfolio.__add__(self, other)
+        self.wrapper = PArrayWrapper.from_obj(price)
 
     # ############# Class methods ############# #
 
@@ -294,8 +185,8 @@ class Portfolio(_PandasIndexer):
             entry_price (array_like): Entry price. Defaults to `price`.
             exit_price (array_like): Exit price. Defaults to `price`.
             init_capital (int or float): The initial capital.
-            fees (float or array_like): Fees in percentage of the trade value.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per trade.
+            fees (float or array_like): Fees in percentage of the order value.
+            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
             slippage (float or array_like): Slippage in percentage of price.
             accumulate (bool): If `accumulate` is `True`, entering the market when already 
                 in the market will be allowed to increase a position.
@@ -323,27 +214,15 @@ class Portfolio(_PandasIndexer):
             ...     price, entries, exits, size=10,
             ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
 
-            >>> print(portfolio.trade_size)
-                           a     b     c
-            2018-01-01  10.0  10.0  10.0
-            2018-01-02   NaN -10.0   NaN
-            2018-01-03   NaN  10.0   NaN
-            2018-01-04   NaN -10.0   NaN
-            2018-01-05   NaN  10.0   NaN
-            >>> print(portfolio.trade_price)
-                            a      b      c
-            2018-01-01  1.001  1.001  1.001
-            2018-01-02    NaN  1.998    NaN
-            2018-01-03    NaN  3.003    NaN
-            2018-01-04    NaN  1.998    NaN
-            2018-01-05    NaN  1.001    NaN
-            >>> print(portfolio.trade_fees)
-                               a         b         c
-            2018-01-01  1.025025  1.025025  1.025025
-            2018-01-02       NaN  1.049950       NaN
-            2018-01-03       NaN  1.075075       NaN
-            2018-01-04       NaN  1.049950       NaN
-            2018-01-05       NaN  1.025025       NaN
+            >>> print(portfolio.order_records)
+               Column  Index  Size  Price      Fees  Side
+            0     0.0    0.0  10.0  1.001  1.025025   0.0
+            1     1.0    0.0  10.0  1.001  1.025025   0.0
+            2     1.0    1.0  10.0  1.998  1.049950   1.0
+            3     1.0    2.0  10.0  3.003  1.075075   0.0
+            4     1.0    3.0  10.0  1.998  1.049950   1.0
+            5     1.0    4.0  10.0  1.001  1.025025   0.0
+            6     2.0    0.0  10.0  1.001  1.025025   0.0
             >>> print(portfolio.shares)
                            a     b     c
             2018-01-01  10.0  10.0  10.0
@@ -385,7 +264,7 @@ class Portfolio(_PandasIndexer):
                                   fixed_fees, slippage, **broadcast_kwargs, writeable=True)
 
         # Perform calculation
-        trade_size, trade_price, trade_fees, cash, shares = nb.simulate_from_signals_nb(
+        order_records, cash, shares = nb.simulate_from_signals_nb(
             reshape_fns.to_2d(price, raw=True).shape,
             init_capital,
             reshape_fns.to_2d(entries, raw=True),
@@ -399,13 +278,10 @@ class Portfolio(_PandasIndexer):
             accumulate)
 
         # Bring to the same meta
-        trade_size = price.vbt.wrap(trade_size)
-        trade_price = price.vbt.wrap(trade_price)
-        trade_fees = price.vbt.wrap(trade_fees)
         cash = price.vbt.wrap(cash)
         shares = price.vbt.wrap(shares)
 
-        return cls(price, init_capital, trade_size, trade_price, trade_fees, cash, shares, **kwargs)
+        return cls(price, init_capital, order_records, cash, shares, **kwargs)
 
     @classmethod
     def from_orders(cls, price, order_size, order_price=None, init_capital=None, fees=None, fixed_fees=None,
@@ -424,8 +300,8 @@ class Portfolio(_PandasIndexer):
                 To buy/sell everything, set the size to `numpy.inf`.
             order_price (array_like): Order price. Defaults to `price`.
             init_capital (int or float): The initial capital.
-            fees (float or array_like): Fees in percentage of the trade value.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per trade.
+            fees (float or array_like): Fees in percentage of the order value.
+            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
             slippage (float or array_like): Slippage in percentage of `order_price`.
             is_target (bool): If `True`, will order the difference between current and target size.
             **kwargs: Keyword arguments passed to the `__init__` method.
@@ -446,27 +322,19 @@ class Portfolio(_PandasIndexer):
             >>> portfolio = vbt.Portfolio.from_orders(price, orders, 
             ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
 
-            >>> print(portfolio.trade_size)
-                                a    b           c
-            2018-01-01  98.654463  1.0   98.654463
-            2018-01-02        NaN  1.0  -98.654463
-            2018-01-03        NaN  1.0   64.646521
-            2018-01-04        NaN  1.0  -64.646521
-            2018-01-05        NaN -4.0  126.398131
-            >>> print(portfolio.trade_price)
-                            a      b      c
-            2018-01-01  1.001  1.001  1.001
-            2018-01-02    NaN  2.002  1.998
-            2018-01-03    NaN  3.003  3.003
-            2018-01-04    NaN  2.002  1.998
-            2018-01-05    NaN  0.999  1.001
-            >>> print(portfolio.trade_fees)
-                               a         b         c
-            2018-01-01  1.246883  1.002502  1.246883
-            2018-01-02       NaN  1.005005  1.492779
-            2018-01-03       NaN  1.007507  1.485334
-            2018-01-04       NaN  1.005005  1.322909
-            2018-01-05       NaN  1.009990  1.316311
+            >>> print(portfolio.order_records)
+                Column  Index        Size  Price      Fees  Side
+            0      0.0    0.0   98.654463  1.001  1.246883   0.0
+            1      1.0    0.0    1.000000  1.001  1.002502   0.0
+            2      1.0    1.0    1.000000  2.002  1.005005   0.0
+            3      1.0    2.0    1.000000  3.003  1.007507   0.0
+            4      1.0    3.0    1.000000  2.002  1.005005   0.0
+            5      1.0    4.0    4.000000  0.999  1.009990   1.0
+            6      2.0    0.0   98.654463  1.001  1.246883   0.0
+            7      2.0    1.0   98.654463  1.998  1.492779   1.0
+            8      2.0    2.0   64.646521  3.003  1.485334   0.0
+            9      2.0    3.0   64.646521  1.998  1.322909   1.0
+            10     2.0    4.0  126.398131  1.001  1.316311   0.0
             >>> print(portfolio.shares)
                                 a    b           c
             2018-01-01  98.654463  1.0   98.654463
@@ -505,7 +373,7 @@ class Portfolio(_PandasIndexer):
                                   slippage, **broadcast_kwargs, writeable=True)
 
         # Perform calculation
-        trade_size, trade_price, trade_fees, cash, shares = nb.simulate_from_orders_nb(
+        order_records, cash, shares = nb.simulate_from_orders_nb(
             reshape_fns.to_2d(price, raw=True).shape,
             init_capital,
             reshape_fns.to_2d(order_size, raw=True),
@@ -516,13 +384,10 @@ class Portfolio(_PandasIndexer):
             is_target)
 
         # Bring to the same meta
-        trade_size = price.vbt.wrap(trade_size)
-        trade_price = price.vbt.wrap(trade_price)
-        trade_fees = price.vbt.wrap(trade_fees)
         cash = price.vbt.wrap(cash)
         shares = price.vbt.wrap(shares)
 
-        return cls(price, init_capital, trade_size, trade_price, trade_fees, cash, shares, **kwargs)
+        return cls(price, init_capital, order_records, cash, shares, **kwargs)
 
     @classmethod
     def from_order_func(cls, price, order_func_nb, *args, init_capital=None, **kwargs):
@@ -555,39 +420,20 @@ class Portfolio(_PandasIndexer):
             ```python-repl
             >>> from vectorbt.portfolio.nb import Order
 
-            >>> size = 10
-            >>> fees = 0.01
-            >>> fixed_fees = 1
-            >>> slippage = 0.01
-
             >>> @njit
             ... def order_func_nb(col, i, run_cash, run_shares, price):
-            ...     return Order(size, price[i], fees, fixed_fees, slippage)
+            ...     return Order(10, price[i], fees=0.01, fixed_fees=1., slippage=0.01)
 
             >>> portfolio = vbt.Portfolio.from_order_func(
-            ...     price, order_func_nb, price.values)
+            ...     price, order_func_nb, price.values, init_capital=100)
 
-            >>> print(portfolio.trade_size)
-            2018-01-01    10.0
-            2018-01-02    10.0
-            2018-01-03    10.0
-            2018-01-04    10.0
-            2018-01-05    10.0
-            Name: a, dtype: float64
-            >>> print(portfolio.trade_price)
-            2018-01-01    1.01
-            2018-01-02    2.02
-            2018-01-03    3.03
-            2018-01-04    2.02
-            2018-01-05    1.01
-            Name: a, dtype: float64
-            >>> print(portfolio.trade_fees)
-            2018-01-01    1.101
-            2018-01-02    1.202
-            2018-01-03    1.303
-            2018-01-04    1.202
-            2018-01-05    1.101
-            Name: a, dtype: float64
+            >>> print(portfolio.order_records)
+               Column  Index  Size  Price   Fees  Side
+            0     0.0    0.0  10.0   1.01  1.101   0.0
+            1     0.0    1.0  10.0   2.02  1.202   0.0
+            2     0.0    2.0  10.0   3.03  1.303   0.0
+            3     0.0    3.0  10.0   2.02  1.202   0.0
+            4     0.0    4.0  10.0   1.01  1.101   0.0
             >>> print(portfolio.shares)
             2018-01-01    10.0
             2018-01-02    20.0
@@ -614,20 +460,17 @@ class Portfolio(_PandasIndexer):
         checks.assert_numba_func(order_func_nb)
 
         # Perform calculation
-        trade_size, trade_price, trade_fees, cash, shares = nb.simulate_nb(
+        order_records, cash, shares = nb.simulate_nb(
             reshape_fns.to_2d(price, raw=True).shape,
             init_capital,
             order_func_nb,
             *args)
 
         # Bring to the same meta
-        trade_size = price.vbt.wrap(trade_size)
-        trade_price = price.vbt.wrap(trade_price)
-        trade_fees = price.vbt.wrap(trade_fees)
         cash = price.vbt.wrap(cash)
         shares = price.vbt.wrap(shares)
 
-        return cls(price, init_capital, trade_size, trade_price, trade_fees, cash, shares, **kwargs)
+        return cls(price, init_capital, order_records, cash, shares, **kwargs)
 
     # ############# Passed properties ############# #
 
@@ -640,21 +483,6 @@ class Portfolio(_PandasIndexer):
     def price(self):
         """Price per share at each time step."""
         return self._price
-
-    @timeseries_property('Trade size')
-    def trade_size(self):
-        """Trade size at each time step."""
-        return self._trade_size
-
-    @timeseries_property('Trade price')
-    def trade_price(self):
-        """Trade price at each time step."""
-        return self._trade_price
-
-    @timeseries_property('Trade fees')
-    def trade_fees(self):
-        """Trade fees at each time step."""
-        return self._trade_fees
 
     @timeseries_property('Cash')
     def cash(self):
@@ -703,98 +531,65 @@ class Portfolio(_PandasIndexer):
         """Benchmark return to compare returns against."""
         return self._factor_returns
 
+    # ############# Orders ############# #
+
+    @records_property('Order records')
+    def order_records(self):
+        """Records of type `vectorbt.portfolio.enums.OrderRecord`."""
+        return self.wrapper.wrap_records(self._order_records, OrderRecord)
+
+    @group_property('Orders', Orders)
+    def orders(self):
+        """Time series and metrics based on order records."""
+        return Orders(self.wrapper, self._order_records)
+
     # ############# Trades ############# #
 
-    @timeseries_property('Trades')
+    @records_property('Trade records')
+    def trade_records(self):
+        """Records of type `vectorbt.portfolio.enums.TradeRecord`."""
+        trade_records = nb.trade_records_nb(self.price.vbt.to_2d_array(), self._order_records)
+        return self.wrapper.wrap_records(trade_records, TradeRecord)
+
+    @group_property('Trades', Trades)
     def trades(self):
-        """Amount of shares ordered at each time step."""
-        shares = self.shares.vbt.to_2d_array()
-        trades = timeseries.nb.fillna_nb(timeseries.nb.diff_nb(shares), 0)
-        trades[0, :] = shares[0, :]
-        return self.ts_wrapper.wrap(trades)
-
-    def plot_trades(self,
-                    buy_trace_kwargs={},
-                    sell_trace_kwargs={},
-                    fig=None,
-                    **layout_kwargs):
-        """Plot trades as markers.
-
-        Args:
-            buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
-            sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```py
-            vbt.Portfolio.from_orders(price, price.diff(), init_capital=100).plot_trades()
-            ```
-
-            ![](/vectorbt/docs/img/portfolio_plot_trades.png)"""
-        checks.assert_type(self.price, pd.Series)
-        checks.assert_type(self.trades, pd.Series)
-        sell_mask = self.trades < 0
-        buy_mask = self.trades > 0
-
-        # Plot time series
-        fig = self.price.vbt.timeseries.plot(fig=fig, **layout_kwargs)
-        # Plot markers
-        buy_trace_kwargs = merge_kwargs(dict(
-            customdata=self.trades[buy_mask],
-            hovertemplate='(%{x}, %{y})<br>%{customdata:.6g}',
-            marker=dict(
-                symbol='triangle-up',
-                color='limegreen'
-            )
-        ), buy_trace_kwargs)
-        buy_mask.vbt.signals.plot_markers(
-            self.price, name='Buy', trace_kwargs=buy_trace_kwargs, fig=fig, **layout_kwargs)
-        sell_trace_kwargs = merge_kwargs(dict(
-            customdata=self.trades[sell_mask],
-            hovertemplate='(%{x}, %{y})<br>%{customdata:.6g}',
-            marker=dict(
-                symbol='triangle-down',
-                color='orangered'
-            )
-        ), sell_trace_kwargs)
-        sell_mask.vbt.signals.plot_markers(
-            self.price, name='Sell', trace_kwargs=sell_trace_kwargs, fig=fig, **layout_kwargs)
-        return fig
+        """Time series and metrics based on trade records."""
+        return Trades(self.wrapper, self.trade_records.vbt.to_array())
 
     # ############# Positions ############# #
 
+    @records_property('Position records')
+    def position_records(self):
+        """Records of type `vectorbt.portfolio.enums.PositionRecord`."""
+        position_records = nb.position_records_nb(self.price.vbt.to_2d_array(), self._order_records)
+        return self.wrapper.wrap_records(position_records, PositionRecord)
+
     @group_property('Positions', Positions)
     def positions(self):
-        """Positions of the portfolio."""
-        return Positions(
-            self.ts_wrapper,
-            nb.position_records_nb(
-                self.price.vbt.to_2d_array(),
-                self.trade_size.vbt.to_2d_array(),
-                self.trade_price.vbt.to_2d_array(),
-                self.trade_fees.vbt.to_2d_array()))
+        """Time series and metrics based on position records."""
+        return Positions(self.wrapper, self.position_records.vbt.to_array())
 
     # ############# Equity ############# #
 
     @timeseries_property('Equity')
     def equity(self):
-        """Portfolio value at each time step."""
+        """Equity."""
         equity = self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.price.vbt.to_2d_array()
-        return self.ts_wrapper.wrap(equity)
+        return self.wrapper.wrap_timeseries(equity)
 
     @metric_property('Total profit')
     def total_profit(self):
         """Total profit."""
         total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.init_capital
-        return self.ts_wrapper.wrap_reduced(total_profit)
+        return self.wrapper.wrap_metric(total_profit)
 
     # ############# Returns ############# #
 
     @timeseries_property('Returns')
     def returns(self):
-        """Portfolio returns at each time step."""
+        """Portfolio returns."""
         returns = timeseries.nb.pct_change_nb(self.equity.vbt.to_2d_array())
-        return self.ts_wrapper.wrap(returns)
+        return self.wrapper.wrap_timeseries(returns)
 
     @timeseries_property('Daily returns')
     def daily_returns(self):
@@ -814,72 +609,50 @@ class Portfolio(_PandasIndexer):
     def total_return(self):
         """Total return."""
         total_return = reshape_fns.to_1d(self.total_profit, raw=True) / self.init_capital
-        return self.ts_wrapper.wrap_reduced(total_return)
+        return self.wrapper.wrap_metric(total_return)
 
     # ############# Drawdown ############# #
 
     @timeseries_property('Drawdown')
     def drawdown(self):
-        """Relative decline from a peak at each time step."""
+        """Relative decline from a peak."""
         equity = self.equity.vbt.to_2d_array()
         drawdown = 1 - equity / timeseries.nb.expanding_max_nb(equity)
-        return self.ts_wrapper.wrap(drawdown)
+        return self.wrapper.wrap_timeseries(drawdown)
 
     @metric_property('Max drawdown')
     def max_drawdown(self):
         """Total maximum drawdown (MDD)."""
         max_drawdown = np.max(self.drawdown.vbt.to_2d_array(), axis=0)
-        return self.ts_wrapper.wrap_reduced(max_drawdown)
-
-    # ############# Costs ############# #
-
-    @metric_property('Total paid fees')
-    def total_fees_paid(self):
-        """Total paid fees."""
-        total_fees_paid = np.sum(self.fees_paid.vbt.to_2d_array(), axis=0)
-        return self.ts_wrapper.wrap_reduced(total_fees_paid)
-
-    @metric_property('Total paid slippage')
-    def total_slippage_paid(self):
-        """Total paid slippage."""
-        total_slippage_paid = np.sum(self.slippage_paid.vbt.to_2d_array(), axis=0)
-        return self.ts_wrapper.wrap_reduced(total_slippage_paid)
-
-    @metric_property('Total costs')
-    def total_costs(self):
-        """Total costs."""
-        total_fees_paid = reshape_fns.to_1d(self.total_fees_paid, raw=True)
-        total_slippage_paid = reshape_fns.to_1d(self.total_slippage_paid, raw=True)
-        total_costs = total_fees_paid + total_slippage_paid
-        return self.ts_wrapper.wrap_reduced(total_costs)
+        return self.wrapper.wrap_metric(max_drawdown)
 
     # ############# Risk and performance metrics ############# #
 
     @timeseries_property('Cumulative returns')
     def cum_returns(self):
-        """Cumulative returns at each time step."""
-        return self.ts_wrapper.wrap(nb.cum_returns_nb(self.returns.vbt.to_2d_array()))
+        """Cumulative returns."""
+        return self.wrapper.wrap_timeseries(nb.cum_returns_nb(self.returns.vbt.to_2d_array()))
 
     @metric_property('Annualized return')
     def annualized_return(self):
         """Mean annual growth rate of returns. 
 
         This is equivilent to the compound annual growth rate."""
-        return self.ts_wrapper.wrap_reduced(nb.annualized_return_nb(
+        return self.wrapper.wrap_metric(nb.annualized_return_nb(
             self.returns.vbt.to_2d_array(),
             self.ann_factor))
 
     @metric_property('Annualized volatility')
     def annualized_volatility(self):
         """Annualized volatility of a strategy."""
-        return self.ts_wrapper.wrap_reduced(nb.annualized_volatility_nb(
+        return self.wrapper.wrap_metric(nb.annualized_volatility_nb(
             self.returns.vbt.to_2d_array(),
             self.ann_factor))
 
     @metric_property('Calmar ratio')
     def calmar_ratio(self):
         """Calmar ratio, or drawdown ratio, of a strategy."""
-        return self.ts_wrapper.wrap_reduced(nb.calmar_ratio_nb(
+        return self.wrapper.wrap_metric(nb.calmar_ratio_nb(
             self.returns.vbt.to_2d_array(),
             reshape_fns.to_1d(self.annualized_return, raw=True),
             reshape_fns.to_1d(self.max_drawdown, raw=True),
@@ -888,7 +661,7 @@ class Portfolio(_PandasIndexer):
     @metric_property('Omega ratio')
     def omega_ratio(self):
         """Omega ratio of a strategy."""
-        return self.ts_wrapper.wrap_reduced(nb.omega_ratio_nb(
+        return self.wrapper.wrap_metric(nb.omega_ratio_nb(
             self.returns.vbt.to_2d_array(),
             self.ann_factor,
             risk_free=self.risk_free,
@@ -897,7 +670,7 @@ class Portfolio(_PandasIndexer):
     @metric_property('Sharpe ratio')
     def sharpe_ratio(self):
         """Sharpe ratio of a strategy."""
-        return self.ts_wrapper.wrap_reduced(nb.sharpe_ratio_nb(
+        return self.wrapper.wrap_metric(nb.sharpe_ratio_nb(
             self.returns.vbt.to_2d_array(),
             self.ann_factor,
             risk_free=self.risk_free))
@@ -905,7 +678,7 @@ class Portfolio(_PandasIndexer):
     @metric_property('Downside risk')
     def downside_risk(self):
         """Downside deviation below a threshold."""
-        return self.ts_wrapper.wrap_reduced(nb.downside_risk_nb(
+        return self.wrapper.wrap_metric(nb.downside_risk_nb(
             self.returns.vbt.to_2d_array(),
             self.ann_factor,
             required_return=self.required_return))
@@ -913,7 +686,7 @@ class Portfolio(_PandasIndexer):
     @metric_property('Sortino ratio')
     def sortino_ratio(self):
         """Sortino ratio of a strategy."""
-        return self.ts_wrapper.wrap_reduced(nb.sortino_ratio_nb(
+        return self.wrapper.wrap_metric(nb.sortino_ratio_nb(
             self.returns.vbt.to_2d_array(),
             reshape_fns.to_1d(self.downside_risk, raw=True),
             self.ann_factor,
@@ -927,7 +700,7 @@ class Portfolio(_PandasIndexer):
             `factor_returns` must be set."""
         checks.assert_not_none(self.factor_returns)
 
-        return self.ts_wrapper.wrap_reduced(nb.information_ratio_nb(
+        return self.wrapper.wrap_metric(nb.information_ratio_nb(
             self.returns.vbt.to_2d_array(),
             self.factor_returns.vbt.to_2d_array()))
 
@@ -939,7 +712,7 @@ class Portfolio(_PandasIndexer):
             `factor_returns` must be set."""
         checks.assert_not_none(self.factor_returns)
 
-        return self.ts_wrapper.wrap_reduced(nb.beta_nb(
+        return self.wrapper.wrap_metric(nb.beta_nb(
             self.returns.vbt.to_2d_array(),
             self.factor_returns.vbt.to_2d_array(),
             risk_free=self.risk_free))
@@ -952,7 +725,7 @@ class Portfolio(_PandasIndexer):
             `factor_returns` must be set."""
         checks.assert_not_none(self.factor_returns)
 
-        return self.ts_wrapper.wrap_reduced(nb.alpha_nb(
+        return self.wrapper.wrap_metric(nb.alpha_nb(
             self.returns.vbt.to_2d_array(),
             self.factor_returns.vbt.to_2d_array(),
             reshape_fns.to_1d(self.beta, raw=True),
@@ -962,19 +735,19 @@ class Portfolio(_PandasIndexer):
     @metric_property('Tail ratio')
     def tail_ratio(self):
         """Ratio between the right (95%) and left tail (5%)."""
-        return self.ts_wrapper.wrap_reduced(nb.tail_ratio_nb(self.returns.vbt.to_2d_array()))
+        return self.wrapper.wrap_metric(nb.tail_ratio_nb(self.returns.vbt.to_2d_array()))
 
     @metric_property('Value at risk')
     def value_at_risk(self):
         """Value at risk (VaR) of a returns stream."""
-        return self.ts_wrapper.wrap_reduced(nb.value_at_risk_nb(
+        return self.wrapper.wrap_metric(nb.value_at_risk_nb(
             self.returns.vbt.to_2d_array(),
             cutoff=self.cutoff))
 
     @metric_property('Conditional value at risk')
     def conditional_value_at_risk(self):
         """Conditional value at risk (CVaR) of a returns stream."""
-        return self.ts_wrapper.wrap_reduced(nb.conditional_value_at_risk_nb(
+        return self.wrapper.wrap_metric(nb.conditional_value_at_risk_nb(
             self.returns.vbt.to_2d_array(),
             cutoff=self.cutoff))
 
@@ -986,7 +759,7 @@ class Portfolio(_PandasIndexer):
             `factor_returns` must be set."""
         checks.assert_not_none(self.factor_returns)
 
-        return self.ts_wrapper.wrap_reduced(nb.capture_nb(
+        return self.wrapper.wrap_metric(nb.capture_nb(
             self.returns.vbt.to_2d_array(),
             self.factor_returns.vbt.to_2d_array(),
             self.ann_factor))
@@ -999,7 +772,7 @@ class Portfolio(_PandasIndexer):
             `factor_returns` must be set."""
         checks.assert_not_none(self.factor_returns)
 
-        return self.ts_wrapper.wrap_reduced(nb.up_capture_nb(
+        return self.wrapper.wrap_metric(nb.up_capture_nb(
             self.returns.vbt.to_2d_array(),
             self.factor_returns.vbt.to_2d_array(),
             self.ann_factor))
@@ -1012,7 +785,7 @@ class Portfolio(_PandasIndexer):
             `factor_returns` must be set."""
         checks.assert_not_none(self.factor_returns)
 
-        return self.ts_wrapper.wrap_reduced(nb.down_capture_nb(
+        return self.wrapper.wrap_metric(nb.down_capture_nb(
             self.returns.vbt.to_2d_array(),
             self.factor_returns.vbt.to_2d_array(),
             self.ann_factor))
@@ -1020,9 +793,9 @@ class Portfolio(_PandasIndexer):
     @metric_property('Skewness')
     def skew(self):
         """Skewness of returns."""
-        return self.ts_wrapper.wrap_reduced(stats.skew(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))
+        return self.wrapper.wrap_metric(stats.skew(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))
 
     @metric_property('Kurtosis')
     def kurtosis(self):
         """Kurtosis of returns."""
-        return self.ts_wrapper.wrap_reduced(stats.kurtosis(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))
+        return self.wrapper.wrap_metric(stats.kurtosis(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))

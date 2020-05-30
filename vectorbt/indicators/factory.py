@@ -614,7 +614,7 @@ class IndicatorFactory():
 
             for i, ts_name in enumerate(ts_names):
                 setattr(self, f'_{ts_name}', ts_list[i])
-            self.ts_wrapper = TSArrayWrapper.from_obj(ts_list[0])
+            self.wrapper = TSArrayWrapper.from_obj(ts_list[0])
             for i, output_name in enumerate(output_names):
                 setattr(self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):

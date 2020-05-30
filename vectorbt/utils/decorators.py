@@ -83,7 +83,7 @@ class cached_property(custom_property):
             delattr(instance, self.attrname)
 
     def __set_name__(self, owner, name):
-        self.attrname = '_' + name # here is the difference
+        self.attrname = '__cache_' + name # here is the difference
 
     def __get__(self, instance, owner=None):
         if instance is None:
@@ -147,7 +147,7 @@ class cached_method(custom_method):
             delattr(instance, self.attrname)
 
     def __set_name__(self, owner, name):
-        self.attrname = '_' + name # here is the difference
+        self.attrname = '__cache_' + name # here is the difference
 
     def __get__(self, instance, owner=None):
         if instance is None:

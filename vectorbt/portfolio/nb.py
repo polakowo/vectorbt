@@ -12,7 +12,16 @@ from numba import njit, b1, i1, i8, f8
 from numba.core.types import UniTuple
 
 from vectorbt import timeseries
-from vectorbt.portfolio.enums import TradeType, PositionStatus, Order, Trade, Position, EventRecord, TradeRecord, PositionRecord
+from vectorbt.portfolio.enums import (
+    Order,
+    OrderSide,
+    FilledOrder,
+    OrderRecord,
+    EventRecord,
+    TradeRecord,
+    PositionStatus,
+    PositionRecord
+)
 
 # ############# Simulation ############# #
 
@@ -46,7 +55,8 @@ def buy_nb(run_cash, run_shares, order):
         # Update current cash and shares
         run_cash -= adj_size * adj_price + fees_paid
         run_shares += adj_size
-    return run_cash, run_shares, adj_size, adj_price, fees_paid
+        return run_cash, run_shares, FilledOrder(adj_size, adj_price, fees_paid, OrderSide.Buy)
+    return run_cash, run_shares, None
 
 
 @njit(cache=True)
@@ -71,18 +81,19 @@ def sell_nb(run_cash, run_shares, order):
         # Update current cash and shares
         run_cash += adj_size * adj_price - fees_paid
         run_shares -= adj_size
-        adj_size *= -1
-    return run_cash, run_shares, adj_size, adj_price, fees_paid
+        return run_cash, run_shares, FilledOrder(adj_size, adj_price, fees_paid, OrderSide.Sell)
+    return run_cash, run_shares, None
 
 
 @njit(cache=True)
 def fill_order_nb(run_cash, run_shares, order):
     """Fill an order."""
-    if order.size > 0.:
-        return buy_nb(run_cash, run_shares, order)
-    if order.size < 0.:
-        return sell_nb(run_cash, run_shares, order)
-    return run_cash, run_shares, 0., 0., 0.
+    if order is not None:
+        if order.size > 0.:
+            return buy_nb(run_cash, run_shares, order)
+        if order.size < 0.:
+            return sell_nb(run_cash, run_shares, order)
+    return run_cash, run_shares, None
 
 
 @njit
@@ -94,22 +105,25 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
     fulfill that order. If unsuccessful due to insufficient cash/shares, always orders 
     the available fraction. Updates then the current cash and shares balance.
 
-    Returns trade size with direction, trade price, trade fees, cash and shares as time series.
+    Returns order records of layout `vectorbt.portfolio.enums.OrderRecord`, but also 
+    cash and shares as time series.
 
     `order_func_nb` must accept index of the current column `col`, the time step `i`,
     the amount of cash `run_cash` and shares `run_shares` held at the time step `i`, and `*args`.
-    Must either return an `Order` tuple or `None` to do nothing.
+    Must either return an `vectorbt.portfolio.enums.Order` tuple or `None` to do nothing.
 
     !!! warning
         In some cases, passing large arrays as `*args` can negatively impact performance. What can help
         is accessing arrays from `order_func_nb` as non-local variables as we do in the example below.
 
     Example:
+        Simulate a basic buy-and-hold strategy:
         ```python-repl
         >>> import numpy as np
+        >>> import pandas as pd
         >>> from numba import njit
         >>> from vectorbt.portfolio.nb import simulate_nb
-        >>> from vectorbt.portfolio.enums import Order
+        >>> from vectorbt.portfolio.enums import Order, OrderRecord
 
         >>> price = np.asarray([
         ...     [1, 5, 1],
@@ -123,46 +137,30 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         >>> slippage = 0.001
         >>> @njit
         ... def order_func_nb(col, i, run_cash, run_shares):
-        ...     return Order(1 if i % 2 == 0 else -1, price[i, col], 
+        ...     return Order(np.inf if i == 0 else 0, price[i, col], 
         ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage)
-        >>> trade_size, trade_price, trade_fees, cash, shares = \\
-        ...     simulate_nb(price.shape, 100, order_func_nb)
+        >>> order_records, cash, shares = simulate_nb(price.shape, 100, order_func_nb)
 
-        >>> print(trade_size)
-        [[ 1.  1.  1.]
-         [-1. -1. -1.]
-         [ 1.  1.  1.]
-         [-1. -1. -1.]
-         [ 1.  1.  1.]]
-        >>> print(trade_price)
-        [[1.001 5.005 1.001]
-         [1.998 3.996 1.998]
-         [3.003 3.003 3.003]
-         [3.996 1.998 1.998]
-         [5.005 1.001 1.001]]
-        >>> print(trade_fees)
-        [[1.001001 1.005005 1.001001]
-         [1.001998 1.003996 1.001998]
-         [1.003003 1.003003 1.003003]
-         [1.003996 1.001998 1.001998]
-         [1.005005 1.001001 1.001001]]
+        >>> print(pd.DataFrame(order_records, columns=OrderRecord._fields))
+        [[ 0.   0.   98.8022966   1.001   1.0989011   0.   ]
+         [ 1.   0.   19.76045932  5.005   1.0989011   0.   ]
+         [ 2.   0.   98.8022966   1.001   1.0989011   0.   ]]
         >>> print(cash)
-        [[97.997999 93.989995 97.997999]
-         [98.994001 96.981999 98.994001]
-         [94.987998 92.975996 94.987998]
-         [97.980002 93.971998 95.984   ]
-         [91.969997 91.969997 93.981999]]
+        [[0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]
+         [0. 0. 0.]]
         >>> print(shares)
-        [[1. 1. 1.]
-         [0. 0. 0.]
-         [1. 1. 1.]
-         [0. 0. 0.]
-         [1. 1. 1.]]
+        [[98.8022966  19.76045932 98.8022966 ]
+         [98.8022966  19.76045932 98.8022966 ]
+         [98.8022966  19.76045932 98.8022966 ]
+         [98.8022966  19.76045932 98.8022966 ]
+         [98.8022966  19.76045932 98.8022966 ]]
         ```
     """
-    trade_size = np.full(target_shape, np.nan, dtype=f8)
-    trade_price = np.full(target_shape, np.nan, dtype=f8)
-    trade_fees = np.full(target_shape, np.nan, dtype=f8)
+    order_records = np.empty((target_shape[0] * target_shape[1], len(OrderRecord)), dtype=f8)
+    j = 0
     cash = np.empty(target_shape, dtype=f8)
     shares = np.empty(target_shape, dtype=f8)
 
@@ -173,29 +171,31 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         for i in range(target_shape[0]):
             # Generate the next oder or None to do nothing
             order = order_func_nb(col, i, run_cash, run_shares, *args)
-            if order is not None:
-                # Fill the order
-                run_cash, run_shares, adj_size, adj_price, fees_paid = fill_order_nb(run_cash, run_shares, order)
+            # Fill the order
+            run_cash, run_shares, filled_order = fill_order_nb(run_cash, run_shares, order)
 
-                # Update matrices
-                if adj_size != 0.:
-                    trade_size[i, col] = adj_size
-                    trade_price[i, col] = adj_price
-                    trade_fees[i, col] = fees_paid
+            # Add a new record
+            if filled_order is not None:
+                order_records[j, OrderRecord.Column] = col
+                order_records[j, OrderRecord.Index] = i
+                order_records[j, OrderRecord.Size] = filled_order.size
+                order_records[j, OrderRecord.Price] = filled_order.price
+                order_records[j, OrderRecord.Fees] = filled_order.fees
+                order_records[j, OrderRecord.Side] = filled_order.side
+                j += 1
 
             # Populate cash and shares
             cash[i, col], shares[i, col] = run_cash, run_shares
 
-    return trade_size, trade_price, trade_fees, cash, shares
+    return order_records[:j, :], cash, shares
 
 
 @njit(cache=True)
 def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, entry_price,
                              exit_price, fees, fixed_fees, slippage, accumulate):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals."""
-    trade_size = np.full(target_shape, np.nan, dtype=f8)
-    trade_price = np.full(target_shape, np.nan, dtype=f8)
-    trade_fees = np.full(target_shape, np.nan, dtype=f8)
+    order_records = np.empty((target_shape[0] * target_shape[1], len(OrderRecord)), dtype=f8)
+    j = 0
     cash = np.empty(target_shape, dtype=f8)
     shares = np.empty(target_shape, dtype=f8)
 
@@ -217,20 +217,23 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, e
                     fixed_fees[i, col],
                     slippage[i, col],
                     accumulate)
-                if order is not None:
-                    # Fill the order
-                    run_cash, run_shares, adj_size, adj_price, fees_paid = fill_order_nb(run_cash, run_shares, order)
+                # Fill the order
+                run_cash, run_shares, filled_order = fill_order_nb(run_cash, run_shares, order)
 
-                    # Update matrices
-                    if adj_size != 0.:
-                        trade_size[i, col] = adj_size
-                        trade_price[i, col] = adj_price
-                        trade_fees[i, col] = fees_paid
+                # Add a new record
+                if filled_order is not None:
+                    order_records[j, OrderRecord.Column] = col
+                    order_records[j, OrderRecord.Index] = i
+                    order_records[j, OrderRecord.Size] = filled_order.size
+                    order_records[j, OrderRecord.Price] = filled_order.price
+                    order_records[j, OrderRecord.Fees] = filled_order.fees
+                    order_records[j, OrderRecord.Side] = filled_order.side
+                    j += 1
 
             # Populate cash and shares
             cash[i, col], shares[i, col] = run_cash, run_shares
 
-    return trade_size, trade_price, trade_fees, cash, shares
+    return order_records[:j, :], cash, shares
 
 
 @njit(cache=True)
@@ -271,9 +274,8 @@ def signals_order_func_nb(run_shares, entries, exits, size, entry_price,
 @njit(cache=True)
 def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed_fees, slippage, is_target):
     """Adaptation of `simulate_nb` for simulation based on orders."""
-    trade_size = np.full(target_shape, np.nan, dtype=f8)
-    trade_price = np.full(target_shape, np.nan, dtype=f8)
-    trade_fees = np.full(target_shape, np.nan, dtype=f8)
+    order_records = np.empty((target_shape[0] * target_shape[1], len(OrderRecord)), dtype=f8)
+    j = 0
     cash = np.empty(target_shape, dtype=f8)
     shares = np.empty(target_shape, dtype=f8)
 
@@ -291,20 +293,23 @@ def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed
                 fixed_fees[i, col],
                 slippage[i, col],
                 is_target)
-            if order is not None:
-                # Fill the order
-                run_cash, run_shares, adj_size, adj_price, fees_paid = fill_order_nb(run_cash, run_shares, order)
+            # Fill the order
+            run_cash, run_shares, filled_order = fill_order_nb(run_cash, run_shares, order)
 
-                # Update matrices
-                if adj_size != 0.:
-                    trade_size[i, col] = adj_size
-                    trade_price[i, col] = adj_price
-                    trade_fees[i, col] = fees_paid
+            # Add a new record
+            if filled_order is not None:
+                order_records[j, OrderRecord.Column] = col
+                order_records[j, OrderRecord.Index] = i
+                order_records[j, OrderRecord.Size] = filled_order.size
+                order_records[j, OrderRecord.Price] = filled_order.price
+                order_records[j, OrderRecord.Fees] = filled_order.fees
+                order_records[j, OrderRecord.Side] = filled_order.side
+                j += 1
 
             # Populate cash and shares
             cash[i, col], shares[i, col] = run_cash, run_shares
 
-    return trade_size, trade_price, trade_fees, cash, shares
+    return order_records[:j, :], cash, shares
 
 
 @njit(cache=True)
@@ -325,237 +330,244 @@ def size_order_func_nb(run_shares, size, price, fees, fixed_fees, slippage, is_t
 
 
 @njit(cache=True)
-def trade_records_nb(trade_size, trade_price, trade_fees):
-    """Map each trade to an array of information.
+def trade_records_nb(price, order_records):
+    """Find trades and store their information as records to an array.
+
+    One position can have multiple trades. A trade in this regard is just a sell operation.
+    Performance for this operation is calculated based on the size weighted average of 
+    previous buy operations in the same position.
 
     Example:
-        Build an array with trade metrics:
+        Build an array with trade information:
         ```python-repl
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio.nb import trade_records_nb
-        >>> from vectorbt.portfolio.enums import TradeRecord
+        >>> from vectorbt.portfolio.nb import simulate_nb, trade_records_nb
+        >>> from vectorbt.portfolio.enums import Order, TradeRecord
 
-        >>> trade_price = np.arange(1, 6)[:, None]
-        >>> trade_size = np.asarray([0, 1, -1, 1, 1])[:, None]
-        >>> trade_fees = np.full(5, 0.01)[:, None]
+        >>> order_price = price = np.arange(1, 6)[:, None]
+        >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
-        >>> records = trade_records_nb(trade_size, trade_price, trade_fees)
-        >>> print(pd.DataFrame(records, columns=TradeRecord._fields))
+        >>> @njit
+        ... def order_func_nb(col, i, run_cash, run_shares):
+        ...     return Order(order_size[i, col], order_price[i, col], 
+        ...          fees=0.01, slippage=0., fixed_fees=0.)
+        >>> order_records, cash, shares = simulate_nb(price.shape, 100, order_func_nb)
+        >>> records = trade_records_nb(price, order_records)
+
+        >>> print(pd.DataFrame(records, columns=TradeRecord._fields)) 
            Column  Size  OpenAt  OpenPrice  OpenFees  CloseAt  ClosePrice  CloseFees  \\
-        0     0.0   1.0     1.0        2.0      0.01      NaN         NaN        NaN   
-        1     0.0   1.0     1.0        2.0      0.01      2.0         3.0       0.01   
-        2     0.0   1.0     3.0        4.0      0.01      NaN         NaN        NaN   
-        3     0.0   1.0     4.0        5.0      0.01      NaN         NaN        NaN   
+        0     0.0   1.0     0.0        1.0      0.01      1.0         2.0       0.02   
+        1     0.0   1.0     2.0        3.0      0.03      3.0         4.0       0.04   
 
-            PnL    Return  Type  Position  
-        0   NaN       NaN   0.0       0.0  
-        1  0.98  0.487562   1.0       0.0  
-        2   NaN       NaN   0.0       1.0  
-        3   NaN       NaN   0.0       1.0 
+            PnL    Return  Position  
+        0  0.97  0.960396       0.0  
+        1  0.93  0.306931       1.0  
         ```"""
-    result = np.empty((trade_size.shape[0] * trade_size.shape[1], len(TradeRecord)), dtype=f8)
+    result = np.empty((price.shape[0] * price.shape[1], len(TradeRecord)), dtype=f8)
     position_idx = -1
     j = 0
+    prev_col = -1
 
-    for col in range(trade_size.shape[1]):
-        buy_size_sum = 0.
-        buy_gross_sum = 0.
-        buy_fees_sum = 0.
+    for r in range(order_records.shape[0]):
+        record = order_records[r]
+        i = int(record[OrderRecord.Index])
+        col = int(record[OrderRecord.Column])
+        order_size = record[OrderRecord.Size]
+        order_price = record[OrderRecord.Price]
+        order_fees = record[OrderRecord.Fees]
+        order_side = record[OrderRecord.Side]
 
-        for i in range(trade_size.shape[0]):
-            sig_size = trade_size[i, col]
-            size = abs(sig_size)
-            price = trade_price[i, col]
-            fees = trade_fees[i, col]
+        if col != prev_col:
+            # Column has changed
+            prev_col = col
+            buy_size_sum = 0.
+            buy_gross_sum = 0.
+            buy_fees_sum = 0.
 
-            if ~np.isnan(sig_size) and sig_size != 0.:
-                if sig_size > 0.:
-                    # Position increased
-                    if buy_size_sum == 0.:
-                        position_start = i
-                        position_idx += 1
+        if order_side == OrderSide.Buy:
+            # Buy operation
+            if buy_size_sum == 0.:
+                position_start = i
+                position_idx += 1
 
-                    buy_size_sum += size
-                    buy_gross_sum += size * price
-                    buy_fees_sum += fees
+            # Position increased
+            buy_size_sum += order_size
+            buy_gross_sum += order_size * order_price
+            buy_fees_sum += order_fees
 
-                    # Information for buy operation
-                    open_at = np.nan
-                    open_price = np.nan
-                    open_fees = np.nan
-                    close_at = i
-                    close_price = price
-                    close_fees = fees
-                    pnl = np.nan
-                    ret = np.nan
-                    trade_type = TradeType.Buy
+        elif order_side == OrderSide.Sell:
+            # Sell operation
+            # Close the current trade
+            # Opening price is the size-weighted average over all purchase prices
+            avg_buy_price = buy_gross_sum / buy_size_sum
+            # Opening fees are the size-weighted average over all purchase fees
+            frac_buy_fees = order_size / buy_size_sum * buy_fees_sum
+            # Calculate P&L and return
+            buy_val = order_size * avg_buy_price + frac_buy_fees
+            sell_val = order_size * order_price - order_fees
+            pnl = sell_val - buy_val
+            ret = (sell_val - buy_val) / buy_val
 
-                elif sig_size < 0.:
-                    # Information for sell operation
-                    open_at = position_start
-                    # Measure average buy price and fees
-                    # A size-weighted average over all purchase prices
-                    open_price = buy_gross_sum / buy_size_sum
-                    # A size-weighted average over all purchase fees
-                    open_fees = size / buy_size_sum * buy_fees_sum
-                    close_at = i
-                    close_price = price
-                    close_fees = fees
-                    # Calculate P&L and return
-                    buy_val = size * open_price + open_fees
-                    sell_val = size * close_price - close_fees
-                    pnl = sell_val - buy_val
-                    ret = (sell_val - buy_val) / buy_val
-                    trade_type = TradeType.Sell
+            # Save the trade to the records
+            result[j, TradeRecord.Column] = col
+            result[j, TradeRecord.Size] = order_size
+            result[j, TradeRecord.OpenAt] = position_start
+            result[j, TradeRecord.OpenPrice] = avg_buy_price
+            result[j, TradeRecord.OpenFees] = frac_buy_fees
+            result[j, TradeRecord.CloseAt] = i
+            result[j, TradeRecord.ClosePrice] = order_price
+            result[j, TradeRecord.CloseFees] = order_fees
+            result[j, TradeRecord.PnL] = pnl
+            result[j, TradeRecord.Return] = ret
+            result[j, TradeRecord.Position] = position_idx
+            j += 1
 
-                    # Position decreased, previous purchases have now less impact
-                    size_fraction = (buy_size_sum - size) / buy_size_sum
-                    buy_size_sum *= size_fraction
-                    buy_gross_sum *= size_fraction
-                    buy_fees_sum *= size_fraction
-
-                # Save trade to the cube
-                result[j, TradeRecord.Column] = col
-                result[j, TradeRecord.Size] = size
-                result[j, TradeRecord.OpenAt] = open_at
-                result[j, TradeRecord.OpenPrice] = open_price
-                result[j, TradeRecord.OpenFees] = open_fees
-                result[j, TradeRecord.CloseAt] = close_at
-                result[j, TradeRecord.ClosePrice] = close_price
-                result[j, TradeRecord.CloseFees] = close_fees
-                result[j, TradeRecord.PnL] = pnl
-                result[j, TradeRecord.Return] = ret
-                result[j, TradeRecord.Type] = trade_type
-                result[j, TradeRecord.Position] = position_idx
-                j += 1
+            # Position decreased, previous purchases have now less impact
+            size_fraction = (buy_size_sum - order_size) / buy_size_sum
+            buy_size_sum *= size_fraction
+            buy_gross_sum *= size_fraction
+            buy_fees_sum *= size_fraction
     return result[:j, :]
 
 # ############# Positions ############# #
 
 
 @njit(cache=True)
-def position_records_nb(price, trade_size, trade_price, trade_fees):
-    """Map each position to an array of information.
+def position_records_nb(price, order_records):
+    """Find positions and store their information as records to an array.
 
     Example:
-        Build an array with position metrics:
+        Build an array with trade information:
         ```python-repl
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio.nb import position_records_nb
-        >>> from vectorbt.portfolio.enums import PositionRecord
+        >>> from vectorbt.portfolio.nb import simulate_nb, position_records_nb
+        >>> from vectorbt.portfolio.enums import Order, PositionRecord
 
-        >>> trade_price = price = np.arange(1, 6)[:, None]
-        >>> trade_size = np.asarray([0, 1, -1, 1, 1])[:, None]
-        >>> trade_fees = np.full(5, 0.01)[:, None]
+        >>> order_price = price = np.arange(1, 6)[:, None]
+        >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
-        >>> records = position_records_nb(price, trade_size, trade_price, trade_fees)
-        >>> print(pd.DataFrame(records, columns=PositionRecord._fields))
-           Column  Size  OpenAt  OpenPrice  OpenFees  CloseAt  ClosePrice  CloseFees  \\
-        0     0.0   1.0     1.0        2.0      0.01      2.0         3.0       0.01   
-        1     0.0   2.0     3.0        4.5      0.02      4.0         5.0       0.00   
+        >>> @njit
+        ... def order_func_nb(col, i, run_cash, run_shares):
+        ...     return Order(order_size[i, col], order_price[i, col], 
+        ...          fees=0.01, slippage=0., fixed_fees=0.)
+        >>> order_records, cash, shares = simulate_nb(price.shape, 100, order_func_nb)
+        >>> records = position_records_nb(price, order_records)
+
+        >>> print(pd.DataFrame(records, columns=PositionRecord._fields)) 
+           Column  Size  OpenAt  OpenPrice  OpenFees  CloseAt  ClosePrice  CloseFees  \
+        0     0.0   1.0     0.0        1.0      0.01      1.0         2.0       0.02   
+        1     0.0   1.0     2.0        3.0      0.03      3.0         4.0       0.04   
+        2     0.0   1.0     4.0        5.0      0.05      4.0         5.0       0.00   
 
             PnL    Return  Status  
-        0  0.98  0.487562     1.0  
-        1  0.98  0.108647     0.0  
+        0  0.97  0.960396     1.0  
+        1  0.93  0.306931     1.0  
+        2 -0.05 -0.009901     0.0  
         ```"""
-    result = np.empty((trade_size.shape[0] * trade_size.shape[1], len(PositionRecord)), dtype=f8)
+    result = np.empty((price.shape[0] * price.shape[1], len(PositionRecord)), dtype=f8)
     j = 0
+    prev_col = -1
 
-    for col in range(price.shape[1]):
-        buy_size_sum = 0.
-        buy_gross_sum = 0.
-        buy_fees_sum = 0.
-        sell_size_sum = 0.
-        sell_gross_sum = 0.
-        sell_fees_sum = 0.
-        store_position = False
+    for r in range(order_records.shape[0]):
+        record = order_records[r]
+        i = int(record[OrderRecord.Index])
+        col = int(record[OrderRecord.Column])
+        order_size = record[OrderRecord.Size]
+        order_price = record[OrderRecord.Price]
+        order_fees = record[OrderRecord.Fees]
+        order_side = record[OrderRecord.Side]
 
-        for i in range(trade_size.shape[0]):
-            sig_tsize = trade_size[i, col]
-            tsize = abs(sig_tsize)
-            tprice = trade_price[i, col]
-            tfees = trade_fees[i, col]
+        if col != prev_col:
+            # Column has changed
+            prev_col = col
+            buy_size_sum = 0.
+            buy_gross_sum = 0.
+            buy_fees_sum = 0.
+            sell_size_sum = 0.
+            sell_gross_sum = 0.
+            sell_fees_sum = 0.
+            store_position = False
 
-            if ~np.isnan(sig_tsize) and sig_tsize != 0.:
-                if sig_tsize > 0.:
-                    # Position increased
-                    if buy_size_sum == 0.:
-                        open_at = i
+        if order_side == OrderSide.Buy:
+            # Position increased
+            if buy_size_sum == 0.:
+                position_start = i
 
-                    buy_size_sum += tsize
-                    buy_gross_sum += tsize * tprice
-                    buy_fees_sum += tfees
+            buy_size_sum += order_size
+            buy_gross_sum += order_size * order_price
+            buy_fees_sum += order_fees
 
-                elif sig_tsize < 0.:
-                    # Position decreased
-                    sell_size_sum += tsize
-                    sell_gross_sum += tsize * tprice
-                    sell_fees_sum += tfees
+        elif order_side == OrderSide.Sell:
+            # Position decreased
+            sell_size_sum += order_size
+            sell_gross_sum += order_size * order_price
+            sell_fees_sum += order_fees
 
-                if buy_size_sum == sell_size_sum:
-                    # Closed position
-                    status = PositionStatus.Closed
-                    store_position = True
+        if buy_size_sum == sell_size_sum:
+            # Closed position
+            status = PositionStatus.Closed
+            store_position = True
 
-            if i == price.shape[0] - 1 and buy_size_sum > sell_size_sum:
-                # If position hasn't been closed, calculate its unrealized metrics
-                sell_size_sum += buy_size_sum
-                sell_gross_sum += buy_size_sum * price[i, col]
-                # NOTE: We have no information about fees here, so we don't add them
-                status = PositionStatus.Open
-                store_position = True
+        if i == price.shape[0] - 1 and buy_size_sum > sell_size_sum:
+            # If position hasn't been closed, calculate its unrealized metrics
+            sell_size_sum += buy_size_sum
+            sell_gross_sum += buy_size_sum * price[i, col]
+            # NOTE: We have no information about fees here, so we don't add them
+            status = PositionStatus.Open
+            store_position = True
 
-            if store_position:
-                # Calculate PnL and return
-                avg_buy_price = buy_gross_sum / buy_size_sum
-                avg_sell_price = sell_gross_sum / sell_size_sum
-                buy_val = buy_size_sum * avg_buy_price + buy_fees_sum
-                sell_val = buy_size_sum * avg_sell_price - sell_fees_sum
-                pnl = sell_val - buy_val
-                ret = (sell_val - buy_val) / buy_val
+        if store_position:
+            # Calculate PnL and return
+            avg_buy_price = buy_gross_sum / buy_size_sum
+            avg_sell_price = sell_gross_sum / sell_size_sum
+            buy_val = buy_size_sum * avg_buy_price + buy_fees_sum
+            sell_val = buy_size_sum * avg_sell_price - sell_fees_sum
+            pnl = sell_val - buy_val
+            ret = (sell_val - buy_val) / buy_val
 
-                # Save position to the cube
-                result[j, PositionRecord.Column] = col
-                result[j, PositionRecord.Size] = buy_size_sum
-                result[j, PositionRecord.OpenAt] = open_at
-                result[j, PositionRecord.OpenPrice] = avg_buy_price
-                result[j, PositionRecord.OpenFees] = buy_fees_sum
-                result[j, PositionRecord.CloseAt] = i
-                result[j, PositionRecord.ClosePrice] = avg_sell_price
-                result[j, PositionRecord.CloseFees] = sell_fees_sum
-                result[j, PositionRecord.PnL] = pnl
-                result[j, PositionRecord.Return] = ret
-                result[j, PositionRecord.Status] = status
-                j += 1
+            # Save position to the records
+            result[j, PositionRecord.Column] = col
+            result[j, PositionRecord.Size] = buy_size_sum
+            result[j, PositionRecord.OpenAt] = position_start
+            result[j, PositionRecord.OpenPrice] = avg_buy_price
+            result[j, PositionRecord.OpenFees] = buy_fees_sum
+            result[j, PositionRecord.CloseAt] = i
+            result[j, PositionRecord.ClosePrice] = avg_sell_price
+            result[j, PositionRecord.CloseFees] = sell_fees_sum
+            result[j, PositionRecord.PnL] = pnl
+            result[j, PositionRecord.Return] = ret
+            result[j, PositionRecord.Status] = status
+            j += 1
 
-                # Create a new position
-                buy_size_sum = 0.
-                buy_gross_sum = 0.
-                buy_fees_sum = 0.
-                sell_size_sum = 0.
-                sell_gross_sum = 0.
-                sell_fees_sum = 0.
-                store_position = False
+            # Reset running vars for a new position
+            buy_size_sum = 0.
+            buy_gross_sum = 0.
+            buy_fees_sum = 0.
+            sell_size_sum = 0.
+            sell_gross_sum = 0.
+            sell_fees_sum = 0.
+            store_position = False
     return result[:j, :]
 
 
 # ############# Mapping to matrix ############# #
 
 @njit
-def map_records_to_matrix_nb(records, target_shape, map_func_nb, *args):
-    """Map each record to a value and place it to the matrix.
-    The position of the value will be `(EventRecord.CloseAt, EventRecord.Column)`.
+def map_records_to_matrix_nb(records, target_shape, col_field, row_field, map_func_nb, *args):
+    """Reshape records into a matrix.
 
-    `records` must follow the layout of `EventRecord`."""
+    Maps each record to a value at `(row_field, col_field)`.
+
+    `map_func_nb` must accept a single record and `*args`, and return a single value."""
     result = np.full(target_shape, np.nan, dtype=f8)
     for i in range(records.shape[0]):
         record = records[i, :]
-        col = int(record[EventRecord.Column])
-        i = int(record[EventRecord.CloseAt])
+        col = int(record[col_field])
+        i = int(record[row_field])
         result[i, col] = map_func_nb(record, *args)
     return result
 
@@ -568,7 +580,9 @@ def field_map_func_nb(record, field):
 
 @njit(cache=True)
 def duration_map_func_nb(record):
-    """`map_func_nb` that returns duration of the event."""
+    """`map_func_nb` that returns duration of the event.
+
+    Record must have layout of `vectorbt.portfolio.enums.EventRecord`."""
     return record[EventRecord.CloseAt] - record[EventRecord.OpenAt]
 
 
@@ -576,23 +590,22 @@ def duration_map_func_nb(record):
 
 
 @njit
-def reduce_records_nb(records, target_shape, reduce_func_nb, *args):
-    """Reduce a series of records of each column into a value.
+def reduce_records_nb(records, n_cols, col_field, reduce_func_nb, *args):
+    """Perform a reducing operation over the records of each column.
 
     Faster than `map_records_to_matrix_nb` and `vbt.timeseries.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
+    `reduce_func_nb` must accept an array of records and `*args`, and return a single value.
+
     !!! note
-        `EventRecord.Column` of each record must be in ascending order."""
-    result = np.full(target_shape, np.nan, dtype=f8)
+        Records must be in the order they were created."""
+    result = np.full(n_cols, np.nan, dtype=f8)
     from_i = 0
     col = -1
     for i in range(records.shape[0]):
-        record = records[i, :]
-        record_col = int(record[EventRecord.Column])
+        record_col = int(records[i, col_field])
         if record_col != col:
-            if record_col < col:
-                raise ValueError("Column of each record must be in ascending order")
             if col != -1:
                 # At the beginning of second column do reduce on the first
                 result[col] = reduce_func_nb(records[from_i:i, :], *args)
@@ -602,42 +615,11 @@ def reduce_records_nb(records, target_shape, reduce_func_nb, *args):
             result[col] = reduce_func_nb(records[from_i:i+1, :], *args)
     return result
 
-# ############# Accumulation ############# #
-
 
 @njit(cache=True)
-def is_accumulated_nb(trade_records, position_records):
-    """Detect accumulation, that is, position is being increased/decreased gradually.
-
-    !!! note
-        `trade_records` and `position_records` must be in order they were created."""
-    result = np.full(position_records.shape[0], False, dtype=b1)
-    buy_size_sum = 0.
-    pos_idx = -1
-    ignore_pos_idx = -1
-    for i in range(trade_records.shape[0]):
-        trade_pos_idx = int(trade_records[i, TradeRecord.Position])
-        if trade_pos_idx == ignore_pos_idx:
-            continue
-        if trade_pos_idx != pos_idx:
-            if trade_pos_idx < pos_idx:
-                raise ValueError("Positions must be in ascending order")
-            buy_size_sum = 0.
-            pos_idx = trade_pos_idx
-            ignore_pos_idx = -1
-        trade_size = trade_records[i, TradeRecord.Size]
-        trade_type = trade_records[i, TradeRecord.Type]
-        if trade_type == TradeType.Buy:
-            buy_size_sum += trade_size
-            if buy_size_sum != trade_size:
-                result[pos_idx] = True
-                ignore_pos_idx = pos_idx
-        elif trade_type == TradeType.Sell:
-            buy_size_sum -= trade_size
-            if buy_size_sum != 0.:
-                result[pos_idx] = True
-                ignore_pos_idx = pos_idx
-    return result
+def count_reduce_func_nb(records):
+    """`reduce_func_nb` that returns the number of records."""
+    return len(records)
 
 # ############# Financial risk and performance metrics ############# #
 
