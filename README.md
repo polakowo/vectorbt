@@ -170,9 +170,7 @@ pip install git+https://github.com/polakowo/vectorbt.git
 
 See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) for Plotly figures.
 
-## Documentation
-
-[polakowo.io/vectorbt](https://polakowo.io/vectorbt/)
+## [Documentation](https://polakowo.io/vectorbt/)
 
 ## Example notebooks
 
