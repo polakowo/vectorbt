@@ -17,7 +17,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in under 5 seconds (Note: compiling with Numba may take some time):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in under 5 seconds (Note: compiling with Numba may take a while):
 
 ```python
 import vectorbt as vbt
