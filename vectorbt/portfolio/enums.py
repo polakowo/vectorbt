@@ -15,7 +15,7 @@ Order = namedtuple('Order', [
     'fees',
     'fixed_fees',
     'slippage'
-], defaults=[0., 0., 0.])
+])
 
 __pdoc__['Order'] = "A named tuple representing an order."
 __pdoc__['Order.size'] = "Size in shares. Filled size will depend upon your funds."
