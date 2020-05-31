@@ -248,9 +248,13 @@ def signals_order_func_nb(run_shares, entries, exits, size, entry_price,
         else:
             return None
     elif not entries and exits:
-        # Sell everything
-        if run_shares > 0.:
+        if run_shares > 0. and not accumulate:
+            # If accumulation is turned off, sell everything
             order_size = -np.inf
+            order_price = exit_price
+        elif run_shares > 0. and accumulate:
+            # If accumulation is turned on, sell size
+            order_size = -abs(size)
             order_price = exit_price
         else:
             return None
