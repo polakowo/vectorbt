@@ -289,10 +289,7 @@
     <%include file="logo.mako"/>
 
     % if search_query:
-        <div class="gcse-search" style="height: 70px"
-             data-as_oq="${' '.join(search_query.strip().split()) | h }"
-             data-gaCategoryParameter="${module.refname | h}">
-        </div>
+        <div class="gcse-search" style="height: 70px"></div>
     % endif
 
     <h1>Index</h1>
@@ -395,7 +392,7 @@
   % endif
 
   % if search_query:
-    <script async src="https://cse.google.com/cse.js?cx=017837193012385208679:pey8ky8gdqw"></script>
+    <script async src="https://cse.google.com/cse.js?cx=014436609532799159425:amlo31uwzil"></script>
     <style>.gsc-control-cse {padding:0 !important;margin-top:1em}</style>
   % endif
 
