@@ -548,7 +548,9 @@ class Portfolio(PropertyTraverser):
 
     @group_property('Orders', Orders)
     def orders(self):
-        """Time series and metrics based on order records."""
+        """Time series and metrics based on order records.
+        
+        See `vectorbt.portfolio.records.Orders`."""
         return Orders(self.wrapper, self._order_records)
 
     # ############# Trades ############# #
@@ -561,7 +563,9 @@ class Portfolio(PropertyTraverser):
 
     @group_property('Trades', Trades)
     def trades(self):
-        """Time series and metrics based on trade records."""
+        """Time series and metrics based on trade records.
+        
+        See `vectorbt.portfolio.records.Trades`."""
         return Trades(self.wrapper, self.trade_records.vbt.to_array())
 
     # ############# Positions ############# #
@@ -574,7 +578,9 @@ class Portfolio(PropertyTraverser):
 
     @group_property('Positions', Positions)
     def positions(self):
-        """Time series and metrics based on position records."""
+        """Time series and metrics based on position records.
+        
+        See `vectorbt.portfolio.records.Positions`."""
         return Positions(self.wrapper, self.position_records.vbt.to_array())
 
     # ############# Equity ############# #

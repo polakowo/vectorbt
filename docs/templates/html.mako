@@ -25,8 +25,6 @@
     return annot
 %>
 
-<%def name="ident(name)"><span class="ident">${name}</span></%def>
-
 <%def name="show_source(d)">
   % if (show_source_code or git_link_template) and d.source and d.obj is not getattr(d.inherits, 'obj', None):
     <% git_link = format_git_link(git_link_template, d) %>
@@ -109,7 +107,7 @@
             params = ', '.join(f.params(annotate=show_type_annotations, link=link))
             return_type = get_annotation(f.return_annotation, '->')
         %>
-        <span>${f.funcdef()} ${ident(f.name)}</span>(<span>${params})${return_type}</span>
+        <span>${f.funcdef()} <span class="ident fname">${f.name}</span></span>(<span>${params})${return_type}</span>
     </code></dt>
     <dd>${show_desc(f)}</dd>
   </%def>
@@ -153,7 +151,7 @@
     <dl>
     % for v in variables:
       <% return_type = get_annotation(v.type_annotation) %>
-      <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+      <dt id="${v.refname}"><code class="name">var <span class="ident fname">${v.name}</span>${return_type}</code></dt>
       <dd>${show_desc(v)}</dd>
     % endfor
     </dl>
@@ -186,7 +184,7 @@
       params = ', '.join(c.params(annotate=show_type_annotations, link=link))
       %>
       <dt id="${c.refname}"><code class="flex name class">
-          <span>class ${ident(c.name)}</span>
+          <span>class <span class="ident parent-fname">${c.name}</span></span>
           % if params:
               <span>(</span><span>${params})</span>
           % endif
@@ -195,7 +193,7 @@
       <dd>${show_desc(c)}
 
       % if mro:
-          <h3>Ancestors</h3>
+          <h3 class="section-subtitle">Ancestors</h3>
           <ul class="hlist">
           % for cls in mro:
               <li>${link(cls)}</li>
@@ -204,7 +202,7 @@
       %endif
 
       % if subclasses:
-          <h3>Subclasses</h3>
+          <h3 class="section-subtitle">Subclasses</h3>
           <ul class="hlist">
           % for sub in subclasses:
               <li>${link(sub)}</li>
@@ -212,17 +210,17 @@
           </ul>
       % endif
       % if class_vars:
-          <h3>Class variables</h3>
+          <h3 class="section-subtitle">Class variables</h3>
           <dl>
           % for v in class_vars:
               <% return_type = get_annotation(v.type_annotation) %>
-              <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+              <dt id="${v.refname}"><code class="name">var <span class="ident fname">${v.name}</span>${return_type}</code></dt>
               <dd>${show_desc(v)}</dd>
           % endfor
           </dl>
       % endif
       % if smethods:
-          <h3>Static methods</h3>
+          <h3 class="section-subtitle">Static methods</h3>
           <dl>
           % for f in smethods:
               ${show_func(f)}
@@ -230,17 +228,17 @@
           </dl>
       % endif
       % if inst_vars:
-          <h3>Instance variables</h3>
+          <h3 class="section-subtitle">Instance variables</h3>
           <dl>
           % for v in inst_vars:
               <% return_type = get_annotation(v.type_annotation) %>
-              <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+              <dt id="${v.refname}"><code class="name">var <span class="ident fname">${v.name}</span>${return_type}</code></dt>
               <dd>${show_desc(v)}</dd>
           % endfor
           </dl>
       % endif
       % if methods:
-          <h3>Methods</h3>
+          <h3 class="section-subtitle">Methods</h3>
           <dl>
           % for f in methods:
               ${show_func(f)}
@@ -253,7 +251,7 @@
               members = c.inherited_members()
           %>
           % if members:
-              <h3>Inherited members</h3>
+              <h3 class="section-subtitle">Inherited members</h3>
               <ul class="hlist">
               % for cls, mems in members:
                   <li><code><b>${link(cls)}</b></code>:
@@ -288,10 +286,16 @@
 
     <%include file="logo.mako"/>
 
-    % if search_query:
-        <div class="gcse-search" style="height: 70px"></div>
-    % endif
+    <div class="search-container">
+        <input
+            id="search_input"
+            type="text"
+            placeholder="Search"
+            title="Search"
+        />
+    </div>
 
+    <div class="scrollable-index">
     <h1>Index</h1>
     ${extract_toc(module.docstring) if extract_module_toc_into_sidebar else ''}
     <ul id="index">
@@ -351,6 +355,7 @@
     % endif
 
     </ul>
+    </div>
   </nav>
 </%def>
 
@@ -373,6 +378,7 @@
     <meta name="description" content="${module.docstring | glimpse, trim, h}" />
   % endif
 
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.css" />
   <link href='https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.0/normalize.min.css' rel='stylesheet'>
   <link href='https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/8.0.0/sanitize.min.css' rel='stylesheet'>
   % if syntax_highlighting:
@@ -389,11 +395,6 @@
     window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
     ga('create', '${google_analytics}', 'auto'); ga('send', 'pageview');
     </script><script async src='https://www.google-analytics.com/analytics.js'></script>
-  % endif
-
-  % if search_query:
-    <script async src="https://cse.google.com/cse.js?cx=014436609532799159425:amlo31uwzil"></script>
-    <style>.gsc-control-cse {padding:0 !important;margin-top:1em}</style>
   % endif
 
   % if latex_math:
@@ -436,5 +437,18 @@
         }).then(response => response.ok && window.location.reload()), 700);
     </script>
 % endif
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"></script>
+<script type="text/javascript"> 
+docsearch({
+    apiKey: 'ac97cfdd96a6e6fcdc67c570adaeaf94',
+    indexName: 'vectorbt',
+    inputSelector: '#search_input',
+    autocompleteOptions: {
+        autoWidth: false
+    },
+    debug: true // Set debug to true if you want to inspect the dropdown
+});
+</script>
 </body>
 </html>

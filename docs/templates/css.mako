@@ -513,6 +513,35 @@ a.badge-dark.focus {
     outline: 0;
     box-shadow: 0 0 0 0.2rem rgba(52, 58, 64, 0.5);
 }
+
+.search-container {
+    width: 100%;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+#search_input {
+    isplay: block;
+    width: 100%;
+    padding: .375rem .75rem;
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #495057;
+    background-color: #fff;
+    background-clip: padding-box;
+    border: 1px solid #ced4da;
+    border-radius: .25rem;
+    transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+}
+
+.algolia-autocomplete {
+    width: 100%;
+}
+
+.scrollable-index {
+    overflow-y: scroll;
+    height: calc(100vh - 200px);
+}
 </%def>
 
 <%def name="desktop()" filter="minify_css">
@@ -520,7 +549,7 @@ a.badge-dark.focus {
 	#sidebar {
 		width: 30%;
 		height: 100vh;
-		overflow: auto;
+		overflow: visible;
 		position: sticky;
 		top: 0;
 	}
