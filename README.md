@@ -107,16 +107,17 @@ matrix operation, without any Pythonic loops.
 - For high performance, most operations are done strictly using NumPy and Numba 
 - Utility functions for working with data
     - Implements NumPy-like broadcasting for pandas, among other features.
-- `vbt.timeseries` accessor for working with time series
+- Functions for working with time series
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
     - Drawdown analysis for historical periods
-- `vbt.signals` accessor for working with signals data
+- Functions for working with signals
     - Entry, exit and random signal generation, ranking and distance functions
     - Generation of stop loss, trailing stop and take profit signals
-- `vbt.returns` accessor for computing common financial risk and performance metrics
-- `vbt.portfolio` accessor for modeling portfolio performance
+- Functions for working with returns
+    - Computing common financial risk and performance metrics
+- Class for modeling portfolio performance
     - Accepts signals, orders, or custom order function
-    - Metrics and tools for analyzing returns, orders, trades and positions
+    - Provides metrics and tools for analyzing returns, orders, trades and positions
 - Technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
