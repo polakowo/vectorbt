@@ -1,3 +1,3 @@
-"""Package for dealing with signals."""
+"""Package for working with signals."""
 
 from vectorbt.signals import accessors, nb
