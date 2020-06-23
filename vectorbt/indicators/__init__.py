@@ -1,4 +1,4 @@
-"""Package for building and running indicators.
+"""Modules for building and running indicators.
 
 Technical indicators are used to see past trends and anticipate future moves.
 

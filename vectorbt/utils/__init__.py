@@ -1,4 +1,4 @@
-"""Package with utilities."""
+"""Modules with utilities."""
 
 from vectorbt.utils import (
     accessors,

@@ -1,4 +1,4 @@
-"""Package for working with records."""
+"""Modules for working with records."""
 
 from vectorbt.records import common, enums, events, main, nb, orders
 

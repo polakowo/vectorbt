@@ -1,4 +1,4 @@
-"""Package for working with portfolios.
+"""Modules for working with portfolios.
 
 Use the `vectorbt.portfolio.main.Portfolio` class to model portfolio performance."""
 

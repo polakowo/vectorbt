@@ -17,7 +17,7 @@ Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Movi
 
 ### Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in under 5 seconds (Note: compiling with Numba may take a while):
+Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history in under 5 seconds (Note: compiling for the first time may take a while):
 
 ```python
 import vectorbt as vbt
@@ -26,7 +26,6 @@ import yfinance as yf
 
 # Define params
 windows = np.arange(2, 101)
-init_capital = 100 # in $
 fees = 0.001 # in %
 
 # Prepare data
@@ -38,7 +37,7 @@ entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
 # Calculate performance
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_capital=init_capital, fees=fees)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=fees, freq='1 days')
 performance = portfolio.total_return * 100
 
 # Plot heatmap
@@ -62,80 +61,6 @@ vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude sp
 It natively works on pandas objects, while performing all calculations using NumPy and Numba under the hood. It introduces a namespace (accessor) to pandas objects (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). This way, user can easily switch betweeen native pandas functionality such as indexing, and highly-performant vectorbt methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
 
 In contrast to most other vectorized backtesting libraries where backtesting is limited to simple arrays (think of an array for price, an array for signals, an array for equity, etc.), vectorbt is optimized for working with 2-dimensional data: it treats each index of a DataFrame as time axis and each column as a distinct feature that should be backtested, and performs calculations on the entire matrix at once. This way, user can construct huge matrices with millions of columns and calculate the performance for each one with a single matrix operation, without any Pythonic loops. This is the magic behind backtesting thousands of window combinations at once, as we did above.
-
-### Why not only pandas?
-
-While there is a subset of pandas functionality that is already compiled with Cython or Numba, such as window functions, it cannot be accessed within user-defined Numba code, since Numba cannot do any compilation on pandas objects. Take for example generating trailing stop orders: to calculate expanding maximum for each order, you cannot do `df.expanding().max()` from within Numba, but write and compile your own expanding max function wrapped with `@njit`. That's why vectorbt also provides an arsenal of Numba-compiled functions that are ready to be used everywhere.
-
-Moreover, compared to NumPy, some pandas operations may be extremely slow compared to their NumPy counterparts; for example, the `pct_change` operation in NumPy is nearly 70 times faster than its pandas equivalent:
-
-```
-a = np.random.uniform(size=(1000, 1000))
-a_df = pd.DataFrame(a)
-
->>> %timeit np.diff(a, axis=0) / a[:-1, :]
-3.69 ms ± 110 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
-
->>> %timeit a_df.pct_change()
-266 ms ± 7.26 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-```
-
-Hence, vectorbt uses NumPy + Numba wherever possible in the backtesting pipeline.
-
-#### Broadcasting and indexing
-
-The other problem relies in broadcasting rules implemented in pandas: they are less flexible than in NumPy. Also, pandas follows strict rules regarding indexing; for example, you will have issues using multiple DataFrames with different index/columns in the same operation, but such operations are quite common in backtesting (think of combining signals from different indicators, each having columns of the same cardinality but different labels).
-
-To solve this, vectobt borrows broadcasting rules from NumPy and implements itws own indexing rules that allow operations between pandas objects of the same shape, regardless of their index/columns - those are simply stacked upon each other in the resulting object.
-
-For example, consider the following DataFrames with different index/columns:
-
-```python
-df = pd.DataFrame(
-    [[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
-    index=pd.Index(['x', 'y', 'z'], name='idx'), 
-    columns=pd.Index(['a', 'b', 'c'], name='cols'))
-    
-df2 = pd.DataFrame(
-    [[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
-    index=pd.Index(['x2', 'y2', 'z2'], name='idx2'), 
-    columns=pd.Index(['a2', 'b2', 'c2'], name='cols2'))
-```
-
-Addition operation using pandas yields NaNs:
-
-```
->>> print(df + df2)
-
-     a  a2   b  b2   c  c2
-x  NaN NaN NaN NaN NaN NaN
-x2 NaN NaN NaN NaN NaN NaN
-y  NaN NaN NaN NaN NaN NaN
-y2 NaN NaN NaN NaN NaN NaN
-z  NaN NaN NaN NaN NaN NaN
-z2 NaN NaN NaN NaN NaN NaN
-```
-
-Addition operation using vectorbt yields correct results:
-
-```
->>> print(df.vbt + df2.vbt)
-
-cols       a   b   c
-cols2     a2  b2  c2
-idx idx2            
-x   x2     2   4   6
-y   y2     8  10  12
-z   z2    14  16  18
-```
-
-### Why not only NumPy?
-
-Working with NumPy alone, from the user's point of view, is problematic, since important information in form of index and columns and all indexing checks must be explicitly handled by the user, making analysis prone to errors.
-
-But also, vectorized implementation is hard to read or cannot be properly defined at all, and one must rely on an iterative approach instead, which is processing data in element-by-element fashion. That's where Numba comes into play: it allows both writing iterative code and compiling slow Python loops to be run at native machine code speed.
-
-The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5dc4ff5468dbcc14a29c4f45f557) of vectorbt were written in pure NumPy which led to more performance but less usability.
 
 ## Features
 
