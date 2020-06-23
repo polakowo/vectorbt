@@ -27,6 +27,11 @@ While it might seem tempting to perform all sorts of computations with pandas al
 outperforms pandas significantly, especially for basic operations:
 
 ```python-repl
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> big_ts = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
+
 >>> %timeit big_ts.pct_change()
 280 ms ± 12.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
@@ -37,11 +42,6 @@ outperforms pandas significantly, especially for basic operations:
 But also pandas functions that are already compiled with Cython/Numba are slower:
 
 ```python-repl
->>> import pandas as pd
->>> import vectorbt as vbt
-
->>> big_ts = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
-
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
