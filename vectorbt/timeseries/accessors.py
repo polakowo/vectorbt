@@ -11,11 +11,11 @@ from numba import njit
 from datetime import datetime
 
 index = pd.Index([
-    datetime(2018, 1, 1),
-    datetime(2018, 1, 2),
-    datetime(2018, 1, 3),
-    datetime(2018, 1, 4),
-    datetime(2018, 1, 5)
+    datetime(2020, 1, 1),
+    datetime(2020, 1, 2),
+    datetime(2020, 1, 3),
+    datetime(2020, 1, 4),
+    datetime(2020, 1, 5)
 ])
 columns = ['a', 'b', 'c']
 df = pd.DataFrame([
@@ -30,16 +30,16 @@ df = pd.DataFrame([
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-import itertools
 from numba.typed import Dict
-from datetime import timedelta
 
+from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks, index_fns, reshape_fns
-from vectorbt.utils.decorators import add_nb_methods
-from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
+from vectorbt.utils.decorators import add_nb_methods, cached_property
+from vectorbt.utils.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.timeseries import nb
 from vectorbt.timeseries.common import TSArrayWrapper
+from vectorbt.records.drawdowns import Drawdowns
 from vectorbt.widgets.common import DefaultFigureWidget
 
 try:
@@ -72,6 +72,7 @@ except ImportError:
     nb.diff_nb,
     nb.pct_change_nb,
     nb.ffill_nb,
+    nb.product_nb,
     nb.cumsum_nb,
     nb.cumprod_nb,
     nb.rolling_min_nb,
@@ -85,20 +86,30 @@ except ImportError:
     nb.expanding_mean_nb,
     nb.expanding_std_nb,
     module_name='vectorbt.timeseries.nb')
-class TimeSeries_Accessor(TSArrayWrapper):
-    """Accessor with methods for both Series and DataFrames.
+class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
+    """Accessor on top of time series. For both, Series and DataFrames.
 
-    Accessible through `pandas.Series.vbt.timeseries` and `pandas.DataFrame.vbt.timeseries`."""
+    Accessible through `pandas.Series.vbt.timeseries` and `pandas.DataFrame.vbt.timeseries`.
 
-    def __init__(self, parent):
-        self._obj = parent._obj  # access pandas object
+    You can call the accessor and specify index frequency if your index isn't datetime-like."""
+
+    def __init__(self, obj, freq=None):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+
+        Base_Accessor.__init__(self, obj)
 
         # Initialize array wrapper
-        wrapper = TSArrayWrapper.from_obj(self._obj)
-        TSArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
+        wrapper = TSArrayWrapper.from_obj(obj)
+        TSArrayWrapper.__init__(
+            self,
+            index=wrapper.index,
+            columns=wrapper.columns,
+            ndim=wrapper.ndim,
+            freq=freq)
 
     def rolling_apply(self, window, apply_func_nb, *args, on_matrix=False):
-        """See `vectorbt.timeseries.nb.rolling_apply_nb` and 
+        """See `vectorbt.timeseries.nb.rolling_apply_nb` and
         `vectorbt.timeseries.nb.rolling_apply_matrix_nb` for `on_matrix=True`.
 
         Example:
@@ -106,21 +117,21 @@ class TimeSeries_Accessor(TSArrayWrapper):
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
             >>> print(df.vbt.timeseries.rolling_apply(3, mean_nb))
                           a    b         c
-            2018-01-01  1.0  5.0  1.000000
-            2018-01-02  1.5  4.5  1.500000
-            2018-01-03  2.0  4.0  2.000000
-            2018-01-04  3.0  3.0  2.333333
-            2018-01-05  4.0  2.0  2.000000
+            2020-01-01  1.0  5.0  1.000000
+            2020-01-02  1.5  4.5  1.500000
+            2020-01-03  2.0  4.0  2.000000
+            2020-01-04  3.0  3.0  2.333333
+            2020-01-05  4.0  2.0  2.000000
 
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.timeseries.rolling_apply(3, 
+            >>> print(df.vbt.timeseries.rolling_apply(3,
             ...     mean_matrix_nb, on_matrix=True))
                                a         b         c
-            2018-01-01  2.333333  2.333333  2.333333
-            2018-01-02  2.500000  2.500000  2.500000
-            2018-01-03  2.666667  2.666667  2.666667
-            2018-01-04  2.777778  2.777778  2.777778
-            2018-01-05  2.666667  2.666667  2.666667
+            2020-01-01  2.333333  2.333333  2.333333
+            2020-01-02  2.500000  2.500000  2.500000
+            2020-01-03  2.666667  2.666667  2.666667
+            2020-01-04  2.777778  2.777778  2.777778
+            2020-01-05  2.666667  2.666667  2.666667
             ```"""
         checks.assert_numba_func(apply_func_nb)
 
@@ -131,7 +142,7 @@ class TimeSeries_Accessor(TSArrayWrapper):
         return self.wrap(result)
 
     def expanding_apply(self, apply_func_nb, *args, on_matrix=False):
-        """See `vectorbt.timeseries.nb.expanding_apply_nb` and 
+        """See `vectorbt.timeseries.nb.expanding_apply_nb` and
         `vectorbt.timeseries.nb.expanding_apply_matrix_nb` for `on_matrix=True`.
 
         Example:
@@ -139,21 +150,21 @@ class TimeSeries_Accessor(TSArrayWrapper):
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
             >>> print(df.vbt.timeseries.expanding_apply(mean_nb))
                           a    b    c
-            2018-01-01  1.0  5.0  1.0
-            2018-01-02  1.5  4.5  1.5
-            2018-01-03  2.0  4.0  2.0
-            2018-01-04  2.5  3.5  2.0
-            2018-01-05  3.0  3.0  1.8
+            2020-01-01  1.0  5.0  1.0
+            2020-01-02  1.5  4.5  1.5
+            2020-01-03  2.0  4.0  2.0
+            2020-01-04  2.5  3.5  2.0
+            2020-01-05  3.0  3.0  1.8
 
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.timeseries.expanding_apply( 
+            >>> print(df.vbt.timeseries.expanding_apply(
             ...     mean_matrix_nb, on_matrix=True))
                                a         b         c
-            2018-01-01  2.333333  2.333333  2.333333
-            2018-01-02  2.500000  2.500000  2.500000
-            2018-01-03  2.666667  2.666667  2.666667
-            2018-01-04  2.666667  2.666667  2.666667
-            2018-01-05  2.600000  2.600000  2.600000
+            2020-01-01  2.333333  2.333333  2.333333
+            2020-01-02  2.500000  2.500000  2.500000
+            2020-01-03  2.666667  2.666667  2.666667
+            2020-01-04  2.666667  2.666667  2.666667
+            2020-01-05  2.600000  2.600000  2.600000
             ```"""
         checks.assert_numba_func(apply_func_nb)
 
@@ -164,7 +175,7 @@ class TimeSeries_Accessor(TSArrayWrapper):
         return self.wrap(result)
 
     def groupby_apply(self, by, apply_func_nb, *args, on_matrix=False, **kwargs):
-        """See `vectorbt.timeseries.nb.groupby_apply_nb` and 
+        """See `vectorbt.timeseries.nb.groupby_apply_nb` and
         `vectorbt.timeseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
         For `by`, see `pandas.DataFrame.groupby`.
@@ -172,15 +183,14 @@ class TimeSeries_Accessor(TSArrayWrapper):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3], 
-            ...     mean_nb))
+            >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3], mean_nb))
                  a    b    c
             1  1.5  4.5  1.5
             2  3.5  2.5  2.5
             3  5.0  1.0  1.0
 
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3], 
+            >>> print(df.vbt.timeseries.groupby_apply([1, 1, 2, 2, 3],
             ...     mean_matrix_nb, on_matrix=True))
                       a         b         c
             1  2.500000  2.500000  2.500000
@@ -197,10 +207,10 @@ class TimeSeries_Accessor(TSArrayWrapper):
             result = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             result = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        return self.wrap(result, index=list(regrouped.indices.keys()))
+        return self.wrap_reduced(result, index=list(regrouped.indices.keys()))
 
     def resample_apply(self, freq, apply_func_nb, *args, on_matrix=False, **kwargs):
-        """See `vectorbt.timeseries.nb.groupby_apply_nb` and 
+        """See `vectorbt.timeseries.nb.groupby_apply_nb` and
         `vectorbt.timeseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
         For `freq`, see `pandas.DataFrame.resample`.
@@ -210,17 +220,17 @@ class TimeSeries_Accessor(TSArrayWrapper):
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
             >>> print(df.vbt.timeseries.resample_apply('2d', mean_nb))
                           a    b    c
-            2018-01-01  1.5  4.5  1.5
-            2018-01-03  3.5  2.5  2.5
-            2018-01-05  5.0  1.0  1.0
+            2020-01-01  1.5  4.5  1.5
+            2020-01-03  3.5  2.5  2.5
+            2020-01-05  5.0  1.0  1.0
 
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.timeseries.resample_apply('2d', 
+            >>> print(df.vbt.timeseries.resample_apply('2d',
             ...     mean_matrix_nb, on_matrix=True))
                                a         b         c
-            2018-01-01  2.500000  2.500000  2.500000
-            2018-01-03  2.833333  2.833333  2.833333
-            2018-01-05  2.333333  2.333333  2.333333
+            2020-01-01  2.500000  2.500000  2.500000
+            2020-01-03  2.833333  2.833333  2.833333
+            2020-01-05  2.333333  2.333333  2.333333
             ```"""
         checks.assert_numba_func(apply_func_nb)
 
@@ -238,28 +248,54 @@ class TimeSeries_Accessor(TSArrayWrapper):
         resampled_obj.loc[result_obj.index] = result_obj.values
         return resampled_obj
 
-    def rolling_window(self, window, n=None):
-        """Split time series into `n` time ranges each `window` long.
+    def split_into_ranges(self, range_len=None, n=None):
+        """Split time series into `n` ranges each `range_len` long.
 
-        The result will be a new DataFrame with index of length `window` and columns of length
-        `len(columns) * n`. If `n` is `None`, will return the maximum number of time ranges.
+        At least one of `range_len` and `n` must be set.
+        If `range_len` is `None`, will split evenly into `n` ranges.
+        If `n` is `None`, will return the maximum number of ranges of length `range_len`.
+
+        !!! note
+            The datetime-like format of the index will be lost as result of this operation.
+            Make sure to store the index metadata such as frequency information beforehand.
 
         Example:
             ```python-repl
-            >>> print(df.vbt.timeseries.rolling_window(2, n=2))
-                                a                     b                     c           
-            start_date 2018-01-01 2018-01-04 2018-01-01 2018-01-04 2018-01-01 2018-01-04
+            >>> print(df.vbt.timeseries.split_into_ranges(n=2))
+                                           a                     b                     c
+            start_date 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
+            end_date   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
             0                 1.0        4.0        5.0        2.0        1.0        2.0
-            1                 2.0        5.0        4.0        1.0        2.0        1.0 
+            1                 2.0        5.0        4.0        1.0        2.0        1.0
+
+            >>> print(df.vbt.timeseries.split_into_ranges(range_len=4))
+                                           a                     b                     c
+            start_date 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
+            end_date   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
+            0                 1.0        2.0        5.0        4.0        1.0        2.0
+            1                 2.0        3.0        4.0        3.0        2.0        3.0
+            2                 3.0        4.0        3.0        2.0        3.0        2.0
+            3                 4.0        5.0        2.0        1.0        2.0        1.0
             ```"""
-        cube = nb.rolling_window_nb(self.to_2d_array(), window)
+        if range_len is None:
+            checks.assert_not_none(n)
+        elif n is None:
+            checks.assert_not_none(range_len)
+
+        if range_len is None:
+            range_len = len(self.index) // n
+        cube = nb.rolling_window_nb(self.to_2d_array(), range_len)
         if n is not None:
-            idxs = np.round(np.linspace(0, cube.shape[2]-1, n)).astype(int)
+            if n > cube.shape[2]:
+                raise Exception(f"n cannot be bigger than the maximum number of ranges {cube.shape[2]}")
+            idxs = np.round(np.linspace(0, cube.shape[2] - 1, n)).astype(int)
             cube = cube[:, :, idxs]
         else:
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
-        range_columns = pd.Index(self.index[idxs], name='start_date')
+        start_dates = pd.Index(self.index[idxs], name='start_date')
+        end_dates = pd.Index(self.index[idxs + range_len - 1], name='end_date')
+        range_columns = index_fns.stack_indexes(start_dates, end_dates)
         new_columns = index_fns.combine_indexes(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
@@ -271,11 +307,11 @@ class TimeSeries_Accessor(TSArrayWrapper):
             >>> multiply_nb = njit(lambda col, i, a: a ** 2)
             >>> print(df.vbt.timeseries.applymap(multiply_nb))
                            a     b    c
-            2018-01-01   1.0  25.0  1.0
-            2018-01-02   4.0  16.0  4.0
-            2018-01-03   9.0   9.0  9.0
-            2018-01-04  16.0   4.0  4.0
-            2018-01-05  25.0   1.0  1.0
+            2020-01-01   1.0  25.0  1.0
+            2020-01-02   4.0  16.0  4.0
+            2020-01-03   9.0   9.0  9.0
+            2020-01-04  16.0   4.0  4.0
+            2020-01-05  25.0   1.0  1.0
             ```"""
         checks.assert_numba_func(apply_func_nb)
 
@@ -290,11 +326,11 @@ class TimeSeries_Accessor(TSArrayWrapper):
             >>> greater_nb = njit(lambda col, i, a: a > 2)
             >>> print(df.vbt.timeseries.filter(greater_nb))
                           a    b    c
-            2018-01-01  NaN  5.0  NaN
-            2018-01-02  NaN  4.0  NaN
-            2018-01-03  3.0  3.0  3.0
-            2018-01-04  4.0  NaN  NaN
-            2018-01-05  5.0  NaN  NaN
+            2020-01-01  NaN  5.0  NaN
+            2020-01-02  NaN  4.0  NaN
+            2020-01-03  3.0  3.0  3.0
+            2020-01-04  4.0  NaN  NaN
+            2020-01-05  5.0  NaN  NaN
             ```"""
         checks.assert_numba_func(filter_func_nb)
 
@@ -304,7 +340,7 @@ class TimeSeries_Accessor(TSArrayWrapper):
     def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.apply_and_reduce_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
+        `**kwargs` will be passed to `vectorbt.timeseries.common.TSArrayWrapper.wrap_reduced`.
 
         Example:
             ```python-repl
@@ -325,7 +361,7 @@ class TimeSeries_Accessor(TSArrayWrapper):
     def reduce(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.reduce_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
+        `**kwargs` will be passed to `vectorbt.timeseries.common.TSArrayWrapper.wrap_reduced`.
 
         Example:
             ```python-repl
@@ -344,7 +380,7 @@ class TimeSeries_Accessor(TSArrayWrapper):
     def reduce_to_array(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.timeseries.nb.reduce_to_array_nb`.
 
-        `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
+        `**kwargs` will be passed to `vectorbt.timeseries.common.TSArrayWrapper.wrap_reduced`.
 
         Example:
             ```python-repl
@@ -395,8 +431,8 @@ class TimeSeries_Accessor(TSArrayWrapper):
         """Return index of max of non-NaN elements."""
         return self.wrap_reduced(self.index[nanargmax(self.to_2d_array(), axis=0)], **kwargs)
 
-    def describe(self, percentiles=[0.25, 0.5, 0.75], **kwargs):
-        """See `vectorbt.timeseries.nb.describe_reduce_func_nb`.
+    def describe(self, percentiles=[0.25, 0.5, 0.75], ddof=1, **kwargs):
+        """See `vectorbt.timeseries.nb.describe_reduce_nb`.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
@@ -420,18 +456,32 @@ class TimeSeries_Accessor(TSArrayWrapper):
         else:
             percentiles = np.empty(0)
         index = pd.Index(['count', 'mean', 'std', 'min', *map(lambda x: '%.2f%%' % (x * 100), percentiles), 'max'])
-        return self.reduce_to_array(nb.describe_reduce_func_nb, percentiles, index=index, **kwargs)
+        return self.reduce_to_array(nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
+
+    def drawdown(self):
+        """Drawdown series."""
+        return self.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
+
+    def drawdowns(self):
+        """Drawdown records.
+
+        See `vectorbt.records.drawdowns.Drawdowns`."""
+        return Drawdowns.from_ts(self._obj, freq=self.freq)
+
 
 
 @register_series_accessor('timeseries')
 class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
-    """Accessor with methods for Series only.
+    """Accessor on top of time series. For Series only.
 
     Accessible through `pandas.Series.vbt.timeseries`."""
 
-    def __init__(self, parent):
-        Base_SRAccessor.__init__(self, parent)
-        TimeSeries_Accessor.__init__(self, parent)
+    def __init__(self, obj, freq=None):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+
+        Base_SRAccessor.__init__(self, obj)
+        TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot Series as a line.
@@ -449,13 +499,13 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             ![](/vectorbt/docs/img/timeseries_sr_plot.png)"""
         if fig is None:
             fig = DefaultFigureWidget()
-            fig.update_layout(**layout_kwargs)
+        fig.update_layout(**layout_kwargs)
         if name is None:
             name = self._obj.name
 
         scatter = go.Scatter(
             x=self.index,
-            y=self.to_array(),
+            y=self._obj.values,
             mode='lines',
             name=str(name),
             showlegend=name is not None
@@ -509,14 +559,15 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
         # Set up figure
         if fig is None:
             fig = DefaultFigureWidget()
-            fig.update_layout(**layout_kwargs)
+        fig.update_layout(**layout_kwargs)
 
         # Plot other
         other_scatter = go.Scatter(
+            mode='lines',
             x=other.index,
             y=other,
             line=dict(
-                color="grey",
+                color=defaults.color_schema['gray'],
                 width=2,
                 dash="dot",
             ),
@@ -532,9 +583,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             y=above_obj,
             mode='markers',
             marker=dict(
-                symbol='circle',
-                color='green',
-                size=10
+                color=defaults.color_schema['green']
             ),
             name=f'{name} (above)',
             showlegend=name is not None
@@ -547,9 +596,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             y=below_obj,
             mode='markers',
             marker=dict(
-                symbol='circle',
-                color='red',
-                size=10
+                color=defaults.color_schema['red']
             ),
             name=f'{name} (below)',
             showlegend=name is not None
@@ -562,9 +609,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             y=equal_obj,
             mode='markers',
             marker=dict(
-                symbol='circle',
-                color='grey',
-                size=10
+                color=defaults.color_schema['gray']
             ),
             name=f'{name} (equal)',
             showlegend=name is not None
@@ -574,23 +619,13 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
         # If other is a straight line, make y-axis symmetric
         if np.all(other.values == other.values.item(0)):
-            maxval = np.nanmax(np.abs(self.to_array()))
+            maxval = np.nanmax(np.abs(self._obj.values))
             space = 0.1 * 2 * maxval
             y = other.values.item(0)
             fig.update_layout(
                 yaxis=dict(
-                    range=[y-(maxval+space), y+maxval+space]
-                ),
-                shapes=[dict(
-                    type="line",
-                    xref="paper",
-                    yref='y',
-                    x0=0, x1=1, y0=y, y1=y,
-                    line=dict(
-                        color="grey",
-                        width=2,
-                        dash="dot",
-                    ))]
+                    range=[y - (maxval + space), y + maxval + space]
+                )
             )
 
         return fig
@@ -598,13 +633,16 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
 @register_dataframe_accessor('timeseries')
 class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
-    """Accessor with methods for DataFrames only.
+    """Accessor on top of time series. For DataFrames only.
 
     Accessible through `pandas.DataFrame.vbt.timeseries`."""
 
-    def __init__(self, parent):
-        Base_DFAccessor.__init__(self, parent)
-        TimeSeries_Accessor.__init__(self, parent)
+    def __init__(self, obj, freq=None):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+
+        Base_DFAccessor.__init__(self, obj)
+        TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
         """Plot each column in DataFrame as a line.
@@ -632,30 +670,22 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
 @register_dataframe_accessor('ohlcv')
 class OHLCV_DFAccessor(TimeSeries_DFAccessor):
-    """Accessor with methods for DataFrames only.
+    """Accessor on top of OHLCV data. For DataFrames only.
 
     Accessible through `pandas.DataFrame.vbt.ohlcv`."""
 
-    def __init__(self, parent):
-        TimeSeries_DFAccessor.__init__(self, parent)
+    def __init__(self, obj, column_names=None, freq=None):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._column_names = column_names
 
-        self()  # set column map
-
-    def __call__(self, open='Open', high='High', low='Low', close='Close', volume='Volume'):
-        """Accessor is callable to be able to provide column names."""
-        self._column_map = dict(
-            open=open,
-            high=high,
-            low=low,
-            close=close,
-            volume=volume
-        )
-        return self
+        TimeSeries_DFAccessor.__init__(self, obj, freq=freq)
 
     def plot(self,
              display_volume=True,
              candlestick_kwargs={},
              bar_kwargs={},
+             fig=None,
              **layout_kwargs):
         """Plot OHLCV data.
 
@@ -674,12 +704,15 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
             ```
 
             ![](/vectorbt/docs/img/ohlcv.png)"""
-        open = self._obj[self._column_map['open']]
-        high = self._obj[self._column_map['high']]
-        low = self._obj[self._column_map['low']]
-        close = self._obj[self._column_map['close']]
+        column_names = defaults.ohlcv['column_names'] if self._column_names is None else self._column_names
+        open = self._obj[column_names['open']]
+        high = self._obj[column_names['high']]
+        low = self._obj[column_names['low']]
+        close = self._obj[column_names['close']]
 
-        fig = DefaultFigureWidget()
+        # Set up figure
+        if fig is None:
+            fig = DefaultFigureWidget()
         candlestick = go.Candlestick(
             x=self.index,
             open=open,
@@ -693,7 +726,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
         candlestick.update(**candlestick_kwargs)
         fig.add_trace(candlestick)
         if display_volume:
-            volume = self._obj[self._column_map['volume']]
+            volume = self._obj[column_names['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=np.object)
             marker_colors[(close.values - open.values) > 0] = 'green'

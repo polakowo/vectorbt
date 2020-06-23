@@ -11,7 +11,7 @@
     
     All functions passed as argument must be Numba-compiled."""
 
-from numba import njit, f8, i8, b1, optional
+from numba import njit, f8
 import numpy as np
 
 
@@ -300,12 +300,12 @@ def nanmean_nb(a):
 @njit(cache=True)
 def nanstd_1d_nb(a, ddof=1):
     """Compute the standard deviation while ignoring NaNs."""
-    a = a[~np.isnan(a)]
-    rcount = max(a.shape[0] - ddof, 0)
+    cnt = a.shape[0] - np.count_nonzero(np.isnan(a))
+    rcount = max(cnt - ddof, 0)
     if rcount == 0:
         return np.nan
     else:
-        return np.std(a) * np.sqrt(a.shape[0] / rcount)
+        return np.nanstd(a) * np.sqrt(cnt / rcount)
 
 
 @njit(cache=True)
@@ -350,7 +350,7 @@ def rolling_min_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise ValueError("minp must be <= window")
+        raise Exception("minp must be <= window")
     result = np.empty_like(a, dtype=f8)
     for i in range(a.shape[0]):
         minv = a[i]
@@ -385,7 +385,7 @@ def rolling_max_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise ValueError("minp must be <= window")
+        raise Exception("minp must be <= window")
     result = np.empty_like(a, dtype=f8)
     for i in range(a.shape[0]):
         maxv = a[i]
@@ -420,7 +420,7 @@ def rolling_mean_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise ValueError("minp must be <= window")
+        raise Exception("minp must be <= window")
     result = np.empty_like(a, dtype=f8)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -463,7 +463,7 @@ def rolling_std_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise ValueError("minp must be <= window")
+        raise Exception("minp must be <= window")
     if minp == 1:
         minp = 2
     result = np.empty_like(a, dtype=f8)
@@ -519,7 +519,7 @@ def ewm_mean_1d_nb(a, span, minp=None):
     if minp is None:
         minp = span
     if minp > span:
-        raise ValueError("minp must be <= span")
+        raise Exception("minp must be <= span")
     N = len(a)
     result = np.empty(N, dtype=f8)
     if N == 0:
@@ -570,7 +570,7 @@ def ewm_std_1d_nb(a, span, minp=None):
     if minp is None:
         minp = span
     if minp > span:
-        raise ValueError("minp must be <= span")
+        raise Exception("minp must be <= span")
     N = len(a)
     result = np.empty(N, dtype=f8)
     if N == 0:
@@ -628,7 +628,7 @@ def ewm_std_1d_nb(a, span, minp=None):
         if nobs >= minp:
             numerator = sum_wt * sum_wt
             denominator = numerator - sum_wt2
-            if (denominator > 0.):
+            if denominator > 0.:
                 result[i] = ((numerator / denominator) * cov)
             else:
                 result[i] = np.nan
@@ -884,7 +884,7 @@ def reduce_to_array_nb(a, reduce_func_nb, *args):
 
 
 @njit(cache=True)
-def describe_reduce_func_nb(col, a, percentiles):
+def describe_reduce_nb(col, a, percentiles, ddof):
     """Return descriptive statistics.
 
     Numba equivalent to `pd.Series(a).describe(percentiles)`."""
@@ -893,10 +893,9 @@ def describe_reduce_func_nb(col, a, percentiles):
     result[0] = len(a)
     if len(a) > 0:
         result[1] = np.mean(a)
-        result[2] = nanstd_1d_nb(a, ddof=1)
+        result[2] = nanstd_1d_nb(a, ddof=ddof)
         result[3] = np.min(a)
-        for i, percentile in enumerate(percentiles):
-            result[4:-1] = np.percentile(a, percentiles * 100)
+        result[4:-1] = np.percentile(a, percentiles * 100)
         result[4+len(percentiles)] = np.max(a)
     else:
         result[1:] = np.nan
