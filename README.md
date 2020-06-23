@@ -30,11 +30,10 @@ init_capital = 100 # in $
 fees = 0.001 # in %
 
 # Prepare data
-ticker = yf.Ticker("BTC-USD")
-price = ticker.history(period="max")['Close']
+price = yf.Ticker("BTC-USD").history(period="max")['Close']
 
 # Generate signals
-fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2)
+fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2, names=['fast', 'slow'])
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
@@ -44,8 +43,8 @@ performance = portfolio.total_return * 100
 
 # Plot heatmap
 perf_matrix = performance.vbt.unstack_to_df(
-    index_levels='ma1_window', 
-    column_levels='ma2_window', 
+    index_levels='fast_window', 
+    column_levels='slow_window', 
     symmetric=True)
 perf_matrix.vbt.Heatmap(
     xaxis_title='Slow window', 
@@ -178,7 +177,3 @@ See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-
 - [How stop-loss and trailing stop orders perform on crypto?](examples/StopLoss-vs-TrailingStop.ipynb)
 
 Note: you will need to run the notebook to play with widgets.
-
-## Credits
-
-- Logo made by [Freepik](https://www.flaticon.com/authors/freepik) from [Flaticon](www.flaticon.com)
