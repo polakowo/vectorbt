@@ -18,13 +18,12 @@ price['Close'].vbt.timeseries.plot()
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
 import numpy as np
-import pandas as pd
 from numba import njit
 import itertools
 import plotly.graph_objects as go
 
 from vectorbt import timeseries, defaults
-from vectorbt.utils import checks, reshape_fns
+from vectorbt.utils import reshape_fns
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.indicators.factory import IndicatorFactory
@@ -40,9 +39,9 @@ def ma_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                ma = timeseries.nb.ewm_mean_nb(ts, windows[i], minp=windows[i])
+                ma = timeseries.nb.ewm_mean_nb(ts, windows[i])
             else:
-                ma = timeseries.nb.rolling_mean_nb(ts, windows[i], minp=windows[i])
+                ma = timeseries.nb.rolling_mean_nb(ts, windows[i])
             cache_dict[h] = ma
     return cache_dict
 
@@ -261,9 +260,9 @@ def mstd_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                mstd = timeseries.nb.ewm_std_nb(ts, windows[i], minp=windows[i])
+                mstd = timeseries.nb.ewm_std_nb(ts, windows[i])
             else:
-                mstd = timeseries.nb.rolling_std_nb(ts, windows[i], minp=windows[i])
+                mstd = timeseries.nb.rolling_std_nb(ts, windows[i])
             cache_dict[h] = mstd
     return cache_dict
 
@@ -384,9 +383,9 @@ BollingerBands = IndicatorFactory(
     output_names=['ma', 'upper_band', 'lower_band'],
     name='bb',
     custom_outputs=dict(
-        percent_b=lambda self: self.wrap(
+        percent_b=lambda self: self.wrapper.wrap(
             (self.ts.values - self.lower_band.values) / (self.upper_band.values - self.lower_band.values)),
-        bandwidth=lambda self: self.wrap(
+        bandwidth=lambda self: self.wrapper.wrap(
             (self.upper_band.values - self.lower_band.values) / self.ma.values)
     )
 ).from_apply_func(bb_apply_nb, caching_func=bb_caching_nb)
@@ -572,11 +571,11 @@ def rsi_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i], minp=windows[i])
-                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i], minp=windows[i])
+                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i])
+                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i])
             else:
-                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i], minp=windows[i])
-                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i], minp=windows[i])
+                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i])
+                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i])
             roll_up = timeseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
             roll_down = timeseries.nb.prepend_nb(roll_down, 1, np.nan)
             cache_dict[h] = roll_up, roll_down
@@ -700,8 +699,8 @@ def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     for i in range(k_windows.shape[0]):
         h = hash(k_windows[i])
         if h not in cache_dict:
-            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i], minp=1) # min_periods=1
-            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i], minp=1)
+            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i])
+            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i])
             cache_dict[h] = roll_min, roll_max
     return cache_dict
 
@@ -713,9 +712,9 @@ def stoch_apply_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_d
     roll_min, roll_max = cache_dict[h]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
     if d_ewm:
-        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window, minp=d_window)
+        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window)
     else:
-        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window, minp=d_window)
+        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window)
     return percent_k, percent_d
 
 
@@ -865,15 +864,16 @@ def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, s
 @njit(cache=True)
 def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
     """Numba-compiled apply function for `MACD`."""
-    h = hash((fast_window, macd_ewm))
-    fast_ma = cache_dict[h]
-    slow_ma = cache_dict[h]
+    fast_h = hash((fast_window, macd_ewm))
+    slow_h = hash((slow_window, macd_ewm))
+    fast_ma = cache_dict[fast_h]
+    slow_ma = cache_dict[slow_h]
     macd_ts = fast_ma - slow_ma
     if signal_ewm:
-        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window, minp=signal_window)
+        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window)
     else:
-        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window, minp=signal_window)
-    return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
+        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window)
+    return fast_ma, slow_ma, macd_ts, signal_ts
 
 
 MACD = IndicatorFactory(
@@ -884,7 +884,7 @@ MACD = IndicatorFactory(
     output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
     name='macd',
     custom_outputs=dict(
-        histogram=lambda self: self.wrap(self.macd.values - self.signal.values),
+        histogram=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
 ).from_apply_func(macd_apply_nb, caching_func=macd_caching_nb)
 
@@ -1087,9 +1087,9 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                atr = timeseries.nb.ewm_mean_nb(tr, windows[i], minp=windows[i])
+                atr = timeseries.nb.ewm_mean_nb(tr, windows[i])
             else:
-                atr = timeseries.nb.rolling_mean_nb(tr, windows[i], minp=windows[i])
+                atr = timeseries.nb.rolling_mean_nb(tr, windows[i])
             cache_dict[h] = atr
     return tr, cache_dict
 
