@@ -32,7 +32,7 @@ body {
 #footer {
     font-size: .75em;
     padding: 5px 30px;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid #eee;
     text-align: right;
 }
 
@@ -149,7 +149,8 @@ pre {
 }
 
 #index h3 {
-    border-bottom: 1px solid #ddd;
+    padding-bottom: .5em;
+    border-bottom: 1px solid #e82;
 }
 
 #index ul {
@@ -521,43 +522,107 @@ a.badge-dark.focus {
 }
 
 #search_input {
-    isplay: block;
+    display: inline-block;
     width: 100%;
+    height: 40px;
     padding: .375rem .75rem;
     font-size: 1rem;
     line-height: 1.5;
-    color: #495057;
-    background-color: #fff;
-    background-clip: padding-box;
-    border: 1px solid #ced4da;
-    border-radius: .25rem;
-    transition: border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+    color: #ddd;
+    background: rgba(0, 0, 0, .2);
+    border: none;
+    border-bottom: 1px solid #e82;
+    outline: none;
 }
 
 .algolia-autocomplete {
     width: 100%;
+    background: rgba(0, 0, 0, .2);
+    border: none;
 }
 
-.scrollable-index {
-    overflow-y: scroll;
-    height: calc(100vh - 200px);
+.algolia-autocomplete input {
+    display: none;
+}
+
+.index-caption {
+    color: #ddd;
+}
+
+#index a, #index h3, .toc a {
+    color: #ddd;
+}
+
+#index a:hover, .toc a:hover {
+    color: #e82;
+}
+
+#sidebar {
+    background: #313f52;
+}
+
+.toc ul ul, #index ul {
+    padding-left: 1.5em;
+}
+
+.toc>ul>li {
+    margin-top: .5em;
+}
+
+pre {
+    position: relative;
+    background: #fafafa;
+}
+
+pre .btnIcon {
+    position: absolute;
+    top: 4px;
+    z-index: 2;
+    cursor: pointer;
+    border: 1px solid transparent;
+    padding: 0;
+    color: #383a42;
+    background-color: transparent;
+    height: 30px;
+    transition: all .25s ease-out;
+}
+
+pre .btnIcon:hover {
+    text-decoration: none;
+}
+
+.btnIcon__body {
+    align-items: center;
+    display: flex;
+}
+
+.btnIcon svg {
+    fill: currentColor;
+    margin-right: .4em;
+}
+
+.btnIcon__label {
+    font-size: 11px;
+}
+
+.btnClipboard {
+    right: 10px;
 }
 </%def>
 
 <%def name="desktop()" filter="minify_css">
 @media screen and (min-width: 700px) {
 	#sidebar {
-		width: 30%;
+		width: 400px;
 		height: 100vh;
 		overflow: visible;
 		position: sticky;
 		top: 0;
 	}
 	#content {
-		width: 70%;
+        width: 100%;
 		max-width: 100ch;
 		padding: 3em 4em;
-		border-left: 1px solid #ddd;
 	}
 	.item .name {
 		font-size: 1em;
@@ -567,13 +632,10 @@ a.badge-dark.focus {
 		flex-direction: row-reverse;
 		justify-content: flex-end;
 	}
-	.toc ul ul,
-	#index ul {
-		padding-left: 1.5em;
-	}
-	.toc>ul>li {
-		margin-top: .5em;
-	}
+    .scrollable-index {
+        overflow-y: scroll;
+        height: calc(100vh - 250px);
+    }
 }
 </%def>
 
