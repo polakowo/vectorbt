@@ -2,6 +2,7 @@
 
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.widgets import basic
+from vectorbt.utils import checks
 
 
 @register_dataframe_accessor('Bar')
@@ -9,8 +10,10 @@ from vectorbt.widgets import basic
 class Bar_Accessor():
     """Allows calling `vectorbt.widgets.basic.Bar` using `pandas.Series.vbt.Bar` and `pandas.DataFrame.vbt.Bar`."""
 
-    def __init__(self, parent):
-        self._obj = parent._obj  # access pandas object
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._obj = obj
 
     def __call__(self, x_labels=None, trace_names=None, **kwargs):
         obj = self._obj
@@ -27,8 +30,10 @@ class Bar_Accessor():
 class Scatter_Accessor():
     """Allows calling `vectorbt.widgets.basic.Scatter` using `pandas.Series.vbt.Scatter` and `pandas.DataFrame.vbt.Scatter`."""
 
-    def __init__(self, parent):
-        self._obj = parent._obj  # access pandas object
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._obj = obj
 
     def __call__(self, x_labels=None, trace_names=None, **kwargs):
         obj = self._obj
@@ -45,8 +50,10 @@ class Scatter_Accessor():
 class Histogram_Accessor():
     """Allows calling `vectorbt.widgets.basic.Histogram` using `pandas.Series.vbt.Histogram` and `pandas.DataFrame.vbt.Histogram`."""
 
-    def __init__(self, parent):
-        self._obj = parent._obj  # access pandas object
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._obj = obj
 
     def __call__(self, trace_names=None, **kwargs):
         obj = self._obj
@@ -61,8 +68,10 @@ class Histogram_Accessor():
 class Heatmap_Accessor():
     """Allows calling `vectorbt.widgets.basic.Heatmap` using `pandas.Series.vbt.Heatmap` and `pandas.DataFrame.vbt.Heatmap`."""
 
-    def __init__(self, parent):
-        self._obj = parent._obj  # access pandas object
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._obj = obj
 
     def __call__(self, x_labels=None, y_labels=None, **kwargs):
         obj = self._obj
