@@ -64,17 +64,17 @@ instruments in little time, to explore where your strategy performs best and to 
 Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Moving_average_crossover) strategy 
 for example. By calculating the performance of each reasonable window combination and plotting the whole thing 
 as a heatmap (as we do above), you can easily identify how performance depends on window size. If you additionally 
-calculate the same heatmap over multiple time periods, you will spot how performance varies with downtrends and 
-uptrends. By doing the same for other strategies such as holding and trading randomly, you can compare them using 
-significance tests. With vectorbt, this analysis can be done in minutes, and will effectively save you hours of 
-getting the same insights using other libraries.
+compute the same heatmap over multiple time periods, you will spot how performance varies with downtrends and 
+uptrends. Finally, by running the same pipeline on other strategies such as holding and trading randomly, 
+you can compare them and decide whether your strategy is worth executing. With vectorbt, this analysis can 
+be done in minutes, and will effectively save you hours of getting the same insights using other libraries.
 
 ## How it works?
 
 vectorbt combines pandas, NumPy and Numba sauce to obtain orders-of-magnitude speedup over other libraries.
 
-It natively works on pandas objects, while performing all calculations using NumPy and Numba under the hood. 
-This way, it is much faster than pandas alone.
+It natively works on pandas objects, while performing all computations using NumPy and Numba under the hood. 
+This way, it is often much faster than pandas alone.
 
 ```python-repl
 >>> import pandas as pd
@@ -94,33 +94,34 @@ To make the library easier to use, vectorbt introduces a namespace (accessor) to
 This way, user can easily switch between native pandas functionality such as indexing, and highly-efficient 
 vectorbt methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
 
-In contrast to most other vectorized backtesting libraries where backtesting is limited to simple arrays 
-(think of an array for price, an array for signals, an array for equity, etc.), vectorbt is optimized for 
-working with 2-dimensional data: it treats each index of a DataFrame as time axis and each column as a 
-distinct feature that should be backtested, and performs calculations on the entire matrix at once. 
-This way, user can construct huge matrices with millions of columns and calculate the performance for each 
-one with a single matrix operation, without any Pythonic loops.
+In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
+(think of an array for price, an array for signals, etc.), vectorbt is optimized for working with 
+2-dimensional data: it treats index of a DataFrame as time axis and columns as distinct features
+that should be backtested, and performs calculations on the entire matrix at once. This way, user can 
+construct huge matrices with millions of columns and calculate the performance for each one with a single 
+matrix operation, without any Pythonic loops.
 
 ## Features
 
 - Extends pandas using a custom `vbt` accessor
 - For high performance, most operations are done strictly using NumPy and Numba 
-- Provides a collection of utility functions for working with data
+- Utility functions for working with data
     - Implements NumPy-like broadcasting for pandas, among other features.
 - `vbt.timeseries` accessor for working with time series
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
+    - Drawdown analysis for historical periods
 - `vbt.signals` accessor for working with signals data
     - Entry, exit and random signal generation, ranking and distance functions
     - Generation of stop loss, trailing stop and take profit signals
 - `vbt.returns` accessor for computing common financial risk and performance metrics
 - `vbt.portfolio` accessor for modeling portfolio performance
     - Accepts signals, orders, or custom order function
-    - Provides a collection of metrics and tools for analyzing returns, orders, trades and positions
-- Provides a range of technical indicators with full Numba support
+    - Metrics and tools for analyzing returns, orders, trades and positions
+- Technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
     - Each indicator accepts arbitrary parameter combinations
-    - Indicator factory for construction of complex technical indicators in a simplified way
+    - Indicator factory for building complex technical indicators in a simple way
 - Interactive Plotly-based widgets to visualize backtest results
     - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
