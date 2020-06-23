@@ -2,12 +2,14 @@
 
 from vectorbt.utils import (
     accessors,
+    array_wrapper,
     checks,
+    colors,
     combine_fns,
     config,
     decorators,
     index_fns,
     indexing,
-    pdoc,
+    docs,
     reshape_fns
 )

@@ -1,7 +1,6 @@
 """Utilities for combining arrays."""
 
 import numpy as np
-import pandas as pd
 from numba import njit
 from numba.typed import List
 

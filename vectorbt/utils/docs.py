@@ -24,11 +24,11 @@ def list_module_keys(module_name, whitelist=[], blacklist=[]):
                 and name not in blacklist) or name in whitelist]
 
 
-def fix_class_for_pdoc(cls):
+def fix_class_for_docs(cls):
     """Make functions and properties that were defined in any superclass of `cls` visible 
     in the documentation of `cls`."""
     for func_name in dir(cls):
         if not func_name.startswith("_"):
             func = getattr(cls, func_name)
-            if isinstance(func, (FunctionType, property, custom_property, custom_method)):
+            if isinstance(func, (FunctionType, property, custom_property)):
                 setattr(cls, func_name, func)

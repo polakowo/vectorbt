@@ -5,12 +5,12 @@ import pandas as pd
 from collections.abc import Iterable
 
 from vectorbt.utils import checks, combine_fns, index_fns, reshape_fns
-from vectorbt.utils.reshape_fns import ArrayWrapper
+from vectorbt.utils.array_wrapper import ArrayWrapper
 from vectorbt.utils.decorators import class_or_instancemethod
 
 
 class Base_Accessor(ArrayWrapper):
-    """Accessor with methods for both Series and DataFrames.
+    """Accessor on top of any data series. For both, Series and DataFrames.
 
     Accessible through `pandas.Series.vbt` and `pandas.DataFrame.vbt`, and all child accessors.
 
@@ -18,12 +18,21 @@ class Base_Accessor(ArrayWrapper):
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
     by using `Base_Accessor.wrap`, we will convert the 2-dim output back to a Series."""
 
-    def __init__(self, parent):
-        self._obj = parent._obj  # access pandas object
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._obj = obj
 
         # Initialize array wrapper
-        wrapper = ArrayWrapper.from_obj(self._obj)
+        wrapper = ArrayWrapper.from_obj(obj)
         ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
+
+    def __call__(self, *args, **kwargs):
+        """Allows passing arguments to the initializer."""
+
+        return self.__class__(self._obj, *args, **kwargs)
+
+    # ############# Creation ############# #
 
     @classmethod
     def empty(cls, shape, fill_value=np.nan, **kwargs):
@@ -39,9 +48,99 @@ class Base_Accessor(ArrayWrapper):
             return cls.empty(other.shape, fill_value=fill_value, index=other.index, name=other.name)
         return cls.empty(other.shape, fill_value=fill_value, index=other.index, columns=other.columns)
 
-    def to_array(self):
-        """Convert to NumPy array."""
-        return np.asarray(self._obj)
+    # ############# Index and columns ############# #
+
+    def apply_func_on_index(self, apply_func, *args, axis=1, inplace=False, **kwargs):
+        """Apply function `apply_func` on index of the pandas object.
+
+        Set `axis` to 1 for columns and 0 for index.
+        If `inplace` is `True`, modifies the pandas object. Otherwise, returns a copy."""
+        checks.assert_value_in(axis, (0, 1))
+
+        if axis == 1:
+            obj_index = self.columns
+        else:
+            obj_index = self.index
+        obj_index = apply_func(obj_index, *args, **kwargs)
+        if inplace:
+            if axis == 1:
+                self._obj.columns = obj_index
+            else:
+                self._obj.index = obj_index
+            return None
+        else:
+            obj = self._obj.copy()
+            if axis == 1:
+                obj.columns = obj_index
+            else:
+                obj.index = obj_index
+            return obj
+
+    def stack_index(self, index, on_top=True, axis=1, inplace=False):
+        """See `vectorbt.utils.index_fns.stack_indexes`.
+
+        Set `on_top` to `False` to stack at bottom.
+
+        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+
+        def apply_func(obj_index):
+            if on_top:
+                return index_fns.stack_indexes(index, obj_index)
+            return index_fns.stack_indexes(obj_index, index)
+
+        return self.apply_func_on_index(apply_func)
+
+    def drop_levels(self, levels, axis=1, inplace=False):
+        """See `vectorbt.utils.index_fns.drop_levels`.
+
+        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+
+        def apply_func(obj_index):
+            return index_fns.drop_levels(obj_index, levels)
+
+        return self.apply_func_on_index(apply_func)
+
+    def rename_levels(self, name_dict, axis=1, inplace=False):
+        """See `vectorbt.utils.index_fns.rename_levels`.
+
+        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+
+        def apply_func(obj_index):
+            return index_fns.rename_levels(obj_index, name_dict)
+
+        return self.apply_func_on_index(apply_func)
+
+    def select_levels(self, level_names, axis=1, inplace=False):
+        """See `vectorbt.utils.index_fns.select_levels`.
+
+        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+
+        def apply_func(obj_index):
+            return index_fns.select_levels(obj_index, level_names)
+
+        return self.apply_func_on_index(apply_func)
+
+    def drop_redundant_levels(self, axis=1, inplace=False):
+        """See `vectorbt.utils.index_fns.drop_redundant_levels`.
+
+        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+
+        def apply_func(obj_index):
+            return index_fns.drop_redundant_levels(obj_index)
+
+        return self.apply_func_on_index(apply_func)
+
+    def drop_duplicate_levels(self, keep='last', axis=1, inplace=False):
+        """See `vectorbt.utils.index_fns.drop_duplicate_levels`.
+
+        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+
+        def apply_func(obj_index):
+            return index_fns.drop_duplicate_levels(obj_index, keep=keep)
+
+        return self.apply_func_on_index(apply_func)
+
+    # ############# Reshaping ############# #
 
     def to_1d_array(self):
         """Convert to 1-dim NumPy array
@@ -125,6 +224,8 @@ class Base_Accessor(ArrayWrapper):
     def unstack_to_df(self, **kwargs):
         """See `vectorbt.utils.reshape_fns.unstack_to_df`."""
         return reshape_fns.unstack_to_df(self._obj, **kwargs)
+
+    # ############# Combining ############# #
 
     @class_or_instancemethod
     def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
@@ -296,7 +397,7 @@ class Base_Accessor(ArrayWrapper):
             # Concat the results horizontally
             if checks.is_numba_func(combine_func):
                 for i in range(1, len(bc_arrays)):
-                    checks.assert_same_meta(bc_arrays[i-1], bc_arrays[i])
+                    checks.assert_same_meta(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_and_concat_nb(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
@@ -310,48 +411,77 @@ class Base_Accessor(ArrayWrapper):
             # Combine arguments pairwise into one object
             if checks.is_numba_func(combine_func):
                 for i in range(1, len(bc_arrays)):
-                    checks.assert_same_dtype(bc_arrays[i-1], bc_arrays[i])
+                    checks.assert_same_dtype(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
             return new_obj.vbt.wrap(result)
 
+    # ############# Magic methods ############# #
+
     # Comparison operators
-    def __eq__(self, other): return self.combine_with(other, combine_func=np.equal)
-    def __ne__(self, other): return self.combine_with(other, combine_func=np.not_equal)
-    def __lt__(self, other): return self.combine_with(other, combine_func=np.less)
-    def __gt__(self, other): return self.combine_with(other, combine_func=np.greater)
-    def __le__(self, other): return self.combine_with(other, combine_func=np.less_equal)
-    def __ge__(self, other): return self.combine_with(other, combine_func=np.greater_equal)
+    def __eq__(self, other):
+        return self.combine_with(other, combine_func=np.equal)
+
+    def __ne__(self, other):
+        return self.combine_with(other, combine_func=np.not_equal)
+
+    def __lt__(self, other):
+        return self.combine_with(other, combine_func=np.less)
+
+    def __gt__(self, other):
+        return self.combine_with(other, combine_func=np.greater)
+
+    def __le__(self, other):
+        return self.combine_with(other, combine_func=np.less_equal)
+
+    def __ge__(self, other):
+        return self.combine_with(other, combine_func=np.greater_equal)
 
     # Binary operators
-    def __add__(self, other): return self.combine_with(other, combine_func=np.add)
-    def __sub__(self, other): return self.combine_with(other, combine_func=np.subtract)
-    def __mul__(self, other): return self.combine_with(other, combine_func=np.multiply)
-    def __div__(self, other): return self.combine_with(other, combine_func=np.divide)
+    def __add__(self, other):
+        return self.combine_with(other, combine_func=np.add)
+
+    def __sub__(self, other):
+        return self.combine_with(other, combine_func=np.subtract)
+
+    def __mul__(self, other):
+        return self.combine_with(other, combine_func=np.multiply)
+
+    def __div__(self, other):
+        return self.combine_with(other, combine_func=np.divide)
+
     __radd__ = __add__
     __rsub__ = __sub__
     __rmul__ = __mul__
     __rdiv__ = __div__
 
     # Boolean operators
-    def __and__(self, other): return self.combine_with(other, combine_func=np.logical_and)
-    def __or__(self, other): return self.combine_with(other, combine_func=np.logical_or)
-    def __xor__(self, other): return self.combine_with(other, combine_func=np.logical_xor)
+    def __and__(self, other):
+        return self.combine_with(other, combine_func=np.logical_and)
+
+    def __or__(self, other):
+        return self.combine_with(other, combine_func=np.logical_or)
+
+    def __xor__(self, other):
+        return self.combine_with(other, combine_func=np.logical_xor)
+
     __rand__ = __and__
     __ror__ = __or__
     __rxor__ = __xor__
 
 
 class Base_SRAccessor(Base_Accessor):
-    """Accessor with methods for Series only.
+    """Accessor on top of any data series. For Series only.
 
     Accessible through `pandas.Series.vbt` and all child accessors."""
 
-    def __init__(self, parent):
-        checks.assert_type(parent._obj, pd.Series)
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        checks.assert_type(obj, pd.Series)
 
-        Base_Accessor.__init__(self, parent)
+        Base_Accessor.__init__(self, obj)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -363,14 +493,16 @@ class Base_SRAccessor(Base_Accessor):
 
 
 class Base_DFAccessor(Base_Accessor):
-    """Accessor with methods for DataFrames only.
+    """Accessor on top of any data series. For DataFrames only.
 
     Accessible through `pandas.DataFrame.vbt` and all child accessors."""
 
-    def __init__(self, parent):
-        checks.assert_type(parent._obj, pd.DataFrame)
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        checks.assert_type(obj, pd.DataFrame)
 
-        Base_Accessor.__init__(self, parent)
+        Base_Accessor.__init__(self, obj)
 
     @class_or_instancemethod
     def is_series(self_or_cls):

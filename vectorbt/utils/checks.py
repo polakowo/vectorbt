@@ -38,47 +38,53 @@ def is_hashable(arg):
     """Determine whether `arg` can be hashed."""
     try:
         hash(arg)
-    except TypeError:
+    except Exception:
         return False
     return True
 
 
 # ############# Asserts ############# #
 
+def assert_value_in(value, lst):
+    """Raise exception if `value` is not in `lst`."""
+    if value not in lst:
+        raise Exception(f"Value {value} is outside of {lst}")
+
+
 def assert_numba_func(func):
     """Raise exception if `func` is not Numba-compiled."""
     if not is_numba_func(func):
-        raise TypeError(f"Function {func} must be Numba compiled")
+        raise Exception(f"Function {func} must be Numba compiled")
 
 
 def assert_not_none(arg):
     """Raise exception if `arg` is None."""
     if arg is None:
-        raise TypeError(f"Cannot be None")
+        raise Exception(f"Cannot be None")
 
 
 def assert_type(arg, types):
     """Raise exception if `arg` is none of types `types`."""
     if not isinstance(arg, types):
         if isinstance(types, tuple):
-            raise TypeError(f"Type must be one of {types}, not {type(arg)}")
+            raise Exception(f"Type must be one of {types}, not {type(arg)}")
         else:
-            raise TypeError(f"Type must be {types}, not {type(arg)}")
+            raise Exception(f"Type must be {types}, not {type(arg)}")
 
 
 def assert_not_type(arg, types):
     """Raise exception if `arg` is any of types `types`."""
     if isinstance(arg, types):
         if isinstance(types, tuple):
-            raise TypeError(f"Type cannot be any of {types}")
+            raise Exception(f"Type cannot be any of {types}")
         else:
-            raise TypeError(f"Type cannot be {types}")
+            raise Exception(f"Type cannot be {types}")
 
 
 def assert_same_type(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different types."""
     if type(arg1) != type(arg2):
-        raise TypeError(f"Types {type(arg1)} and {type(arg2)} do not match")
+        raise Exception(f"Types {type(arg1)} and {type(arg2)} do not match")
 
 
 def assert_dtype(arg, dtype):
@@ -87,10 +93,10 @@ def assert_dtype(arg, dtype):
         arg = np.asarray(arg)
     if is_frame(arg):
         if (arg.dtypes != dtype).any():
-            raise ValueError(f"Data type must be {dtype}, not {arg.dtypes}")
+            raise Exception(f"Data type must be {dtype}, not {arg.dtypes}")
     else:
         if arg.dtype != dtype:
-            raise ValueError(f"Data type must be {dtype}, not {arg.dtype}")
+            raise Exception(f"Data type must be {dtype}, not {arg.dtype}")
 
 
 def assert_same_dtype(arg1, arg2):
@@ -113,7 +119,7 @@ def assert_same_dtype(arg1, arg2):
     elif len(np.unique(dtypes1)) == 1 and len(np.unique(dtypes2)) == 1:
         if (np.unique(dtypes1) == np.unique(dtypes2)).all():
             return
-    raise ValueError(f"Data types {dtypes1} and {dtypes2} do not match")
+    raise Exception(f"Data types {dtypes1} and {dtypes2} do not match")
 
 
 def assert_ndim(arg, ndims):
@@ -122,10 +128,10 @@ def assert_ndim(arg, ndims):
         arg = np.asarray(arg)
     if isinstance(ndims, tuple):
         if arg.ndim not in ndims:
-            raise ValueError(f"Number of dimensions must be one of {ndims}, not {arg.ndim}")
+            raise Exception(f"Number of dimensions must be one of {ndims}, not {arg.ndim}")
     else:
         if arg.ndim != ndims:
-            raise ValueError(f"Number of dimensions must be {ndims}, not {arg.ndim}")
+            raise Exception(f"Number of dimensions must be {ndims}, not {arg.ndim}")
 
 
 def assert_same_len(arg1, arg2):
@@ -133,7 +139,7 @@ def assert_same_len(arg1, arg2):
 
     Does not transform arguments to NumPy arrays."""
     if len(arg1) != len(arg2):
-        raise ValueError(f"Lengths {len(arg1)} and {len(arg2)} do not match")
+        raise Exception(f"Lengths {len(arg1)} and {len(arg2)} do not match")
 
 
 def assert_same_shape(arg1, arg2, axis=None):
@@ -144,27 +150,27 @@ def assert_same_shape(arg1, arg2, axis=None):
         arg2 = np.asarray(arg2)
     if axis is None:
         if arg1.shape != arg2.shape:
-            raise ValueError(f"Shapes {arg1.shape} and {arg2.shape} do not match")
+            raise Exception(f"Shapes {arg1.shape} and {arg2.shape} do not match")
     else:
         if isinstance(axis, tuple):
             if arg1.shape[axis[0]] != arg2.shape[axis[1]]:
-                raise ValueError(
+                raise Exception(
                     f"Axis {axis[0]} of {arg1.shape} and axis {axis[1]} of {arg2.shape} do not match")
         else:
             if arg1.shape[axis] != arg2.shape[axis]:
-                raise ValueError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
+                raise Exception(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
 def assert_same_index(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different index."""
     if not pd.Index.equals(arg1.index, arg2.index):
-        raise ValueError(f"Indexes {arg1.index} and {arg2.index} do not match")
+        raise Exception(f"Indexes {arg1.index} and {arg2.index} do not match")
 
 
 def assert_same_columns(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different columns."""
     if not pd.Index.equals(arg1.columns, arg2.columns):
-        raise ValueError(f"Columns {arg1.columns} and {arg2.columns} do not match")
+        raise Exception(f"Columns {arg1.columns} and {arg2.columns} do not match")
 
 
 def assert_same_meta(arg1, arg2):
@@ -187,7 +193,7 @@ def assert_same(arg1, arg2):
         arg2 = np.asarray(arg2)
         if np.array_equal(arg1, arg2):
             return
-    raise ValueError(f"Values do not match")
+    raise Exception(f"Values do not match")
 
 
 def assert_level_not_exists(arg, level_name):
@@ -199,4 +205,4 @@ def assert_level_not_exists(arg, level_name):
     else:
         names = [arg.columns.name]
     if level_name in names:
-        raise ValueError(f"Level {level_name} already exists in {names}")
+        raise Exception(f"Level {level_name} already exists in {names}")
