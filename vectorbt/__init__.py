@@ -39,7 +39,7 @@ outperforms pandas significantly, especially for basic operations:
 5.95 ms ± 380 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
-But also pandas functions that are already compiled with Cython/Numba are slower:
+But also functions already compiled with Cython/Numba are slower:
 
 ```python-repl
 >>> %timeit big_ts.expanding().max()
@@ -53,11 +53,11 @@ Moreover, pandas functions cannot be accessed within user-defined Numba code, si
 compilation on pandas objects. Take for example generating trailing stop orders: to calculate expanding
 maximum for each order, you cannot simply do `df.expanding().max()` from within Numba, but you must write
 and compile your own expanding max function wrapped with `@njit`. That's why vectorbt provides an arsenal
-of Numba-compiled functions that are ready to be used everywhere.
+of Numba-compiled functions for any sort of task.
 
 ## Usability
 
-Working with NumPy and Numba alone, from the user's point of view, is problematic, since important information
+From the user's point of view, working with NumPy and Numba alone is difficult, since important information
 in form of index and columns and all indexing checks must be explicitly handled by the user,
 making analysis prone to errors. That's why vectorbt introduces a namespace (accessor) to pandas objects
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)).
@@ -116,9 +116,7 @@ the whole backtesting pipeline, from signal generation, to performance modeling.
 
 ### Broadcasting
 
-Moreover, vectobt borrows broadcasting rules from NumPy and implements its own indexing rules that
-allow operations between pandas objects of compatible shapes, regardless of their index/columns -
-those are simply stacked upon each other in the resulting object.
+Moreover, vectobt borrows broadcasting rules from NumPy.
 
 For example, consider the following objects:
 
@@ -158,9 +156,29 @@ y  6  7  8
 z  7  8  9
 ```
 
-This way, you can perform operations on objects of arbitrary (but compatible) shapes, and
-still preserve their index information. This is handy for combining complex DataFrames, such as
-signals from different indicators.
+In case index or columns in both objects are different, thy are simply stacked upon each other
+(by default):
+
+```python-repl
+>>> df2 = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a2', 'b2', 'c2'])
+
+>>> print(df + df2)
+    a  a2   b  b2   c  c2
+x NaN NaN NaN NaN NaN NaN
+y NaN NaN NaN NaN NaN NaN
+z NaN NaN NaN NaN NaN NaN
+
+>>> print(df.vbt + df2)
+   a   b   c
+  a2  b2  c2
+x  8  10  12
+y  8  10  12
+z  8  10  12
+```
+
+This way, you can perform operations on objects of arbitrary (but compatible) shapes, and still
+preserve their index information. This is handy for combining complex DataFrames, such as signals
+from different indicators.
 
 ## Example
 
@@ -457,13 +475,13 @@ The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `panda
 ```plaintext
 vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseries
 vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
-vbt.signals.accessors.Signals_SR/DFAccessor        -> pd.Series/DataFrame.vbt.signals
-vbt.returns.accessors.Returns_SR/DFAccessor        -> pd.Series/DataFrame.vbt.returns
-vbt.widgets.accessors.Bar_Accessor                 -> pd.Series/DataFrame.vbt.Bar
-vbt.widgets.accessors.Scatter_Accessor             -> pd.Series/DataFrame.vbt.Scatter
-vbt.widgets.accessors.Histogram_Accessor           -> pd.Series/DataFrame.vbt.Histogram
-vbt.widgets.accessors.Heatmap_Accessor             -> pd.Series/DataFrame.vbt.Heatmap
-vbt.utils.accessors.Base_SR/DFAccessor             -> pd.Series/DataFrame.vbt.*
+vbt.signals.accessors.Signals_SR/DFAccessor     -> pd.Series/DataFrame.vbt.signals
+vbt.returns.accessors.Returns_SR/DFAccessor     -> pd.Series/DataFrame.vbt.returns
+vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.Bar
+vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.Scatter
+vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.Histogram
+vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.Heatmap
+vbt.utils.accessors.Base_SR/DFAccessor          -> pd.Series/DataFrame.vbt.*
 ```
 
 Additionally, some accessors subclass other accessors building the following inheritance hiearchy:

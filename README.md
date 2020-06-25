@@ -104,24 +104,26 @@ matrix operation, without any Pythonic loops.
 ## Features
 
 - Extends pandas using a custom `vbt` accessor
+    -> Compatible with any library
 - For high performance, most operations are done strictly using NumPy and Numba 
+    -> Much faster than comparable functions in pandas
 - Utility functions for working with data
-    - Implements NumPy-like broadcasting for pandas, among other features.
-- Functions for working with time series (`vbt.tseries` accessor)
+    - NumPy-like broadcasting for pandas, among other features.
+- Functions for working with time series - `vbt.tseries`
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
-    - Drawdown analysis for historical periods
-- Functions for working with signals (`vbt.signals` accessor)
+    - Drawdown analysis
+- Functions for working with signals - `vbt.signals`
     - Entry, exit and random signal generation, ranking and distance functions
-    - Generation of stop loss, trailing stop and take profit signals
-- Functions for working with returns (`vbt.returns` accessor)
-    - Computing common financial risk and performance metrics
+    - Stop loss, trailing stop and take profit signal generation
+- Functions for working with returns - `vbt.returns`
+    - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
 - Class for modeling portfolio performance
-    - Accepts signals, orders, or custom order function
+    - Accepts signals, orders, and custom order function
     - Provides metrics and tools for analyzing returns, orders, trades and positions
 - Technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
-    - Each indicator accepts arbitrary parameter combinations
+    - Each indicator allows arbitrary parameter combinations, from arrays to Cartesian products
     - Indicator factory for building complex technical indicators in a simple way
 - Interactive Plotly-based widgets to visualize backtest results
     - Indicator, Bar, Scatter, Histogram and Heatmap
