@@ -85,7 +85,7 @@ This way, it is often much faster than pandas alone.
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
->>> %timeit big_ts.vbt.timeseries.expanding_max()
+>>> %timeit big_ts.vbt.tseries.expanding_max()
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -107,7 +107,7 @@ matrix operation, without any Pythonic loops.
 - For high performance, most operations are done strictly using NumPy and Numba 
 - Utility functions for working with data
     - Implements NumPy-like broadcasting for pandas, among other features.
-- Functions for working with time series (`vbt.timeseries` accessor)
+- Functions for working with time series (`vbt.tseries` accessor)
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
     - Drawdown analysis for historical periods
 - Functions for working with signals (`vbt.signals` accessor)

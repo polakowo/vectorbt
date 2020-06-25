@@ -1,6 +1,8 @@
 """Custom pandas accessors.
 
 !!! note
+    The underlying Series/DataFrame must already be a signal series.
+
     Input arrays must be `numpy.bool`.
     
 ```py
@@ -44,7 +46,7 @@ from vectorbt.utils import checks, reshape_fns, index_fns
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.decorators import add_nb_methods, cached_property
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.timeseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
+from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
 from vectorbt.signals import nb
 from vectorbt.widgets import DefaultFigureWidget
 
@@ -640,7 +642,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            fig = ts['a'].vbt.timeseries.plot()
+            fig = ts['a'].vbt.tseries.plot()
             signals['a'].vbt.signals.plot_as_entry_markers(ts['a'], fig=fig)
             (~signals['a']).vbt.signals.plot_as_exit_markers(ts['a'], fig=fig)
             ```

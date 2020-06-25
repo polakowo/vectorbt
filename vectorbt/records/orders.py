@@ -8,7 +8,7 @@ from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.indexing import PandasIndexer
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.timeseries.common import TSArrayWrapper
+from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.main import Records
 from vectorbt.records.enums import OrderSide, order_dt
 from vectorbt.records.common import indexing_on_records
@@ -69,7 +69,7 @@ class BaseOrders(Records):
             raise Exception("You must select a column first")
 
         # Plot main price
-        fig = self.main_price.vbt.timeseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.main_price.vbt.tseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         idx = self.records_arr['idx']

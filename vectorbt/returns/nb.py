@@ -10,7 +10,7 @@
 import numpy as np
 from numba import njit, f8
 
-from vectorbt import timeseries
+from vectorbt import tseries
 
 # ############# Financial risk and performance metrics ############# #
 
@@ -18,7 +18,7 @@ from vectorbt import timeseries
 @njit(cache=True)
 def total_return_apply_nb(col, idxs, returns):
     """Calculate total return from returns."""
-    return timeseries.nb.product_1d_nb(returns + 1) - 1
+    return tseries.nb.product_1d_nb(returns + 1) - 1
 
 # Functions from empyrical but Numba-compiled
 
@@ -30,7 +30,7 @@ def cum_returns_1d_nb(returns, start_value=0.):
     if nanmask.any():
         returns = returns.copy()
         returns[nanmask] = 0
-    result = timeseries.nb.cumprod_1d_nb(returns + 1.)
+    result = tseries.nb.cumprod_1d_nb(returns + 1.)
     if start_value == 0.:
         return result - 1.
     return result * start_value
@@ -50,7 +50,7 @@ def cum_returns_nb(returns, start_value_arr):
 @njit(cache=True)
 def cum_returns_final_1d_nb(returns, start_value=0.):
     """See `empyrical.cum_returns_final`."""
-    result = timeseries.nb.product_1d_nb(returns + 1.)
+    result = tseries.nb.product_1d_nb(returns + 1.)
     if start_value == 0.:
         return result - 1.
     return result * start_value
@@ -89,7 +89,7 @@ def annualized_volatility_1d_nb(returns, ann_factor, levy_alpha=2.0):
     if returns.shape[0] < 2:
         return np.nan
 
-    return timeseries.nb.nanstd_1d_nb(returns, ddof=1) * ann_factor ** (1.0 / levy_alpha)
+    return tseries.nb.nanstd_1d_nb(returns, ddof=1) * ann_factor ** (1.0 / levy_alpha)
 
 
 @njit(cache=True)
@@ -107,7 +107,7 @@ def annualized_volatility_nb(returns, ann_factor, levy_alpha_arr):
 def drawdown_1d_nb(returns):
     """Drawdown of cumulative returns."""
     cum_returns = cum_returns_1d_nb(returns, start_value=100.)
-    max_returns = timeseries.nb.expanding_max_1d_nb(cum_returns, minp=1)
+    max_returns = tseries.nb.expanding_max_1d_nb(cum_returns, minp=1)
     return 1 - cum_returns / max_returns
 
 
@@ -191,7 +191,7 @@ def sharpe_ratio_1d_nb(returns, ann_factor, risk_free=0.):
 
     returns_risk_adj = returns - risk_free
     mean = np.nanmean(returns_risk_adj)
-    std = timeseries.nb.nanstd_1d_nb(returns_risk_adj, ddof=1)
+    std = tseries.nb.nanstd_1d_nb(returns_risk_adj, ddof=1)
     if std == 0.:
         return np.nan
     return mean / std * np.sqrt(ann_factor)
@@ -259,7 +259,7 @@ def information_ratio_1d_nb(returns, factor_returns):
         return np.nan
 
     active_return = returns - factor_returns
-    return np.nanmean(active_return) / timeseries.nb.nanstd_1d_nb(active_return, ddof=1)
+    return np.nanmean(active_return) / tseries.nb.nanstd_1d_nb(active_return, ddof=1)
 
 
 @njit(cache=True)

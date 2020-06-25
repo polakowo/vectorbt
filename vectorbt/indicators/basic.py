@@ -13,7 +13,7 @@ import vectorbt as vbt
 ticker = yf.Ticker("BTC-USD")
 price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
 
-price['Close'].vbt.timeseries.plot()
+price['Close'].vbt.tseries.plot()
 ```
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
@@ -22,7 +22,7 @@ from numba import njit
 import itertools
 import plotly.graph_objects as go
 
-from vectorbt import timeseries, defaults
+from vectorbt import tseries, defaults
 from vectorbt.utils import reshape_fns
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
@@ -39,9 +39,9 @@ def ma_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                ma = timeseries.nb.ewm_mean_nb(ts, windows[i])
+                ma = tseries.nb.ewm_mean_nb(ts, windows[i])
             else:
-                ma = timeseries.nb.rolling_mean_nb(ts, windows[i])
+                ma = tseries.nb.rolling_mean_nb(ts, windows[i])
             cache_dict[h] = ma
     return cache_dict
 
@@ -191,7 +191,7 @@ class MA(MA):
             it for indexing as follows:
 
             ```py
-            fig = price['Close'].vbt.timeseries.plot(name='Price')
+            fig = price['Close'].vbt.tseries.plot(name='Price')
             fig = entry_signals[(10, False, 20, False)]\\
                 .vbt.signals.plot_as_markers(price['Close'], signal_type='entry', fig=fig)
             fig = exit_signals[(10, False, 20, False)]\\
@@ -241,8 +241,8 @@ class MA(MA):
             name=f'MA ({self.name})'
         ), ma_trace_kwargs)
 
-        fig = self.ts.vbt.timeseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.timeseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.tseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -260,9 +260,9 @@ def mstd_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                mstd = timeseries.nb.ewm_std_nb(ts, windows[i])
+                mstd = tseries.nb.ewm_std_nb(ts, windows[i])
             else:
-                mstd = timeseries.nb.rolling_std_nb(ts, windows[i])
+                mstd = tseries.nb.rolling_std_nb(ts, windows[i])
             cache_dict[h] = mstd
     return cache_dict
 
@@ -346,7 +346,7 @@ class MSTD(MSTD):
             name=f'MSTD ({self.name})'
         ), mstd_trace_kwargs)
 
-        fig = self.mstd.vbt.timeseries.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.mstd.vbt.tseries.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -545,10 +545,10 @@ class BollingerBands(BollingerBands):
             line=dict(color=defaults.layout['colorway'][0])
         ), ts_trace_kwargs)
 
-        fig = self.lower_band.vbt.timeseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.upper_band.vbt.timeseries.plot(trace_kwargs=upper_band_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.timeseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ts.vbt.timeseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.lower_band.vbt.tseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.upper_band.vbt.tseries.plot(trace_kwargs=upper_band_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.tseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -561,23 +561,23 @@ fix_class_for_docs(BollingerBands)
 @njit(cache=True)
 def rsi_caching_nb(ts, windows, ewms):
     """Numba-compiled caching function for `RSI`."""
-    delta = timeseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
+    delta = tseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
-    up = timeseries.nb.set_by_mask_nb(up, up < 0, 0)
-    down = np.abs(timeseries.nb.set_by_mask_nb(down, down > 0, 0))
+    up = tseries.nb.set_by_mask_nb(up, up < 0, 0)
+    down = np.abs(tseries.nb.set_by_mask_nb(down, down > 0, 0))
     # Cache
     cache_dict = dict()
     for i in range(windows.shape[0]):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i])
-                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i])
+                roll_up = tseries.nb.ewm_mean_nb(up, windows[i])
+                roll_down = tseries.nb.ewm_mean_nb(down, windows[i])
             else:
-                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i])
-                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i])
-            roll_up = timeseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
-            roll_down = timeseries.nb.prepend_nb(roll_down, 1, np.nan)
+                roll_up = tseries.nb.rolling_mean_nb(up, windows[i])
+                roll_down = tseries.nb.rolling_mean_nb(down, windows[i])
+            roll_up = tseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
+            roll_down = tseries.nb.prepend_nb(roll_down, 1, np.nan)
             cache_dict[h] = roll_up, roll_down
     return cache_dict
 
@@ -667,7 +667,7 @@ class RSI(RSI):
         ), rsi_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
-        fig = self.rsi.vbt.timeseries.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.rsi.vbt.tseries.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Fill void between levels
         fig.add_shape(
@@ -699,8 +699,8 @@ def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     for i in range(k_windows.shape[0]):
         h = hash(k_windows[i])
         if h not in cache_dict:
-            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i])
-            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i])
+            roll_min = tseries.nb.rolling_min_nb(low_ts, k_windows[i])
+            roll_max = tseries.nb.rolling_max_nb(high_ts, k_windows[i])
             cache_dict[h] = roll_min, roll_max
     return cache_dict
 
@@ -712,9 +712,9 @@ def stoch_apply_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_d
     roll_min, roll_max = cache_dict[h]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
     if d_ewm:
-        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window)
+        percent_d = tseries.nb.ewm_mean_nb(percent_k, d_window)
     else:
-        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window)
+        percent_d = tseries.nb.rolling_mean_nb(percent_k, d_window)
     return percent_k, percent_d
 
 
@@ -827,8 +827,8 @@ class Stochastic(Stochastic):
         ), percent_d_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
-        fig = self.percent_k.vbt.timeseries.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.percent_d.vbt.timeseries.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.percent_k.vbt.tseries.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.percent_d.vbt.tseries.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Plot levels
         # Fill void between levels
@@ -870,9 +870,9 @@ def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_
     slow_ma = cache_dict[slow_h]
     macd_ts = fast_ma - slow_ma
     if signal_ewm:
-        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window)
+        signal_ts = tseries.nb.ewm_mean_nb(macd_ts, signal_window)
     else:
-        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window)
+        signal_ts = tseries.nb.rolling_mean_nb(macd_ts, signal_window)
     return fast_ma, slow_ma, macd_ts, signal_ts
 
 
@@ -1043,12 +1043,12 @@ class MACD(MACD):
         ), histogram_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(bargap=0), layout_kwargs)
-        fig = self.macd.vbt.timeseries.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.signal.vbt.timeseries.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.macd.vbt.tseries.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.signal.vbt.tseries.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Plot histogram
         hist = self.histogram.values
-        hist_diff = timeseries.nb.diff_1d_nb(hist)
+        hist_diff = tseries.nb.diff_1d_nb(hist)
         marker_colors = np.full(hist.shape, np.nan, dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
@@ -1078,18 +1078,18 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     """Numba-compiled caching function for `ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_nb
     tr0 = high_ts - low_ts
-    tr1 = np.abs(high_ts - timeseries.nb.fshift_nb(close_ts, 1))
-    tr2 = np.abs(low_ts - timeseries.nb.fshift_nb(close_ts, 1))
-    tr = timeseries.nb.nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
+    tr1 = np.abs(high_ts - tseries.nb.fshift_nb(close_ts, 1))
+    tr2 = np.abs(low_ts - tseries.nb.fshift_nb(close_ts, 1))
+    tr = tseries.nb.nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
 
     cache_dict = dict()
     for i in range(windows.shape[0]):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                atr = timeseries.nb.ewm_mean_nb(tr, windows[i])
+                atr = tseries.nb.ewm_mean_nb(tr, windows[i])
             else:
-                atr = timeseries.nb.rolling_mean_nb(tr, windows[i])
+                atr = tseries.nb.rolling_mean_nb(tr, windows[i])
             cache_dict[h] = atr
     return tr, cache_dict
 
@@ -1197,8 +1197,8 @@ class ATR(ATR):
             name=f'ATR ({self.name})'
         ), atr_trace_kwargs)
 
-        fig = self.tr.vbt.timeseries.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.atr.vbt.timeseries.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.tr.vbt.tseries.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.atr.vbt.tseries.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -1293,7 +1293,7 @@ class OBV(OBV):
             name=f'OBV ({self.name})'
         ), obv_trace_kwargs)
 
-        fig = self.obv.vbt.timeseries.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.obv.vbt.tseries.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 

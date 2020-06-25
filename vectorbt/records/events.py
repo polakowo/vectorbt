@@ -10,7 +10,7 @@ from vectorbt.utils.reshape_fns import to_1d
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.indexing import PandasIndexer
-from vectorbt.timeseries.common import DatetimeTypes, TSArrayWrapper
+from vectorbt.tseries.common import DatetimeTypes, TSArrayWrapper
 from vectorbt.records.main import Records
 from vectorbt.records import nb
 from vectorbt.records.common import indexing_on_records
@@ -81,7 +81,7 @@ class BaseEvents(Records):
             raise Exception("You must select a column first")
 
         # Plot main price
-        fig = self.main_price.vbt.timeseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.main_price.vbt.tseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         size = self.records_arr['size']

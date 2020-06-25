@@ -98,7 +98,7 @@ Example:
     ...     param_names=['window'],
     ...     output_names=['ma'],
     ...     name='myma'
-    ... ).from_apply_func(vbt.timeseries.nb.rolling_mean_nb)
+    ... ).from_apply_func(vbt.tseries.nb.rolling_mean_nb)
 
     >>> myma = MyMA.from_params(price_sm, [2, 3])
     >>> above_signals = myma.price_sm_above(myma.ma, crossed=True)
@@ -214,7 +214,7 @@ import itertools
 from vectorbt.utils import checks, index_fns, reshape_fns, combine_fns
 from vectorbt.utils.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
 from vectorbt.utils.decorators import cached_property
-from vectorbt.timeseries.common import TSArrayWrapper
+from vectorbt.tseries.common import TSArrayWrapper
 
 
 def build_column_hierarchy(param_list, level_names, ts_columns):

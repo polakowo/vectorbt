@@ -35,7 +35,7 @@ outperforms pandas significantly, especially for basic operations:
 >>> %timeit big_ts.pct_change()
 280 ms ± 12.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
->>> %timeit big_ts.vbt.timeseries.pct_change()
+>>> %timeit big_ts.vbt.tseries.pct_change()
 5.95 ms ± 380 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -45,7 +45,7 @@ But also pandas functions that are already compiled with Cython/Numba are slower
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
->>> %timeit big_ts.vbt.timeseries.expanding_max()
+>>> %timeit big_ts.vbt.tseries.expanding_max()
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -380,7 +380,7 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 
 ```python-repl
 >>> # Multiple strategy instances, instruments and time periods
->>> mult_comb_price = comb_price.vbt.timeseries.split_into_ranges(n=2)
+>>> mult_comb_price = comb_price.vbt.tseries.split_into_ranges(n=2)
 >>> print(mult_comb_price)
 asset             BTC                   ETH
 start_date 2018-12-31 2019-07-02 2018-12-31 2019-07-02
@@ -455,8 +455,8 @@ The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `panda
 `pandas.DataFrame` object. It is the main entry point for all other accessors:
 
 ```plaintext
-vbt.timeseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.timeseries
-vbt.timeseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
+vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseries
+vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
 vbt.signals.accessors.Signals_SR/DFAccessor        -> pd.Series/DataFrame.vbt.signals
 vbt.returns.accessors.Returns_SR/DFAccessor        -> pd.Series/DataFrame.vbt.returns
 vbt.widgets.accessors.Bar_Accessor                 -> pd.Series/DataFrame.vbt.Bar
@@ -470,8 +470,8 @@ Additionally, some accessors subclass other accessors building the following inh
 
 ```plaintext
 vbt.utils.accessors.Base_SR/DFAccessor
-    -> vbt.timeseries.accessors.TimeSeries_SR/DFAccessor
-        -> vbt.timeseries.accessors.OHLCV_DFAccessor
+    -> vbt.tseries.accessors.TimeSeries_SR/DFAccessor
+        -> vbt.tseries.accessors.OHLCV_DFAccessor
         -> vbt.signals.accessors.Signals_SR/DFAccessor
         -> vbt.returns.accessors.Returns_SR/DFAccessor
 vbt.widgets.accessors.Bar_Accessor
@@ -488,7 +488,7 @@ So, for example, the method `pd.Series.vbt.to_2d_array` is also available as `pd
 If any of the functions can take a pandas object as input, it will be offered as an accessor method.
 For example, `vectorbt.utils.reshape_fns.broadcast` can take an arbitrary number of pandas
 objects, thus you can find its variations in `vectorbt.utils.accessors.Base_Accessor` class.
-`vectorbt.utils.accessors` has utility classes that are subclassed by `vbt`, `vbt.timeseries` and
+`vectorbt.utils.accessors` has utility classes that are subclassed by `vbt`, `vbt.tseries` and
 `vbt.signals` accessors.
 
 ```python-repl
@@ -527,19 +527,19 @@ ma_ewm    False False
 2           2.5   2.0
 ```
 
-### timeseries
+### tseries
 
-`vectorbt.timeseries` provides accessors and Numba-compiled functions for working with any
+`vectorbt.tseries` provides accessors and Numba-compiled functions for working with any
 time series data, such as price series.
 
-You can access methods listed in `vectorbt.timeseries.accessors` as follows:
+You can access methods listed in `vectorbt.tseries.accessors` as follows:
 
-* `vectorbt.timeseries.accessors.TimeSeries_SRAccessor` -> `pandas.Series.vbt.timeseries.*`
-* `vectorbt.timeseries.accessors.TimeSeries_DFAccessor` -> `pandas.DataFrame.vbt.timeseries.*`
+* `vectorbt.tseries.accessors.TimeSeries_SRAccessor` -> `pandas.Series.vbt.tseries.*`
+* `vectorbt.tseries.accessors.TimeSeries_DFAccessor` -> `pandas.DataFrame.vbt.tseries.*`
 
 ```python-repl
->>> # vectorbt.timeseries.accessors.TimeSeries_Accessor.rolling_mean
->>> pd.Series([1, 2, 3, 4]).vbt.timeseries.rolling_mean(2)
+>>> # vectorbt.tseries.accessors.TimeSeries_Accessor.rolling_mean
+>>> pd.Series([1, 2, 3, 4]).vbt.tseries.rolling_mean(2)
 0    NaN
 1    1.5
 2    2.5
@@ -547,12 +547,12 @@ You can access methods listed in `vectorbt.timeseries.accessors` as follows:
 dtype: float64
 ```
 
-`vectorbt.timeseries.nb` provides a range of Numba-compiled functions that are used by accessors.
+`vectorbt.tseries.nb` provides a range of Numba-compiled functions that are used by accessors.
 These only accept NumPy arrays and other Numba-compatible types.
 
 ```python-repl
->>> # vectorbt.timeseries.nb.rolling_mean_1d_nb
->>> vbt.timeseries.nb.rolling_mean_1d_nb(np.asarray([1, 2, 3, 4]), 2)
+>>> # vectorbt.tseries.nb.rolling_mean_1d_nb
+>>> vbt.tseries.nb.rolling_mean_1d_nb(np.asarray([1, 2, 3, 4]), 2)
 array([nan, 1.5, 2.5, 3.5])
 ```
 
@@ -660,7 +660,7 @@ from vectorbt import (
     portfolio,
     returns,
     signals,
-    timeseries,
+    tseries,
     utils,
     widgets,
     accessors,

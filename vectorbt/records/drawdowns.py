@@ -10,7 +10,7 @@ from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.reshape_fns import to_1d
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.timeseries.common import TSArrayWrapper, DatetimeTypes
+from vectorbt.tseries.common import TSArrayWrapper, DatetimeTypes
 from vectorbt.records.main import Records
 from vectorbt.records.common import indexing_on_records
 from vectorbt.records.enums import DrawdownStatus, drawdown_dt
@@ -82,7 +82,7 @@ class BaseDrawdowns(Records):
         if self.wrapper.ndim > 1:
             raise Exception("You must select a column first")
 
-        fig = self.ts.vbt.timeseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 
         if self.records_arr.shape[0] == 0:
             return fig

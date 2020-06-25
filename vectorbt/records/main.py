@@ -50,7 +50,7 @@ For example:
 >>> import pandas as pd
 >>> from numba import njit
 >>> from collections import namedtuple
->>> from vectorbt.timeseries.common import TSArrayWrapper
+>>> from vectorbt.tseries.common import TSArrayWrapper
 >>> from vectorbt.records import Records
 
 >>> example_dt = np.dtype([
@@ -177,7 +177,7 @@ import pandas as pd
 from vectorbt.utils import checks
 from vectorbt.utils.indexing import PandasIndexer
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.timeseries.common import TSArrayWrapper
+from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.common import indexing_on_records
 from vectorbt.records import nb
 
@@ -194,7 +194,7 @@ class Records(PandasIndexer):
         records_arr (np.ndarray): A structured NumPy array of records.
 
             Must have fields `idx` (index position in a matrix) and `col` (column position in a matrix).
-        wrapper (TSArrayWrapper): Array wrapper of type `vectorbt.timeseries.common.TSArrayWrapper`."""
+        wrapper (TSArrayWrapper): Array wrapper of type `vectorbt.tseries.common.TSArrayWrapper`."""
 
     def __init__(self, records_arr, wrapper):
         checks.assert_type(records_arr, np.ndarray)
@@ -252,7 +252,7 @@ class Records(PandasIndexer):
 
         See `vectorbt.portfolio.nb.reduce_records_nb`.
 
-        `**kwargs` will be passed to `vectorbt.timeseries.common.TSArrayWrapper.wrap_reduced`."""
+        `**kwargs` will be passed to `vectorbt.tseries.common.TSArrayWrapper.wrap_reduced`."""
         checks.assert_numba_func(reduce_func_nb)
 
         return self.wrapper.wrap_reduced(nb.reduce_records_nb(
@@ -263,7 +263,7 @@ class Records(PandasIndexer):
 
         See `vectorbt.portfolio.nb.map_reduce_records_nb`.
 
-        `**kwargs` will be passed to `vectorbt.timeseries.common.TSArrayWrapper.wrap_reduced`."""
+        `**kwargs` will be passed to `vectorbt.tseries.common.TSArrayWrapper.wrap_reduced`."""
         checks.assert_numba_func(reduce_func_nb)
 
         return self.wrapper.wrap_reduced(nb.map_reduce_records_nb(

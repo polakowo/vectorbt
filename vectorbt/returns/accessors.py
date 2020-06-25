@@ -1,4 +1,7 @@
-"""Custom pandas accessors."""
+"""Custom pandas accessors.
+
+!!! note
+    The underlying Series/DataFrame must already be a return series."""
 
 import numpy as np
 import pandas as pd
@@ -7,13 +10,13 @@ from scipy import stats
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks, reshape_fns
-from vectorbt.timeseries.accessors import (
+from vectorbt.tseries.accessors import (
     TimeSeries_Accessor,
     TimeSeries_SRAccessor,
     TimeSeries_DFAccessor
 )
-from vectorbt.timeseries.nb import pct_change_nb
-from vectorbt.timeseries.common import freq_delta, DatetimeTypes
+from vectorbt.tseries.nb import pct_change_nb
+from vectorbt.tseries.common import freq_delta, DatetimeTypes
 from vectorbt.returns import nb
 
 
@@ -32,9 +35,9 @@ class Returns_Accessor(TimeSeries_Accessor):
         TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
     @classmethod
-    def from_price(cls, price):
+    def from_price(cls, price, **kwargs):
         """Computes the return series of `price`."""
-        return price.vbt.wrap(pct_change_nb(price.vbt.to_2d_array()))
+        return cls(price.vbt.tseries.pct_change(), **kwargs)
 
     @property
     def year_freq(self):
@@ -238,7 +241,7 @@ class Returns_Accessor(TimeSeries_Accessor):
             start_value (int, float or array_like): The starting returns.
 
                 Default value is 1 to avoid zeros."""
-        return self.cumulative(start_value=start_value).vbt.timeseries(freq=self.freq).drawdown()
+        return self.cumulative(start_value=start_value).vbt.tseries(freq=self.freq).drawdown()
 
     def drawdowns(self, start_value=1.):
         """Drawdown records of cumulative returns.
@@ -249,7 +252,7 @@ class Returns_Accessor(TimeSeries_Accessor):
             start_value (int, float or array_like): The starting returns.
 
                 Default value is 1 to avoid zeros."""
-        return self.cumulative(start_value=start_value).vbt.timeseries(freq=self.freq).drawdowns()
+        return self.cumulative(start_value=start_value).vbt.tseries(freq=self.freq).drawdowns()
 
 
 @register_series_accessor('returns')

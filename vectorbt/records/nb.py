@@ -102,7 +102,7 @@ def convert_array_to_matrix(a, records, target_shape, default_val):
 def reduce_records_nb(records, n_cols, default_val, reduce_func_nb, *args):
     """Reduce records by column.
 
-    Faster than `map_records_to_matrix_nb` and `vbt.timeseries.*` used together, and also
+    Faster than `map_records_to_matrix_nb` and `vbt.tseries.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
     `reduce_func_nb` must accept an array of records and `*args`, and return a single value."""

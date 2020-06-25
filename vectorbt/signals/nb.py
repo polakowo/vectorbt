@@ -10,7 +10,7 @@
 from numba import njit, f8, i8, b1
 import numpy as np
 
-from vectorbt import timeseries
+from vectorbt import tseries
 from vectorbt.utils import combine_fns
 
 
@@ -191,7 +191,7 @@ def stop_loss_choice_nb(col, from_i, to_i, ts, stop, trailing, relative, first):
     stop = stop[from_i - 1:to_i, col]
     if trailing:
         # Propagate the maximum value from the entry using expanding max
-        peak_ts = timeseries.nb.expanding_max_1d_nb(ts)
+        peak_ts = tseries.nb.expanding_max_1d_nb(ts)
         if relative:
             stop = (1 - stop) * peak_ts
             # Get the absolute index of the first ts being below that stop

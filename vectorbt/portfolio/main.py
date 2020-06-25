@@ -86,11 +86,11 @@ Name: a, dtype: float64
 import numpy as np
 import pandas as pd
 
-from vectorbt import timeseries, defaults
+from vectorbt import tseries, defaults
 from vectorbt.utils import checks, reshape_fns
 from vectorbt.utils.indexing import PandasIndexer
 from vectorbt.utils.decorators import cached_property
-from vectorbt.timeseries.common import TSArrayWrapper
+from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.portfolio import nb
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
 
@@ -190,7 +190,7 @@ class Portfolio(PandasIndexer):
         self._cash = cash
         self._shares = shares
 
-        freq = main_price.vbt.timeseries(freq=freq).freq
+        freq = main_price.vbt.tseries(freq=freq).freq
         if freq is None:
             raise Exception("Couldn't parse the frequency of index. You must set `freq`.")
         self._freq = freq
@@ -628,12 +628,12 @@ class Portfolio(PandasIndexer):
     @cached_property
     def peak_equity(self):
         """Peak equity."""
-        return self.equity.vbt.timeseries.max()
+        return self.equity.vbt.tseries.max()
 
     @cached_property
     def dip_equity(self):
         """Dip equity."""
-        return self.equity.vbt.timeseries.min()
+        return self.equity.vbt.tseries.min()
 
     @cached_property
     def total_profit(self):
@@ -648,12 +648,12 @@ class Portfolio(PandasIndexer):
     def drawdown(self):
         """Drawdown series."""
         equity = self.equity.vbt.to_2d_array()
-        return self.wrapper.wrap(equity / timeseries.nb.expanding_max_nb(equity) - 1)
+        return self.wrapper.wrap(equity / tseries.nb.expanding_max_nb(equity) - 1)
 
     @cached_property
     def max_drawdown(self):
         """Max drawdown."""
-        return self.drawdown.vbt.timeseries.min()
+        return self.drawdown.vbt.tseries.min()
 
     @cached_property
     def drawdowns(self):
@@ -670,14 +670,14 @@ class Portfolio(PandasIndexer):
 
         !!! note:
             Does not take into account fees and slippage. For this, create a separate portfolio."""
-        returns = timeseries.nb.pct_change_nb(self.main_price.vbt.to_2d_array())
+        returns = tseries.nb.pct_change_nb(self.main_price.vbt.to_2d_array())
         return self.wrapper.wrap(returns).vbt.returns.total()
 
     @cached_property
     def returns(self):
         """Portfolio return series."""
         equity = self.equity.vbt.to_2d_array()
-        returns = timeseries.nb.pct_change_nb(equity)
+        returns = tseries.nb.pct_change_nb(equity)
         init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
         returns[0, :] = (equity[0, :] - init_capital) / init_capital
         return self.wrapper.wrap(returns)
