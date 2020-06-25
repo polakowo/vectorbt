@@ -69,7 +69,7 @@ class MA(MA):
 
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp).
 
-    Use `MA.from_params` or `MA.from_combinations` methods to run the indicator."""
+    Use `MA.from_params` or `MA.from_combs` methods to run the indicator."""
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
         """Calculate moving average `MA.ma` from time series `ts` and parameters `window` and `ewm`.
@@ -104,7 +104,7 @@ class MA(MA):
         return super().from_params(ts, window, ewm, **kwargs)
 
     @classmethod
-    def from_combinations(cls, ts, windows, r, ewm=False, names=None, **kwargs):
+    def from_combs(cls, ts, windows, r, ewm=False, names=None, **kwargs):
         """Create multiple `MA` combinations according to `itertools.combinations`.
 
         Args:
@@ -119,7 +119,7 @@ class MA(MA):
             tuple of MA
         Example:
             ```python-repl
-            >>> fast_ma, slow_ma = vbt.MA.from_combinations(price['Close'], 
+            >>> fast_ma, slow_ma = vbt.MA.from_combs(price['Close'],
             ...     [10, 20, 30], 2, ewm=[False, False, True], names=['fast', 'slow'])
 
             >>> print(fast_ma.ma)
@@ -199,7 +199,7 @@ class MA(MA):
 
             fig.show()
             ```
-            ![](/vectorbt/docs/img/MA_from_combinations.png)
+            ![](/vectorbt/docs/img/MA_from_combs.png)
         """
 
         if names is None:

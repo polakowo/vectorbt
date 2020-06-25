@@ -24,31 +24,28 @@ import vectorbt as vbt
 import numpy as np
 import yfinance as yf
 
-# Define params
-windows = np.arange(2, 101)
-fees = 0.001 # in %
-
-# Prepare data
+# Fetch daily price of Bitcoin
 price = yf.Ticker("BTC-USD").history(period="max")['Close']
 
 # Generate signals
-fast_ma, slow_ma = vbt.MA.from_combinations(price, windows, 2, names=['fast', 'slow'])
+fast_ma, slow_ma = vbt.MA.from_combs(price, np.arange(2, 101), 2, names=['fast', 'slow'])
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
-# Calculate performance
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=fees, freq='1 days')
-performance = portfolio.total_return * 100
+# Model portfolio
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.001, freq='1 day')
 
-# Plot heatmap
-perf_matrix = performance.vbt.unstack_to_df(
+# Get total return and reshape into a matrix indexed by windows
+window_ret_matrix = portfolio.total_return.vbt.unstack_to_df(
     index_levels='fast_window', 
     column_levels='slow_window', 
     symmetric=True)
-perf_matrix.vbt.Heatmap(
+
+# Plot the whole thing
+window_ret_matrix.vbt.Heatmap(
     xaxis_title='Slow window', 
     yaxis_title='Fast window', 
-    trace_kwargs=dict(colorbar=dict(title='Total return in %')),
+    trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')),
     width=600, height=450)
 ```
 
@@ -89,17 +86,17 @@ This way, it is often much faster than pandas alone.
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
-To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
-(see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
-This way, user can easily switch between native pandas functionality such as indexing, and highly-efficient 
-vectorbt methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
-
 In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
 (think of an array for price, an array for signals, etc.), vectorbt is optimized for working with 
 2-dimensional data: it treats index of a DataFrame as time axis and columns as distinct features
 that should be backtested, and performs calculations on the entire matrix at once. This way, user can 
 construct huge matrices with millions of columns and calculate the performance for each one with a single 
 matrix operation, without any Pythonic loops.
+
+To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
+(see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
+This way, user can easily switch between native pandas functionality and highly-efficient vectorbt 
+methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
 
 ## Features
 
