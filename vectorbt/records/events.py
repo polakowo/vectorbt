@@ -6,10 +6,10 @@ import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.reshape_fns import to_1d
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.config import merge_kwargs
-from vectorbt.utils.indexing import PandasIndexer
+from vectorbt.base.indexing import PandasIndexer
+from vectorbt.base.reshape_fns import to_1d
 from vectorbt.tseries.common import DatetimeTypes, TSArrayWrapper
 from vectorbt.records.main import Records
 from vectorbt.records import nb
@@ -393,7 +393,7 @@ class Events(BaseEventsByResult):
 class Trades(Events):
     """Extends `Events` for working with trade records.
 
-    Such records can be created by using `vectorbt.portfolio.nb.trade_records_nb`.
+    Such records can be created by using `vectorbt.records.nb.trade_records_nb`.
 
     Example:
         Get the average PnL of trades with duration over 2 days:
@@ -452,7 +452,7 @@ class Trades(Events):
 class Positions(Events):
     """Extends `Events` for working with position records.
 
-    Such records can be created by using `vectorbt.portfolio.nb.position_records_nb`.
+    Such records can be created by using `vectorbt.records.nb.position_records_nb`.
 
     Example:
         Get the average PnL of closed positions with duration over 2 days:

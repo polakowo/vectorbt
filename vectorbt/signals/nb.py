@@ -11,7 +11,7 @@ from numba import njit, f8, i8, b1
 import numpy as np
 
 from vectorbt import tseries
-from vectorbt.utils import combine_fns
+from vectorbt.base import combine_fns
 
 
 # ############# Signal generation ############# #
@@ -224,13 +224,13 @@ def take_profit_choice_nb(col, from_i, to_i, ts, stop, relative, first):
 
 @njit
 def stop_loss_apply_nb(i, entries, ts, stops, trailing, relative, first):
-    """`apply_func_nb` for stop loss used in `vectorbt.utils.combine_fns.apply_and_concat_one_nb`."""
+    """`apply_func_nb` for stop loss used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
     return generate_after_nb(entries, stop_loss_choice_nb, ts, stops[i, :, :], trailing, relative, first)
 
 
 @njit
 def take_profit_apply_nb(i, entries, ts, stops, relative, first):
-    """`apply_func_nb` for take profit used in `vectorbt.utils.combine_fns.apply_and_concat_one_nb`."""
+    """`apply_func_nb` for take profit used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
     return generate_after_nb(entries, take_profit_choice_nb, ts, stops[i, :, :], relative, first)
 
 
@@ -255,7 +255,7 @@ def generate_stop_loss_nb(entries, ts, stops, trailing=False, relative=True, fir
         >>> import numpy as np
         >>> from numba import njit
         >>> from vectorbt.signals.nb import generate_stop_loss_nb
-        >>> from vectorbt.utils.reshape_fns import broadcast_to_array_of
+        >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
 
         >>> entries = np.asarray([False, True, False, False, False])[:, None]
         >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]

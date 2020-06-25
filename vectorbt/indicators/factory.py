@@ -211,9 +211,10 @@ from numba import njit
 from numba.typed import List
 import itertools
 
-from vectorbt.utils import checks, index_fns, reshape_fns, combine_fns
-from vectorbt.utils.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
+from vectorbt.base import index_fns, reshape_fns, combine_fns
+from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
 from vectorbt.tseries.common import TSArrayWrapper
 
 
@@ -289,7 +290,7 @@ def from_params_pipeline(
         pass_lists (bool): If `True`, arguments are passed to the `custom_func` as lists.
         pass_2d (bool): If `True`, time series arrays will be passed as two-dimensional, otherwise as is.
         param_product (bool): If `True`, builds a Cartesian product out of all parameters.
-        broadcast_kwargs (dict): Keyword arguments passed to the `vectorbt.utils.reshape_fns.broadcast` 
+        broadcast_kwargs (dict): Keyword arguments passed to the `vectorbt.base.reshape_fns.broadcast`
             on time series objects.
         return_raw (bool): If `True`, returns the raw output without post-processing.
         **kwargs: Keyword arguments passed to the `custom_func`.
@@ -314,7 +315,7 @@ def from_params_pipeline(
         >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
         >>> ts_list = [sr, df]
 
-        >>> ts_list = vbt.utils.reshape_fns.broadcast(*ts_list)
+        >>> ts_list = vbt.base.reshape_fns.broadcast(*ts_list)
         >>> print(ts_list[0])
         a  b
         x  1  1
@@ -332,7 +333,7 @@ def from_params_pipeline(
         >>> p1, p2, p3 = 1, [2, 3, 4], [False]
         >>> param_list = [p1, p2, p3]
 
-        >>> param_list = vbt.utils.reshape_fns.broadcast(*param_list)
+        >>> param_list = vbt.base.reshape_fns.broadcast(*param_list)
         >>> print(param_list[0])
         array([1, 1, 1])
         >>> print(param_list[1])
@@ -364,8 +365,8 @@ def from_params_pipeline(
         >>> p1_columns = pd.Index(param_list[0], name='p1')
         >>> p2_columns = pd.Index(param_list[1], name='p2')
         >>> p3_columns = pd.Index(param_list[2], name='p3')
-        >>> p_columns = vbt.utils.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
-        >>> new_columns = vbt.utils.index_fns.combine_indexes(p_columns, ts_list[0].columns)
+        >>> p_columns = vbt.base.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
+        >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, ts_list[0].columns)
 
         >>> output_df = pd.DataFrame(output, columns=new_columns)
         >>> print(output_df)
@@ -483,7 +484,7 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
     Both will be broadcast together. Set `multiple` to `True` to compare with multiple arguments.
     In this case, a new column level will be created with the name `name`.
 
-    See `vectorbt.utils.accessors.Base_Accessor.combine_with`."""
+    See `vectorbt.base.accessors.Base_Accessor.combine_with`."""
     if multiple:
         if as_columns is None:
             as_columns = index_fns.index_from_values(other, name=name)
@@ -531,7 +532,7 @@ class IndicatorFactory():
 
             In contrast to `IndicatorFactory.from_apply_func`, it's up to you to handle caching
             and concatenate columns for each parameter (for example, by using 
-            `vectorbt.utils.combine_fns.apply_and_concat_one`). Also, you must ensure that each output 
+            `vectorbt.base.combine_fns.apply_and_concat_one`). Also, you must ensure that each output
             array has an appropriate number of columns, which is the number of columns in input time 
             series multiplied by the number of parameter values.
 
@@ -555,7 +556,7 @@ class IndicatorFactory():
 
             >>> @njit
             ... def custom_func(ts1, ts2, p1, p2, *args):
-            ...     return vbt.utils.combine_fns.apply_and_concat_multiple_nb(
+            ...     return vbt.base.combine_fns.apply_and_concat_multiple_nb(
             ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, *args)
 
             >>> MyInd = vbt.IndicatorFactory(

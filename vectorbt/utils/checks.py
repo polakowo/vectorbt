@@ -4,8 +4,6 @@ import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
 
-from vectorbt.utils import reshape_fns
-
 # ############# Checks ############# #
 
 
@@ -177,9 +175,10 @@ def assert_same_meta(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different metadata."""
     assert_same_type(arg1, arg2)
     assert_same_shape(arg1, arg2)
-    if is_pandas(arg1) or is_pandas(arg2):
+    if is_pandas(arg1):
         assert_same_index(arg1, arg2)
-        assert_same_columns(reshape_fns.to_2d(arg1), reshape_fns.to_2d(arg2))
+        if is_frame(arg1):
+            assert_same_columns(arg1, arg2)
 
 
 def assert_same(arg1, arg2):

@@ -3,7 +3,9 @@
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import checks, index_fns, reshape_fns
+from vectorbt.utils import checks
+from vectorbt.base import index_fns, reshape_fns
+
 
 class ArrayWrapper:
     """Class that stores index, columns and shape metadata for wrapping NumPy arrays."""

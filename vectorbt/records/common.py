@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import reshape_fns
+from vectorbt.base import reshape_fns
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records import nb
 

@@ -1,4 +1,4 @@
-"""Utilities for working with index/columns."""
+"""Functions for working with index/columns."""
 
 import numpy as np
 import pandas as pd

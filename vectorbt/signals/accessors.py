@@ -40,9 +40,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from vectorbt.defaults import color_schema, contrast_color_schema
+from vectorbt.defaults import contrast_color_schema
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks, reshape_fns, index_fns
+from vectorbt.utils import checks
+from vectorbt.base import reshape_fns, index_fns
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.decorators import add_nb_methods, cached_property
 from vectorbt.utils.colors import adjust_lightness
@@ -70,7 +71,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
-        """`vectorbt.utils.accessors.Base_Accessor.empty` with `fill_value=False`.
+        """`vectorbt.base.accessors.Base_Accessor.empty` with `fill_value=False`.
 
         Example:
             ```python-repl
@@ -87,7 +88,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
     @classmethod
     def empty_like(cls, *args, fill_value=False, **kwargs):
-        """`vectorbt.utils.accessors.Base_Accessor.empty_like` with `fill_value=False`.
+        """`vectorbt.base.accessors.Base_Accessor.empty_like` with `fill_value=False`.
 
         Example:
             ```python-repl
@@ -270,7 +271,7 @@ class Signals_Accessor(TimeSeries_Accessor):
                            first=True, as_columns=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_stop_loss_nb`.
 
-        Arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
         Use `as_columns` as a top-level column level.
@@ -313,7 +314,7 @@ class Signals_Accessor(TimeSeries_Accessor):
     def generate_take_profit(self, ts, stops, relative=True, first=True, as_columns=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_take_profit_nb`.
 
-        Arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
         Use `as_columns` as a top-level column level.
@@ -356,7 +357,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
         If `other` specified, see `vectorbt.signals.nb.map_reduce_between_two_nb`.
 
-        Arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         Example:
@@ -541,7 +542,7 @@ class Signals_Accessor(TimeSeries_Accessor):
     def AND(self, *others, **kwargs):
         """Combine with each in `*others` using logical AND.
 
-        See `vectorbt.utils.accessors.Base_Accessor.combine_with_multiple`.
+        See `vectorbt.base.accessors.Base_Accessor.combine_with_multiple`.
 
         """
         return self.combine_with_multiple(others, combine_func=np.logical_and, **kwargs)
@@ -549,7 +550,7 @@ class Signals_Accessor(TimeSeries_Accessor):
     def OR(self, *others, **kwargs):
         """Combine with each in `*others` using logical OR.
 
-        See `vectorbt.utils.accessors.Base_Accessor.combine_with_multiple`.
+        See `vectorbt.base.accessors.Base_Accessor.combine_with_multiple`.
 
         Example:
             Perform two OR operations and concatenate them:
@@ -570,7 +571,7 @@ class Signals_Accessor(TimeSeries_Accessor):
     def XOR(self, *others, **kwargs):
         """Combine with each in `*others` using logical XOR.
 
-        See `vectorbt.utils.accessors.Base_Accessor.combine_with_multiple`."""
+        See `vectorbt.base.accessors.Base_Accessor.combine_with_multiple`."""
         return self.combine_with_multiple(others, combine_func=np.logical_xor, **kwargs)
 
 

@@ -23,9 +23,9 @@ import itertools
 import plotly.graph_objects as go
 
 from vectorbt import tseries, defaults
-from vectorbt.utils import reshape_fns
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
+from vectorbt.base import reshape_fns
 from vectorbt.indicators.factory import IndicatorFactory
 
 # ############# MA ############# #

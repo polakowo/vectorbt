@@ -5,7 +5,7 @@ import pandas as pd
 from datetime import timedelta
 
 from vectorbt.utils import checks
-from vectorbt.utils.array_wrapper import ArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper
 
 DatetimeTypes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
 
@@ -37,7 +37,7 @@ def freq_delta(freq):
 
 
 class TSArrayWrapper(ArrayWrapper):
-    """Introduces methods for wrapping time series on top of `vectorbt.utils.reshape_fns.ArrayWrapper`."""
+    """Introduces methods for wrapping time series on top of `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def __init__(self, freq=None, **kwargs):
         ArrayWrapper.__init__(self, **kwargs)

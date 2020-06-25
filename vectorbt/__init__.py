@@ -39,7 +39,7 @@ outperforms pandas significantly, especially for basic operations:
 5.95 ms ± 380 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
-But also functions already compiled with Cython/Numba are slower:
+But also pandas functions already compiled with Cython/Numba are slower:
 
 ```python-repl
 >>> %timeit big_ts.expanding().max()
@@ -473,6 +473,7 @@ The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `panda
 `pandas.DataFrame` object. It is the main entry point for all other accessors:
 
 ```plaintext
+vbt.base.accessors.Base_SR/DFAccessor           -> pd.Series/DataFrame.vbt.*
 vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseries
 vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
 vbt.signals.accessors.Signals_SR/DFAccessor     -> pd.Series/DataFrame.vbt.signals
@@ -481,17 +482,16 @@ vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.Bar
 vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.Scatter
 vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.Histogram
 vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.Heatmap
-vbt.utils.accessors.Base_SR/DFAccessor          -> pd.Series/DataFrame.vbt.*
 ```
 
 Additionally, some accessors subclass other accessors building the following inheritance hiearchy:
 
 ```plaintext
-vbt.utils.accessors.Base_SR/DFAccessor
-    -> vbt.tseries.accessors.TimeSeries_SR/DFAccessor
-        -> vbt.tseries.accessors.OHLCV_DFAccessor
-        -> vbt.signals.accessors.Signals_SR/DFAccessor
-        -> vbt.returns.accessors.Returns_SR/DFAccessor
+vbt.base.accessors.Base_SR/DFAccessor
+    \_ vbt.tseries.accessors.TimeSeries_SR/DFAccessor
+        \_ vbt.tseries.accessors.OHLCV_DFAccessor
+        \_ vbt.signals.accessors.Signals_SR/DFAccessor
+        \_ vbt.returns.accessors.Returns_SR/DFAccessor
 vbt.widgets.accessors.Bar_Accessor
 vbt.widgets.accessors.Scatter_Accessor
 vbt.widgets.accessors.Histogram_Accessor
@@ -500,20 +500,19 @@ vbt.widgets.accessors.Heatmap_Accessor
 
 So, for example, the method `pd.Series.vbt.to_2d_array` is also available as `pd.Series.vbt.returns.to_2d_array`.
 
-### utils
+### base
 
-`vectorbt.utils` provides an extensive collection of utilities, such as pandas broadcasting.
+`vectorbt.base` provides base classes and utilities for pandas objects, such as broadcasting.
 If any of the functions can take a pandas object as input, it will be offered as an accessor method.
-For example, `vectorbt.utils.reshape_fns.broadcast` can take an arbitrary number of pandas
-objects, thus you can find its variations in `vectorbt.utils.accessors.Base_Accessor` class.
-`vectorbt.utils.accessors` has utility classes that are subclassed by `vbt`, `vbt.tseries` and
-`vbt.signals` accessors.
+For example, `vectorbt.base.reshape_fns.broadcast` can take an arbitrary number of pandas
+objects, thus you can find its variations in `vectorbt.base.accessors.Base_Accessor` class.
+`vectorbt.base.accessors` has utility classes that are subclassed by other accessors.
 
 ```python-repl
 >>> sr = pd.Series([1])
 >>> df = pd.DataFrame([1, 2, 3])
 
->>> vbt.utils.reshape_fns.broadcast_to(sr, df)
+>>> vbt.base.reshape_fns.broadcast_to(sr, df)
    0
 0  1
 1  1
@@ -630,7 +629,7 @@ be used directly for custom analysis. They don't provide any pandas accessors.
 
 `vectorbt.portfolio` provides the class `vectorbt.portfolio.main.Portfolio` for modeling portfolio
 performance and calculating various risk and performance metrics. It uses Numba-compiled
-functions from `vectorbt.portfolio.nb` for most computations and `vectorbt.portfolio.records`
+functions from `vectorbt.portfolio.nb` for most computations and record classes from `vectorbt.records`
 for tracking events such as orders, trades and positions. It doesn't provide any pandas accessors.
 You can access the class directly by `vbt.Portfolio`.
 
@@ -660,9 +659,13 @@ You can access basic widgets listed in `vectorbt.widgets.basic` as `pandas.Serie
 
 ![](/vectorbt/docs/img/hist_normal.png)
 
+### utils
+
+`vectorbt.utils` provides utility functions and classes that are used throughout vectorbt.
+
 ### defaults
 
-`vectorbt.defaults` contains default parameters for vectorbt.
+`vectorbt.defaults` provides default parameters for vectorbt.
 
 For example, you can change default width and height of each plot:
 ```python-repl

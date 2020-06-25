@@ -87,9 +87,10 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import tseries, defaults
-from vectorbt.utils import checks, reshape_fns
-from vectorbt.utils.indexing import PandasIndexer
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
+from vectorbt.base import reshape_fns
+from vectorbt.base.indexing import PandasIndexer
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.portfolio import nb
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
@@ -146,7 +147,7 @@ class Portfolio(PandasIndexer):
         init_capital (int, float or pd.Series): The initial capital.
 
             If `pd.Series`, must have the same index as columns in `main_price`.
-        orders (vectorbt.portfolio.records.Orders): Order records.
+        orders (vectorbt.records.orders.Orders): Order records.
         cash (pandas_like): Cash held at each time step.
 
             Must have the same metadata as `main_price`.
@@ -240,13 +241,13 @@ class Portfolio(PandasIndexer):
             slippage (float or array_like): Slippage in percentage of price.
             accumulate (bool): If `accumulate` is `True`, entering the market when already
                 in the market will be allowed to increase a position.
-            broadcast_kwargs: Keyword arguments passed to `vectorbt.utils.reshape_fns.broadcast`.
+            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All time series will be broadcasted together using `vectorbt.utils.reshape_fns.broadcast`.
+        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
         At the end, they will have the same metadata.
 
         Example:
@@ -360,13 +361,13 @@ class Portfolio(PandasIndexer):
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
             slippage (float or array_like): Slippage in percentage of `order_price`.
             is_target (bool): If `True`, will order the difference between current and target size.
-            broadcast_kwargs: Keyword arguments passed to `vectorbt.utils.reshape_fns.broadcast`.
+            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All time series will be broadcasted together using `vectorbt.utils.reshape_fns.broadcast`.
+        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
         At the end, they will have the same metadata.
 
         Example:
@@ -468,7 +469,7 @@ class Portfolio(PandasIndexer):
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All time series will be broadcasted together using `vectorbt.utils.reshape_fns.broadcast`.
+        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
         At the end, they will have the same metadata.
 
         !!! note

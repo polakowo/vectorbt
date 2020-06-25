@@ -1,9 +1,10 @@
-"""Utilities for indexing."""
+"""Classes for indexing."""
 
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import checks, index_fns, reshape_fns
+from vectorbt.utils import checks
+from vectorbt.base import index_fns, reshape_fns
 
 
 class _iLoc:
@@ -36,10 +37,10 @@ class PandasIndexer:
     Indexing function `indexing_func` should apply `pd_indexing_func` on all pandas objects in question 
     and return a new instance of the class.
     
-    Example:
+    Example:ee
         ```python-repl
         >>> import pandas as pd
-        >>> from vectorbt.utils.indexing import PandasIndexer
+        >>> from vectorbt.base.indexing import PandasIndexer
 
         >>> def indexing_func(c, pd_indexing_func):
         ...     return C(pd_indexing_func(c.df1), pd_indexing_func(c.df2))
@@ -181,7 +182,7 @@ class ParamIndexerFactory:
     Example:
         ```python-repl
         >>> import pandas as pd
-        >>> from vectorbt.utils.indexing import ParamIndexerFactory, indexing_on_mapper
+        >>> from vectorbt.base.indexing import ParamIndexerFactory, indexing_on_mapper
 
         >>> def indexing_func(c, pd_indexing_func):
         ...     return C(pd_indexing_func(c.df), indexing_on_mapper(
@@ -215,7 +216,7 @@ class ParamIndexerFactory:
         1  2  2  4  4
         ```"""
 
-    def __new__(self, param_names, class_name='ParamIndexer', module_name='vectorbt.utils.indexing'):
+    def __new__(self, param_names, class_name='ParamIndexer', module_name='vectorbt.base.indexing'):
 
         class ParamIndexer:
             def __init__(self, param_mappers, indexing_func):

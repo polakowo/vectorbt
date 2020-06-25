@@ -4,9 +4,10 @@ import numpy as np
 import pandas as pd
 from collections.abc import Iterable
 
-from vectorbt.utils import checks, combine_fns, index_fns, reshape_fns
-from vectorbt.utils.array_wrapper import ArrayWrapper
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
+from vectorbt.base import combine_fns, index_fns, reshape_fns
+from vectorbt.base.array_wrapper import ArrayWrapper
 
 
 class Base_Accessor(ArrayWrapper):
@@ -77,7 +78,7 @@ class Base_Accessor(ArrayWrapper):
             return obj
 
     def stack_index(self, index, on_top=True, axis=1, inplace=False):
-        """See `vectorbt.utils.index_fns.stack_indexes`.
+        """See `vectorbt.base.index_fns.stack_indexes`.
 
         Set `on_top` to `False` to stack at bottom.
 
@@ -88,74 +89,74 @@ class Base_Accessor(ArrayWrapper):
                 return index_fns.stack_indexes(index, obj_index)
             return index_fns.stack_indexes(obj_index, index)
 
-        return self.apply_func_on_index(apply_func)
+        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_levels(self, levels, axis=1, inplace=False):
-        """See `vectorbt.utils.index_fns.drop_levels`.
+        """See `vectorbt.base.index_fns.drop_levels`.
 
         See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_levels(obj_index, levels)
 
-        return self.apply_func_on_index(apply_func)
+        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
 
     def rename_levels(self, name_dict, axis=1, inplace=False):
-        """See `vectorbt.utils.index_fns.rename_levels`.
+        """See `vectorbt.base.index_fns.rename_levels`.
 
         See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.rename_levels(obj_index, name_dict)
 
-        return self.apply_func_on_index(apply_func)
+        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
 
     def select_levels(self, level_names, axis=1, inplace=False):
-        """See `vectorbt.utils.index_fns.select_levels`.
+        """See `vectorbt.base.index_fns.select_levels`.
 
         See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.select_levels(obj_index, level_names)
 
-        return self.apply_func_on_index(apply_func)
+        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_redundant_levels(self, axis=1, inplace=False):
-        """See `vectorbt.utils.index_fns.drop_redundant_levels`.
+        """See `vectorbt.base.index_fns.drop_redundant_levels`.
 
         See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_redundant_levels(obj_index)
 
-        return self.apply_func_on_index(apply_func)
+        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_duplicate_levels(self, keep='last', axis=1, inplace=False):
-        """See `vectorbt.utils.index_fns.drop_duplicate_levels`.
+        """See `vectorbt.base.index_fns.drop_duplicate_levels`.
 
         See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_duplicate_levels(obj_index, keep=keep)
 
-        return self.apply_func_on_index(apply_func)
+        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
 
     # ############# Reshaping ############# #
 
     def to_1d_array(self):
         """Convert to 1-dim NumPy array
 
-        See `vectorbt.utils.reshape_fns.to_1d`."""
+        See `vectorbt.base.reshape_fns.to_1d`."""
         return reshape_fns.to_1d(self._obj, raw=True)
 
     def to_2d_array(self):
         """Convert to 2-dim NumPy array.
 
-        See `vectorbt.utils.reshape_fns.to_2d`."""
+        See `vectorbt.base.reshape_fns.to_2d`."""
         return reshape_fns.to_2d(self._obj, raw=True)
 
     def tile(self, n, as_columns=None):
-        """See `vectorbt.utils.reshape_fns.tile`.
+        """See `vectorbt.base.reshape_fns.tile`.
 
         Use `as_columns` as a top-level column level."""
         tiled = reshape_fns.tile(self._obj, n, axis=1)
@@ -165,7 +166,7 @@ class Base_Accessor(ArrayWrapper):
         return tiled
 
     def repeat(self, n, as_columns=None):
-        """See `vectorbt.utils.reshape_fns.repeat`.
+        """See `vectorbt.base.reshape_fns.repeat`.
 
         Use `as_columns` as a top-level column level."""
         repeated = reshape_fns.repeat(self._obj, n, axis=1)
@@ -201,28 +202,28 @@ class Base_Accessor(ArrayWrapper):
 
     @class_or_instancemethod
     def broadcast(self_or_cls, *others, **kwargs):
-        """See `vectorbt.utils.reshape_fns.broadcast`."""
+        """See `vectorbt.base.reshape_fns.broadcast`."""
         others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
         if isinstance(self_or_cls, type):
             return reshape_fns.broadcast(*others, **kwargs)
         return reshape_fns.broadcast(self_or_cls._obj, *others, **kwargs)
 
     def broadcast_to(self, other, **kwargs):
-        """See `vectorbt.utils.reshape_fns.broadcast_to`."""
+        """See `vectorbt.base.reshape_fns.broadcast_to`."""
         if isinstance(other, Base_Accessor):
             other = other._obj
         return reshape_fns.broadcast_to(self._obj, other, **kwargs)
 
     def make_symmetric(self):
-        """See `vectorbt.utils.reshape_fns.make_symmetric`."""
+        """See `vectorbt.base.reshape_fns.make_symmetric`."""
         return reshape_fns.make_symmetric(self._obj)
 
     def unstack_to_array(self, **kwargs):
-        """See `vectorbt.utils.reshape_fns.unstack_to_array`."""
+        """See `vectorbt.base.reshape_fns.unstack_to_array`."""
         return reshape_fns.unstack_to_array(self._obj, **kwargs)
 
     def unstack_to_df(self, **kwargs):
-        """See `vectorbt.utils.reshape_fns.unstack_to_df`."""
+        """See `vectorbt.base.reshape_fns.unstack_to_df`."""
         return reshape_fns.unstack_to_df(self._obj, **kwargs)
 
     # ############# Combining ############# #
@@ -231,7 +232,7 @@ class Base_Accessor(ArrayWrapper):
     def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
         """Concatenate with `others` along columns.
 
-        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Use `as_columns` as a top-level column level.
 
         Example:
@@ -263,7 +264,7 @@ class Base_Accessor(ArrayWrapper):
 
     def apply_and_concat(self, ntimes, *args, apply_func=None, pass_2d=False, as_columns=None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
-        See `vectorbt.utils.combine_fns.apply_and_concat`.
+        See `vectorbt.base.combine_fns.apply_and_concat`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
@@ -301,7 +302,7 @@ class Base_Accessor(ArrayWrapper):
     def combine_with(self, other, *args, combine_func=None, pass_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
 
-        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`.
@@ -339,13 +340,13 @@ class Base_Accessor(ArrayWrapper):
                               concat=False, broadcast_kwargs={}, as_columns=None, **kwargs):
         """Combine with `others` using `combine_func`.
 
-        All arguments will be broadcasted using `vectorbt.utils.reshape_fns.broadcast`
+        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         If `concat` is `True`, concatenate the results along columns, 
-        see `vectorbt.utils.combine_fns.combine_and_concat`.
+        see `vectorbt.base.combine_fns.combine_and_concat`.
         Otherwise, pairwise combine into a Series/DataFrame of the same shape, 
-        see `vectorbt.utils.combine_fns.combine_multiple`.
+        see `vectorbt.base.combine_fns.combine_multiple`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`. 
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.

@@ -6,8 +6,8 @@ import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property
-from vectorbt.utils.indexing import PandasIndexer
 from vectorbt.utils.colors import adjust_lightness
+from vectorbt.base.indexing import PandasIndexer
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.main import Records
 from vectorbt.records.enums import OrderSide, order_dt

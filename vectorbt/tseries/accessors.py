@@ -34,9 +34,10 @@ from numba.typed import Dict
 
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks, index_fns, reshape_fns
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import add_nb_methods
-from vectorbt.utils.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
+from vectorbt.base import index_fns, reshape_fns
+from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.tseries import nb
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.drawdowns import Drawdowns

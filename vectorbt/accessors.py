@@ -2,7 +2,8 @@
 
 import pandas as pd
 from pandas.core.accessor import _register_accessor, DirNamesMixin
-from vectorbt.utils.accessors import Base_DFAccessor, Base_SRAccessor
+
+from vectorbt.base.accessors import Base_DFAccessor, Base_SRAccessor
 
 
 # By subclassing DirNamesMixin, we can build accessors on top of each other

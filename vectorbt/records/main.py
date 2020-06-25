@@ -175,8 +175,8 @@ import numpy as np
 import pandas as pd
 
 from vectorbt.utils import checks
-from vectorbt.utils.indexing import PandasIndexer
 from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.base.indexing import PandasIndexer
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.common import indexing_on_records
 from vectorbt.records import nb
@@ -221,7 +221,7 @@ class Records(PandasIndexer):
     def map_records_to_matrix(self, map_func_nb, *args, default_val=np.nan):
         """Map each record to a value and store it in a matrix.
 
-        See `vectorbt.portfolio.nb.map_records_to_matrix_nb`."""
+        See `vectorbt.records.nb.map_records_to_matrix_nb`."""
         checks.assert_numba_func(map_func_nb)
 
         target_shape = (len(self.wrapper.index), len(self.wrapper.columns))
@@ -231,7 +231,7 @@ class Records(PandasIndexer):
     def convert_array_to_matrix(self, a, default_val=np.nan):
         """Convert a 1-dim array already mapped by the user.
 
-        See `vectorbt.portfolio.nb.convert_array_to_matrix`.
+        See `vectorbt.records.nb.convert_array_to_matrix`.
 
         The length of the array should match that of the records."""
         checks.assert_type(a, np.ndarray)
@@ -250,7 +250,7 @@ class Records(PandasIndexer):
     def reduce_records(self, reduce_func_nb, *args, default_val=np.nan, **kwargs):
         """Reduce records by column.
 
-        See `vectorbt.portfolio.nb.reduce_records_nb`.
+        See `vectorbt.records.nb.reduce_records_nb`.
 
         `**kwargs` will be passed to `vectorbt.tseries.common.TSArrayWrapper.wrap_reduced`."""
         checks.assert_numba_func(reduce_func_nb)
@@ -261,7 +261,7 @@ class Records(PandasIndexer):
     def map_reduce_records(self, map_func_nb, reduce_func_nb, *args, default_val=np.nan, **kwargs):
         """Map each record to a value and reduce all values by column.
 
-        See `vectorbt.portfolio.nb.map_reduce_records_nb`.
+        See `vectorbt.records.nb.map_reduce_records_nb`.
 
         `**kwargs` will be passed to `vectorbt.tseries.common.TSArrayWrapper.wrap_reduced`."""
         checks.assert_numba_func(reduce_func_nb)

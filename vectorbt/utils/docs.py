@@ -4,7 +4,7 @@ import inspect
 import sys
 from types import FunctionType
 
-from vectorbt.utils.decorators import custom_property, custom_method
+from vectorbt.utils.decorators import custom_property
 
 
 def is_from_module(obj, module):

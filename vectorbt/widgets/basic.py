@@ -3,11 +3,10 @@
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-import inspect
 
 from vectorbt.widgets.common import DefaultFigureWidget
-from vectorbt.utils import checks, reshape_fns
-from collections import namedtuple
+from vectorbt.utils import checks
+from vectorbt.base import reshape_fns
 
 
 # ############# Indicator ############# #

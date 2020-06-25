@@ -9,13 +9,13 @@ from scipy import stats
 
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
-from vectorbt.utils import checks, reshape_fns
+from vectorbt.utils import checks
+from vectorbt.base import reshape_fns
 from vectorbt.tseries.accessors import (
     TimeSeries_Accessor,
     TimeSeries_SRAccessor,
     TimeSeries_DFAccessor
 )
-from vectorbt.tseries.nb import pct_change_nb
 from vectorbt.tseries.common import freq_delta, DatetimeTypes
 from vectorbt.returns import nb
 

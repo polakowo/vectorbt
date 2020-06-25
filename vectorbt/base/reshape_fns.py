@@ -1,10 +1,11 @@
-"""Utilities for reshaping arrays."""
+"""Functions for reshaping arrays."""
 
 import numpy as np
 import pandas as pd
 
 from vectorbt import defaults
-from vectorbt.utils import checks, index_fns, array_wrapper
+from vectorbt.utils import checks
+from vectorbt.base import index_fns, array_wrapper
 
 
 def soft_broadcast_to_ndim(arg, ndim):
@@ -124,13 +125,13 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
             * `None` - use the original index/columns of the objects in `args`
             * `int` - use the index/columns of the i-nth object in `args`
             * `'strict'` - ensure that all pandas objects have the same index/columns
-            * `'stack'` - stack different indexes/columns using `vectorbt.utils.index_fns.stack_indexes`
+            * `'stack'` - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
         ignore_single (bool): If `True`, won't consider index/columns with a single value.
-        drop_duplicates (bool): See `vectorbt.utils.index_fns.drop_duplicate_levels`.
-        keep (bool): See `vectorbt.utils.index_fns.drop_duplicate_levels`.
+        drop_duplicates (bool): See `vectorbt.base.index_fns.drop_duplicate_levels`.
+        keep (bool): See `vectorbt.base.index_fns.drop_duplicate_levels`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
     """
@@ -272,7 +273,7 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
         ```python-repl
         >>> import numpy as np
         >>> import pandas as pd
-        >>> from vectorbt.utils.reshape_fns import broadcast
+        >>> from vectorbt.base.reshape_fns import broadcast
 
         >>> v = 0
         >>> a = np.array([1, 2, 3])
@@ -454,7 +455,7 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
         ```python-repl
         >>> import numpy as np
         >>> import pandas as pd
-        >>> from vectorbt.utils.reshape_fns import broadcast_to
+        >>> from vectorbt.base.reshape_fns import broadcast_to
 
         >>> a = np.array([1, 2, 3])
         >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
@@ -489,7 +490,7 @@ def broadcast_to_array_of(arg1, arg2):
     Example:
         ```python-repl
         >>> import numpy as np
-        >>> from vectorbt.utils.reshape_fns import broadcast_to_array_of
+        >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
 
         >>> print(broadcast_to_array_of([0.1, 0.2], np.empty((2, 2))))
         [[[0.1 0.1]
@@ -537,7 +538,7 @@ def unstack_to_array(arg, levels=None):
     Example:
         ```python-repl
         >>> import pandas as pd
-        >>> from vectorbt.utils.reshape_fns import unstack_to_array
+        >>> from vectorbt.base.reshape_fns import unstack_to_array
 
         >>> index = pd.MultiIndex.from_arrays(
         ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
@@ -589,7 +590,7 @@ def make_symmetric(arg):
     Example:
         ```python-repl
         >>> import pandas as pd
-        >>> from vectorbt.utils.reshape_fns import make_symmetric
+        >>> from vectorbt.base.reshape_fns import make_symmetric
 
         >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
 
@@ -642,7 +643,7 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     Example:
         ```python-repl
         >>> import pandas as pd
-        >>> from vectorbt.utils.reshape_fns import unstack_to_df
+        >>> from vectorbt.base.reshape_fns import unstack_to_df
 
         >>> index = pd.MultiIndex.from_arrays(
         ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']], 

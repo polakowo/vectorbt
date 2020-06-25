@@ -5,9 +5,9 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
-from vectorbt.utils.indexing import PandasIndexer
 from vectorbt.utils.decorators import cached_property
-from vectorbt.utils.reshape_fns import to_1d
+from vectorbt.base.reshape_fns import to_1d
+from vectorbt.base.indexing import PandasIndexer
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.tseries.common import TSArrayWrapper, DatetimeTypes

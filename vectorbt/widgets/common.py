@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 
 from vectorbt import defaults
 
+
 class DefaultFigureWidget(go.FigureWidget):
     def __init__(self, *args, **kwargs):
         """Subclass of the `plotly.graph_objects.FigureWidget` class initialized 
