@@ -441,7 +441,7 @@ dtype: float64
 ```
 
 Notice how index is no more datetime-like, since it captures multiple time periods.
-That's why it's required here to pass the frequency `freq` to the `vectorbt.portfolio.main.Portfolio`
+That's why it's required here to pass the frequency `freq` to the `vectorbt.portfolio.base.Portfolio`
 class methods in order to be able to compute performance metrics such as Sharpe ratio.
 
 The index hierarchy of the final performance series can be then used to group performance
@@ -611,7 +611,7 @@ their accessors extend the time series accessors.
 `vectorbt.records` provides a collection of classes for working with event data, such as trades and
 positions. They wrap [NumPy's structured arrays](https://numpy.org/doc/stable/user/basics.rec.html),
 and offer properties and methods for analyzing them. They are instantiated as properties within the
-`vectorbt.portfolio.main.Portfolio` class, such as `vectorbt.portfolio.main.Portfolio.trades`, or can
+`vectorbt.portfolio.base.Portfolio` class, such as `vectorbt.portfolio.base.Portfolio.trades`, or can
 be used directly for custom analysis. They don't provide any pandas accessors.
 
 ```python-repl
@@ -627,7 +627,7 @@ be used directly for custom analysis. They don't provide any pandas accessors.
 
 ### portfolio
 
-`vectorbt.portfolio` provides the class `vectorbt.portfolio.main.Portfolio` for modeling portfolio
+`vectorbt.portfolio` provides the class `vectorbt.portfolio.base.Portfolio` for modeling portfolio
 performance and calculating various risk and performance metrics. It uses Numba-compiled
 functions from `vectorbt.portfolio.nb` for most computations and record classes from `vectorbt.records`
 for tracking events such as orders, trades and positions. It doesn't provide any pandas accessors.
@@ -638,7 +638,7 @@ You can access the class directly by `vbt.Portfolio`.
 >>> entries = pd.Series([True, False, True, False])
 >>> exits = pd.Series([False, True, False, True])
 
->>> # vectorbt.portfolio.main.Portfolio
+>>> # vectorbt.portfolio.base.Portfolio
 >>> vbt.Portfolio.from_signals(price, entries, exits, freq='1D').equity
 0    100.000000
 1    200.000000

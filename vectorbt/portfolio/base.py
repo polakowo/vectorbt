@@ -1,4 +1,4 @@
-"""Main class for modeling portfolio and measuring its performance.
+"""Base class for modeling portfolio and measuring its performance.
 
 The job of the `Portfolio` class is to create a series of positions allocated 
     against a cash component, produce an equity curve, incorporate basic transaction costs 

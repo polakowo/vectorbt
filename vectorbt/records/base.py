@@ -108,6 +108,7 @@ z  144.0  225.0
 
 * Use `Records.convert_array_to_matrix` to convert an array of already mapped values.
 
+```python-repl
 >>> print(records.convert_array_to_matrix(records_arr['some_field'] ** 2))
        a      b
 x  100.0  169.0

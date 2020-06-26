@@ -9,7 +9,7 @@ from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.tseries.common import TSArrayWrapper
-from vectorbt.records.main import Records
+from vectorbt.records.base import Records
 from vectorbt.records.enums import OrderSide, order_dt
 from vectorbt.records.common import indexing_on_records
 from vectorbt.records import nb

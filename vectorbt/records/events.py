@@ -11,7 +11,7 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.tseries.common import DatetimeTypes, TSArrayWrapper
-from vectorbt.records.main import Records
+from vectorbt.records.base import Records
 from vectorbt.records import nb
 from vectorbt.records.common import indexing_on_records
 from vectorbt.records.enums import (
