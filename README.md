@@ -49,7 +49,7 @@ window_ret_matrix.vbt.Heatmap(
     width=600, height=450)
 ```
 
-![dmac_heatmap.png](dmac_heatmap.png)
+![dmac_heatmap.png](img/dmac_heatmap.png)
 
 ## Motivation
 
@@ -74,6 +74,7 @@ It natively works on pandas objects, while performing all computations using Num
 This way, it is often much faster than pandas alone.
 
 ```python-repl
+>>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
@@ -104,24 +105,92 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
     -> Compatible with any library
 - For high performance, most operations are done strictly using NumPy and Numba 
     -> Much faster than comparable functions in pandas
-- Utility functions for working with data
+    
+```python-repl
+# pandas
+>>> %timeit big_ts + 1
+242 ms ± 3.58 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+>>> %timeit big_ts.vbt + 1
+3.32 ms ± 19.7 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
+```
+    
+- Utility functions for working with arrays and pandas objects
     - NumPy-like broadcasting for pandas, among other features.
+    
+```python-repl
+# pandas
+>>> pd.Series([1, 2, 3]) + pd.DataFrame([[1, 2, 3]])
+   0  1  2
+0  2  4  6
+
+>>> pd.Series([1, 2, 3]).vbt + pd.DataFrame([[1, 2, 3]])
+   0  1  2
+0  2  3  4
+1  3  4  5
+2  4  5  6
+```
+    
 - Functions for working with time series - `vbt.tseries`
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
     - Drawdown analysis
+
+```python-repl
+>>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns().plot()
+```
+
+![drawdowns.png](img/drawdowns.png)
+
 - Functions for working with signals - `vbt.signals`
     - Entry, exit and random signal generation, ranking and distance functions
     - Stop loss, trailing stop and take profit signal generation
+    
+```python-repl
+>>> pd.Series([False, True, True, True]).vbt.signals.first()
+0    False
+1     True
+2    False
+3    False
+dtype: bool
+```
+    
 - Functions for working with returns - `vbt.returns`
     - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
+
+```python-repl
+>>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
+5.515130702591433
+```
+    
 - Class for modeling portfolio performance
     - Accepts signals, orders, and custom order function
     - Provides metrics and tools for analyzing returns, orders, trades and positions
+    
+```python-repl
+>>> order_price = pd.Series([1, 2, 3, 2, 1])
+>>> order_size = pd.Series([1, -1, 1, -1, 0])
+>>> portfolio = vbt.Portfolio.from_orders(order_price, order_size, freq='1D')
+>>> portfolio.trades.plot()
+```
+
+![trades.png](img/trades.png)
+    
 - Technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each indicator offers methods for generating signals and plotting
     - Each indicator allows arbitrary parameter combinations, from arrays to Cartesian products
     - Indicator factory for building complex technical indicators in a simple way
+    
+```python-repl
+>>> vbt.MA.from_params(pd.Series([1, 2, 3]), window=[2, 3], 
+...      ewm=[False, True], param_product=True).ma
+ma_window               2               3          
+ma_ewm    False      True  False     True 
+0           NaN       NaN   NaN       NaN
+1           1.5  1.750000   NaN       NaN
+2           2.5  2.615385   2.0  2.428571
+``` 
+    
 - Interactive Plotly-based widgets to visualize backtest results
     - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data

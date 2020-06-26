@@ -71,7 +71,7 @@ class BaseEvents(Records):
 
             price = pd.Series([1, 2, 3, 2, 1])
             orders = pd.Series([1, -1, 1, -1, 0])
-            portfolio = vbt.Portfolio.from_orders(price, orders, init_capital=100, freq='1D')
+            portfolio = vbt.Portfolio.from_orders(price, orders, freq='1D')
 
             portfolio.trades.plot()
             ```
