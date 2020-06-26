@@ -1,4 +1,4 @@
-"""Main class for modeling portfolio performance.
+"""Main class for modeling portfolio and measuring its performance.
 
 The job of the `Portfolio` class is to create a series of positions allocated 
     against a cash component, produce an equity curve, incorporate basic transaction costs 
@@ -25,185 +25,230 @@ a custom order function. The results are then automatically passed to the constr
 The `Portfolio` class offers numerous properties for measuring the performance of a strategy. 
 They can be categorized as follows:
 
-* Time series indexed by time, such as `Portfolio.equity`.
+* Time series indexed by time, such as `Portfolio.returns`.
 * Metrics indexed by columns, such as `Portfolio.total_profit`.
 * Group objects with own time series and metrics, such as `Portfolio.positions`.
 
 ### Caching
 
-Each property is cached, thus properties can effectively build upon each other. 
-
-Take for example the `Portfolio.max_drawdown` property: it depends upon `Portfolio.drawdown`,
-which in turn depends upon `Portfolio.equity`, and so on. Without caching, `Portfolio.max_drawdown` 
-would have re-calculated everything starting from equity, each time.
+Each property is cached, thus properties can effectively build upon each other, without side effects.
 
 !!! note
-    `Portfolio` class is meant to be immutable due to caching, thus each public attribute is
-    marked as read-only. To change an attribute, you need to create a new Portfolio instance.
-    
-### Property hierarchy
+    Due to caching, `Portfolio` class is meant to be atomic and immutable, thus each public attribute
+    is marked as read-only. To change any parameter, you need to create a new `Portfolio` instance.
 
-All those properties are building a hierarchy with time series and metrics as leafs, and group 
-objects as nodes. By implementing custom cachable property classes `vectorbt.portfolio.common.timeseries_property` 
-and `vectorbt.portfolio.common.metric_property`, we are also able to encode information into each property, 
-such as the full name of a metric and its display format. And by defining the group properties with 
-`vectorbt.portfolio.common.group_property`, we are able to define gateaway points that can be easily traversed.
+## Indexing
 
-```plaintext
-Portfolio
-+-- @timeseries_property
-+-- @metric_property
-+-- @records_property
-+-- ...
-+-- @group_property
-    +-- @timeseries_property
-    +-- @metric_property
-    +-- @records_property
-    +-- ...
+In addition, you can use pandas indexing on the `Portfolio` class itself, which forwards
+indexing operation to each `__init__` argument with pandas type:
+
+```python-repl
+>>> import vectorbt as vbt
+>>> import numpy as np
+>>> import pandas as pd
+>>> from numba import njit
+>>> from datetime import datetime
+
+>>> index = pd.Index([
+...     datetime(2020, 1, 1),
+...     datetime(2020, 1, 2),
+...     datetime(2020, 1, 3),
+...     datetime(2020, 1, 4),
+...     datetime(2020, 1, 5)
+... ])
+>>> price = pd.Series([1, 2, 3, 2, 1], index=index, name='a')
+>>> orders = pd.DataFrame({
+...     'a': [np.inf, 0, 0, 0, 0],
+...     'b': [1, 1, 1, 1, -np.inf],
+...     'c': [np.inf, -np.inf, np.inf, -np.inf, np.inf]
+... }, index=index)
+>>> portfolio = vbt.Portfolio.from_orders(price, orders, init_capital=100)
+
+>>> print(portfolio.equity)
+                a      b           c
+2020-01-01  100.0  100.0  100.000000
+2020-01-02  200.0  101.0  200.000000
+2020-01-03  300.0  103.0  200.000000
+2020-01-04  200.0  100.0  133.333333
+2020-01-05  100.0   96.0  133.333333
+>>> print(portfolio['a'].equity)
+2020-01-01    100.0
+2020-01-02    200.0
+2020-01-03    300.0
+2020-01-04    200.0
+2020-01-05    100.0
+Name: a, dtype: float64
 ```
 
-This way, the `Portfolio` class acts as an extendable tree data structure for properties with 
-annotations. Instead of hard-coding the list of available time series and metrics with something 
-like `_PERFORMANCE_METRICS_PROPS`, we can call `Portfolio.traverse_properties` and build the list on the fly.
-
 !!! note
-    Hierarchy and annotations are only visible when traversing the class, not the class instance.
-    To add a new attribute to the hierarchy, you need to subclass `Portfolio` and define your
-    properties there. Each property must be a subclass of `vectorbt.utils.decorators.custom_property`.
-    
-```py
-import vectorbt as vbt
-import numpy as np
-import pandas as pd
-from numba import njit
-from datetime import datetime
-index = pd.Index([
-    datetime(2018, 1, 1),
-    datetime(2018, 1, 2),
-    datetime(2018, 1, 3),
-    datetime(2018, 1, 4),
-    datetime(2018, 1, 5)
-])
-price = pd.Series([1, 2, 3, 2, 1], index=index, name='a')
-```"""
+    Changing index (time axis) is not supported."""
 
 import numpy as np
 import pandas as pd
-from datetime import timedelta
-from scipy import stats
 
-from vectorbt import timeseries, accessors, defaults
-from vectorbt.utils import checks, reshape_fns
-from vectorbt.utils.config import merge_kwargs
+from vectorbt import tseries, defaults
+from vectorbt.utils import checks
+from vectorbt.utils.decorators import cached_property
+from vectorbt.base import reshape_fns
+from vectorbt.base.indexing import PandasIndexer
+from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.portfolio import nb
-from vectorbt.portfolio.records import Orders, Trades, Positions
-from vectorbt.portfolio.enums import OrderRecord, TradeRecord, PositionRecord
-from vectorbt.portfolio.common import (
-    TSRArrayWrapper,
-    timeseries_property,
-    metric_property,
-    records_property,
-    group_property,
-    PropertyTraverser
-)
+from vectorbt.records import Orders, Trades, Positions, Drawdowns
 
 
-class Portfolio(PropertyTraverser):
-    """Class for building a portfolio and measuring its performance.
+def _indexing_func(obj, pd_indexing_func):
+    """Perform indexing on `Portfolio`."""
+    if obj.wrapper.ndim == 1:
+        raise Exception("Indexing on Series is not supported")
+
+    n_rows = len(obj.wrapper.index)
+    n_cols = len(obj.wrapper.columns)
+    col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
+    col_mapper = pd_indexing_func(col_mapper)
+    if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
+        raise Exception("Changing index (time axis) is not supported")
+    new_cols = col_mapper.values[0]
+
+    # Array-like params
+    def index_arraylike_param(param):
+        if np.asarray(param).ndim > 0:
+            param = reshape_fns.broadcast_to_axis_of(param, obj.main_price, 1)
+            param = param[new_cols]
+        return param
+
+    factor_returns = obj.factor_returns
+    if factor_returns is not None:
+        if checks.is_frame(factor_returns):
+            factor_returns = reshape_fns.broadcast_to(factor_returns, obj.main_price)
+            factor_returns = pd_indexing_func(factor_returns)
+
+    # Create new Portfolio instance
+    return obj.__class__(
+        pd_indexing_func(obj.main_price),
+        obj.init_capital.iloc[new_cols],
+        pd_indexing_func(obj.orders),  # Orders class supports indexing
+        pd_indexing_func(obj.cash),
+        pd_indexing_func(obj.shares),
+        freq=obj.freq,
+        year_freq=obj.year_freq,
+        levy_alpha=index_arraylike_param(obj.levy_alpha),
+        risk_free=index_arraylike_param(obj.risk_free),
+        required_return=index_arraylike_param(obj.required_return),
+        cutoff=index_arraylike_param(obj.cutoff),
+        factor_returns=factor_returns
+    )
+
+
+class Portfolio(PandasIndexer):
+    """Class for modeling portfolio and measuring its performance.
 
     Args:
-        price (pandas_like): Main price of the asset.
-        init_capital (int or float): The initial capital.
-        order_records (array_like): Records of type `vectorbt.portfolio.enums.OrderRecord`.
+        main_price (pandas_like): Main price of the asset.
+        init_capital (int, float or pd.Series): The initial capital.
+
+            If `pd.Series`, must have the same index as columns in `main_price`.
+        orders (vectorbt.records.orders.Orders): Order records.
         cash (pandas_like): Cash held at each time step.
+
+            Must have the same metadata as `main_price`.
         shares (pandas_like): Shares held at each time step.
-        data_freq (any): Data frequency in case `price.index` is not datetime-like. 
 
-            Will be passed to `pandas.to_timedelta`.
-        year_freq (any): Year frequency. Will be passed to `pandas.to_timedelta`.
-        risk_free (float): Constant risk-free return throughout the period.
-        required_return (float): Minimum acceptance return of the investor.
-        cutoff (float): Decimal representing the percentage cutoff for the bottom percentile of returns.
-        factor_returns (pandas_like): Benchmark return to compare returns against. 
+            Must have the same metadata as `main_price`.
+        freq (any): Index frequency in case `main_price.index` is not datetime-like.
+        year_freq (any): Year frequency for working with returns.
+        levy_alpha (float or array_like): Scaling relation (Levy stability exponent).
+        risk_free (float or array_like): Constant risk-free return throughout the period.
+        required_return (float or array_like): Minimum acceptance return of the investor.
+        cutoff (float or array_like): Decimal representing the percentage cutoff for the
+                bottom percentile of returns.
+        factor_returns (array_like): Benchmark return to compare returns against. Will broadcast.
 
-            If set, will be broadcasted to the shape of `price`.
-
-    For defaults, see `vectorbt.defaults.portfolio`.
+            By default it's `None`, but it's required by some return-based metrics.
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
         The `__init__` method is reserved for indexing purposes.
 
-        All array objects must have the same metadata as `price`."""
+        All array objects must have the same metadata as `main_price`."""
 
-    def __init__(self, price, init_capital, order_records, cash, shares, data_freq=None,
-                 year_freq=None, risk_free=None, required_return=None, cutoff=None, factor_returns=None):
+    def __init__(self, main_price, init_capital, orders, cash, shares, freq=None, year_freq=None,
+                 levy_alpha=None, risk_free=None, required_return=None, cutoff=None,
+                 factor_returns=None):
         # Perform checks
-        checks.assert_type(price, (pd.Series, pd.DataFrame))
-        checks.assert_type(order_records, np.ndarray)
-        checks.assert_same_shape(order_records, OrderRecord, axis=(1, 0))
-        checks.assert_same_meta(price, cash)
-        checks.assert_same_meta(price, shares)
+        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
+        if checks.is_frame(main_price):
+            checks.assert_type(init_capital, pd.Series)
+            checks.assert_same(main_price.columns, init_capital.index)
+        else:
+            checks.assert_ndim(init_capital, 0)
+        checks.assert_same_meta(main_price, cash)
+        checks.assert_same_meta(main_price, shares)
 
-        # Main parameters
-        self._price = price
+        # Store passed arguments
+        self._main_price = main_price
         self._init_capital = init_capital
-        self._order_records = order_records
+        self._orders = orders
         self._cash = cash
         self._shares = shares
 
-        # Other parameters
-        if data_freq is None:
-            data_freq = price.vbt.timeseries.timedelta
-        else:
-            data_freq = pd.to_timedelta(data_freq)
-        self._data_freq = data_freq
-        year_freq = defaults.portfolio['year_freq'] if year_freq is None else year_freq
-        year_freq = pd.to_timedelta(year_freq)
+        freq = main_price.vbt.tseries(freq=freq).freq
+        if freq is None:
+            raise Exception("Couldn't parse the frequency of index. You must set `freq`.")
+        self._freq = freq
+
+        year_freq = main_price.vbt.returns(year_freq=year_freq).year_freq
+        if freq is None:
+            raise Exception("You must set `year_freq`.")
         self._year_freq = year_freq
-        self._ann_factor = year_freq / data_freq
+
+        # Parameters
+        self._levy_alpha = defaults.portfolio['levy_alpha'] if levy_alpha is None else levy_alpha
         self._risk_free = defaults.portfolio['risk_free'] if risk_free is None else risk_free
         self._required_return = defaults.portfolio['required_return'] if required_return is None else required_return
         self._cutoff = defaults.portfolio['cutoff'] if cutoff is None else cutoff
-        if factor_returns is not None:
-            factor_returns = reshape_fns.broadcast_to(factor_returns, price)
-        self._factor_returns = factor_returns
+        self._factor_returns = defaults.portfolio['factor_returns'] if factor_returns is None else factor_returns
 
         # Supercharge
-        self.wrapper = TSRArrayWrapper.from_obj(price)
+        PandasIndexer.__init__(self, _indexing_func)
+        self.wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
 
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, price, entries, exits, size=np.inf, entry_price=None, exit_price=None, init_capital=None,
-                     fees=None, fixed_fees=None, slippage=None, accumulate=False, broadcast_kwargs={}, **kwargs):
+    def from_signals(cls, main_price, entries, exits, size=np.inf, entry_price=None, exit_price=None,
+                     init_capital=None, fees=None, fixed_fees=None, slippage=None, accumulate=False,
+                     broadcast_kwargs={}, freq=None, **kwargs):
         """Build portfolio from entry and exit signals.
 
         At each entry signal in `entries`, buys `size` of shares for `entry_price` to enter
-        a position. At each exit signal in `exits`, sells everything for `exit_price` 
+        a position. At each exit signal in `exits`, sells everything for `exit_price`
         to exit the position. Accumulation of orders is disabled by default.
 
         Args:
-            price (pandas_like): Main price of the asset, such as close.
+            main_price (pandas_like): Main price of the asset, such as close.
             entries (array_like): Boolean array of entry signals.
             exits (array_like): Boolean array of exit signals.
-            size (int, float or array_like): The amount of shares to order. 
+            size (int, float or array_like): The amount of shares to order.
 
                 To buy/sell everything, set the size to `numpy.inf`.
-            entry_price (array_like): Entry price. Defaults to `price`.
-            exit_price (array_like): Exit price. Defaults to `price`.
-            init_capital (int or float): The initial capital.
+            entry_price (array_like): Entry price. Defaults to `main_price`.
+            exit_price (array_like): Exit price. Defaults to `main_price`.
+            init_capital (int, float or array_like): The initial capital.
+
+                If array, should match the number of columns.
             fees (float or array_like): Fees in percentage of the order value.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
             slippage (float or array_like): Slippage in percentage of price.
-            accumulate (bool): If `accumulate` is `True`, entering the market when already 
+            accumulate (bool): If `accumulate` is `True`, entering the market when already
                 in the market will be allowed to increase a position.
+            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
+            freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All array-like arguments will be broadcasted together using `vectorbt.utils.reshape_fns.broadcast` 
-        with `broadcast_kwargs`. At the end, all array objects will have the same metadata.
+        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
+        At the end, they will have the same metadata.
 
         Example:
             Portfolio from various signal sequences:
@@ -222,36 +267,29 @@ class Portfolio(PropertyTraverser):
             ...     price, entries, exits, size=10,
             ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
 
-            >>> print(portfolio.order_records)
-               Column  Index  Size  Price      Fees  Side
-            0     0.0    0.0  10.0  1.001  1.025025   0.0
-            1     1.0    0.0  10.0  1.001  1.025025   0.0
-            2     1.0    1.0  10.0  1.998  1.049950   1.0
-            3     1.0    2.0  10.0  3.003  1.075075   0.0
-            4     1.0    3.0  10.0  1.998  1.049950   1.0
-            5     1.0    4.0  10.0  1.001  1.025025   0.0
-            6     2.0    0.0  10.0  1.001  1.025025   0.0
-            >>> print(portfolio.shares)
-                           a     b     c
-            2018-01-01  10.0  10.0  10.0
-            2018-01-02  10.0   0.0  10.0
-            2018-01-03  10.0  10.0  10.0
-            2018-01-04  10.0   0.0  10.0
-            2018-01-05  10.0  10.0  10.0
-            >>> print(portfolio.cash)
-                                a           b          c
-            2018-01-01  88.964975   88.964975  88.964975
-            2018-01-02  88.964975  107.895025  88.964975
-            2018-01-03  88.964975   76.789950  88.964975
-            2018-01-04  88.964975   95.720000  88.964975
-            2018-01-05  88.964975   84.684975  88.964975
+            >>> print(portfolio.orders.records)
+               col  idx  size  price      fees  side
+            0    0    0  10.0  1.001  1.025025     0
+            1    1    0  10.0  1.001  1.025025     0
+            2    1    1  10.0  1.998  1.049950     1
+            3    1    2  10.0  3.003  1.075075     0
+            4    1    3  10.0  1.998  1.049950     1
+            5    1    4  10.0  1.001  1.025025     0
+            6    2    0  10.0  1.001  1.025025     0
+            >>> print(portfolio.equity)
+                                 a           b           c
+            2020-01-01   98.964975   98.964975   98.964975
+            2020-01-02  108.964975  107.895025  108.964975
+            2020-01-03  118.964975  106.789950  118.964975
+            2020-01-04  108.964975   95.720000  108.964975
+            2020-01-05   98.964975   94.684975   98.964975
             ```
         """
         # Get defaults
         if entry_price is None:
-            entry_price = price
+            entry_price = main_price
         if exit_price is None:
-            exit_price = price
+            exit_price = main_price
         if init_capital is None:
             init_capital = defaults.portfolio['init_capital']
         if fees is None:
@@ -262,18 +300,21 @@ class Portfolio(PropertyTraverser):
             slippage = defaults.portfolio['slippage']
 
         # Perform checks
-        checks.assert_type(price, (pd.Series, pd.DataFrame))
+        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
         checks.assert_dtype(entries, np.bool_)
         checks.assert_dtype(exits, np.bool_)
 
         # Broadcast inputs
-        price, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage = \
-            reshape_fns.broadcast(price, entries, exits, size, entry_price, exit_price, fees,
-                                  fixed_fees, slippage, **broadcast_kwargs, writeable=True)
+        main_price, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage = \
+            reshape_fns.broadcast(
+                main_price, entries, exits, size, entry_price, exit_price, fees,
+                fixed_fees, slippage, **broadcast_kwargs, writeable=True)
+        target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
+        init_capital = np.broadcast_to(init_capital, (target_shape[1],))
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_from_signals_nb(
-            reshape_fns.to_2d(price, raw=True).shape,
+            target_shape,
             init_capital,
             reshape_fns.to_2d(entries, raw=True),
             reshape_fns.to_2d(exits, raw=True),
@@ -286,85 +327,82 @@ class Portfolio(PropertyTraverser):
             accumulate)
 
         # Bring to the same meta
-        cash = price.vbt.wrap(cash)
-        shares = price.vbt.wrap(shares)
+        wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        cash = wrapper.wrap(cash)
+        shares = wrapper.wrap(shares)
+        orders = Orders(order_records, main_price, freq=freq)
+        if checks.is_series(main_price):
+            init_capital = init_capital[0]
+        else:
+            init_capital = wrapper.wrap_reduced(init_capital)
 
-        return cls(price, init_capital, order_records, cash, shares, **kwargs)
+        return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 
     @classmethod
-    def from_orders(cls, price, order_size, order_price=None, init_capital=None, fees=None, fixed_fees=None,
-                    slippage=None, is_target=False, broadcast_kwargs={}, **kwargs):
+    def from_orders(cls, main_price, order_size, order_price=None, init_capital=None, fees=None, fixed_fees=None,
+                    slippage=None, is_target=False, broadcast_kwargs={}, freq=None, **kwargs):
         """Build portfolio from orders.
 
-        Starting with initial capital `init_capital`, at each time step, orders the number 
-        of shares specified in `order_size` for `order_price`. 
+        Starting with initial capital `init_capital`, at each time step, orders the number
+        of shares specified in `order_size` for `order_price`.
 
         Args:
-            price (pandas_like): Main price of the asset, such as close.
-            order_size (int, float or array_like): The amount of shares to order. 
+            main_price (pandas_like): Main price of the asset, such as close.
+            order_size (int, float or array_like): The amount of shares to order.
 
-                If the size is positive, this is the number of shares to buy. 
+                If the size is positive, this is the number of shares to buy.
                 If the size is negative, this is the number of shares to sell.
                 To buy/sell everything, set the size to `numpy.inf`.
-            order_price (array_like): Order price. Defaults to `price`.
-            init_capital (int or float): The initial capital.
+            order_price (array_like): Order price. Defaults to `main_price`.
+            init_capital (int, float or array_like): The initial capital.
+
+                If array, should match the number of columns.
             fees (float or array_like): Fees in percentage of the order value.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
             slippage (float or array_like): Slippage in percentage of `order_price`.
             is_target (bool): If `True`, will order the difference between current and target size.
+            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
+            freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All array-like arguments will be broadcasted together using `vectorbt.utils.reshape_fns.broadcast` 
-        with `broadcast_kwargs`. At the end, all array objects will have the same metadata.
+        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
+        At the end, they will have the same metadata.
 
         Example:
             Portfolio from various order sequences:
             ```python-repl
-            >>> orders = pd.DataFrame({
-            ...     'a': [np.inf, 0, 0, 0, 0],
-            ...     'b': [1, 1, 1, 1, -np.inf],
-            ...     'c': [np.inf, -np.inf, np.inf, -np.inf, np.inf]
-            ... }, index=index)
-            >>> portfolio = vbt.Portfolio.from_orders(price, orders, 
+            >>> portfolio = vbt.Portfolio.from_orders(price, orders,
             ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
 
-            >>> print(portfolio.order_records)
-                Column  Index        Size  Price      Fees  Side
-            0      0.0    0.0   98.654463  1.001  1.246883   0.0
-            1      1.0    0.0    1.000000  1.001  1.002502   0.0
-            2      1.0    1.0    1.000000  2.002  1.005005   0.0
-            3      1.0    2.0    1.000000  3.003  1.007507   0.0
-            4      1.0    3.0    1.000000  2.002  1.005005   0.0
-            5      1.0    4.0    4.000000  0.999  1.009990   1.0
-            6      2.0    0.0   98.654463  1.001  1.246883   0.0
-            7      2.0    1.0   98.654463  1.998  1.492779   1.0
-            8      2.0    2.0   64.646521  3.003  1.485334   0.0
-            9      2.0    3.0   64.646521  1.998  1.322909   1.0
-            10     2.0    4.0  126.398131  1.001  1.316311   0.0
-            >>> print(portfolio.shares)
-                                a    b           c
-            2018-01-01  98.654463  1.0   98.654463
-            2018-01-02  98.654463  2.0    0.000000
-            2018-01-03  98.654463  3.0   64.646521
-            2018-01-04  98.654463  4.0    0.000000
-            2018-01-05  98.654463  0.0  126.398131
-            >>> print(portfolio.cash)
-                          a          b             c
-            2018-01-01  0.0  97.996498  0.000000e+00
-            2018-01-02  0.0  94.989493  1.956188e+02
-            2018-01-03  0.0  90.978985  2.842171e-14
-            2018-01-04  0.0  87.971980  1.278408e+02
-            2018-01-05  0.0  90.957990  0.000000e+00
+            >>> print(portfolio.orders.records)
+                col  idx        size  price      fees  side
+            0     0    0   98.654463  1.001  1.246883     0
+            1     1    0    1.000000  1.001  1.002502     0
+            2     1    1    1.000000  2.002  1.005005     0
+            3     1    2    1.000000  3.003  1.007507     0
+            4     1    3    1.000000  2.002  1.005005     0
+            5     1    4    4.000000  0.999  1.009990     1
+            6     2    0   98.654463  1.001  1.246883     0
+            7     2    1   98.654463  1.998  1.492779     1
+            8     2    2   64.646521  3.003  1.485334     0
+            9     2    3   64.646521  1.998  1.322909     1
+            10    2    4  126.398131  1.001  1.316311     0
+            >>> print(portfolio.equity)
+                                 a          b           c
+            2020-01-01   98.654463  98.996498   98.654463
+            2020-01-02  197.308925  98.989493  195.618838
+            2020-01-03  295.963388  99.978985  193.939564
+            2020-01-04  197.308925  95.971980  127.840840
+            2020-01-05   98.654463  90.957990  126.398131
             ```
         """
         # Get defaults
         if order_price is None:
-            order_price = price
+            order_price = main_price
         if init_capital is None:
             init_capital = defaults.portfolio['init_capital']
-        init_capital = float(init_capital)
         if fees is None:
             fees = defaults.portfolio['fees']
         if fixed_fees is None:
@@ -373,16 +411,18 @@ class Portfolio(PropertyTraverser):
             slippage = defaults.portfolio['slippage']
 
         # Perform checks
-        checks.assert_type(price, (pd.Series, pd.DataFrame))
+        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
 
         # Broadcast inputs
-        price, order_size, order_price, fees, fixed_fees, slippage = \
-            reshape_fns.broadcast(price, order_size, order_price, fees, fixed_fees,
+        main_price, order_size, order_price, fees, fixed_fees, slippage = \
+            reshape_fns.broadcast(main_price, order_size, order_price, fees, fixed_fees,
                                   slippage, **broadcast_kwargs, writeable=True)
+        target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
+        init_capital = np.broadcast_to(init_capital, (target_shape[1],))
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_from_orders_nb(
-            reshape_fns.to_2d(price, raw=True).shape,
+            target_shape,
             init_capital,
             reshape_fns.to_2d(order_size, raw=True),
             reshape_fns.to_2d(order_price, raw=True),
@@ -392,33 +432,45 @@ class Portfolio(PropertyTraverser):
             is_target)
 
         # Bring to the same meta
-        cash = price.vbt.wrap(cash)
-        shares = price.vbt.wrap(shares)
+        wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        cash = wrapper.wrap(cash)
+        shares = wrapper.wrap(shares)
+        orders = Orders(order_records, main_price, freq=freq)
+        if checks.is_series(main_price):
+            init_capital = init_capital[0]
+        else:
+            init_capital = wrapper.wrap_reduced(init_capital)
 
-        return cls(price, init_capital, order_records, cash, shares, **kwargs)
+        return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 
     @classmethod
-    def from_order_func(cls, price, order_func_nb, *args, init_capital=None, **kwargs):
+    def from_order_func(cls, main_price, order_func_nb, *args, init_capital=None, freq=None, **kwargs):
         """Build portfolio from a custom order function.
 
-        Starting with initial capital `init_capital`, iterates over shape `price.shape`, and for 
-        each data point, generates an order using `order_func_nb`. This way, you can specify order 
+        Starting with initial capital `init_capital`, iterates over shape `main_price.shape`, and for
+        each data point, generates an order using `order_func_nb`. This way, you can specify order
         size, price and transaction costs dynamically (for example, based on the current balance).
 
-        To iterate over a bigger shape than `price`, you should tile/repeat `price` to the desired shape.
+        To iterate over a bigger shape than `main_price`, you should tile/repeat `main_price` to the desired shape.
 
         Args:
-            price (pandas_like): Main price of the asset, such as close.
+            main_price (pandas_like): Main price of the asset, such as close.
 
                 Must be a pandas object.
-            order_func_nb (function): Function that returns an order. 
+            order_func_nb (function): Function that returns an order.
 
                 See `vectorbt.portfolio.enums.Order`.
             *args: Arguments passed to `order_func_nb`.
-            init_capital (int or float): The initial capital.
+            init_capital (int, float or array_like): The initial capital.
+
+                If array, should match the number of columns.
+            freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.defaults.portfolio`.
+
+        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
+        At the end, they will have the same metadata.
 
         !!! note
             `order_func_nb` must be Numba-compiled.
@@ -426,7 +478,7 @@ class Portfolio(PropertyTraverser):
         Example:
             Portfolio from buying daily:
             ```python-repl
-            >>> from vectorbt.portfolio.nb import Order
+            >>> from vectorbt.portfolio import Order
 
             >>> @njit
             ... def order_func_nb(col, i, run_cash, run_shares, price):
@@ -435,79 +487,79 @@ class Portfolio(PropertyTraverser):
             >>> portfolio = vbt.Portfolio.from_order_func(
             ...     price, order_func_nb, price.values, init_capital=100)
 
-            >>> print(portfolio.order_records)
-               Column  Index  Size  Price   Fees  Side
-            0     0.0    0.0  10.0   1.01  1.101   0.0
-            1     0.0    1.0  10.0   2.02  1.202   0.0
-            2     0.0    2.0  10.0   3.03  1.303   0.0
-            3     0.0    3.0  10.0   2.02  1.202   0.0
-            4     0.0    4.0  10.0   1.01  1.101   0.0
-            >>> print(portfolio.shares)
-            2018-01-01    10.0
-            2018-01-02    20.0
-            2018-01-03    30.0
-            2018-01-04    40.0
-            2018-01-05    50.0
-            Name: a, dtype: float64
-            >>> print(portfolio.cash)
-            2018-01-01    88.799
-            2018-01-02    67.397
-            2018-01-03    35.794
-            2018-01-04    14.392
-            2018-01-05     3.191
+            >>> print(portfolio.orders.records)
+               col  idx  size  price   fees  side
+            0    0    0  10.0   1.01  1.101     0
+            1    0    1  10.0   2.02  1.202     0
+            2    0    2  10.0   3.03  1.303     0
+            3    0    3  10.0   2.02  1.202     0
+            4    0    4  10.0   1.01  1.101     0
+            >>> print(portfolio.equity)
+            2020-01-01     98.799
+            2020-01-02    107.397
+            2020-01-03    125.794
+            2020-01-04     94.392
+            2020-01-05     53.191
             Name: a, dtype: float64
             ```
         """
         # Get defaults
         if init_capital is None:
             init_capital = defaults.portfolio['init_capital']
-        init_capital = float(init_capital)
 
         # Perform checks
-        checks.assert_type(price, (pd.Series, pd.DataFrame))
+        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
         checks.assert_numba_func(order_func_nb)
+
+        # Broadcast inputs
+        target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
+        init_capital = np.broadcast_to(init_capital, (target_shape[1],))
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_nb(
-            reshape_fns.to_2d(price, raw=True).shape,
+            target_shape,
             init_capital,
             order_func_nb,
             *args)
 
         # Bring to the same meta
-        cash = price.vbt.wrap(cash)
-        shares = price.vbt.wrap(shares)
+        wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        cash = wrapper.wrap(cash)
+        shares = wrapper.wrap(shares)
+        orders = Orders(order_records, main_price, freq=freq)
+        if checks.is_series(main_price):
+            init_capital = init_capital[0]
+        else:
+            init_capital = wrapper.wrap_reduced(init_capital)
 
-        return cls(price, init_capital, order_records, cash, shares, **kwargs)
+        return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 
-    # ############# Passed properties ############# #
+    # ############# Passed arguments ############# #
 
     @property
     def init_capital(self):
         """Initial capital."""
         return self._init_capital
 
-    @timeseries_property('Price')
-    def price(self):
-        """Price per share at each time step."""
-        return self._price
+    @cached_property
+    def main_price(self):
+        """Price per share series."""
+        return self._main_price
 
-    @timeseries_property('Cash')
+    @cached_property
     def cash(self):
-        """Cash held at each time step."""
+        """Cash series."""
         return self._cash
 
-    @timeseries_property('Shares')
+    @cached_property
     def shares(self):
-        """Shares held at each time step."""
+        """Shares series."""
         return self._shares
 
-    # ############# User-defined parameters ############# #
-
     @property
-    def data_freq(self):
-        """Data frequency."""
-        return self._data_freq
+    def freq(self):
+        """Index frequency."""
+        return self._freq
 
     @property
     def year_freq(self):
@@ -515,9 +567,9 @@ class Portfolio(PropertyTraverser):
         return self._year_freq
 
     @property
-    def ann_factor(self):
-        """Annualization factor."""
-        return self._ann_factor
+    def levy_alpha(self):
+        """Scaling relation (Levy stability exponent)."""
+        return self._levy_alpha
 
     @property
     def risk_free(self):
@@ -539,277 +591,260 @@ class Portfolio(PropertyTraverser):
         """Benchmark return to compare returns against."""
         return self._factor_returns
 
-    # ############# Orders ############# #
+    # ############# Records ############# #
 
-    @records_property('Order records')
-    def order_records(self):
-        """Records of type `vectorbt.portfolio.enums.OrderRecord`."""
-        return self.wrapper.wrap_records(self._order_records, OrderRecord)
-
-    @group_property('Orders', Orders)
+    @cached_property
     def orders(self):
-        """Time series and metrics based on order records.
-        
-        See `vectorbt.portfolio.records.Orders`."""
-        return Orders(self.wrapper, self._order_records)
+        """Order records.
 
-    # ############# Trades ############# #
+        See `vectorbt.records.orders.Orders`."""
+        return self._orders
 
-    @records_property('Trade records')
-    def trade_records(self):
-        """Records of type `vectorbt.portfolio.enums.TradeRecord`."""
-        trade_records = nb.trade_records_nb(self.price.vbt.to_2d_array(), self._order_records)
-        return self.wrapper.wrap_records(trade_records, TradeRecord)
-
-    @group_property('Trades', Trades)
+    @cached_property
     def trades(self):
-        """Time series and metrics based on trade records.
-        
-        See `vectorbt.portfolio.records.Trades`."""
-        return Trades(self.wrapper, self.trade_records.vbt.to_array())
+        """Trade records.
 
-    # ############# Positions ############# #
+        See `vectorbt.records.events.Trades`."""
+        return Trades.from_orders(self.orders)
 
-    @records_property('Position records')
-    def position_records(self):
-        """Records of type `vectorbt.portfolio.enums.PositionRecord`."""
-        position_records = nb.position_records_nb(self.price.vbt.to_2d_array(), self._order_records)
-        return self.wrapper.wrap_records(position_records, PositionRecord)
-
-    @group_property('Positions', Positions)
+    @cached_property
     def positions(self):
-        """Time series and metrics based on position records.
-        
-        See `vectorbt.portfolio.records.Positions`."""
-        return Positions(self.wrapper, self.position_records.vbt.to_array())
+        """Position records.
+
+        See `vectorbt.records.events.Positions`."""
+        return Positions.from_orders(self.orders)
 
     # ############# Equity ############# #
 
-    @timeseries_property('Equity')
+    @cached_property
     def equity(self):
-        """Equity."""
-        equity = self.cash.vbt.to_2d_array() + self.shares.vbt.to_2d_array() * self.price.vbt.to_2d_array()
-        return self.wrapper.wrap(equity)
+        """Portfolio equity series."""
+        return self.cash.vbt + self.shares.vbt * self.main_price.vbt
 
-    @metric_property('Total profit')
+    @cached_property
+    def final_equity(self):
+        """Final equity."""
+        return self.wrapper.wrap_reduced(self.equity.values[-1])
+
+    @cached_property
+    def peak_equity(self):
+        """Peak equity."""
+        return self.equity.vbt.tseries.max()
+
+    @cached_property
+    def dip_equity(self):
+        """Dip equity."""
+        return self.equity.vbt.tseries.min()
+
+    @cached_property
     def total_profit(self):
         """Total profit."""
-        total_profit = self.equity.vbt.to_2d_array()[-1, :] - self.init_capital
-        return self.wrapper.wrap_reduced(total_profit)
-
-    # ############# Returns ############# #
-
-    @timeseries_property('Returns')
-    def returns(self):
-        """Portfolio returns."""
-        returns = timeseries.nb.pct_change_nb(self.equity.vbt.to_2d_array())
-        return self.wrapper.wrap(returns)
-
-    @timeseries_property('Daily returns')
-    def daily_returns(self):
-        """Daily returns."""
-        if self.returns.index.inferred_freq == 'D':
-            return self.returns
-        return self.returns.vbt.timeseries.resample_apply('D', nb.total_return_apply_func_nb)
-
-    @timeseries_property('Annual returns')
-    def annual_returns(self):
-        """Annual returns."""
-        if self.returns.index.inferred_freq == 'Y':
-            return self.returns
-        return self.returns.vbt.timeseries.resample_apply('Y', nb.total_return_apply_func_nb)
-
-    @metric_property('Total return')
-    def total_return(self):
-        """Total return."""
-        total_return = reshape_fns.to_1d(self.total_profit, raw=True) / self.init_capital
-        return self.wrapper.wrap_reduced(total_return)
+        equity = self.equity.vbt.to_2d_array()[-1, :]
+        init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
+        return self.wrapper.wrap_reduced(equity - init_capital)
 
     # ############# Drawdown ############# #
 
-    @timeseries_property('Drawdown')
+    @cached_property
     def drawdown(self):
-        """Relative decline from a peak."""
+        """Drawdown series."""
         equity = self.equity.vbt.to_2d_array()
-        drawdown = 1 - equity / timeseries.nb.expanding_max_nb(equity)
-        return self.wrapper.wrap(drawdown)
+        return self.wrapper.wrap(equity / tseries.nb.expanding_max_nb(equity) - 1)
 
-    @metric_property('Max drawdown')
+    @cached_property
     def max_drawdown(self):
-        """Total maximum drawdown (MDD)."""
-        max_drawdown = np.max(self.drawdown.vbt.to_2d_array(), axis=0)
-        return self.wrapper.wrap_reduced(max_drawdown)
+        """Max drawdown."""
+        return self.drawdown.vbt.tseries.min()
 
-    # ############# Risk and performance metrics ############# #
+    @cached_property
+    def drawdowns(self):
+        """Drawdown records.
 
-    @timeseries_property('Cumulative returns')
-    def cum_returns(self):
-        """Cumulative returns."""
-        return self.wrapper.wrap(nb.cum_returns_nb(self.returns.vbt.to_2d_array()))
+        See `vectorbt.records.drawdowns.Drawdowns`."""
+        return Drawdowns.from_ts(self.equity, freq=self.freq)
 
-    @metric_property('Annualized return')
+    # ############# Returns ############# #
+
+    @cached_property
+    def buy_and_hold_return(self):
+        """Total return of buying and holding.
+
+        !!! note:
+            Does not take into account fees and slippage. For this, create a separate portfolio."""
+        returns = tseries.nb.pct_change_nb(self.main_price.vbt.to_2d_array())
+        return self.wrapper.wrap(returns).vbt.returns.total()
+
+    @cached_property
+    def returns(self):
+        """Portfolio return series."""
+        equity = self.equity.vbt.to_2d_array()
+        returns = tseries.nb.pct_change_nb(equity)
+        init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
+        returns[0, :] = (equity[0, :] - init_capital) / init_capital
+        return self.wrapper.wrap(returns)
+
+    @cached_property
+    def daily_returns(self):
+        """See `vectorbt.returns.accessors.Returns_Accessor.daily`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .daily()
+
+    @cached_property
+    def annual_returns(self):
+        """See `vectorbt.returns.accessors.Returns_Accessor.annual`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .annual()
+
+    @cached_property
+    def cumulative_returns(self):
+        """See `vectorbt.returns.accessors.Returns_Accessor.cumulative`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .cumulative()
+
+    @cached_property
+    def total_return(self):
+        """See `vectorbt.returns.accessors.Returns_Accessor.total`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .total()
+
+    @cached_property
     def annualized_return(self):
-        """Mean annual growth rate of returns. 
+        """See `vectorbt.returns.accessors.Returns_Accessor.annualized_return`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .annualized_return()
 
-        This is equivilent to the compound annual growth rate."""
-        return self.wrapper.wrap_reduced(nb.annualized_return_nb(
-            self.returns.vbt.to_2d_array(),
-            self.ann_factor))
-
-    @metric_property('Annualized volatility')
+    @cached_property
     def annualized_volatility(self):
-        """Annualized volatility of a strategy."""
-        return self.wrapper.wrap_reduced(nb.annualized_volatility_nb(
-            self.returns.vbt.to_2d_array(),
-            self.ann_factor))
+        """See `vectorbt.returns.accessors.Returns_Accessor.annualized_volatility`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .annualized_volatility(levy_alpha=self.levy_alpha)
 
-    @metric_property('Calmar ratio')
+    @cached_property
     def calmar_ratio(self):
-        """Calmar ratio, or drawdown ratio, of a strategy."""
-        return self.wrapper.wrap_reduced(nb.calmar_ratio_nb(
-            self.returns.vbt.to_2d_array(),
-            reshape_fns.to_1d(self.annualized_return, raw=True),
-            reshape_fns.to_1d(self.max_drawdown, raw=True),
-            self.ann_factor))
+        """See `vectorbt.returns.accessors.Returns_Accessor.calmar_ratio`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .calmar_ratio()
 
-    @metric_property('Omega ratio')
+    @cached_property
     def omega_ratio(self):
-        """Omega ratio of a strategy."""
-        return self.wrapper.wrap_reduced(nb.omega_ratio_nb(
-            self.returns.vbt.to_2d_array(),
-            self.ann_factor,
-            risk_free=self.risk_free,
-            required_return=self.required_return))
+        """See `vectorbt.returns.accessors.Returns_Accessor.omega_ratio`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .omega_ratio(risk_free=self.risk_free, required_return=self.required_return)
 
-    @metric_property('Sharpe ratio')
+    @cached_property
     def sharpe_ratio(self):
-        """Sharpe ratio of a strategy."""
-        return self.wrapper.wrap_reduced(nb.sharpe_ratio_nb(
-            self.returns.vbt.to_2d_array(),
-            self.ann_factor,
-            risk_free=self.risk_free))
+        """See `vectorbt.returns.accessors.Returns_Accessor.sharpe_ratio`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .sharpe_ratio(risk_free=self.risk_free)
 
-    @metric_property('Downside risk')
+    @cached_property
     def downside_risk(self):
-        """Downside deviation below a threshold."""
-        return self.wrapper.wrap_reduced(nb.downside_risk_nb(
-            self.returns.vbt.to_2d_array(),
-            self.ann_factor,
-            required_return=self.required_return))
+        """See `vectorbt.returns.accessors.Returns_Accessor.downside_risk`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .downside_risk(required_return=self.required_return)
 
-    @metric_property('Sortino ratio')
+    @cached_property
     def sortino_ratio(self):
-        """Sortino ratio of a strategy."""
-        return self.wrapper.wrap_reduced(nb.sortino_ratio_nb(
-            self.returns.vbt.to_2d_array(),
-            reshape_fns.to_1d(self.downside_risk, raw=True),
-            self.ann_factor,
-            required_return=self.required_return))
+        """See `vectorbt.returns.accessors.Returns_Accessor.sortino_ratio`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .sortino_ratio(required_return=self.required_return)
 
-    @metric_property('Information ratio')
+    @cached_property
     def information_ratio(self):
-        """Information ratio of a strategy.
+        """See `vectorbt.returns.accessors.Returns_Accessor.information_ratio`."""
+        if self.factor_returns is None:
+            raise Exception("This property requires factor_returns to be set")
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .information_ratio(self.factor_returns)
 
-        !!! note
-            `factor_returns` must be set."""
-        checks.assert_not_none(self.factor_returns)
-
-        return self.wrapper.wrap_reduced(nb.information_ratio_nb(
-            self.returns.vbt.to_2d_array(),
-            self.factor_returns.vbt.to_2d_array()))
-
-    @metric_property('Beta')
+    @cached_property
     def beta(self):
-        """Beta.
+        """See `vectorbt.returns.accessors.Returns_Accessor.beta`."""
+        if self.factor_returns is None:
+            raise Exception("This property requires factor_returns to be set")
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .beta(self.factor_returns)
 
-        !!! note
-            `factor_returns` must be set."""
-        checks.assert_not_none(self.factor_returns)
-
-        return self.wrapper.wrap_reduced(nb.beta_nb(
-            self.returns.vbt.to_2d_array(),
-            self.factor_returns.vbt.to_2d_array(),
-            risk_free=self.risk_free))
-
-    @metric_property('Annualized alpha')
+    @cached_property
     def alpha(self):
-        """Annualized alpha.
+        """See `vectorbt.returns.accessors.Returns_Accessor.alpha`."""
+        if self.factor_returns is None:
+            raise Exception("This property requires factor_returns to be set")
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .alpha(self.factor_returns, risk_free=self.risk_free)
 
-        !!! note
-            `factor_returns` must be set."""
-        checks.assert_not_none(self.factor_returns)
-
-        return self.wrapper.wrap_reduced(nb.alpha_nb(
-            self.returns.vbt.to_2d_array(),
-            self.factor_returns.vbt.to_2d_array(),
-            reshape_fns.to_1d(self.beta, raw=True),
-            self.ann_factor,
-            risk_free=self.risk_free))
-
-    @metric_property('Tail ratio')
+    @cached_property
     def tail_ratio(self):
-        """Ratio between the right (95%) and left tail (5%)."""
-        return self.wrapper.wrap_reduced(nb.tail_ratio_nb(self.returns.vbt.to_2d_array()))
+        """See `vectorbt.returns.accessors.Returns_Accessor.tail_ratio`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .tail_ratio()
 
-    @metric_property('Value at risk')
+    @cached_property
     def value_at_risk(self):
-        """Value at risk (VaR) of a returns stream."""
-        return self.wrapper.wrap_reduced(nb.value_at_risk_nb(
-            self.returns.vbt.to_2d_array(),
-            cutoff=self.cutoff))
+        """See `vectorbt.returns.accessors.Returns_Accessor.value_at_risk`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .value_at_risk(cutoff=self.cutoff)
 
-    @metric_property('Conditional value at risk')
+    @cached_property
     def conditional_value_at_risk(self):
-        """Conditional value at risk (CVaR) of a returns stream."""
-        return self.wrapper.wrap_reduced(nb.conditional_value_at_risk_nb(
-            self.returns.vbt.to_2d_array(),
-            cutoff=self.cutoff))
+        """See `vectorbt.returns.accessors.Returns_Accessor.conditional_value_at_risk`."""
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .conditional_value_at_risk(cutoff=self.cutoff)
 
-    @metric_property('Capture ratio')
+    @cached_property
     def capture(self):
-        """Capture ratio.
+        """See `vectorbt.returns.accessors.Returns_Accessor.capture`."""
+        if self.factor_returns is None:
+            raise Exception("This property requires factor_returns to be set")
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .capture(self.factor_returns)
 
-        !!! note
-            `factor_returns` must be set."""
-        checks.assert_not_none(self.factor_returns)
-
-        return self.wrapper.wrap_reduced(nb.capture_nb(
-            self.returns.vbt.to_2d_array(),
-            self.factor_returns.vbt.to_2d_array(),
-            self.ann_factor))
-
-    @metric_property('Capture ratio (positive)')
+    @cached_property
     def up_capture(self):
-        """Capture ratio for periods when the benchmark return is positive.
+        """See `vectorbt.returns.accessors.Returns_Accessor.up_capture`."""
+        if self.factor_returns is None:
+            raise Exception("This property requires factor_returns to be set")
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .up_capture(self.factor_returns)
 
-        !!! note
-            `factor_returns` must be set."""
-        checks.assert_not_none(self.factor_returns)
-
-        return self.wrapper.wrap_reduced(nb.up_capture_nb(
-            self.returns.vbt.to_2d_array(),
-            self.factor_returns.vbt.to_2d_array(),
-            self.ann_factor))
-
-    @metric_property('Capture ratio (negative)')
+    @cached_property
     def down_capture(self):
-        """Capture ratio for periods when the benchmark return is negative.
+        """See `vectorbt.returns.accessors.Returns_Accessor.down_capture`."""
+        if self.factor_returns is None:
+            raise Exception("This property requires factor_returns to be set")
+        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
+            .down_capture(self.factor_returns)
 
-        !!! note
-            `factor_returns` must be set."""
-        checks.assert_not_none(self.factor_returns)
+    # ############# Stats ############# #
 
-        return self.wrapper.wrap_reduced(nb.down_capture_nb(
-            self.returns.vbt.to_2d_array(),
-            self.factor_returns.vbt.to_2d_array(),
-            self.ann_factor))
+    @cached_property
+    def stats(self):
+        """Compute various interesting statistics on this portfolio."""
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-    @metric_property('Skewness')
-    def skew(self):
-        """Skewness of returns."""
-        return self.wrapper.wrap_reduced(stats.skew(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))
-
-    @metric_property('Kurtosis')
-    def kurtosis(self):
-        """Kurtosis of returns."""
-        return self.wrapper.wrap_reduced(stats.kurtosis(self.returns.vbt.to_2d_array(), axis=0, nan_policy='omit'))
+        return pd.Series({
+            'Start': self.wrapper.index[0],
+            'End': self.wrapper.index[-1],
+            'Duration': self.wrapper.shape[0] * self.freq,
+            'Time in Position [%]': self.positions.coverage * 100,
+            'Total Profit': self.total_profit,
+            'Total Return [%]': self.total_return * 100,
+            'Buy & Hold Return [%]': self.buy_and_hold_return * 100,
+            'Max. Drawdown [%]': -self.max_drawdown * 100,
+            'Avg. Drawdown [%]': -self.drawdowns.avg_drawdown * 100,
+            'Max. Drawdown Duration': self.drawdowns.max_duration,
+            'Avg. Drawdown Duration': self.drawdowns.avg_duration,
+            'Num. Trades': self.trades.count,
+            'Win Rate [%]': self.trades.win_rate * 100,
+            'Best Trade [%]': self.trades.max_return * 100,
+            'Worst Trade [%]': self.trades.min_return * 100,
+            'Avg. Trade [%]': self.trades.avg_return * 100,
+            'Max. Trade Duration': self.trades.max_duration,
+            'Avg. Trade Duration': self.trades.avg_duration,
+            'Expectancy': self.trades.expectancy,
+            'SQN': self.trades.sqn,
+            'Sharpe Ratio': self.sharpe_ratio,
+            'Sortino Ratio': self.sortino_ratio,
+            'Calmar Ratio': self.calmar_ratio
+        })

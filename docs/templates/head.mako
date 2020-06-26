@@ -6,20 +6,18 @@
         display: block;
         font-size: 2em;
         font-weight: bold;
-        color: #555;
-        padding-bottom: .5em;
-        border-bottom: 1px solid silver;
+        color: white;
     }
     .homelink:hover {
-        color: inherit;
+        color: #e82;
     }
     .homelink img {
-        max-width:20%;
-        max-height: 5em;
+        max-width: 128px;
+        max-height: 128px;
         margin: auto;
         margin-bottom: .3em;
     }
 </%def>
 
 <style>${homelink()}</style>
-<link rel="icon" href="https://github.com/polakowo/vectorbt/blob/master/logo.png?raw=true">
+<link rel="icon" href="https://github.com/polakowo/vectorbt/blob/master/logo.ico?raw=true">

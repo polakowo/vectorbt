@@ -1,11 +1,10 @@
-"""Utilities for combining arrays."""
+"""Functions for combining arrays."""
 
 import numpy as np
-import pandas as pd
 from numba import njit
 from numba.typed import List
 
-from vectorbt.utils import reshape_fns
+from vectorbt.base import reshape_fns
 
 
 def apply_and_concat_one(n, apply_func, *args, **kwargs):

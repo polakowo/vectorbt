@@ -3,11 +3,10 @@
 import numpy as np
 import plotly.graph_objects as go
 import matplotlib.pyplot as plt
-import inspect
 
 from vectorbt.widgets.common import DefaultFigureWidget
-from vectorbt.utils import checks, reshape_fns
-from collections import namedtuple
+from vectorbt.utils import checks
+from vectorbt.base import reshape_fns
 
 
 # ############# Indicator ############# #
@@ -99,17 +98,10 @@ class Bar(DefaultFigureWidget):
             trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Bar`.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            One trace:
-            ```py
-            vbt.Bar(['x', 'y'], trace_names='a', data=[1, 2])
-            ```
-            ![](/vectorbt/docs/img/Bar.png)
-
-            Multiple traces:
             ```py
             vbt.Bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
             ```
-            ![](/vectorbt/docs/img/Bar_mult.png)
+            ![](/vectorbt/docs/img/Bar.png)
             """
         if isinstance(trace_names, str) or trace_names is None:
             trace_names = [trace_names]

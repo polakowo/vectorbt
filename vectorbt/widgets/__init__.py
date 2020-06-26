@@ -1,4 +1,4 @@
-"""Package for creating and displaying widgets.
+"""Modules for creating and displaying widgets.
 
 Figure widgets enable interactive data visualization in Jupyter Notebook and JupyterLab environments.
 
@@ -9,5 +9,3 @@ from vectorbt.widgets import accessors, basic, common
 
 from vectorbt.widgets.common import DefaultFigureWidget
 from vectorbt.widgets.basic import Indicator, Bar, Scatter, Histogram, Heatmap
-
-

@@ -1,13 +1,9 @@
-"""Package with utilities."""
+"""Modules with utilities."""
 
 from vectorbt.utils import (
-    accessors,
     checks,
-    combine_fns,
+    colors,
     config,
     decorators,
-    index_fns,
-    indexing,
-    pdoc,
-    reshape_fns
+    docs
 )

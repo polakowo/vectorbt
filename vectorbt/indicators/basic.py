@@ -13,53 +13,32 @@ import vectorbt as vbt
 ticker = yf.Ticker("BTC-USD")
 price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
 
-price['Close'].vbt.timeseries.plot()
+price['Close'].vbt.tseries.plot()
 ```
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
 import numpy as np
-import pandas as pd
-from numba import njit
-from numba.core.types import UniTuple, f8, i8, b1, DictType, Tuple
 import itertools
 import plotly.graph_objects as go
 
-from vectorbt import timeseries, defaults
-from vectorbt.utils import checks, reshape_fns
-from vectorbt.utils.pdoc import fix_class_for_pdoc
+from vectorbt import tseries, defaults
+from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.docs import fix_class_for_docs
+from vectorbt.base import reshape_fns
 from vectorbt.indicators.factory import IndicatorFactory
+from vectorbt.indicators import nb
 
 # ############# MA ############# #
 
 
-@njit(cache=True)
-def ma_caching_nb(ts, windows, ewms):
-    """Numba-compiled caching function for `MA`."""
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                ma = timeseries.nb.ewm_mean_nb(ts, windows[i], minp=windows[i])
-            else:
-                ma = timeseries.nb.rolling_mean_nb(ts, windows[i], minp=windows[i])
-            cache_dict[h] = ma
-    return cache_dict
-
-
-@njit(cache=True)
-def ma_apply_func_nb(ts, window, ewm, cache_dict):
-    """Numba-compiled apply function for `MA`."""
-    h = hash((window, ewm))
-    return cache_dict[h]
-
-
 MA = IndicatorFactory(
+    class_name='MA',
+    module_name=__name__,
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['ma'],
     name='ma'
-).from_apply_func(ma_apply_func_nb, caching_func=ma_caching_nb)
+).from_apply_func(nb.ma_apply_nb, caching_func=nb.ma_caching_nb)
 
 
 class MA(MA):
@@ -68,7 +47,8 @@ class MA(MA):
 
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp).
 
-    Use `MA.from_params` or `MA.from_combinations` methods to run the indicator."""
+    Use `MA.from_params` or `MA.from_combs` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
         """Calculate moving average `MA.ma` from time series `ts` and parameters `window` and `ewm`.
@@ -103,7 +83,7 @@ class MA(MA):
         return super().from_params(ts, window, ewm, **kwargs)
 
     @classmethod
-    def from_combinations(cls, ts, windows, r, ewm=False, names=None, **kwargs):
+    def from_combs(cls, ts, windows, r, ewm=False, names=None, **kwargs):
         """Create multiple `MA` combinations according to `itertools.combinations`.
 
         Args:
@@ -118,7 +98,7 @@ class MA(MA):
             tuple of MA
         Example:
             ```python-repl
-            >>> fast_ma, slow_ma = vbt.MA.from_combinations(price['Close'], 
+            >>> fast_ma, slow_ma = vbt.MA.from_combs(price['Close'],
             ...     [10, 20, 30], 2, ewm=[False, False, True], names=['fast', 'slow'])
 
             >>> print(fast_ma.ma)
@@ -190,19 +170,19 @@ class MA(MA):
             it for indexing as follows:
 
             ```py
-            fig = price['Close'].vbt.timeseries.plot(name='Price')
+            fig = price['Close'].vbt.tseries.plot(name='Price')
             fig = entry_signals[(10, False, 20, False)]\\
-                .vbt.signals.plot_markers(price['Close'], signal_type='entry', fig=fig)
+                .vbt.signals.plot_as_markers(price['Close'], signal_type='entry', fig=fig)
             fig = exit_signals[(10, False, 20, False)]\\
-                .vbt.signals.plot_markers(price['Close'], signal_type='exit', fig=fig)
+                .vbt.signals.plot_as_markers(price['Close'], signal_type='exit', fig=fig)
 
             fig.show()
             ```
-            ![](/vectorbt/docs/img/MA_from_combinations.png)
+            ![](/vectorbt/docs/img/MA_from_combs.png)
         """
 
         if names is None:
-            names = ['ma' + str(i+1) for i in range(r)]
+            names = ['ma' + str(i + 1) for i in range(r)]
         windows, ewm = reshape_fns.broadcast(windows, ewm, writeable=True)
         cache_dict = cls.from_params(ts, windows, ewm=ewm, return_cache=True, **kwargs)
         param_lists = zip(*itertools.combinations(zip(windows, ewm), r))
@@ -224,63 +204,41 @@ class MA(MA):
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             ma[(10, False)].plot()
             ```
 
             ![](/vectorbt/docs/img/MA.png)"""
-        checks.assert_type(self.ts, pd.Series)
-        checks.assert_type(self.ma, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        ts_trace_kwargs = {**dict(
+        ts_trace_kwargs = merge_kwargs(dict(
             name=f'Price ({self.name})'
-        ), **ts_trace_kwargs}
-        ma_trace_kwargs = {**dict(
+        ), ts_trace_kwargs)
+        ma_trace_kwargs = merge_kwargs(dict(
             name=f'MA ({self.name})'
-        ), **ma_trace_kwargs}
+        ), ma_trace_kwargs)
 
-        fig = self.ts.vbt.timeseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.timeseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.tseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
 
-fix_class_for_pdoc(MA)
+fix_class_for_docs(MA)
 
 # ############# MSTD ############# #
 
 
-@njit(cache=True)
-def mstd_caching_nb(ts, windows, ewms):
-    """Numba-compiled caching function for `MSTD`."""
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                mstd = timeseries.nb.ewm_std_nb(ts, windows[i], minp=windows[i])
-            else:
-                mstd = timeseries.nb.rolling_std_nb(ts, windows[i], minp=windows[i])
-            cache_dict[h] = mstd
-    return cache_dict
-
-
-@njit(cache=True)
-def mstd_apply_func_nb(ts, window, ewm, cache_dict):
-    """Numba-compiled apply function for `MSTD`."""
-    h = hash((window, ewm))
-    return cache_dict[h]
-
-
 MSTD = IndicatorFactory(
+    class_name='MSTD',
+    module_name=__name__,
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['mstd'],
     name='mstd'
-).from_apply_func(mstd_apply_func_nb, caching_func=mstd_caching_nb)
+).from_apply_func(nb.mstd_apply_nb, caching_func=nb.mstd_caching_nb)
 
 
 class MSTD(MSTD):
@@ -288,6 +246,7 @@ class MSTD(MSTD):
     in order to predict how volatile the price may be in the future.
 
     Use `MSTD.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
         """Calculate moving standard deviation `MSTD.mstd` from time series `ts` and 
@@ -332,50 +291,32 @@ class MSTD(MSTD):
             mstd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSTD.mstd`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             mstd[(10, False)].plot()
             ```
 
             ![](/vectorbt/docs/img/MSTD.png)"""
-        checks.assert_type(self.mstd, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        mstd_trace_kwargs = {**dict(
+        mstd_trace_kwargs = merge_kwargs(dict(
             name=f'MSTD ({self.name})'
-        ), **mstd_trace_kwargs}
+        ), mstd_trace_kwargs)
 
-        fig = self.mstd.vbt.timeseries.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.mstd.vbt.tseries.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
 
-fix_class_for_pdoc(MSTD)
+fix_class_for_docs(MSTD)
 
 # ############# BollingerBands ############# #
 
 
-@njit(cache=True)
-def bb_caching_nb(ts, windows, ewms, alphas):
-    """Numba-compiled caching function for `BollingerBands`."""
-    ma_cache_dict = ma_caching_nb(ts, windows, ewms)
-    mstd_cache_dict = mstd_caching_nb(ts, windows, ewms)
-    return ma_cache_dict, mstd_cache_dict
-
-
-@njit(cache=True)
-def bb_apply_func_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
-    """Numba-compiled apply function for `BollingerBands`."""
-    # Calculate lower, middle and upper bands
-    h = hash((window, ewm))
-    ma = np.copy(ma_cache_dict[h])
-    mstd = np.copy(mstd_cache_dict[h])
-    # # (MA + Kσ), MA, (MA - Kσ)
-    return ma, ma + alpha * mstd, ma - alpha * mstd
-
-
 BollingerBands = IndicatorFactory(
+    class_name='BollingerBands',
+    module_name=__name__,
     ts_names=['ts'],
     param_names=['window', 'ewm', 'alpha'],
     output_names=['ma', 'upper_band', 'lower_band'],
@@ -386,7 +327,7 @@ BollingerBands = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap(
             (self.upper_band.values - self.lower_band.values) / self.ma.values)
     )
-).from_apply_func(bb_apply_func_nb, caching_func=bb_caching_nb)
+).from_apply_func(nb.bb_apply_nb, caching_func=nb.bb_caching_nb)
 
 
 class BollingerBands(BollingerBands):
@@ -397,6 +338,7 @@ class BollingerBands(BollingerBands):
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp).
 
     Use `BollingerBands.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window=20, ewm=False, alpha=2, **kwargs):
         """Calculate moving average `BollingerBands.ma`, upper Bollinger Band `BollingerBands.upper_band`,
@@ -513,91 +455,57 @@ class BollingerBands(BollingerBands):
             lower_band_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.lower_band`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             bb[(10, False, 2)].plot()
             ```
 
             ![](/vectorbt/docs/img/BollingerBands.png)"""
-        checks.assert_type(self.ts, pd.Series)
-        checks.assert_type(self.ma, pd.Series)
-        checks.assert_type(self.upper_band, pd.Series)
-        checks.assert_type(self.lower_band, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        lower_band_trace_kwargs = {**dict(
+        lower_band_trace_kwargs = merge_kwargs(dict(
             name=f'Lower Band ({self.name})',
             line=dict(color='grey', width=0),
             showlegend=False
-        ), **lower_band_trace_kwargs}
-        upper_band_trace_kwargs = {**dict(
+        ), lower_band_trace_kwargs)
+        upper_band_trace_kwargs = merge_kwargs(dict(
             name=f'Upper Band ({self.name})',
             line=dict(color='grey', width=0),
             fill='tonexty',
             fillcolor='rgba(128, 128, 128, 0.25)',
             showlegend=False
-        ), **upper_band_trace_kwargs}  # default kwargs
-        ma_trace_kwargs = {**dict(
+        ), upper_band_trace_kwargs)  # default kwargs
+        ma_trace_kwargs = merge_kwargs(dict(
             name=f'MA ({self.name})',
             line=dict(color=defaults.layout['colorway'][1])
-        ), **ma_trace_kwargs}
-        ts_trace_kwargs = {**dict(
+        ), ma_trace_kwargs)
+        ts_trace_kwargs = merge_kwargs(dict(
             name=f'Price ({self.name})',
             line=dict(color=defaults.layout['colorway'][0])
-        ), **ts_trace_kwargs}
+        ), ts_trace_kwargs)
 
-        fig = self.lower_band.vbt.timeseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.upper_band.vbt.timeseries.plot(trace_kwargs=upper_band_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.timeseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ts.vbt.timeseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.lower_band.vbt.tseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.upper_band.vbt.tseries.plot(trace_kwargs=upper_band_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.tseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
 
-fix_class_for_pdoc(BollingerBands)
+fix_class_for_docs(BollingerBands)
 
 # ############# RSI ############# #
 
 
-@njit(cache=True)
-def rsi_caching_nb(ts, windows, ewms):
-    """Numba-compiled caching function for `RSI`."""
-    delta = timeseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
-    up, down = delta.copy(), delta.copy()
-    up = timeseries.nb.set_by_mask_nb(up, up < 0, 0)
-    down = np.abs(timeseries.nb.set_by_mask_nb(down, down > 0, 0))
-    # Cache
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                roll_up = timeseries.nb.ewm_mean_nb(up, windows[i], minp=windows[i])
-                roll_down = timeseries.nb.ewm_mean_nb(down, windows[i], minp=windows[i])
-            else:
-                roll_up = timeseries.nb.rolling_mean_nb(up, windows[i], minp=windows[i])
-                roll_down = timeseries.nb.rolling_mean_nb(down, windows[i], minp=windows[i])
-            roll_up = timeseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
-            roll_down = timeseries.nb.prepend_nb(roll_down, 1, np.nan)
-            cache_dict[h] = roll_up, roll_down
-    return cache_dict
-
-
-@njit(cache=True)
-def rsi_apply_func_nb(ts, window, ewm, cache_dict):
-    """Numba-compiled apply function for `RSI`."""
-    h = hash((window, ewm))
-    roll_up, roll_down = cache_dict[h]
-    return 100 - 100 / (1 + roll_up / roll_down)
-
-
 RSI = IndicatorFactory(
+    class_name='RSI',
+    module_name=__name__,
     ts_names=['ts'],
     param_names=['window', 'ewm'],
     output_names=['rsi'],
     name='rsi'
-).from_apply_func(rsi_apply_func_nb, caching_func=rsi_caching_nb)
+).from_apply_func(nb.rsi_apply_nb, caching_func=nb.rsi_caching_nb)
 
 
 class RSI(RSI):
@@ -609,6 +517,7 @@ class RSI(RSI):
     See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp).
 
     Use `RSI.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window=14, ewm=False, **kwargs):
         """Calculate relative strength index `RSI.rsi` from time series `ts` and parameters `window` and `ewm`.
@@ -653,22 +562,21 @@ class RSI(RSI):
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `RSI.rsi`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             rsi[(10, False)].plot()
             ```
 
             ![](/vectorbt/docs/img/RSI.png)"""
-        checks.assert_type(self.rsi, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        rsi_trace_kwargs = {**dict(
+        rsi_trace_kwargs = merge_kwargs(dict(
             name=f'RSI ({self.name})'
-        ), **rsi_trace_kwargs}
+        ), rsi_trace_kwargs)
 
-        layout_kwargs = {**dict(yaxis=dict(range=[-5, 105])), **layout_kwargs}
-        fig = self.rsi.vbt.timeseries.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
+        layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
+        fig = self.rsi.vbt.tseries.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Fill void between levels
         fig.add_shape(
@@ -680,7 +588,7 @@ class RSI(RSI):
             x1=self.rsi.index[-1],
             y1=levels[1],
             fillcolor="purple",
-            opacity=0.1,
+            opacity=0.15,
             layer="below",
             line_width=0,
         )
@@ -688,43 +596,19 @@ class RSI(RSI):
         return fig
 
 
-fix_class_for_pdoc(RSI)
+fix_class_for_docs(RSI)
 
 # ############# Stochastic ############# #
 
 
-@njit(cache=True)
-def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
-    """Numba-compiled caching function for `Stochastic`."""
-    cache_dict = dict()
-    for i in range(k_windows.shape[0]):
-        h = hash(k_windows[i])
-        if h not in cache_dict:
-            roll_min = timeseries.nb.rolling_min_nb(low_ts, k_windows[i], minp=1) # min_periods=1
-            roll_max = timeseries.nb.rolling_max_nb(high_ts, k_windows[i], minp=1)
-            cache_dict[h] = roll_min, roll_max
-    return cache_dict
-
-
-@njit(cache=True)
-def stoch_apply_func_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
-    """Numba-compiled apply function for `Stochastic`."""
-    h = hash(k_window)
-    roll_min, roll_max = cache_dict[h]
-    percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
-    if d_ewm:
-        percent_d = timeseries.nb.ewm_mean_nb(percent_k, d_window, minp=d_window)
-    else:
-        percent_d = timeseries.nb.rolling_mean_nb(percent_k, d_window, minp=d_window)
-    return percent_k, percent_d
-
-
 Stochastic = IndicatorFactory(
+    class_name='Stochastic',
+    module_name=__name__,
     ts_names=['close_ts', 'high_ts', 'low_ts'],
     param_names=['k_window', 'd_window', 'd_ewm'],
     output_names=['percent_k', 'percent_d'],
     name='stoch'
-).from_apply_func(stoch_apply_func_nb, caching_func=stoch_caching_nb)
+).from_apply_func(nb.stoch_apply_nb, caching_func=nb.stoch_caching_nb)
 
 
 class Stochastic(Stochastic):
@@ -735,6 +619,7 @@ class Stochastic(Stochastic):
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
 
     Use `Stochastic.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, close_ts, high_ts=None, low_ts=None, k_window=14, d_window=3, d_ewm=False, **kwargs):
         """Calculate %K `Stochastic.percent_k` and %D `Stochastic.percent_d` from time series `close_ts`, 
@@ -798,6 +683,7 @@ class Stochastic(Stochastic):
              levels=(30, 70),
              percent_k_trace_kwargs={},
              percent_d_trace_kwargs={},
+             shape_kwargs={},
              fig=None,
              **layout_kwargs):
         """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
@@ -805,33 +691,32 @@ class Stochastic(Stochastic):
         Args:
             percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Stochastic.percent_k`.
             percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Stochastic.percent_d`.
+            shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zone between levels.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             stoch[(10, 2, False)].plot(levels=(20, 80))
             ```
 
             ![](/vectorbt/docs/img/Stochastic.png)"""
-        checks.assert_type(self.percent_k, pd.Series)
-        checks.assert_type(self.percent_d, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        percent_k_trace_kwargs = {**dict(
+        percent_k_trace_kwargs = merge_kwargs(dict(
             name=f'%K ({self.name})'
-        ), **percent_k_trace_kwargs}
-        percent_d_trace_kwargs = {**dict(
+        ), percent_k_trace_kwargs)
+        percent_d_trace_kwargs = merge_kwargs(dict(
             name=f'%D ({self.name})'
-        ), **percent_d_trace_kwargs}
+        ), percent_d_trace_kwargs)
 
-        layout_kwargs = {**dict(yaxis=dict(range=[-5, 105])), **layout_kwargs}
-        fig = self.percent_k.vbt.timeseries.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.percent_d.vbt.timeseries.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
+        layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
+        fig = self.percent_k.vbt.tseries.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.percent_d.vbt.tseries.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Plot levels
         # Fill void between levels
-        fig.add_shape(
+        shape_kwargs = merge_kwargs(dict(
             type="rect",
             xref="x",
             yref="y",
@@ -840,40 +725,23 @@ class Stochastic(Stochastic):
             x1=self.percent_k.index[-1],
             y1=levels[1],
             fillcolor="purple",
-            opacity=0.1,
+            opacity=0.15,
             layer="below",
             line_width=0,
-        )
+        ), shape_kwargs)
+        fig.add_shape(**shape_kwargs)
 
         return fig
 
 
-fix_class_for_pdoc(Stochastic)
+fix_class_for_docs(Stochastic)
 
 # ############# MACD ############# #
 
 
-@njit(cache=True)
-def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
-    """Numba-compiled caching function for `MACD`."""
-    return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
-
-
-@njit(cache=True)
-def macd_apply_func_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
-    """Numba-compiled apply function for `MACD`."""
-    h = hash((fast_window, macd_ewm))
-    fast_ma = cache_dict[h]
-    slow_ma = cache_dict[h]
-    macd_ts = fast_ma - slow_ma
-    if signal_ewm:
-        signal_ts = timeseries.nb.ewm_mean_nb(macd_ts, signal_window, minp=signal_window)
-    else:
-        signal_ts = timeseries.nb.rolling_mean_nb(macd_ts, signal_window, minp=signal_window)
-    return np.copy(fast_ma), np.copy(slow_ma), macd_ts, signal_ts
-
-
 MACD = IndicatorFactory(
+    class_name='MACD',
+    module_name=__name__,
     ts_names=['ts'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
     output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
@@ -881,7 +749,7 @@ MACD = IndicatorFactory(
     custom_outputs=dict(
         histogram=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
-).from_apply_func(macd_apply_func_nb, caching_func=macd_caching_nb)
+).from_apply_func(nb.macd_apply_nb, caching_func=nb.macd_caching_nb)
 
 
 class MACD(MACD):
@@ -891,6 +759,7 @@ class MACD(MACD):
     See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp).
 
     Use `MACD.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, fast_window=26, slow_window=12, signal_window=9, macd_ewm=True, signal_ewm=True, **kwargs):
         """Calculate fast moving average `MACD.fast_ma`, slow moving average `MACD.slow_ma`, MACD `MACD.macd`, 
@@ -1017,36 +886,33 @@ class MACD(MACD):
             histogram_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar` for `MACD.histogram`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             macd[(10, 20, 30, False, True)].plot()
             ```
 
             ![](/vectorbt/docs/img/MACD.png)"""
-        checks.assert_type(self.macd, pd.Series)
-        checks.assert_type(self.signal, pd.Series)
-        checks.assert_type(self.histogram, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        macd_trace_kwargs = {**dict(
+        macd_trace_kwargs = merge_kwargs(dict(
             name=f'MACD ({self.name})'
-        ), **macd_trace_kwargs}
-        signal_trace_kwargs = {**dict(
+        ), macd_trace_kwargs)
+        signal_trace_kwargs = merge_kwargs(dict(
             name=f'Signal ({self.name})'
-        ), **signal_trace_kwargs}
-        histogram_trace_kwargs = {**dict(
+        ), signal_trace_kwargs)
+        histogram_trace_kwargs = merge_kwargs(dict(
             name=f'Histogram ({self.name})',
             showlegend=False
-        ), **histogram_trace_kwargs}
+        ), histogram_trace_kwargs)
 
-        layout_kwargs = {**dict(bargap=0), **layout_kwargs}
-        fig = self.macd.vbt.timeseries.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.signal.vbt.timeseries.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
+        layout_kwargs = merge_kwargs(dict(bargap=0), layout_kwargs)
+        fig = self.macd.vbt.tseries.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.signal.vbt.tseries.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Plot histogram
         hist = self.histogram.values
-        hist_diff = timeseries.nb.diff_1d_nb(hist)
+        hist_diff = tseries.nb.diff_1d_nb(hist)
         marker_colors = np.full(hist.shape, np.nan, dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
@@ -1066,45 +932,19 @@ class MACD(MACD):
         return fig
 
 
-fix_class_for_pdoc(MACD)
+fix_class_for_docs(MACD)
 
 # ############# ATR ############# #
 
 
-@njit(cache=True)
-def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
-    """Numba-compiled caching function for `ATR`."""
-    # Calculate TR here instead of re-calculating it for each param in atr_apply_func_nb
-    tr0 = high_ts - low_ts
-    tr1 = np.abs(high_ts - timeseries.nb.fshift_nb(close_ts, 1))
-    tr2 = np.abs(low_ts - timeseries.nb.fshift_nb(close_ts, 1))
-    tr = timeseries.nb.nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
-
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                atr = timeseries.nb.ewm_mean_nb(tr, windows[i], minp=windows[i])
-            else:
-                atr = timeseries.nb.rolling_mean_nb(tr, windows[i], minp=windows[i])
-            cache_dict[h] = atr
-    return tr, cache_dict
-
-
-@njit(cache=True)
-def atr_apply_func_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
-    """Numba-compiled apply function for `ATR`."""
-    h = hash((window, ewm))
-    return tr, cache_dict[h]
-
-
 ATR = IndicatorFactory(
+    class_name='ATR',
+    module_name=__name__,
     ts_names=['close_ts', 'high_ts', 'low_ts'],
     param_names=['window', 'ewm'],
     output_names=['tr', 'atr'],
     name='atr'
-).from_apply_func(atr_apply_func_nb, caching_func=atr_caching_nb)
+).from_apply_func(nb.atr_apply_nb, caching_func=nb.atr_caching_nb)
 
 
 class ATR(ATR):
@@ -1114,6 +954,7 @@ class ATR(ATR):
     See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
 
     Use `ATR.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, close_ts, high_ts, low_ts, window, ewm=True, **kwargs):
         """Calculate true range `ATR.tr` and average true range `ATR.atr` from time series `close_ts`, 
@@ -1177,58 +1018,41 @@ class ATR(ATR):
             atr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.atr`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             atr[(10, False)].plot()
             ```
 
             ![](/vectorbt/docs/img/ATR.png)"""
-        checks.assert_type(self.tr, pd.Series)
-        checks.assert_type(self.atr, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        tr_trace_kwargs = {**dict(
+        tr_trace_kwargs = merge_kwargs(dict(
             name=f'TR ({self.name})'
-        ), **tr_trace_kwargs}
-        atr_trace_kwargs = {**dict(
+        ), tr_trace_kwargs)
+        atr_trace_kwargs = merge_kwargs(dict(
             name=f'ATR ({self.name})'
-        ), **atr_trace_kwargs}
+        ), atr_trace_kwargs)
 
-        fig = self.tr.vbt.timeseries.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.atr.vbt.timeseries.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.tr.vbt.tseries.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.atr.vbt.tseries.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
 
-fix_class_for_pdoc(ATR)
+fix_class_for_docs(ATR)
 
 # ############# OBV ############# #
 
 
-@njit(cache=True)
-def obv_custom_func_nb(close_ts, volume_ts):
-    """Numba-compiled custom calculation function for `OBV`."""
-    obv = np.full_like(close_ts, np.nan)
-    for col in range(close_ts.shape[1]):
-        cumsum = 0
-        for i in range(1, close_ts.shape[0]):
-            if np.isnan(close_ts[i, col]) or np.isnan(close_ts[i-1, col]) or np.isnan(volume_ts[i, col]):
-                continue
-            if close_ts[i, col] > close_ts[i-1, col]:
-                cumsum += volume_ts[i, col]
-            elif close_ts[i, col] < close_ts[i-1, col]:
-                cumsum += -volume_ts[i, col]
-            obv[i, col] = cumsum
-    return obv
-
-
 OBV = IndicatorFactory(
+    class_name='OBV',
+    module_name=__name__,
     ts_names=['close_ts', 'volume_ts'],
     param_names=[],
     output_names=['obv'],
     name='obv'
-).from_custom_func(obv_custom_func_nb)
+).from_custom_func(nb.obv_custom_func_nb)
 
 
 class OBV(OBV):
@@ -1238,6 +1062,7 @@ class OBV(OBV):
     See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp).
 
     Use `OBV.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, close_ts, volume_ts):
         """Calculate on-balance volume `OBV.obv` from time series `close_ts` and `volume_ts`, and no parameters.
@@ -1276,23 +1101,22 @@ class OBV(OBV):
             obv_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OBV.obv`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Returns:
-            vectorbt.widgets.common.DefaultFigureWidget
         Example:
             ```py
             obv.plot()
             ```
 
             ![](/vectorbt/docs/img/OBV.png)"""
-        checks.assert_type(self.obv, pd.Series)
+        if self.wrapper.ndim > 1:
+            raise Exception("You must select a column first")
 
-        obv_trace_kwargs = {**dict(
+        obv_trace_kwargs = merge_kwargs(dict(
             name=f'OBV ({self.name})'
-        ), **obv_trace_kwargs}
+        ), obv_trace_kwargs)
 
-        fig = self.obv.vbt.timeseries.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.obv.vbt.tseries.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
 
-fix_class_for_pdoc(OBV)
+fix_class_for_docs(OBV)

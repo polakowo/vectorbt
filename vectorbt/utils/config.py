@@ -5,8 +5,8 @@ class Config(dict):
     """A simple dict with (optionally) frozen keys."""
 
     def __init__(self, *args, frozen=True, **kwargs):
+        super().__init__(*args, **kwargs)
         self.frozen = frozen
-        self.update(*args, **kwargs)
         self.default_config = dict(self)
         for key, value in dict.items(self):
             if isinstance(value, dict):

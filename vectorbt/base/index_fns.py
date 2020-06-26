@@ -1,15 +1,29 @@
-"""Utilities for working with index/columns."""
+"""Functions for working with index/columns."""
 
 import numpy as np
 import pandas as pd
 from collections.abc import Iterable
 
+from vectorbt import defaults
 from vectorbt.utils import checks
+
+
+def get_index(arg, axis):
+    """Get index of `arg` by `axis`."""
+    checks.assert_value_in(axis, (0, 1))
+
+    if axis == 0:
+        return arg.index
+    else:
+        if checks.is_series(arg):
+            return pd.Index([arg.name])
+        else:
+            return arg.columns
 
 
 def index_from_values(values, name=None):
     """Create a new `pd.Index` with `name` by parsing an iterable `values`.
-    
+
     Each in `values` will correspond to an element in the new index."""
     checks.assert_type(values, Iterable)
 
@@ -27,6 +41,8 @@ def repeat_index(index, n):
     """Repeat each element in `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
+    if len(index) == 1 and index[0] is None:
+        return pd.Index(np.arange(n))
 
     return np.repeat(index, n)
 
@@ -35,6 +51,8 @@ def tile_index(index, n):
     """Tile the whole `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
+    if len(index) == 1 and index[0] is None:
+        return pd.Index(np.arange(n))
 
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
@@ -42,7 +60,7 @@ def tile_index(index, n):
 
 
 def stack_indexes(*indexes):
-    """Stack each index in `indexes` on top of each other."""
+    """Stack each index in `indexes` on top of each other, from top to bottom."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
         index1, index2 = new_index, indexes[i]
@@ -53,17 +71,25 @@ def stack_indexes(*indexes):
             index2 = pd.MultiIndex.from_arrays([index2])
 
         levels = []
-        for i in range(len(index1.names)):
+        for i in range(index1.nlevels):
             levels.append(index1.get_level_values(i))
-        for i in range(len(index2.names)):
+        for i in range(index2.nlevels):
             levels.append(index2.get_level_values(i))
 
         new_index = pd.MultiIndex.from_arrays(levels)
     return new_index
 
 
-def combine_indexes(*indexes):
-    """Combine each index in `indexes` using Cartesian product."""
+def combine_indexes(*indexes, ignore_single=None):
+    """Combine each index in `indexes` using Cartesian product.
+
+    If `ignore_single` is `True`, ignores indexes/columns with one value. If both are with one
+    value, will keep both regardless of `ignore_single`.
+
+    For defaults, see `vectorbt.defaults.broadcasting`."""
+    if ignore_single is None:
+        ignore_single = defaults.broadcasting['ignore_single']
+
     new_index = indexes[0]
     for i in range(1, len(indexes)):
         index1, index2 = new_index, indexes[i]
@@ -72,11 +98,14 @@ def combine_indexes(*indexes):
         if not isinstance(index2, pd.Index):
             index2 = pd.Index(index2)
 
-        if len(index1) == 1:
-            return index2
-        elif len(index2) == 1:
-            return index1
-
+        if ignore_single:
+            if len(index1) > 1 or len(index2) > 1:
+                if len(index1) == 1:
+                    new_index = index2
+                    continue
+                if len(index2) == 1:
+                    new_index = index1
+                    continue
         tuples1 = np.repeat(index1.to_numpy(), len(index2))
         tuples2 = np.tile(index2.to_numpy(), len(index1))
 
@@ -94,7 +123,7 @@ def combine_indexes(*indexes):
 
 
 def drop_levels(index, levels):
-    """Drop `levels` in `index` by name/position."""
+    """Softly drop `levels` in `index` by their name/position."""
     checks.assert_type(index, pd.MultiIndex)
 
     levels_to_drop = []
@@ -102,8 +131,13 @@ def drop_levels(index, levels):
         levels = [levels]
     for level in levels:
         if level in index.names:
-            levels_to_drop.append(level)
-    if len(levels_to_drop) < len(index.names):
+            if level not in levels_to_drop:
+                levels_to_drop.append(level)
+        elif isinstance(level, int):
+            if (level >= 0 and level < index.nlevels) or level == -1:
+                if level not in levels_to_drop:
+                    levels_to_drop.append(level)
+    if len(levels_to_drop) < index.nlevels:
         # Drop only if there will be some indexes left
         return index.droplevel(levels_to_drop)
     return index
@@ -148,14 +182,14 @@ def drop_redundant_levels(index):
                 if len(index.get_level_values(i)) == len(level):
                     levels_to_drop.append(i)
         # Remove redundant levels only if there are some non-redundant levels left
-        if len(levels_to_drop) < len(index.levels):
+        if len(levels_to_drop) < index.nlevels:
             return index.droplevel(levels_to_drop)
     return index
 
 
 def drop_duplicate_levels(index, keep='last'):
     """Drop levels in `index` with the same name and values.
-    
+
     Set `keep` to 'last' to keep last levels, otherwise 'first'."""
     if isinstance(index, pd.Index) and not isinstance(index, pd.MultiIndex):
         return index
@@ -164,9 +198,9 @@ def drop_duplicate_levels(index, keep='last'):
     levels = []
     levels_to_drop = []
     if keep == 'first':
-        r = range(0, len(index.levels))
+        r = range(0, index.nlevels)
     elif keep == 'last':
-        r = range(len(index.levels)-1, -1, -1)  # loop backwards
+        r = range(index.nlevels-1, -1, -1)  # loop backwards
     for i in r:
         level = (index.levels[i].name, tuple(index.get_level_values(i).to_numpy().tolist()))
         if level not in levels:
@@ -188,7 +222,7 @@ def align_index_to(index1, index2):
     if not isinstance(index2, pd.MultiIndex):
         index2 = pd.MultiIndex.from_arrays([index2])
     if index1.duplicated().any():
-        raise ValueError("Duplicates index values are not allowed for the first index")
+        raise Exception("Duplicates index values are not allowed for the first index")
 
     if pd.Index.equals(index1, index2):
         return pd.IndexSlice[:]
@@ -196,16 +230,16 @@ def align_index_to(index1, index2):
         if len(index1) == 1:
             return pd.IndexSlice[np.tile([0])]
         js = []
-        for i in range(len(index1.names)):
-            for j in range(len(index2.names)):
+        for i in range(index1.nlevels):
+            for j in range(index2.nlevels):
                 if index1.names[i] == index2.names[j]:
                     if np.array_equal(index1.levels[i], index2.levels[j]):
                         js.append(j)
                         break
-        if len(index1.names) == len(js):
+        if index1.nlevels == len(js):
             new_index = pd.MultiIndex.from_arrays([index2.get_level_values(j) for j in js])
             xsorted = np.argsort(index1)
             ypos = np.searchsorted(index1[xsorted], new_index)
             return pd.IndexSlice[xsorted[ypos]]
 
-    raise ValueError("Indexes could not be aligned together")
+    raise Exception("Indexes could not be aligned together")
