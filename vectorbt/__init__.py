@@ -488,10 +488,10 @@ Additionally, some accessors subclass other accessors building the following inh
 
 ```plaintext
 vbt.base.accessors.Base_SR/DFAccessor
-    \_ vbt.tseries.accessors.TimeSeries_SR/DFAccessor
-        \_ vbt.tseries.accessors.OHLCV_DFAccessor
-        \_ vbt.signals.accessors.Signals_SR/DFAccessor
-        \_ vbt.returns.accessors.Returns_SR/DFAccessor
+    -> vbt.tseries.accessors.TimeSeries_SR/DFAccessor
+        -> vbt.tseries.accessors.OHLCV_DFAccessor
+        -> vbt.signals.accessors.Signals_SR/DFAccessor
+        -> vbt.returns.accessors.Returns_SR/DFAccessor
 vbt.widgets.accessors.Bar_Accessor
 vbt.widgets.accessors.Scatter_Accessor
 vbt.widgets.accessors.Histogram_Accessor
