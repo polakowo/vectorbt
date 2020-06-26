@@ -11,7 +11,7 @@ from vectorbt.base.indexing import PandasIndexer
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.tseries.common import TSArrayWrapper, DatetimeTypes
-from vectorbt.records.main import Records
+from vectorbt.records.base import Records
 from vectorbt.records.common import indexing_on_records
 from vectorbt.records.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records import nb
