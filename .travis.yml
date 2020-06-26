@@ -1,7 +1,7 @@
 language: python
 install:
     - pip install .
-    - pip install pdoc3
+    - pip install pdoc3==0.8.1
 script:
     - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
     - mv docs/vectorbt/* docs
