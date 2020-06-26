@@ -1,5 +1,5 @@
 ![](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)
-![](https://img.shields.io/badge/version-0.9-blue?style=for-the-badge)
+![](https://img.shields.io/badge/version-0.10-blue?style=for-the-badge)
 
 # vectorbt
 
