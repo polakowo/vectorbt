@@ -528,7 +528,7 @@ a.badge-dark.focus {
     padding: .375rem .75rem;
     font-size: 1rem;
     line-height: 1.5;
-    color: #ddd;
+    color: white;
     background: rgba(0, 0, 0, .2);
     border: none;
     border-bottom: 1px solid #e82;
@@ -546,11 +546,11 @@ a.badge-dark.focus {
 }
 
 .index-caption {
-    color: #ddd;
+    color: white;
 }
 
 #index a, #index h3, .toc a {
-    color: #ddd;
+    color: white;
 }
 
 #index a:hover, .toc a:hover {
@@ -558,7 +558,7 @@ a.badge-dark.focus {
 }
 
 #sidebar {
-    background: #313f52;
+    background: #414C75;
 }
 
 .toc ul ul, #index ul {
