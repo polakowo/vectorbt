@@ -18,7 +18,6 @@ price['Close'].vbt.tseries.plot()
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
 import numpy as np
-from numba import njit
 import itertools
 import plotly.graph_objects as go
 
@@ -27,30 +26,9 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.base import reshape_fns
 from vectorbt.indicators.factory import IndicatorFactory
+from vectorbt.indicators import nb
 
 # ############# MA ############# #
-
-
-@njit(cache=True)
-def ma_caching_nb(ts, windows, ewms):
-    """Numba-compiled caching function for `MA`."""
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                ma = tseries.nb.ewm_mean_nb(ts, windows[i])
-            else:
-                ma = tseries.nb.rolling_mean_nb(ts, windows[i])
-            cache_dict[h] = ma
-    return cache_dict
-
-
-@njit(cache=True)
-def ma_apply_nb(ts, window, ewm, cache_dict):
-    """Numba-compiled apply function for `MA`."""
-    h = hash((window, ewm))
-    return cache_dict[h]
 
 
 MA = IndicatorFactory(
@@ -60,7 +38,7 @@ MA = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['ma'],
     name='ma'
-).from_apply_func(ma_apply_nb, caching_func=ma_caching_nb)
+).from_apply_func(nb.ma_apply_nb, caching_func=nb.ma_caching_nb)
 
 
 class MA(MA):
@@ -70,6 +48,7 @@ class MA(MA):
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp).
 
     Use `MA.from_params` or `MA.from_combs` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
         """Calculate moving average `MA.ma` from time series `ts` and parameters `window` and `ewm`.
@@ -203,7 +182,7 @@ class MA(MA):
         """
 
         if names is None:
-            names = ['ma' + str(i+1) for i in range(r)]
+            names = ['ma' + str(i + 1) for i in range(r)]
         windows, ewm = reshape_fns.broadcast(windows, ewm, writeable=True)
         cache_dict = cls.from_params(ts, windows, ewm=ewm, return_cache=True, **kwargs)
         param_lists = zip(*itertools.combinations(zip(windows, ewm), r))
@@ -252,28 +231,6 @@ fix_class_for_docs(MA)
 # ############# MSTD ############# #
 
 
-@njit(cache=True)
-def mstd_caching_nb(ts, windows, ewms):
-    """Numba-compiled caching function for `MSTD`."""
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                mstd = tseries.nb.ewm_std_nb(ts, windows[i])
-            else:
-                mstd = tseries.nb.rolling_std_nb(ts, windows[i])
-            cache_dict[h] = mstd
-    return cache_dict
-
-
-@njit(cache=True)
-def mstd_apply_nb(ts, window, ewm, cache_dict):
-    """Numba-compiled apply function for `MSTD`."""
-    h = hash((window, ewm))
-    return cache_dict[h]
-
-
 MSTD = IndicatorFactory(
     class_name='MSTD',
     module_name=__name__,
@@ -281,7 +238,7 @@ MSTD = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['mstd'],
     name='mstd'
-).from_apply_func(mstd_apply_nb, caching_func=mstd_caching_nb)
+).from_apply_func(nb.mstd_apply_nb, caching_func=nb.mstd_caching_nb)
 
 
 class MSTD(MSTD):
@@ -289,6 +246,7 @@ class MSTD(MSTD):
     in order to predict how volatile the price may be in the future.
 
     Use `MSTD.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window, ewm=False, **kwargs):
         """Calculate moving standard deviation `MSTD.mstd` from time series `ts` and 
@@ -356,25 +314,6 @@ fix_class_for_docs(MSTD)
 # ############# BollingerBands ############# #
 
 
-@njit(cache=True)
-def bb_caching_nb(ts, windows, ewms, alphas):
-    """Numba-compiled caching function for `BollingerBands`."""
-    ma_cache_dict = ma_caching_nb(ts, windows, ewms)
-    mstd_cache_dict = mstd_caching_nb(ts, windows, ewms)
-    return ma_cache_dict, mstd_cache_dict
-
-
-@njit(cache=True)
-def bb_apply_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
-    """Numba-compiled apply function for `BollingerBands`."""
-    # Calculate lower, middle and upper bands
-    h = hash((window, ewm))
-    ma = np.copy(ma_cache_dict[h])
-    mstd = np.copy(mstd_cache_dict[h])
-    # # (MA + Kσ), MA, (MA - Kσ)
-    return ma, ma + alpha * mstd, ma - alpha * mstd
-
-
 BollingerBands = IndicatorFactory(
     class_name='BollingerBands',
     module_name=__name__,
@@ -388,7 +327,7 @@ BollingerBands = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap(
             (self.upper_band.values - self.lower_band.values) / self.ma.values)
     )
-).from_apply_func(bb_apply_nb, caching_func=bb_caching_nb)
+).from_apply_func(nb.bb_apply_nb, caching_func=nb.bb_caching_nb)
 
 
 class BollingerBands(BollingerBands):
@@ -399,6 +338,7 @@ class BollingerBands(BollingerBands):
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp).
 
     Use `BollingerBands.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window=20, ewm=False, alpha=2, **kwargs):
         """Calculate moving average `BollingerBands.ma`, upper Bollinger Band `BollingerBands.upper_band`,
@@ -558,38 +498,6 @@ fix_class_for_docs(BollingerBands)
 # ############# RSI ############# #
 
 
-@njit(cache=True)
-def rsi_caching_nb(ts, windows, ewms):
-    """Numba-compiled caching function for `RSI`."""
-    delta = tseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
-    up, down = delta.copy(), delta.copy()
-    up = tseries.nb.set_by_mask_nb(up, up < 0, 0)
-    down = np.abs(tseries.nb.set_by_mask_nb(down, down > 0, 0))
-    # Cache
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                roll_up = tseries.nb.ewm_mean_nb(up, windows[i])
-                roll_down = tseries.nb.ewm_mean_nb(down, windows[i])
-            else:
-                roll_up = tseries.nb.rolling_mean_nb(up, windows[i])
-                roll_down = tseries.nb.rolling_mean_nb(down, windows[i])
-            roll_up = tseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
-            roll_down = tseries.nb.prepend_nb(roll_down, 1, np.nan)
-            cache_dict[h] = roll_up, roll_down
-    return cache_dict
-
-
-@njit(cache=True)
-def rsi_apply_nb(ts, window, ewm, cache_dict):
-    """Numba-compiled apply function for `RSI`."""
-    h = hash((window, ewm))
-    roll_up, roll_down = cache_dict[h]
-    return 100 - 100 / (1 + roll_up / roll_down)
-
-
 RSI = IndicatorFactory(
     class_name='RSI',
     module_name=__name__,
@@ -597,7 +505,7 @@ RSI = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['rsi'],
     name='rsi'
-).from_apply_func(rsi_apply_nb, caching_func=rsi_caching_nb)
+).from_apply_func(nb.rsi_apply_nb, caching_func=nb.rsi_caching_nb)
 
 
 class RSI(RSI):
@@ -609,6 +517,7 @@ class RSI(RSI):
     See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp).
 
     Use `RSI.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, window=14, ewm=False, **kwargs):
         """Calculate relative strength index `RSI.rsi` from time series `ts` and parameters `window` and `ewm`.
@@ -692,32 +601,6 @@ fix_class_for_docs(RSI)
 # ############# Stochastic ############# #
 
 
-@njit(cache=True)
-def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
-    """Numba-compiled caching function for `Stochastic`."""
-    cache_dict = dict()
-    for i in range(k_windows.shape[0]):
-        h = hash(k_windows[i])
-        if h not in cache_dict:
-            roll_min = tseries.nb.rolling_min_nb(low_ts, k_windows[i])
-            roll_max = tseries.nb.rolling_max_nb(high_ts, k_windows[i])
-            cache_dict[h] = roll_min, roll_max
-    return cache_dict
-
-
-@njit(cache=True)
-def stoch_apply_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_dict):
-    """Numba-compiled apply function for `Stochastic`."""
-    h = hash(k_window)
-    roll_min, roll_max = cache_dict[h]
-    percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
-    if d_ewm:
-        percent_d = tseries.nb.ewm_mean_nb(percent_k, d_window)
-    else:
-        percent_d = tseries.nb.rolling_mean_nb(percent_k, d_window)
-    return percent_k, percent_d
-
-
 Stochastic = IndicatorFactory(
     class_name='Stochastic',
     module_name=__name__,
@@ -725,7 +608,7 @@ Stochastic = IndicatorFactory(
     param_names=['k_window', 'd_window', 'd_ewm'],
     output_names=['percent_k', 'percent_d'],
     name='stoch'
-).from_apply_func(stoch_apply_nb, caching_func=stoch_caching_nb)
+).from_apply_func(nb.stoch_apply_nb, caching_func=nb.stoch_caching_nb)
 
 
 class Stochastic(Stochastic):
@@ -736,6 +619,7 @@ class Stochastic(Stochastic):
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
 
     Use `Stochastic.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, close_ts, high_ts=None, low_ts=None, k_window=14, d_window=3, d_ewm=False, **kwargs):
         """Calculate %K `Stochastic.percent_k` and %D `Stochastic.percent_d` from time series `close_ts`, 
@@ -855,27 +739,6 @@ fix_class_for_docs(Stochastic)
 # ############# MACD ############# #
 
 
-@njit(cache=True)
-def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
-    """Numba-compiled caching function for `MACD`."""
-    return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
-
-
-@njit(cache=True)
-def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_ewm, cache_dict):
-    """Numba-compiled apply function for `MACD`."""
-    fast_h = hash((fast_window, macd_ewm))
-    slow_h = hash((slow_window, macd_ewm))
-    fast_ma = cache_dict[fast_h]
-    slow_ma = cache_dict[slow_h]
-    macd_ts = fast_ma - slow_ma
-    if signal_ewm:
-        signal_ts = tseries.nb.ewm_mean_nb(macd_ts, signal_window)
-    else:
-        signal_ts = tseries.nb.rolling_mean_nb(macd_ts, signal_window)
-    return fast_ma, slow_ma, macd_ts, signal_ts
-
-
 MACD = IndicatorFactory(
     class_name='MACD',
     module_name=__name__,
@@ -886,7 +749,7 @@ MACD = IndicatorFactory(
     custom_outputs=dict(
         histogram=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
-).from_apply_func(macd_apply_nb, caching_func=macd_caching_nb)
+).from_apply_func(nb.macd_apply_nb, caching_func=nb.macd_caching_nb)
 
 
 class MACD(MACD):
@@ -896,6 +759,7 @@ class MACD(MACD):
     See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp).
 
     Use `MACD.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, ts, fast_window=26, slow_window=12, signal_window=9, macd_ewm=True, signal_ewm=True, **kwargs):
         """Calculate fast moving average `MACD.fast_ma`, slow moving average `MACD.slow_ma`, MACD `MACD.macd`, 
@@ -1073,34 +937,6 @@ fix_class_for_docs(MACD)
 # ############# ATR ############# #
 
 
-@njit(cache=True)
-def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
-    """Numba-compiled caching function for `ATR`."""
-    # Calculate TR here instead of re-calculating it for each param in atr_apply_nb
-    tr0 = high_ts - low_ts
-    tr1 = np.abs(high_ts - tseries.nb.fshift_nb(close_ts, 1))
-    tr2 = np.abs(low_ts - tseries.nb.fshift_nb(close_ts, 1))
-    tr = tseries.nb.nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
-
-    cache_dict = dict()
-    for i in range(windows.shape[0]):
-        h = hash((windows[i], ewms[i]))
-        if h not in cache_dict:
-            if ewms[i]:
-                atr = tseries.nb.ewm_mean_nb(tr, windows[i])
-            else:
-                atr = tseries.nb.rolling_mean_nb(tr, windows[i])
-            cache_dict[h] = atr
-    return tr, cache_dict
-
-
-@njit(cache=True)
-def atr_apply_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
-    """Numba-compiled apply function for `ATR`."""
-    h = hash((window, ewm))
-    return tr, cache_dict[h]
-
-
 ATR = IndicatorFactory(
     class_name='ATR',
     module_name=__name__,
@@ -1108,7 +944,7 @@ ATR = IndicatorFactory(
     param_names=['window', 'ewm'],
     output_names=['tr', 'atr'],
     name='atr'
-).from_apply_func(atr_apply_nb, caching_func=atr_caching_nb)
+).from_apply_func(nb.atr_apply_nb, caching_func=nb.atr_caching_nb)
 
 
 class ATR(ATR):
@@ -1118,6 +954,7 @@ class ATR(ATR):
     See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
 
     Use `ATR.from_params` method to run the indicator."""
+
     @classmethod
     def from_params(cls, close_ts, high_ts, low_ts, window, ewm=True, **kwargs):
         """Calculate true range `ATR.tr` and average true range `ATR.atr` from time series `close_ts`, 
@@ -1208,23 +1045,6 @@ fix_class_for_docs(ATR)
 # ############# OBV ############# #
 
 
-@njit(cache=True)
-def obv_custom_func_nb(close_ts, volume_ts):
-    """Numba-compiled custom calculation function for `OBV`."""
-    obv = np.full_like(close_ts, np.nan)
-    for col in range(close_ts.shape[1]):
-        cumsum = 0
-        for i in range(1, close_ts.shape[0]):
-            if np.isnan(close_ts[i, col]) or np.isnan(close_ts[i-1, col]) or np.isnan(volume_ts[i, col]):
-                continue
-            if close_ts[i, col] > close_ts[i-1, col]:
-                cumsum += volume_ts[i, col]
-            elif close_ts[i, col] < close_ts[i-1, col]:
-                cumsum += -volume_ts[i, col]
-            obv[i, col] = cumsum
-    return obv
-
-
 OBV = IndicatorFactory(
     class_name='OBV',
     module_name=__name__,
@@ -1232,7 +1052,7 @@ OBV = IndicatorFactory(
     param_names=[],
     output_names=['obv'],
     name='obv'
-).from_custom_func(obv_custom_func_nb)
+).from_custom_func(nb.obv_custom_func_nb)
 
 
 class OBV(OBV):
@@ -1242,6 +1062,7 @@ class OBV(OBV):
     See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp).
 
     Use `OBV.from_params` methods to run the indicator."""
+
     @classmethod
     def from_params(cls, close_ts, volume_ts):
         """Calculate on-balance volume `OBV.obv` from time series `close_ts` and `volume_ts`, and no parameters.
