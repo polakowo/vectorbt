@@ -28,7 +28,8 @@ import yfinance as yf
 price = yf.Ticker("BTC-USD").history(period="max")['Close']
 
 # Generate signals
-fast_ma, slow_ma = vbt.MA.from_combs(price, np.arange(2, 101), 2, names=['fast', 'slow'])
+fast_ma, slow_ma = vbt.MA.from_combs(price, np.arange(2, 101), 2, 
+    names=['fast', 'slow'], hide_params=['ewm'])
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
@@ -50,6 +51,37 @@ window_ret_matrix.vbt.Heatmap(
 ```
 
 ![dmac_heatmap.png](img/dmac_heatmap.png)
+
+Digging into each individual strategy instance is as simple as indexing with pandas:
+
+```python-repl
+>>> print(portfolio[(13, 21)].stats)
+
+Start                         2014-09-17 00:00:00
+End                           2020-06-27 00:00:00
+Duration                       2110 days 00:00:00
+Time in Position [%]                      56.9194
+Total Profit                              9691.23
+Total Return [%]                          9691.23
+Buy & Hold Return [%]                     1904.51
+Max. Drawdown [%]                         47.8405
+Avg. Drawdown [%]                         8.72147
+Max. Drawdown Duration          510 days 00:00:00
+Avg. Drawdown Duration           36 days 22:40:00
+Num. Trades                                    53
+Win Rate [%]                              52.8302
+Best Trade [%]                            279.692
+Worst Trade [%]                          -23.4948
+Avg. Trade [%]                            13.7254
+Max. Trade Duration             100 days 00:00:00
+Avg. Trade Duration       22 days 15:50:56.603774
+Expectancy                                182.853
+SQN                                       1.97949
+Sharpe Ratio                              1.78866
+Sortino Ratio                             2.82694
+Calmar Ratio                              2.52918
+dtype: object
+```
 
 ## Motivation
 
@@ -182,19 +214,25 @@ dtype: bool
     - Indicator factory for building complex technical indicators in a simple way
     
 ```python-repl
->>> vbt.MA.from_params(pd.Series([1, 2, 3]), window=[2, 3], 
-...      ewm=[False, True], param_product=True).ma
-ma_window               2               3          
-ma_ewm    False      True  False     True 
-0           NaN       NaN   NaN       NaN
-1           1.5  1.750000   NaN       NaN
-2           2.5  2.615385   2.0  2.428571
+>>> vbt.MA.from_params(pd.Series([1, 2, 3]), window=[2, 3], ewm=[False, True]).ma
+ma_window     2         3
+ma_ewm    False      True 
+0           NaN       NaN
+1           1.5       NaN
+2           2.5  2.428571
 ``` 
     
 - Interactive Plotly-based widgets to visualize backtest results
     - Indicator, Bar, Scatter, Histogram and Heatmap
     - Each provides a method for efficiently updating data
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
+
+```python-repl
+>>> a = np.random.normal(0, 4, size=10000)
+>>> pd.Series(a).vbt.Box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
+``` 
+
+![Box.png](img/Box.png)
 
 ## Installation
 

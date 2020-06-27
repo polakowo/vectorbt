@@ -22,7 +22,8 @@ def rgb_from_cmap(cmap_name, value, value_range):
 
 
 class Indicator(DefaultFigureWidget):
-    def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral', trace_kwargs={}, **layout_kwargs):
+    def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral', trace_kwargs={},
+                 **layout_kwargs):
         """Create an updatable indicator plot.
 
         Args:
@@ -82,6 +83,7 @@ class Indicator(DefaultFigureWidget):
                     indicator.gauge.bar.color = rgb_from_cmap(self._cmap_name, value, self._value_range)
             indicator.delta.reference = indicator.value
             indicator.value = value
+
 
 # ############# Bar ############# #
 
@@ -272,6 +274,68 @@ class Histogram(DefaultFigureWidget):
                 else:
                     histogram.x = data[:, i]
                     histogram.y = None
+
+
+# ############# Box ############# #
+
+class Box(DefaultFigureWidget):
+    def __init__(self, trace_names=None, data=None, horizontal=False, trace_kwargs={}, **layout_kwargs):
+        """Create an updatable box plot.
+
+        Args:
+            trace_names (str or list of str): Trace names, corresponding to columns in pandas.
+            data (array_like): Data in any format that can be converted to NumPy.
+            horizontal (bool): Plot horizontally.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Box`.
+            **layout_kwargs: Keyword arguments for layout.
+        Example:
+            ```py
+            vbt.Box(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
+            ```
+            ![](/vectorbt/docs/img/Box.png)
+            """
+
+        if isinstance(trace_names, str) or trace_names is None:
+            trace_names = [trace_names]
+        self._trace_names = trace_names
+        self._horizontal = horizontal
+
+        super().__init__()
+        self.update_layout(barmode='overlay')
+        self.update_layout(**layout_kwargs)
+
+        # Add traces
+        for i, trace_name in enumerate(trace_names):
+            box = go.Box(
+                name=trace_name,
+                showlegend=trace_name is not None
+            )
+            box.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
+            self.add_trace(box)
+
+        if data is not None:
+            self.update_data(data)
+
+    def update_data(self, data):
+        """Update the data of the plot efficiently.
+
+        Args:
+            data (array_like): Data in any format that can be converted to NumPy.
+
+                Must be of shape (any, `trace_names`).
+        """
+        data = reshape_fns.to_2d(np.asarray(data))
+        checks.assert_same_shape(data, self._trace_names, axis=(1, 0))
+
+        # Update traces
+        with self.batch_update():
+            for i, box in enumerate(self.data):
+                if self._horizontal:
+                    box.x = data[:, i]
+                    box.y = None
+                else:
+                    box.x = None
+                    box.y = data[:, i]
 
 
 # ############# Heatmap ############# #

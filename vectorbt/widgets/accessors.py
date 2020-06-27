@@ -63,6 +63,24 @@ class Histogram_Accessor():
         return basic.Histogram(trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
+@register_dataframe_accessor('Box')
+@register_series_accessor('Box')
+class Box_Accessor():
+    """Allows calling `vectorbt.widgets.basic.Box` using `pandas.Series.vbt.Box` and `pandas.DataFrame.vbt.Box`."""
+
+    def __init__(self, obj):
+        if not checks.is_pandas(obj):  # parent accessor
+            obj = obj._obj
+        self._obj = obj
+
+    def __call__(self, trace_names=None, **kwargs):
+        obj = self._obj
+        if trace_names is None:
+            if obj.vbt.is_frame() or (obj.vbt.is_series() and obj.name is not None):
+                trace_names = obj.vbt.columns
+        return basic.Box(trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
+
+
 @register_dataframe_accessor('Heatmap')
 @register_series_accessor('Heatmap')
 class Heatmap_Accessor():
