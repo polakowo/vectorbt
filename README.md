@@ -1,9 +1,9 @@
 ![](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)
-![](https://img.shields.io/badge/version-0.10-blue?style=for-the-badge)
+![](https://img.shields.io/pypi/v/vectorbt?color=blue&style=for-the-badge)
 
 # vectorbt
 
-![Made by Vectors Market](logo.png)
+![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/logo.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy, and is accelerated 
 by [Numba](https://github.com/numba/numba) to backtest and analyze trading strategies at speed and scale :fire:
@@ -50,7 +50,7 @@ window_ret_matrix.vbt.Heatmap(
     width=600, height=450)
 ```
 
-![dmac_heatmap.png](img/dmac_heatmap.png)
+![dmac_heatmap.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.png)
 
 Digging into each individual strategy instance is as simple as indexing with pandas:
 
@@ -171,7 +171,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 >>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns().plot()
 ```
 
-![drawdowns.png](img/drawdowns.png)
+![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
 
 - Functions for working with signals - `vbt.signals`
     - Entry, exit and random signal generation, ranking and distance functions
@@ -199,13 +199,14 @@ dtype: bool
     - Provides metrics and tools for analyzing returns, orders, trades and positions
     
 ```python-repl
->>> order_price = pd.Series([1, 2, 3, 2, 1])
->>> order_size = pd.Series([1, -1, 1, -1, 0])
->>> portfolio = vbt.Portfolio.from_orders(order_price, order_size, freq='1D')
+>>> price = pd.Series([1, 2, 3, 2, 1])
+>>> entries = pd.Series([True, False, True, False, False])
+>>> exits = pd.Series([False, True, False, True, False])
+>>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
 >>> portfolio.trades.plot()
 ```
 
-![trades.png](img/trades.png)
+![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)
     
 - Technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
@@ -232,12 +233,12 @@ ma_ewm    False      True
 >>> pd.Series(a).vbt.Box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
 ``` 
 
-![Box.png](img/Box.png)
+![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/Box.png)
 
 ## Installation
 
 ```
-pip install git+https://github.com/polakowo/vectorbt.git
+pip install vectorbt
 ```
 
 See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) 

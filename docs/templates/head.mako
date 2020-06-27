@@ -20,4 +20,4 @@
 </%def>
 
 <style>${homelink()}</style>
-<link rel="icon" href="https://github.com/polakowo/vectorbt/blob/master/favicon.ico?raw=true">
+<link rel="icon" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/favicon.ico">
