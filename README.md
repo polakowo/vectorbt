@@ -1,4 +1,5 @@
 ![](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)
+![](https://img.shields.io/pypi/v/vectorbt?color=blue&style=for-the-badge)
 
 # vectorbt
 
