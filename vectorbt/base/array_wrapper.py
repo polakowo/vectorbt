@@ -11,9 +11,9 @@ class ArrayWrapper:
     """Class that stores index, columns and shape metadata for wrapping NumPy arrays."""
 
     def __init__(self, index=None, columns=None, ndim=None):
-        if not isinstance(index, pd.Index):
+        if index is not None and not isinstance(index, pd.Index):
             index = pd.Index(index)
-        if not isinstance(columns, pd.Index):
+        if columns is not None and not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
         self._index = index
         self._columns = columns
@@ -49,45 +49,64 @@ class ArrayWrapper:
         ndim = obj.ndim
         return cls(*args, index=index, columns=columns, ndim=ndim, **kwargs)
 
-    def wrap(self, arg, index=None, columns=None, ndim=None, dtype=None):
+    def wrap(self, a, index=None, columns=None, ndim=None, dtype=None):
         """Wrap a NumPy array using the stored metadata."""
-        arg = np.asarray(arg)
+        checks.assert_ndim(a, (1, 2))
+
+        a = np.asarray(a)
         if ndim is None:
             ndim = self.ndim
         if ndim is not None:
-            arg = reshape_fns.soft_broadcast_to_ndim(arg, self.ndim)
+            a = reshape_fns.soft_broadcast_to_ndim(a, self.ndim)
         if index is None:
             index = self.index
         if columns is None:
             columns = self.columns
         if columns is not None and len(columns) == 1:
             name = columns[0]
+            if name == 0:  # was a Series before
+                name = None
         else:
             name = None
 
         # Perform checks
         if index is not None:
-            checks.assert_same_shape(arg, index, axis=(0, 0))
-        if arg.ndim == 2 and columns is not None:
-            checks.assert_same_shape(arg, columns, axis=(1, 0))
+            checks.assert_same_shape(a, index, axis=(0, 0))
+        if a.ndim == 2 and columns is not None:
+            checks.assert_same_shape(a, columns, axis=(1, 0))
 
-        if arg.ndim == 1:
-            return pd.Series(arg, index=index, name=name, dtype=dtype)
-        return pd.DataFrame(arg, index=index, columns=columns, dtype=dtype)
+        if a.ndim == 1:
+            return pd.Series(a, index=index, name=name, dtype=dtype)
+        return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
 
     def wrap_reduced(self, a, index=None):
-        """Wrap result of reduction."""
+        """Wrap result of reduction.
+
+        Argument `index` can be passed when reducing to an array of values (vs. one value) per column."""
+        checks.assert_ndim(a, np.arange(self.ndim+1))
+
+        a = np.asarray(a)
         if a.ndim == 0:
-            return a
+            # Scalar value
+            return a.item()
         elif a.ndim == 1:
-            # Each column reduced to a single value
-            a_obj = pd.Series(a, index=self.columns)
-            if self.ndim > 1:
-                return a_obj
-            return a_obj.iloc[0]
-        else:
-            # Each column reduced to an array
-            if index is None:
-                index = pd.Index(range(a.shape[0]))
-            a_obj = self.wrap(a, index=index)
-            return a_obj
+            if a.shape[0] == 1:
+                # Scalar value
+                return a[0]
+            if self.ndim == 1:
+                # Array per series
+                if len(self.columns) == 1:
+                    name = self.columns[0]
+                    if name == 0:  # was a Series before
+                        name = None
+                else:
+                    name = None
+                return pd.Series(a, index=index, name=name)
+            if self.ndim == 2:
+                # Value per column
+                return pd.Series(a, index=self.columns)
+        # Array per column
+        if a.shape == (1, 1):
+            # Scalar value
+            return a[0, 0]
+        return pd.DataFrame(a, index=index, columns=self.columns)

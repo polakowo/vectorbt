@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
+from collections.abc import Iterable
 
 # ############# Checks ############# #
 
@@ -70,13 +71,13 @@ def assert_type(arg, types):
             raise Exception(f"Type must be {types}, not {type(arg)}")
 
 
-def assert_not_type(arg, types):
-    """Raise exception if `arg` is any of types `types`."""
-    if isinstance(arg, types):
-        if isinstance(types, tuple):
-            raise Exception(f"Type cannot be any of {types}")
+def assert_subclass(arg, classes):
+    """Raise exception if `arg` is not a subclass of classes `classes`."""
+    if not issubclass(arg, classes):
+        if isinstance(classes, tuple):
+            raise Exception(f"Class must be a subclass of one of {classes}, not {arg}")
         else:
-            raise Exception(f"Type cannot be {types}")
+            raise Exception(f"Class must be a subclass of {classes}, not {arg}")
 
 
 def assert_same_type(arg1, arg2):
@@ -124,7 +125,7 @@ def assert_ndim(arg, ndims):
     """Raise exception if `arg` has a different number of dimensions than `ndims`."""
     if not is_array(arg):
         arg = np.asarray(arg)
-    if isinstance(ndims, tuple):
+    if isinstance(ndims, Iterable):
         if arg.ndim not in ndims:
             raise Exception(f"Number of dimensions must be one of {ndims}, not {arg.ndim}")
     else:
@@ -196,12 +197,10 @@ def assert_same(arg1, arg2):
 
 
 def assert_level_not_exists(arg, level_name):
-    """Raise exception if `arg` has column level `level_name`."""
-    if not is_frame(arg):
-        return
-    if isinstance(arg.columns, pd.MultiIndex):
-        names = arg.columns.names
+    """Raise exception if index `arg` has level `level_name`."""
+    if isinstance(arg, pd.MultiIndex):
+        names = arg.names
     else:
-        names = [arg.columns.name]
+        names = [arg.name]
     if level_name in names:
         raise Exception(f"Level {level_name} already exists in {names}")

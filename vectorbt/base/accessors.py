@@ -8,9 +8,47 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.common import add_binary_magic_methods, add_unary_magic_methods, AbstractOps
 
 
-class Base_Accessor(ArrayWrapper):
+@add_binary_magic_methods([
+    # comparison ops
+    ('__eq__', np.equal),
+    ('__ne__', np.not_equal),
+    ('__lt__', np.less),
+    ('__gt__', np.greater),
+    ('__le__', np.less_equal),
+    ('__ge__', np.greater_equal),
+    # arithmetic ops
+    ('__add__', np.add),
+    ('__sub__', np.subtract),
+    ('__mul__', np.multiply),
+    ('__pow__', np.power),
+    ('__mod__', np.mod),
+    ('__floordiv__', np.floor_divide),
+    ('__truediv__', np.true_divide),
+    ('__radd__', lambda x, y: np.add(y, x)),
+    ('__rsub__', lambda x, y: np.subtract(y, x)),
+    ('__rmul__', lambda x, y: np.multiply(y, x)),
+    ('__rpow__', lambda x, y: np.power(y, x)),
+    ('__rmod__', lambda x, y: np.mod(y, x)),
+    ('__rfloordiv__', lambda x, y: np.floor_divide(y, x)),
+    ('__rtruediv__', lambda x, y: np.true_divide(y, x)),
+    # mask ops
+    ('__and__', np.bitwise_and),
+    ('__or__', np.bitwise_or),
+    ('__xor__', np.bitwise_xor),
+    ('__rand__', lambda x, y: np.bitwise_and(y, x)),
+    ('__ror__', lambda x, y: np.bitwise_or(y, x)),
+    ('__rxor__', lambda x, y: np.bitwise_xor(y, x))
+])
+@add_unary_magic_methods([
+    ('__neg__', np.negative),
+    ('__pos__', np.positive),
+    ('__abs__', np.absolute),
+    ('__invert__', np.invert)
+])
+class Base_Accessor(ArrayWrapper, AbstractOps):
     """Accessor on top of any data series. For both, Series and DataFrames.
 
     Accessible through `pandas.Series.vbt` and `pandas.DataFrame.vbt`, and all child accessors.
@@ -51,7 +89,7 @@ class Base_Accessor(ArrayWrapper):
 
     # ############# Index and columns ############# #
 
-    def apply_func_on_index(self, apply_func, *args, axis=1, inplace=False, **kwargs):
+    def apply_on_index(self, apply_func, *args, axis=1, inplace=False, **kwargs):
         """Apply function `apply_func` on index of the pandas object.
 
         Set `axis` to 1 for columns and 0 for index.
@@ -82,64 +120,64 @@ class Base_Accessor(ArrayWrapper):
 
         Set `on_top` to `False` to stack at bottom.
 
-        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+        See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             if on_top:
                 return index_fns.stack_indexes(index, obj_index)
             return index_fns.stack_indexes(obj_index, index)
 
-        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
+        return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_levels(self, levels, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.drop_levels`.
 
-        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+        See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_levels(obj_index, levels)
 
-        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
+        return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def rename_levels(self, name_dict, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.rename_levels`.
 
-        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+        See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.rename_levels(obj_index, name_dict)
 
-        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
+        return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def select_levels(self, level_names, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.select_levels`.
 
-        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+        See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.select_levels(obj_index, level_names)
 
-        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
+        return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_redundant_levels(self, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.drop_redundant_levels`.
 
-        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+        See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_redundant_levels(obj_index)
 
-        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
+        return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     def drop_duplicate_levels(self, keep='last', axis=1, inplace=False):
         """See `vectorbt.base.index_fns.drop_duplicate_levels`.
 
-        See `Base_Accessor.apply_func_on_index` for other keyword arguments."""
+        See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_duplicate_levels(obj_index, keep=keep)
 
-        return self.apply_func_on_index(apply_func, axis=axis, inplace=inplace)
+        return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
     # ############# Reshaping ############# #
 
@@ -180,6 +218,7 @@ class Base_Accessor(ArrayWrapper):
 
         Example:
             ```python-repl
+            >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
             >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'], 
@@ -228,6 +267,37 @@ class Base_Accessor(ArrayWrapper):
 
     # ############# Combining ############# #
 
+    def apply(self, *args, apply_func=None, pass_2d=False, **kwargs):
+        """Apply a function `apply_func`.
+
+        Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
+        If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
+
+        !!! note
+            The resulted array must have the same shape as the original array.
+
+        Example:
+            ```python-repl
+            >>> import vectorbt as vbt
+            >>> import pandas as pd
+            >>> sr = pd.Series([1, 2], index=['x', 'y'])
+
+            >>> print(sr2.vbt.apply(apply_func=lambda x: x ** 2))
+            i2
+            x2    1
+            y2    4
+            z2    9
+            Name: a2, dtype: int64
+            ```"""
+        checks.assert_not_none(apply_func)
+        # Optionally cast to 2d array
+        if pass_2d:
+            obj = reshape_fns.to_2d(self._obj, raw=True)
+        else:
+            obj = np.asarray(self._obj)
+        result = apply_func(obj, *args, **kwargs)
+        return self.wrap(result)
+
     @class_or_instancemethod
     def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
         """Concatenate with `others` along columns.
@@ -237,6 +307,7 @@ class Base_Accessor(ArrayWrapper):
 
         Example:
             ```python-repl
+            >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
@@ -254,24 +325,25 @@ class Base_Accessor(ArrayWrapper):
             objs = (self_or_cls._obj,) + others
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
         broadcasted = tuple(map(reshape_fns.to_2d, broadcasted))
-        if checks.is_pandas(broadcasted[0]):
-            concated = pd.concat(broadcasted, axis=1)
-            if as_columns is not None:
-                concated.columns = index_fns.combine_indexes(as_columns, broadcasted[0].columns)
-        else:
-            concated = np.hstack(broadcasted)
-        return concated
+        concatenated = pd.concat(broadcasted, axis=1)
+        if as_columns is not None:
+            concatenated.columns = index_fns.combine_indexes(as_columns, broadcasted[0].columns)
+        return concatenated
 
     def apply_and_concat(self, ntimes, *args, apply_func=None, pass_2d=False, as_columns=None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
-        See `vectorbt.base.combine_fns.apply_and_concat`.
+        See `vectorbt.base.combine_fns.apply_and_concat_one`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
         Use `as_columns` as a top-level column level.
 
+        !!! note
+            The resulted arrays to be concatenated must have the same shape as broadcasted input arrays.
+
         Example:
             ```python-repl
+            >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
@@ -285,13 +357,13 @@ class Base_Accessor(ArrayWrapper):
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
         if pass_2d:
-            obj_arr = reshape_fns.to_2d(np.asarray(self._obj))
+            obj_arr = reshape_fns.to_2d(self._obj, raw=True)
         else:
             obj_arr = np.asarray(self._obj)
         if checks.is_numba_func(apply_func):
-            result = combine_fns.apply_and_concat_nb(obj_arr, ntimes, apply_func, *args, **kwargs)
+            result = combine_fns.apply_and_concat_one_nb(ntimes, apply_func, obj_arr, *args, **kwargs)
         else:
-            result = combine_fns.apply_and_concat(obj_arr, ntimes, apply_func, *args, **kwargs)
+            result = combine_fns.apply_and_concat_one(ntimes, apply_func, obj_arr, *args, **kwargs)
         # Build column hierarchy
         if as_columns is not None:
             new_columns = index_fns.combine_indexes(as_columns, self.columns)
@@ -308,8 +380,12 @@ class Base_Accessor(ArrayWrapper):
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`.
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
 
+        !!! note
+            The resulted array must have the same shape as broadcasted input arrays.
+
         Example:
             ```python-repl
+            >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
@@ -328,8 +404,8 @@ class Base_Accessor(ArrayWrapper):
         new_obj, new_other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
         # Optionally cast to 2d array
         if pass_2d:
-            new_obj_arr = reshape_fns.to_2d(np.asarray(new_obj))
-            new_other_arr = reshape_fns.to_2d(np.asarray(new_other))
+            new_obj_arr = reshape_fns.to_2d(new_obj, raw=True)
+            new_other_arr = reshape_fns.to_2d(new_other, raw=True)
         else:
             new_obj_arr = np.asarray(new_obj)
             new_other_arr = np.asarray(new_other)
@@ -362,6 +438,7 @@ class Base_Accessor(ArrayWrapper):
 
         Example:
             ```python-repl
+            >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
@@ -391,7 +468,7 @@ class Base_Accessor(ArrayWrapper):
         new_obj, *new_others = reshape_fns.broadcast(self._obj, *others, **broadcast_kwargs)
         # Optionally cast to 2d array
         if pass_2d:
-            bc_arrays = tuple(map(lambda x: reshape_fns.to_2d(np.asarray(x)), (new_obj, *new_others)))
+            bc_arrays = tuple(map(lambda x: reshape_fns.to_2d(x, raw=True), (new_obj, *new_others)))
         else:
             bc_arrays = tuple(map(lambda x: np.asarray(x), (new_obj, *new_others)))
         if concat:
@@ -417,59 +494,6 @@ class Base_Accessor(ArrayWrapper):
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
             return new_obj.vbt.wrap(result)
-
-    # ############# Magic methods ############# #
-
-    # Comparison operators
-    def __eq__(self, other):
-        return self.combine_with(other, combine_func=np.equal)
-
-    def __ne__(self, other):
-        return self.combine_with(other, combine_func=np.not_equal)
-
-    def __lt__(self, other):
-        return self.combine_with(other, combine_func=np.less)
-
-    def __gt__(self, other):
-        return self.combine_with(other, combine_func=np.greater)
-
-    def __le__(self, other):
-        return self.combine_with(other, combine_func=np.less_equal)
-
-    def __ge__(self, other):
-        return self.combine_with(other, combine_func=np.greater_equal)
-
-    # Binary operators
-    def __add__(self, other):
-        return self.combine_with(other, combine_func=np.add)
-
-    def __sub__(self, other):
-        return self.combine_with(other, combine_func=np.subtract)
-
-    def __mul__(self, other):
-        return self.combine_with(other, combine_func=np.multiply)
-
-    def __div__(self, other):
-        return self.combine_with(other, combine_func=np.divide)
-
-    __radd__ = __add__
-    __rsub__ = __sub__
-    __rmul__ = __mul__
-    __rdiv__ = __div__
-
-    # Boolean operators
-    def __and__(self, other):
-        return self.combine_with(other, combine_func=np.logical_and)
-
-    def __or__(self, other):
-        return self.combine_with(other, combine_func=np.logical_or)
-
-    def __xor__(self, other):
-        return self.combine_with(other, combine_func=np.logical_xor)
-
-    __rand__ = __and__
-    __ror__ = __or__
-    __rxor__ = __xor__
 
 
 class Base_SRAccessor(Base_Accessor):

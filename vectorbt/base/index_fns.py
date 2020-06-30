@@ -10,13 +10,16 @@ from vectorbt.utils import checks
 
 def get_index(arg, axis):
     """Get index of `arg` by `axis`."""
+    checks.assert_type(arg, (pd.Series, pd.DataFrame))
     checks.assert_value_in(axis, (0, 1))
 
     if axis == 0:
         return arg.index
     else:
         if checks.is_series(arg):
-            return pd.Index([arg.name])
+            if arg.name is not None:
+                return pd.Index([arg.name])
+            return pd.Index([0])  # same as how pandas does it
         else:
             return arg.columns
 
@@ -41,9 +44,8 @@ def repeat_index(index, n):
     """Repeat each element in `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if len(index) == 1 and index[0] is None:
-        return pd.Index(np.arange(n))
-
+    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges
+        return pd.RangeIndex(start=0, stop=n, step=1)
     return np.repeat(index, n)
 
 
@@ -51,9 +53,8 @@ def tile_index(index, n):
     """Tile the whole `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if len(index) == 1 and index[0] is None:
-        return pd.Index(np.arange(n))
-
+    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges
+        return pd.RangeIndex(start=0, stop=n, step=1)
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
     return pd.Index(np.tile(index, n), name=index.name)
@@ -124,7 +125,8 @@ def combine_indexes(*indexes, ignore_single=None):
 
 def drop_levels(index, levels):
     """Softly drop `levels` in `index` by their name/position."""
-    checks.assert_type(index, pd.MultiIndex)
+    if not isinstance(index, pd.MultiIndex):
+        return index
 
     levels_to_drop = []
     if not isinstance(levels, (tuple, list)):
@@ -134,7 +136,7 @@ def drop_levels(index, levels):
             if level not in levels_to_drop:
                 levels_to_drop.append(level)
         elif isinstance(level, int):
-            if (level >= 0 and level < index.nlevels) or level == -1:
+            if 0 <= level < index.nlevels or level == -1:
                 if level not in levels_to_drop:
                     levels_to_drop.append(level)
     if len(levels_to_drop) < index.nlevels:
@@ -168,22 +170,21 @@ def select_levels(index, level_names):
 
 def drop_redundant_levels(index):
     """Drop levels in `index` that either have a single value or a range from 0 to n."""
-    if not isinstance(index, pd.Index):
-        index = pd.Index(index)
+    if not isinstance(index, pd.MultiIndex):
+        return index
     if len(index) == 1:
         return index
 
-    if isinstance(index, pd.MultiIndex):
-        levels_to_drop = []
-        for i, level in enumerate(index.levels):
-            if len(level) == 1:
+    levels_to_drop = []
+    for i, level in enumerate(index.levels):
+        if len(level) == 1:
+            levels_to_drop.append(i)
+        elif level.name is None and (level == np.arange(len(level))).all():  # basic range
+            if len(index.get_level_values(i)) == len(level):
                 levels_to_drop.append(i)
-            elif level.name is None and (level == np.arange(len(level))).all():  # basic range
-                if len(index.get_level_values(i)) == len(level):
-                    levels_to_drop.append(i)
-        # Remove redundant levels only if there are some non-redundant levels left
-        if len(levels_to_drop) < index.nlevels:
-            return index.droplevel(levels_to_drop)
+    # Remove redundant levels only if there are some non-redundant levels left
+    if len(levels_to_drop) < index.nlevels:
+        return index.droplevel(levels_to_drop)
     return index
 
 
@@ -191,9 +192,8 @@ def drop_duplicate_levels(index, keep='last'):
     """Drop levels in `index` with the same name and values.
 
     Set `keep` to 'last' to keep last levels, otherwise 'first'."""
-    if isinstance(index, pd.Index) and not isinstance(index, pd.MultiIndex):
+    if not isinstance(index, pd.MultiIndex):
         return index
-    checks.assert_type(index, pd.MultiIndex)
 
     levels = []
     levels_to_drop = []

@@ -1,8 +1,6 @@
 """Class and function decorators."""
 
-import numpy as np
 from functools import wraps, lru_cache, RLock
-import inspect
 
 from vectorbt import defaults
 from vectorbt.utils import checks
@@ -15,51 +13,6 @@ class class_or_instancemethod(classmethod):
     def __get__(self, instance, type_):
         descr_get = super().__get__ if instance is None else self.__func__.__get__
         return descr_get(instance, type_)
-
-
-def get_kwargs(func):
-    """Get names and default values of keyword arguments from the signature of `func`."""
-    return {
-        k: v.default
-        for k, v in inspect.signature(func).parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
-
-
-def add_nb_methods(*nb_funcs, module_name=None):
-    """Class decorator to wrap each Numba function in `nb_funcs` as a method of an accessor class."""
-
-    def wrapper(cls):
-        for nb_func in nb_funcs:
-            default_kwargs = get_kwargs(nb_func)
-
-            def nb_method(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
-                if '_1d' in nb_func.__name__:
-                    # One-dimensional array as input
-                    a = nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs})
-                    if np.asarray(a).ndim == 0 or len(self.index) != a.shape[0]:
-                        return self.wrap_reduced(a)
-                    return self.wrap(a)
-                else:
-                    # Two-dimensional array as input
-                    a = nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs})
-                    if np.asarray(a).ndim == 0 or a.ndim == 1:
-                        return self.wrap_reduced(a)
-                    return self.wrap(a)
-
-            # Replace the function's signature with the original one
-            sig = inspect.signature(nb_func)
-            self_arg = tuple(inspect.signature(nb_method).parameters.values())[0]
-            sig = sig.replace(parameters=(self_arg,) + tuple(sig.parameters.values())[1:])
-            nb_method.__signature__ = sig
-            if module_name is not None:
-                nb_method.__doc__ = f"See `{module_name}.{nb_func.__name__}`"
-            else:
-                nb_method.__doc__ = f"See `{nb_func.__name__}`"
-            setattr(cls, nb_func.__name__.replace('_1d', '').replace('_nb', ''), nb_method)
-        return cls
-
-    return wrapper
 
 
 class custom_property():

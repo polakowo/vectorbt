@@ -35,9 +35,9 @@ from numba.typed import Dict
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import add_nb_methods
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
+from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries import nb
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.drawdowns import Drawdowns
@@ -67,7 +67,7 @@ except ImportError:
     nanargmin = np.nanargmin
 
 
-@add_nb_methods(
+@add_nb_methods([
     nb.fillna_nb,
     nb.fshift_nb,
     nb.diff_nb,
@@ -85,8 +85,8 @@ except ImportError:
     nb.expanding_min_nb,
     nb.expanding_max_nb,
     nb.expanding_mean_nb,
-    nb.expanding_std_nb,
-    module_name='vectorbt.tseries.nb')
+    nb.expanding_std_nb
+], module_name='vectorbt.tseries.nb')
 class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
     """Accessor on top of time series. For both, Series and DataFrames.
 

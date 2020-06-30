@@ -411,7 +411,8 @@ def from_params_pipeline(
         # Every time series object should be free of the specified level names in its columns
         for level_name in level_names:
             if level_name is not None:
-                checks.assert_level_not_exists(ts, level_name)
+                if checks.is_frame(ts):
+                    checks.assert_level_not_exists(ts.columns, level_name)
     # Convert params to 1-dim arrays
     param_list = list(map(reshape_fns.to_1d, param_list))
     if len(param_list) > 1:

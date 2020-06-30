@@ -43,19 +43,20 @@ import plotly.graph_objects as go
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.base import reshape_fns, index_fns
 from vectorbt.utils.config import merge_kwargs
-from vectorbt.utils.decorators import add_nb_methods, cached_property
+from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
+from vectorbt.base import reshape_fns, index_fns
+from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
 from vectorbt.signals import nb
 from vectorbt.widgets import DefaultFigureWidget
 
 
-@add_nb_methods(
+@add_nb_methods([
     nb.shuffle_nb,
     nb.fshift_nb,
-    module_name='vectorbt.signals.nb')
+], module_name='vectorbt.signals.nb')
 class Signals_Accessor(TimeSeries_Accessor):
     """Accessor on top of signal series. For both, Series and DataFrames.
 
