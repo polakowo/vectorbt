@@ -5,35 +5,31 @@
 
     Input arrays must be `numpy.bool`.
     
-```py
-import vectorbt as vbt
-import numpy as np
-import pandas as pd
-from numba import njit
-from datetime import datetime
+```python-repl
+>>> import vectorbt as vbt
+>>> import numpy as np
+>>> import pandas as pd
+>>> from numba import njit
+>>> from datetime import datetime
 
-index = pd.Index([
-    datetime(2020, 1, 1),
-    datetime(2020, 1, 2),
-    datetime(2020, 1, 3),
-    datetime(2020, 1, 4),
-    datetime(2020, 1, 5)
-])
-columns = ['a', 'b', 'c']
-signals = pd.DataFrame([
-    [False, True, True],
-    [True, False, True],
-    [True, True, False],
-    [False, True, True],
-    [True, False, True]
-], index=index, columns=columns)
-ts = pd.DataFrame([
-    [1, 5, 1],
-    [2, 4, 2],
-    [3, 3, 3],
-    [4, 2, 2],
-    [5, 1, 1]
-], index=index, columns=columns)
+>>> sig = pd.DataFrame({
+...     'a': [True, False, False, False, False],
+...     'b': [True, False, True, False, True],
+...     'c': [True, True, True, False, False]
+... }, index=pd.Index([
+...     datetime(2020, 1, 1),
+...     datetime(2020, 1, 2),
+...     datetime(2020, 1, 3),
+...     datetime(2020, 1, 4),
+...     datetime(2020, 1, 5)
+... ]))
+>>> print(sig)
+                a      b      c
+2020-01-01   True   True   True
+2020-01-02  False  False   True
+2020-01-03  False   True   True
+2020-01-04  False  False  False
+2020-01-05  False   True  False
 ```"""
 
 import numpy as np
@@ -44,7 +40,6 @@ from vectorbt.defaults import contrast_color_schema
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
-from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
@@ -76,8 +71,16 @@ class Signals_Accessor(TimeSeries_Accessor):
 
         Example:
             ```python-repl
+            >>> print(pd.Series.vbt.signals.empty(5,
+            ...     index=sig.index, name=sig['a'].name))
+            2020-01-01    False
+            2020-01-02    False
+            2020-01-03    False
+            2020-01-04    False
+            2020-01-05    False
+            Name: a, dtype: bool
             >>> print(pd.DataFrame.vbt.signals.empty((5, 3), 
-            ...     index=index, columns=columns))
+            ...     index=sig.index, columns=sig.columns))
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02  False  False  False
@@ -93,7 +96,14 @@ class Signals_Accessor(TimeSeries_Accessor):
 
         Example:
             ```python-repl
-            >>> print(pd.DataFrame.vbt.signals.empty_like(signals))
+            >>> print(pd.Series.vbt.signals.empty_like(sig['a']))
+            2020-01-01    False
+            2020-01-02    False
+            2020-01-03    False
+            2020-01-04    False
+            2020-01-05    False
+            Name: a, dtype: bool
+            >>> print(pd.DataFrame.vbt.signals.empty_like(sig))
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02  False  False  False
@@ -102,6 +112,8 @@ class Signals_Accessor(TimeSeries_Accessor):
             2020-01-05  False  False  False
             ```"""
         return TimeSeries_Accessor.empty_like(*args, fill_value=fill_value, **kwargs)
+
+    # ############# Signal generation ############# #
 
     @classmethod
     def generate(cls, shape, choice_func_nb, *args, **kwargs):
@@ -115,16 +127,16 @@ class Signals_Accessor(TimeSeries_Accessor):
             ```python-repl
             >>> @njit
             ... def choice_func_nb(col, from_i, to_i):
-            ...     return np.random.choice(np.arange(from_i, to_i), replace=False)
+            ...     return col + from_i
 
             >>> print(pd.DataFrame.vbt.signals.generate((5, 3), 
-            ...     choice_func_nb, index=index, columns=columns))
+            ...     choice_func_nb, index=sig.index, columns=sig.columns))
                             a      b      c
-            2020-01-01  False  False  False
-            2020-01-02  False  False  False
-            2020-01-03   True  False   True
+            2020-01-01   True  False  False
+            2020-01-02  False   True  False
+            2020-01-03  False  False   True
             2020-01-04  False  False  False
-            2020-01-05  False   True  False
+            2020-01-05  False  False  False
             ```"""
         checks.assert_numba_func(choice_func_nb)
 
@@ -139,40 +151,28 @@ class Signals_Accessor(TimeSeries_Accessor):
             return pd.Series(result[:, 0], **kwargs)
         return pd.DataFrame(result, **kwargs)
 
-    @classmethod
-    def generate_random(cls, shape, n_range, n_prob=None, min_space=None, seed=None, **kwargs):
-        """See `vectorbt.signals.nb.generate_random_nb`.
-
-        `**kwargs` will be passed to pandas constructor.
+    def generate_after(self, choice_func_nb, *args):
+        """See `vectorbt.signals.nb.generate_after_nb`.
 
         Example:
-            For each column, generate either 1 (with 30% probability) or 2 (with 70% probability)
-            signals randomly. Leave one position free between signals:
+            Fill all space between signals in `sig`:
 
             ```python-repl
-            >>> print(pd.DataFrame.vbt.signals.generate_random((5, 3), [1, 2], 
-            ...     n_prob=[0.3, 0.7], min_space=1, seed=42, index=index, columns=columns))
+            >>> @njit
+            ... def choice_func_nb(col, from_i, to_i):
+            ...     return np.arange(from_i, to_i)
+
+            >>> print(sig.vbt.signals.generate_after(choice_func_nb))
                             a      b      c
-            2020-01-01   True  False  False
-            2020-01-02  False   True  False
+            2020-01-01  False  False  False
+            2020-01-02   True   True  False
             2020-01-03   True  False  False
-            2020-01-04  False   True   True
-            2020-01-05  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05   True  False   True
             ```"""
-        if not isinstance(shape, tuple):
-            shape = (shape, 1)
-        elif isinstance(shape, tuple) and len(shape) == 1:
-            shape = (shape[0], 1)
+        checks.assert_numba_func(choice_func_nb)
 
-        n_range = reshape_fns.to_1d(n_range)
-        if n_prob is not None:
-            n_prob = reshape_fns.to_1d(n_prob)
-            checks.assert_same_shape(n_range, n_prob)
-        result = nb.generate_random_nb(shape, n_range, n_prob=n_prob, min_space=min_space, seed=seed)
-
-        if cls.is_series():
-            return pd.Series(result[:, 0], **kwargs)
-        return pd.DataFrame(result, **kwargs)
+        return self.wrap(nb.generate_after_nb(self.to_2d_array(), choice_func_nb, *args))
 
     @classmethod
     def generate_iteratively(cls, shape, choice_func1_nb, choice_func2_nb, *args, **kwargs):
@@ -193,7 +193,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
             >>> entries, exits = pd.DataFrame.vbt.signals.generate_iteratively(
             ...     (5, 3), choice_func1_nb, choice_func2_nb, 
-            ...     index=index, columns=columns)
+            ...     index=sig.index, columns=sig.columns)
             >>> print(entries)
                             a      b      c
             2020-01-01   True   True   True
@@ -222,55 +222,125 @@ class Signals_Accessor(TimeSeries_Accessor):
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
-    def generate_after(self, choice_func_nb, *args):
-        """See `vectorbt.signals.nb.generate_after_nb`.
+    # ############# Random ############# #
+
+    @classmethod
+    def generate_random(cls, shape, n, seed=None, **kwargs):
+        """See `vectorbt.signals.nb.generate_rand_nb`.
+
+        `**kwargs` will be passed to pandas constructor.
 
         Example:
-            Fill all space between signals in `signals`:
+            For each column, generate two signals randomly:
+            ```python-repl
+            >>> print(pd.DataFrame.vbt.signals.generate_random((5, 3), 2,
+            ...     seed=42, index=sig.index, columns=sig.columns))
+                            a      b      c
+            2020-01-01  False  False   True
+            2020-01-02   True   True   True
+            2020-01-03  False  False  False
+            2020-01-04  False   True  False
+            2020-01-05   True  False  False
+            ```"""
+        if not isinstance(shape, tuple):
+            shape = (shape, 1)
+        elif isinstance(shape, tuple) and len(shape) == 1:
+            shape = (shape[0], 1)
+
+        result = nb.generate_rand_nb(shape, n, seed=seed)
+
+        if cls.is_series():
+            return pd.Series(result[:, 0], **kwargs)
+        return pd.DataFrame(result, **kwargs)
+
+    @classmethod
+    def generate_random_by_prob(cls, shape, prob, seed=None, **kwargs):
+        """See `vectorbt.signals.nb.generate_rand_nb_by_prob`.
+
+        `prob` must be either a single number or an array that will be broadcast to match `shape`.
+        `**kwargs` will be passed to pandas constructor.
+
+        Example:
+            For each column and time step, pick a signal with 0.5 probability:
+            ```python-repl
+            >>> print(pd.DataFrame.vbt.signals.generate_random_by_prob((5, 3), 0.5,
+            ...     seed=42, index=sig.index, columns=sig.columns))
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02  False   True  False
+            2020-01-03  False  False  False
+            2020-01-04  False  False   True
+            2020-01-05   True  False   True
+            ```"""
+        if not isinstance(shape, tuple):
+            shape = (shape, 1)
+        elif isinstance(shape, tuple) and len(shape) == 1:
+            shape = (shape[0], 1)
+
+        probs = np.broadcast_to(prob, shape)
+        result = nb.generate_rand_by_prob_nb(shape, probs, seed=seed)
+
+        if cls.is_series():
+            return pd.Series(result[:, 0], **kwargs)
+        return pd.DataFrame(result, **kwargs)
+
+    # ############# Exits ############# #
+
+    def generate_random_exits(self, seed=None):
+        """See `vectorbt.signals.nb.generate_rand_exits_nb`.
+
+        Example:
+            Generate exactly a random signal after each signal in `sig`:
 
             ```python-repl
-            >>> @njit
-            ... def choice_func_nb(col, from_i, to_i):
-            ...     return np.arange(from_i, to_i)
-
-            >>> print(signals.vbt.signals.generate_after(choice_func_nb))
+            >>> print(sig.vbt.signals.generate_random_exits(seed=42))
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02  False   True  False
-            2020-01-03  False  False   True
-            2020-01-04   True  False  False
-            2020-01-05  False   True  False
+            2020-01-03   True  False  False
+            2020-01-04  False   True  False
+            2020-01-05  False  False   True
             ```"""
-        checks.assert_numba_func(choice_func_nb)
+        return self.wrap(nb.generate_rand_exits_nb(self.to_2d_array(), seed=seed))
 
-        return self.wrap(nb.generate_after_nb(self.to_2d_array(), choice_func_nb, *args))
-
-    def generate_random_after(self, n_range, n_prob=None, min_space=None, seed=None):
-        """See `vectorbt.signals.nb.generate_random_after_nb`.
+    @classmethod
+    def generate_random_entries_and_exits(cls, shape, n_entries, seed=None, **kwargs):
+        """See `vectorbt.signals.nb.generate_rand_entries_and_exits_nb`.
 
         Example:
-            Generate exactly one random signal after each signal in `signals`:
+            Generate 2 entries and same number of exits:
 
             ```python-repl
-            >>> print(signals.vbt.signals.generate_random_after(1, seed=42))
+            >>> entries, exits = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
+            ...      (5, 3), 2, seed=42, index=sig.index, columns=sig.columns)
+            >>> print(entries)
+                            a      b      c
+            2020-01-01   True   True   True
+            2020-01-02  False  False  False
+            2020-01-03   True   True  False
+            2020-01-04  False  False   True
+            2020-01-05  False  False  False
+            >>> print(exits)
                             a      b      c
             2020-01-01  False  False  False
-            2020-01-02  False   True  False
-            2020-01-03  False  False   True
-            2020-01-04   True  False  False
-            2020-01-05  False   True  False
+            2020-01-02   True   True   True
+            2020-01-03  False  False  False
+            2020-01-04  False   True  False
+            2020-01-05   True  False   True
             ```"""
-        n_range = reshape_fns.to_1d(n_range)
-        if n_prob is not None:
-            n_prob = reshape_fns.to_1d(n_prob)
-            checks.assert_same_shape(n_range, n_prob)
-        result = nb.generate_random_after_nb(
-            self.to_2d_array(), n_range, n_prob=n_prob, min_space=min_space, seed=seed)
-        return self.wrap(result)
+        if not isinstance(shape, tuple):
+            shape = (shape, 1)
+        elif isinstance(shape, tuple) and len(shape) == 1:
+            shape = (shape[0], 1)
 
-    def generate_stop_loss(self, ts, stops, trailing=False, relative=True,
-                           first=True, as_columns=None, broadcast_kwargs={}):
-        """See `vectorbt.signals.nb.generate_stop_loss_nb`.
+        entries, exits = nb.generate_rand_entries_and_exits_nb(shape, n_entries, seed=seed)
+
+        if cls.is_series():
+            return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
+        return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
+
+    def generate_stop_loss_exits(self, ts, stops, trailing=False, first=True, as_columns=None, broadcast_kwargs={}):
+        """See `vectorbt.signals.nb.generate_stop_loss_exits_nb`.
 
         Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
@@ -278,29 +348,37 @@ class Signals_Accessor(TimeSeries_Accessor):
         Use `as_columns` as a top-level column level.
 
         Example:
-            For each entry in `signals`, set stop loss for 10% and 20% below the price `ts`:
+            For each entry in `sig`, set stop loss for 10% and 20% below the entry price:
 
             ```python-repl
-            >>> print(signals.vbt.signals.generate_stop_loss(ts, [0.1, 0.2]))
-            stop_loss                   0.1                  0.2
+            >>> ts = pd.Series([1, 2, 3, 2, 1])
+            >>> print(sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.5]))
+            stop_loss                   0.1                  0.5
                             a      b      c      a      b      c
             2020-01-01  False  False  False  False  False  False
-            2020-01-02  False   True  False  False   True  False
+            2020-01-02  False  False  False  False  False  False
             2020-01-03  False  False  False  False  False  False
-            2020-01-04  False  False  False  False  False  False
-            2020-01-05  False   True  False  False   True  False
+            2020-01-04  False   True   True  False  False  False
+            2020-01-05  False  False  False  False  False   True
+            >>> print(sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.5], trailing=True))
+            trail_stop                  0.1                  0.5
+                            a      b      c      a      b      c
+            2020-01-01  False  False  False  False  False  False
+            2020-01-02  False  False  False  False  False  False
+            2020-01-03  False  False  False  False  False  False
+            2020-01-04   True   True   True  False  False  False
+            2020-01-05  False  False  False   True  False   True
             ```"""
         entries = self._obj
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
 
         entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs, writeable=True)
         stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
-        exits = nb.generate_stop_loss_nb(
-            entries.vbt.to_2d_array(), 
-            ts.vbt.to_2d_array(), 
+        exits = nb.generate_stop_loss_exits_nb(
+            entries.vbt.to_2d_array(),
+            ts.vbt.to_2d_array(),
             stops,
             trailing=trailing,
-            relative=relative,
             first=first)
 
         # Build column hierarchy
@@ -312,8 +390,8 @@ class Signals_Accessor(TimeSeries_Accessor):
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
         return entries.vbt.wrap(exits, columns=columns)
 
-    def generate_take_profit(self, ts, stops, relative=True, first=True, as_columns=None, broadcast_kwargs={}):
-        """See `vectorbt.signals.nb.generate_take_profit_nb`.
+    def generate_take_profit_exits(self, ts, stops, first=True, as_columns=None, broadcast_kwargs={}):
+        """See `vectorbt.signals.nb.generate_take_profit_exits_nb`.
 
         Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
@@ -321,28 +399,28 @@ class Signals_Accessor(TimeSeries_Accessor):
         Use `as_columns` as a top-level column level.
 
         Example:
-            For each entry in `signals`, set take profit for 10% and 20% above the price `ts`:
+            For each entry in `sig`, set take profit for 10% and 20% above the entry price:
 
             ```python-repl
-            >>> print(signals.vbt.signals.generate_take_profit(ts, [0.1, 0.2]))
-            take_profit                  0.1                  0.2
+            >>> ts = pd.Series([1, 2, 3, 4, 5])
+            >>> print(sig.vbt.signals.generate_take_profit_exits(ts, [0.1, 0.5]))
+            take_profit                  0.1                  0.5
                              a      b      c      a      b      c
             2020-01-01   False  False  False  False  False  False
-            2020-01-02   False  False  False  False  False  False
-            2020-01-03   False  False   True  False  False   True
-            2020-01-04    True  False  False   True  False  False
-            2020-01-05   False  False  False  False  False  False
+            2020-01-02    True   True  False   True   True  False
+            2020-01-03   False  False  False  False  False  False
+            2020-01-04   False   True   True  False  False  False
+            2020-01-05   False  False  False  False  False   True
             ```"""
         entries = self._obj
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
 
         entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs, writeable=True)
         stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
-        exits = nb.generate_take_profit_nb(
-            entries.vbt.to_2d_array(), 
+        exits = nb.generate_take_profit_exits_nb(
+            entries.vbt.to_2d_array(),
             ts.vbt.to_2d_array(),
             stops,
-            relative=relative,
             first=first)
 
         # Build column hierarchy
@@ -353,6 +431,8 @@ class Signals_Accessor(TimeSeries_Accessor):
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
         return entries.vbt.wrap(exits, columns=columns)
 
+    # ############# Map and reduce ############# #
+
     def map_reduce_between(self, *args, other=None, map_func_nb=None, reduce_func_nb=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.map_reduce_between_nb`. 
 
@@ -362,17 +442,17 @@ class Signals_Accessor(TimeSeries_Accessor):
         with `broadcast_kwargs`.
 
         Example:
-            Get average distance between signals in `signals`:
+            Get average distance between signals in `sig`:
 
             ```python-repl
             >>> distance_map_nb = njit(lambda col, from_i, to_i: to_i - from_i)
             >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
 
-            >>> print(signals.vbt.signals.map_reduce_between(
+            >>> print(sig.vbt.signals.map_reduce_between(
             ...     map_func_nb=distance_map_nb, reduce_func_nb=mean_reduce_nb))
-            a    1.500000
-            b    1.500000
-            c    1.333333
+            a    NaN
+            b    2.0
+            c    1.0
             dtype: float64
             ```"""
         checks.assert_not_none(map_func_nb)
@@ -394,22 +474,21 @@ class Signals_Accessor(TimeSeries_Accessor):
                 self.to_2d_array(), other.vbt.to_2d_array(), map_func_nb, reduce_func_nb, *args)
             return self.wrap_reduced(result)
 
-
     def map_reduce_partitions(self, *args, map_func_nb=None, reduce_func_nb=None):
         """See `vectorbt.signals.nb.map_reduce_partitions_nb`.
 
         Example:
-            Get average length of each partition in `signals`:
+            Get average length of each partition in `sig`:
 
             ```python-repl
             >>> distance_map_nb = njit(lambda col, from_i, to_i: to_i - from_i)
             >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
 
-            >>> print(signals.vbt.signals.map_reduce_partitions(
+            >>> print(sig.vbt.signals.map_reduce_partitions(
             ...     map_func_nb=distance_map_nb, reduce_func_nb=mean_reduce_nb))
-            a    1.5
-            b    1.5
-            c    2.0
+            a    1.0
+            b    1.0
+            c    3.0
             dtype: float64
             ```"""
         checks.assert_not_none(map_func_nb)
@@ -420,18 +499,16 @@ class Signals_Accessor(TimeSeries_Accessor):
         result = nb.map_reduce_partitions_nb(self.to_2d_array(), map_func_nb, reduce_func_nb, *args)
         return self.wrap_reduced(result)
 
-    @cached_property
     def num_signals(self):
         """Sum up `True` values."""
-        return self.wrap_reduced(self._obj.values.sum(axis=0))
+        return self.sum()
 
-    @cached_property
-    def avg_distance(self):
-        """Calculate the average distance between `True` values.
+    def avg_distance(self, **kwargs):
+        """Calculate the average distance between `True` values in `self`.
 
         See `Signals_Accessor.map_reduce_between`."""
         return self.map_reduce_between(
-            map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb)
+            other=None, map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb, **kwargs)
 
     def avg_distance_to(self, other, **kwargs):
         """Calculate the average distance between `True` values in `self` and `other`.
@@ -440,41 +517,43 @@ class Signals_Accessor(TimeSeries_Accessor):
         return self.map_reduce_between(
             other=other, map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb, **kwargs)
 
+    # ############# Ranking ############# #
+
     def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.rank_nb`.
 
         Example:
-            Rank each `True` value in each partition in `signals`:
+            Rank each `True` value in each partition in `sig`:
 
             ```python-repl
-            >>> print(signals.vbt.signals.rank())
+            >>> print(sig.vbt.signals.rank())
                         a  b  c
-            2020-01-01  0  1  1
-            2020-01-02  1  0  2
-            2020-01-03  2  1  0
-            2020-01-04  0  2  1
-            2020-01-05  1  0  2
-            >>> print(signals.vbt.signals.rank(after_false=True))
+            2020-01-01  1  1  1
+            2020-01-02  0  0  2
+            2020-01-03  0  1  3
+            2020-01-04  0  0  0
+            2020-01-05  0  1  0
+            >>> print(sig.vbt.signals.rank(after_false=True))
                         a  b  c
             2020-01-01  0  0  0
-            2020-01-02  1  0  0
-            2020-01-03  2  1  0
-            2020-01-04  0  2  1
-            2020-01-05  1  0  2
-            >>> print(signals.vbt.signals.rank(allow_gaps=True))
+            2020-01-02  0  0  0
+            2020-01-03  0  1  0
+            2020-01-04  0  0  0
+            2020-01-05  0  1  0
+            >>> print(sig.vbt.signals.rank(allow_gaps=True))
                         a  b  c
-            2020-01-01  0  1  1
-            2020-01-02  1  0  2
-            2020-01-03  2  2  0
-            2020-01-04  0  3  3
-            2020-01-05  3  0  4
-            >>> print(signals.vbt.signals.rank(reset_by=~signals, allow_gaps=True))
+            2020-01-01  1  1  1
+            2020-01-02  0  0  2
+            2020-01-03  0  2  3
+            2020-01-04  0  0  0
+            2020-01-05  0  3  0
+            >>> print(sig.vbt.signals.rank(reset_by=~sig, allow_gaps=True))
                         a  b  c
-            2020-01-01  0  1  1
-            2020-01-02  1  0  2
-            2020-01-03  2  1  0
-            2020-01-04  0  2  1
-            2020-01-05  1  0  2
+            2020-01-01  1  1  1
+            2020-01-02  0  0  2
+            2020-01-03  0  1  3
+            2020-01-04  0  0  0
+            2020-01-05  0  1  0
             ```"""
         if reset_by is not None:
             obj, reset_by = reshape_fns.broadcast(self._obj, reset_by, **broadcast_kwargs)
@@ -492,30 +571,30 @@ class Signals_Accessor(TimeSeries_Accessor):
         """See `vectorbt.signals.nb.rank_partitions_nb`.
 
         Example:
-            Rank each partition of `True` values in `signals`:
+            Rank each partition of `True` values in `sig`:
 
             ```python-repl
-            >>> print(signals.vbt.signals.rank_partitions())
+            >>> print(sig.vbt.signals.rank_partitions())
                         a  b  c
-            2020-01-01  0  1  1
-            2020-01-02  1  0  1
-            2020-01-03  1  2  0
-            2020-01-04  0  2  2
-            2020-01-05  2  0  2
-            >>> print(signals.vbt.signals.rank_partitions(after_false=True))
+            2020-01-01  1  1  1
+            2020-01-02  0  0  1
+            2020-01-03  0  2  1
+            2020-01-04  0  0  0
+            2020-01-05  0  3  0
+            >>> print(sig.vbt.signals.rank_partitions(after_false=True))
                         a  b  c
             2020-01-01  0  0  0
-            2020-01-02  1  0  0
-            2020-01-03  1  1  0
-            2020-01-04  0  1  1
-            2020-01-05  2  0  1
-            >>> print(signals.vbt.signals.rank_partitions(reset_by=signals))
+            2020-01-02  0  0  0
+            2020-01-03  0  1  0
+            2020-01-04  0  0  0
+            2020-01-05  0  2  0
+            >>> print(sig.vbt.signals.rank_partitions(reset_by=sig))
                         a  b  c
-            2020-01-01  0  1  1
-            2020-01-02  1  0  1
-            2020-01-03  1  1  0
-            2020-01-04  0  1  1
-            2020-01-05  1  0  1
+            2020-01-01  1  1  1
+            2020-01-02  0  0  1
+            2020-01-03  0  1  1
+            2020-01-04  0  0  0
+            2020-01-05  0  1  0
             ```"""
         if reset_by is not None:
             obj, reset_by = reshape_fns.broadcast(self._obj, reset_by, **broadcast_kwargs)
@@ -540,6 +619,8 @@ class Signals_Accessor(TimeSeries_Accessor):
         """`vectorbt.signals.nb.rank_nb` >= n."""
         return self.wrap(self.rank(**kwargs).values >= n)
 
+    # ############# Logical operations ############# #
+
     def AND(self, *others, **kwargs):
         """Combine with each in `*others` using logical AND.
 
@@ -557,15 +638,16 @@ class Signals_Accessor(TimeSeries_Accessor):
             Perform two OR operations and concatenate them:
 
             ```python-repl
-            >>> print(signals.vbt.signals.OR(ts > 1, ts > 2, 
+            >>> ts = pd.Series([1, 2, 3, 2, 1])
+            >>> print(sig.vbt.signals.OR(ts > 1, ts > 2,
             ...     concat=True, as_columns=['>1', '>2']))
-                                        >1                  >2
-                            a      b     c      a      b     c
-            2020-01-01  False   True  True  False   True  True
-            2020-01-02   True   True  True   True   True  True
-            2020-01-03   True   True  True   True   True  True
-            2020-01-04   True   True  True   True   True  True
-            2020-01-05   True  False  True   True  False  True
+                                        >1                   >2
+                            a     b      c      a      b      c
+            2020-01-01   True  True   True   True   True   True
+            2020-01-02   True  True   True  False  False   True
+            2020-01-03   True  True   True   True   True   True
+            2020-01-04   True  True   True  False  False  False
+            2020-01-05  False  True  False  False   True  False
             ```"""
         return self.combine_with_multiple(others, combine_func=np.logical_or, **kwargs)
 
@@ -644,9 +726,10 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            fig = ts['a'].vbt.tseries.plot()
-            signals['a'].vbt.signals.plot_as_entry_markers(ts['a'], fig=fig)
-            (~signals['a']).vbt.signals.plot_as_exit_markers(ts['a'], fig=fig)
+            ts = pd.Series([1, 2, 3, 2, 1], index=sig.index)
+            fig = ts.vbt.tseries.plot()
+            sig['b'].vbt.signals.plot_as_entry_markers(ts, fig=fig)
+            (~sig['b']).vbt.signals.plot_as_exit_markers(ts, fig=fig)
             ```
 
             ![](/vectorbt/docs/img/signals_plot_as_markers.png)"""
@@ -737,7 +820,7 @@ class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            signals[['a', 'c']].vbt.signals.plot().show_png()
+            signals[['a', 'c']].vbt.signals.plot()
             ```
 
             ![](/vectorbt/docs/img/signals_signals_plot.png)"""

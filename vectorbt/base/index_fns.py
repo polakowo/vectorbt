@@ -44,7 +44,7 @@ def repeat_index(index, n):
     """Repeat each element in `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges
+    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=n, step=1)
     return np.repeat(index, n)
 
@@ -53,7 +53,7 @@ def tile_index(index, n):
     """Tile the whole `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges
+    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=n, step=1)
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)

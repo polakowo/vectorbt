@@ -47,10 +47,27 @@ one can manupulate complex classes with dozens of pandas objects using a single 
 
 ## Accessors
 
-The main accessor of vectorbt is `vectorbt.base.accessors.Base_Accessor`. It contains base methods for
-working with pandas objects. Most of these methods are adaptations of combine/reshape/index functions
-that can work with pandas objects. For example, `vectorbt.base.reshape_fns.broadcast` can
-take an arbitrary number of pandas objects, thus you can find its variations as accessor methods.
+The base accessor of vectorbt is `vectorbt.base.accessors.Base_Accessor`.
+You can access its methods as follows:
+
+* `vectorbt.base.accessors.Base_SRAccessor` -> `pd.Series.vbt.*`
+* `vectorbt.base.accessors.Base_DFAccessor` -> `pd.DataFrame.vbt.*`
+
+For example:
+
+```python-repl
+>>> # vectorbt.base.accessors.Base_Accessor.make_symmetric
+>>> pd.Series([1, 2, 3]).vbt.make_symmetric()
+     0    1    2
+0  1.0  2.0  3.0
+1  2.0  NaN  NaN
+2  3.0  NaN  NaN
+```
+
+It contains base methods for working with pandas objects. Most of these methods are adaptations
+of combine/reshape/index functions that can work with pandas objects. For example,
+`vectorbt.base.reshape_fns.broadcast` can take an arbitrary number of pandas objects, thus
+you can find its variations as accessor methods.
 
 ```python-repl
 >>> import pandas as pd

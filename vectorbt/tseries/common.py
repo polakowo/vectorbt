@@ -2,30 +2,11 @@
 
 import numpy as np
 import pandas as pd
-from datetime import timedelta
 
 from vectorbt.utils import checks
 from vectorbt.base.array_wrapper import ArrayWrapper
 
 DatetimeTypes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
-
-
-def to_time_units(obj, freq_delta):
-    """Multiply each element with `freq_delta` to get result in time units."""
-    checks.assert_not_none(freq_delta)
-
-    total_seconds = pd.Timedelta(freq_delta).total_seconds()
-
-    def to_td(x):
-        return timedelta(seconds=x * total_seconds) if ~np.isnan(x) else np.nan
-
-    to_td = np.vectorize(to_td, otypes=[np.object])
-    if checks.is_pandas(obj):
-        return obj.vbt.wrap(to_td(obj.values))
-    arr = np.asarray(obj)
-    if arr.ndim == 0:
-        return to_td(arr.item())
-    return to_td(arr)
 
 
 def freq_delta(freq):
@@ -34,6 +15,13 @@ def freq_delta(freq):
         # Otherwise "ValueError: unit abbreviation w/o a number"
         freq = '1' + freq
     return pd.to_timedelta(freq)
+
+
+def to_time_units(obj, freq):
+    """Multiply each element with `freq_delta` to get result in time units."""
+    if not checks.is_array(obj):
+        obj = np.asarray(obj)
+    return obj * freq_delta(freq).to_timedelta64()
 
 
 class TSArrayWrapper(ArrayWrapper):

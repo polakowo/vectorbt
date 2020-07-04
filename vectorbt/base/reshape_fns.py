@@ -161,7 +161,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                     if checks.is_pandas(arg):
                         index = index_fns.get_index(arg, axis)
                         if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):
-                            # ignore simple ranges
+                            # ignore simple ranges without name
                             continue
                         if new_index is None:
                             new_index = index
@@ -488,6 +488,8 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
 
 def broadcast_to_array_of(arg1, arg2):
     """Broadcast `arg1` to the shape `(1, *arg2.shape)`.
+
+    `arg1` must be either a scalar, a 1-dim array, or have 1 dimension more than `arg2`.
 
     Example:
         ```python-repl

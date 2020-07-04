@@ -83,7 +83,7 @@ class ArrayWrapper:
         """Wrap result of reduction.
 
         Argument `index` can be passed when reducing to an array of values (vs. one value) per column."""
-        checks.assert_ndim(a, np.arange(self.ndim+1))
+        checks.assert_not_none(self.ndim)
 
         a = np.asarray(a)
         if a.ndim == 0:
@@ -95,18 +95,23 @@ class ArrayWrapper:
                 return a[0]
             if self.ndim == 1:
                 # Array per series
-                if len(self.columns) == 1:
-                    name = self.columns[0]
-                    if name == 0:  # was a Series before
-                        name = None
-                else:
+                name = self.columns[0]
+                if name == 0:  # was a Series before
                     name = None
                 return pd.Series(a, index=index, name=name)
-            if self.ndim == 2:
+            else:
                 # Value per column
                 return pd.Series(a, index=self.columns)
-        # Array per column
-        if a.shape == (1, 1):
-            # Scalar value
-            return a[0, 0]
-        return pd.DataFrame(a, index=index, columns=self.columns)
+        else:
+            # Array per column
+            if a.shape == (1, 1):
+                # Scalar value
+                return a[0, 0]
+            if self.ndim == 1:
+                # Array per series
+                name = self.columns[0]
+                if name == 0:  # was a Series before
+                    name = None
+                return pd.Series(a[:, 0], index=index, name=name)
+            # Value per column
+            return pd.DataFrame(a, index=index, columns=self.columns)

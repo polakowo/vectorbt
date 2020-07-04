@@ -368,7 +368,8 @@ class Base_Accessor(ArrayWrapper, AbstractOps):
         if as_columns is not None:
             new_columns = index_fns.combine_indexes(as_columns, self.columns)
         else:
-            new_columns = index_fns.tile_index(self.columns, ntimes)
+            top_columns = pd.Index(np.arange(ntimes), name='apply_idx')
+            new_columns = index_fns.combine_indexes(top_columns, self.columns)
         return self.wrap(result, columns=new_columns)
 
     def combine_with(self, other, *args, combine_func=None, pass_2d=False, broadcast_kwargs={}, **kwargs):
@@ -483,7 +484,8 @@ class Base_Accessor(ArrayWrapper, AbstractOps):
             if as_columns is not None:
                 new_columns = index_fns.combine_indexes(as_columns, columns)
             else:
-                new_columns = index_fns.tile_index(columns, len(others))
+                top_columns = pd.Index(np.arange(len(new_others)), name='combine_idx')
+                new_columns = index_fns.combine_indexes(top_columns, columns)
             return new_obj.vbt.wrap(result, columns=new_columns)
         else:
             # Combine arguments pairwise into one object
