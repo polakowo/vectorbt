@@ -108,7 +108,7 @@ def drawdown_1d_nb(returns):
     """Drawdown of cumulative returns."""
     cum_returns = cum_returns_1d_nb(returns, start_value=100.)
     max_returns = tseries.nb.expanding_max_1d_nb(cum_returns, minp=1)
-    return 1 - cum_returns / max_returns
+    return cum_returns / max_returns - 1
 
 
 @njit(cache=True)
@@ -123,7 +123,7 @@ def drawdown_nb(returns):
 @njit(cache=True)
 def max_drawdown_1d_nb(returns):
     """See `empyrical.max_drawdown`."""
-    return np.max(drawdown_1d_nb(returns))
+    return np.min(drawdown_1d_nb(returns))
 
 
 @njit(cache=True)
@@ -167,7 +167,7 @@ def omega_ratio_1d_nb(returns, ann_factor, risk_free=0., required_return=0.):
     numer = np.sum(returns_less_thresh[returns_less_thresh > 0.0])
     denom = -1.0 * np.sum(returns_less_thresh[returns_less_thresh < 0.0])
     if denom == 0.:
-        return np.nan
+        return np.inf
     return numer / denom
 
 
@@ -193,7 +193,7 @@ def sharpe_ratio_1d_nb(returns, ann_factor, risk_free=0.):
     mean = np.nanmean(returns_risk_adj)
     std = tseries.nb.nanstd_1d_nb(returns_risk_adj, ddof=1)
     if std == 0.:
-        return np.nan
+        return np.inf
     return mean / std * np.sqrt(ann_factor)
 
 
@@ -237,7 +237,7 @@ def sortino_ratio_1d_nb(returns, ann_factor, required_return=0.):
     average_annualized_return = np.nanmean(adj_returns) * ann_factor
     downside_risk = downside_risk_1d_nb(returns, ann_factor, required_return=required_return)
     if downside_risk == 0.:
-        return np.nan
+        return np.inf
     return average_annualized_return / downside_risk
 
 
@@ -289,7 +289,7 @@ def beta_1d_nb(returns, factor_returns):
     if ind_variances < 1.0e-30:
         ind_variances = np.nan
     if ind_variances == 0.:
-        return np.nan
+        return np.inf
     return covariances / ind_variances
 
 
@@ -335,7 +335,7 @@ def tail_ratio_1d_nb(returns):
     perc_95 = np.abs(np.percentile(returns, 95))
     perc_5 = np.abs(np.percentile(returns, 5))
     if perc_5 == 0.:
-        return np.nan
+        return np.inf
     return perc_95 / perc_5
 
 
@@ -392,7 +392,7 @@ def capture_1d_nb(returns, factor_returns, ann_factor):
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
     annualized_return2 = annualized_return_1d_nb(factor_returns, ann_factor)
     if annualized_return2 == 0.:
-        return np.nan
+        return np.inf
     return annualized_return1 / annualized_return2
 
 
@@ -415,7 +415,7 @@ def up_capture_1d_nb(returns, factor_returns, ann_factor):
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
     annualized_return2 = annualized_return_1d_nb(factor_returns, ann_factor)
     if annualized_return2 == 0.:
-        return np.nan
+        return np.inf
     return annualized_return1 / annualized_return2
 
 
@@ -438,7 +438,7 @@ def down_capture_1d_nb(returns, factor_returns, ann_factor):
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
     annualized_return2 = annualized_return_1d_nb(factor_returns, ann_factor)
     if annualized_return2 == 0.:
-        return np.nan
+        return np.inf
     return annualized_return1 / annualized_return2
 
 

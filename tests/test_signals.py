@@ -29,6 +29,15 @@ day_dt = np.timedelta64(86400000000000)
 
 
 class TestAccessors:
+    def test_freq(self):
+        assert sig.vbt.signals.freq == day_dt
+        assert sig['a'].vbt.signals.freq == day_dt
+        assert sig.vbt.signals(freq='2D').freq == day_dt * 2
+        assert sig['a'].vbt.signals(freq='2D').freq == day_dt * 2
+        assert pd.Series([False, True]).vbt.signals.freq is None
+        assert pd.Series([False, True]).vbt.signals(freq='3D').freq == day_dt * 3
+        assert pd.Series([False, True]).vbt.signals(freq=np.timedelta64(4, 'D')).freq == day_dt * 4
+
     def test_shuffle(self):
         pd.testing.assert_series_equal(
             sig['a'].vbt.signals.shuffle(seed=seed),

@@ -272,12 +272,14 @@ class BaseDrawdowns(Records):
     @cached_property
     def avg_drawdown(self):
         """Average drawdown (ADD)."""
-        return self.map_reduce_records(nb.dd_drawdown_map_nb, nb.mean_reduce_nb, self.ts.vbt.to_2d_array())
+        return self.map_reduce_records(
+            nb.dd_drawdown_map_nb, nb.mean_reduce_nb, self.ts.vbt.to_2d_array(), default_val=0.)
 
     @cached_property
     def max_drawdown(self):
         """Maximum drawdown (MDD)."""
-        return self.map_reduce_records(nb.dd_drawdown_map_nb, nb.min_reduce_nb, self.ts.vbt.to_2d_array())
+        return self.map_reduce_records(
+            nb.dd_drawdown_map_nb, nb.min_reduce_nb, self.ts.vbt.to_2d_array(), default_val=0.)
 
     @cached_property
     def duration(self):

@@ -36,7 +36,7 @@ class Returns_Accessor(TimeSeries_Accessor):
 
     @classmethod
     def from_price(cls, price, **kwargs):
-        """Computes the return series of `price`."""
+        """Returns a new `Returns_Accessor` instance with returns from `price`."""
         return cls(price.vbt.tseries.pct_change(), **kwargs)
 
     @property
@@ -56,9 +56,9 @@ class Returns_Accessor(TimeSeries_Accessor):
         """Daily returns."""
         checks.assert_type(self.index, DatetimeTypes)
 
-        if self.freq == pd.Timedelta('1 days'):
+        if self.freq == pd.Timedelta('1D'):
             return self._obj
-        return self.resample_apply('1 days', nb.total_return_apply_nb)
+        return self.resample_apply('1D', nb.total_return_apply_nb)
 
     def annual(self):
         """Annual returns."""
@@ -79,14 +79,6 @@ class Returns_Accessor(TimeSeries_Accessor):
     def total(self):
         """Total return."""
         return self.wrap_reduced(nb.cum_returns_final_nb(self.to_2d_array(), np.full(len(self.columns), 0.)))
-
-    def drawdown(self):
-        """Relative decline from a peak."""
-        return self.wrap(nb.drawdown_nb(self.to_2d_array()))
-
-    def max_drawdown(self):
-        """Total maximum drawdown (MDD)."""
-        return self.wrap_reduced(nb.max_drawdown_nb(self.to_2d_array()))
 
     def annualized_return(self):
         """Mean annual growth rate of returns.
@@ -234,25 +226,19 @@ class Returns_Accessor(TimeSeries_Accessor):
         """Kurtosis of returns."""
         return self.wrap_reduced(stats.kurtosis(self.to_2d_array(), axis=0, nan_policy='omit'))
 
-    def drawdown(self, start_value=1.):
-        """Drawdown of cumulative returns.
+    def drawdown(self):
+        """Relative decline from a peak."""
+        return self.wrap(nb.drawdown_nb(self.to_2d_array()))
 
-        Args:
-            start_value (int, float or array_like): The starting returns.
+    def max_drawdown(self):
+        """Total maximum drawdown (MDD)."""
+        return self.wrap_reduced(nb.max_drawdown_nb(self.to_2d_array()))
 
-                Default value is 1 to avoid zeros."""
-        return self.cumulative(start_value=start_value).vbt.tseries(freq=self.freq).drawdown()
-
-    def drawdowns(self, start_value=1.):
+    def drawdowns(self):
         """Drawdown records of cumulative returns.
 
-        See `vectorbt.records.drawdowns.Drawdowns`.
-
-        Args:
-            start_value (int, float or array_like): The starting returns.
-
-                Default value is 1 to avoid zeros."""
-        return self.cumulative(start_value=start_value).vbt.tseries(freq=self.freq).drawdowns()
+        See `vectorbt.records.drawdowns.Drawdowns`."""
+        return self.cumulative(start_value=1.).vbt.tseries(freq=self.freq).drawdowns()
 
 
 @register_series_accessor('returns')
