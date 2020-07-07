@@ -243,16 +243,6 @@ def cumprod_nb(a):
 
 
 @njit(cache=True)
-def nanmax_cube_nb(a):
-    """Return max of a cube by reducing the axis 0."""
-    result = np.empty((a.shape[1], a.shape[2]), dtype=f8)
-    for i in range(a.shape[1]):
-        for j in range(a.shape[2]):
-            result[i, j] = np.nanmax(a[:, i, j])
-    return result
-
-
-@njit(cache=True)
 def nancnt_nb(a):
     """Compute count while ignoring NaNs."""
     result = np.empty(a.shape[1], dtype=f8)

@@ -677,6 +677,7 @@ Changes take effect immediately.
 """
 
 from vectorbt import (
+    base,
     indicators,
     portfolio,
     returns,

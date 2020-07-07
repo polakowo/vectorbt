@@ -71,7 +71,7 @@ class cached_property(custom_property):
 
     def __init__(self, func, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
-        self.attrname = None
+        self.attrname = '__cached_' + func.__name__
         self.lock = RLock()
         self.disabled = disabled
 

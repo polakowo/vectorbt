@@ -14,6 +14,13 @@ and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display compl
 Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to process data 
 on the fly and thus enable the user to interact with data-hungry widgets without significant delays.
 
+With vectorbt you can
+* Analyze and engineer features for any time series data
+* Run many common pandas operations on Series/DataFrames a lot faster
+* Test millions of strategies/hyper-parameter combinations in one go
+* Test machine learning models
+* Build interactive charts/dashboards without leaving Jupyter
+
 ## Example
 
 Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history 

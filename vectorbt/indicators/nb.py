@@ -8,7 +8,7 @@
     All functions passed as argument must be Numba-compiled."""
 
 import numpy as np
-from numba import njit
+from numba import njit, f8
 
 from vectorbt import tseries
 
@@ -152,7 +152,17 @@ def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_
         signal_ts = tseries.nb.ewm_mean_nb(macd_ts, signal_window)
     else:
         signal_ts = tseries.nb.rolling_mean_nb(macd_ts, signal_window)
-    return fast_ma, slow_ma, macd_ts, signal_ts
+    return macd_ts, signal_ts
+
+
+@njit(cache=True)
+def nanmax_cube_nb(a):
+    """Return max of a cube by reducing the axis 0."""
+    result = np.empty((a.shape[1], a.shape[2]), dtype=f8)
+    for i in range(a.shape[1]):
+        for j in range(a.shape[2]):
+            result[i, j] = np.nanmax(a[:, i, j])
+    return result
 
 
 @njit(cache=True)
@@ -162,7 +172,7 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     tr0 = high_ts - low_ts
     tr1 = np.abs(high_ts - tseries.nb.fshift_nb(close_ts, 1))
     tr2 = np.abs(low_ts - tseries.nb.fshift_nb(close_ts, 1))
-    tr = tseries.nb.nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
+    tr = nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
 
     cache_dict = dict()
     for i in range(windows.shape[0]):
@@ -186,7 +196,7 @@ def atr_apply_nb(close_ts, high_ts, low_ts, window, ewm, tr, cache_dict):
 @njit(cache=True)
 def obv_custom_func_nb(close_ts, volume_ts):
     """Custom calculation function for `vectorbt.indicators.basic.OBV`."""
-    obv = np.full_like(close_ts, np.nan)
+    obv = np.full(close_ts.shape, np.nan, dtype=f8)
     for col in range(close_ts.shape[1]):
         cumsum = 0
         for i in range(1, close_ts.shape[0]):
