@@ -5,10 +5,11 @@ from vectorbt.widgets import basic
 from vectorbt.utils import checks
 
 
-@register_dataframe_accessor('Bar')
-@register_series_accessor('Bar')
+@register_dataframe_accessor('bar')
+@register_series_accessor('bar')
 class Bar_Accessor():
-    """Allows calling `vectorbt.widgets.basic.Bar` using `pandas.Series.vbt.Bar` and `pandas.DataFrame.vbt.Bar`."""
+    """Allows calling `vectorbt.widgets.basic.Bar`
+    using `pd.Series.vbt.bar` and `pd.DataFrame.vbt.bar`."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor
@@ -25,10 +26,11 @@ class Bar_Accessor():
         return basic.Bar(x_labels, trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
-@register_dataframe_accessor('Scatter')
-@register_series_accessor('Scatter')
+@register_dataframe_accessor('scatter')
+@register_series_accessor('scatter')
 class Scatter_Accessor():
-    """Allows calling `vectorbt.widgets.basic.Scatter` using `pandas.Series.vbt.Scatter` and `pandas.DataFrame.vbt.Scatter`."""
+    """Allows calling `vectorbt.widgets.basic.Scatter`
+    using `pd.Series.vbt.scatter` and `pd.DataFrame.vbt.scatter`."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor
@@ -45,10 +47,11 @@ class Scatter_Accessor():
         return basic.Scatter(x_labels, trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
-@register_dataframe_accessor('Histogram')
-@register_series_accessor('Histogram')
+@register_dataframe_accessor('hist')
+@register_series_accessor('hist')
 class Histogram_Accessor():
-    """Allows calling `vectorbt.widgets.basic.Histogram` using `pandas.Series.vbt.Histogram` and `pandas.DataFrame.vbt.Histogram`."""
+    """Allows calling `vectorbt.widgets.basic.Histogram`
+    using `pd.Series.vbt.hist` and `pd.DataFrame.vbt.hist`."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor
@@ -63,10 +66,11 @@ class Histogram_Accessor():
         return basic.Histogram(trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
-@register_dataframe_accessor('Box')
-@register_series_accessor('Box')
+@register_dataframe_accessor('box')
+@register_series_accessor('box')
 class Box_Accessor():
-    """Allows calling `vectorbt.widgets.basic.Box` using `pandas.Series.vbt.Box` and `pandas.DataFrame.vbt.Box`."""
+    """Allows calling `vectorbt.widgets.basic.Box`
+    using `pd.Series.vbt.boxplot` and `pd.DataFrame.vbt.boxplot`."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor
@@ -81,10 +85,11 @@ class Box_Accessor():
         return basic.Box(trace_names=trace_names, data=obj.vbt.to_2d_array(), **kwargs)
 
 
-@register_dataframe_accessor('Heatmap')
-@register_series_accessor('Heatmap')
+@register_dataframe_accessor('heatmap')
+@register_series_accessor('heatmap')
 class Heatmap_Accessor():
-    """Allows calling `vectorbt.widgets.basic.Heatmap` using `pandas.Series.vbt.Heatmap` and `pandas.DataFrame.vbt.Heatmap`."""
+    """Allows calling `vectorbt.widgets.basic.Heatmap`
+    using `pd.Series.vbt.heatmap` and `pd.DataFrame.vbt.heatmap`."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor

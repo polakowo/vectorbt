@@ -65,7 +65,8 @@ class Indicator(DefaultFigureWidget):
         Args:
             value (int or float): The value to be displayed.
         """
-        # NOTE: If called by Plotly event handler and in case of error, this won't visible in a notebook cell, but in logs!
+        # NOTE: If called by Plotly event handler and in case of error,
+        # this won't visible in a notebook cell, but in logs!
         checks.assert_type(value, (int, float))
 
         # Update value range
@@ -101,7 +102,7 @@ class Bar(DefaultFigureWidget):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            vbt.Bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
+            vbt.bar(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
             ```
             ![](/vectorbt/docs/img/Bar.png)
             """
@@ -135,7 +136,7 @@ class Bar(DefaultFigureWidget):
                 Must be of shape (`x_labels`, `trace_names`).
         Example:
             ```py
-            fig = pd.Series([1, 2], index=['x', 'y'], name='a').vbt.Bar()
+            fig = pd.Series([1, 2], index=['x', 'y'], name='a').vbt.bar()
             fig.update_data([2, 1])
             fig.show()
             ```
@@ -168,7 +169,7 @@ class Scatter(DefaultFigureWidget):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            vbt.Scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
+            vbt.scatter(['x', 'y'], trace_names=['a', 'b'], data=[[1, 2], [3, 4]])
             ```
             ![](/vectorbt/docs/img/Scatter.png)
             """
@@ -227,7 +228,7 @@ class Histogram(DefaultFigureWidget):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            vbt.Histogram(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
+            vbt.hist(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
             ```
             ![](/vectorbt/docs/img/Histogram.png)
             """
@@ -290,7 +291,7 @@ class Box(DefaultFigureWidget):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            vbt.Box(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
+            vbt.box(trace_names=['a', 'b'], data=[[1, 2], [3, 4], [2, 1]])
             ```
             ![](/vectorbt/docs/img/Box.png)
             """
@@ -353,7 +354,7 @@ class Heatmap(DefaultFigureWidget):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            vbt.Heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
+            vbt.heatmap(['a', 'b'], ['x', 'y'], data=[[1, 2], [3, 4]])
             ```
             ![](/vectorbt/docs/img/Heatmap.png)
             """

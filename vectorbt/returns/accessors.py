@@ -10,6 +10,7 @@ from scipy import stats
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
+from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns
 from vectorbt.tseries.accessors import (
     TimeSeries_Accessor,
@@ -23,7 +24,7 @@ from vectorbt.returns import nb
 class Returns_Accessor(TimeSeries_Accessor):
     """Accessor on top of return series. For both, Series and DataFrames.
 
-    Accessible through `pandas.Series.vbt.returns` and `pandas.DataFrame.vbt.returns`."""
+    Accessible through `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`."""
 
     def __init__(self, obj, freq=None, year_freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -234,18 +235,19 @@ class Returns_Accessor(TimeSeries_Accessor):
         """Total maximum drawdown (MDD)."""
         return self.wrap_reduced(nb.max_drawdown_nb(self.to_2d_array()))
 
+    @cached_property
     def drawdowns(self):
         """Drawdown records of cumulative returns.
 
         See `vectorbt.records.drawdowns.Drawdowns`."""
-        return self.cumulative(start_value=1.).vbt.tseries(freq=self.freq).drawdowns()
+        return self.cumulative(start_value=1.).vbt.tseries(freq=self.freq).drawdowns
 
 
 @register_series_accessor('returns')
 class Returns_SRAccessor(Returns_Accessor, TimeSeries_SRAccessor):
     """Accessor on top of return series. For Series only.
 
-    Accessible through `pandas.Series.vbt.returns`."""
+    Accessible through `pd.Series.vbt.returns`."""
 
     def __init__(self, obj, freq=None, year_freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -259,7 +261,7 @@ class Returns_SRAccessor(Returns_Accessor, TimeSeries_SRAccessor):
 class Returns_DFAccessor(Returns_Accessor, TimeSeries_DFAccessor):
     """Accessor on top of return series. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt.returns`."""
+    Accessible through `pd.DataFrame.vbt.returns`."""
 
     def __init__(self, obj, freq=None, year_freq=None):
         if not checks.is_pandas(obj):  # parent accessor

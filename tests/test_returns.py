@@ -7,6 +7,8 @@ import empyrical
 from vectorbt import defaults
 from vectorbt.records.drawdowns import Drawdowns
 
+from tests.utils import day_dt, isclose
+
 index = pd.DatetimeIndex([
     datetime(2018, 1, 1),
     datetime(2018, 1, 2),
@@ -21,8 +23,6 @@ ts = pd.DataFrame({
 }, index=index)
 ret = ts.pct_change()
 
-day_dt = np.timedelta64(86400000000000)
-
 defaults.returns['year_freq'] = '252 days'  # same as empyrical
 
 factor_returns = pd.DataFrame({
@@ -30,16 +30,6 @@ factor_returns = pd.DataFrame({
     'b': ret['b'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 2,
     'c': ret['c'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 3
 })
-
-
-def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
-    if np.isnan(a) == np.isnan(b):
-        return True
-    if np.isinf(a) == np.isinf(b):
-        return True
-    if a == b:
-        return True
-    return abs(a-b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 
 # ############# accessors.py ############# #
@@ -409,12 +399,12 @@ class TestAccessors:
         )
 
     def test_drawdowns(self):
-        assert type(ret['a'].vbt.returns.drawdowns()) is Drawdowns
-        assert ret['a'].vbt.returns.drawdowns().wrapper.freq == ret['a'].vbt.returns.freq
-        assert ret['a'].vbt.returns.drawdowns().wrapper.ndim == ret['a'].ndim
-        assert ret.vbt.returns.drawdowns().wrapper.ndim == ret.ndim
-        assert isclose(ret['a'].vbt.returns.drawdowns().max_drawdown, ret['a'].vbt.returns.max_drawdown())
+        assert type(ret['a'].vbt.returns.drawdowns) is Drawdowns
+        assert ret['a'].vbt.returns.drawdowns.wrapper.freq == ret['a'].vbt.returns.freq
+        assert ret['a'].vbt.returns.drawdowns.wrapper.ndim == ret['a'].ndim
+        assert ret.vbt.returns.drawdowns.wrapper.ndim == ret.ndim
+        assert isclose(ret['a'].vbt.returns.drawdowns.max_drawdown, ret['a'].vbt.returns.max_drawdown())
         pd.testing.assert_series_equal(
-            ret.vbt.returns.drawdowns().max_drawdown,
+            ret.vbt.returns.drawdowns.max_drawdown,
             ret.vbt.returns.max_drawdown()
         )

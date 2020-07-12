@@ -21,7 +21,7 @@ def to_time_units(obj, freq):
     """Multiply each element with `freq_delta` to get result in time units."""
     if not checks.is_array(obj):
         obj = np.asarray(obj)
-    return obj * freq_delta(freq).to_timedelta64()
+    return obj * freq_delta(freq)
 
 
 class TSArrayWrapper(ArrayWrapper):
@@ -57,4 +57,7 @@ class TSArrayWrapper(ArrayWrapper):
         If `time_units` is set, calls `vectorbt.tseries.common.to_time_units`."""
         if time_units:
             a = self.to_time_units(a)
-        return ArrayWrapper.wrap_reduced(self, a, index=index)
+        result = ArrayWrapper.wrap_reduced(self, a, index=index)
+        if isinstance(result, np.timedelta64):
+            return pd.to_timedelta(result)
+        return result

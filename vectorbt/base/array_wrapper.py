@@ -115,3 +115,14 @@ class ArrayWrapper:
                 return pd.Series(a[:, 0], index=index, name=name)
             # Value per column
             return pd.DataFrame(a, index=index, columns=self.columns)
+
+    def __eq__(self, other):
+        if type(self) != type(other):
+            return False
+        if not pd.Index.equals(self.index, other.index):
+            return False
+        if not pd.Index.equals(self.columns, other.columns):
+            return False
+        if self.ndim != other.ndim:
+            return False
+        return True

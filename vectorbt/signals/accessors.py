@@ -41,6 +41,7 @@ from vectorbt.accessors import register_dataframe_accessor, register_series_acce
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
+from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
@@ -55,7 +56,7 @@ from vectorbt.widgets import DefaultFigureWidget
 class Signals_Accessor(TimeSeries_Accessor):
     """Accessor on top of signal series. For both, Series and DataFrames.
 
-    Accessible through `pandas.Series.vbt.signals` and `pandas.DataFrame.vbt.signals`."""
+    Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -499,16 +500,18 @@ class Signals_Accessor(TimeSeries_Accessor):
         result = nb.map_reduce_partitions_nb(self.to_2d_array(), map_func_nb, reduce_func_nb, *args)
         return self.wrap_reduced(result)
 
+    @cached_property
     def num_signals(self):
         """Sum up `True` values."""
         return self.sum()
 
-    def avg_distance(self, **kwargs):
+    @cached_property
+    def avg_distance(self):
         """Calculate the average distance between `True` values in `self`.
 
         See `Signals_Accessor.map_reduce_between`."""
         return self.map_reduce_between(
-            other=None, map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb, **kwargs)
+            other=None, map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb)
 
     def avg_distance_to(self, other, **kwargs):
         """Calculate the average distance between `True` values in `self` and `other`.
@@ -662,7 +665,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
     """Accessor on top of signal series. For Series only.
 
-    Accessible through `pandas.Series.vbt.signals`."""
+    Accessible through `pd.Series.vbt.signals`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -802,7 +805,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
 class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
     """Accessor on top of signal series. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt.signals`."""
+    Accessible through `pd.DataFrame.vbt.signals`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor

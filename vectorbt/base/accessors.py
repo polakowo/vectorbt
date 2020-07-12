@@ -8,50 +8,26 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.base.common import add_binary_magic_methods, add_unary_magic_methods, AbstractOps
+from vectorbt.base.common import (
+    add_binary_magic_methods,
+    add_unary_magic_methods,
+    binary_magic_methods,
+    unary_magic_methods
+)
 
 
-@add_binary_magic_methods([
-    # comparison ops
-    ('__eq__', np.equal),
-    ('__ne__', np.not_equal),
-    ('__lt__', np.less),
-    ('__gt__', np.greater),
-    ('__le__', np.less_equal),
-    ('__ge__', np.greater_equal),
-    # arithmetic ops
-    ('__add__', np.add),
-    ('__sub__', np.subtract),
-    ('__mul__', np.multiply),
-    ('__pow__', np.power),
-    ('__mod__', np.mod),
-    ('__floordiv__', np.floor_divide),
-    ('__truediv__', np.true_divide),
-    ('__radd__', lambda x, y: np.add(y, x)),
-    ('__rsub__', lambda x, y: np.subtract(y, x)),
-    ('__rmul__', lambda x, y: np.multiply(y, x)),
-    ('__rpow__', lambda x, y: np.power(y, x)),
-    ('__rmod__', lambda x, y: np.mod(y, x)),
-    ('__rfloordiv__', lambda x, y: np.floor_divide(y, x)),
-    ('__rtruediv__', lambda x, y: np.true_divide(y, x)),
-    # mask ops
-    ('__and__', np.bitwise_and),
-    ('__or__', np.bitwise_or),
-    ('__xor__', np.bitwise_xor),
-    ('__rand__', lambda x, y: np.bitwise_and(y, x)),
-    ('__ror__', lambda x, y: np.bitwise_or(y, x)),
-    ('__rxor__', lambda x, y: np.bitwise_xor(y, x))
-])
-@add_unary_magic_methods([
-    ('__neg__', np.negative),
-    ('__pos__', np.positive),
-    ('__abs__', np.absolute),
-    ('__invert__', np.invert)
-])
-class Base_Accessor(ArrayWrapper, AbstractOps):
+@add_binary_magic_methods(
+    binary_magic_methods,
+    lambda self, other, np_func: self.combine_with(other, combine_func=np_func)
+)
+@add_unary_magic_methods(
+    unary_magic_methods,
+    lambda self, np_func: self.apply(apply_func=np_func)
+)
+class Base_Accessor(ArrayWrapper):
     """Accessor on top of any data series. For both, Series and DataFrames.
 
-    Accessible through `pandas.Series.vbt` and `pandas.DataFrame.vbt`, and all child accessors.
+    Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
 
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
@@ -501,7 +477,7 @@ class Base_Accessor(ArrayWrapper, AbstractOps):
 class Base_SRAccessor(Base_Accessor):
     """Accessor on top of any data series. For Series only.
 
-    Accessible through `pandas.Series.vbt` and all child accessors."""
+    Accessible through `pd.Series.vbt` and all child accessors."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor
@@ -522,7 +498,7 @@ class Base_SRAccessor(Base_Accessor):
 class Base_DFAccessor(Base_Accessor):
     """Accessor on top of any data series. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt` and all child accessors."""
+    Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
     def __init__(self, obj):
         if not checks.is_pandas(obj):  # parent accessor

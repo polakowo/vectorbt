@@ -38,6 +38,7 @@ from numba.typed import Dict
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
+from vectorbt.utils.decorators import cached_property
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.base.common import add_nb_methods
@@ -93,7 +94,7 @@ except ImportError:
 class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
     """Accessor on top of time series. For both, Series and DataFrames.
 
-    Accessible through `pandas.Series.vbt.tseries` and `pandas.DataFrame.vbt.tseries`.
+    Accessible through `pd.Series.vbt.tseries` and `pd.DataFrame.vbt.tseries`.
 
     You can call the accessor and specify index frequency if your index isn't datetime-like."""
 
@@ -228,7 +229,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         """See `vectorbt.tseries.nb.groupby_apply_nb` and
         `vectorbt.tseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
-        For `by`, see `pandas.DataFrame.groupby`.
+        For `by`, see `pd.DataFrame.groupby`.
 
         Example:
             ```python-repl
@@ -262,7 +263,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         """See `vectorbt.tseries.nb.groupby_apply_nb` and
         `vectorbt.tseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
-        For `freq`, see `pandas.DataFrame.resample`.
+        For `freq`, see `pd.DataFrame.resample`.
 
         Example:
             ```python-repl
@@ -469,7 +470,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
-        For `percentiles`, see `pandas.DataFrame.describe`.
+        For `percentiles`, see `pd.DataFrame.describe`.
 
         Example:
             ```python-repl
@@ -485,11 +486,13 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
             max    5.000000  5.000000  3.00000
             ```"""
         if percentiles is not None:
-            percentiles = reshape_fns.to_1d(percentiles)
+            percentiles = reshape_fns.to_1d(percentiles, raw=True)
         else:
             percentiles = np.array([0.25, 0.5, 0.75])
-        if len(percentiles) == 0:
-            percentiles = np.array([0.5])
+        percentiles = percentiles.tolist()
+        if 0.5 not in percentiles:
+            percentiles.append(0.5)
+        percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
         return self.reduce_to_array(nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
@@ -498,6 +501,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         """Drawdown series."""
         return self.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
 
+    @cached_property
     def drawdowns(self):
         """Drawdown records.
 
@@ -509,7 +513,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
 class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
     """Accessor on top of time series. For Series only.
 
-    Accessible through `pandas.Series.vbt.tseries`."""
+    Accessible through `pd.Series.vbt.tseries`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -555,7 +559,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
     """Accessor on top of time series. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt.tseries`."""
+    Accessible through `pd.DataFrame.vbt.tseries`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -592,7 +596,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 class OHLCV_DFAccessor(TimeSeries_DFAccessor):
     """Accessor on top of OHLCV data. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt.ohlcv`."""
+    Accessible through `pd.DataFrame.vbt.ohlcv`."""
 
     def __init__(self, obj, column_names=None, freq=None):
         if not checks.is_pandas(obj):  # parent accessor

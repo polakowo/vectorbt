@@ -50,7 +50,7 @@ window_ret_matrix = portfolio.total_return.vbt.unstack_to_df(
     symmetric=True)
 
 # Plot the whole thing
-window_ret_matrix.vbt.Heatmap(
+window_ret_matrix.vbt.heatmap(
     xaxis_title='Slow window', 
     yaxis_title='Fast window', 
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')),
@@ -175,7 +175,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
     - Drawdown analysis
 
 ```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns().plot()
+>>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns.plot()
 ```
 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
@@ -237,7 +237,7 @@ ma_ewm    False      True
 
 ```python-repl
 >>> a = np.random.normal(0, 4, size=10000)
->>> pd.Series(a).vbt.Box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
+>>> pd.Series(a).vbt.box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
 ``` 
 
 ![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/Box.png)

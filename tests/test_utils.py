@@ -1,13 +1,11 @@
 import numpy as np
 import pandas as pd
 from numba import njit
-import hashlib
 
 from vectorbt import defaults
 from vectorbt.utils import checks, config, decorators
 
-# non-randomized hash function
-hash = lambda s: int(hashlib.sha512(s.encode('utf-8')).hexdigest()[:16], 16)
+from tests.utils import hash
 
 
 # ############# config.py ############# #

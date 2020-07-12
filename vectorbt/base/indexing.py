@@ -8,7 +8,7 @@ from vectorbt.base import index_fns, reshape_fns
 
 
 class _iLoc:
-    """Forwards `pandas.Series.iloc`/`pandas.DataFrame.iloc`
+    """Forwards `pd.Series.iloc`/`pd.DataFrame.iloc`
     operation to each Series/DataFrame and returns a new class instance."""
 
     def __init__(self, obj, indexing_func):
@@ -20,7 +20,7 @@ class _iLoc:
 
 
 class _Loc:
-    """Forwards `pandas.Series.loc`/`pandas.DataFrame.loc`
+    """Forwards `pd.Series.loc`/`pd.DataFrame.loc`
     operation to each Series/DataFrame and returns a new class instance."""
 
     def __init__(self, obj, indexing_func):
@@ -88,7 +88,7 @@ class PandasIndexer:
     loc.__doc__ = _Loc.__doc__
 
     def xs(self, *args, **kwargs):
-        """Forwards `pandas.Series.xs`/`pandas.DataFrame.xs`
+        """Forwards `pd.Series.xs`/`pd.DataFrame.xs`
         operation to each Series/DataFrame and returns a new class instance."""
         return self._indexing_func(self, lambda x: x.xs(*args, **kwargs))
 
@@ -111,7 +111,7 @@ def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
 
 
 class _ParamLoc:
-    """Access a group of columns by parameter using `pandas.Series.loc`.
+    """Access a group of columns by parameter using `pd.Series.loc`.
 
     Uses `mapper` to establish link between columns and parameter values."""
 
@@ -169,7 +169,7 @@ class ParamIndexerFactory:
 
     Parameter indexer enables accessing a group of rows and columns by a parameter array (similar to `loc`). 
     This way, one can query index/columns by another Series called a parameter mapper, which is just a
-    `pandas.Series` that maps columns (its index) to params (its values).
+    `pd.Series` that maps columns (its index) to params (its values).
     
     Parameter indexing is important, since querying by column/index labels alone is not always the best option.
     For example, `pandas` doesn't let you query by list at a specific index/column level.
@@ -230,7 +230,7 @@ class ParamIndexerFactory:
             def param_loc(self, param_name=param_name):
                 return getattr(self, f'_{param_name}_loc')
 
-            param_loc.__doc__ = f"""Access a group of columns by parameter `{param_name}` using `pandas.Series.loc`.
+            param_loc.__doc__ = f"""Access a group of columns by parameter `{param_name}` using `pd.Series.loc`.
             
             Forwards this operation to each Series/DataFrame and returns a new class instance.
             """

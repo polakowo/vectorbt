@@ -5,14 +5,13 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
-from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.tseries.common import TSArrayWrapper, DatetimeTypes
-from vectorbt.records.base import Records
-from vectorbt.records.common import indexing_on_records
+from vectorbt.records.base import Records, indexing_on_records
 from vectorbt.records.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records import nb
 
@@ -20,7 +19,7 @@ from vectorbt.records import nb
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseDrawdowns`."""
     records_arr, _ = indexing_on_records(obj, pd_indexing_func)
-    return obj.__class__(records_arr, pd_indexing_func(obj.ts), freq=obj.wrapper.freq)
+    return obj.__class__(records_arr, pd_indexing_func(obj.ts), freq=obj.wrapper.freq, idx_field=obj.idx_field)
 
 
 class BaseDrawdowns(Records):
@@ -28,8 +27,8 @@ class BaseDrawdowns(Records):
 
     Requires `records_arr` to have all fields defined in `vectorbt.records.enums.drawdown_dt`."""
 
-    def __init__(self, records_arr, ts, freq=None):
-        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(ts, freq=freq))
+    def __init__(self, records_arr, ts, freq=None, idx_field='end_idx'):
+        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(ts, freq=freq), idx_field=idx_field)
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
@@ -44,6 +43,11 @@ class BaseDrawdowns(Records):
         `**kwargs` such as `freq` will be passed to `BaseDrawdowns.__init__`."""
         records_arr = nb.drawdown_records_nb(ts.vbt.to_2d_array())
         return cls(records_arr, ts, **kwargs)
+
+    @cached_method
+    def filter_by_mask(self, mask):
+        """Return a new class instance, filtered by mask."""
+        return self.__class__(self.records_arr[mask], self.ts, freq=self.wrapper.freq, idx_field=self.idx_field)
 
     def plot(self,
              ts_trace_kwargs={},
@@ -252,61 +256,74 @@ class BaseDrawdowns(Records):
     @cached_property
     def start_value(self):
         """Start value of each drawdown."""
-        return self.map_records_to_matrix(nb.dd_start_value_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_start_value_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
     def valley_value(self):
         """Valley value of each drawdown."""
-        return self.map_records_to_matrix(nb.dd_valley_value_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_valley_value_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
     def end_value(self):
         """End value of each drawdown."""
-        return self.map_records_to_matrix(nb.dd_end_value_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_end_value_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
     def drawdown(self):
         """Drawdown value (in percentage)."""
-        return self.map_records_to_matrix(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
     def avg_drawdown(self):
         """Average drawdown (ADD)."""
-        return self.map_reduce_records(
-            nb.dd_drawdown_map_nb, nb.mean_reduce_nb, self.ts.vbt.to_2d_array(), default_val=0.)
+        return self.drawdown.mean(default_val=0.)
 
     @cached_property
     def max_drawdown(self):
         """Maximum drawdown (MDD)."""
-        return self.map_reduce_records(
-            nb.dd_drawdown_map_nb, nb.min_reduce_nb, self.ts.vbt.to_2d_array(), default_val=0.)
+        return self.drawdown.min(default_val=0.)
 
     @cached_property
     def duration(self):
         """Duration of each drawdown (in raw format)."""
-        return self.map_records_to_matrix(nb.dd_duration_map_nb)
+        return self.map(nb.dd_duration_map_nb)
 
     @cached_property
     def avg_duration(self):
         """Average drawdown duration (in time units)."""
-        return self.map_reduce_records(nb.dd_duration_map_nb, nb.mean_reduce_nb, time_units=True)
+        return self.duration.mean(time_units=True)
 
     @cached_property
     def max_duration(self):
         """Maximum drawdown duration (in time units)."""
-        return self.map_reduce_records(nb.dd_duration_map_nb, nb.max_reduce_nb, time_units=True)
+        return self.duration.max(time_units=True)
 
     @cached_property
     def coverage(self):
         """Coverage, that is, total duration divided by the whole period."""
-        total_duration = self.map_reduce_records(nb.dd_duration_map_nb, nb.sum_reduce_nb, default_val=0.)
-        coverage = to_1d(total_duration, raw=True) / self.wrapper.shape[0]
+        coverage = to_1d(self.duration.sum(), raw=True) / self.wrapper.shape[0]
         return self.wrapper.wrap_reduced(coverage)
 
     @cached_property
     def ptv_duration(self):
         """Peak-to-valley (PtV) duration of each drawdown."""
-        return self.map_records_to_matrix(nb.dd_ptv_duration_map_nb)
+        return self.map(nb.dd_ptv_duration_map_nb)
+
+
+class ActiveDrawdowns(BaseDrawdowns):
+    """Extends `BaseDrawdowns` by properties for active drawdowns."""
+
+    @cached_property
+    def current_drawdown(self):
+        return self.drawdown.nst(-1)
+
+    @cached_property
+    def current_duration(self):
+        return self.duration.nst(-1, time_units=True)
+
+    @cached_property
+    def current_return(self):
+        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array()).nst(-1)
 
 
 class RecoveredDrawdowns(BaseDrawdowns):
@@ -315,19 +332,19 @@ class RecoveredDrawdowns(BaseDrawdowns):
     @cached_property
     def recovery_return(self):
         """Recovery return of each drawdown."""
-        return self.map_records_to_matrix(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
     def vtr_duration(self):
         """Valley-to-recovery (VtR) duration of each drawdown."""
-        return self.map_records_to_matrix(nb.dd_vtr_duration_map_nb)
+        return self.map(nb.dd_vtr_duration_map_nb)
 
     @cached_property
     def vtr_duration_ratio(self):
         """Ratio of VtR duration to total duration of each drawdown.
 
         The time from valley to recovery divided by the time from peak to valley."""
-        return self.map_records_to_matrix(nb.dd_vtr_duration_ratio_map_nb)
+        return self.map(nb.dd_vtr_duration_ratio_map_nb)
 
 
 class Drawdowns(BaseDrawdowns):
@@ -336,8 +353,8 @@ class Drawdowns(BaseDrawdowns):
     Example:
         Compare the average duration of active and recovered drawdowns:
         ```python-repl
+        >>> import vectorbt as vbt
         >>> import pandas as pd
-        >>> from vectorbt.records import Drawdowns
 
         >>> ts = pd.DataFrame([
         ...     [1, 1, 1],
@@ -346,14 +363,14 @@ class Drawdowns(BaseDrawdowns):
         ...     [2, 2, 3],
         ...     [1, 3, 1]
         ... ], columns=['a', 'b', 'c'])
-        >>> drawdowns = Drawdowns.from_ts(ts, freq='1 days')
+        >>> drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days')
 
         >>> print(drawdowns.records)
-           col  idx  start_idx  valley_idx  end_idx  status
-        0    0    4          2           4        4       0
-        1    1    4          2           3        4       1
-        2    2    3          1           2        3       1
-        3    2    4          3           4        4       0
+           col  start_idx  valley_idx  end_idx  status
+        0    0          2           4        4       0
+        1    1          2           3        4       1
+        2    2          1           2        3       1
+        3    2          3           4        4       0
         >>> print(drawdowns.active.avg_duration)
         a   2 days
         b      NaT
@@ -369,7 +386,7 @@ class Drawdowns(BaseDrawdowns):
     @cached_property
     def status(self):
         """See `vectorbt.records.enums.DrawdownStatus`."""
-        return self.map_field_to_matrix('status')
+        return self.map_field('status')
 
     @cached_property
     def recovered_rate(self):
@@ -380,10 +397,20 @@ class Drawdowns(BaseDrawdowns):
     def active(self):
         """Active drawdowns of type `BaseDrawdowns`."""
         filter_mask = self.records_arr['status'] == DrawdownStatus.Active
-        return BaseDrawdowns(self.records_arr[filter_mask], self.ts, freq=self.wrapper.freq)
+        return ActiveDrawdowns(
+            self.records_arr[filter_mask],
+            self.ts,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )
 
     @cached_property
     def recovered(self):
         """Recovered drawdowns of type `RecoveredDrawdowns`."""
         filter_mask = self.records_arr['status'] == DrawdownStatus.Recovered
-        return RecoveredDrawdowns(self.records_arr[filter_mask], self.ts, freq=self.wrapper.freq)
+        return RecoveredDrawdowns(
+            self.records_arr[filter_mask],
+            self.ts,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )

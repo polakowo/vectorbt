@@ -9,7 +9,7 @@ from vectorbt.base.accessors import Base_DFAccessor, Base_SRAccessor
 # By subclassing DirNamesMixin, we can build accessors on top of each other
 @pd.api.extensions.register_series_accessor("vbt")
 class Vbt_SRAccessor(DirNamesMixin, Base_SRAccessor):
-    """The main `vectorbt` accessor for `pandas.Series`."""
+    """The main vectorbt accessor for `pd.Series`."""
 
     def __init__(self, obj):
         self._obj = obj
@@ -20,7 +20,7 @@ class Vbt_SRAccessor(DirNamesMixin, Base_SRAccessor):
 
 @pd.api.extensions.register_dataframe_accessor("vbt")
 class Vbt_DFAccessor(DirNamesMixin, Base_DFAccessor):
-    """The main `vectorbt` accessor for `pandas.DataFrame`."""
+    """The main vectorbt accessor for `pd.DataFrame`."""
 
     def __init__(self, obj):
         self._obj = obj
@@ -30,10 +30,10 @@ class Vbt_DFAccessor(DirNamesMixin, Base_DFAccessor):
 
 
 def register_dataframe_accessor(name):
-    """Decorator to register a custom `pandas.DataFrame` accessor on top of the `vbt` accessor."""
+    """Decorator to register a custom `pd.DataFrame` accessor on top of the `vbt` accessor."""
     return _register_accessor(name, Vbt_DFAccessor)
 
 
 def register_series_accessor(name):
-    """Decorator to register a custom `pandas.Series` accessor on top of the `vbt` accessor."""
+    """Decorator to register a custom `pd.Series` accessor on top of the `vbt` accessor."""
     return _register_accessor(name, Vbt_SRAccessor)

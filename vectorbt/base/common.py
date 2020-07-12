@@ -2,7 +2,6 @@
 
 import numpy as np
 import inspect
-from abc import ABC, abstractmethod
 
 from vectorbt.utils import checks
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -57,29 +56,13 @@ def add_nb_methods(nb_funcs, module_name=None):
     return wrapper
 
 
-class AbstractOps(ABC):
-    """Abstract class defining methods needed for operations."""
-    @abstractmethod
-    def apply(self, apply_func=None):
-        pass
-
-    @abstractmethod
-    def combine_with(self, other, combine_func=None):
-        pass
-
-
-def add_binary_magic_methods(combine_funcs):
-    """Class decorator to add binary magic methods using NumPy to the class.
-
-    Requires the class to be a subclass of `AbstractOps`."""
+def add_binary_magic_methods(np_funcs, translate_func):
+    """Class decorator to add binary magic methods using NumPy to the class."""
 
     def wrapper(cls):
-        checks.assert_subclass(cls, AbstractOps)
-
-        for fname, combine_func in combine_funcs:
-
-            def magic_func(self, other, combine_func=combine_func):
-                return self.combine_with(other, combine_func=combine_func)
+        for fname, np_func in np_funcs:
+            def magic_func(self, other, np_func=np_func):
+                return translate_func(self, other, np_func)
 
             setattr(cls, fname, magic_func)
         return cls
@@ -87,20 +70,55 @@ def add_binary_magic_methods(combine_funcs):
     return wrapper
 
 
-def add_unary_magic_methods(apply_funcs):
-    """Class decorator to add unary magic methods using NumPy to the class.
-
-    Requires the class to be a subclass of `AbstractOps`."""
+def add_unary_magic_methods(np_funcs, translate_func):
+    """Class decorator to add unary magic methods using NumPy to the class."""
 
     def wrapper(cls):
-        checks.assert_subclass(cls, AbstractOps)
-
-        for fname, apply_func in apply_funcs:
-
-            def magic_func(self, apply_func=apply_func):
-                return self.apply(apply_func=apply_func)
+        for fname, np_func in np_funcs:
+            def magic_func(self, np_func=np_func):
+                return translate_func(self, np_func)
 
             setattr(cls, fname, magic_func)
         return cls
 
     return wrapper
+
+
+binary_magic_methods = [
+    # comparison ops
+    ('__eq__', np.equal),
+    ('__ne__', np.not_equal),
+    ('__lt__', np.less),
+    ('__gt__', np.greater),
+    ('__le__', np.less_equal),
+    ('__ge__', np.greater_equal),
+    # arithmetic ops
+    ('__add__', np.add),
+    ('__sub__', np.subtract),
+    ('__mul__', np.multiply),
+    ('__pow__', np.power),
+    ('__mod__', np.mod),
+    ('__floordiv__', np.floor_divide),
+    ('__truediv__', np.true_divide),
+    ('__radd__', lambda x, y: np.add(y, x)),
+    ('__rsub__', lambda x, y: np.subtract(y, x)),
+    ('__rmul__', lambda x, y: np.multiply(y, x)),
+    ('__rpow__', lambda x, y: np.power(y, x)),
+    ('__rmod__', lambda x, y: np.mod(y, x)),
+    ('__rfloordiv__', lambda x, y: np.floor_divide(y, x)),
+    ('__rtruediv__', lambda x, y: np.true_divide(y, x)),
+    # mask ops
+    ('__and__', np.bitwise_and),
+    ('__or__', np.bitwise_or),
+    ('__xor__', np.bitwise_xor),
+    ('__rand__', lambda x, y: np.bitwise_and(y, x)),
+    ('__ror__', lambda x, y: np.bitwise_or(y, x)),
+    ('__rxor__', lambda x, y: np.bitwise_xor(y, x))
+]
+
+unary_magic_methods = [
+    ('__neg__', np.negative),
+    ('__pos__', np.positive),
+    ('__abs__', np.absolute),
+    ('__invert__', np.invert)
+]

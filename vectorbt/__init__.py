@@ -383,7 +383,7 @@ fast_window  slow_window  asset
 dtype: float64
 
 >>> mean_return = portfolio.total_return.groupby('asset').mean()
->>> mean_return.vbt.Bar(
+>>> mean_return.vbt.bar(
 ...     xaxis_title='Asset',
 ...     yaxis_title='Mean total return').show_png()
 ```
@@ -449,7 +449,7 @@ by any feature, such as window pair, asset, and time period.
 
 ```python-repl
 >>> mean_return = portfolio.total_return.groupby(['end_date', 'asset']).mean()
->>> mean_return = mean_return.unstack(level=-1).vbt.Bar(
+>>> mean_return = mean_return.unstack(level=-1).vbt.bar(
 ...     xaxis_title='End date',
 ...     yaxis_title='Mean total return',
 ...     legend_title_text='Asset').show_png()
@@ -469,8 +469,8 @@ The package consists of a series of packages and modules each playing its role i
 
 An accessor adds additional “namespace” to pandas objects.
 
-The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `pandas.Series` and
-`pandas.DataFrame` object. It is the main entry point for all other accessors:
+The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `pd.Series` and
+`pd.DataFrame` object. It is the main entry point for all other accessors:
 
 ```plaintext
 vbt.base.accessors.Base_SR/DFAccessor           -> pd.Series/DataFrame.vbt.*
@@ -478,10 +478,10 @@ vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseri
 vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
 vbt.signals.accessors.Signals_SR/DFAccessor     -> pd.Series/DataFrame.vbt.signals
 vbt.returns.accessors.Returns_SR/DFAccessor     -> pd.Series/DataFrame.vbt.returns
-vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.Bar
-vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.Scatter
-vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.Histogram
-vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.Heatmap
+vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.bar
+vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.scatter
+vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.hist
+vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.heatmap
 ```
 
 Additionally, some accessors subclass other accessors building the following inheritance hiearchy:
@@ -551,8 +551,8 @@ time series data, such as price series.
 
 You can access methods listed in `vectorbt.tseries.accessors` as follows:
 
-* `vectorbt.tseries.accessors.TimeSeries_SRAccessor` -> `pandas.Series.vbt.tseries.*`
-* `vectorbt.tseries.accessors.TimeSeries_DFAccessor` -> `pandas.DataFrame.vbt.tseries.*`
+* `vectorbt.tseries.accessors.TimeSeries_SRAccessor` -> `pd.Series.vbt.tseries.*`
+* `vectorbt.tseries.accessors.TimeSeries_DFAccessor` -> `pd.DataFrame.vbt.tseries.*`
 
 ```python-repl
 >>> # vectorbt.tseries.accessors.TimeSeries_Accessor.rolling_mean
@@ -650,11 +650,11 @@ dtype: float64
 ### widgets
 
 `vectorbt.widgets` provides widgets for visualizing data in an efficient and convenient way.
-You can access basic widgets listed in `vectorbt.widgets.basic` as `pandas.Series.vbt.*` and `pandas.DataFrame.vbt.*`.
+You can access basic widgets listed in `vectorbt.widgets.basic` as `pd.Series.vbt.*` and `pd.DataFrame.vbt.*`.
 
 ```python-repl
 >>> # vectorbt.widgets.accessors.Histogram_Accessor
->>> pd.Series(np.random.normal(size=100000)).vbt.Histogram()
+>>> pd.Series(np.random.normal(size=100000)).vbt.hist()
 ```
 
 ![](/vectorbt/docs/img/hist_normal.png)
@@ -680,6 +680,7 @@ from vectorbt import (
     base,
     indicators,
     portfolio,
+    records,
     returns,
     signals,
     tseries,
@@ -690,12 +691,22 @@ from vectorbt import (
 )
 
 # Most important classes
+from vectorbt.records import (
+    MappedArray,
+    Records,
+    Orders,
+    Events,
+    Trades,
+    Positions,
+    Drawdowns
+)
 from vectorbt.widgets import (
     DefaultFigureWidget,
     Indicator,
     Bar,
     Scatter,
     Histogram,
+    Box,
     Heatmap
 )
 from vectorbt.portfolio import Portfolio

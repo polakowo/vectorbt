@@ -108,6 +108,12 @@ class TestArrayWrapper:
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=df4.columns)
         )
 
+    def test_eq(self):
+        assert array_wrapper.ArrayWrapper.from_obj(sr2) == array_wrapper.ArrayWrapper.from_obj(sr2)
+        assert array_wrapper.ArrayWrapper.from_obj(df2) == array_wrapper.ArrayWrapper.from_obj(df2)
+        assert array_wrapper.ArrayWrapper.from_obj(sr2) != array_wrapper.ArrayWrapper.from_obj(df2)
+        assert array_wrapper.ArrayWrapper.from_obj(sr2) != [0, 1, 2]
+
 
 # ############# index_fns.py ############# #
 

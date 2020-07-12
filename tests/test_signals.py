@@ -5,6 +5,8 @@ from numba import njit
 from datetime import datetime
 import pytest
 
+from tests.utils import seed, day_dt
+
 index = pd.Index([
     datetime(2020, 1, 1),
     datetime(2020, 1, 2),
@@ -20,10 +22,6 @@ sig = pd.DataFrame([
     [True, False, False],
     [False, True, False]
 ], index=index, columns=columns)
-
-seed = 42
-
-day_dt = np.timedelta64(86400000000000)
 
 # ############# accessors.py ############# #
 
@@ -684,16 +682,16 @@ class TestAccessors:
         )
 
     def test_num_signals(self):
-        assert sig['a'].vbt.signals.num_signals() == 2
+        assert sig['a'].vbt.signals.num_signals == 2
         pd.testing.assert_series_equal(
-            sig.vbt.signals.num_signals(),
+            sig.vbt.signals.num_signals,
             pd.Series([2, 2, 1], index=sig.columns)
         )
 
     def test_avg_distance(self):
-        assert sig['a'].vbt.signals.avg_distance() == 3.
+        assert sig['a'].vbt.signals.avg_distance == 3.
         pd.testing.assert_series_equal(
-            sig.vbt.signals.avg_distance(),
+            sig.vbt.signals.avg_distance,
             pd.Series([3., 3., np.nan], index=sig.columns)
         )
 

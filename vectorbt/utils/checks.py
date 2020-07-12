@@ -9,22 +9,22 @@ from collections.abc import Iterable
 
 
 def is_series(arg):
-    """Determine whether `arg` is `pandas.Series`."""
+    """Determine whether `arg` is `pd.Series`."""
     return isinstance(arg, pd.Series)
 
 
 def is_frame(arg):
-    """Determine whether `arg` is `pandas.DataFrame`."""
+    """Determine whether `arg` is `pd.DataFrame`."""
     return isinstance(arg, pd.DataFrame)
 
 
 def is_pandas(arg):
-    """Determine whether `arg` is `pandas.Series` or `pandas.DataFrame`."""
+    """Determine whether `arg` is `pd.Series` or `pd.DataFrame`."""
     return is_series(arg) or is_frame(arg)
 
 
 def is_array(arg):
-    """Determine whether `arg` is any of `numpy.ndarray`, `pandas.Series` or `pandas.DataFrame`."""
+    """Determine whether `arg` is any of `numpy.ndarray`, `pd.Series` or `pd.DataFrame`."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
 

@@ -1,7 +1,7 @@
 """Numba-compiled 1-dim and 2-dim functions.
 
 !!! note
-    `vectorbt` treats matrices as first-class citizens and expects input arrays to be
+    vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0).
     

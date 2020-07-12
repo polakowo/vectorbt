@@ -1,7 +1,7 @@
 """Numba-compiled 1-dim and 2-dim functions.
 
 !!! note
-    `vectorbt` treats matrices as first-class citizens and expects input arrays to be
+    vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.
     Data is processed along index (axis 0).
 
@@ -32,10 +32,10 @@ def isclose_nb(a, b, rel_tol=1e-09, abs_tol=0.0):
     return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 
-# ############# Indexing ############# #
+# ############# Indexing (records) ############# #
 
 @njit(cache=True)
-def index_record_cols_nb(records, n_cols):
+def record_col_index_nb(records, n_cols):
     """Index columns of `records`.
 
     Creates a 2-dim array with first column being start indices (inclusive) and
@@ -64,94 +64,144 @@ def select_record_cols_nb(records, col_index, new_cols):
     result = np.empty(new_n, dtype=records.dtype)
     j = 0
     for c in range(new_cols.shape[0]):
-        col_records = np.copy(records[col_index[c, 0]:col_index[c, 1]])
+        from_i = col_index[c, 0]
+        to_i = col_index[c, 1]
+        if from_i == -1 or to_i == -1:
+            continue
+        col_records = np.copy(records[from_i:to_i])
         col_records['col'][:] = c  # don't forget to assign new column indices
         result[j:j + col_records.shape[0]] = col_records
         j += col_records.shape[0]
     return result
 
 
-# ############# Mapping to matrix ############# #
-
-
-@njit
-def map_records_to_matrix_nb(records, target_shape, default_val, map_func_nb, *args):
-    """Map each record to a value and store it in a matrix.
-
-    `map_func_nb` must accept a single record and `*args`, and return a single value."""
-    result = np.full(target_shape, default_val, dtype=f8)
-    for r in range(records.shape[0]):
-        result[records['idx'][r], records['col'][r]] = map_func_nb(records[r], *args)
-    return result
+# ############# Indexing (mapped arrays) ############# #
 
 
 @njit(cache=True)
-def convert_array_to_matrix(a, records, target_shape, default_val):
-    """Convert a 1-dim array already mapped by the user."""
+def mapped_col_index_nb(mapped_arr, col_arr, n_cols):
+    """Identical to `record_col_index_nb`, but for mapped arrays."""
+    col_index = np.full((n_cols, 2), -1, dtype=i8)
+    last_col = -1
+    for r in range(mapped_arr.shape[0]):
+        col = col_arr[r]
+        if last_col != col:
+            if last_col != -1:
+                col_index[last_col, 1] = r
+            col_index[col, 0] = r
+            last_col = col
+        if r == mapped_arr.shape[0] - 1:
+            col_index[col, 1] = r + 1
+    return col_index
+
+
+@njit(cache=True)
+def select_mapped_cols_nb(col_arr, col_index, new_cols):
+    """Return indices of elements corresponding to columns in `new_cols`.
+
+    In contrast to `select_record_cols_nb`, returns new indices and new column array."""
+    col_index = col_index[new_cols]
+    new_n = np.sum(col_index[:, 1] - col_index[:, 0])
+    mapped_arr_result = np.empty(new_n, dtype=i8)
+    col_arr_result = np.empty(new_n, dtype=i8)
+    j = 0
+    for c in range(new_cols.shape[0]):
+        from_i = col_index[c, 0]
+        to_i = col_index[c, 1]
+        if from_i == -1 or to_i == -1:
+            continue
+        rang = np.arange(from_i, to_i)
+        mapped_arr_result[j:j + rang.shape[0]] = rang
+        col_arr_result[j:j + rang.shape[0]] = c
+        j += rang.shape[0]
+    return mapped_arr_result, col_arr_result
+
+
+# ############# Mapping (records) ############# #
+
+
+@njit
+def map_records_nb(records, map_func_nb, *args):
+    """Map each record to a scalar value.
+
+    `map_func_nb` must accept a single record and `*args`, and return a scalar value."""
+    result = np.empty(records.shape[0], dtype=f8)
+    for r in range(records.shape[0]):
+        result[r] = map_func_nb(records[r], *args)
+    return result
+
+
+# ############# Converting to matrix (mapped arrays) ############# #
+
+
+@njit(cache=True)
+def mapped_to_matrix_nb(mapped_arr, col_arr, idx_arr, target_shape, default_val):
+    """Convert mapped array to the matrix form."""
 
     result = np.full(target_shape, default_val, dtype=f8)
-    for r in range(a.shape[0]):
-        result[records['idx'][r], records['col'][r]] = a[r]
+    for r in range(mapped_arr.shape[0]):
+        result[idx_arr[r], col_arr[r]] = mapped_arr[r]
     return result
 
 
-# ############# Reducing ############# #
-
+# ############# Reducing (mapped arrays) ############# #
 
 @njit
-def reduce_records_nb(records, n_cols, default_val, reduce_func_nb, *args):
-    """Reduce records by column.
+def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *args):
+    """Reduce mapped array by column to a scalar value.
 
-    Faster than `map_records_to_matrix_nb` and `vbt.tseries.*` used together, and also
+    Faster than `mapped_to_matrix_nb` and `vbt.tseries.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
-    `reduce_func_nb` must accept an array of records and `*args`, and return a single value."""
+    `reduce_func_nb` must accept index of the current column, mapped array and `*args`,
+    and return a scalar value."""
     result = np.full(n_cols, default_val, dtype=f8)
     from_r = 0
     col = -1
-    for r in range(records.shape[0]):
-        record_col = records['col'][r]
+    for r in range(mapped_arr.shape[0]):
+        record_col = col_arr[r]
         if record_col != col:
             if col != -1:
                 # At the beginning of second column do reduce on the first
-                result[col] = reduce_func_nb(records[from_r:r], *args)
+                result[col] = reduce_func_nb(record_col, mapped_arr[from_r:r], *args)
             from_r = r
             col = record_col
-        if r == len(records) - 1:
-            result[col] = reduce_func_nb(records[from_r:r + 1], *args)
+        if r == len(mapped_arr) - 1:
+            result[col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
     return result
 
 
 @njit
-def map_reduce_records_nb(records, n_cols, default_val, map_func_nb, reduce_func_nb, *args):
-    """Map each record to a value and reduce all values by column.
+def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *args):
+    """Reduce mapped array by column to an array.
 
-    `map_func_nb` must accept a single record and `*args`, and return a single value.
-    `reduce_func_nb` must accept an array of values and `*args`, and also return a single value."""
-    result = np.full(n_cols, default_val, dtype=f8)
-    mapped = np.empty(records.shape[0], dtype=f8)
+    `reduce_func_nb` same as for `reduce_mapped_nb` but must return an array.
+
+    !!! note
+        Output of `reduce_func_nb` must be strictly homogeneous."""
     from_r = 0
     col = -1
-    for r in range(records.shape[0]):
-        mapped[r] = map_func_nb(records[r], *args)
-        record_col = records['col'][r]
+    result_inited = False
+
+    for r in range(mapped_arr.shape[0]):
+        record_col = col_arr[r]
         if record_col != col:
             if col != -1:
                 # At the beginning of second column do reduce on the first
-                result[col] = reduce_func_nb(mapped[from_r:r], *args)
+                result0 = reduce_func_nb(col, mapped_arr[from_r:r], *args)
+                if not result_inited:
+                    result = np.full((result0.shape[0], n_cols), default_val, dtype=f8)
+                    result_inited = True
+                result[:, col] = result0
             from_r = r
             col = record_col
-        if r == len(records) - 1:
-            result[col] = reduce_func_nb(mapped[from_r:r + 1], *args)
+        if r == len(mapped_arr) - 1:
+            result0 = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
+            if not result_inited:
+                result = np.full((result0.shape[0], n_cols), default_val, dtype=f8)
+                result_inited = True
+            result[:, col] = result0
     return result
-
-
-# Some basic stat functions be passed to reduce_array_nb
-min_reduce_nb = njit(cache=True)(lambda x, *args: np.min(x))
-max_reduce_nb = njit(cache=True)(lambda x, *args: np.max(x))
-mean_reduce_nb = njit(cache=True)(lambda x, *args: np.mean(x))
-sum_reduce_nb = njit(cache=True)(lambda x, *args: np.sum(x))
-count_reduce_nb = njit(cache=True)(lambda x, *args: len(x))
 
 
 # ############# Drawdowns ############# #
@@ -178,10 +228,10 @@ def drawdown_records_nb(ts):
             >>> records = drawdown_records_nb(ts)
 
             >>> print(pd.DataFrame.from_records(records))
-               col  idx  start_idx  valley_idx  end_idx  status
-            0    1    4          0           4        4       0
-            1    2    4          2           4        4       0
-            2    3    4          0           2        4       1
+               col  start_idx  valley_idx  end_idx  status
+            0    1          0           4        4       0
+            1    2          2           4        4       0
+            2    3          0           2        4       1
             ```"""
     result = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
     j = 0
@@ -233,7 +283,6 @@ def drawdown_records_nb(ts):
                 if store_drawdown:
                     # Save drawdown to the records
                     result[j]['col'] = col
-                    result[j]['idx'] = i
                     result[j]['start_idx'] = peak_idx
                     result[j]['valley_idx'] = valley_idx
                     result[j]['end_idx'] = i
@@ -252,19 +301,19 @@ def drawdown_records_nb(ts):
 
 
 @njit(cache=True)
-def dd_start_value_map_nb(record, ts, *args):
+def dd_start_value_map_nb(record, ts):
     """`map_func_nb` that returns start value of a drawdown."""
     return ts[record['start_idx'], record['col']]
 
 
 @njit(cache=True)
-def dd_valley_value_map_nb(record, ts, *args):
+def dd_valley_value_map_nb(record, ts):
     """`map_func_nb` that returns valley value of a drawdown."""
     return ts[record['valley_idx'], record['col']]
 
 
 @njit(cache=True)
-def dd_end_value_map_nb(record, ts, *args):
+def dd_end_value_map_nb(record, ts):
     """`map_func_nb` that returns end value of a drawdown.
 
     This can be either recovery value or last value of an active drawdown."""
@@ -272,7 +321,7 @@ def dd_end_value_map_nb(record, ts, *args):
 
 
 @njit(cache=True)
-def dd_drawdown_map_nb(record, ts, *args):
+def dd_drawdown_map_nb(record, ts):
     """`map_func_nb` that returns drawdown value of a drawdown."""
     valley_val = dd_valley_value_map_nb(record, ts)
     start_val = dd_start_value_map_nb(record, ts)
@@ -280,31 +329,31 @@ def dd_drawdown_map_nb(record, ts, *args):
 
 
 @njit(cache=True)
-def dd_duration_map_nb(record, *args):
+def dd_duration_map_nb(record):
     """`map_func_nb` that returns total duration of a drawdown."""
     return record['end_idx'] - record['start_idx']
 
 
 @njit(cache=True)
-def dd_ptv_duration_map_nb(record, *args):
+def dd_ptv_duration_map_nb(record):
     """`map_func_nb` that returns duration of the peak-to-valley (PtV) phase."""
     return record['valley_idx'] - record['start_idx']
 
 
 @njit(cache=True)
-def dd_vtr_duration_map_nb(record, *args):
+def dd_vtr_duration_map_nb(record):
     """`map_func_nb` that returns duration of the valley-to-recovery (VtR) phase."""
     return record['end_idx'] - record['valley_idx']
 
 
 @njit(cache=True)
-def dd_vtr_duration_ratio_map_nb(record, *args):
+def dd_vtr_duration_ratio_map_nb(record):
     """`map_func_nb` that returns ratio of VtR duration to total duration."""
     return dd_vtr_duration_map_nb(record) / dd_duration_map_nb(record)
 
 
 @njit(cache=True)
-def dd_recovery_return_map_nb(record, ts, *args):
+def dd_recovery_return_map_nb(record, ts):
     """`map_func_nb` that returns recovery return of a drawdown."""
     end_val = dd_end_value_map_nb(record, ts)
     valley_val = dd_valley_value_map_nb(record, ts)
@@ -315,19 +364,19 @@ def dd_recovery_return_map_nb(record, ts, *args):
 
 
 @njit(cache=True)
-def order_size_map_nb(record, *args):
+def order_size_map_nb(record):
     """`map_func_nb` that returns order size."""
     return record['size']
 
 
 @njit(cache=True)
-def order_price_map_nb(record, *args):
+def order_price_map_nb(record):
     """`map_func_nb` that returns order price."""
     return record['price']
 
 
 @njit(cache=True)
-def order_fees_map_nb(record, *args):
+def order_fees_map_nb(record):
     """`map_func_nb` that returns order fees."""
     return record['fees']
 
@@ -336,31 +385,21 @@ def order_fees_map_nb(record, *args):
 
 
 @njit(cache=True)
-def event_duration_map_nb(record, *args):
+def event_duration_map_nb(record):
     """`map_func_nb` that returns event duration."""
     return record['close_idx'] - record['open_idx']
 
 
 @njit(cache=True)
-def event_pnl_map_nb(record, *args):
+def event_pnl_map_nb(record):
     """`map_func_nb` that returns event PnL."""
     return record['pnl']
 
 
 @njit(cache=True)
-def event_return_map_nb(record, *args):
+def event_return_map_nb(record):
     """`map_func_nb` that returns event return."""
     return record['return']
-
-
-@njit(cache=True)
-def event_sqn_reduce_nb(records, ddof):
-    """`reduce_func_nb` that returns event SQN."""
-    cnt = len(records)
-    if cnt - ddof == 0:
-        return np.nan
-    std = np.std(records['pnl']) * np.sqrt(cnt / (cnt - ddof))
-    return np.sqrt(cnt) * np.mean(records['pnl']) / std
 
 
 # ############# Trades ############# #
@@ -385,7 +424,6 @@ def save_trade_nb(record, col, i, order_size, order_price, order_fees, position_
 
     # Save trade
     record['col'] = col
-    record['idx'] = i
     record['size'] = order_size
     record['open_idx'] = position_start
     record['open_price'] = avg_buy_price
@@ -431,10 +469,10 @@ def trade_records_nb(price, order_records):
         >>> records = trade_records_nb(price, order_records)
 
         >>> print(pd.DataFrame.from_records(records))
-           col  idx  size  open_idx  open_price  open_fees  close_idx  close_price  \
-        0    0    1   1.0         0         1.0       0.01          1          2.0
-        1    0    3   1.0         2         3.0       0.03          3          4.0
-        2    0    4   1.0         4         5.0       0.05          4          5.0
+           col  size  open_idx  open_price  open_fees  close_idx  close_price  \
+        0    0   1.0         0         1.0       0.01          1          2.0
+        1    0   1.0         2         3.0       0.03          3          4.0
+        2    0   1.0         4         5.0       0.05          4          5.0
 
            close_fees   pnl    return  status  position_idx
         0        0.02  0.97  0.960396       1             0
@@ -571,7 +609,6 @@ def save_position_nb(record, col, i, position_start, buy_size_sum, buy_gross_sum
 
     # Save trade
     record['col'] = col
-    record['idx'] = i
     record['size'] = buy_size_sum
     record['open_idx'] = position_start
     record['open_price'] = avg_buy_price
@@ -612,10 +649,10 @@ def position_records_nb(price, order_records):
         >>> records = position_records_nb(price, order_records)
 
         >>> print(pd.DataFrame.from_records(records))
-           col  idx  size  open_idx  open_price  open_fees  close_idx  close_price  \
-        0    0    1   1.0         0         1.0       0.01          1          2.0
-        1    0    3   1.0         2         3.0       0.03          3          4.0
-        2    0    4   1.0         4         5.0       0.05          4          5.0
+           col  size  open_idx  open_price  open_fees  close_idx  close_price  \
+        0    0   1.0         0         1.0       0.01          1          2.0
+        1    0   1.0         2         3.0       0.03          3          4.0
+        2    0   1.0         4         5.0       0.05          4          5.0
 
            close_fees   pnl    return  status
         0        0.02  0.97  0.960396       1

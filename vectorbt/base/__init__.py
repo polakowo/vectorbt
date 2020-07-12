@@ -88,8 +88,8 @@ you can find its variations as accessor methods.
 2  1
 ```
 
-Additionally, `vectorbt.base.accessors.Base_Accessor` supports arithmetic operations such as
-addition by doing the compuation with NumPy under the hood (faster).
+Additionally, `vectorbt.base.accessors.Base_Accessor` implements arithmetic, comparison and
+logical operators by doing the compuation with NumPy under the hood (faster).
 
 ```python-repl
 >>> import numpy as np

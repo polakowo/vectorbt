@@ -8,4 +8,4 @@ For more details on using Plotly, see [Getting Started with Plotly in Python](ht
 from vectorbt.widgets import accessors, basic, common
 
 from vectorbt.widgets.common import DefaultFigureWidget
-from vectorbt.widgets.basic import Indicator, Bar, Scatter, Histogram, Heatmap
+from vectorbt.widgets.basic import Indicator, Bar, Scatter, Histogram, Box, Heatmap

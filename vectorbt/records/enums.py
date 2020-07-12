@@ -23,7 +23,6 @@ __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 
 drawdown_dt = np.dtype([
     ('col', np.int64),
-    ('idx', np.int64),
     ('start_idx', np.int64),
     ('valley_idx', np.int64),
     ('end_idx', np.int64),
@@ -93,7 +92,6 @@ __pdoc__['EventStatus'] = f"""Event status.
 
 _event_fields = [
     ('col', np.int64),
-    ('idx', np.int64),
     ('size', np.float64),
     ('open_idx', np.int64),
     ('open_price', np.float64),

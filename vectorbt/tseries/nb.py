@@ -1,7 +1,7 @@
 """Numba-compiled 1-dim and 2-dim functions.
 
 !!! note
-    `vectorbt` treats matrices as first-class citizens and expects input arrays to be
+    vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0).
     
@@ -18,7 +18,7 @@ import numpy as np
 @njit(cache=True)
 def prepend_1d_nb(a, n, value):
     """Prepend value `n` times."""
-    result = np.empty(a.shape[0]+n, dtype=f8)
+    result = np.empty(a.shape[0] + n, dtype=f8)
     result[:n] = value
     result[n:] = a
     return result
@@ -27,7 +27,7 @@ def prepend_1d_nb(a, n, value):
 @njit(cache=True)
 def prepend_nb(a, n, value):
     """2-dim version of `prepend_1d_nb`."""
-    result = np.empty((a.shape[0]+n, a.shape[1]), dtype=f8)
+    result = np.empty((a.shape[0] + n, a.shape[1]), dtype=f8)
     result[:n, :] = value
     result[n:, :] = a
     return result
@@ -295,7 +295,7 @@ def nanstd_1d_nb(a, ddof=1):
     if rcount == 0:
         return np.nan
     else:
-        return np.nanstd(a) * np.sqrt(cnt / rcount)
+        return np.sqrt(np.nanvar(a) * cnt / rcount)
 
 
 @njit(cache=True)
@@ -305,6 +305,7 @@ def nanstd_nb(a, ddof=1):
     for col in range(a.shape[1]):
         result[col] = nanstd_1d_nb(a[:, col], ddof=ddof)
     return result
+
 
 # ############# Rolling functions ############# #
 
@@ -317,7 +318,7 @@ def rolling_window_1d_nb(a, window):
     width = a.shape[0] - window + 1
     result = np.empty((window, width), dtype=f8)
     for col in range(width):
-        result[:, col] = a[col:col+window]
+        result[:, col] = a[col:col + window]
     return result
 
 
@@ -345,7 +346,7 @@ def rolling_min_1d_nb(a, window, minp=None):
     for i in range(a.shape[0]):
         minv = a[i]
         cnt = 0
-        for j in range(max(i-window+1, 0), i+1):
+        for j in range(max(i - window + 1, 0), i + 1):
             if np.isnan(a[j]):
                 continue
             if np.isnan(minv) or a[j] < minv:
@@ -380,7 +381,7 @@ def rolling_max_1d_nb(a, window, minp=None):
     for i in range(a.shape[0]):
         maxv = a[i]
         cnt = 0
-        for j in range(max(i-window+1, 0), i+1):
+        for j in range(max(i - window + 1, 0), i + 1):
             if np.isnan(a[j]):
                 continue
             if np.isnan(maxv) or a[j] > maxv:
@@ -427,8 +428,8 @@ def rolling_mean_1d_nb(a, window, minp=None):
             window_len = i + 1 - nancnt
             window_cumsum = cumsum
         else:
-            window_len = window - (nancnt - nancnt_arr[i-window])
-            window_cumsum = cumsum - cumsum_arr[i-window]
+            window_len = window - (nancnt - nancnt_arr[i - window])
+            window_cumsum = cumsum - cumsum_arr[i - window]
         if window_len < minp:
             result[i] = np.nan
         else:
@@ -478,9 +479,9 @@ def rolling_std_1d_nb(a, window, minp=None):
             window_cumsum = cumsum
             window_cumsum_sq = cumsum_sq
         else:
-            window_len = window - (nancnt - nancnt_arr[i-window])
-            window_cumsum = cumsum - cumsum_arr[i-window]
-            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i-window]
+            window_len = window - (nancnt - nancnt_arr[i - window])
+            window_cumsum = cumsum - cumsum_arr[i - window]
+            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - window]
         if window_len < minp:
             result[i] = np.nan
         else:
@@ -505,7 +506,7 @@ def ewm_mean_1d_nb(a, span, minp=None):
 
     Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).mean()`.
 
-    Adaptation of `pandas._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
+    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
     if minp is None:
         minp = span
     if minp > span:
@@ -556,7 +557,7 @@ def ewm_std_1d_nb(a, span, minp=None):
 
     Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std()`.
 
-    Adaptation of `pandas._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
+    Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
     if minp is None:
         minp = span
     if minp > span:
@@ -634,6 +635,7 @@ def ewm_std_nb(a, span, minp=None):
     for col in range(a.shape[1]):
         result[:, col] = ewm_std_1d_nb(a[:, col], span, minp=minp)
     return result
+
 
 # ############# Expanding functions ############# #
 
@@ -723,6 +725,7 @@ def expanding_std_nb(a, minp=1):
     """2-dim version of `expanding_std_1d_nb`."""
     return rolling_std_nb(a, a.shape[0], minp=minp)
 
+
 # ############# Apply functions ############# #
 
 
@@ -735,7 +738,7 @@ def rolling_apply_nb(a, window, apply_func_nb, *args):
     result = np.empty_like(a, dtype=f8)
     for col in range(a.shape[1]):
         for i in range(a.shape[0]):
-            window_a = a[max(0, i+1-window):i+1, col]
+            window_a = a[max(0, i + 1 - window):i + 1, col]
             result[i, col] = apply_func_nb(col, i, window_a, *args)
     return result
 
@@ -748,7 +751,7 @@ def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
     Must return a single value or an array of shape `a.shape[1]`."""
     result = np.empty_like(a, dtype=f8)
     for i in range(a.shape[0]):
-        window_a = a[max(0, i+1-window):i+1, :]
+        window_a = a[max(0, i + 1 - window):i + 1, :]
         result[i, :] = apply_func_nb(i, window_a, *args)
     return result
 
@@ -792,6 +795,7 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
     for i, idxs in groups.items():
         result[i, :] = apply_func_nb(idxs, a[idxs, :], *args)
     return result
+
 
 # ############# Map, filter and reduce ############# #
 
@@ -862,31 +866,75 @@ def reduce_nb(a, reduce_func_nb, *args):
 def reduce_to_array_nb(a, reduce_func_nb, *args):
     """Reduce each column into an array of values using `reduce_func_nb`.
 
-    `reduce_func_nb` same as for `reduce_a` but must return an array.
+    `reduce_func_nb` same as for `reduce_nb` but must return an array.
 
     !!! note
-        * Output of `reduce_func_nb` must be strictly homogeneous"""
-    result0 = reduce_func_nb(0, a[:, 0], *args)
-    result = np.full((result0.shape[0], a.shape[1]), np.nan, dtype=f8)
+        Output of `reduce_func_nb` must be strictly homogeneous."""
+    result_inited = False
     for col in range(a.shape[1]):
-        result[:, col] = reduce_func_nb(col, a[:, col], *args)
+        col_result = reduce_func_nb(col, a[:, col], *args)
+        if not result_inited:
+            result = np.full((col_result.shape[0], a.shape[1]), np.nan, dtype=f8)
+            result_inited = True
+        result[:, col] = col_result
+
     return result
 
 
 @njit(cache=True)
-def describe_reduce_nb(col, a, percentiles, ddof):
+def nst_reduce_nb(col, a, n, *args):
+    if n >= a.shape[0]:
+        raise ValueError("index is out of bounds")
+    return a[n]
+
+
+min_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmin(a))
+max_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmax(a))
+mean_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmean(a))
+median_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmedian(a))
+sum_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nansum(a))
+count_reduce_nb = njit(cache=True)(lambda col, a, *args: np.sum(~np.isnan(a)))
+
+
+@njit(cache=True)
+def std_reduce_nb(col, a, ddof, *args):
+    return nanstd_1d_nb(a, ddof=ddof)
+
+
+@njit(cache=True)
+def describe_reduce_nb(col, a, perc, ddof, *args):
     """Return descriptive statistics.
 
-    Numba equivalent to `pd.Series(a).describe(percentiles)`."""
+    Numba equivalent to `pd.Series(a).describe(perc)`."""
     a = a[~np.isnan(a)]
-    result = np.empty(5 + len(percentiles), dtype=f8)
+    result = np.empty(5 + len(perc), dtype=f8)
     result[0] = len(a)
     if len(a) > 0:
         result[1] = np.mean(a)
         result[2] = nanstd_1d_nb(a, ddof=ddof)
         result[3] = np.min(a)
-        result[4:-1] = np.percentile(a, percentiles * 100)
-        result[4+len(percentiles)] = np.max(a)
+        result[4:-1] = np.percentile(a, perc * 100)
+        result[4 + len(perc)] = np.max(a)
     else:
         result[1:] = np.nan
     return result
+
+
+@njit(cache=True)
+def argmin_reduce_nb(col, a, *args):
+    a = np.copy(a)
+    mask = np.isnan(a)
+    if np.all(mask):
+        raise ValueError("All-NaN slice encountered")
+    a[mask] = np.inf
+    return np.argmin(a)
+
+
+@njit(cache=True)
+def argmax_reduce_nb(col, a, *args):
+    a = np.copy(a)
+    mask = np.isnan(a)
+    if np.all(mask):
+        raise ValueError("All-NaN slice encountered")
+    a[mask] = -np.inf
+    return np.argmax(a)

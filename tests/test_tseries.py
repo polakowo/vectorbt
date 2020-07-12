@@ -8,24 +8,24 @@ from itertools import product
 from vectorbt.tseries import common
 from vectorbt.records.drawdowns import Drawdowns
 
-index = pd.DatetimeIndex([
+from tests.utils import day_dt
+
+ts = pd.DataFrame({
+    'a': [1, 2, 3, 4, np.nan],
+    'b': [np.nan, 4, 3, 2, 1],
+    'c': [1, 2, np.nan, 2, 1]
+}, index=pd.DatetimeIndex([
     datetime(2018, 1, 1),
     datetime(2018, 1, 2),
     datetime(2018, 1, 3),
     datetime(2018, 1, 4),
     datetime(2018, 1, 5)
-])
-ts = pd.DataFrame({
-    'a': [1, 2, 3, 4, np.nan],
-    'b': [np.nan, 4, 3, 2, 1],
-    'c': [1, 2, np.nan, 2, 1]
-}, index=index)
-
-day_dt = np.timedelta64(86400000000000)
+]))
 
 pd_nanmean_nb = njit(lambda x: np.nanmean(x))
 nanmean_nb = njit(lambda col, i, x: np.nanmean(x))
 nanmean_matrix_nb = njit(lambda i, x: np.nanmean(x))
+
 
 # ############# common.py ############# #
 
@@ -56,10 +56,8 @@ class TestCommon:
         )
         assert common.to_time_units(1, '1 days') == day_dt
 
-
     def test_freq_delta(self):
         assert common.freq_delta('1D') == common.freq_delta('D') == day_dt
-
 
     def test_ts_array_wrapper(self):
         # freq
@@ -99,6 +97,7 @@ class TestCommon:
             freq='1 days',
             ndim=1,
         ).wrap_reduced(1, time_units=True) == day_dt
+
 
 # ############# accessors.py ############# #
 
@@ -630,7 +629,7 @@ class TestAccessors:
         )
 
     def test_drawdowns(self):
-        assert type(ts['a'].vbt.tseries.drawdowns()) is Drawdowns
-        assert ts['a'].vbt.tseries.drawdowns().wrapper.freq == ts['a'].vbt.tseries.freq
-        assert ts['a'].vbt.tseries.drawdowns().wrapper.ndim == ts['a'].ndim
-        assert ts.vbt.tseries.drawdowns().wrapper.ndim == ts.ndim
+        assert type(ts['a'].vbt.tseries.drawdowns) is Drawdowns
+        assert ts['a'].vbt.tseries.drawdowns.wrapper.freq == ts['a'].vbt.tseries.freq
+        assert ts['a'].vbt.tseries.drawdowns.wrapper.ndim == ts['a'].ndim
+        assert ts.vbt.tseries.drawdowns.wrapper.ndim == ts.ndim

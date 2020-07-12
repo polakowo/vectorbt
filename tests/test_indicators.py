@@ -5,6 +5,8 @@ from numba import njit
 from datetime import datetime
 import pytest
 
+from tests.utils import seed
+
 ts = pd.DataFrame({
     'a': [1, 2, 3, 4, np.nan],
     'b': [np.nan, 4, 3, 2, 1],
@@ -337,7 +339,7 @@ class TestFactory:
 
     def test_cache(self):
         def caching_func(ts, params):
-            np.random.seed(42)
+            np.random.seed(seed)
             return np.random.uniform(0, 1)
 
         target = pd.DataFrame(
@@ -636,8 +638,8 @@ class TestFactory:
     )
     def test_pandas_indexing(self, test_attr):
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.iloc[:, np.arange(3)], test_attr),
-            getattr(custom_ind, test_attr).iloc[:, np.arange(3)]
+            getattr(custom_ind.iloc[np.arange(3), np.arange(3)], test_attr),
+            getattr(custom_ind, test_attr).iloc[np.arange(3), np.arange(3)]
         )
         pd.testing.assert_series_equal(
             getattr(custom_ind.loc[:, (1, 3, 'a')], test_attr),
