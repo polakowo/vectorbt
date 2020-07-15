@@ -53,7 +53,12 @@ class BaseOrders(Records):
         """Return a new class instance, filtered by mask."""
         return self.__class__(self.records_arr[mask], self.main_price, freq=self.wrapper.freq, idx_field=self.idx_field)
 
-    def plot(self, main_price_trace_kwargs={}, buy_trace_kwargs={}, sell_trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self,
+             main_price_trace_kwargs={},
+             buy_trace_kwargs={},
+             sell_trace_kwargs={},
+             fig=None,
+             **layout_kwargs):  # pragma: no cover
         """Plot orders.
 
         Args:

@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import pytest
+import os
 
 from vectorbt import defaults
 from vectorbt.utils import checks, config, decorators, math
@@ -205,6 +206,9 @@ class TestChecks:
         assert checks.is_array(pd.DataFrame([1, 2, 3]))
 
     def test_is_numba_func(self):
+        if 'NUMBA_DISABLE_JIT' in os.environ:
+            if os.environ['NUMBA_DISABLE_JIT'] == '1':
+                return
         assert not checks.is_numba_func(lambda x: x)
         assert checks.is_numba_func(njit(lambda x: x))
 

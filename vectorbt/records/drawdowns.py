@@ -59,7 +59,7 @@ class BaseDrawdowns(Records):
              vtr_shape_kwargs={},
              active_shape_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot drawdowns over `Drawdowns.ts`.
 
         Args:

@@ -10,7 +10,7 @@
     Records must remain in the order they were created."""
 
 import numpy as np
-from numba import njit, f8, i8
+from numba import njit
 
 from vectorbt.utils.math import is_close_nb
 from vectorbt.records.enums import (
@@ -37,7 +37,7 @@ def record_col_index_nb(records, n_cols):
     second column being end indices (exclusive)."""
     # Record start and end indices for each column
     # Instead of doing np.flatnonzero and masking, this is much faster
-    col_index = np.full((n_cols, 2), -1, dtype=i8)
+    col_index = np.full((n_cols, 2), -1, dtype=np.int_)
     last_col = -1
     for r in range(records.shape[0]):
         col = records['col'][r]
@@ -76,7 +76,7 @@ def select_record_cols_nb(records, col_index, new_cols):
 @njit(cache=True)
 def mapped_col_index_nb(mapped_arr, col_arr, n_cols):
     """Identical to `record_col_index_nb`, but for mapped arrays."""
-    col_index = np.full((n_cols, 2), -1, dtype=i8)
+    col_index = np.full((n_cols, 2), -1, dtype=np.int_)
     last_col = -1
     for r in range(mapped_arr.shape[0]):
         col = col_arr[r]
@@ -97,8 +97,8 @@ def select_mapped_cols_nb(col_arr, col_index, new_cols):
     In contrast to `select_record_cols_nb`, returns new indices and new column array."""
     col_index = col_index[new_cols]
     new_n = np.sum(col_index[:, 1] - col_index[:, 0])
-    mapped_arr_result = np.empty(new_n, dtype=i8)
-    col_arr_result = np.empty(new_n, dtype=i8)
+    mapped_arr_result = np.empty(new_n, dtype=np.int_)
+    col_arr_result = np.empty(new_n, dtype=np.int_)
     j = 0
     for c in range(new_cols.shape[0]):
         from_i = col_index[c, 0]
@@ -120,7 +120,7 @@ def map_records_nb(records, map_func_nb, *args):
     """Map each record to a scalar value.
 
     `map_func_nb` must accept a single record and `*args`, and return a scalar value."""
-    result = np.empty(records.shape[0], dtype=f8)
+    result = np.empty(records.shape[0], dtype=np.float_)
     for r in range(records.shape[0]):
         result[r] = map_func_nb(records[r], *args)
     return result
@@ -133,7 +133,7 @@ def map_records_nb(records, map_func_nb, *args):
 def mapped_to_matrix_nb(mapped_arr, col_arr, idx_arr, target_shape, default_val):
     """Convert mapped array to the matrix form."""
 
-    result = np.full(target_shape, default_val, dtype=f8)
+    result = np.full(target_shape, default_val, dtype=np.float_)
     for r in range(mapped_arr.shape[0]):
         result[idx_arr[r], col_arr[r]] = mapped_arr[r]
     return result
@@ -150,7 +150,7 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
 
     `reduce_func_nb` must accept index of the current column, mapped array and `*args`,
     and return a scalar value."""
-    result = np.full(n_cols, default_val, dtype=f8)
+    result = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
     col = -1
     for r in range(mapped_arr.shape[0]):
@@ -185,7 +185,7 @@ def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, default_val, reduce_f
                 # At the beginning of second column do reduce on the first
                 result0 = reduce_func_nb(col, mapped_arr[from_r:r], *args)
                 if not result_inited:
-                    result = np.full((result0.shape[0], n_cols), default_val, dtype=f8)
+                    result = np.full((result0.shape[0], n_cols), default_val, dtype=np.float_)
                     result_inited = True
                 result[:, col] = result0
             from_r = r
@@ -193,7 +193,7 @@ def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, default_val, reduce_f
         if r == len(mapped_arr) - 1:
             result0 = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
             if not result_inited:
-                result = np.full((result0.shape[0], n_cols), default_val, dtype=f8)
+                result = np.full((result0.shape[0], n_cols), default_val, dtype=np.float_)
                 result_inited = True
             result[:, col] = result0
     return result

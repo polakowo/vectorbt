@@ -7,7 +7,7 @@
     
     All functions passed as argument must be Numba-compiled."""
 
-from numba import njit, f8, i8, b1
+from numba import njit
 import numpy as np
 
 from vectorbt import tseries
@@ -45,7 +45,7 @@ def generate_nb(shape, choice_func_nb, *args):
          [False False False]
          [False False False]]
         ```"""
-    result = np.full(shape, False, dtype=b1)
+    result = np.full(shape, False, dtype=np.bool_)
 
     for col in range(result.shape[1]):
         idxs = choice_func_nb(col, 0, shape[0], *args)
@@ -130,7 +130,7 @@ def shuffle_nb(a, seed=None):
     """2-dim version of `shuffle_1d_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    result = np.empty_like(a, dtype=b1)
+    result = np.empty_like(a, dtype=np.bool_)
 
     for col in range(a.shape[1]):
         result[:, col] = np.random.permutation(a[:, col])
@@ -159,7 +159,7 @@ def rand_choice_by_prob_nb(col, from_i, to_i, probs):
     """`choice_func_nb` to randomly pick values from range `[from_i, to_i)` with probabilities `probs`.
 
     `probs` must be a 1-dim array."""
-    result = np.empty(to_i - from_i, dtype=i8)
+    result = np.empty(to_i - from_i, dtype=np.int_)
     j = 0
     for i in np.arange(from_i, to_i):
         if np.random.uniform(0, 1) <= probs[i, col]:
@@ -330,7 +330,7 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
         >>> print(map_reduce_between_nb(a, map_func_nb, reduce_func_nb))
         [1.5]
         ```"""
-    result = np.full(a.shape[1], np.nan, dtype=f8)
+    result = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -355,7 +355,7 @@ def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
     Iterates over `b`, and for each found `True` value, looks for the preceding `True` value in `a`.
 
     `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
-    result = np.full((a.shape[1],), np.nan, dtype=f8)
+    result = np.full((a.shape[1],), np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -380,7 +380,7 @@ def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each partition of `True` values in `a`.
 
     `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
-    result = np.full(a.shape[1], np.nan, dtype=f8)
+    result = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
         is_partition = False
@@ -447,15 +447,15 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
         >>> print(rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by))
         [1 1 0 2 1]
         ```"""
-    result = np.zeros(a.shape, dtype=i8)
+    result = np.zeros(a.shape, dtype=np.int_)
 
-    false_seen = ~after_false
+    false_seen = not after_false
     inc = 0
     for i in range(a.shape[0]):
         if reset_by is not None:
             if reset_by[i]:
                 # Signal in b_ref resets rank
-                false_seen = ~after_false
+                false_seen = not after_false
                 inc = 0
         if a[i]:
             if false_seen:
@@ -471,7 +471,7 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
 @njit(cache=True)
 def rank_nb(a, reset_by=None, after_false=False, allow_gaps=False):
     """2-dim version of `rank_1d_nb`."""
-    result = np.zeros(a.shape, dtype=i8)
+    result = np.zeros(a.shape, dtype=np.int_)
 
     for col in range(a.shape[1]):
         result[:, col] = rank_1d_nb(
@@ -504,16 +504,16 @@ def rank_partitions_1d_nb(a, reset_by=None, after_false=False):
         >>> print(rank_partitions_1d_nb(signals, reset_by=reset_by))
         [1 1 0 2 1]
         ```"""
-    result = np.zeros(a.shape, dtype=i8)
+    result = np.zeros(a.shape, dtype=np.int_)
 
-    false_seen = ~after_false
+    false_seen = not after_false
     first_seen = False
     inc = 0
     for i in range(a.shape[0]):
         if reset_by is not None:
             if reset_by[i]:
                 # Signal in b_ref resets rank
-                false_seen = ~after_false
+                false_seen = not after_false
                 first_seen = False
                 inc = 0
         if a[i]:
@@ -531,7 +531,7 @@ def rank_partitions_1d_nb(a, reset_by=None, after_false=False):
 @njit(cache=True)
 def rank_partitions_nb(a, reset_by=None, after_false=False):
     """2-dim version of `rank_partitions_1d_nb`."""
-    result = np.zeros(a.shape, dtype=i8)
+    result = np.zeros(a.shape, dtype=np.int_)
 
     for col in range(a.shape[1]):
         result[:, col] = rank_partitions_1d_nb(
@@ -551,7 +551,7 @@ def rank_partitions_nb(a, reset_by=None, after_false=False):
 @njit(cache=True)
 def fshift_1d_nb(a, n):
     """Shift forward `a` by `n` positions."""
-    result = np.empty_like(a, dtype=b1)
+    result = np.empty_like(a, dtype=np.bool_)
     result[:n, :] = False
     result[n:, :] = a[:-n, :]
     return result
@@ -560,7 +560,7 @@ def fshift_1d_nb(a, n):
 @njit(cache=True)
 def fshift_nb(a, n):
     """2-dim version of `fshift_1d_nb`."""
-    result = np.empty_like(a, dtype=b1)
+    result = np.empty_like(a, dtype=np.bool_)
     result[:n] = False
     result[n:] = a[:-n]
     return result

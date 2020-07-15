@@ -522,7 +522,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
         Base_SRAccessor.__init__(self, obj)
         TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
@@ -568,7 +568,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
         Base_DFAccessor.__init__(self, obj)
         TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:
@@ -610,7 +610,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
              candlestick_kwargs={},
              bar_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot OHLCV data.
 
         Args:

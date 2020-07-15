@@ -10,7 +10,7 @@
     Records must remain in the order they were created."""
 
 import numpy as np
-from numba import njit, f8
+from numba import njit
 
 from vectorbt.utils.math import is_close_or_less_nb
 from vectorbt.portfolio.enums import (
@@ -184,8 +184,8 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
     """
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
-    cash = np.empty(target_shape, dtype=f8)
-    shares = np.empty(target_shape, dtype=f8)
+    cash = np.empty(target_shape, dtype=np.float_)
+    shares = np.empty(target_shape, dtype=np.float_)
 
     for col in range(target_shape[1]):
         run_cash = init_capital[col]
@@ -221,8 +221,8 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, e
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
-    cash = np.empty(target_shape, dtype=f8)
-    shares = np.empty(target_shape, dtype=f8)
+    cash = np.empty(target_shape, dtype=np.float_)
+    shares = np.empty(target_shape, dtype=np.float_)
 
     for col in range(target_shape[1]):
         run_cash = init_capital[col]
@@ -309,8 +309,8 @@ def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed
     """Adaptation of `simulate_nb` for simulation based on orders."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
-    cash = np.empty(target_shape, dtype=f8)
-    shares = np.empty(target_shape, dtype=f8)
+    cash = np.empty(target_shape, dtype=np.float_)
+    shares = np.empty(target_shape, dtype=np.float_)
 
     for col in range(target_shape[1]):
         run_cash = init_capital[col]

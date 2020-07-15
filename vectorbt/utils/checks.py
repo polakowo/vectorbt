@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
 from collections.abc import Iterable
+import os
 
 # ############# Checks ############# #
 
@@ -52,6 +53,9 @@ def assert_value_in(value, lst):
 
 def assert_numba_func(func):
     """Raise exception if `func` is not Numba-compiled."""
+    if 'NUMBA_DISABLE_JIT' in os.environ:
+        if os.environ['NUMBA_DISABLE_JIT'] == '1':
+            return
     if not is_numba_func(func):
         raise Exception(f"Function {func} must be Numba compiled")
 

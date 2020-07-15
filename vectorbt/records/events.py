@@ -54,7 +54,7 @@ class BaseEvents(Records):
              profit_shape_kwargs={},
              loss_shape_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot orders.
 
         Args:

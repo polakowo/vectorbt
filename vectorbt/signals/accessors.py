@@ -674,7 +674,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         TimeSeries_SRAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
@@ -714,7 +714,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
 
         return fig
 
-    def plot_as_markers(self, ts, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot_as_markers(self, ts, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as markers.
 
         Args:
@@ -766,7 +766,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         fig.add_trace(scatter)
         return fig
 
-    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs={}, **kwargs):
+    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs={}, **kwargs):  # pragma: no cover
         """Plot signals as entry markers.
         
         See `Signals_SRAccessor.plot_as_markers`."""
@@ -783,7 +783,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         ), trace_kwargs)
         return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
 
-    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs={}, **kwargs):
+    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs={}, **kwargs):  # pragma: no cover
         """Plot signals as exit markers.
         
         See `Signals_SRAccessor.plot_as_markers`."""
@@ -814,7 +814,7 @@ class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
         TimeSeries_DFAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:

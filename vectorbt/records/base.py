@@ -506,7 +506,7 @@ class MappedArray(PandasIndexer):
             result = self.wrapper.index[idx_arr[result.astype(int)]].to_numpy()
         return self.wrapper.wrap_reduced(result, **kwargs)
 
-    def _transform_and_plot(self, plot_func):
+    def _transform_and_plot(self, plot_func):  # pragma: no cover
         """Transform data to the format suitable for plotting, and plot.
 
         Should only be used by plotting methods that disregard X axis labels."""
@@ -520,11 +520,11 @@ class MappedArray(PandasIndexer):
             a[:masked_arr.shape[0], col] = masked_arr
         return plot_func(pd.DataFrame(a, columns=self.wrapper.columns))
 
-    def hist(self, **kwargs):
+    def hist(self, **kwargs):  # pragma: no cover
         """Plot histogram by column."""
         return self._transform_and_plot(lambda x: x.vbt.hist(**kwargs))
 
-    def box(self, **kwargs):
+    def box(self, **kwargs):  # pragma: no cover
         """Plot box plot by column."""
         return self._transform_and_plot(lambda x: x.vbt.box(**kwargs))
 

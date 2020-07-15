@@ -8,7 +8,7 @@
     All functions passed as argument must be Numba-compiled."""
 
 import numpy as np
-from numba import njit, f8
+from numba import njit
 
 from vectorbt import tseries
 
@@ -41,7 +41,7 @@ def cum_returns_nb(returns, start_value_arr):
     """2-dim version of `cum_returns_1d_nb`.
 
     `start_value_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty_like(returns, dtype=f8)
+    result = np.empty_like(returns, dtype=np.float_)
     for col in range(returns.shape[1]):
         result[:, col] = cum_returns_1d_nb(returns[:, col], start_value=start_value_arr[col])
     return result
@@ -61,7 +61,7 @@ def cum_returns_final_nb(returns, start_value_arr):
     """2-dim version of `cum_returns_final_1d_nb`.
 
     `start_value_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = cum_returns_final_1d_nb(returns[:, col], start_value=start_value_arr[col])
     return result
@@ -77,7 +77,7 @@ def annualized_return_1d_nb(returns, ann_factor):
 @njit(cache=True)
 def annualized_return_nb(returns, ann_factor):
     """2-dim version of `annualized_return_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = annualized_return_1d_nb(returns[:, col], ann_factor)
     return result
@@ -97,7 +97,7 @@ def annualized_volatility_nb(returns, ann_factor, levy_alpha_arr):
     """2-dim version of `annualized_volatility_1d_nb`.
 
     `levy_alpha_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = annualized_volatility_1d_nb(returns[:, col], ann_factor, levy_alpha=levy_alpha_arr[col])
     return result
@@ -114,7 +114,7 @@ def drawdown_1d_nb(returns):
 @njit(cache=True)
 def drawdown_nb(returns):
     """2-dim version of `drawdown_1d_nb`."""
-    result = np.empty_like(returns, dtype=f8)
+    result = np.empty_like(returns, dtype=np.float_)
     for col in range(returns.shape[1]):
         result[:, col] = drawdown_1d_nb(returns[:, col])
     return result
@@ -129,7 +129,7 @@ def max_drawdown_1d_nb(returns):
 @njit(cache=True)
 def max_drawdown_nb(returns):
     """2-dim version of `max_drawdown_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = max_drawdown_1d_nb(returns[:, col])
     return result
@@ -148,7 +148,7 @@ def calmar_ratio_1d_nb(returns, ann_factor):
 @njit(cache=True)
 def calmar_ratio_nb(returns, ann_factor):
     """2-dim version of `calmar_ratio_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = calmar_ratio_1d_nb(returns[:, col], ann_factor)
     return result
@@ -176,7 +176,7 @@ def omega_ratio_nb(returns, ann_factor, risk_free_arr, required_return_arr):
     """2-dim version of `omega_ratio_1d_nb`.
 
     `risk_free_arr` and `required_return_arr` should be arrays of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = omega_ratio_1d_nb(
             returns[:, col], ann_factor, risk_free=risk_free_arr[col], required_return=required_return_arr[col])
@@ -202,7 +202,7 @@ def sharpe_ratio_nb(returns, ann_factor, risk_free_arr):
     """2-dim version of `sharpe_ratio_1d_nb`.
 
     `risk_free_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = sharpe_ratio_1d_nb(returns[:, col], ann_factor, risk_free=risk_free_arr[col])
     return result
@@ -221,7 +221,7 @@ def downside_risk_nb(returns, ann_factor, required_return_arr):
     """2-dim version of `downside_risk_1d_nb`.
 
     `required_return_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = downside_risk_1d_nb(returns[:, col], ann_factor, required_return=required_return_arr[col])
     return result
@@ -246,7 +246,7 @@ def sortino_ratio_nb(returns, ann_factor, required_return_arr):
     """2-dim version of `sortino_ratio_1d_nb`.
 
     `required_return_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = sortino_ratio_1d_nb(returns[:, col], ann_factor, required_return=required_return_arr[col])
     return result
@@ -265,7 +265,7 @@ def information_ratio_1d_nb(returns, factor_returns):
 @njit(cache=True)
 def information_ratio_nb(returns, factor_returns):
     """2-dim version of `information_ratio_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = information_ratio_1d_nb(returns[:, col], factor_returns[:, col])
     return result
@@ -296,7 +296,7 @@ def beta_1d_nb(returns, factor_returns):
 @njit(cache=True)
 def beta_nb(returns, factor_returns):
     """2-dim version of `beta_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = beta_1d_nb(returns[:, col], factor_returns[:, col])
     return result
@@ -320,7 +320,7 @@ def alpha_nb(returns, factor_returns, ann_factor, risk_free_arr):
     """2-dim version of `alpha_1d_nb`.
 
     `risk_free_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = alpha_1d_nb(returns[:, col], factor_returns[:, col], ann_factor, risk_free=risk_free_arr[col])
     return result
@@ -342,7 +342,7 @@ def tail_ratio_1d_nb(returns):
 @njit(cache=True)
 def tail_ratio_nb(returns):
     """2-dim version of `tail_ratio_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = tail_ratio_1d_nb(returns[:, col])
     return result
@@ -362,7 +362,7 @@ def value_at_risk_nb(returns, cutoff_arr):
     """2-dim version of `value_at_risk_1d_nb`.
 
     `cutoff_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = value_at_risk_1d_nb(returns[:, col], cutoff=cutoff_arr[col])
     return result
@@ -380,7 +380,7 @@ def conditional_value_at_risk_nb(returns, cutoff_arr):
     """2-dim version of `conditional_value_at_risk_1d_nb`.
 
     `cutoff_arr` should be an array of shape `returns.shape[1]`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = conditional_value_at_risk_1d_nb(returns[:, col], cutoff=cutoff_arr[col])
     return result
@@ -399,7 +399,7 @@ def capture_1d_nb(returns, factor_returns, ann_factor):
 @njit(cache=True)
 def capture_nb(returns, factor_returns, ann_factor):
     """2-dim version of `capture_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
     return result
@@ -422,7 +422,7 @@ def up_capture_1d_nb(returns, factor_returns, ann_factor):
 @njit(cache=True)
 def up_capture_nb(returns, factor_returns, ann_factor):
     """2-dim version of `up_capture_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = up_capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
     return result
@@ -445,7 +445,7 @@ def down_capture_1d_nb(returns, factor_returns, ann_factor):
 @njit(cache=True)
 def down_capture_nb(returns, factor_returns, ann_factor):
     """2-dim version of `down_capture_1d_nb`."""
-    result = np.empty(returns.shape[1], dtype=f8)
+    result = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         result[col] = down_capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
     return result

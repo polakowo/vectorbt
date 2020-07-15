@@ -214,7 +214,7 @@ class MA(MA):
              ts_trace_kwargs={},
              ma_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `MA.ma` against `MA.ts`.
 
         Args:
@@ -302,7 +302,7 @@ class MSTD(MSTD):
     def plot(self,
              mstd_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `MSTD.mstd`.
 
         Args:
@@ -462,7 +462,7 @@ class BollingerBands(BollingerBands):
              upper_trace_kwargs={},
              lower_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `BollingerBands.middle`, `BollingerBands.upper` and `BollingerBands.lower` against
         `BollingerBands.ts`.
 
@@ -571,7 +571,7 @@ class RSI(RSI):
              levels=(30, 70),
              rsi_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
@@ -701,7 +701,7 @@ class Stochastic(Stochastic):
              percent_d_trace_kwargs={},
              shape_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
 
         Args:
@@ -858,7 +858,7 @@ class MACD(MACD):
              signal_trace_kwargs={},
              histogram_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.histogram`.
 
         Args:
@@ -990,7 +990,7 @@ class ATR(ATR):
              tr_trace_kwargs={},
              atr_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
@@ -1074,7 +1074,7 @@ class OBV(OBV):
     def plot(self,
              obv_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `OBV.obv`.
 
         Args:
