@@ -1,10 +1,11 @@
 language: python
 install:
     - pip install .
-    - pip install pdoc3==0.8.1
+    - pip install empyrical
     - pip install pytest
     - pip install pytest-cov
     - pip install codecov
+    - pip install pdoc3==0.8.1
 script:
     - pytest tests/
     - export NUMBA_DISABLE_JIT=1
