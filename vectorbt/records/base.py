@@ -141,7 +141,7 @@ b    14.0
 dtype: float64
 ```
 
-* Use `Records.to_matrix` to map to a matrix and then reduce manually (expensive):
+* Use `MappedArray.to_matrix` to map to a matrix and then reduce manually (expensive):
 
 ```python-repl
 >>> print(mapped.to_matrix().mean())

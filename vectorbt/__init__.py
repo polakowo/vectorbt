@@ -461,10 +461,12 @@ There is much more to backtesting than simply stacking columns. vectorbt offers 
 most parts of a common backtesting pipeline, from building indicators and generating signals, to
 modeling portfolio performance and visualizing results.
 
-## Example notebooks
+## Notebooks
 
 - [Who beats Bitcoin: Dual moving average crossover, trading randomly or holding?](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Bitcoin-DMAC.ipynb)
 - [How stop-loss and trailing stop orders perform on crypto?](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopLoss-vs-TrailingStop.ipynb)
+
+There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/master/tests/notebooks) for testing purposes.
 """
 
 from vectorbt import (

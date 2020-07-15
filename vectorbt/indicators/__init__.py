@@ -41,8 +41,8 @@ Name: (1, 3), dtype: int64
 
 ## Basic
 
-`vectorbt.basic` provides a collection of basic technical trading indicators, such as Bollinger Bands,
-all built with `vectorbt.indicators.factory.IndicatorFactory`.
+`vectorbt.indicators.basic` provides a collection of basic technical trading indicators, such as
+Bollinger Bands, all built with `vectorbt.indicators.factory.IndicatorFactory`.
 
 You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 

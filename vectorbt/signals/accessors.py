@@ -256,7 +256,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
     @classmethod
     def generate_random_by_prob(cls, shape, prob, seed=None, **kwargs):
-        """See `vectorbt.signals.nb.generate_rand_nb_by_prob`.
+        """See `vectorbt.signals.nb.generate_rand_by_prob_nb`.
 
         `prob` must be either a single number or an array that will be broadcast to match `shape`.
         `**kwargs` will be passed to pandas constructor.
