@@ -71,6 +71,7 @@ indexing operation to each `__init__` argument with pandas type:
 2020-01-03  300.0  103.0  200.000000
 2020-01-04  200.0  100.0  133.333333
 2020-01-05  100.0   96.0  133.333333
+
 >>> print(portfolio['a'].equity)
 2020-01-01    100.0
 2020-01-02    200.0
@@ -99,14 +100,14 @@ from vectorbt.records import Orders, Trades, Positions, Drawdowns
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Portfolio`."""
     if obj.wrapper.ndim == 1:
-        raise Exception("Indexing on Series is not supported")
+        raise TypeError("Indexing on Series is not supported")
 
     n_rows = len(obj.wrapper.index)
     n_cols = len(obj.wrapper.columns)
     col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
     col_mapper = pd_indexing_func(col_mapper)
     if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise Exception("Changing index (time axis) is not supported")
+        raise NotImplementedError("Changing index (time axis) is not supported")
     new_cols = col_mapper.values[0]
 
     # Array-like params
@@ -157,10 +158,18 @@ class Portfolio(PandasIndexer):
         freq (any): Index frequency in case `main_price.index` is not datetime-like.
         year_freq (any): Year frequency for working with returns.
         levy_alpha (float or array_like): Scaling relation (Levy stability exponent).
+
+            Single value or value per column.
         risk_free (float or array_like): Constant risk-free return throughout the period.
+
+            Single value or value per column.
         required_return (float or array_like): Minimum acceptance return of the investor.
+
+            Single value or value per column.
         cutoff (float or array_like): Decimal representing the percentage cutoff for the
-                bottom percentile of returns.
+            bottom percentile of returns.
+
+            Single value or value per column.
         factor_returns (array_like): Benchmark return to compare returns against. Will broadcast.
 
             By default it's `None`, but it's required by some return-based metrics.
@@ -193,12 +202,12 @@ class Portfolio(PandasIndexer):
 
         freq = main_price.vbt.tseries(freq=freq).freq
         if freq is None:
-            raise Exception("Couldn't parse the frequency of index. You must set `freq`.")
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         self._freq = freq
 
         year_freq = main_price.vbt.returns(year_freq=year_freq).year_freq
         if freq is None:
-            raise Exception("You must set `year_freq`.")
+            raise ValueError("You must set `year_freq`.")
         self._year_freq = year_freq
 
         # Parameters
@@ -230,15 +239,21 @@ class Portfolio(PandasIndexer):
             exits (array_like): Boolean array of exit signals.
             size (int, float or array_like): The amount of shares to order.
 
-                To buy/sell everything, set the size to `numpy.inf`.
+                To buy/sell everything, set the size to `np.inf`.
             entry_price (array_like): Entry price. Defaults to `main_price`.
             exit_price (array_like): Exit price. Defaults to `main_price`.
             init_capital (int, float or array_like): The initial capital.
 
-                If array, should match the number of columns.
+                Single value or value per column.
             fees (float or array_like): Fees in percentage of the order value.
+
+                Single value, value per column, or value per element.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
+
+                Single value, value per column, or value per element.
             slippage (float or array_like): Slippage in percentage of price.
+
+                Single value, value per column, or value per element.
             accumulate (bool): If `accumulate` is `True`, entering the market when already
                 in the market will be allowed to increase a position.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
@@ -352,14 +367,20 @@ class Portfolio(PandasIndexer):
 
                 If the size is positive, this is the number of shares to buy.
                 If the size is negative, this is the number of shares to sell.
-                To buy/sell everything, set the size to `numpy.inf`.
+                To buy/sell everything, set the size to `np.inf`.
             order_price (array_like): Order price. Defaults to `main_price`.
             init_capital (int, float or array_like): The initial capital.
 
-                If array, should match the number of columns.
+                Single value or value per column.
             fees (float or array_like): Fees in percentage of the order value.
+
+                Single value, value per column, or value per element.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
-            slippage (float or array_like): Slippage in percentage of `order_price`.
+
+                Single value, value per column, or value per element.
+            slippage (float or array_like): Slippage in percentage of price.
+
+                Single value, value per column, or value per element.
             is_target (bool): If `True`, will order the difference between current and target size.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
@@ -463,7 +484,7 @@ class Portfolio(PandasIndexer):
             *args: Arguments passed to `order_func_nb`.
             init_capital (int, float or array_like): The initial capital.
 
-                If array, should match the number of columns.
+                Single value or value per column.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
@@ -614,6 +635,13 @@ class Portfolio(PandasIndexer):
         See `vectorbt.records.events.Positions`."""
         return Positions.from_orders(self.orders)
 
+    @cached_property
+    def drawdowns(self):
+        """Drawdown records.
+
+        See `vectorbt.records.drawdowns.Drawdowns`."""
+        return Drawdowns.from_ts(self.equity, freq=self.freq)
+
     # ############# Equity ############# #
 
     @cached_property
@@ -625,16 +653,6 @@ class Portfolio(PandasIndexer):
     def final_equity(self):
         """Final equity."""
         return self.wrapper.wrap_reduced(self.equity.values[-1])
-
-    @cached_property
-    def peak_equity(self):
-        """Peak equity."""
-        return self.equity.vbt.tseries.max()
-
-    @cached_property
-    def dip_equity(self):
-        """Dip equity."""
-        return self.equity.vbt.tseries.min()
 
     @cached_property
     def total_profit(self):
@@ -655,13 +673,6 @@ class Portfolio(PandasIndexer):
     def max_drawdown(self):
         """Max drawdown."""
         return self.drawdown.vbt.tseries.min()
-
-    @cached_property
-    def drawdowns(self):
-        """Drawdown records.
-
-        See `vectorbt.records.drawdowns.Drawdowns`."""
-        return Drawdowns.from_ts(self.equity, freq=self.freq)
 
     # ############# Returns ############# #
 
@@ -753,7 +764,7 @@ class Portfolio(PandasIndexer):
     def information_ratio(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.information_ratio`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .information_ratio(self.factor_returns)
 
@@ -761,7 +772,7 @@ class Portfolio(PandasIndexer):
     def beta(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.beta`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .beta(self.factor_returns)
 
@@ -769,7 +780,7 @@ class Portfolio(PandasIndexer):
     def alpha(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.alpha`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .alpha(self.factor_returns, risk_free=self.risk_free)
 
@@ -795,7 +806,7 @@ class Portfolio(PandasIndexer):
     def capture(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.capture`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .capture(self.factor_returns)
 
@@ -803,7 +814,7 @@ class Portfolio(PandasIndexer):
     def up_capture(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.up_capture`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .up_capture(self.factor_returns)
 
@@ -811,7 +822,7 @@ class Portfolio(PandasIndexer):
     def down_capture(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.down_capture`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .down_capture(self.factor_returns)
 
@@ -821,13 +832,13 @@ class Portfolio(PandasIndexer):
     def stats(self):
         """Compute various interesting statistics on this portfolio."""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         return pd.Series({
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.freq,
-            'Time in Position [%]': self.positions.coverage * 100,
+            'Holding Duration [%]': self.positions.coverage * 100,
             'Total Profit': self.total_profit,
             'Total Return [%]': self.total_return * 100,
             'Buy & Hold Return [%]': self.buy_and_hold_return * 100,
@@ -837,14 +848,14 @@ class Portfolio(PandasIndexer):
             'Avg. Drawdown Duration': self.drawdowns.avg_duration,
             'Num. Trades': self.trades.count,
             'Win Rate [%]': self.trades.win_rate * 100,
-            'Best Trade [%]': self.trades.max_return * 100,
-            'Worst Trade [%]': self.trades.min_return * 100,
-            'Avg. Trade [%]': self.trades.avg_return * 100,
-            'Max. Trade Duration': self.trades.max_duration,
-            'Avg. Trade Duration': self.trades.avg_duration,
+            'Best Trade [%]': self.trades.returns.max() * 100,
+            'Worst Trade [%]': self.trades.returns.min() * 100,
+            'Avg. Trade [%]': self.trades.returns.mean() * 100,
+            'Max. Trade Duration': self.trades.duration.max(time_units=True),
+            'Avg. Trade Duration': self.trades.duration.mean(time_units=True),
             'Expectancy': self.trades.expectancy,
             'SQN': self.trades.sqn,
             'Sharpe Ratio': self.sharpe_ratio,
             'Sortino Ratio': self.sortino_ratio,
             'Calmar Ratio': self.calmar_ratio
-        })
+        }, name=self.wrapper.name)

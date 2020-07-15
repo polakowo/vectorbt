@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='vectorbt',
-    version='0.10',
+    version='0.11',
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',

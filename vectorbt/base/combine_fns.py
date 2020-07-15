@@ -93,31 +93,14 @@ def apply_and_concat_multiple_nb(n, apply_func_nb, *args):
     return outputs
 
 
-def apply_and_concat(obj, n, apply_func, *args, **kwargs):
-    """Use `apply_and_concat_one` with additional argument `obj`."""
-    return apply_and_concat_one(n, apply_func, obj, *args, **kwargs)
-
-
-@njit
-def apply_and_concat_nb(obj, n, apply_func_nb, *args):
-    """A Numba-compiled version of `apply_and_concat`.
-    
-    !!! note
-        * `apply_func_nb` must be Numba-compiled
-        * `*args` must be Numba-compatible
-        * No support for `**kwargs`
-    """
-    return apply_and_concat_one_nb(n, apply_func_nb, obj, *args)
-
-
 def select_and_combine(i, obj, others, combine_func, *args, **kwargs):
     """Combine `obj` and an element from `others` at `i` using `combine_func`."""
     return combine_func(obj, others[i], *args, **kwargs)
 
 
 def combine_and_concat(obj, others, combine_func, *args, **kwargs):
-    """Use `apply_and_concat` to combine `obj` with each element from `others` using `combine_func`."""
-    return apply_and_concat(obj, len(others), select_and_combine, others, combine_func, *args, **kwargs)
+    """Use `apply_and_concat_one` to combine `obj` with each element from `others` using `combine_func`."""
+    return apply_and_concat_one(len(others), select_and_combine, obj, others, combine_func, *args, **kwargs)
 
 
 @njit
@@ -136,7 +119,7 @@ def select_and_combine_nb(i, obj, others, combine_func_nb, *args):
 @njit
 def combine_and_concat_nb(obj, others, combine_func_nb, *args):
     """A Numba-compiled version of `combine_and_concat`."""
-    return apply_and_concat_nb(obj, len(others), select_and_combine_nb, others, combine_func_nb, *args)
+    return apply_and_concat_one_nb(len(others), select_and_combine_nb, obj, others, combine_func_nb, *args)
 
 
 def combine_multiple(objs, combine_func, *args, **kwargs):

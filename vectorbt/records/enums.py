@@ -23,7 +23,6 @@ __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 
 drawdown_dt = np.dtype([
     ('col', np.int64),
-    ('idx', np.int64),
     ('start_idx', np.int64),
     ('valley_idx', np.int64),
     ('end_idx', np.int64),
@@ -31,7 +30,7 @@ drawdown_dt = np.dtype([
 ], align=True)
 """_"""
 
-__pdoc__['drawdown_dt'] = f"""`numpy.dtype` of drawdown records.
+__pdoc__['drawdown_dt'] = f"""`np.dtype` of drawdown records.
 
 ```plaintext
 {json.dumps(dict(zip(
@@ -66,7 +65,7 @@ order_dt = np.dtype([
 ], align=True)
 """_"""
 
-__pdoc__['order_dt'] = f"""`numpy.dtype` of order records.
+__pdoc__['order_dt'] = f"""`np.dtype` of order records.
 
 ```plaintext
 {json.dumps(dict(zip(
@@ -93,14 +92,13 @@ __pdoc__['EventStatus'] = f"""Event status.
 
 _event_fields = [
     ('col', np.int64),
-    ('idx', np.int64),
     ('size', np.float64),
-    ('open_idx', np.int64),
-    ('open_price', np.float64),
-    ('open_fees', np.float64),
-    ('close_idx', np.int64),
-    ('close_price', np.float64),
-    ('close_fees', np.float64),
+    ('entry_idx', np.int64),
+    ('entry_price', np.float64),
+    ('entry_fees', np.float64),
+    ('exit_idx', np.int64),
+    ('exit_price', np.float64),
+    ('exit_fees', np.float64),
     ('pnl', np.float64),
     ('return', np.float64),
     ('status', np.int64)
@@ -109,7 +107,7 @@ _event_fields = [
 event_dt = np.dtype(_event_fields, align=True)
 """_"""
 
-__pdoc__['event_dt'] = f"""`numpy.dtype` of event records.
+__pdoc__['event_dt'] = f"""`np.dtype` of event records.
 
 ```plaintext
 {json.dumps(dict(zip(
@@ -127,7 +125,7 @@ trade_dt = np.dtype([
 ], align=True)
 """_"""
 
-__pdoc__['trade_dt'] = f"""`numpy.dtype` of trade records. Follows `event_dt`.
+__pdoc__['trade_dt'] = f"""`np.dtype` of trade records. Follows `event_dt`.
 
 ```plaintext
 {json.dumps(dict(zip(
@@ -144,7 +142,7 @@ position_dt = np.dtype([
 ], align=True)
 """_"""
 
-__pdoc__['position_dt'] = f"""`numpy.dtype` of position records. Follows `event_dt`.
+__pdoc__['position_dt'] = f"""`np.dtype` of position records. Follows `event_dt`.
 
 ```plaintext
 {json.dumps(dict(zip(

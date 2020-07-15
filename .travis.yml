@@ -1,13 +1,22 @@
 language: python
 install:
     - pip install .
+    - pip install empyrical
+    - pip install pytest
+    - pip install pytest-cov
+    - pip install codecov
     - pip install pdoc3==0.8.1
 script:
+    - pytest tests/
+    - export NUMBA_DISABLE_JIT=1
+    - pytest tests/ --cov=vectorbt --cov-report term
     - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
     - mv docs/vectorbt/* docs
     - rmdir docs/vectorbt
     - rm -rf !(docs)
     - echo "<meta http-equiv=\"refresh\" content=\"0; url=./docs/index.html\" />" > index.html
+after_success:
+    - codecov
 deploy:
     provider: pages
     skip_cleanup: true

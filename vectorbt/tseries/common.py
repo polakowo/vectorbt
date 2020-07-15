@@ -2,30 +2,11 @@
 
 import numpy as np
 import pandas as pd
-from datetime import timedelta
 
 from vectorbt.utils import checks
 from vectorbt.base.array_wrapper import ArrayWrapper
 
 DatetimeTypes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
-
-
-def to_time_units(obj, freq_delta):
-    """Multiply each element with `freq_delta` to get result in time units."""
-    checks.assert_not_none(freq_delta)
-
-    total_seconds = pd.Timedelta(freq_delta).total_seconds()
-
-    def to_td(x):
-        return timedelta(seconds=x * total_seconds) if ~np.isnan(x) else np.nan
-
-    to_td = np.vectorize(to_td, otypes=[np.object])
-    if checks.is_pandas(obj):
-        return obj.vbt.wrap(to_td(obj.values))
-    arr = np.asarray(obj)
-    if arr.ndim == 0:
-        return to_td(arr.item())
-    return to_td(arr)
 
 
 def freq_delta(freq):
@@ -34,6 +15,13 @@ def freq_delta(freq):
         # Otherwise "ValueError: unit abbreviation w/o a number"
         freq = '1' + freq
     return pd.to_timedelta(freq)
+
+
+def to_time_units(obj, freq):
+    """Multiply each element with `freq_delta` to get result in time units."""
+    if not checks.is_array(obj):
+        obj = np.asarray(obj)
+    return obj * freq_delta(freq)
 
 
 class TSArrayWrapper(ArrayWrapper):
@@ -60,7 +48,7 @@ class TSArrayWrapper(ArrayWrapper):
     def to_time_units(self, a):
         """Convert array to time units."""
         if self.freq is None:
-            raise Exception("Couldn't parse the frequency of index. You must set `freq`.")
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         return to_time_units(a, self.freq)
 
     def wrap_reduced(self, a, time_units=False, index=None):
@@ -69,4 +57,7 @@ class TSArrayWrapper(ArrayWrapper):
         If `time_units` is set, calls `vectorbt.tseries.common.to_time_units`."""
         if time_units:
             a = self.to_time_units(a)
-        return ArrayWrapper.wrap_reduced(self, a, index=index)
+        result = ArrayWrapper.wrap_reduced(self, a, index=index)
+        if isinstance(result, np.timedelta64):
+            return pd.to_timedelta(result)
+        return result

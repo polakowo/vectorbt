@@ -9,16 +9,14 @@ from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.tseries.common import TSArrayWrapper
-from vectorbt.records.base import Records
+from vectorbt.records.base import Records, indexing_on_records
 from vectorbt.records.enums import OrderSide, order_dt
-from vectorbt.records.common import indexing_on_records
-from vectorbt.records import nb
 
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseOrders`."""
     records_arr, _ = indexing_on_records(obj, pd_indexing_func)
-    return obj.__class__(records_arr, pd_indexing_func(obj.main_price), freq=obj.wrapper.freq)
+    return obj.__class__(records_arr, pd_indexing_func(obj.main_price), freq=obj.wrapper.freq, idx_field=obj.idx_field)
 
 
 class BaseOrders(Records):
@@ -36,21 +34,30 @@ class BaseOrders(Records):
         ...      init_capital=100, freq='1D')
 
         >>> print(portfolio.orders.buy.count)
-        4.0
+        4
         >>> print(portfolio.orders.sell.count)
-        1.0
+        1
         ```"""
 
-    def __init__(self, records_arr, main_price, freq=None):
-        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(main_price, freq=freq))
+    def __init__(self, records_arr, main_price, freq=None, idx_field='idx'):
+        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(main_price, freq=freq), idx_field=idx_field)
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
-            raise Exception("Records array must have all fields defined in order_dt")
+            raise ValueError("Records array must have all fields defined in order_dt")
 
         self.main_price = main_price
 
-    def plot(self, main_price_trace_kwargs={}, buy_trace_kwargs={}, sell_trace_kwargs={}, fig=None, **layout_kwargs):
+    def filter_by_mask(self, mask):
+        """Return a new class instance, filtered by mask."""
+        return self.__class__(self.records_arr[mask], self.main_price, freq=self.wrapper.freq, idx_field=self.idx_field)
+
+    def plot(self,
+             main_price_trace_kwargs={},
+             buy_trace_kwargs={},
+             sell_trace_kwargs={},
+             fig=None,
+             **layout_kwargs):  # pragma: no cover
         """Plot orders.
 
         Args:
@@ -66,7 +73,7 @@ class BaseOrders(Records):
 
             ![](/vectorbt/docs/img/orders.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         # Plot main price
         fig = self.main_price.vbt.tseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
@@ -129,42 +136,17 @@ class BaseOrders(Records):
     @cached_property
     def size(self):
         """Size of each order."""
-        return self.map_field_to_matrix('size')
-
-    @cached_property
-    def avg_size(self):
-        """Average size of an order."""
-        return self.map_reduce_records(nb.order_size_map_nb, nb.mean_reduce_nb)
-
-    @cached_property
-    def total_size(self):
-        """Total size of all orders."""
-        return self.map_reduce_records(nb.order_size_map_nb, nb.sum_reduce_nb)
+        return self.map_field('size')
 
     @cached_property
     def price(self):
         """Price of each order."""
-        return self.map_field_to_matrix('price')
-
-    @cached_property
-    def avg_price(self):
-        """Average price of an order."""
-        return self.map_reduce_records(nb.order_price_map_nb, nb.mean_reduce_nb)
+        return self.map_field('price')
 
     @cached_property
     def fees(self):
         """Fees paid for each order."""
-        return self.map_field_to_matrix('fees')
-
-    @cached_property
-    def avg_fees(self):
-        """Average fees paid for an order."""
-        return self.map_reduce_records(nb.order_fees_map_nb, nb.mean_reduce_nb)
-
-    @cached_property
-    def total_fees(self):
-        """Total fees paid for all orders."""
-        return self.map_reduce_records(nb.order_fees_map_nb, nb.sum_reduce_nb)
+        return self.map_field('fees')
 
 
 class Orders(BaseOrders):
@@ -175,16 +157,26 @@ class Orders(BaseOrders):
         """Side of each order.
 
         See `vectorbt.records.enums.OrderSide`."""
-        return self.map_field_to_matrix('side')
+        return self.map_field('side')
 
     @cached_property
     def buy(self):
         """Buy operations of type `BaseOrders`."""
         filter_mask = self.records_arr['side'] == OrderSide.Buy
-        return BaseOrders(self.records_arr[filter_mask], self.main_price, freq=self.wrapper.freq)
+        return BaseOrders(
+            self.records_arr[filter_mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )
 
     @cached_property
     def sell(self):
         """Sell operations of type `BaseOrders`."""
         filter_mask = self.records_arr['side'] == OrderSide.Sell
-        return BaseOrders(self.records_arr[filter_mask], self.main_price, freq=self.wrapper.freq)
+        return BaseOrders(
+            self.records_arr[filter_mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )

@@ -11,9 +11,8 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.tseries.common import DatetimeTypes, TSArrayWrapper
-from vectorbt.records.base import Records
+from vectorbt.records.base import Records, indexing_on_records
 from vectorbt.records import nb
-from vectorbt.records.common import indexing_on_records
 from vectorbt.records.enums import (
     EventStatus,
     event_dt,
@@ -25,40 +24,44 @@ from vectorbt.records.enums import (
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseEvents`."""
     records_arr, _ = indexing_on_records(obj, pd_indexing_func)
-    return obj.__class__(records_arr, pd_indexing_func(obj.main_price), freq=obj.wrapper.freq)
+    return obj.__class__(records_arr, pd_indexing_func(obj.main_price), freq=obj.wrapper.freq, idx_field=obj.idx_field)
 
 
 class BaseEvents(Records):
     """Extends `Records` for working with event records."""
 
-    def __init__(self, records_arr, main_price, freq=None):
-        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(main_price, freq=freq))
+    def __init__(self, records_arr, main_price, freq=None, idx_field='exit_idx'):
+        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(main_price, freq=freq), idx_field=idx_field)
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in event_dt.names):
-            raise Exception("Records array must have all fields defined in event_dt")
+            raise ValueError("Records array must have all fields defined in event_dt")
 
         self.main_price = main_price
 
+    def filter_by_mask(self, mask):
+        """Return a new class instance, filtered by mask."""
+        return self.__class__(self.records_arr[mask], self.main_price, freq=self.wrapper.freq, idx_field=self.idx_field)
+
     def plot(self,
              main_price_trace_kwargs={},
-             open_trace_kwargs={},
-             close_trace_kwargs={},
-             close_profit_trace_kwargs={},
-             close_loss_trace_kwargs={},
+             entry_trace_kwargs={},
+             exit_trace_kwargs={},
+             exit_profit_trace_kwargs={},
+             exit_loss_trace_kwargs={},
              active_trace_kwargs={},
              profit_shape_kwargs={},
              loss_shape_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot orders.
 
         Args:
             main_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
-            open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.
-            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Close" markers.
-            close_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Close - Profit" markers.
-            close_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Close - Loss" markers.
+            entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Entry" markers.
+            exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit" markers.
+            exit_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit - Profit" markers.
+            exit_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit - Loss" markers.
             active_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Active" markers.
             profit_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for profit zones.
             loss_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for loss zones.
@@ -78,19 +81,19 @@ class BaseEvents(Records):
 
             ![](/vectorbt/docs/img/events.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         # Plot main price
         fig = self.main_price.vbt.tseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         size = self.records_arr['size']
-        open_idx = self.records_arr['open_idx']
-        open_price = self.records_arr['open_price']
-        open_fees = self.records_arr['open_fees']
-        close_idx = self.records_arr['close_idx']
-        close_price = self.records_arr['close_price']
-        close_fees = self.records_arr['close_fees']
+        entry_idx = self.records_arr['entry_idx']
+        entry_price = self.records_arr['entry_price']
+        entry_fees = self.records_arr['entry_fees']
+        exit_idx = self.records_arr['exit_idx']
+        exit_price = self.records_arr['exit_price']
+        exit_fees = self.records_arr['exit_fees']
         pnl = self.records_arr['pnl']
         ret = self.records_arr['return']
         status = self.records_arr['status']
@@ -104,13 +107,13 @@ class BaseEvents(Records):
                 duration = to_idx - from_idx
             return np.vectorize(str)(duration)
 
-        duration = get_duration_str(open_idx, close_idx)
+        duration = get_duration_str(entry_idx, exit_idx)
 
-        # Plot Open markers
-        open_customdata = np.stack((size, open_fees), axis=1)
-        open_scatter = go.Scatter(
-            x=self.wrapper.index[open_idx],
-            y=open_price,
+        # Plot Entry markers
+        entry_customdata = np.stack((size, entry_fees), axis=1)
+        entry_scatter = go.Scatter(
+            x=self.wrapper.index[entry_idx],
+            y=entry_price,
             mode='markers',
             marker=dict(
                 symbol='circle',
@@ -121,25 +124,25 @@ class BaseEvents(Records):
                     color=adjust_lightness(contrast_color_schema['blue'])
                 )
             ),
-            name='Open',
-            customdata=open_customdata,
+            name='Entry',
+            customdata=entry_customdata,
             hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.2f}"
         )
-        open_scatter.update(**open_trace_kwargs)
-        fig.add_trace(open_scatter)
+        entry_scatter.update(**entry_trace_kwargs)
+        fig.add_trace(entry_scatter)
 
         # Plot end markers
         def plot_end_markers(mask, name, color, kwargs):
             customdata = np.stack((
                 size[mask],
-                close_fees[mask],
+                exit_fees[mask],
                 pnl[mask],
                 ret[mask],
                 duration[mask]
             ), axis=1)
             scatter = go.Scatter(
-                x=self.wrapper.index[close_idx[mask]],
-                y=close_price[mask],
+                x=self.wrapper.index[exit_idx[mask]],
+                y=exit_price[mask],
                 mode='markers',
                 marker=dict(
                     symbol='circle',
@@ -162,28 +165,28 @@ class BaseEvents(Records):
             scatter.update(**kwargs)
             fig.add_trace(scatter)
 
-        # Plot Close markers
+        # Plot Exit markers
         plot_end_markers(
             (status == EventStatus.Closed) & (pnl == 0.),
-            'Close',
+            'Exit',
             contrast_color_schema['gray'],
-            close_trace_kwargs
+            exit_trace_kwargs
         )
 
-        # Plot Close - Profit markers
+        # Plot Exit - Profit markers
         plot_end_markers(
             (status == EventStatus.Closed) & (pnl > 0.),
-            'Close - Profit',
+            'Exit - Profit',
             contrast_color_schema['green'],
-            close_profit_trace_kwargs
+            exit_profit_trace_kwargs
         )
 
-        # Plot Close - Loss markers
+        # Plot Exit - Loss markers
         plot_end_markers(
             (status == EventStatus.Closed) & (pnl < 0.),
-            'Close - Loss',
+            'Exit - Loss',
             contrast_color_schema['red'],
-            close_loss_trace_kwargs
+            exit_loss_trace_kwargs
         )
 
         # Plot Active markers
@@ -201,10 +204,10 @@ class BaseEvents(Records):
                 type="rect",
                 xref="x",
                 yref="y",
-                x0=self.wrapper.index[open_idx[i]],
-                y0=open_price[i],
-                x1=self.wrapper.index[close_idx[i]],
-                y1=close_price[i],
+                x0=self.wrapper.index[entry_idx[i]],
+                y0=entry_price[i],
+                x1=self.wrapper.index[exit_idx[i]],
+                y1=exit_price[i],
                 fillcolor='green',
                 opacity=0.15,
                 layer="below",
@@ -218,10 +221,10 @@ class BaseEvents(Records):
                 type="rect",
                 xref="x",
                 yref="y",
-                x0=self.wrapper.index[open_idx[i]],
-                y0=open_price[i],
-                x1=self.wrapper.index[close_idx[i]],
-                y1=close_price[i],
+                x0=self.wrapper.index[entry_idx[i]],
+                y0=entry_price[i],
+                x1=self.wrapper.index[exit_idx[i]],
+                y1=exit_price[i],
                 fillcolor='red',
                 opacity=0.15,
                 layer="below",
@@ -235,23 +238,12 @@ class BaseEvents(Records):
     @cached_property
     def duration(self):
         """Duration of each event (in raw format)."""
-        return self.map_records_to_matrix(nb.event_duration_map_nb)
-
-    @cached_property
-    def avg_duration(self):
-        """Average duration (in time units)."""
-        return self.map_reduce_records(nb.event_duration_map_nb, nb.mean_reduce_nb, time_units=True)
-
-    @cached_property
-    def max_duration(self):
-        """Maximum duration (in time units)."""
-        return self.map_reduce_records(nb.event_duration_map_nb, nb.max_reduce_nb, time_units=True)
+        return self.map(nb.event_duration_map_nb)
 
     @cached_property
     def coverage(self):
         """Coverage, that is, total duration divided by the whole period."""
-        total_duration = self.map_reduce_records(nb.event_duration_map_nb, nb.sum_reduce_nb, default_val=0.)
-        coverage = to_1d(total_duration, raw=True) / self.wrapper.shape[0]
+        coverage = to_1d(self.duration.sum(), raw=True) / self.wrapper.shape[0]
         return self.wrapper.wrap_reduced(coverage)
 
     # ############# PnL ############# #
@@ -259,54 +251,14 @@ class BaseEvents(Records):
     @cached_property
     def pnl(self):
         """PnL of each event."""
-        return self.map_field_to_matrix('pnl')
-
-    @cached_property
-    def min_pnl(self):
-        """Minimum PnL."""
-        return self.map_reduce_records(nb.event_pnl_map_nb, nb.min_reduce_nb)
-
-    @cached_property
-    def max_pnl(self):
-        """Maximum PnL."""
-        return self.map_reduce_records(nb.event_pnl_map_nb, nb.max_reduce_nb)
-
-    @cached_property
-    def avg_pnl(self):
-        """Average PnL."""
-        return self.map_reduce_records(nb.event_pnl_map_nb, nb.mean_reduce_nb)
-
-    @cached_property
-    def total_pnl(self):
-        """Total PnL of all events."""
-        return self.map_reduce_records(nb.event_pnl_map_nb, nb.sum_reduce_nb)
+        return self.map_field('pnl')
 
     # ############# Returns ############# #
 
     @cached_property
     def returns(self):
         """Return of each event."""
-        return self.map_field_to_matrix('return')
-
-    @cached_property
-    def min_return(self):
-        """Minimum return."""
-        return self.map_reduce_records(nb.event_return_map_nb, nb.min_reduce_nb)
-
-    @cached_property
-    def max_return(self):
-        """Maximum return."""
-        return self.map_reduce_records(nb.event_return_map_nb, nb.max_reduce_nb)
-
-    @cached_property
-    def avg_return(self):
-        """Average return."""
-        return self.map_reduce_records(nb.event_return_map_nb, nb.mean_reduce_nb)
-
-    @cached_property
-    def sqn(self):
-        """System Quality Number (SQN)."""
-        return self.reduce_records(nb.event_sqn_reduce_nb, 1)  # ddof
+        return self.map_field('return')
 
 
 class BaseEventsByResult(BaseEvents):
@@ -316,13 +268,23 @@ class BaseEventsByResult(BaseEvents):
     def winning(self):
         """Winning events of type `BaseEvents`."""
         filter_mask = self.records_arr['pnl'] > 0.
-        return BaseEvents(self.records_arr[filter_mask], self.main_price, freq=self.wrapper.freq)
+        return BaseEvents(
+            self.records_arr[filter_mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )
 
     @cached_property
     def losing(self):
         """Losing events of type `BaseEvents`."""
         filter_mask = self.records_arr['pnl'] < 0.
-        return BaseEvents(self.records_arr[filter_mask], self.main_price, freq=self.wrapper.freq)
+        return BaseEvents(
+            self.records_arr[filter_mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )
 
     @cached_property
     def win_rate(self):
@@ -336,8 +298,8 @@ class BaseEventsByResult(BaseEvents):
     @cached_property
     def profit_factor(self):
         """Profit factor."""
-        total_win = to_1d(self.winning.total_pnl, raw=True)
-        total_loss = to_1d(self.losing.total_pnl, raw=True)
+        total_win = to_1d(self.winning.pnl.sum(), raw=True)
+        total_loss = to_1d(self.losing.pnl.sum(), raw=True)
 
         # Otherwise columns with only wins or losses will become NaNs
         has_values = to_1d(self.count, raw=True) > 0
@@ -351,8 +313,8 @@ class BaseEventsByResult(BaseEvents):
     def expectancy(self):
         """Average profitability."""
         win_rate = to_1d(self.win_rate, raw=True)
-        avg_win = to_1d(self.winning.avg_pnl, raw=True)
-        avg_loss = to_1d(self.losing.avg_pnl, raw=True)
+        avg_win = to_1d(self.winning.pnl.mean(), raw=True)
+        avg_loss = to_1d(self.losing.pnl.mean(), raw=True)
 
         # Otherwise columns with only wins or losses will become NaNs
         has_values = to_1d(self.count, raw=True) > 0
@@ -362,6 +324,15 @@ class BaseEventsByResult(BaseEvents):
         expectancy = win_rate * avg_win - (1 - win_rate) * np.abs(avg_loss)
         return self.wrapper.wrap_reduced(expectancy)
 
+    @cached_property
+    def sqn(self):
+        """System Quality Number (SQN)."""
+        count = to_1d(self.count, raw=True)
+        pnl_mean = to_1d(self.pnl.mean(), raw=True)
+        pnl_std = to_1d(self.pnl.std(), raw=True)
+        sqn = np.sqrt(count) * pnl_mean / pnl_std
+        return self.wrapper.wrap_reduced(sqn)
+
 
 class Events(BaseEventsByResult):
     """Extends `BaseEventsByResult` by further dividing events by status."""
@@ -369,7 +340,7 @@ class Events(BaseEventsByResult):
     @cached_property
     def status(self):
         """See `vectorbt.records.enums.EventStatus`."""
-        return self.map_field_to_matrix('status')
+        return self.map_field('status')
 
     @cached_property
     def closed_rate(self):
@@ -381,13 +352,23 @@ class Events(BaseEventsByResult):
     def open(self):
         """Open events of type `BaseEventsByResult`."""
         filter_mask = self.records_arr['status'] == EventStatus.Open
-        return BaseEventsByResult(self.records_arr[filter_mask], self.main_price, freq=self.wrapper.freq)
+        return BaseEventsByResult(
+            self.records_arr[filter_mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )
 
     @cached_property
     def closed(self):
         """Closed events of type `BaseEventsByResult`."""
         filter_mask = self.records_arr['status'] == EventStatus.Closed
-        return BaseEventsByResult(self.records_arr[filter_mask], self.main_price, freq=self.wrapper.freq)
+        return BaseEventsByResult(
+            self.records_arr[filter_mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=self.idx_field
+        )
 
 
 class Trades(Events):
@@ -396,57 +377,54 @@ class Trades(Events):
     Such records can be created by using `vectorbt.records.nb.trade_records_nb`.
 
     Example:
-        Get the average PnL of trades with duration over 2 days:
+        Get count and P&L of trades:
         ```python-repl
         >>> import vectorbt as vbt
         >>> import pandas as pd
-        >>> from vectorbt.records import Trades
 
-        >>> price = pd.Series([1, 2, 3, 2, 1])
-        >>> orders = pd.Series([1, -1, 1, 0, -1])
+        >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
+        >>> orders = pd.Series([1, -0.5, -0.5, 2, -0.5, -0.5, -0.5])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_capital=100, freq='1D')
-        >>> print(portfolio.trades.avg_pnl)
-        -0.5
 
-        >>> records_arr = portfolio.trades.records_arr
-        >>> duration_mask = (records_arr['close_idx'] - records_arr['open_idx']) >= 2.
-        >>> trades = Trades(portfolio.wrapper, records_arr[duration_mask])
-        >>> print(trades.avg_pnl)
-        -2.0
+        >>> trades = vbt.Trades.from_orders(portfolio.orders)
+        >>> print(trades.count)
+        6
+        >>> print(trades.pnl.sum())
+        -3.0
+        >>> print(trades.winning.count)
+        2
+        >>> print(trades.winning.pnl.sum())
+        1.5
         ```
 
-        The same can be done by using `BaseEvents.reduce_records`,
-        which skips the step of transforming records into a matrix and thus saves memory.
+        Get count and P&L of trades with duration of more than 2 days:
         ```python-repl
-        >>> import numpy as np
-        >>> from numba import njit
-
-        >>> @njit
-        ... def reduce_func_nb(col_rs):
-        ...     duration_mask = col_rs[:, TS.CloseIdx] - col_rs[:, TS.OpenIdx] >= 2.
-        ...     return np.nanmean(col_rs[duration_mask, TS.PnL])
-
-        >>> portfolio.trades.reduce_records(reduce_func_nb)
-        -2.0
+        >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
+        >>> trades_filtered = trades.filter_by_mask(mask)
+        >>> print(trades_filtered.count)
+        2
+        >>> print(trades_filtered.pnl.sum())
+        -3.0
         ```"""
 
-    def __init__(self, records_arr, main_price, freq=None):
-        Events.__init__(self, records_arr, main_price, freq=freq)
+    def __init__(self, records_arr, main_price, **kwargs):
+        Events.__init__(self, records_arr, main_price, **kwargs)
 
         if not all(field in records_arr.dtype.names for field in trade_dt.names):
-            raise Exception("Records array must have all fields defined in trade_dt")
+            raise ValueError("Records array must have all fields defined in trade_dt")
 
     @classmethod
-    def from_orders(cls, orders):
+    def from_orders(cls, orders, **kwargs):
         """Build `Trades` from `Orders`."""
         trade_records = nb.trade_records_nb(orders.main_price.vbt.to_2d_array(), orders.records_arr)
-        return cls(trade_records, orders.main_price, freq=orders.wrapper.freq)
+        return cls(trade_records, orders.main_price, freq=orders.wrapper.freq, **kwargs)
 
     @cached_property
     def position_idx(self):
         """Position index of each trade."""
-        return self.map_field_to_matrix('position_idx')
+        return self.map_field('position_idx')
+
 
 
 class Positions(Events):
@@ -455,35 +433,46 @@ class Positions(Events):
     Such records can be created by using `vectorbt.records.nb.position_records_nb`.
 
     Example:
-        Get the average PnL of closed positions with duration over 2 days:
+        Get count and P&L of positions:
         ```python-repl
         >>> import vectorbt as vbt
         >>> import pandas as pd
-        >>> from vectorbt.records import Positions
 
-        >>> price = pd.Series([1, 2, 3, 2, 1])
-        >>> orders = pd.Series([1, -1, 1, 0, -1])
+        >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
+        >>> orders = pd.Series([1, -0.5, -0.5, 1, -1, 2, -1])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_capital=100, freq='1D')
-        >>> print(portfolio.positions.avg_pnl)
-        -0.5
 
-        >>> records_arr = portfolio.positions.closed.records_arr
-        >>> duration_mask = (records_arr['close_idx'] - records_arr['open_idx']) >= 2.
-        >>> positions = Positions(portfolio.wrapper, records_arr[duration_mask])
-        >>> print(positions.avg_pnl)
+        >>> positions = vbt.Positions.from_orders(portfolio.orders)
+        >>> print(positions.count)
+        3
+        >>> print(positions.pnl.sum())
+        -1.5
+        >>> print(positions.open.pnl.sum())
+        -2.0
+        >>> print(positions.closed.pnl.sum())
+        0.5
+        ```
+
+        Get count and P&L of positions with size of more than 1 share:
+        ```python-repl
+        >>> mask = positions.records['size'] > 1
+        >>> positions_filtered = positions.filter_by_mask(mask)
+        >>> print(positions_filtered.count)
+        1
+        >>> print(positions_filtered.pnl.sum())
         -2.0
         ```"""
 
-    def __init__(self, records_arr, main_price, freq=None):
-        Events.__init__(self, records_arr, main_price, freq=freq)
+    def __init__(self, records_arr, main_price, **kwargs):
+        Events.__init__(self, records_arr, main_price, **kwargs)
 
         if not all(field in records_arr.dtype.names for field in position_dt.names):
-            raise Exception("Records array must have all fields defined in position_dt")
+            raise ValueError("Records array must have all fields defined in position_dt")
 
     @classmethod
-    def from_orders(cls, orders):
+    def from_orders(cls, orders, **kwargs):
         """Build `Positions` from `Orders`."""
         position_records = nb.position_records_nb(orders.main_price.vbt.to_2d_array(), orders.records_arr)
-        return cls(position_records, orders.main_price, freq=orders.wrapper.freq)
+        return cls(position_records, orders.main_price, freq=orders.wrapper.freq, **kwargs)
 

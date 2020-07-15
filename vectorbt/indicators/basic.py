@@ -1,19 +1,31 @@
 """Indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
-```py
-import numpy as np
-import pandas as pd
-from datetime import datetime, timedelta
-import itertools
-from numba import njit
-import yfinance as yf
+```python-repl
+>>> import vectorbt as vbt
+>>> import numpy as np
+>>> import pandas as pd
+>>> from datetime import datetime, timedelta
+>>> import itertools
+>>> from numba import njit
+>>> import yfinance as yf
 
-import vectorbt as vbt
+>>> ticker = yf.Ticker("BTC-USD")
+>>> price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
+>>> price = price[['Open', 'High', 'Low', 'Close', 'Volume']]
+>>> print(price)
+                Open      High       Low     Close       Volume
+Date
+2019-02-28   3848.26   3906.06   3845.82   3854.79   8399767798
+2019-03-01   3853.76   3907.80   3851.69   3859.58   7661247975
+2019-03-02   3855.32   3874.61   3832.13   3864.42   7578786075
+...              ...       ...       ...       ...          ...
+2019-08-29   9756.79   9756.79   9421.63   9510.20  17045878500
+2019-08-30   9514.84   9656.12   9428.30   9598.17  13595263986
+2019-08-31   9597.54   9673.22   9531.80   9630.66  11454806419
 
-ticker = yf.Ticker("BTC-USD")
-price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
+[185 rows x 5 columns]
 
-price['Close'].vbt.tseries.plot()
+>>> price['Close'].vbt.tseries.plot()
 ```
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
@@ -25,7 +37,7 @@ from vectorbt import tseries, defaults
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.base import reshape_fns
-from vectorbt.indicators.factory import IndicatorFactory
+from vectorbt.indicators.factory import IndicatorFactory, build_param_product
 from vectorbt.indicators import nb
 
 # ############# MA ############# #
@@ -83,7 +95,7 @@ class MA(MA):
         return super().from_params(ts, window, ewm, **kwargs)
 
     @classmethod
-    def from_combs(cls, ts, windows, r, ewm=False, names=None, **kwargs):
+    def from_combs(cls, ts, windows, r, ewm=False, param_product=False, names=None, **kwargs):
         """Create multiple `MA` combinations according to `itertools.combinations`.
 
         Args:
@@ -92,6 +104,7 @@ class MA(MA):
             r (int): The number of `MA` instances to combine.
             ewm (bool or array_like of bool): If `True`, uses exponential moving average, otherwise 
                 uses simple moving average.
+            param_product (bool): If `True`, builds a Cartesian product out of all parameters.
             names (list of str): A list of names for each `MA` instance.
             **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.from_params_pipeline.`
         Returns:
@@ -183,7 +196,12 @@ class MA(MA):
 
         if names is None:
             names = ['ma' + str(i + 1) for i in range(r)]
-        windows, ewm = reshape_fns.broadcast(windows, ewm, writeable=True)
+        param_list = [windows, ewm]
+        if param_product:
+            param_list = build_param_product(param_list)
+        else:
+            param_list = reshape_fns.broadcast(*param_list, writeable=True)
+        windows, ewm = param_list
         cache_dict = cls.from_params(ts, windows, ewm=ewm, return_cache=True, **kwargs)
         param_lists = zip(*itertools.combinations(zip(windows, ewm), r))
         mas = []
@@ -196,7 +214,7 @@ class MA(MA):
              ts_trace_kwargs={},
              ma_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `MA.ma` against `MA.ts`.
 
         Args:
@@ -211,7 +229,7 @@ class MA(MA):
 
             ![](/vectorbt/docs/img/MA.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         ts_trace_kwargs = merge_kwargs(dict(
             name=f'Price ({self.name})'
@@ -284,7 +302,7 @@ class MSTD(MSTD):
     def plot(self,
              mstd_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `MSTD.mstd`.
 
         Args:
@@ -298,7 +316,7 @@ class MSTD(MSTD):
 
             ![](/vectorbt/docs/img/MSTD.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         mstd_trace_kwargs = merge_kwargs(dict(
             name=f'MSTD ({self.name})'
@@ -319,13 +337,13 @@ BollingerBands = IndicatorFactory(
     module_name=__name__,
     ts_names=['ts'],
     param_names=['window', 'ewm', 'alpha'],
-    output_names=['ma', 'upper_band', 'lower_band'],
+    output_names=['middle', 'upper', 'lower'],
     name='bb',
     custom_outputs=dict(
         percent_b=lambda self: self.wrapper.wrap(
-            (self.ts.values - self.lower_band.values) / (self.upper_band.values - self.lower_band.values)),
+            (self.ts.values - self.lower.values) / (self.upper.values - self.lower.values)),
         bandwidth=lambda self: self.wrapper.wrap(
-            (self.upper_band.values - self.lower_band.values) / self.ma.values)
+            (self.upper.values - self.lower.values) / self.middle.values)
     )
 ).from_apply_func(nb.bb_apply_nb, caching_func=nb.bb_caching_nb)
 
@@ -341,9 +359,9 @@ class BollingerBands(BollingerBands):
 
     @classmethod
     def from_params(cls, ts, window=20, ewm=False, alpha=2, **kwargs):
-        """Calculate moving average `BollingerBands.ma`, upper Bollinger Band `BollingerBands.upper_band`,
-        lower Bollinger Band `BollingerBands.lower_band`, %b `BollingerBands.percent_b` and 
-        bandwidth `BollingerBands.bandwidth` from time series `ts` and parameters `window`, `ewm` and `alpha`.
+        """Calculate middle line `BollingerBands.middle`, upper Bollinger Band `BollingerBands.upper`,
+        lower Bollinger Band `BollingerBands.lower`, %b `BollingerBands.percent_b` and bandwidth
+        `BollingerBands.bandwidth` from time series `ts` and parameters `window`, `ewm` and `alpha`.
 
         Args:
             ts (pandas_like): Time series (such as price).
@@ -359,7 +377,7 @@ class BollingerBands(BollingerBands):
             >>> bb = vbt.BollingerBands.from_params(price['Close'], 
             ...     window=[10, 20], alpha=[2, 3], ewm=[False, True])
 
-            >>> print(bb.ma)
+            >>> print(bb.middle)
             bb_window          10            20
             bb_ewm          False          True
             bb_alpha          2.0           3.0
@@ -374,7 +392,7 @@ class BollingerBands(BollingerBands):
 
             [185 rows x 2 columns]
 
-            >>> print(bb.upper_band)
+            >>> print(bb.upper)
             bb_window             10            20
             bb_ewm             False          True
             bb_alpha             2.0           3.0
@@ -389,7 +407,7 @@ class BollingerBands(BollingerBands):
 
             [185 rows x 2 columns]
 
-            >>> print(bb.lower_band)
+            >>> print(bb.lower)
             bb_window            10           20
             bb_ewm            False         True
             bb_alpha            2.0          3.0
@@ -440,19 +458,19 @@ class BollingerBands(BollingerBands):
 
     def plot(self,
              ts_trace_kwargs={},
-             ma_trace_kwargs={},
-             upper_band_trace_kwargs={},
-             lower_band_trace_kwargs={},
+             middle_trace_kwargs={},
+             upper_trace_kwargs={},
+             lower_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
-        """Plot `BollingerBands.ma`, `BollingerBands.upper_band` and `BollingerBands.lower_band` against 
+             **layout_kwargs):  # pragma: no cover
+        """Plot `BollingerBands.middle`, `BollingerBands.upper` and `BollingerBands.lower` against
         `BollingerBands.ts`.
 
         Args:
             ts_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.ts`.
-            ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.ma`.
-            upper_band_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.upper_band`.
-            lower_band_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.lower_band`.
+            middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.middle`.
+            upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.upper`.
+            lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.lower`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -462,32 +480,30 @@ class BollingerBands(BollingerBands):
 
             ![](/vectorbt/docs/img/BollingerBands.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
-        lower_band_trace_kwargs = merge_kwargs(dict(
+        lower_trace_kwargs = merge_kwargs(dict(
             name=f'Lower Band ({self.name})',
-            line=dict(color='grey', width=0),
-            showlegend=False
-        ), lower_band_trace_kwargs)
-        upper_band_trace_kwargs = merge_kwargs(dict(
+            line=dict(color='silver')
+        ), lower_trace_kwargs)
+        upper_trace_kwargs = merge_kwargs(dict(
             name=f'Upper Band ({self.name})',
-            line=dict(color='grey', width=0),
+            line=dict(color='silver'),
             fill='tonexty',
-            fillcolor='rgba(128, 128, 128, 0.25)',
-            showlegend=False
-        ), upper_band_trace_kwargs)  # default kwargs
-        ma_trace_kwargs = merge_kwargs(dict(
-            name=f'MA ({self.name})',
+            fillcolor='rgba(128, 128, 128, 0.25)'
+        ), upper_trace_kwargs)  # default kwargs
+        middle_trace_kwargs = merge_kwargs(dict(
+            name=f'Middle Band ({self.name})',
             line=dict(color=defaults.layout['colorway'][1])
-        ), ma_trace_kwargs)
+        ), middle_trace_kwargs)
         ts_trace_kwargs = merge_kwargs(dict(
             name=f'Price ({self.name})',
             line=dict(color=defaults.layout['colorway'][0])
         ), ts_trace_kwargs)
 
-        fig = self.lower_band.vbt.tseries.plot(trace_kwargs=lower_band_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.upper_band.vbt.tseries.plot(trace_kwargs=upper_band_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.tseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.lower.vbt.tseries.plot(trace_kwargs=lower_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.upper.vbt.tseries.plot(trace_kwargs=upper_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.middle.vbt.tseries.plot(trace_kwargs=middle_trace_kwargs, fig=fig, **layout_kwargs)
         fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
@@ -555,7 +571,7 @@ class RSI(RSI):
              levels=(30, 70),
              rsi_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
@@ -569,7 +585,7 @@ class RSI(RSI):
 
             ![](/vectorbt/docs/img/RSI.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         rsi_trace_kwargs = merge_kwargs(dict(
             name=f'RSI ({self.name})'
@@ -685,7 +701,7 @@ class Stochastic(Stochastic):
              percent_d_trace_kwargs={},
              shape_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
 
         Args:
@@ -701,7 +717,7 @@ class Stochastic(Stochastic):
 
             ![](/vectorbt/docs/img/Stochastic.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         percent_k_trace_kwargs = merge_kwargs(dict(
             name=f'%K ({self.name})'
@@ -744,7 +760,7 @@ MACD = IndicatorFactory(
     module_name=__name__,
     ts_names=['ts'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
-    output_names=['fast_ma', 'slow_ma', 'macd', 'signal'],
+    output_names=['macd', 'signal'],
     name='macd',
     custom_outputs=dict(
         histogram=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
@@ -762,9 +778,8 @@ class MACD(MACD):
 
     @classmethod
     def from_params(cls, ts, fast_window=26, slow_window=12, signal_window=9, macd_ewm=True, signal_ewm=True, **kwargs):
-        """Calculate fast moving average `MACD.fast_ma`, slow moving average `MACD.slow_ma`, MACD `MACD.macd`, 
-        signal `MACD.signal` and histogram `MACD.histogram` from time series `ts` and parameters `fast_window`, 
-        `slow_window`, `signal_window`, `macd_ewm` and `signal_ewm`.
+        """Calculate MACD `MACD.macd`, signal `MACD.signal` and histogram `MACD.histogram` from time series `ts`
+        and parameters `fast_window`, `slow_window`, `signal_window`, `macd_ewm` and `signal_ewm`.
 
         Args:
             ts (pandas_like): Time series (such as price).
@@ -783,40 +798,6 @@ class MACD(MACD):
             >>> macd = vbt.MACD.from_params(price['Close'], 
             ...     fast_window=[10, 20], slow_window=[20, 30], signal_window=[30, 40], 
             ...     macd_ewm=[False, True], signal_ewm=[True, False])
-
-            >>> print(macd.fast_ma)
-            macd_fast_window           10            20
-            macd_slow_window           20            30
-            macd_signal_window         30            40
-            macd_macd_ewm           False          True
-            macd_signal_ewm          True         False
-            Date                                       
-            2019-02-28                NaN           NaN
-            2019-03-01                NaN           NaN
-            2019-03-02                NaN           NaN
-            ...                       ...           ...
-            2019-08-29          10155.972  10330.457140
-            2019-08-30          10039.466  10260.715507
-            2019-08-31           9988.727  10200.710220
-
-            [185 rows x 2 columns]
-
-            >>> print(macd.slow_ma)
-            macd_fast_window            10            20
-            macd_slow_window            20            30
-            macd_signal_window          30            40
-            macd_macd_ewm            False          True
-            macd_signal_ewm           True         False
-            Date                                        
-            2019-02-28                 NaN           NaN
-            2019-03-01                 NaN           NaN
-            2019-03-02                 NaN           NaN
-            ...                        ...           ...
-            2019-08-29          10447.3480  10423.585970
-            2019-08-30          10359.5555  10370.333077
-            2019-08-31          10264.9095  10322.612024
-
-            [185 rows x 2 columns]
 
             >>> print(macd.macd)
             macd_fast_window          10          20
@@ -877,7 +858,7 @@ class MACD(MACD):
              signal_trace_kwargs={},
              histogram_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.histogram`.
 
         Args:
@@ -893,7 +874,7 @@ class MACD(MACD):
 
             ![](/vectorbt/docs/img/MACD.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         macd_trace_kwargs = merge_kwargs(dict(
             name=f'MACD ({self.name})'
@@ -913,10 +894,9 @@ class MACD(MACD):
         # Plot histogram
         hist = self.histogram.values
         hist_diff = tseries.nb.diff_1d_nb(hist)
-        marker_colors = np.full(hist.shape, np.nan, dtype=np.object)
+        marker_colors = np.full(hist.shape, 'silver', dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
-        marker_colors[hist == 0] = 'lightgrey'
         marker_colors[(hist < 0) & (hist_diff < 0)] = 'red'
         marker_colors[(hist < 0) & (hist_diff >= 0)] = 'lightcoral'
 
@@ -1010,7 +990,7 @@ class ATR(ATR):
              tr_trace_kwargs={},
              atr_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
@@ -1025,7 +1005,7 @@ class ATR(ATR):
 
             ![](/vectorbt/docs/img/ATR.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         tr_trace_kwargs = merge_kwargs(dict(
             name=f'TR ({self.name})'
@@ -1094,7 +1074,7 @@ class OBV(OBV):
     def plot(self,
              obv_trace_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot `OBV.obv`.
 
         Args:
@@ -1108,7 +1088,7 @@ class OBV(OBV):
 
             ![](/vectorbt/docs/img/OBV.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         obv_trace_kwargs = merge_kwargs(dict(
             name=f'OBV ({self.name})'

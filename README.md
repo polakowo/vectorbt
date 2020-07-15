@@ -14,6 +14,13 @@ and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display compl
 Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to process data 
 on the fly and thus enable the user to interact with data-hungry widgets without significant delays.
 
+With vectorbt you can
+* Analyze and engineer features for any time series data
+* Run many common pandas operations on Series/DataFrames a lot faster
+* Test millions of strategies/hyper-parameter combinations in one go
+* Test machine learning models
+* Build interactive charts/dashboards without leaving Jupyter
+
 ## Example
 
 Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history 
@@ -43,7 +50,7 @@ window_ret_matrix = portfolio.total_return.vbt.unstack_to_df(
     symmetric=True)
 
 # Plot the whole thing
-window_ret_matrix.vbt.Heatmap(
+window_ret_matrix.vbt.heatmap(
     xaxis_title='Slow window', 
     yaxis_title='Fast window', 
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')),
@@ -57,30 +64,30 @@ Digging into each individual strategy instance is as simple as indexing with pan
 ```python-repl
 >>> print(portfolio[(13, 21)].stats)
 
-Start                         2014-09-17 00:00:00
-End                           2020-06-27 00:00:00
-Duration                       2110 days 00:00:00
-Time in Position [%]                      56.9194
-Total Profit                              9691.23
-Total Return [%]                          9691.23
-Buy & Hold Return [%]                     1904.51
-Max. Drawdown [%]                         47.8405
-Avg. Drawdown [%]                         8.72147
-Max. Drawdown Duration          510 days 00:00:00
-Avg. Drawdown Duration           36 days 22:40:00
-Num. Trades                                    53
-Win Rate [%]                              52.8302
-Best Trade [%]                            279.692
-Worst Trade [%]                          -23.4948
-Avg. Trade [%]                            13.7254
-Max. Trade Duration             100 days 00:00:00
-Avg. Trade Duration       22 days 15:50:56.603774
-Expectancy                                182.853
-SQN                                       1.97949
-Sharpe Ratio                              1.78866
-Sortino Ratio                             2.82694
-Calmar Ratio                              2.52918
-dtype: object
+Start                     2014-09-17 00:00:00
+End                       2020-07-15 00:00:00
+Duration                   2129 days 00:00:00
+Holding Duration [%]                  56.4584
+Total Profit                          9626.46
+Total Return [%]                      9626.46
+Buy & Hold Return [%]                 1909.76
+Max. Drawdown [%]                     47.8405
+Avg. Drawdown [%]                     8.72147
+Max. Drawdown Duration      510 days 00:00:00
+Avg. Drawdown Duration       37 days 07:06:40
+Num. Trades                                54
+Win Rate [%]                          51.8519
+Best Trade [%]                        279.692
+Worst Trade [%]                      -23.4948
+Avg. Trade [%]                         13.459
+Max. Trade Duration         100 days 00:00:00
+Avg. Trade Duration          22 days 06:13:20
+Expectancy                            178.268
+SQN                                    1.9641
+Sharpe Ratio                          1.77836
+Sortino Ratio                         2.81075
+Calmar Ratio                          2.49139
+Name: (13, 21), dtype: object
 ```
 
 ## Motivation
@@ -168,7 +175,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
     - Drawdown analysis
 
 ```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns().plot()
+>>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns.plot()
 ```
 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
@@ -230,7 +237,7 @@ ma_ewm    False      True
 
 ```python-repl
 >>> a = np.random.normal(0, 4, size=10000)
->>> pd.Series(a).vbt.Box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
+>>> pd.Series(a).vbt.box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
 ``` 
 
 ![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/Box.png)

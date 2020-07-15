@@ -1,30 +1,33 @@
 """Custom pandas accessors.
 
 !!! note
-    Input arrays can be of any data type, but most output arrays are `numpy.float64`.
+    Input arrays can be of any data type, but most output arrays are `np.float64`.
     
-```py
-import vectorbt as vbt
-import numpy as np
-import pandas as pd
-from numba import njit
-from datetime import datetime
+```python-repl
+>>> import vectorbt as vbt
+>>> import numpy as np
+>>> import pandas as pd
+>>> from numba import njit
+>>> from datetime import datetime
 
-index = pd.Index([
-    datetime(2020, 1, 1),
-    datetime(2020, 1, 2),
-    datetime(2020, 1, 3),
-    datetime(2020, 1, 4),
-    datetime(2020, 1, 5)
-])
-columns = ['a', 'b', 'c']
-df = pd.DataFrame([
-    [1, 5, 1],
-    [2, 4, 2],
-    [3, 3, 3],
-    [4, 2, 2],
-    [5, 1, 1]
-], index=index, columns=columns)
+>>> ts = pd.DataFrame({
+...     'a': [1, 2, 3, 4, 5],
+...     'b': [5, 4, 3, 2, 1],
+...     'c': [1, 2, 3, 2, 1]
+... }, index=pd.Index([
+...     datetime(2020, 1, 1),
+...     datetime(2020, 1, 2),
+...     datetime(2020, 1, 3),
+...     datetime(2020, 1, 4),
+...     datetime(2020, 1, 5)
+... ]))
+>>> print(ts)
+            a  b  c
+2020-01-01  1  5  1
+2020-01-02  2  4  2
+2020-01-03  3  3  3
+2020-01-04  4  2  2
+2020-01-05  5  1  1
 ```"""
 
 import numpy as np
@@ -35,9 +38,10 @@ from numba.typed import Dict
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import add_nb_methods
+from vectorbt.utils.decorators import cached_property
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
+from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries import nb
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.drawdowns import Drawdowns
@@ -67,7 +71,7 @@ except ImportError:
     nanargmin = np.nanargmin
 
 
-@add_nb_methods(
+@add_nb_methods([
     nb.fillna_nb,
     nb.fshift_nb,
     nb.diff_nb,
@@ -85,12 +89,12 @@ except ImportError:
     nb.expanding_min_nb,
     nb.expanding_max_nb,
     nb.expanding_mean_nb,
-    nb.expanding_std_nb,
-    module_name='vectorbt.tseries.nb')
+    nb.expanding_std_nb
+], module_name='vectorbt.tseries.nb')
 class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
     """Accessor on top of time series. For both, Series and DataFrames.
 
-    Accessible through `pandas.Series.vbt.tseries` and `pandas.DataFrame.vbt.tseries`.
+    Accessible through `pd.Series.vbt.tseries` and `pd.DataFrame.vbt.tseries`.
 
     You can call the accessor and specify index frequency if your index isn't datetime-like."""
 
@@ -122,41 +126,38 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
 
         Example:
             ```python-repl
-            >>> print(df.vbt.tseries.split_into_ranges(n=2))
-                                           a                     b                     c
-            start_date 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
-            end_date   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
-            0                 1.0        4.0        5.0        2.0        1.0        2.0
-            1                 2.0        5.0        4.0        1.0        2.0        1.0
-
-            >>> print(df.vbt.tseries.split_into_ranges(range_len=4))
-                                           a                     b                     c
-            start_date 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
-            end_date   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
-            0                 1.0        2.0        5.0        4.0        1.0        2.0
-            1                 2.0        3.0        4.0        3.0        2.0        3.0
-            2                 3.0        4.0        3.0        2.0        3.0        2.0
-            3                 4.0        5.0        2.0        1.0        2.0        1.0
+            >>> print(ts.vbt.tseries.split_into_ranges(n=2))
+                                            a                     b                     c
+            range_start 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
+            range_end   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
+            0                  1.0        4.0        5.0        2.0        1.0        2.0
+            1                  2.0        5.0        4.0        1.0        2.0        1.0
+            >>> print(ts.vbt.tseries.split_into_ranges(range_len=4))
+                                            a                     b                     c
+            range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
+            range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
+            0                  1.0        2.0        5.0        4.0        1.0        2.0
+            1                  2.0        3.0        4.0        3.0        2.0        3.0
+            2                  3.0        4.0        3.0        2.0        3.0        2.0
+            3                  4.0        5.0        2.0        1.0        2.0        1.0
             ```"""
-        if range_len is None:
-            checks.assert_not_none(n)
-        elif n is None:
-            checks.assert_not_none(range_len)
+        if range_len is None and n is None:
+            raise ValueError("At least range_len or n must be set")
 
         if range_len is None:
             range_len = len(self.index) // n
         cube = nb.rolling_window_nb(self.to_2d_array(), range_len)
         if n is not None:
             if n > cube.shape[2]:
-                raise Exception(f"n cannot be bigger than the maximum number of ranges {cube.shape[2]}")
+                raise ValueError(f"n cannot be bigger than the maximum number of ranges {cube.shape[2]}")
             idxs = np.round(np.linspace(0, cube.shape[2] - 1, n)).astype(int)
             cube = cube[:, :, idxs]
         else:
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
-        start_dates = pd.Index(self.index[idxs], name='start_date')
-        end_dates = pd.Index(self.index[idxs + range_len - 1], name='end_date')
-        range_columns = index_fns.stack_indexes(start_dates, end_dates)
+        range_starts = pd.Index(self.index[idxs], name='range_start')
+        range_ends = pd.Index(self.index[idxs + range_len - 1], name='range_end')
+        range_columns = index_fns.stack_indexes(range_starts, range_ends)
         new_columns = index_fns.combine_indexes(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
@@ -167,16 +168,15 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.rolling_apply(3, mean_nb))
+            >>> print(ts.vbt.tseries.rolling_apply(3, mean_nb))
                           a    b         c
             2020-01-01  1.0  5.0  1.000000
             2020-01-02  1.5  4.5  1.500000
             2020-01-03  2.0  4.0  2.000000
             2020-01-04  3.0  3.0  2.333333
             2020-01-05  4.0  2.0  2.000000
-
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.rolling_apply(3,
+            >>> print(ts.vbt.tseries.rolling_apply(3,
             ...     mean_matrix_nb, on_matrix=True))
                                a         b         c
             2020-01-01  2.333333  2.333333  2.333333
@@ -200,16 +200,15 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.expanding_apply(mean_nb))
+            >>> print(ts.vbt.tseries.expanding_apply(mean_nb))
                           a    b    c
             2020-01-01  1.0  5.0  1.0
             2020-01-02  1.5  4.5  1.5
             2020-01-03  2.0  4.0  2.0
             2020-01-04  2.5  3.5  2.0
             2020-01-05  3.0  3.0  1.8
-
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.expanding_apply(
+            >>> print(ts.vbt.tseries.expanding_apply(
             ...     mean_matrix_nb, on_matrix=True))
                                a         b         c
             2020-01-01  2.333333  2.333333  2.333333
@@ -230,19 +229,18 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         """See `vectorbt.tseries.nb.groupby_apply_nb` and
         `vectorbt.tseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
-        For `by`, see `pandas.DataFrame.groupby`.
+        For `by`, see `pd.DataFrame.groupby`.
 
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.groupby_apply([1, 1, 2, 2, 3], mean_nb))
+            >>> print(ts.vbt.tseries.groupby_apply([1, 1, 2, 2, 3], mean_nb))
                  a    b    c
             1  1.5  4.5  1.5
             2  3.5  2.5  2.5
             3  5.0  1.0  1.0
-
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.groupby_apply([1, 1, 2, 2, 3],
+            >>> print(ts.vbt.tseries.groupby_apply([1, 1, 2, 2, 3],
             ...     mean_matrix_nb, on_matrix=True))
                       a         b         c
             1  2.500000  2.500000  2.500000
@@ -265,19 +263,18 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         """See `vectorbt.tseries.nb.groupby_apply_nb` and
         `vectorbt.tseries.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
 
-        For `freq`, see `pandas.DataFrame.resample`.
+        For `freq`, see `pd.DataFrame.resample`.
 
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.resample_apply('2d', mean_nb))
+            >>> print(ts.vbt.tseries.resample_apply('2d', mean_nb))
                           a    b    c
             2020-01-01  1.5  4.5  1.5
             2020-01-03  3.5  2.5  2.5
             2020-01-05  5.0  1.0  1.0
-
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.resample_apply('2d',
+            >>> print(ts.vbt.tseries.resample_apply('2d',
             ...     mean_matrix_nb, on_matrix=True))
                                a         b         c
             2020-01-01  2.500000  2.500000  2.500000
@@ -306,7 +303,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         Example:
             ```python-repl
             >>> multiply_nb = njit(lambda col, i, a: a ** 2)
-            >>> print(df.vbt.tseries.applymap(multiply_nb))
+            >>> print(ts.vbt.tseries.applymap(multiply_nb))
                            a     b    c
             2020-01-01   1.0  25.0  1.0
             2020-01-02   4.0  16.0  4.0
@@ -325,7 +322,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         Example:
             ```python-repl
             >>> greater_nb = njit(lambda col, i, a: a > 2)
-            >>> print(df.vbt.tseries.filter(greater_nb))
+            >>> print(ts.vbt.tseries.filter(greater_nb))
                           a    b    c
             2020-01-01  NaN  5.0  NaN
             2020-01-02  NaN  4.0  NaN
@@ -347,7 +344,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
             ```python-repl
             >>> greater_nb = njit(lambda col, a: a[a > 2])
             >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.apply_and_reduce(greater_nb, mean_nb))
+            >>> print(ts.vbt.tseries.apply_and_reduce(greater_nb, mean_nb))
             a    4.0
             b    4.0
             c    3.0
@@ -367,7 +364,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(df.vbt.tseries.reduce(mean_nb))
+            >>> print(ts.vbt.tseries.reduce(mean_nb))
             a    3.0
             b    3.0
             c    1.8
@@ -386,7 +383,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         Example:
             ```python-repl
             >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-            >>> print(df.vbt.tseries.reduce_to_array(min_max_nb, index=['min', 'max']))
+            >>> print(ts.vbt.tseries.reduce_to_array(min_max_nb, index=['min', 'max']))
                    a    b    c
             min  1.0  1.0  1.0
             max  5.0  5.0  3.0
@@ -398,71 +395,113 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
 
     def min(self, **kwargs):
         """Return min of non-NaN elements."""
-        return self.wrap_reduced(nanmin(self.to_2d_array(), axis=0), **kwargs)
+        arr = self.to_2d_array()
+        if arr.dtype != int and arr.dtype != float:
+            # bottleneck can't consume other than that
+            _nanmin = np.nanmin
+        else:
+            _nanmin = nanmin
+        return self.wrap_reduced(_nanmin(arr, axis=0), **kwargs)
 
     def max(self, **kwargs):
         """Return max of non-NaN elements."""
-        return self.wrap_reduced(nanmax(self.to_2d_array(), axis=0), **kwargs)
+        arr = self.to_2d_array()
+        if arr.dtype != int and arr.dtype != float:
+            # bottleneck can't consume other than that
+            _nanmax = np.nanmax
+        else:
+            _nanmax = nanmax
+        return self.wrap_reduced(_nanmax(arr, axis=0), **kwargs)
 
     def mean(self, **kwargs):
         """Return mean of non-NaN elements."""
-        return self.wrap_reduced(nanmean(self.to_2d_array(), axis=0), **kwargs)
+        arr = self.to_2d_array()
+        if arr.dtype != int and arr.dtype != float:
+            # bottleneck can't consume other than that
+            _nanmean = np.nanmean
+        else:
+            _nanmean = nanmean
+        return self.wrap_reduced(_nanmean(arr, axis=0), **kwargs)
 
     def median(self, **kwargs):
         """Return median of non-NaN elements."""
-        return self.wrap_reduced(nanmedian(self.to_2d_array(), axis=0), **kwargs)
+        arr = self.to_2d_array()
+        if arr.dtype != int and arr.dtype != float:
+            # bottleneck can't consume other than that
+            _nanmedian = np.nanmedian
+        else:
+            _nanmedian = nanmedian
+        return self.wrap_reduced(_nanmedian(arr, axis=0), **kwargs)
 
     def std(self, ddof=1, **kwargs):
         """Return standard deviation of non-NaN elements."""
-        return self.wrap_reduced(nanstd(self.to_2d_array(), ddof=ddof, axis=0), **kwargs)
+        arr = self.to_2d_array()
+        if arr.dtype != int and arr.dtype != float:
+            # bottleneck can't consume other than that
+            _nanstd = np.nanstd
+        else:
+            _nanstd = nanstd
+        return self.wrap_reduced(_nanstd(arr, ddof=ddof, axis=0), **kwargs)
+
+    def sum(self, **kwargs):
+        """Return sum of non-NaN elements."""
+        arr = self.to_2d_array()
+        if arr.dtype != int and arr.dtype != float:
+            # bottleneck can't consume other than that
+            _nansum = np.nansum
+        else:
+            _nansum = nansum
+        return self.wrap_reduced(_nansum(arr, axis=0), **kwargs)
 
     def count(self, **kwargs):
         """Return count of non-NaN elements."""
         return self.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **kwargs)
 
-    def sum(self, **kwargs):
-        """Return sum of non-NaN elements."""
-        return self.wrap_reduced(nansum(self.to_2d_array(), axis=0), **kwargs)
-
-    def argmin(self, **kwargs):
+    def idxmin(self, **kwargs):
         """Return index of min of non-NaN elements."""
         return self.wrap_reduced(self.index[nanargmin(self.to_2d_array(), axis=0)], **kwargs)
 
-    def argmax(self, **kwargs):
+    def idxmax(self, **kwargs):
         """Return index of max of non-NaN elements."""
         return self.wrap_reduced(self.index[nanargmax(self.to_2d_array(), axis=0)], **kwargs)
 
-    def describe(self, percentiles=[0.25, 0.5, 0.75], ddof=1, **kwargs):
+    def describe(self, percentiles=None, ddof=1, **kwargs):
         """See `vectorbt.tseries.nb.describe_reduce_nb`.
 
         `**kwargs` will be passed to `TimeSeries_Accessor.wrap_reduced`.
 
-        For `percentiles`, see `pandas.DataFrame.describe`.
+        For `percentiles`, see `pd.DataFrame.describe`.
 
         Example:
             ```python-repl
-            >>> print(df.vbt.tseries.describe())
-                           a         b        c
-            count   5.000000  5.000000  5.00000
-            mean    3.000000  3.000000  1.80000
-            std     1.581139  1.581139  0.83666
-            min     1.000000  1.000000  1.00000
-            25.00%  2.000000  2.000000  1.00000
-            50.00%  3.000000  3.000000  2.00000
-            75.00%  4.000000  4.000000  2.00000
-            max     5.000000  5.000000  3.00000
+            >>> print(ts.vbt.tseries.describe())
+                          a         b        c
+            count  5.000000  5.000000  5.00000
+            mean   3.000000  3.000000  1.80000
+            std    1.581139  1.581139  0.83666
+            min    1.000000  1.000000  1.00000
+            25%    2.000000  2.000000  1.00000
+            50%    3.000000  3.000000  2.00000
+            75%    4.000000  4.000000  2.00000
+            max    5.000000  5.000000  3.00000
             ```"""
         if percentiles is not None:
-            percentiles = reshape_fns.to_1d(percentiles)
+            percentiles = reshape_fns.to_1d(percentiles, raw=True)
         else:
-            percentiles = np.empty(0)
-        index = pd.Index(['count', 'mean', 'std', 'min', *map(lambda x: '%.2f%%' % (x * 100), percentiles), 'max'])
+            percentiles = np.array([0.25, 0.5, 0.75])
+        percentiles = percentiles.tolist()
+        if 0.5 not in percentiles:
+            percentiles.append(0.5)
+        percentiles = np.unique(percentiles)
+        perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
+        index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
         return self.reduce_to_array(nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
 
     def drawdown(self):
         """Drawdown series."""
         return self.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
 
+    @cached_property
     def drawdowns(self):
         """Drawdown records.
 
@@ -474,7 +513,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
 class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
     """Accessor on top of time series. For Series only.
 
-    Accessible through `pandas.Series.vbt.tseries`."""
+    Accessible through `pd.Series.vbt.tseries`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -483,7 +522,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
         Base_SRAccessor.__init__(self, obj)
         TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
@@ -493,7 +532,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            df['a'].vbt.tseries.plot()
+            ts['a'].vbt.tseries.plot()
             ```
 
             ![](/vectorbt/docs/img/tseries_sr_plot.png)"""
@@ -520,7 +559,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
     """Accessor on top of time series. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt.tseries`."""
+    Accessible through `pd.DataFrame.vbt.tseries`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -529,7 +568,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
         Base_DFAccessor.__init__(self, obj)
         TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):
+    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:
@@ -538,7 +577,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            df[['a', 'b']].vbt.tseries.plot()
+            ts[['a', 'b']].vbt.tseries.plot()
             ```
 
             ![](/vectorbt/docs/img/tseries_df_plot.png)"""
@@ -557,7 +596,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 class OHLCV_DFAccessor(TimeSeries_DFAccessor):
     """Accessor on top of OHLCV data. For DataFrames only.
 
-    Accessible through `pandas.DataFrame.vbt.ohlcv`."""
+    Accessible through `pd.DataFrame.vbt.ohlcv`."""
 
     def __init__(self, obj, column_names=None, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -571,7 +610,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
              candlestick_kwargs={},
              bar_kwargs={},
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         """Plot OHLCV data.
 
         Args:

@@ -1,4 +1,14 @@
-"""Global defaults."""
+"""Global defaults.
+
+For example, you can change default width and height of each plot:
+```python-repl
+>>> import vectorbt as vbt
+
+>>> vbt.defaults.layout['width'] = 800
+>>> vbt.defaults.layout['height'] = 400
+```
+
+Changes take effect immediately."""
 
 import json
 
