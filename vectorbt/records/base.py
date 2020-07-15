@@ -211,7 +211,11 @@ You can perform basic operations (such as addition) on mapped arrays as if they 
 
 >>> mapped + mapped
 <vectorbt.records.base.MappedArray at 0x7f97bfc492e8>
-```"""
+```
+
+!!! note
+    You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
+"""
 
 import numpy as np
 import pandas as pd

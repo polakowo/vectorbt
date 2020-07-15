@@ -5,7 +5,7 @@ from numba import njit
 from datetime import datetime
 import pytest
 
-from tests.utils import seed
+seed = 42
 
 ts = pd.DataFrame({
     'a': [1, 2, 3, 4, np.nan],

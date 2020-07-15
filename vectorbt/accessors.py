@@ -1,4 +1,34 @@
-"""Root pandas accessors."""
+"""Root pandas accessors.
+
+An accessor adds additional “namespace” to pandas objects.
+
+The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `pd.Series` and
+`pd.DataFrame` object. It is the main entry point for all other accessors:
+
+```plaintext
+vbt.base.accessors.Base_SR/DFAccessor           -> pd.Series/DataFrame.vbt.*
+vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseries
+vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
+vbt.signals.accessors.Signals_SR/DFAccessor     -> pd.Series/DataFrame.vbt.signals
+vbt.returns.accessors.Returns_SR/DFAccessor     -> pd.Series/DataFrame.vbt.returns
+vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.bar
+vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.scatter
+vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.hist
+vbt.widgets.accessors.Box_Accessor              -> pd.Series/DataFrame.vbt.box
+vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.heatmap
+```
+
+Additionally, some accessors subclass other accessors building the following inheritance hiearchy:
+
+```plaintext
+vbt.base.accessors.Base_SR/DFAccessor
+    -> vbt.tseries.accessors.TimeSeries_SR/DFAccessor
+        -> vbt.tseries.accessors.OHLCV_DFAccessor
+        -> vbt.signals.accessors.Signals_SR/DFAccessor
+        -> vbt.returns.accessors.Returns_SR/DFAccessor
+```
+
+So, for example, the method `pd.Series.vbt.to_2d_array` is also available as `pd.Series.vbt.returns.to_2d_array`."""
 
 import pandas as pd
 from pandas.core.accessor import _register_accessor, DirNamesMixin

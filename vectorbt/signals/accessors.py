@@ -3,7 +3,7 @@
 !!! note
     The underlying Series/DataFrame must already be a signal series.
 
-    Input arrays must be `numpy.bool`.
+    Input arrays must be `np.bool`.
     
 ```python-repl
 >>> import vectorbt as vbt

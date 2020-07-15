@@ -8,7 +8,7 @@ from itertools import product
 from vectorbt.tseries import common
 from vectorbt.records.drawdowns import Drawdowns
 
-from tests.utils import day_dt
+day_dt = np.timedelta64(86400000000000)
 
 ts = pd.DataFrame({
     'a': [1, 2, 3, 4, np.nan],

@@ -12,6 +12,7 @@
 import numpy as np
 from numba import njit, f8
 
+from vectorbt.utils.math import is_close_or_less_nb
 from vectorbt.portfolio.enums import (
     Order,
     FilledOrder
@@ -36,7 +37,7 @@ def buy_nb(run_cash, run_shares, order):
     req_cash = order.size * adj_price
     adj_req_cash = req_cash * (1 + order.fees) + order.fixed_fees
 
-    if adj_req_cash <= run_cash:
+    if is_close_or_less_nb(adj_req_cash, run_cash):
         # Sufficient cash
         adj_size = order.size
         fees_paid = adj_req_cash - req_cash
@@ -46,11 +47,12 @@ def buy_nb(run_cash, run_shares, order):
         run_shares += adj_size
     else:
         # Insufficient cash, size will be less than requested
-        # For fees of 10%, you can buy shares for 90.9$ (adj_cash) to spend 100$ (run_cash) in total
-        adj_cash = (run_cash - order.fixed_fees) / (1 + order.fees)
-        if adj_cash <= 0.:
+        if is_close_or_less_nb(run_cash, order.fixed_fees):
             # Can't cover
             return run_cash, run_shares, None
+
+        # For fees of 10%, you can buy shares for 90.9$ (adj_cash) to spend 100$ (run_cash) in total
+        adj_cash = (run_cash - order.fixed_fees) / (1 + order.fees)
 
         # Update size and feee
         adj_size = adj_cash / adj_price
@@ -77,17 +79,18 @@ def sell_nb(run_cash, run_shares, order):
     cash = adj_size * adj_price
 
     # Minus costs
-    adj_cash = cash * (1 - order.fees) - order.fixed_fees
-    if adj_cash <= 0.:
+    adj_cash = cash * (1 - order.fees)
+    if is_close_or_less_nb(adj_cash, order.fixed_fees):
         # Can't cover
         return run_cash, run_shares, None
+    adj_cash -= order.fixed_fees
 
     # Update fees
     fees_paid = cash - adj_cash
 
     # Update current cash and shares
     run_cash += adj_size * adj_price - fees_paid
-    if run_shares <= abs(order.size):
+    if is_close_or_less_nb(run_shares, abs(order.size)):
         run_shares = 0.  # numerical stability
     else:
         run_shares -= adj_size
@@ -106,9 +109,9 @@ def fill_order_nb(run_cash, run_shares, order):
             raise Exception("Fixed fees must be zero or greater")
         if order.slippage < 0.:
             raise Exception("Slippage must be zero or greater")
-        if order.size > 0.:
+        if order.size > 0. and run_cash > 0.:
             return buy_nb(run_cash, run_shares, order)
-        if order.size < 0.:
+        if order.size < 0. and run_shares > 0.:
             return sell_nb(run_cash, run_shares, order)
     return run_cash, run_shares, None
 

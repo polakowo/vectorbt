@@ -1,10 +1,6 @@
 import numpy as np
 import hashlib
 
-seed = 42
-
-day_dt = np.timedelta64(86400000000000)
-
 # non-randomized hash function
 hash = lambda s: int(hashlib.sha512(s.encode('utf-8')).hexdigest()[:16], 16)
 
@@ -17,3 +13,8 @@ def isclose(a, b, rel_tol=1e-09, abs_tol=0.0):
     if a == b:
         return True
     return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
+
+
+def record_arrays_close(x, y):
+    for field in x.dtype.names:
+        np.testing.assert_allclose(x[field], y[field])

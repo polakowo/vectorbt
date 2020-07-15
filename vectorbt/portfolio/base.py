@@ -71,6 +71,7 @@ indexing operation to each `__init__` argument with pandas type:
 2020-01-03  300.0  103.0  200.000000
 2020-01-04  200.0  100.0  133.333333
 2020-01-05  100.0   96.0  133.333333
+
 >>> print(portfolio['a'].equity)
 2020-01-01    100.0
 2020-01-02    200.0
@@ -157,10 +158,18 @@ class Portfolio(PandasIndexer):
         freq (any): Index frequency in case `main_price.index` is not datetime-like.
         year_freq (any): Year frequency for working with returns.
         levy_alpha (float or array_like): Scaling relation (Levy stability exponent).
+
+            Single value or value per column.
         risk_free (float or array_like): Constant risk-free return throughout the period.
+
+            Single value or value per column.
         required_return (float or array_like): Minimum acceptance return of the investor.
+
+            Single value or value per column.
         cutoff (float or array_like): Decimal representing the percentage cutoff for the
-                bottom percentile of returns.
+            bottom percentile of returns.
+
+            Single value or value per column.
         factor_returns (array_like): Benchmark return to compare returns against. Will broadcast.
 
             By default it's `None`, but it's required by some return-based metrics.
@@ -230,15 +239,21 @@ class Portfolio(PandasIndexer):
             exits (array_like): Boolean array of exit signals.
             size (int, float or array_like): The amount of shares to order.
 
-                To buy/sell everything, set the size to `numpy.inf`.
+                To buy/sell everything, set the size to `np.inf`.
             entry_price (array_like): Entry price. Defaults to `main_price`.
             exit_price (array_like): Exit price. Defaults to `main_price`.
             init_capital (int, float or array_like): The initial capital.
 
-                If array, should match the number of columns.
+                Single value or value per column.
             fees (float or array_like): Fees in percentage of the order value.
+
+                Single value, value per column, or value per element.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
+
+                Single value, value per column, or value per element.
             slippage (float or array_like): Slippage in percentage of price.
+
+                Single value, value per column, or value per element.
             accumulate (bool): If `accumulate` is `True`, entering the market when already
                 in the market will be allowed to increase a position.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
@@ -352,14 +367,20 @@ class Portfolio(PandasIndexer):
 
                 If the size is positive, this is the number of shares to buy.
                 If the size is negative, this is the number of shares to sell.
-                To buy/sell everything, set the size to `numpy.inf`.
+                To buy/sell everything, set the size to `np.inf`.
             order_price (array_like): Order price. Defaults to `main_price`.
             init_capital (int, float or array_like): The initial capital.
 
-                If array, should match the number of columns.
+                Single value or value per column.
             fees (float or array_like): Fees in percentage of the order value.
+
+                Single value, value per column, or value per element.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
-            slippage (float or array_like): Slippage in percentage of `order_price`.
+
+                Single value, value per column, or value per element.
+            slippage (float or array_like): Slippage in percentage of price.
+
+                Single value, value per column, or value per element.
             is_target (bool): If `True`, will order the difference between current and target size.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
@@ -463,7 +484,7 @@ class Portfolio(PandasIndexer):
             *args: Arguments passed to `order_func_nb`.
             init_capital (int, float or array_like): The initial capital.
 
-                If array, should match the number of columns.
+                Single value or value per column.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
@@ -614,6 +635,13 @@ class Portfolio(PandasIndexer):
         See `vectorbt.records.events.Positions`."""
         return Positions.from_orders(self.orders)
 
+    @cached_property
+    def drawdowns(self):
+        """Drawdown records.
+
+        See `vectorbt.records.drawdowns.Drawdowns`."""
+        return Drawdowns.from_ts(self.equity, freq=self.freq)
+
     # ############# Equity ############# #
 
     @cached_property
@@ -625,16 +653,6 @@ class Portfolio(PandasIndexer):
     def final_equity(self):
         """Final equity."""
         return self.wrapper.wrap_reduced(self.equity.values[-1])
-
-    @cached_property
-    def peak_equity(self):
-        """Peak equity."""
-        return self.equity.vbt.tseries.max()
-
-    @cached_property
-    def dip_equity(self):
-        """Dip equity."""
-        return self.equity.vbt.tseries.min()
 
     @cached_property
     def total_profit(self):
@@ -655,13 +673,6 @@ class Portfolio(PandasIndexer):
     def max_drawdown(self):
         """Max drawdown."""
         return self.drawdown.vbt.tseries.min()
-
-    @cached_property
-    def drawdowns(self):
-        """Drawdown records.
-
-        See `vectorbt.records.drawdowns.Drawdowns`."""
-        return Drawdowns.from_ts(self.equity, freq=self.freq)
 
     # ############# Returns ############# #
 
@@ -827,7 +838,7 @@ class Portfolio(PandasIndexer):
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.freq,
-            'Time in Position [%]': self.positions.coverage * 100,
+            'Holding Duration [%]': self.positions.coverage * 100,
             'Total Profit': self.total_profit,
             'Total Return [%]': self.total_return * 100,
             'Buy & Hold Return [%]': self.buy_and_hold_return * 100,
@@ -837,14 +848,14 @@ class Portfolio(PandasIndexer):
             'Avg. Drawdown Duration': self.drawdowns.avg_duration,
             'Num. Trades': self.trades.count,
             'Win Rate [%]': self.trades.win_rate * 100,
-            'Best Trade [%]': self.trades.max_return * 100,
-            'Worst Trade [%]': self.trades.min_return * 100,
-            'Avg. Trade [%]': self.trades.avg_return * 100,
-            'Max. Trade Duration': self.trades.max_duration,
-            'Avg. Trade Duration': self.trades.avg_duration,
+            'Best Trade [%]': self.trades.returns.max() * 100,
+            'Worst Trade [%]': self.trades.returns.min() * 100,
+            'Avg. Trade [%]': self.trades.returns.mean() * 100,
+            'Max. Trade Duration': self.trades.duration.max(time_units=True),
+            'Avg. Trade Duration': self.trades.duration.mean(time_units=True),
             'Expectancy': self.trades.expectancy,
             'SQN': self.trades.sqn,
             'Sharpe Ratio': self.sharpe_ratio,
             'Sortino Ratio': self.sortino_ratio,
             'Calmar Ratio': self.calmar_ratio
-        })
+        }, name=self.wrapper.name)

@@ -24,7 +24,7 @@ def is_pandas(arg):
 
 
 def is_array(arg):
-    """Determine whether `arg` is any of `numpy.ndarray`, `pd.Series` or `pd.DataFrame`."""
+    """Determine whether `arg` is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
 

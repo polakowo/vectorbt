@@ -35,6 +35,15 @@ class ArrayWrapper:
         return self._ndim
 
     @property
+    def name(self):
+        """Name."""
+        if self.ndim == 1:
+            if self.columns[0] == 0:
+                return None
+            return self.columns[0]
+        return None
+
+    @property
     def shape(self):
         """Shape."""
         if self.ndim == 1:
@@ -90,31 +99,25 @@ class ArrayWrapper:
             # Scalar value
             return a.item()
         elif a.ndim == 1:
-            if a.shape[0] == 1:
-                # Scalar value
-                return a[0]
             if self.ndim == 1:
+                if a.shape[0] == 1:
+                    # Scalar value
+                    return a[0]
                 # Array per series
                 name = self.columns[0]
                 if name == 0:  # was a Series before
                     name = None
                 return pd.Series(a, index=index, name=name)
-            else:
-                # Value per column
-                return pd.Series(a, index=self.columns)
-        else:
-            # Array per column
-            if a.shape == (1, 1):
-                # Scalar value
-                return a[0, 0]
-            if self.ndim == 1:
-                # Array per series
-                name = self.columns[0]
-                if name == 0:  # was a Series before
-                    name = None
-                return pd.Series(a[:, 0], index=index, name=name)
             # Value per column
-            return pd.DataFrame(a, index=index, columns=self.columns)
+            return pd.Series(a, index=self.columns)
+        if self.ndim == 1:
+            # Array per series
+            name = self.columns[0]
+            if name == 0:  # was a Series before
+                name = None
+            return pd.Series(a[:, 0], index=index, name=name)
+        # Value per column
+        return pd.DataFrame(a, index=index, columns=self.columns)
 
     def __eq__(self, other):
         if type(self) != type(other):

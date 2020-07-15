@@ -88,8 +88,9 @@ you can find its variations as accessor methods.
 2  1
 ```
 
-Additionally, `vectorbt.base.accessors.Base_Accessor` implements arithmetic, comparison and
-logical operators by doing the compuation with NumPy under the hood (faster).
+Additionally, `vectorbt.base.accessors.Base_Accessor` implements arithmetic (such as `+`),
+comparison (such as `>`) and logical operators (such as `&`) by doing 1) NumPy-like broadcasting
+and 2) the compuation with NumPy under the hood, which is mostly much faster than with pandas.
 
 ```python-repl
 >>> import numpy as np
@@ -102,6 +103,9 @@ logical operators by doing the compuation with NumPy under the hood (faster).
 >>> %timeit df.vbt * 2
 5.48 ms ± 1.12 ms per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
+
+!!! note
+    You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
 """
 
 from vectorbt.base import (

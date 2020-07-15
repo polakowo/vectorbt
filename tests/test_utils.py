@@ -1,9 +1,10 @@
 import numpy as np
 import pandas as pd
 from numba import njit
+import pytest
 
 from vectorbt import defaults
-from vectorbt.utils import checks, config, decorators
+from vectorbt.utils import checks, config, decorators, math
 
 from tests.utils import hash
 
@@ -11,7 +12,6 @@ from tests.utils import hash
 # ############# config.py ############# #
 
 class TestConfig:
-
     def test_config(self):
         conf = config.Config({'a': 0, 'b': {'c': 1}}, frozen=False)
         conf['b']['d'] = 2
@@ -397,3 +397,93 @@ class TestChecks:
             raise ValueError
         except:
             pass
+
+# ############# math.py ############# #
+
+class TestMath:
+    @pytest.mark.parametrize(
+        "test_func",
+        [math.is_close, math.is_close_nb],
+    )
+    def test_is_close(self, test_func):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        # test scalar
+        assert test_func(a, a)
+        assert test_func(a, b)
+        assert test_func(-a, -b)
+        assert not test_func(-a, b)
+        assert not test_func(a, -b)
+        assert test_func(1e10 + a, 1e10 + b)
+
+        # test np.nan
+        assert not test_func(np.nan, b)
+        assert not test_func(a, np.nan)
+
+        # test np.inf
+        assert not test_func(np.inf, b)
+        assert not test_func(a, np.inf)
+        assert not test_func(-np.inf, b)
+        assert not test_func(a, -np.inf)
+        assert not test_func(-np.inf, -np.inf)
+        assert not test_func(np.inf, np.inf)
+        assert not test_func(-np.inf, np.inf)
+
+    @pytest.mark.parametrize(
+        "test_func",
+        [math.is_close_or_less, math.is_close_or_less_nb],
+    )
+    def test_is_close_or_less(self, test_func):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        # test scalar
+        assert test_func(a, a)
+        assert test_func(a, b)
+        assert test_func(-a, -b)
+        assert test_func(-a, b)
+        assert not test_func(a, -b)
+        assert test_func(1e10 + a, 1e10 + b)
+
+        # test np.nan
+        assert not test_func(np.nan, b)
+        assert not test_func(a, np.nan)
+
+        # test np.inf
+        assert not test_func(np.inf, b)
+        assert test_func(a, np.inf)
+        assert test_func(-np.inf, b)
+        assert not test_func(a, -np.inf)
+        assert not test_func(-np.inf, -np.inf)
+        assert not test_func(np.inf, np.inf)
+        assert test_func(-np.inf, np.inf)
+
+    @pytest.mark.parametrize(
+        "test_func",
+        [math.is_less, math.is_less_nb],
+    )
+    def test_is_less(self, test_func):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        # test scalar
+        assert not test_func(a, a)
+        assert not test_func(a, b)
+        assert not test_func(-a, -b)
+        assert test_func(-a, b)
+        assert not test_func(a, -b)
+        assert not test_func(1e10 + a, 1e10 + b)
+
+        # test np.nan
+        assert not test_func(np.nan, b)
+        assert not test_func(a, np.nan)
+
+        # test np.inf
+        assert not test_func(np.inf, b)
+        assert test_func(a, np.inf)
+        assert test_func(-np.inf, b)
+        assert not test_func(a, -np.inf)
+        assert not test_func(-np.inf, -np.inf)
+        assert not test_func(np.inf, np.inf)
+        assert test_func(-np.inf, np.inf)

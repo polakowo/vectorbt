@@ -5,7 +5,9 @@ from numba import njit
 from datetime import datetime
 import pytest
 
-from tests.utils import seed, day_dt
+seed = 42
+
+day_dt = np.timedelta64(86400000000000)
 
 index = pd.Index([
     datetime(2020, 1, 1),

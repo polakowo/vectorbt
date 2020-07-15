@@ -5,7 +5,7 @@
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0).
     
-    Input arrays can be of any data type, but most output arrays are `numpy.float64`.
+    Input arrays can be of any data type, but most output arrays are `np.float64`.
     
     Rolling functions with `minp=None` have `min_periods` set to the window size.
     

@@ -10,12 +10,14 @@ from vectorbt.records import (
     trade_dt,
     position_dt
 )
-from vectorbt.records.drawdowns import BaseDrawdowns, ActiveDrawdowns, RecoveredDrawdowns
+from vectorbt.records.drawdowns import ActiveDrawdowns, RecoveredDrawdowns
 from vectorbt.records.orders import BaseOrders
 from vectorbt.records.events import BaseEvents, BaseEventsByResult
 from vectorbt.tseries.common import TSArrayWrapper
 
-from tests.utils import day_dt
+from tests.utils import record_arrays_close
+
+day_dt = np.timedelta64(86400000000000)
 
 # ############# base.py ############# #
 
@@ -476,7 +478,7 @@ class TestRecords:
     def test_filter_by_mask(self):
         mask = records.records_arr['some_field1'] >= records.records_arr['some_field1'].mean()
         filtered = records.filter_by_mask(mask)
-        np.testing.assert_array_equal(
+        record_arrays_close(
             records.records_arr,
             np.array([
                 (0, 0, 10., 21.),
@@ -491,7 +493,7 @@ class TestRecords:
             ], dtype=example_dt)
         )
         mask_a = records['a'].records_arr['some_field1'] >= records['a'].records_arr['some_field1'].mean()
-        np.testing.assert_array_equal(
+        record_arrays_close(
             records['a'].filter_by_mask(mask_a).records_arr,
             np.array([
                 (0, 1, 11., 22.),
@@ -558,7 +560,7 @@ class TestRecords:
         assert records['a'].count == target['a']
 
     def test_indexing(self):
-        np.testing.assert_array_equal(
+        record_arrays_close(
             records['a'].records_arr,
             np.array([
                 (0, 0, 10., 21.),
@@ -570,7 +572,7 @@ class TestRecords:
             records['a'].wrapper.columns,
             pd.Index(['a'], dtype='object')
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             records[['a', 'b']].records_arr,
             np.array([
                 (0, 0, 10., 21.),
@@ -585,7 +587,7 @@ class TestRecords:
             records[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             records[['a', 'a']].records_arr,
             np.array([
                 (0, 0, 10., 21.),
@@ -609,7 +611,7 @@ class TestRecords:
 
     def test_filtering(self):
         filtered_records = vbt.Records(records_arr[[0, -1]], wrapper)
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered_records.records_arr,
             np.array([(0, 0, 10., 21.), (2, 2, 18., 29.)], dtype=example_dt)
         )
@@ -623,7 +625,7 @@ class TestRecords:
             ])
         )
         # a
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered_records['a'].records_arr,
             np.array([(0, 0, 10., 21.)], dtype=example_dt)
         )
@@ -638,7 +640,7 @@ class TestRecords:
         assert filtered_records['a'].map_field('some_field1').min() == 10.
         assert filtered_records['a'].count == 1.
         # b
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered_records['b'].records_arr,
             np.array([], dtype=example_dt)
         )
@@ -653,7 +655,7 @@ class TestRecords:
         assert filtered_records['b'].count == 0.
         assert np.isnan(filtered_records['b'].map_field('some_field1').min())
         # c
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered_records['c'].records_arr,
             np.array([(0, 2, 18.0, 29.0)], dtype=example_dt)
         )
@@ -668,7 +670,7 @@ class TestRecords:
         assert filtered_records['c'].count == 1.
         assert filtered_records['c'].map_field('some_field1').min() == 18.
         # d
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered_records['d'].records_arr,
             np.array([], dtype=example_dt)
         )
@@ -700,7 +702,7 @@ drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days')
 class TestDrawdowns:
     def test_from_ts(self):
         drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days', idx_field='start_idx')
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns.records_arr,
             np.array([
                 (0, 0, 1, 2, 1),
@@ -718,7 +720,7 @@ class TestDrawdowns:
     def test_filter_by_mask(self):
         mask = drawdowns.records_arr['col'] > 0
         filtered = drawdowns.filter_by_mask(mask)
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered.records_arr,
             np.array([
                 (1, 1, 2, 3, 1),
@@ -727,7 +729,7 @@ class TestDrawdowns:
             ], dtype=drawdown_dt)
         )
         mask_a = drawdowns['a'].records_arr['col'] > 0
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns['a'].filter_by_mask(mask_a).records_arr,
             np.array([], dtype=drawdown_dt)
         )
@@ -869,20 +871,20 @@ class TestDrawdowns:
         assert isinstance(drawdowns.active, ActiveDrawdowns)
         assert drawdowns.active.idx_field == drawdowns.idx_field
         assert drawdowns.active.wrapper.freq == drawdowns.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns.active.records_arr,
             np.array([
                 (0, 4, 5, 5, 0),
                 (2, 2, 4, 5, 0)
             ], dtype=drawdown_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns['a'].active.records_arr,
             np.array([
                 (0, 4, 5, 5, 0)
             ], dtype=drawdown_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns.active['a'].records_arr,
             np.array([
                 (0, 4, 5, 5, 0)
@@ -917,7 +919,7 @@ class TestDrawdowns:
         assert isinstance(drawdowns.recovered, RecoveredDrawdowns)
         assert drawdowns.recovered.idx_field == drawdowns.idx_field
         assert drawdowns.recovered.wrapper.freq == drawdowns.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns.recovered.records_arr,
             np.array([
                 (0, 0, 1, 2, 1),
@@ -926,14 +928,14 @@ class TestDrawdowns:
                 (1, 3, 4, 5, 1)
             ], dtype=drawdown_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns['a'].recovered.records_arr,
             np.array([
                 (0, 0, 1, 2, 1),
                 (0, 2, 3, 4, 1)
             ], dtype=drawdown_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             drawdowns.recovered['a'].records_arr,
             np.array([
                 (0, 0, 1, 2, 1),
@@ -1005,7 +1007,7 @@ class TestOrders:
     def test_filter_by_mask(self):
         mask = orders.records_arr['col'] > 1
         filtered = orders.filter_by_mask(mask)
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered.records_arr,
             np.array([
                 (2, 0, 99.00990099, 1., 0.99009901, 0),
@@ -1019,7 +1021,7 @@ class TestOrders:
         pd.testing.assert_frame_equal(filtered.main_price, orders.main_price)
         assert filtered.wrapper == orders.wrapper
         mask_a = orders['a'].records_arr['col'] > 1
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders['a'].filter_by_mask(mask_a).records_arr,
             np.array([], dtype=order_dt)
         )
@@ -1092,7 +1094,7 @@ class TestOrders:
         assert isinstance(orders.buy, BaseOrders)
         assert orders.buy.idx_field == orders.idx_field
         assert orders.buy.wrapper.freq == orders.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders.buy.records_arr,
             np.array([
                 (0, 2, 33.00330033, 3., 0.99009901, 0),
@@ -1105,14 +1107,14 @@ class TestOrders:
                 (3, 6, 24.26232722, 4., 0.97049309, 0)
             ], dtype=order_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders['a'].buy.records_arr,
             np.array([
                 (0, 2, 33.00330033, 3., 0.99009901, 0),
                 (0, 4, 25.8798157, 5., 1.29399079, 0)
             ], dtype=order_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders.buy['a'].records_arr,
             np.array([
                 (0, 2, 33.00330033, 3., 0.99009901, 0),
@@ -1124,7 +1126,7 @@ class TestOrders:
         assert isinstance(orders.sell, BaseOrders)
         assert orders.sell.idx_field == orders.idx_field
         assert orders.sell.wrapper.freq == orders.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders.sell.records_arr,
             np.array([
                 (0, 3, 33.00330033, 4., 1.32013201, 1),
@@ -1135,14 +1137,14 @@ class TestOrders:
                 (3, 4, 49.5049505, 2., 0.99009901, 1)
             ], dtype=order_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders['a'].sell.records_arr,
             np.array([
                 (0, 3, 33.00330033, 4., 1.32013201, 1),
                 (0, 6, 25.8798157, 7., 1.8115871, 1)
             ], dtype=order_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             orders.sell['a'].records_arr,
             np.array([
                 (0, 3, 33.00330033, 4., 1.32013201, 1),
@@ -1171,7 +1173,7 @@ class TestEvents:
     def test_filter_by_mask(self):
         mask = events.records_arr['col'] > 1
         filtered = events.filter_by_mask(mask)
-        np.testing.assert_array_equal(
+        record_arrays_close(
             filtered.records_arr,
             np.array([
                 (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1),
@@ -1183,7 +1185,7 @@ class TestEvents:
         pd.testing.assert_frame_equal(filtered.main_price, events.main_price)
         assert filtered.wrapper == events.wrapper
         mask_a = events['a'].records_arr['col'] > 1
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events['a'].filter_by_mask(mask_a).records_arr,
             np.array([], dtype=event_dt)
         )
@@ -1235,7 +1237,7 @@ class TestEvents:
         assert isinstance(events.winning, BaseEvents)
         assert events.winning.idx_field == events.idx_field
         assert events.winning.wrapper.freq == events.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.winning.records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
@@ -1243,14 +1245,14 @@ class TestEvents:
                 (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1)
             ], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events['a'].winning.records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
             ], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.winning['a'].records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
@@ -1262,7 +1264,7 @@ class TestEvents:
         assert isinstance(events.losing, BaseEvents)
         assert events.losing.idx_field == events.idx_field
         assert events.losing.wrapper.freq == events.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.losing.records_arr,
             np.array([
                 (1, 14.14427157, 2, 7., 0.99009901, 3, 6., 0.84865629, -15.98302687, -0.15983027, 1),
@@ -1272,11 +1274,11 @@ class TestEvents:
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
             ], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events['a'].losing.records_arr,
             np.array([], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.losing['a'].records_arr,
             np.array([], dtype=event_dt)
         )
@@ -1330,18 +1332,18 @@ class TestEvents:
         assert isinstance(events.open, BaseEventsByResult)
         assert events.open.idx_field == events.idx_field
         assert events.open.wrapper.freq == events.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.open.records_arr,
             np.array([
                 (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618, -0.00990099, 0),
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
             ], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events['a'].open.records_arr,
             np.array([], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.open['a'].records_arr,
             np.array([], dtype=event_dt)
         )
@@ -1350,7 +1352,7 @@ class TestEvents:
         assert isinstance(events.closed, BaseEventsByResult)
         assert events.closed.idx_field == events.idx_field
         assert events.closed.wrapper.freq == events.wrapper.freq
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.closed.records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
@@ -1361,14 +1363,14 @@ class TestEvents:
                 (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1)
             ], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events['a'].closed.records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
             ], dtype=event_dt)
         )
-        np.testing.assert_array_equal(
+        record_arrays_close(
             events.closed['a'].records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
@@ -1383,17 +1385,17 @@ trades = vbt.Trades.from_orders(orders)
 class TestTrades:
     def test_from_orders(self):
         trades = vbt.Trades.from_orders(orders, idx_field='open_idx')
-        np.testing.assert_array_equal(
+        record_arrays_close(
             trades.records_arr,
             np.array([
-                (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.3069306931, 1, 0),
-                (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351000001, 0.37227722766262084, 1, 1),
-                (1, 14.14427157, 2, 7., 0.99009901, 3, 6., 0.84865629, -15.98302686999999, -0.1598302686999999, 1, 2),
-                (1, 16.63702438, 4, 5., 0.83185122, 5, 4., 0.66548098, -18.134356580000002, -0.2158415842248805, 1, 3),
-                (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396000002, 0.9603960396000002, 1, 4),
-                (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618000001, -0.009900990110121062, 0, 5),
-                (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.980198019999989, -0.01980198019801969, 1, 6),
-                (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.970493090000005, -0.009900990111131165, 0, 7)
+                (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1, 0),
+                (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1, 1),
+                (1, 14.14427157, 2, 7., 0.99009901, 3, 6., 0.84865629, -15.98302687, -0.15983027, 1, 2),
+                (1, 16.63702438, 4, 5., 0.83185122, 5, 4., 0.66548098, -18.13435658, -0.21584158, 1, 3),
+                (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1, 4),
+                (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618, -0.00990099, 0, 5),
+                (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1, 6),
+                (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0, 7)
             ], dtype=trade_dt)
         )
         pd.testing.assert_frame_equal(trades.main_price, price)
@@ -1417,17 +1419,17 @@ positions = vbt.Positions.from_orders(orders)
 class TestPositions:
     def test_from_orders(self):
         positions = vbt.Positions.from_orders(orders, idx_field='open_idx')
-        np.testing.assert_array_equal(
+        record_arrays_close(
             positions.records_arr,
             np.array([
-                (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.3069306931, 1),
-                (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351000001, 0.37227722766262084, 1),
-                (1, 14.14427157, 2, 7., 0.99009901, 3, 6., 0.84865629, -15.98302686999999, -0.1598302686999999, 1),
-                (1, 16.63702438, 4, 5., 0.83185122, 5, 4., 0.66548098, -18.134356580000002, -0.2158415842248805, 1),
-                (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396000002, 0.9603960396000002, 1),
-                (2, 194.09861778, 6, 1., 1.94098618, 6, 4., 0., 580.35486716, 2.960396039559516, 0),
-                (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.980198019999989, -0.01980198019801969, 1),
-                (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.970493090000005, -0.009900990111131165, 0)
+                (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
+                (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1),
+                (1, 14.14427157, 2, 7., 0.99009901, 3, 6., 0.84865629, -15.98302687, -0.15983027, 1),
+                (1, 16.63702438, 4, 5., 0.83185122, 5, 4., 0.66548098, -18.13435658, -0.21584158, 1),
+                (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1),
+                (2, 194.09861778, 6, 1., 1.94098618, 6, 4., 0., 580.35486716, 2.96039604, 0),
+                (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1),
+                (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
             ], dtype=position_dt)
         )
         pd.testing.assert_frame_equal(positions.main_price, price)

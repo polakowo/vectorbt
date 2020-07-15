@@ -427,6 +427,7 @@ class Trades(Events):
         return self.map_field('position_idx')
 
 
+
 class Positions(Events):
     """Extends `Events` for working with position records.
 

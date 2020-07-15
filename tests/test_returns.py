@@ -7,7 +7,9 @@ import empyrical
 from vectorbt import defaults
 from vectorbt.records.drawdowns import Drawdowns
 
-from tests.utils import day_dt, isclose
+from tests.utils import isclose
+
+day_dt = np.timedelta64(86400000000000)
 
 index = pd.DatetimeIndex([
     datetime(2018, 1, 1),

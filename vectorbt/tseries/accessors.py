@@ -1,7 +1,7 @@
 """Custom pandas accessors.
 
 !!! note
-    Input arrays can be of any data type, but most output arrays are `numpy.float64`.
+    Input arrays can be of any data type, but most output arrays are `np.float64`.
     
 ```python-repl
 >>> import vectorbt as vbt
@@ -155,9 +155,9 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
         else:
             idxs = np.arange(cube.shape[2])
         matrix = np.hstack(cube)
-        start_dates = pd.Index(self.index[idxs], name='range_start')
-        end_dates = pd.Index(self.index[idxs + range_len - 1], name='range_end')
-        range_columns = index_fns.stack_indexes(start_dates, end_dates)
+        range_starts = pd.Index(self.index[idxs], name='range_start')
+        range_ends = pd.Index(self.index[idxs + range_len - 1], name='range_end')
+        range_columns = index_fns.stack_indexes(range_starts, range_ends)
         new_columns = index_fns.combine_indexes(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 

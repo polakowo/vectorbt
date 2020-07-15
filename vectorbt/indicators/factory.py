@@ -309,7 +309,7 @@ def from_params_pipeline(
             
     Returns:
         A list of transformed inputs (`pandas_like`), a list of generated outputs (`pandas_like`), 
-        a list of parameter arrays (`numpy.ndarray`), a list of parameter mappers (`pd.Series`),
+        a list of parameter arrays (`np.ndarray`), a list of parameter mappers (`pd.Series`),
         a list of other generated outputs that are outside of  `num_outputs`.
 
     Explanation:

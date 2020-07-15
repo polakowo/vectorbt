@@ -401,19 +401,19 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 >>> mult_comb_price = comb_price.vbt.tseries.split_into_ranges(n=2)
 >>> print(mult_comb_price)
 asset             BTC                   ETH
-start_date 2018-12-31 2019-07-02 2018-12-31 2019-07-02
-end_date   2019-07-01 2019-12-31 2019-07-01 2019-12-31
-0             3866.84   10588.68     140.03     293.54
-1             3746.71   10818.16     133.42     291.76
-2             3849.22   11972.72     141.52     303.03
-3             3931.05   11203.10     155.20     284.38
-4             3832.04   10982.54     148.91     287.89
-..                ...        ...        ...        ...
-178          13017.12    7238.14     336.96     126.37
-179          11162.17    7289.03     294.14     127.21
-180          12400.76    7317.65     311.28     128.27
-181          11931.99    7420.27     319.58     134.80
-182          10796.93    7294.44     290.27     132.61
+range_start 2018-12-31 2019-07-02 2018-12-31 2019-07-02
+range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
+0              3866.84   10588.68     140.03     293.54
+1              3746.71   10818.16     133.42     291.76
+2              3849.22   11972.72     141.52     303.03
+3              3931.05   11203.10     155.20     284.38
+4              3832.04   10982.54     148.91     287.89
+..                 ...        ...        ...        ...
+178           13017.12    7238.14     336.96     126.37
+179           11162.17    7289.03     294.14     127.21
+180           12400.76    7317.65     311.28     128.27
+181           11931.99    7420.27     319.58     134.80
+182           10796.93    7294.44     290.27     132.61
 
 [183 rows x 4 columns]
 
@@ -460,220 +460,6 @@ by any feature, such as window pair, asset, and time period.
 There is much more to backtesting than simply stacking columns. vectorbt offers functions for
 most parts of a common backtesting pipeline, from building indicators and generating signals, to
 modeling portfolio performance and visualizing results.
-
-## Package structure
-
-The package consists of a series of packages and modules each playing its role in the backtesting pipeline.
-
-### accessors
-
-An accessor adds additional “namespace” to pandas objects.
-
-The `vectorbt.accessors` registers a custom `vbt` accessor on top of each `pd.Series` and
-`pd.DataFrame` object. It is the main entry point for all other accessors:
-
-```plaintext
-vbt.base.accessors.Base_SR/DFAccessor           -> pd.Series/DataFrame.vbt.*
-vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseries
-vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
-vbt.signals.accessors.Signals_SR/DFAccessor     -> pd.Series/DataFrame.vbt.signals
-vbt.returns.accessors.Returns_SR/DFAccessor     -> pd.Series/DataFrame.vbt.returns
-vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.bar
-vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.scatter
-vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.hist
-vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.heatmap
-```
-
-Additionally, some accessors subclass other accessors building the following inheritance hiearchy:
-
-```plaintext
-vbt.base.accessors.Base_SR/DFAccessor
-    -> vbt.tseries.accessors.TimeSeries_SR/DFAccessor
-        -> vbt.tseries.accessors.OHLCV_DFAccessor
-        -> vbt.signals.accessors.Signals_SR/DFAccessor
-        -> vbt.returns.accessors.Returns_SR/DFAccessor
-vbt.widgets.accessors.Bar_Accessor
-vbt.widgets.accessors.Scatter_Accessor
-vbt.widgets.accessors.Histogram_Accessor
-vbt.widgets.accessors.Heatmap_Accessor
-```
-
-So, for example, the method `pd.Series.vbt.to_2d_array` is also available as `pd.Series.vbt.returns.to_2d_array`.
-
-### base
-
-`vectorbt.base` provides base classes and utilities for pandas objects, such as broadcasting.
-If any of the functions can take a pandas object as input, it will be offered as an accessor method.
-For example, `vectorbt.base.reshape_fns.broadcast` can take an arbitrary number of pandas
-objects, thus you can find its variations in `vectorbt.base.accessors.Base_Accessor` class.
-`vectorbt.base.accessors` has utility classes that are subclassed by other accessors.
-
-```python-repl
->>> sr = pd.Series([1])
->>> df = pd.DataFrame([1, 2, 3])
-
->>> vbt.base.reshape_fns.broadcast_to(sr, df)
-   0
-0  1
-1  1
-2  1
->>> sr.vbt.broadcast_to(df)
-   0
-0  1
-1  1
-2  1
-```
-
-### indicators
-
-`vectorbt.indicators` provides a collection of common technical trading indicators such as Bollinger Bands,
-but also a factory class `vectorbt.indicators.factory.IndicatorFactory` to create new indicators of any
-complexity and with ease. It doesn't provide any pandas accessors. You can access all the indicators either
-by `vbt.*` or `vbt.indicators.*`.
-
-```python-repl
->>> import pandas as pd
->>> import vectorbt as vbt
-
->>> # vectorbt.indicators.basic.MA
->>> vbt.MA.from_params(pd.Series([1, 2, 3]), [2, 3]).ma
-ma_window     2     3
-ma_ewm    False False
-0           NaN   NaN
-1           1.5   NaN
-2           2.5   2.0
-```
-
-### tseries
-
-`vectorbt.tseries` provides accessors and Numba-compiled functions for working with any
-time series data, such as price series.
-
-You can access methods listed in `vectorbt.tseries.accessors` as follows:
-
-* `vectorbt.tseries.accessors.TimeSeries_SRAccessor` -> `pd.Series.vbt.tseries.*`
-* `vectorbt.tseries.accessors.TimeSeries_DFAccessor` -> `pd.DataFrame.vbt.tseries.*`
-
-```python-repl
->>> # vectorbt.tseries.accessors.TimeSeries_Accessor.rolling_mean
->>> pd.Series([1, 2, 3, 4]).vbt.tseries.rolling_mean(2)
-0    NaN
-1    1.5
-2    2.5
-3    3.5
-dtype: float64
-```
-
-`vectorbt.tseries.nb` provides a range of Numba-compiled functions that are used by accessors.
-These only accept NumPy arrays and other Numba-compatible types.
-
-```python-repl
->>> # vectorbt.tseries.nb.rolling_mean_1d_nb
->>> vbt.tseries.nb.rolling_mean_1d_nb(np.asarray([1, 2, 3, 4]), 2)
-array([nan, 1.5, 2.5, 3.5])
-```
-
-### signals
-
-`vectorbt.signals` provides accessors and Numba-compiled functions for working with signals,
-such as entry and exit signals. Since signals are a special case of time series, their accessors
-extend the time series accessors.
-
-```python-repl
->>> # vectorbt.signals.accessors.Signals_Accessor.rank
->>> pd.Series([False, True, True, True, False]).vbt.signals.rank()
-0    0
-1    1
-2    2
-3    3
-4    0
-dtype: int64
-```
-
-### returns
-
-`vectorbt.returns` provides accessors and Numba-compiled functions for working with returns.
-It provides common financial risk and performance metrics. Since returns are a special case of time series,
-their accessors extend the time series accessors.
-
-```python-repl
->>> # vectorbt.returns.accessors.Returns_Accessor.total
->>> pd.Series([0.2, 0.1, 0, -0.1, -0.2]).vbt.returns.total()
--0.049599999999999866
-
->>> # inherited from TimeSeries_Accessor
->>> pd.Series([0.2, 0.1, 0, -0.1, -0.2]).vbt.returns.max()
-0.2
-```
-
-### records
-
-`vectorbt.records` provides a collection of classes for working with event data, such as trades and
-positions. They wrap [NumPy's structured arrays](https://numpy.org/doc/stable/user/basics.rec.html),
-and offer properties and methods for analyzing them. They are instantiated as properties within the
-`vectorbt.portfolio.base.Portfolio` class, such as `vectorbt.portfolio.base.Portfolio.trades`, or can
-be used directly for custom analysis. They don't provide any pandas accessors.
-
-```python-repl
->>> drawdowns = vbt.records.Drawdowns.from_ts(pd.Series([1, 2, 1, 2, 3, 2, 1, 2]))
->>> drawdowns.records
-   col  idx  start_idx  valley_idx  end_idx  status
-0    0    3          1           2        3       1
-1    0    7          4           6        7       0
-
->>> drawdowns.max_drawdown
--0.6666666666666666
-```
-
-### portfolio
-
-`vectorbt.portfolio` provides the class `vectorbt.portfolio.base.Portfolio` for modeling portfolio
-performance and calculating various risk and performance metrics. It uses Numba-compiled
-functions from `vectorbt.portfolio.nb` for most computations and record classes from `vectorbt.records`
-for tracking events such as orders, trades and positions. It doesn't provide any pandas accessors.
-You can access the class directly by `vbt.Portfolio`.
-
-```python-repl
->>> price = pd.Series([1, 2, 3, 4])
->>> entries = pd.Series([True, False, True, False])
->>> exits = pd.Series([False, True, False, True])
-
->>> # vectorbt.portfolio.base.Portfolio
->>> vbt.Portfolio.from_signals(price, entries, exits, freq='1D').equity
-0    100.000000
-1    200.000000
-2    200.000000
-3    266.666667
-dtype: float64
-```
-
-### widgets
-
-`vectorbt.widgets` provides widgets for visualizing data in an efficient and convenient way.
-You can access basic widgets listed in `vectorbt.widgets.basic` as `pd.Series.vbt.*` and `pd.DataFrame.vbt.*`.
-
-```python-repl
->>> # vectorbt.widgets.accessors.Histogram_Accessor
->>> pd.Series(np.random.normal(size=100000)).vbt.hist()
-```
-
-![](/vectorbt/docs/img/hist_normal.png)
-
-### utils
-
-`vectorbt.utils` provides utility functions and classes that are used throughout vectorbt.
-
-### defaults
-
-`vectorbt.defaults` provides default parameters for vectorbt.
-
-For example, you can change default width and height of each plot:
-```python-repl
->>> vbt.defaults.layout['width'] = 800
->>> vbt.defaults.layout['height'] = 400
-```
-
-Changes take effect immediately.
 """
 
 from vectorbt import (

@@ -2,7 +2,7 @@
 
 Records are the second form of data representation in vectorbt. They allow storing sparse event data
 such as drawdowns, orders, trades, and positions, without converting them back to the matrix form and
-occupying much of the user's memory. For more details, see `vectorbt.records.base`.
+occupying the user's memory. For more details, see `vectorbt.records.base`.
 
 ## Base classes
 
@@ -153,7 +153,7 @@ natively supported by `vectorbt.portfolio.base.Portfolio`.
 
 ## Enums
 
-`vectorbt.records.enums` schemas for all records used across vectorbt.
+`vectorbt.records.enums` defines schemas for all records used across vectorbt.
 
 ## Numba-compiled functions
 

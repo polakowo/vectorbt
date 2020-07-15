@@ -90,19 +90,22 @@ class TestArrayWrapper:
     def test_wrap_reduced(self):
         sr_wrapper = array_wrapper.ArrayWrapper.from_obj(sr2)
         df_wrapper = array_wrapper.ArrayWrapper.from_obj(df4)
-        assert sr_wrapper.wrap_reduced(0) == 0
+        # sr to value
         assert df_wrapper.wrap_reduced(0) == 0
-        assert sr_wrapper.wrap_reduced(np.array([0])) == 0
-        assert df_wrapper.wrap_reduced(np.array([0])) == 0
+        assert sr_wrapper.wrap_reduced(np.array([0])) == 0  # result of computation on 2d
+        # sr to array
         pd.testing.assert_series_equal(
             sr_wrapper.wrap_reduced(np.array([0, 1]), index=['x', 'y']),
             pd.Series(np.array([0, 1]), index=['x', 'y'], name=sr2.name)
         )
+        # df to value
+        assert sr_wrapper.wrap_reduced(0) == 0
+        # df to value per column
         pd.testing.assert_series_equal(
             df_wrapper.wrap_reduced(np.array([0, 1, 2])),
             pd.Series(np.array([0, 1, 2]), index=df4.columns)
         )
-        assert df_wrapper.wrap_reduced(np.array([[0]])) == 0
+        # df to array per column
         pd.testing.assert_frame_equal(
             df_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y']),
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=df4.columns)
@@ -1509,10 +1512,13 @@ class TestAccessors:
         pd.testing.assert_index_equal(sr2.vbt.index, sr2.index)
         pd.testing.assert_index_equal(sr2.vbt.columns, sr2.to_frame().columns)
         assert sr2.vbt.ndim == sr2.ndim
+        assert sr2.vbt.name == sr2.name
+        assert pd.Series([1, 2, 3]).vbt.name is None
         assert sr2.vbt.shape == sr2.shape
         pd.testing.assert_index_equal(df4.vbt.index, df4.index)
         pd.testing.assert_index_equal(df4.vbt.columns, df4.columns)
         assert df4.vbt.ndim == df4.ndim
+        assert df4.vbt.name is None
         assert df4.vbt.shape == df4.shape
         pd.testing.assert_series_equal(sr2.vbt.wrap(a2), sr2)
         pd.testing.assert_series_equal(sr2.vbt.wrap(df2), sr2)

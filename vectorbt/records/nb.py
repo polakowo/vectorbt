@@ -12,6 +12,7 @@
 import numpy as np
 from numba import njit, f8, i8
 
+from vectorbt.utils.math import is_close_nb
 from vectorbt.records.enums import (
     DrawdownStatus,
     drawdown_dt,
@@ -24,12 +25,6 @@ from vectorbt.records.enums import (
 size_zero_err = "Found order with size equal or less than zero"
 price_zero_err = "Found order with price equal or less than zero"
 sell_greater_than_buy_err = "Size of sell operations exceeds that of buy operations"
-
-
-@njit(cache=True)
-def isclose_nb(a, b, rel_tol=1e-09, abs_tol=0.0):
-    """Tell whether two values are approximately equal."""
-    return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
 
 
 # ############# Indexing (records) ############# #
@@ -557,7 +552,7 @@ def trade_records_nb(price, order_records):
             j += 1
 
             # Position decreased, previous purchases have now less impact
-            if isclose_nb(buy_size_sum, order_size):
+            if is_close_nb(buy_size_sum, order_size):
                 size_fraction = 0.  # numerical stability
             else:
                 if order_size > buy_size_sum:
@@ -729,7 +724,7 @@ def position_records_nb(price, order_records):
             sell_size_sum += order_size
             sell_gross_sum += order_size * order_price
             sell_fees_sum += order_fees
-            if isclose_nb(buy_size_sum, sell_size_sum):
+            if is_close_nb(buy_size_sum, sell_size_sum):
                 sell_size_sum = buy_size_sum  # numerical stability
             else:
                 if sell_size_sum > buy_size_sum:
