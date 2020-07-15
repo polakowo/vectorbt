@@ -22,7 +22,7 @@ class TestConfig:
 
         try:
             conf['d'] = 2
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -31,7 +31,7 @@ class TestConfig:
 
         try:
             conf['b']['d'] = 2
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -220,7 +220,7 @@ class TestChecks:
         checks.assert_value_in(0, (0, 1))
         try:
             checks.assert_value_in(2, (0, 1))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -228,7 +228,7 @@ class TestChecks:
         checks.assert_numba_func(njit(lambda x: x))
         try:
             checks.assert_numba_func(lambda x: x)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -236,7 +236,7 @@ class TestChecks:
         checks.assert_not_none(0)
         try:
             checks.assert_not_none(None)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -246,7 +246,7 @@ class TestChecks:
         checks.assert_type(pd.Series([1, 2, 3]), (np.ndarray, pd.Series))
         try:
             checks.assert_type(pd.DataFrame([1, 2, 3]), (np.ndarray, pd.Series))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -265,7 +265,7 @@ class TestChecks:
         checks.assert_subclass(C, A)
         try:
             checks.assert_subclass(A, B)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -274,7 +274,7 @@ class TestChecks:
         checks.assert_same_type(np.zeros(1), np.empty(1))
         try:
             checks.assert_type(0, np.zeros(1))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -284,7 +284,7 @@ class TestChecks:
         checks.assert_dtype(pd.DataFrame([[1, 2, 3]]), np.int)
         try:
             checks.assert_dtype(pd.DataFrame([[1, 2, 3.]]), np.int)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -294,7 +294,7 @@ class TestChecks:
         checks.assert_same_dtype(pd.DataFrame([[1, 2, 3.]]), pd.DataFrame([[1, 2, 3.]]))
         try:
             checks.assert_same_dtype(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3.]]))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -305,7 +305,7 @@ class TestChecks:
         checks.assert_ndim(pd.DataFrame([1, 2, 3]), (1, 2))
         try:
             checks.assert_ndim(np.zeros((3, 3, 3)), (1, 2))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -314,7 +314,7 @@ class TestChecks:
         checks.assert_same_len([[1]], [[2, 3]])
         try:
             checks.assert_same_len([[1]], [[2], [3]])
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -326,7 +326,7 @@ class TestChecks:
         checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(1, 0))
         try:
             checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(0, 1))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -335,7 +335,7 @@ class TestChecks:
         checks.assert_same_index(pd.Series([1, 2, 3], index=index), pd.DataFrame([1, 2, 3], index=index))
         try:
             checks.assert_same_index(pd.Series([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -344,7 +344,7 @@ class TestChecks:
         checks.assert_same_index(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
         try:
             checks.assert_same_index(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -356,25 +356,25 @@ class TestChecks:
         checks.assert_same_meta(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
         try:
             checks.assert_same_meta(pd.Series([1, 2]), pd.DataFrame([1, 2]))
-            raise ValueError
+            raise Exception
         except:
             pass
 
         try:
             checks.assert_same_meta(pd.DataFrame([1, 2]), pd.DataFrame([1, 2, 3]))
-            raise ValueError
+            raise Exception
         except:
             pass
 
         try:
             checks.assert_same_meta(pd.DataFrame([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
-            raise ValueError
+            raise Exception
         except:
             pass
 
         try:
             checks.assert_same_meta(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -386,7 +386,7 @@ class TestChecks:
         checks.assert_same(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
         try:
             checks.assert_same(np.array([1, 2]), np.array([1, 2, 3]))
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -398,7 +398,7 @@ class TestChecks:
         try:
             checks.assert_level_not_exists(i, 'i')
             checks.assert_level_not_exists(multi_i, 'i')
-            raise ValueError
+            raise Exception
         except:
             pass
 

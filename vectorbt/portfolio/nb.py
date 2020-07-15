@@ -102,13 +102,13 @@ def fill_order_nb(run_cash, run_shares, order):
     """Fill an order."""
     if order.size != 0.:
         if order.price <= 0.:
-            raise Exception("Price must be greater than zero")
+            raise ValueError("Price must be greater than zero")
         if order.fees < 0.:
-            raise Exception("Fees must be zero or greater")
+            raise ValueError("Fees must be zero or greater")
         if order.fixed_fees < 0.:
-            raise Exception("Fixed fees must be zero or greater")
+            raise ValueError("Fixed fees must be zero or greater")
         if order.slippage < 0.:
-            raise Exception("Slippage must be zero or greater")
+            raise ValueError("Slippage must be zero or greater")
         if order.size > 0. and run_cash > 0.:
             return buy_nb(run_cash, run_shares, order)
         if order.size < 0. and run_shares > 0.:

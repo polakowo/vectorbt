@@ -100,14 +100,14 @@ from vectorbt.records import Orders, Trades, Positions, Drawdowns
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Portfolio`."""
     if obj.wrapper.ndim == 1:
-        raise Exception("Indexing on Series is not supported")
+        raise TypeError("Indexing on Series is not supported")
 
     n_rows = len(obj.wrapper.index)
     n_cols = len(obj.wrapper.columns)
     col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
     col_mapper = pd_indexing_func(col_mapper)
     if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise Exception("Changing index (time axis) is not supported")
+        raise NotImplementedError("Changing index (time axis) is not supported")
     new_cols = col_mapper.values[0]
 
     # Array-like params
@@ -202,12 +202,12 @@ class Portfolio(PandasIndexer):
 
         freq = main_price.vbt.tseries(freq=freq).freq
         if freq is None:
-            raise Exception("Couldn't parse the frequency of index. You must set `freq`.")
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         self._freq = freq
 
         year_freq = main_price.vbt.returns(year_freq=year_freq).year_freq
         if freq is None:
-            raise Exception("You must set `year_freq`.")
+            raise ValueError("You must set `year_freq`.")
         self._year_freq = year_freq
 
         # Parameters
@@ -764,7 +764,7 @@ class Portfolio(PandasIndexer):
     def information_ratio(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.information_ratio`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .information_ratio(self.factor_returns)
 
@@ -772,7 +772,7 @@ class Portfolio(PandasIndexer):
     def beta(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.beta`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .beta(self.factor_returns)
 
@@ -780,7 +780,7 @@ class Portfolio(PandasIndexer):
     def alpha(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.alpha`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .alpha(self.factor_returns, risk_free=self.risk_free)
 
@@ -806,7 +806,7 @@ class Portfolio(PandasIndexer):
     def capture(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.capture`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .capture(self.factor_returns)
 
@@ -814,7 +814,7 @@ class Portfolio(PandasIndexer):
     def up_capture(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.up_capture`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .up_capture(self.factor_returns)
 
@@ -822,7 +822,7 @@ class Portfolio(PandasIndexer):
     def down_capture(self):
         """See `vectorbt.returns.accessors.Returns_Accessor.down_capture`."""
         if self.factor_returns is None:
-            raise Exception("This property requires factor_returns to be set")
+            raise ValueError("This property requires factor_returns to be set")
         return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
             .down_capture(self.factor_returns)
 
@@ -832,7 +832,7 @@ class Portfolio(PandasIndexer):
     def stats(self):
         """Compute various interesting statistics on this portfolio."""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         return pd.Series({
             'Start': self.wrapper.index[0],

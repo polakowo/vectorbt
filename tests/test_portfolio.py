@@ -822,7 +822,7 @@ class TestPortfolio:
         )
         try:
             _ = test_portfolio.iloc[::2, :]  # changing time not supported
-            raise ValueError
+            raise Exception
         except:
             pass
         _ = test_portfolio.iloc[np.arange(test_portfolio.wrapper.shape[0]), :]  # won't change time

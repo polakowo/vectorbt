@@ -116,7 +116,7 @@ class TestAccessors:
         )
         try:
             _ = pd.Series.vbt.signals.generate((5, 1), choice_func_nb, 1)
-            raise ValueError
+            raise Exception
         except:
             pass
         pd.testing.assert_frame_equal(
@@ -135,7 +135,7 @@ class TestAccessors:
         )
         try:
             _ = pd.DataFrame.vbt.signals.generate((5,), choice_func_nb, 1)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -271,7 +271,7 @@ class TestAccessors:
         )
         try:
             _ = pd.Series.vbt.signals.generate_random((5, 1), 3)
-            raise ValueError
+            raise Exception
         except:
             pass
         pd.testing.assert_frame_equal(
@@ -290,7 +290,7 @@ class TestAccessors:
         )
         try:
             _ = pd.DataFrame.vbt.signals.generate_random((5,), 3)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -315,7 +315,7 @@ class TestAccessors:
         )
         try:
             _ = pd.Series.vbt.signals.generate_random((5, 1), 3)
-            raise ValueError
+            raise Exception
         except:
             pass
         pd.testing.assert_frame_equal(
@@ -335,7 +335,7 @@ class TestAccessors:
         )
         try:
             _ = pd.DataFrame.vbt.signals.generate_random((5,), 3)
-            raise ValueError
+            raise Exception
         except:
             pass
         pd.testing.assert_frame_equal(

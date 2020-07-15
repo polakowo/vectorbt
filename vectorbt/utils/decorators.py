@@ -40,7 +40,7 @@ class custom_property():
         elif len(args) == 1:
             return super().__new__(cls)
         else:
-            raise Exception("Either function or keyword arguments must be passed")
+            raise ValueError("Either function or keyword arguments must be passed")
 
     def __init__(self, func, **kwargs):
         self.func = func
@@ -134,7 +134,7 @@ def custom_method(*args, **kwargs):
     elif len(args) == 1:
         return decorator(args[0])
     else:
-        raise Exception("Either function or keyword arguments must be passed")
+        raise ValueError("Either function or keyword arguments must be passed")
 
 
 def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
@@ -210,7 +210,7 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
     elif len(args) == 1:
         return decorator(args[0])
     else:
-        raise Exception("Either function or keyword arguments must be passed")
+        raise ValueError("Either function or keyword arguments must be passed")
 
 
 def traverse_attr_kwargs(cls, key=None, value=None):

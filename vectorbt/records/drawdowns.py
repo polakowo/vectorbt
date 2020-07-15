@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
-from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.decorators import cached_property
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.utils.config import merge_kwargs
@@ -32,7 +32,7 @@ class BaseDrawdowns(Records):
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
-            raise Exception("Records array must have all fields defined in drawdown_dt")
+            raise ValueError("Records array must have all fields defined in drawdown_dt")
 
         self.ts = ts
 
@@ -44,7 +44,6 @@ class BaseDrawdowns(Records):
         records_arr = nb.drawdown_records_nb(ts.vbt.to_2d_array())
         return cls(records_arr, ts, **kwargs)
 
-    @cached_method
     def filter_by_mask(self, mask):
         """Return a new class instance, filtered by mask."""
         return self.__class__(self.records_arr[mask], self.ts, freq=self.wrapper.freq, idx_field=self.idx_field)
@@ -84,7 +83,7 @@ class BaseDrawdowns(Records):
 
             ![](/vectorbt/docs/img/drawdowns.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 

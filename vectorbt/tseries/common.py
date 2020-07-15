@@ -48,7 +48,7 @@ class TSArrayWrapper(ArrayWrapper):
     def to_time_units(self, a):
         """Convert array to time units."""
         if self.freq is None:
-            raise Exception("Couldn't parse the frequency of index. You must set `freq`.")
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         return to_time_units(a, self.freq)
 
     def wrap_reduced(self, a, time_units=False, index=None):

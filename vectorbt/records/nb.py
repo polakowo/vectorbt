@@ -382,7 +382,7 @@ def order_fees_map_nb(record):
 @njit(cache=True)
 def event_duration_map_nb(record):
     """`map_func_nb` that returns event duration."""
-    return record['close_idx'] - record['open_idx']
+    return record['exit_idx'] - record['entry_idx']
 
 
 @njit(cache=True)
@@ -420,12 +420,12 @@ def save_trade_nb(record, col, i, order_size, order_price, order_fees, position_
     # Save trade
     record['col'] = col
     record['size'] = order_size
-    record['open_idx'] = position_start
-    record['open_price'] = avg_buy_price
-    record['open_fees'] = frac_buy_fees
-    record['close_idx'] = i
-    record['close_price'] = order_price
-    record['close_fees'] = order_fees
+    record['entry_idx'] = position_start
+    record['entry_price'] = avg_buy_price
+    record['entry_fees'] = frac_buy_fees
+    record['exit_idx'] = i
+    record['exit_price'] = order_price
+    record['exit_fees'] = order_fees
     record['pnl'] = pnl
     record['return'] = ret
     record['status'] = status
@@ -464,15 +464,15 @@ def trade_records_nb(price, order_records):
         >>> records = trade_records_nb(price, order_records)
 
         >>> print(pd.DataFrame.from_records(records))
-           col  size  open_idx  open_price  open_fees  close_idx  close_price  \
-        0    0   1.0         0         1.0       0.01          1          2.0
-        1    0   1.0         2         3.0       0.03          3          4.0
-        2    0   1.0         4         5.0       0.05          4          5.0
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+        0    0   1.0          0          1.0        0.01         1         2.0
+        1    0   1.0          2          3.0        0.03         3         4.0
+        2    0   1.0          4          5.0        0.05         4         5.0
 
-           close_fees   pnl    return  status  position_idx
-        0        0.02  0.97  0.960396       1             0
-        1        0.04  0.93  0.306931       1             1
-        2        0.00 -0.05 -0.009901       0             2
+           exit_fees   pnl    return  status  position_idx
+        0       0.02  0.97  0.960396       1             0
+        1       0.04  0.93  0.306931       1             1
+        2       0.00 -0.05 -0.009901       0             2
         ```"""
     result = np.empty(price.shape[0] * price.shape[1], dtype=trade_dt)
     position_idx = -1
@@ -492,9 +492,9 @@ def trade_records_nb(price, order_records):
         order_side = order_records[r]['side']
 
         if order_size <= 0.:
-            raise Exception(size_zero_err)
+            raise ValueError(size_zero_err)
         if order_price <= 0.:
-            raise Exception(price_zero_err)
+            raise ValueError(price_zero_err)
 
         if col != prev_col:
             # Column has changed
@@ -556,7 +556,7 @@ def trade_records_nb(price, order_records):
                 size_fraction = 0.  # numerical stability
             else:
                 if order_size > buy_size_sum:
-                    raise Exception(sell_greater_than_buy_err)
+                    raise ValueError(sell_greater_than_buy_err)
                 size_fraction = (buy_size_sum - order_size) / buy_size_sum
             buy_size_sum *= size_fraction
             buy_gross_sum *= size_fraction
@@ -605,12 +605,12 @@ def save_position_nb(record, col, i, position_start, buy_size_sum, buy_gross_sum
     # Save trade
     record['col'] = col
     record['size'] = buy_size_sum
-    record['open_idx'] = position_start
-    record['open_price'] = avg_buy_price
-    record['open_fees'] = buy_fees_sum
-    record['close_idx'] = i
-    record['close_price'] = avg_sell_price
-    record['close_fees'] = sell_fees_sum
+    record['entry_idx'] = position_start
+    record['entry_price'] = avg_buy_price
+    record['entry_fees'] = buy_fees_sum
+    record['exit_idx'] = i
+    record['exit_price'] = avg_sell_price
+    record['exit_fees'] = sell_fees_sum
     record['pnl'] = pnl
     record['return'] = ret
     record['status'] = status
@@ -644,15 +644,15 @@ def position_records_nb(price, order_records):
         >>> records = position_records_nb(price, order_records)
 
         >>> print(pd.DataFrame.from_records(records))
-           col  size  open_idx  open_price  open_fees  close_idx  close_price  \
-        0    0   1.0         0         1.0       0.01          1          2.0
-        1    0   1.0         2         3.0       0.03          3          4.0
-        2    0   1.0         4         5.0       0.05          4          5.0
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+        0    0   1.0          0          1.0        0.01         1         2.0
+        1    0   1.0          2          3.0        0.03         3         4.0
+        2    0   1.0          4          5.0        0.05         4         5.0
 
-           close_fees   pnl    return  status
-        0        0.02  0.97  0.960396       1
-        1        0.04  0.93  0.306931       1
-        2        0.00 -0.05 -0.009901       0
+           exit_fees   pnl    return  status
+        0       0.02  0.97  0.960396       1
+        1       0.04  0.93  0.306931       1
+        2       0.00 -0.05 -0.009901       0
         ```"""
     result = np.empty(price.shape[0] * price.shape[1], dtype=position_dt)
     j = 0
@@ -674,9 +674,9 @@ def position_records_nb(price, order_records):
         order_side = order_records[r]['side']
 
         if order_size <= 0.:
-            raise Exception(size_zero_err)
+            raise ValueError(size_zero_err)
         if order_price <= 0.:
-            raise Exception(price_zero_err)
+            raise ValueError(price_zero_err)
 
         if col != prev_col:
             # Column has changed
@@ -728,7 +728,7 @@ def position_records_nb(price, order_records):
                 sell_size_sum = buy_size_sum  # numerical stability
             else:
                 if sell_size_sum > buy_size_sum:
-                    raise Exception(sell_greater_than_buy_err)
+                    raise ValueError(sell_greater_than_buy_err)
 
         if buy_size_sum == sell_size_sum:
             # Close the current position

@@ -76,7 +76,7 @@ def generate_after_nb(a, choice_func_nb, *args):
                     to_i = next_idx
                     idxs = choice_func_nb(col, from_i, to_i, *args)
                     if np.any(idxs < from_i) or np.any(idxs >= to_i):
-                        raise Exception("Returned indices are outside of the allowed range")
+                        raise ValueError("Returned indices are outside of the allowed range")
                     result[idxs, col] = True
     return result
 
@@ -103,7 +103,7 @@ def generate_iteratively_nb(shape, choice_func1_nb, choice_func2_nb, *args):
                 idxs = choice_func2_nb(col, from_i, to_i, *args)
                 a = result2
             if np.any(idxs < from_i):
-                raise Exception("Returned indices are outside of the allowed range")
+                raise ValueError("Returned indices are outside of the allowed range")
             if len(idxs) == 0:
                 break
             a[idxs, col] = True

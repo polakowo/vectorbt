@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
-from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.tseries.common import TSArrayWrapper
@@ -44,11 +44,10 @@ class BaseOrders(Records):
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
-            raise Exception("Records array must have all fields defined in order_dt")
+            raise ValueError("Records array must have all fields defined in order_dt")
 
         self.main_price = main_price
 
-    @cached_method
     def filter_by_mask(self, mask):
         """Return a new class instance, filtered by mask."""
         return self.__class__(self.records_arr[mask], self.main_price, freq=self.wrapper.freq, idx_field=self.idx_field)
@@ -74,7 +73,7 @@ class BaseOrders(Records):
 
             ![](/vectorbt/docs/img/orders.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         # Plot main price
         fig = self.main_price.vbt.tseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)

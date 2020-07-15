@@ -222,7 +222,7 @@ def align_index_to(index1, index2):
     if not isinstance(index2, pd.MultiIndex):
         index2 = pd.MultiIndex.from_arrays([index2])
     if index1.duplicated().any():
-        raise Exception("Duplicates index values are not allowed for the first index")
+        raise ValueError("Duplicates index values are not allowed for the first index")
 
     if pd.Index.equals(index1, index2):
         return pd.IndexSlice[:]
@@ -242,4 +242,4 @@ def align_index_to(index1, index2):
             ypos = np.searchsorted(index1[xsorted], new_index)
             return pd.IndexSlice[xsorted[ypos]]
 
-    raise Exception("Indexes could not be aligned together")
+    raise ValueError("Indexes could not be aligned together")

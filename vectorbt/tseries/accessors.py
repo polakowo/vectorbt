@@ -142,14 +142,14 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
             3                  4.0        5.0        2.0        1.0        2.0        1.0
             ```"""
         if range_len is None and n is None:
-            raise Exception("At least range_len or n must be set")
+            raise ValueError("At least range_len or n must be set")
 
         if range_len is None:
             range_len = len(self.index) // n
         cube = nb.rolling_window_nb(self.to_2d_array(), range_len)
         if n is not None:
             if n > cube.shape[2]:
-                raise Exception(f"n cannot be bigger than the maximum number of ranges {cube.shape[2]}")
+                raise ValueError(f"n cannot be bigger than the maximum number of ranges {cube.shape[2]}")
             idxs = np.round(np.linspace(0, cube.shape[2] - 1, n)).astype(int)
             cube = cube[:, :, idxs]
         else:

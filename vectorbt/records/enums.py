@@ -93,12 +93,12 @@ __pdoc__['EventStatus'] = f"""Event status.
 _event_fields = [
     ('col', np.int64),
     ('size', np.float64),
-    ('open_idx', np.int64),
-    ('open_price', np.float64),
-    ('open_fees', np.float64),
-    ('close_idx', np.int64),
-    ('close_price', np.float64),
-    ('close_fees', np.float64),
+    ('entry_idx', np.int64),
+    ('entry_price', np.float64),
+    ('entry_fees', np.float64),
+    ('exit_idx', np.int64),
+    ('exit_price', np.float64),
+    ('exit_fees', np.float64),
     ('pnl', np.float64),
     ('return', np.float64),
     ('status', np.int64)

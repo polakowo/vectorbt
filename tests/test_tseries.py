@@ -81,7 +81,7 @@ class TestCommon:
             _ = common.TSArrayWrapper(
                 index=[1, 2, 3]
             ).to_time_units([1, 2, 3])
-            raise ValueError
+            raise Exception
         except:
             pass
         np.testing.assert_array_equal(

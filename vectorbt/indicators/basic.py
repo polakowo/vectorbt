@@ -229,7 +229,7 @@ class MA(MA):
 
             ![](/vectorbt/docs/img/MA.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         ts_trace_kwargs = merge_kwargs(dict(
             name=f'Price ({self.name})'
@@ -316,7 +316,7 @@ class MSTD(MSTD):
 
             ![](/vectorbt/docs/img/MSTD.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         mstd_trace_kwargs = merge_kwargs(dict(
             name=f'MSTD ({self.name})'
@@ -480,7 +480,7 @@ class BollingerBands(BollingerBands):
 
             ![](/vectorbt/docs/img/BollingerBands.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         lower_trace_kwargs = merge_kwargs(dict(
             name=f'Lower Band ({self.name})',
@@ -585,7 +585,7 @@ class RSI(RSI):
 
             ![](/vectorbt/docs/img/RSI.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         rsi_trace_kwargs = merge_kwargs(dict(
             name=f'RSI ({self.name})'
@@ -717,7 +717,7 @@ class Stochastic(Stochastic):
 
             ![](/vectorbt/docs/img/Stochastic.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         percent_k_trace_kwargs = merge_kwargs(dict(
             name=f'%K ({self.name})'
@@ -874,7 +874,7 @@ class MACD(MACD):
 
             ![](/vectorbt/docs/img/MACD.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         macd_trace_kwargs = merge_kwargs(dict(
             name=f'MACD ({self.name})'
@@ -1005,7 +1005,7 @@ class ATR(ATR):
 
             ![](/vectorbt/docs/img/ATR.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         tr_trace_kwargs = merge_kwargs(dict(
             name=f'TR ({self.name})'
@@ -1088,7 +1088,7 @@ class OBV(OBV):
 
             ![](/vectorbt/docs/img/OBV.png)"""
         if self.wrapper.ndim > 1:
-            raise Exception("You must select a column first")
+            raise TypeError("You must select a column first")
 
         obv_trace_kwargs = merge_kwargs(dict(
             name=f'OBV ({self.name})'

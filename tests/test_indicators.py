@@ -464,7 +464,7 @@ class TestFactory:
                 ).from_params(ts['a'], 10, b=ts['a'].values).output,
                 target
             )
-            raise ValueError
+            raise Exception
         except:
             pass
         pd.testing.assert_series_equal(

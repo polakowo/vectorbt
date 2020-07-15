@@ -178,6 +178,38 @@ min  10.0  13.0
 max  12.0  15.0
 ```
 
+### Conversion
+
+You can convert any `MappedArray` instance to the matrix form, given `idx_arr` was provided:
+
+```python-repl
+>>> mapped.to_matrix()
+      a     b
+x  10.0  13.0
+y  11.0  14.0
+z  12.0  15.0
+```
+
+Note, though, that it will raise an error if there are multiple records pointing to the same matrix element.
+
+### Plotting
+
+You can build histograms and boxplots of `MappedArray` directly:
+
+```python-repl
+>>> mapped.box()
+```
+
+![](/vectorbt/docs/img/mapped_box.png)
+
+To use scatterplots or any other plots that require index, convert to matrix first:
+
+```python-repl
+>>> mapped.to_matrix().vbt.scatter(trace_kwargs=dict(connectgaps=True))
+```
+
+![](/vectorbt/docs/img/mapped_scatter.png)
+
 ## Indexing
 
 You can use pandas indexing on both the `Records` and `MappedArray` class, which will forward
@@ -221,7 +253,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.decorators import cached_property
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base import reshape_fns
 from vectorbt.base.common import (
@@ -238,14 +270,14 @@ from vectorbt.records import nb
 def _mapped_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `MappedArray`."""
     if obj.wrapper.ndim == 1:
-        raise Exception("Indexing on Series is not supported")
+        raise TypeError("Indexing on Series is not supported")
 
     n_rows = len(obj.wrapper.index)
     n_cols = len(obj.wrapper.columns)
     col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
     col_mapper = pd_indexing_func(col_mapper)
     if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise Exception("Changing index (time axis) is not supported")
+        raise NotImplementedError("Changing index (time axis) is not supported")
 
     new_cols = reshape_fns.to_1d(col_mapper.values[0])  # array required
     new_indices, new_col_arr = nb.select_mapped_cols_nb(
@@ -337,7 +369,6 @@ class MappedArray(PandasIndexer):
         """Column index for `MappedArray.mapped_arr`."""
         return nb.mapped_col_index_nb(self.mapped_arr, self.col_arr, len(self.wrapper.columns))
 
-    @cached_method
     def filter_by_mask(self, mask):
         """Return a new class instance, filtered by mask."""
         if self.idx_arr is not None:
@@ -346,7 +377,6 @@ class MappedArray(PandasIndexer):
             idx_arr = None
         return self.__class__(self.mapped_arr[mask], self.col_arr[mask], self.wrapper, idx_arr=idx_arr)
 
-    @cached_method
     def to_matrix(self, idx_arr=None, default_val=np.nan):
         """Convert mapped array to the matrix form.
 
@@ -354,16 +384,22 @@ class MappedArray(PandasIndexer):
 
         !!! warning
             Mapped arrays represent information in the most memory-friendly format.
-            Mapping back to the matrix form may occupy lots of memory if records are sparse."""
+            Mapping back to the matrix form may occupy lots of memory if records are sparse.
+
+        !!! note
+            Will raise an error if there are multiple values pointing at the same matrix element."""
         if idx_arr is None:
             if self.idx_arr is None:
-                raise Exception("Must pass idx_arr")
+                raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
+        # Check many-to-one relationship
+        n_unique = np.unique(np.hstack((self.col_arr[:, None], idx_arr[:, None])), axis=0).shape[0]
+        if n_unique < self.col_arr.shape[0]:
+            raise ValueError("Multiple values are pointing at the same matrix element")
         target_shape = (len(self.wrapper.index), len(self.wrapper.columns))
         result = nb.mapped_to_matrix_nb(self.mapped_arr, self.col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(result)
 
-    @cached_method
     def reduce(self, reduce_func_nb, *args, default_val=np.nan, cast=None, **kwargs):
         """Reduce mapped array by column to a scalar value.
 
@@ -384,7 +420,6 @@ class MappedArray(PandasIndexer):
             result = result.astype(cast)
         return self.wrapper.wrap_reduced(result, **kwargs)
 
-    @cached_method
     def reduce_to_array(self, reduce_func_nb, *args, default_val=np.nan, cast=None, **kwargs):
         """Reduce mapped array by column to an array.
 
@@ -405,47 +440,38 @@ class MappedArray(PandasIndexer):
             result = result.astype(cast)
         return self.wrapper.wrap_reduced(result, **kwargs)
 
-    @cached_method
     def nst(self, n, **kwargs):
         """Return nst element of each column."""
         return self.reduce(tseries_nb.nst_reduce_nb, n, **kwargs)
 
-    @cached_method
     def min(self, **kwargs):
         """Return min of each column."""
         return self.reduce(tseries_nb.min_reduce_nb, **kwargs)
 
-    @cached_method
     def max(self, **kwargs):
         """Return max of each column."""
         return self.reduce(tseries_nb.max_reduce_nb, **kwargs)
 
-    @cached_method
     def mean(self, **kwargs):
         """Return mean of each column."""
         return self.reduce(tseries_nb.mean_reduce_nb, **kwargs)
 
-    @cached_method
     def median(self, **kwargs):
         """Return median of each column."""
         return self.reduce(tseries_nb.median_reduce_nb, **kwargs)
 
-    @cached_method
     def std(self, ddof=1, **kwargs):
         """Return std of each column."""
         return self.reduce(tseries_nb.std_reduce_nb, ddof, **kwargs)
 
-    @cached_method
     def sum(self, default_val=0., **kwargs):
         """Return sum of each column."""
         return self.reduce(tseries_nb.sum_reduce_nb, default_val=default_val, **kwargs)
 
-    @cached_method
     def count(self, default_val=0., cast=np.int64, **kwargs):
         """Return count of each column."""
         return self.reduce(tseries_nb.count_reduce_nb, default_val=default_val, cast=cast, **kwargs)
 
-    @cached_method
     def describe(self, percentiles=None, ddof=1, **kwargs):
         """Return stats of each column."""
         if percentiles is not None:
@@ -466,12 +492,11 @@ class MappedArray(PandasIndexer):
                 result.loc['count'] = 0.
         return result
 
-    @cached_method
     def idxmin(self, idx_arr=None, **kwargs):
         """Return index of min of each column."""
         if idx_arr is None:
             if self.idx_arr is None:
-                raise Exception("Must pass idx_arr")
+                raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
         result = reshape_fns.to_1d(self.reduce(tseries_nb.argmin_reduce_nb), raw=True)
         mask = np.isnan(result)
@@ -486,12 +511,11 @@ class MappedArray(PandasIndexer):
             result = self.wrapper.index[idx_arr[result.astype(int)]].to_numpy()
         return self.wrapper.wrap_reduced(result, **kwargs)
 
-    @cached_method
     def idxmax(self, idx_arr=None, **kwargs):
         """Return index of max of each column."""
         if idx_arr is None:
             if self.idx_arr is None:
-                raise Exception("Must pass idx_arr")
+                raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
         result = reshape_fns.to_1d(self.reduce(tseries_nb.argmax_reduce_nb), raw=True)
         mask = np.isnan(result)
@@ -532,14 +556,14 @@ class MappedArray(PandasIndexer):
 def indexing_on_records(obj, pd_indexing_func):
     """Perform indexing on `Records`."""
     if obj.wrapper.ndim == 1:
-        raise Exception("Indexing on Series is not supported")
+        raise TypeError("Indexing on Series is not supported")
 
     n_rows = len(obj.wrapper.index)
     n_cols = len(obj.wrapper.columns)
     col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
     col_mapper = pd_indexing_func(col_mapper)
     if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise Exception("Changing index (time axis) is not supported")
+        raise NotImplementedError("Changing index (time axis) is not supported")
 
     new_cols = reshape_fns.to_1d(col_mapper.values[0])  # array required
     records = nb.select_record_cols_nb(
@@ -600,12 +624,10 @@ class Records(PandasIndexer):
         """Column index for `Records.records`."""
         return nb.record_col_index_nb(self.records_arr, len(self.wrapper.columns))
 
-    @cached_method
     def filter_by_mask(self, mask):
         """Return a new class instance, filtered by mask."""
         return self.__class__(self.records_arr[mask], self.wrapper, idx_field=self.idx_field)
 
-    @cached_method
     def map(self, map_func_nb, *args, idx_arr=None):
         """Map each record to a scalar value. Returns `MappedArray`.
 
@@ -620,7 +642,6 @@ class Records(PandasIndexer):
                 idx_arr = None
         return MappedArray(mapped_arr, self.records_arr['col'], self.wrapper, idx_arr=idx_arr)
 
-    @cached_method
     def map_field(self, field, idx_arr=None):
         """Convert field to `MappedArray`."""
         if idx_arr is None:
@@ -630,7 +651,6 @@ class Records(PandasIndexer):
                 idx_arr = None
         return MappedArray(self.records_arr[field], self.records_arr['col'], self.wrapper, idx_arr=idx_arr)
 
-    @cached_method
     def map_array(self, a, idx_arr=None):
         """Convert array to `MappedArray`.
 

@@ -48,7 +48,7 @@ def is_hashable(arg):
 def assert_value_in(value, lst):
     """Raise exception if `value` is not in `lst`."""
     if value not in lst:
-        raise Exception(f"Value {value} is outside of {lst}")
+        raise AssertionError(f"Value {value} is outside of {lst}")
 
 
 def assert_numba_func(func):
@@ -57,37 +57,37 @@ def assert_numba_func(func):
         if os.environ['NUMBA_DISABLE_JIT'] == '1':
             return
     if not is_numba_func(func):
-        raise Exception(f"Function {func} must be Numba compiled")
+        raise AssertionError(f"Function {func} must be Numba compiled")
 
 
 def assert_not_none(arg):
     """Raise exception if `arg` is None."""
     if arg is None:
-        raise Exception(f"Cannot be None")
+        raise AssertionError(f"Cannot be None")
 
 
 def assert_type(arg, types):
     """Raise exception if `arg` is none of types `types`."""
     if not isinstance(arg, types):
         if isinstance(types, tuple):
-            raise Exception(f"Type must be one of {types}, not {type(arg)}")
+            raise AssertionError(f"Type must be one of {types}, not {type(arg)}")
         else:
-            raise Exception(f"Type must be {types}, not {type(arg)}")
+            raise AssertionError(f"Type must be {types}, not {type(arg)}")
 
 
 def assert_subclass(arg, classes):
     """Raise exception if `arg` is not a subclass of classes `classes`."""
     if not issubclass(arg, classes):
         if isinstance(classes, tuple):
-            raise Exception(f"Class must be a subclass of one of {classes}, not {arg}")
+            raise AssertionError(f"Class must be a subclass of one of {classes}, not {arg}")
         else:
-            raise Exception(f"Class must be a subclass of {classes}, not {arg}")
+            raise AssertionError(f"Class must be a subclass of {classes}, not {arg}")
 
 
 def assert_same_type(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different types."""
     if type(arg1) != type(arg2):
-        raise Exception(f"Types {type(arg1)} and {type(arg2)} do not match")
+        raise AssertionError(f"Types {type(arg1)} and {type(arg2)} do not match")
 
 
 def assert_dtype(arg, dtype):
@@ -96,10 +96,10 @@ def assert_dtype(arg, dtype):
         arg = np.asarray(arg)
     if is_frame(arg):
         if (arg.dtypes != dtype).any():
-            raise Exception(f"Data type must be {dtype}, not {arg.dtypes}")
+            raise AssertionError(f"Data type must be {dtype}, not {arg.dtypes}")
     else:
         if arg.dtype != dtype:
-            raise Exception(f"Data type must be {dtype}, not {arg.dtype}")
+            raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
 
 
 def assert_same_dtype(arg1, arg2):
@@ -122,7 +122,7 @@ def assert_same_dtype(arg1, arg2):
     elif len(np.unique(dtypes1)) == 1 and len(np.unique(dtypes2)) == 1:
         if (np.unique(dtypes1) == np.unique(dtypes2)).all():
             return
-    raise Exception(f"Data types {dtypes1} and {dtypes2} do not match")
+    raise AssertionError(f"Data types {dtypes1} and {dtypes2} do not match")
 
 
 def assert_ndim(arg, ndims):
@@ -131,10 +131,10 @@ def assert_ndim(arg, ndims):
         arg = np.asarray(arg)
     if isinstance(ndims, Iterable):
         if arg.ndim not in ndims:
-            raise Exception(f"Number of dimensions must be one of {ndims}, not {arg.ndim}")
+            raise AssertionError(f"Number of dimensions must be one of {ndims}, not {arg.ndim}")
     else:
         if arg.ndim != ndims:
-            raise Exception(f"Number of dimensions must be {ndims}, not {arg.ndim}")
+            raise AssertionError(f"Number of dimensions must be {ndims}, not {arg.ndim}")
 
 
 def assert_same_len(arg1, arg2):
@@ -142,7 +142,7 @@ def assert_same_len(arg1, arg2):
 
     Does not transform arguments to NumPy arrays."""
     if len(arg1) != len(arg2):
-        raise Exception(f"Lengths {len(arg1)} and {len(arg2)} do not match")
+        raise AssertionError(f"Lengths {len(arg1)} and {len(arg2)} do not match")
 
 
 def assert_same_shape(arg1, arg2, axis=None):
@@ -153,27 +153,27 @@ def assert_same_shape(arg1, arg2, axis=None):
         arg2 = np.asarray(arg2)
     if axis is None:
         if arg1.shape != arg2.shape:
-            raise Exception(f"Shapes {arg1.shape} and {arg2.shape} do not match")
+            raise AssertionError(f"Shapes {arg1.shape} and {arg2.shape} do not match")
     else:
         if isinstance(axis, tuple):
             if arg1.shape[axis[0]] != arg2.shape[axis[1]]:
-                raise Exception(
+                raise AssertionError(
                     f"Axis {axis[0]} of {arg1.shape} and axis {axis[1]} of {arg2.shape} do not match")
         else:
             if arg1.shape[axis] != arg2.shape[axis]:
-                raise Exception(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
+                raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
 def assert_same_index(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different index."""
     if not pd.Index.equals(arg1.index, arg2.index):
-        raise Exception(f"Indexes {arg1.index} and {arg2.index} do not match")
+        raise AssertionError(f"Indexes {arg1.index} and {arg2.index} do not match")
 
 
 def assert_same_columns(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different columns."""
     if not pd.Index.equals(arg1.columns, arg2.columns):
-        raise Exception(f"Columns {arg1.columns} and {arg2.columns} do not match")
+        raise AssertionError(f"Columns {arg1.columns} and {arg2.columns} do not match")
 
 
 def assert_same_meta(arg1, arg2):
@@ -197,7 +197,7 @@ def assert_same(arg1, arg2):
         arg2 = np.asarray(arg2)
         if np.array_equal(arg1, arg2):
             return
-    raise Exception(f"Values do not match")
+    raise AssertionError(f"Values do not match")
 
 
 def assert_level_not_exists(arg, level_name):
@@ -207,4 +207,4 @@ def assert_level_not_exists(arg, level_name):
     else:
         names = [arg.name]
     if level_name in names:
-        raise Exception(f"Level {level_name} already exists in {names}")
+        raise AssertionError(f"Level {level_name} already exists in {names}")

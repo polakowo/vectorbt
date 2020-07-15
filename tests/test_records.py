@@ -141,6 +141,17 @@ class TestMappedArray:
             mapped_array.to_matrix(default_val=0.),
             target.fillna(0.)
         )
+        mapped_array2 = vbt.MappedArray(
+            records_arr['some_field1'].tolist() + [1],
+            records_arr['col'].tolist() + [2],
+            wrapper,
+            idx_arr=records_arr['idx'].tolist() + [2]
+        )
+        try:
+            _ = mapped_array2.to_matrix()
+            raise Exception
+        except:
+            pass
 
     def test_reduce(self):
         @njit
@@ -208,7 +219,7 @@ class TestMappedArray:
         assert mapped_array['a'].nst(-1) == 12.
         try:
             _ = mapped_array.nst(10)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -336,7 +347,7 @@ class TestMappedArray:
         )
         try:
             _ = mapped_array.iloc[::2, :]  # changing time not supported
-            raise ValueError
+            raise Exception
         except:
             pass
         _ = mapped_array.iloc[np.arange(mapped_array.wrapper.shape[0]), :]  # won't change time
@@ -372,7 +383,7 @@ class TestMappedArray:
                 wrapper,
                 idx_arr=records_arr['idx']
             )).mapped_arr, a.mapped_arr * b)
-            raise ValueError
+            raise Exception
         except:
             pass
         try:
@@ -382,7 +393,7 @@ class TestMappedArray:
                 wrapper,
                 idx_arr=None
             )).mapped_arr, a.mapped_arr * b)
-            raise ValueError
+            raise Exception
         except:
             pass
         try:
@@ -392,7 +403,7 @@ class TestMappedArray:
                 wrapper,
                 idx_arr=records_arr['idx'] * 2
             )).mapped_arr, a.mapped_arr * b)
-            raise ValueError
+            raise Exception
         except:
             pass
         try:
@@ -407,7 +418,7 @@ class TestMappedArray:
                 ),
                 idx_arr=records_arr['idx']
             )).mapped_arr, a.mapped_arr * b)
-            raise ValueError
+            raise Exception
         except:
             pass
 
@@ -604,7 +615,7 @@ class TestRecords:
         )
         try:
             _ = records.iloc[::2, :]  # changing time not supported
-            raise ValueError
+            raise Exception
         except:
             pass
         _ = records.iloc[np.arange(records.wrapper.shape[0]), :]  # won't change time
@@ -1384,7 +1395,7 @@ trades = vbt.Trades.from_orders(orders)
 
 class TestTrades:
     def test_from_orders(self):
-        trades = vbt.Trades.from_orders(orders, idx_field='open_idx')
+        trades = vbt.Trades.from_orders(orders, idx_field='entry_idx')
         record_arrays_close(
             trades.records_arr,
             np.array([
@@ -1400,7 +1411,7 @@ class TestTrades:
         )
         pd.testing.assert_frame_equal(trades.main_price, price)
         assert trades.wrapper.freq == day_dt
-        assert trades.idx_field == 'open_idx'
+        assert trades.idx_field == 'entry_idx'
 
     def test_position_idx(self):
         np.testing.assert_array_almost_equal(
@@ -1418,7 +1429,7 @@ positions = vbt.Positions.from_orders(orders)
 
 class TestPositions:
     def test_from_orders(self):
-        positions = vbt.Positions.from_orders(orders, idx_field='open_idx')
+        positions = vbt.Positions.from_orders(orders, idx_field='entry_idx')
         record_arrays_close(
             positions.records_arr,
             np.array([
@@ -1434,4 +1445,4 @@ class TestPositions:
         )
         pd.testing.assert_frame_equal(positions.main_price, price)
         assert positions.wrapper.freq == day_dt
-        assert positions.idx_field == 'open_idx'
+        assert positions.idx_field == 'entry_idx'

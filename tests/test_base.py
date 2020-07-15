@@ -729,7 +729,7 @@ class TestReshapeFns:
                 drop_duplicates=True,
                 ignore_single=True
             )
-            raise ValueError
+            raise Exception
         except:
             pass
         # 2d
@@ -769,7 +769,7 @@ class TestReshapeFns:
                 drop_duplicates=True,
                 ignore_single=True
             )
-            raise ValueError
+            raise Exception
         except:
             pass
         # 2d
@@ -782,7 +782,7 @@ class TestReshapeFns:
                 drop_duplicates=True,
                 ignore_single=True
             )
-            raise ValueError
+            raise Exception
         except:
             pass
 

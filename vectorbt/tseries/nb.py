@@ -341,7 +341,7 @@ def rolling_min_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise Exception("minp must be <= window")
+        raise ValueError("minp must be <= window")
     result = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
         minv = a[i]
@@ -376,7 +376,7 @@ def rolling_max_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise Exception("minp must be <= window")
+        raise ValueError("minp must be <= window")
     result = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
         maxv = a[i]
@@ -411,7 +411,7 @@ def rolling_mean_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise Exception("minp must be <= window")
+        raise ValueError("minp must be <= window")
     result = np.empty_like(a, dtype=np.float_)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -454,7 +454,7 @@ def rolling_std_1d_nb(a, window, minp=None):
     if minp is None:
         minp = window
     if minp > window:
-        raise Exception("minp must be <= window")
+        raise ValueError("minp must be <= window")
     if minp == 1:
         minp = 2
     result = np.empty_like(a, dtype=np.float_)
@@ -510,7 +510,7 @@ def ewm_mean_1d_nb(a, span, minp=None):
     if minp is None:
         minp = span
     if minp > span:
-        raise Exception("minp must be <= span")
+        raise ValueError("minp must be <= span")
     N = len(a)
     result = np.empty(N, dtype=np.float_)
     if N == 0:
@@ -561,7 +561,7 @@ def ewm_std_1d_nb(a, span, minp=None):
     if minp is None:
         minp = span
     if minp > span:
-        raise Exception("minp must be <= span")
+        raise ValueError("minp must be <= span")
     N = len(a)
     result = np.empty(N, dtype=np.float_)
     if N == 0:

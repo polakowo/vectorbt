@@ -42,7 +42,7 @@ def to_1d(arg, raw=False):
         return arg
     elif arg.ndim == 0:
         return arg.reshape((1,))
-    raise Exception(f"Cannot reshape a {arg.ndim}-dimensional array to 1 dimension")
+    raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 1 dimension")
 
 
 def to_2d(arg, raw=False, expand_axis=1):
@@ -63,7 +63,7 @@ def to_2d(arg, raw=False, expand_axis=1):
         return np.expand_dims(arg, expand_axis)
     elif arg.ndim == 0:
         return arg.reshape((1, 1))
-    raise Exception(f"Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions")
+    raise ValueError(f"Cannot reshape a {arg.ndim}-dimensional array to 2 dimensions")
 
 
 def repeat(arg, n, axis=1):
@@ -82,7 +82,7 @@ def repeat(arg, n, axis=1):
                 np.repeat(arg.values, n, axis=1), columns=index_fns.repeat_index(arg.columns, n))
         return np.repeat(arg, n, axis=1)
     else:
-        raise Exception("Only axis 0 and 1 are supported")
+        raise ValueError("Only axis 0 and 1 are supported")
 
 
 def tile(arg, n, axis=1):
@@ -106,7 +106,7 @@ def tile(arg, n, axis=1):
                 np.tile(arg.values, (1, n)), columns=index_fns.tile_index(arg.columns, n))
         return np.tile(arg, (1, n))
     else:
-        raise Exception("Only axis 0 and 1 are supported")
+        raise ValueError("Only axis 0 and 1 are supported")
 
 
 def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='default', drop_duplicates='default',
@@ -151,7 +151,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
         if isinstance(index_from, int):
             # Take index/columns of the object indexed by index_from
             if not checks.is_pandas(args[index_from]):
-                raise Exception(f"Argument under index {index_from} must be a pandas object")
+                raise TypeError(f"Argument under index {index_from} must be a pandas object")
             new_index = index_fns.get_index(args[index_from], axis)
         elif isinstance(index_from, str):
             if index_from in ('stack', 'strict'):
@@ -169,7 +169,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                             if index_from == 'strict':
                                 # If pandas objects have different index/columns, raise an exception
                                 if not pd.Index.equals(index, new_index):
-                                    raise Exception(
+                                    raise ValueError(
                                         f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
                             # Broadcasting index must follow the rules of a regular broadcasting operation
                             # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
@@ -180,7 +180,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                                 continue
                             if len(index) != len(new_index):
                                 if len(index) > 1 and len(new_index) > 1:
-                                    raise Exception("Indexes could not be broadcast together")
+                                    raise ValueError("Indexes could not be broadcast together")
                                 if ignore_single:
                                     # Columns of length 1 should be ignored
                                     if len(index) > len(new_index):
@@ -193,17 +193,17 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                                         index = index_fns.repeat_index(index, len(new_index))
                             new_index = index_fns.stack_indexes(new_index, index)
             else:
-                raise Exception(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
+                raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
         else:
             new_index = index_from
         if new_index is not None:
             if maxlen > len(new_index):
                 if index_from == 'strict':
-                    raise Exception(f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
+                    raise ValueError(f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
                 # This happens only when some numpy object is longer than the new pandas index
                 # In this case, new pandas index (one element) should be repeated to match this length.
                 if maxlen > 1 and len(new_index) > 1:
-                    raise Exception("Indexes could not be broadcast together")
+                    raise ValueError("Indexes could not be broadcast together")
                 new_index = index_fns.repeat_index(new_index, maxlen)
             if drop_duplicates:
                 new_index = index_fns.drop_duplicate_levels(new_index, keep=keep)
@@ -674,9 +674,9 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
 
     if len(sr.index.levels) > 2:
         if index_levels is None:
-            raise Exception("index_levels must be specified")
+            raise ValueError("index_levels must be specified")
         if column_levels is None:
-            raise Exception("column_levels must be specified")
+            raise ValueError("column_levels must be specified")
     else:
         index_levels = 0
         column_levels = 1

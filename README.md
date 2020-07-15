@@ -64,30 +64,30 @@ Digging into each individual strategy instance is as simple as indexing with pan
 ```python-repl
 >>> print(portfolio[(13, 21)].stats)
 
-Start                         2014-09-17 00:00:00
-End                           2020-06-27 00:00:00
-Duration                       2110 days 00:00:00
-Time in Position [%]                      56.9194
-Total Profit                              9691.23
-Total Return [%]                          9691.23
-Buy & Hold Return [%]                     1904.51
-Max. Drawdown [%]                         47.8405
-Avg. Drawdown [%]                         8.72147
-Max. Drawdown Duration          510 days 00:00:00
-Avg. Drawdown Duration           36 days 22:40:00
-Num. Trades                                    53
-Win Rate [%]                              52.8302
-Best Trade [%]                            279.692
-Worst Trade [%]                          -23.4948
-Avg. Trade [%]                            13.7254
-Max. Trade Duration             100 days 00:00:00
-Avg. Trade Duration       22 days 15:50:56.603774
-Expectancy                                182.853
-SQN                                       1.97949
-Sharpe Ratio                              1.78866
-Sortino Ratio                             2.82694
-Calmar Ratio                              2.52918
-dtype: object
+Start                     2014-09-17 00:00:00
+End                       2020-07-15 00:00:00
+Duration                   2129 days 00:00:00
+Holding Duration [%]                  56.4584
+Total Profit                          9626.46
+Total Return [%]                      9626.46
+Buy & Hold Return [%]                 1909.76
+Max. Drawdown [%]                     47.8405
+Avg. Drawdown [%]                     8.72147
+Max. Drawdown Duration      510 days 00:00:00
+Avg. Drawdown Duration       37 days 07:06:40
+Num. Trades                                54
+Win Rate [%]                          51.8519
+Best Trade [%]                        279.692
+Worst Trade [%]                      -23.4948
+Avg. Trade [%]                         13.459
+Max. Trade Duration         100 days 00:00:00
+Avg. Trade Duration          22 days 06:13:20
+Expectancy                            178.268
+SQN                                    1.9641
+Sharpe Ratio                          1.77836
+Sortino Ratio                         2.81075
+Calmar Ratio                          2.49139
+Name: (13, 21), dtype: object
 ```
 
 ## Motivation
