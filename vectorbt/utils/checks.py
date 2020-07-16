@@ -31,6 +31,10 @@ def is_array(arg):
 
 def is_numba_func(arg):
     """Determine whether `arg` is a Numba-compiled function."""
+    if 'NUMBA_DISABLE_JIT' in os.environ:
+        if os.environ['NUMBA_DISABLE_JIT'] == '1':
+            if arg.__name__.endswith('_nb'):
+                return True
     return isinstance(arg, CPUDispatcher)
 
 
@@ -53,9 +57,6 @@ def assert_value_in(value, lst):
 
 def assert_numba_func(func):
     """Raise exception if `func` is not Numba-compiled."""
-    if 'NUMBA_DISABLE_JIT' in os.environ:
-        if os.environ['NUMBA_DISABLE_JIT'] == '1':
-            return
     if not is_numba_func(func):
         raise AssertionError(f"Function {func} must be Numba compiled")
 

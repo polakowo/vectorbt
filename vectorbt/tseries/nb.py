@@ -888,12 +888,34 @@ def nst_reduce_nb(col, a, n, *args):
     return a[n]
 
 
-min_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmin(a))
-max_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmax(a))
-mean_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmean(a))
-median_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nanmedian(a))
-sum_reduce_nb = njit(cache=True)(lambda col, a, *args: np.nansum(a))
-count_reduce_nb = njit(cache=True)(lambda col, a, *args: np.sum(~np.isnan(a)))
+@njit(cache=True)
+def min_reduce_nb(col, a, *args):
+    return np.nanmin(a)
+
+
+@njit(cache=True)
+def max_reduce_nb(col, a, *args):
+    return np.nanmax(a)
+
+
+@njit(cache=True)
+def mean_reduce_nb(col, a, *args):
+    return np.nanmean(a)
+
+
+@njit(cache=True)
+def median_reduce_nb(col, a, *args):
+    return np.nanmedian(a)
+
+
+@njit(cache=True)
+def sum_reduce_nb(col, a, *args):
+    return np.nansum(a)
+
+
+@njit(cache=True)
+def count_reduce_nb(col, a, *args):
+    return np.sum(~np.isnan(a))
 
 
 @njit(cache=True)

@@ -22,9 +22,17 @@ ts = pd.DataFrame({
     datetime(2018, 1, 5)
 ]))
 
-pd_nanmean_nb = njit(lambda x: np.nanmean(x))
-nanmean_nb = njit(lambda col, i, x: np.nanmean(x))
-nanmean_matrix_nb = njit(lambda i, x: np.nanmean(x))
+@njit
+def pd_nanmean_nb(x):
+    return np.nanmean(x)
+
+@njit
+def nanmean_nb(col, i, x):
+    return np.nanmean(x)
+
+@njit
+def nanmean_matrix_nb(i, x):
+    return np.nanmean(x)
 
 
 # ############# common.py ############# #
@@ -474,7 +482,9 @@ class TestAccessors:
         )
 
     def test_applymap(self):
-        mult_nb = njit(lambda col, i, x: x * 2)
+        @njit
+        def mult_nb(col, i, x):
+            return x * 2
 
         pd.testing.assert_series_equal(
             ts['a'].map(lambda x: x * 2),
@@ -486,7 +496,9 @@ class TestAccessors:
         )
 
     def test_filter(self):
-        greater_nb = njit(lambda col, i, x: x > 2)
+        @njit
+        def greater_nb(col, i, x):
+            return x > 2
 
         pd.testing.assert_series_equal(
             ts['a'].map(lambda x: x if x > 2 else np.nan),
@@ -498,8 +510,13 @@ class TestAccessors:
         )
 
     def test_apply_and_reduce(self):
-        every_nth_nb = njit(lambda col, a, n: a[::n])
-        sum_nb = njit(lambda col, a, n: np.nansum(a))
+        @njit
+        def every_nth_nb(col, a, n):
+            return a[::n]
+
+        @njit
+        def sum_nb(col, a, n):
+            return np.nansum(a)
 
         assert ts['a'].iloc[::2].sum() == ts['a'].vbt.tseries.apply_and_reduce(every_nth_nb, sum_nb, 2)
         pd.testing.assert_series_equal(
@@ -512,7 +529,9 @@ class TestAccessors:
         )
 
     def test_reduce(self):
-        sum_nb = njit(lambda col, a: np.nansum(a))
+        @njit
+        def sum_nb(col, a):
+            return np.nansum(a)
 
         assert ts['a'].sum() == ts['a'].vbt.tseries.reduce(sum_nb)
         pd.testing.assert_series_equal(

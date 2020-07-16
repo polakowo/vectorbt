@@ -229,15 +229,15 @@ class Base_Accessor(ArrayWrapper):
             other = other._obj
         return reshape_fns.broadcast_to(self._obj, other, **kwargs)
 
-    def make_symmetric(self):
+    def make_symmetric(self):  # pragma: no cover
         """See `vectorbt.base.reshape_fns.make_symmetric`."""
         return reshape_fns.make_symmetric(self._obj)
 
-    def unstack_to_array(self, **kwargs):
+    def unstack_to_array(self, **kwargs):  # pragma: no cover
         """See `vectorbt.base.reshape_fns.unstack_to_array`."""
         return reshape_fns.unstack_to_array(self._obj, **kwargs)
 
-    def unstack_to_df(self, **kwargs):
+    def unstack_to_df(self, **kwargs):  # pragma: no cover
         """See `vectorbt.base.reshape_fns.unstack_to_df`."""
         return reshape_fns.unstack_to_df(self._obj, **kwargs)
 

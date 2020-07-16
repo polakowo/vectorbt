@@ -632,8 +632,14 @@ class TestAccessors:
         )
 
     def test_map_reduce_between(self):
-        distance_map_nb = njit(lambda col, from_i, to_i: to_i - from_i)
-        mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
+        @njit
+        def distance_map_nb(col, from_i, to_i):
+            return to_i - from_i
+
+        @njit
+        def mean_reduce_nb(col, a):
+            return np.nanmean(a)
+
         other_sig = pd.DataFrame([
             [False, False, False],
             [False, False, False],
@@ -668,8 +674,13 @@ class TestAccessors:
         )
 
     def test_map_reduce_partitions(self):
-        distance_map_nb = njit(lambda col, from_i, to_i: to_i - from_i)
-        mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
+        @njit
+        def distance_map_nb(col, from_i, to_i):
+            return to_i - from_i
+
+        @njit
+        def mean_reduce_nb(col, a):
+            return np.nanmean(a)
 
         assert (~sig['a']).vbt.signals.map_reduce_partitions(
             map_func_nb=distance_map_nb,

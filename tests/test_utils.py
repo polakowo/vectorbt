@@ -206,11 +206,15 @@ class TestChecks:
         assert checks.is_array(pd.DataFrame([1, 2, 3]))
 
     def test_is_numba_func(self):
-        if 'NUMBA_DISABLE_JIT' in os.environ:
-            if os.environ['NUMBA_DISABLE_JIT'] == '1':
-                return
-        assert not checks.is_numba_func(lambda x: x)
-        assert checks.is_numba_func(njit(lambda x: x))
+        def test_func(x):
+            return x
+
+        @njit
+        def test_func_nb(x):
+            return x
+
+        assert not checks.is_numba_func(test_func)
+        assert checks.is_numba_func(test_func_nb)
 
     def test_is_hashable(self):
         assert checks.is_hashable(2)
@@ -225,9 +229,16 @@ class TestChecks:
             pass
 
     def test_assert_numba_func(self):
-        checks.assert_numba_func(njit(lambda x: x))
+        def test_func(x):
+            return x
+
+        @njit
+        def test_func_nb(x):
+            return x
+
+        checks.assert_numba_func(test_func_nb)
         try:
-            checks.assert_numba_func(lambda x: x)
+            checks.assert_numba_func(test_func)
             raise Exception
         except:
             pass

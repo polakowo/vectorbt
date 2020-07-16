@@ -199,15 +199,22 @@ class TestFactory:
                 (1, 'c')
             ], names=['custom_param', None])
         )
+        def apply_func(ts1, ts2, p):
+            return ts1 * ts2 * p
+
+        @njit
+        def apply_func_nb(ts1, ts2, p):
+            return ts1 * ts2 * p
+
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(ts_names=['ts1', 'ts2']) \
-                .from_apply_func(lambda ts1, ts2, p: ts1 * ts2 * p) \
+                .from_apply_func(apply_func) \
                 .from_params(ts, ts + 1, [0, 1]).output,
             target
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(ts_names=['ts1', 'ts2']) \
-                .from_apply_func(njit(lambda ts1, ts2, p: ts1 * ts2 * p)) \
+                .from_apply_func(apply_func_nb) \
                 .from_params(ts, ts + 1, [0, 1]).output,
             target
         )
@@ -231,15 +238,23 @@ class TestFactory:
                 (1, 3, 'c')
             ], names=['custom_p1', 'custom_p2', None])
         )
+
+        def apply_func(ts, p1, p2):
+            return ts * (p1 + p2)
+
+        @njit
+        def apply_func_nb(ts, p1, p2):
+            return ts * (p1 + p2)
+
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
+                .from_apply_func(apply_func) \
                 .from_params(ts, [0, 1], [2, 3]).output,
             target
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(njit(lambda ts, p1, p2: ts * (p1 + p2))) \
+                .from_apply_func(apply_func_nb) \
                 .from_params(ts, [0, 1], [2, 3]).output,
             target
         )
@@ -269,20 +284,36 @@ class TestFactory:
                 (1, 3, 'c')
             ], names=['custom_p1', 'custom_p2', None])
         )
+
+        def apply_func(ts, p1, p2):
+            return ts * (p1 + p2)
+
+        @njit
+        def apply_func_nb(ts, p1, p2):
+            return ts * (p1 + p2)
+
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
+                .from_apply_func(apply_func) \
                 .from_params(ts, [0, 1], [2, 3], param_product=True).output,
             target
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(njit(lambda ts, p1, p2: ts * (p1 + p2))) \
+                .from_apply_func(apply_func_nb) \
                 .from_params(ts, [0, 1], [2, 3], param_product=True).output,
             target
         )
 
     def test_multiple_outputs(self):
+
+        def apply_func(ts, p):
+            return (ts * p, ts * p ** 2)
+
+        @njit
+        def apply_func_nb(ts, p):
+            return (ts * p, ts * p ** 2)
+
         target1 = pd.DataFrame(
             np.array([
                 [0., np.nan, 0., 1., np.nan, 1.],
@@ -314,33 +345,46 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(lambda ts, p: (ts * p, ts * p ** 2)) \
+                .from_apply_func(apply_func) \
                 .from_params(ts, [0, 1]).o1,
             target1
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(njit(lambda ts, p: (ts * p, ts * p ** 2))) \
+                .from_apply_func(apply_func_nb) \
                 .from_params(ts, [0, 1]).o1,
             target1
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(lambda ts, p: (ts * p, ts * p ** 2)) \
+                .from_apply_func(apply_func) \
                 .from_params(ts, [0, 1]).o2,
             target2
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(njit(lambda ts, p: (ts * p, ts * p ** 2))) \
+                .from_apply_func(apply_func_nb) \
                 .from_params(ts, [0, 1]).o2,
             target2
         )
 
     def test_cache(self):
+
         def caching_func(ts, params):
             np.random.seed(seed)
             return np.random.uniform(0, 1)
+
+        @njit
+        def caching_func_nb(ts, params):
+            np.random.seed(seed)
+            return np.random.uniform(0, 1)
+
+        def apply_func(ts, param, c):
+            return ts * param + c
+
+        @njit
+        def apply_func_nb(ts, param, c):
+            return ts * param + c
 
         target = pd.DataFrame(
             np.array([
@@ -362,48 +406,56 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_apply_func(
-                lambda ts, param, c: ts * param + c,
+                apply_func,
                 caching_func=caching_func
             ).from_params(ts, [0, 1]).output,
             target
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_apply_func(
-                njit(lambda ts, param, c: ts * param + c),
-                caching_func=njit(caching_func)
+                apply_func_nb,
+                caching_func=caching_func_nb
             ).from_params(ts, [0, 1]).output,
             target
         )
         # return_cache
         cache = vbt.IndicatorFactory().from_apply_func(
-            lambda ts, param, c: ts * param + c,
+            apply_func,
             caching_func=caching_func,
             return_cache=True
         ).from_params(ts, [0, 1])
         assert cache == 0.3745401188473625
         cache = vbt.IndicatorFactory().from_apply_func(
-            njit(lambda ts, param, c: ts * param + c),
-            caching_func=njit(caching_func),
+            apply_func_nb,
+            caching_func=caching_func_nb,
             return_cache=True
         ).from_params(ts, [0, 1])
         assert cache == 0.3745401188473625
         # pass cache
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_apply_func(
-                lambda ts, param, c: ts * param + c,
+                apply_func,
                 cache=cache
             ).from_params(ts, [0, 1]).output,
             target
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_apply_func(
-                njit(lambda ts, param, c: ts * param + c),
+                apply_func_nb,
                 cache=cache
             ).from_params(ts, [0, 1]).output,
             target
         )
 
     def test_return_raw(self):
+
+        def apply_func(ts, p, a, b=10):
+            return ts * p + a + b
+
+        @njit
+        def apply_func_nb(ts, p, a, b):
+            return ts * p + a + b
+
         target = np.array([
             [110., np.nan, 110., 111., np.nan, 111.],
             [110., 110., 110., 112., 114., 112.],
@@ -413,20 +465,28 @@ class TestFactory:
         ])
         np.testing.assert_array_equal(
             vbt.IndicatorFactory().from_apply_func(
-                lambda ts, p, a, b=10: ts * p + a + b,
+                apply_func,
                 return_raw=True
             ).from_params(ts, [0, 1], 10, b=100),
             target
         )
         np.testing.assert_array_equal(
             vbt.IndicatorFactory().from_apply_func(
-                njit(lambda ts, p, a, b: ts * p + a + b),
+                apply_func_nb,
                 return_raw=True
             ).from_params(ts, [0, 1], 10, 100),
             target
         )
 
     def test_no_params(self):
+
+        def custom_func(ts, a, b=10):
+            return ts + a + b
+
+        @njit
+        def custom_func_nb(ts, a, b):
+            return ts + a + b
+
         target = pd.DataFrame(
             np.array([
                 [111., np.nan, 111.],
@@ -439,19 +499,23 @@ class TestFactory:
             columns=ts.columns
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(
-                lambda ts, a, b=10: ts + a + b
-            ).from_params(ts, 10, b=100).output,
+            vbt.IndicatorFactory().from_custom_func(custom_func).from_params(ts, 10, b=100).output,
             target
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(
-                njit(lambda ts, a, b: ts + a + b)
-            ).from_params(ts, 10, 100).output,
+            vbt.IndicatorFactory().from_custom_func(custom_func_nb).from_params(ts, 10, 100).output,
             target
         )
 
     def test_pass_1d(self):
+
+        def custom_func(ts, a, b=10):
+            return ts + a + b
+
+        @njit
+        def custom_func_nb(ts, a, b):
+            return ts + a + b
+
         target = pd.Series(
             np.array([12., 14., 16., 18., np.nan]),
             index=ts['a'].index,
@@ -460,7 +524,7 @@ class TestFactory:
         try:
             pd.testing.assert_series_equal(
                 vbt.IndicatorFactory(param_names=[]).from_custom_func(
-                    lambda ts, a, b=10: ts + a + b
+                    custom_func
                 ).from_params(ts['a'], 10, b=ts['a'].values).output,
                 target
             )
@@ -469,42 +533,57 @@ class TestFactory:
             pass
         pd.testing.assert_series_equal(
             vbt.IndicatorFactory(param_names=[]).from_custom_func(
-                lambda ts, a, b=10: ts + a + b,
+                custom_func,
                 pass_2d=False
             ).from_params(ts['a'], 10, b=ts['a'].values).output,
             target
         )
         pd.testing.assert_series_equal(
             vbt.IndicatorFactory(param_names=[]).from_custom_func(
-                njit(lambda ts, a, b: ts + a + b),
+                custom_func_nb,
                 pass_2d=False
             ).from_params(ts['a'], 10, ts['a'].values).output,
             target
         )
 
     def test_pass_lists(self):
+
+        def custom_func(ts_list, param_list):
+            return ts_list[0] * param_list[0]
+
+        def custom_func2(ts_list, param_list):
+            return njit(lambda x, y: x * y)(ts_list[0], param_list[0])
+
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_custom_func(
-                lambda ts_list, param_list: ts_list[0] * param_list[0],
+                custom_func,
                 pass_lists=True
             ).from_params(ts, 2).output,
             ts * 2
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_custom_func(
-                lambda ts_list, param_list: njit(lambda x, y: x * y)(ts_list[0], param_list[0]),
+                custom_func2,
                 pass_lists=True
             ).from_params(ts, 2).output,
             ts * 2
         )
 
     def test_other(self):
+
+        def apply_func(ts1, ts2, p1, p2):
+            return (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+
+        @njit
+        def apply_func_nb(ts1, ts2, p1, p2):
+            return (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+
         obj, other = vbt.IndicatorFactory(
             ts_names=['ts1', 'ts2'],
             param_names=['p1', 'p2'],
             output_names=['o1', 'o2']
         ).from_apply_func(
-            lambda ts1, ts2, p1, p2: (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+            apply_func
         ).from_params(ts, ts + 1, [0, 1], [1, 2])
         np.testing.assert_array_equal(
             other,
@@ -521,7 +600,7 @@ class TestFactory:
             param_names=['p1', 'p2'],
             output_names=['o1', 'o2']
         ).from_apply_func(
-            njit(lambda ts1, ts2, p1, p2: (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2))
+            apply_func_nb
         ).from_params(ts, ts + 1, [0, 1], [1, 2])
         np.testing.assert_array_equal(other, other2)
 

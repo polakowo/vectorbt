@@ -1293,6 +1293,13 @@ class TestIndexing:
 
 class TestCombineFns:
     def test_apply_and_concat_one(self):
+        def apply_func(i, x, a):
+            return x + a[i]
+
+        @njit
+        def apply_func_nb(i, x, a):
+            return x + a[i]
+
         # 1d
         target = np.array([
             [11, 21, 31],
@@ -1300,11 +1307,11 @@ class TestCombineFns:
             [13, 23, 33]
         ])
         np.testing.assert_array_equal(
-            combine_fns.apply_and_concat_one(3, lambda i, x, a: x + a[i], sr2.values, [10, 20, 30]),
+            combine_fns.apply_and_concat_one(3, apply_func, sr2.values, [10, 20, 30]),
             target
         )
         np.testing.assert_array_equal(
-            combine_fns.apply_and_concat_one_nb(3, njit(lambda i, x, a: x + a[i]), sr2.values, (10, 20, 30)),
+            combine_fns.apply_and_concat_one_nb(3, apply_func_nb, sr2.values, (10, 20, 30)),
             target
         )
         # 2d
@@ -1314,15 +1321,22 @@ class TestCombineFns:
             [17, 18, 19, 27, 28, 29, 37, 38, 39]
         ])
         np.testing.assert_array_equal(
-            combine_fns.apply_and_concat_one(3, lambda i, x, a: x + a[i], df4.values, [10, 20, 30]),
+            combine_fns.apply_and_concat_one(3, apply_func, df4.values, [10, 20, 30]),
             target2
         )
         np.testing.assert_array_equal(
-            combine_fns.apply_and_concat_one_nb(3, njit(lambda i, x, a: x + a[i]), df4.values, (10, 20, 30)),
+            combine_fns.apply_and_concat_one_nb(3, apply_func_nb, df4.values, (10, 20, 30)),
             target2
         )
 
     def test_apply_and_concat_multiple(self):
+        def apply_func(i, x, a):
+            return (x, x + a[i])
+
+        @njit
+        def apply_func_nb(i, x, a):
+            return (x, x + a[i])
+
         # 1d
         target_a = np.array([
             [1, 1, 1],
@@ -1334,11 +1348,10 @@ class TestCombineFns:
             [12, 22, 32],
             [13, 23, 33]
         ])
-        a, b = combine_fns.apply_and_concat_multiple(3, lambda i, x, a: (x, x + a[i]), sr2.values, [10, 20, 30])
+        a, b = combine_fns.apply_and_concat_multiple(3, apply_func, sr2.values, [10, 20, 30])
         np.testing.assert_array_equal(a, target_a)
         np.testing.assert_array_equal(b, target_b)
-        a, b = combine_fns.apply_and_concat_multiple_nb(3, njit(lambda i, x, a: (x, x + a[i])), sr2.values,
-                                                        (10, 20, 30))
+        a, b = combine_fns.apply_and_concat_multiple_nb(3, apply_func_nb, sr2.values, (10, 20, 30))
         np.testing.assert_array_equal(a, target_a)
         np.testing.assert_array_equal(b, target_b)
         # 2d
@@ -1352,15 +1365,21 @@ class TestCombineFns:
             [14, 15, 16, 24, 25, 26, 34, 35, 36],
             [17, 18, 19, 27, 28, 29, 37, 38, 39]
         ])
-        a, b = combine_fns.apply_and_concat_multiple(3, lambda i, x, a: (x, x + a[i]), df4.values, [10, 20, 30])
+        a, b = combine_fns.apply_and_concat_multiple(3, apply_func, df4.values, [10, 20, 30])
         np.testing.assert_array_equal(a, target_a)
         np.testing.assert_array_equal(b, target_b)
-        a, b = combine_fns.apply_and_concat_multiple_nb(3, njit(lambda i, x, a: (x, x + a[i])), df4.values,
-                                                        (10, 20, 30))
+        a, b = combine_fns.apply_and_concat_multiple_nb(3, apply_func_nb, df4.values, (10, 20, 30))
         np.testing.assert_array_equal(a, target_a)
         np.testing.assert_array_equal(b, target_b)
 
     def test_combine_and_concat(self):
+        def combine_func(x, y, a):
+            return x + y + a
+
+        @njit
+        def combine_func_nb(x, y, a):
+            return x + y + a
+
         # 1d
         target = np.array([
             [103, 104],
@@ -1369,12 +1388,12 @@ class TestCombineFns:
         ])
         np.testing.assert_array_equal(
             combine_fns.combine_and_concat(
-                sr2.values, (sr2.values * 2, sr2.values * 3), lambda x, y, a: x + y + a, 100),
+                sr2.values, (sr2.values * 2, sr2.values * 3), combine_func, 100),
             target
         )
         np.testing.assert_array_equal(
             combine_fns.combine_and_concat_nb(
-                sr2.values, (sr2.values * 2, sr2.values * 3), njit(lambda x, y, a: x + y + a), 100),
+                sr2.values, (sr2.values * 2, sr2.values * 3), combine_func_nb, 100),
             target
         )
         # 2d
@@ -1385,26 +1404,33 @@ class TestCombineFns:
         ])
         np.testing.assert_array_equal(
             combine_fns.combine_and_concat(
-                df4.values, (df4.values * 2, df4.values * 3), lambda x, y, a: x + y + a, 100),
+                df4.values, (df4.values * 2, df4.values * 3), combine_func, 100),
             target2
         )
         np.testing.assert_array_equal(
             combine_fns.combine_and_concat_nb(
-                df4.values, (df4.values * 2, df4.values * 3), njit(lambda x, y, a: x + y + a), 100),
+                df4.values, (df4.values * 2, df4.values * 3), combine_func_nb, 100),
             target2
         )
 
     def test_combine_multiple(self):
+        def combine_func(x, y, a):
+            return x + y + a
+
+        @njit
+        def combine_func_nb(x, y, a):
+            return x + y + a
+
         # 1d
         target = np.array([206, 212, 218])
         np.testing.assert_array_equal(
             combine_fns.combine_multiple(
-                (sr2.values, sr2.values * 2, sr2.values * 3), lambda x, y, a: x + y + a, 100),
+                (sr2.values, sr2.values * 2, sr2.values * 3), combine_func, 100),
             target
         )
         np.testing.assert_array_equal(
             combine_fns.combine_multiple_nb(
-                (sr2.values, sr2.values * 2, sr2.values * 3), njit(lambda x, y, a: x + y + a), 100),
+                (sr2.values, sr2.values * 2, sr2.values * 3), combine_func_nb, 100),
             target
         )
         # 2d
@@ -1415,12 +1441,12 @@ class TestCombineFns:
         ])
         np.testing.assert_array_equal(
             combine_fns.combine_multiple(
-                (df4.values, df4.values * 2, df4.values * 3), lambda x, y, a: x + y + a, 100),
+                (df4.values, df4.values * 2, df4.values * 3), combine_func, 100),
             target2
         )
         np.testing.assert_array_equal(
             combine_fns.combine_multiple_nb(
-                (df4.values, df4.values * 2, df4.values * 3), njit(lambda x, y, a: x + y + a), 100),
+                (df4.values, df4.values * 2, df4.values * 3), combine_func_nb, 100),
             target2
         )
 
@@ -1582,6 +1608,88 @@ class TestAccessors:
                 columns=pd.Index(['a3'], dtype='object', name='c3')
             )
         )
+        df1_copy2 = df1.copy()
+        df1_copy2.vbt.apply_on_index(lambda idx: idx + '_yo', axis=1, inplace=True)
+        pd.testing.assert_frame_equal(
+            df1_copy2,
+            pd.DataFrame(
+                np.asarray([1]),
+                index=pd.Index(['x3'], dtype='object', name='i3'),
+                columns=pd.Index(['a3_yo'], dtype='object', name='c3')
+            )
+        )
+
+    def test_stack_index(self):
+        pd.testing.assert_frame_equal(
+            df5.vbt.stack_index([1, 2, 3], on_top=True),
+            pd.DataFrame(
+                df5.values,
+                index=df5.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (1, 'a7', 'a8'),
+                    (2, 'b7', 'b8'),
+                    (3, 'c7', 'c8')
+                ], names=[None, 'c7', 'c8'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df5.vbt.stack_index([1, 2, 3], on_top=False),
+            pd.DataFrame(
+                df5.values,
+                index=df5.index,
+                columns=pd.MultiIndex.from_tuples([
+                    ('a7', 'a8', 1),
+                    ('b7', 'b8', 2),
+                    ('c7', 'c8', 3)
+                ], names=['c7', 'c8', None])
+            )
+        )
+
+    def test_drop_levels(self):
+        pd.testing.assert_frame_equal(
+            df5.vbt.drop_levels('c7'),
+            pd.DataFrame(
+                df5.values,
+                index=df5.index,
+                columns=pd.Index(['a8', 'b8', 'c8'], dtype='object', name='c8')
+            )
+        )
+
+    def test_rename_levels(self):
+        pd.testing.assert_frame_equal(
+            df5.vbt.rename_levels({'c8': 'c9'}),
+            pd.DataFrame(
+                df5.values,
+                index=df5.index,
+                columns=pd.MultiIndex.from_tuples([
+                    ('a7', 'a8'),
+                    ('b7', 'b8'),
+                    ('c7', 'c8')
+                ], names=['c7', 'c9'])
+            )
+        )
+
+    def test_select_levels(self):
+        pd.testing.assert_frame_equal(
+            df5.vbt.select_levels('c8'),
+            pd.DataFrame(
+                df5.values,
+                index=df5.index,
+                columns=pd.Index(['a8', 'b8', 'c8'], dtype='object', name='c8')
+            )
+        )
+
+    def test_drop_redundant_levels(self):
+        pd.testing.assert_frame_equal(
+            df5.vbt.stack_index(pd.RangeIndex(start=0, step=1, stop=3)).vbt.drop_redundant_levels(),
+            df5
+        )
+
+    def test_drop_duplicate_levels(self):
+        pd.testing.assert_frame_equal(
+            df5.vbt.stack_index(df5.columns.get_level_values(0)).vbt.drop_duplicate_levels(),
+            df5
+        )
 
     def test_to_array(self):
         np.testing.assert_array_equal(sr2.vbt.to_1d_array(), sr2.values)
@@ -1657,7 +1765,10 @@ class TestAccessors:
         a, b = sr2.vbt.broadcast(10)
         pd.testing.assert_series_equal(a, sr2)
         pd.testing.assert_series_equal(b, b_target)
+
+    def test_broadcast_to(self):
         pd.testing.assert_frame_equal(sr2.vbt.broadcast_to(df2), df2)
+        pd.testing.assert_frame_equal(sr2.vbt.broadcast_to(df2.vbt), df2)
 
     def test_apply(self):
         pd.testing.assert_series_equal(sr2.vbt.apply(apply_func=lambda x: x ** 2), sr2 ** 2)
@@ -1698,6 +1809,13 @@ class TestAccessors:
         )
 
     def test_apply_and_concat(self):
+        def apply_func(i, x, y, c, d=1):
+            return x + y[i] + c + d
+
+        @njit
+        def apply_func_nb(i, x, y, c, d):
+            return x + y[i] + c + d
+
         target = pd.DataFrame(
             np.array([
                 [112, 113, 114],
@@ -1709,21 +1827,21 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=lambda i, x, y, c, d=1: x + y[i] + c + d, d=100,
+                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
                 as_columns=['a', 'b', 'c']
             ),
             target
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=njit(lambda i, x, y, c, d=1: x + y[i] + c + 100),
+                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
                 as_columns=['a', 'b', 'c']
             ),
             target
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=lambda i, x, y, c, d=1: x + y[i] + c + d, d=100
+                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100
             ),
             pd.DataFrame(
                 target.values,
@@ -1731,9 +1849,13 @@ class TestAccessors:
                 columns=pd.Int64Index([0, 1, 2], dtype='int64', name='apply_idx')
             )
         )
+
+        def apply_func2(i, x, y, c, d=1):
+            return x + y + c + d
+
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
-                3, np.array([[1], [2], [3]]), 10, apply_func=lambda i, x, y, c, d=1: x + y + c + d, d=100,
+                3, np.array([[1], [2], [3]]), 10, apply_func=apply_func2, d=100,
                 as_columns=['a', 'b', 'c'],
                 pass_2d=True  # otherwise (3, 1) + (1, 3) = (3, 3) != (3, 1) -> error
             ),
@@ -1758,22 +1880,29 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=lambda i, x, y, c, d=1: x + y[i] + c + d, d=100,
+                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
                 as_columns=['a', 'b', 'c']
             ),
             target2
         )
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=njit(lambda i, x, y, c, d=1: x + y[i] + c + 100),
+                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
                 as_columns=['a', 'b', 'c']
             ),
             target2
         )
 
     def test_combine_with(self):
+        def combine_func(x, y, c, d=1):
+            return x + y + c + d
+
+        @njit
+        def combine_func_nb(x, y, c, d):
+            return x + y + c + d
+
         pd.testing.assert_series_equal(
-            sr2.vbt.combine_with(10, 100, d=1000, combine_func=lambda x, y, c, d=1: x + y + c + d),
+            sr2.vbt.combine_with(10, 100, d=1000, combine_func=combine_func),
             pd.Series(
                 np.array([1111, 1112, 1113]),
                 index=pd.Index(['x2', 'y2', 'z2'], dtype='object', name='i2'),
@@ -1781,23 +1910,33 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            sr2.vbt.combine_with(10, 100, 1000, combine_func=njit(lambda x, y, c, d: x + y + c + d)),
+            sr2.vbt.combine_with(10, 100, 1000, combine_func=combine_func_nb),
             pd.Series(
                 np.array([1111, 1112, 1113]),
                 index=pd.Index(['x2', 'y2', 'z2'], dtype='object', name='i2'),
                 name='a2'
             )
         )
+
+        @njit
+        def combine_func2_nb(x, y):
+            return x + y + np.array([[1], [2], [3]])
+
         pd.testing.assert_series_equal(
-            sr2.vbt.combine_with(10, combine_func=njit(lambda x, y: x + y + np.array([[1], [2], [3]])), pass_2d=True),
+            sr2.vbt.combine_with(10, combine_func=combine_func2_nb, pass_2d=True),
             pd.Series(
                 np.array([12, 14, 16]),
                 index=pd.Index(['x2', 'y2', 'z2'], dtype='object', name='i2'),
                 name='a2'
             )
         )
+
+        @njit
+        def combine_func3_nb(x, y):
+            return x + y
+
         pd.testing.assert_frame_equal(
-            df4.vbt.combine_with(sr2, combine_func=lambda x, y: x + y),
+            df4.vbt.combine_with(sr2, combine_func=combine_func3_nb),
             pd.DataFrame(
                 np.array([
                     [2, 3, 4],
@@ -1814,6 +1953,13 @@ class TestAccessors:
         )
 
     def test_combine_with_multiple(self):
+        def combine_func(x, y, a, b=1):
+            return x + y + a + b
+
+        @njit
+        def combine_func_nb(x, y, a, b):
+            return x + y + a + b
+
         target = pd.DataFrame(
             np.array([
                 [232, 233, 234],
@@ -1830,21 +1976,21 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.combine_with_multiple(
                 [10, df4], 10, b=100,
-                combine_func=lambda x, y, a, b=1: x + y + a + b
+                combine_func=combine_func
             ),
             target
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.combine_with_multiple(
                 [10, df4], 10, 100,
-                combine_func=njit(lambda x, y, a, b: x + y + a + b)
+                combine_func=combine_func_nb
             ),
             target
         )
         pd.testing.assert_frame_equal(
             df4.vbt.combine_with_multiple(
                 [10, sr2], 10, b=100,
-                combine_func=lambda x, y, a, b=1: x + y + a + b
+                combine_func=combine_func
             ),
             pd.DataFrame(
                 target.values,
@@ -1879,7 +2025,7 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.combine_with_multiple(
                 [10, df4], 10, b=100,
-                combine_func=lambda x, y, a, b=1: x + y + a + b,
+                combine_func=combine_func,
                 concat=True
             ),
             target2
@@ -1887,7 +2033,7 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.combine_with_multiple(
                 [10, df4], 10, 100,
-                combine_func=njit(lambda x, y, a, b: x + y + a + b),
+                combine_func=combine_func_nb,
                 concat=True
             ),
             target2
