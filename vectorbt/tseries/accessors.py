@@ -47,7 +47,7 @@ from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.drawdowns import Drawdowns
 from vectorbt.widgets.common import DefaultFigureWidget
 
-try:
+try:  # pragma: no cover
     # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
     import bottleneck as bn
 
@@ -593,7 +593,7 @@ class TimeSeries_DFAccessor(TimeSeries_Accessor, Base_DFAccessor):
 
 
 @register_dataframe_accessor('ohlcv')
-class OHLCV_DFAccessor(TimeSeries_DFAccessor):
+class OHLCV_DFAccessor(TimeSeries_DFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.ohlcv`."""
@@ -610,7 +610,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):
              candlestick_kwargs={},
              bar_kwargs={},
              fig=None,
-             **layout_kwargs):  # pragma: no cover
+             **layout_kwargs):
         """Plot OHLCV data.
 
         Args:

@@ -552,15 +552,12 @@ def rank_partitions_nb(a, reset_by=None, after_false=False):
 def fshift_1d_nb(a, n):
     """Shift forward `a` by `n` positions."""
     result = np.empty_like(a, dtype=np.bool_)
-    result[:n, :] = False
-    result[n:, :] = a[:-n, :]
+    result[:n] = False
+    result[n:] = a[:-n]
     return result
 
 
 @njit(cache=True)
 def fshift_nb(a, n):
     """2-dim version of `fshift_1d_nb`."""
-    result = np.empty_like(a, dtype=np.bool_)
-    result[:n] = False
-    result[n:] = a[:-n]
-    return result
+    return fshift_1d_nb(a, n)

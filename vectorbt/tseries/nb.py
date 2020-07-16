@@ -97,10 +97,7 @@ def fshift_1d_nb(a, n):
 @njit(cache=True)
 def fshift_nb(a, n):
     """2-dim version of `fshift_1d_nb`."""
-    result = np.empty_like(a, dtype=np.float_)
-    result[:n, :] = np.nan
-    result[n:, :] = a[:-n, :]
-    return result
+    return fshift_1d_nb(a, n)
 
 
 @njit(cache=True)
@@ -284,6 +281,15 @@ def nanmean_nb(a):
     result = np.empty(a.shape[1], dtype=np.float_)
     for col in range(a.shape[1]):
         result[col] = np.nanmean(a[:, col])
+    return result
+
+
+@njit(cache=True)
+def nanmedian_nb(a):
+    """Compute median while ignoring NaNs."""
+    result = np.empty(a.shape[1], dtype=np.float_)
+    for col in range(a.shape[1]):
+        result[col] = np.nanmedian(a[:, col])
     return result
 
 

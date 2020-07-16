@@ -5,6 +5,8 @@ from numba import njit
 from datetime import datetime
 import pytest
 
+from vectorbt.signals import nb
+
 seed = 42
 
 day_dt = np.timedelta64(86400000000000)
@@ -47,6 +49,10 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
+        np.testing.assert_array_equal(
+            sig['a'].vbt.signals.shuffle(seed=seed).values,
+            nb.shuffle_1d_nb(sig['a'].values, seed=seed)
+        )
         pd.testing.assert_frame_equal(
             sig.vbt.signals.shuffle(seed=seed),
             pd.DataFrame(
@@ -68,6 +74,10 @@ class TestAccessors:
     )
     def test_fshift(self, test_n):
         pd.testing.assert_series_equal(sig['a'].vbt.signals.fshift(test_n), sig['a'].shift(test_n, fill_value=False))
+        np.testing.assert_array_equal(
+            sig['a'].vbt.signals.fshift(test_n).values,
+            nb.fshift_1d_nb(sig['a'].values, test_n)
+        )
         pd.testing.assert_frame_equal(sig.vbt.signals.fshift(test_n), sig.shift(test_n, fill_value=False))
 
     def test_empty(self):

@@ -355,27 +355,6 @@ def dd_recovery_return_map_nb(record, ts):
     return (end_val - valley_val) / valley_val
 
 
-# ############# Orders ############# #
-
-
-@njit(cache=True)
-def order_size_map_nb(record):
-    """`map_func_nb` that returns order size."""
-    return record['size']
-
-
-@njit(cache=True)
-def order_price_map_nb(record):
-    """`map_func_nb` that returns order price."""
-    return record['price']
-
-
-@njit(cache=True)
-def order_fees_map_nb(record):
-    """`map_func_nb` that returns order fees."""
-    return record['fees']
-
-
 # ############# Events ############# #
 
 
@@ -383,18 +362,6 @@ def order_fees_map_nb(record):
 def event_duration_map_nb(record):
     """`map_func_nb` that returns event duration."""
     return record['exit_idx'] - record['entry_idx']
-
-
-@njit(cache=True)
-def event_pnl_map_nb(record):
-    """`map_func_nb` that returns event PnL."""
-    return record['pnl']
-
-
-@njit(cache=True)
-def event_return_map_nb(record):
-    """`map_func_nb` that returns event return."""
-    return record['return']
 
 
 # ############# Trades ############# #

@@ -10,3 +10,5 @@ exclude_lines =
 ignore_errors = True
 omit =
     vectorbt/widgets/*
+    vectorbt/utils/colors/*
+    vectorbt/utils/docs/*

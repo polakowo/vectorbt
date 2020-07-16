@@ -5,7 +5,7 @@ from datetime import datetime
 import pytest
 from itertools import product
 
-from vectorbt.tseries import common
+from vectorbt.tseries import common, nb
 from vectorbt.records.drawdowns import Drawdowns
 
 day_dt = np.timedelta64(86400000000000)
@@ -228,14 +228,20 @@ class TestAccessors:
     )
     def test_fshift(self, test_n):
         pd.testing.assert_series_equal(ts['a'].vbt.tseries.fshift(test_n), ts['a'].shift(test_n))
+        np.testing.assert_array_equal(
+            ts['a'].vbt.tseries.fshift(test_n).values,
+            nb.fshift_1d_nb(ts['a'].values, test_n)
+        )
         pd.testing.assert_frame_equal(ts.vbt.tseries.fshift(test_n), ts.shift(test_n))
 
     def test_diff(self):
         pd.testing.assert_series_equal(ts['a'].vbt.tseries.diff(), ts['a'].diff())
+        np.testing.assert_array_equal(ts['a'].vbt.tseries.diff().values, nb.diff_1d_nb(ts['a'].values))
         pd.testing.assert_frame_equal(ts.vbt.tseries.diff(), ts.diff())
 
     def test_pct_change(self):
         pd.testing.assert_series_equal(ts['a'].vbt.tseries.pct_change(), ts['a'].pct_change(fill_method=None))
+        np.testing.assert_array_equal(ts['a'].vbt.tseries.pct_change().values, nb.pct_change_1d_nb(ts['a'].values))
         pd.testing.assert_frame_equal(ts.vbt.tseries.pct_change(), ts.pct_change(fill_method=None))
 
     def test_ffill(self):
@@ -571,24 +577,25 @@ class TestAccessors:
         )
 
     @pytest.mark.parametrize(
-        "test_func",
+        "test_func,test_func_nb",
         [
-            lambda x, **kwargs: x.min(**kwargs),
-            lambda x, **kwargs: x.max(**kwargs),
-            lambda x, **kwargs: x.mean(**kwargs),
-            lambda x, **kwargs: x.median(**kwargs),
-            lambda x, **kwargs: x.std(**kwargs),
-            lambda x, **kwargs: x.count(**kwargs),
-            lambda x, **kwargs: x.sum(**kwargs)
+            (lambda x, **kwargs: x.min(**kwargs), nb.nanmin_nb),
+            (lambda x, **kwargs: x.max(**kwargs), nb.nanmax_nb),
+            (lambda x, **kwargs: x.mean(**kwargs), nb.nanmean_nb),
+            (lambda x, **kwargs: x.median(**kwargs), nb.nanmedian_nb),
+            (lambda x, **kwargs: x.std(**kwargs), nb.nanstd_nb),
+            (lambda x, **kwargs: x.count(**kwargs), nb.nancnt_nb),
+            (lambda x, **kwargs: x.sum(**kwargs), nb.nansum_nb)
         ],
     )
-    def test_funcs(self, test_func):
+    def test_funcs(self, test_func, test_func_nb):
         # numeric
         assert test_func(ts['a']) == test_func(ts['a'].vbt.tseries)
         pd.testing.assert_series_equal(
             test_func(ts),
             test_func(ts.vbt.tseries)
         )
+        np.testing.assert_array_equal(test_func(ts).values, test_func_nb(ts.values))
         pd.testing.assert_series_equal(
             test_func(ts) * day_dt,
             test_func(ts.vbt.tseries, time_units=True)
