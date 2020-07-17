@@ -478,7 +478,6 @@ from vectorbt import (
     signals,
     tseries,
     utils,
-    widgets,
     accessors,
     defaults
 )
@@ -492,15 +491,6 @@ from vectorbt.records import (
     Trades,
     Positions,
     Drawdowns
-)
-from vectorbt.widgets import (
-    DefaultFigureWidget,
-    Indicator,
-    Bar,
-    Scatter,
-    Histogram,
-    Box,
-    Heatmap
 )
 from vectorbt.portfolio import Portfolio
 from vectorbt.indicators import (

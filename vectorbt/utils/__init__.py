@@ -6,5 +6,6 @@ from vectorbt.utils import (
     config,
     decorators,
     docs,
-    math
+    math,
+    widgets
 )

@@ -45,7 +45,7 @@ from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries import nb
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.drawdowns import Drawdowns
-from vectorbt.widgets.common import DefaultFigureWidget
+from vectorbt.utils.widgets import DefaultFigureWidget
 
 try:  # pragma: no cover
     # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py

@@ -11,11 +11,6 @@ vbt.tseries.accessors.TimeSeries_SR/DFAccessor  -> pd.Series/DataFrame.vbt.tseri
 vbt.tseries.accessors.OHLCV_DFAccessor          -> pd.DataFrame.vbt.ohlcv
 vbt.signals.accessors.Signals_SR/DFAccessor     -> pd.Series/DataFrame.vbt.signals
 vbt.returns.accessors.Returns_SR/DFAccessor     -> pd.Series/DataFrame.vbt.returns
-vbt.widgets.accessors.Bar_Accessor              -> pd.Series/DataFrame.vbt.bar
-vbt.widgets.accessors.Scatter_Accessor          -> pd.Series/DataFrame.vbt.scatter
-vbt.widgets.accessors.Histogram_Accessor        -> pd.Series/DataFrame.vbt.hist
-vbt.widgets.accessors.Box_Accessor              -> pd.Series/DataFrame.vbt.box
-vbt.widgets.accessors.Heatmap_Accessor          -> pd.Series/DataFrame.vbt.heatmap
 ```
 
 Additionally, some accessors subclass other accessors building the following inheritance hiearchy:

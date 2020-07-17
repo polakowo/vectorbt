@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
-from vectorbt.base import combine_fns, index_fns, reshape_fns
+from vectorbt.base import combine_fns, index_fns, reshape_fns, plotting
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.common import (
     add_binary_magic_methods,
@@ -472,6 +472,71 @@ class Base_Accessor(ArrayWrapper):
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
             return new_obj.vbt.wrap(result)
+
+    # ############# Plotting ############# #
+
+    def bar(self, trace_names=None, x_labels=None, **kwargs):
+        """See `vectorbt.base.plotting.create_bar`."""
+        if x_labels is None:
+            x_labels = self.index
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_bar(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            x_labels=x_labels,
+            **kwargs
+        )
+
+    def scatter(self, trace_names=None, x_labels=None, **kwargs):
+        """See `vectorbt.base.plotting.create_scatter`."""
+        if x_labels is None:
+            x_labels = self.index
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_scatter(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            x_labels=x_labels,
+            **kwargs
+        )
+
+    def hist(self, trace_names=None, **kwargs):
+        """See `vectorbt.base.plotting.create_histogram`."""
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_hist(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            **kwargs
+        )
+
+    def box(self, trace_names=None, **kwargs):
+        """See `vectorbt.base.plotting.create_box`."""
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_box(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            **kwargs
+        )
+
+    def heatmap(self, x_labels=None, y_labels=None, **kwargs):
+        """See `vectorbt.base.plotting.create_heatmap`."""
+        if x_labels is None:
+            x_labels = self.columns
+        if y_labels is None:
+            y_labels = self.index
+        return plotting.create_heatmap(
+            data=self.to_2d_array(),
+            x_labels=x_labels,
+            y_labels=y_labels,
+            **kwargs
+        )
 
 
 class Base_SRAccessor(Base_Accessor):

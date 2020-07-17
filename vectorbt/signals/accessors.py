@@ -46,7 +46,7 @@ from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
 from vectorbt.signals import nb
-from vectorbt.widgets import DefaultFigureWidget
+from vectorbt.utils.widgets import DefaultFigureWidget
 
 
 @add_nb_methods([
