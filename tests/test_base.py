@@ -377,6 +377,47 @@ class TestIndexFns:
         multi_c2 = pd.MultiIndex.from_arrays([['a7', 'a7', 'c7', 'c7'], ['a8', 'b8', 'a8', 'b8']], names=['c7', 'c8'])
         np.testing.assert_array_equal(index_fns.align_index_to(multi_c1, multi_c2), np.array([0, 1, 0, 1]))
 
+    def test_pick_levels(self):
+        index = index_fns.stack_indexes(multi_i, multi_c)
+        assert index_fns.pick_levels(index, required_levels=[], optional_levels=[]) \
+               == ([], [])
+        assert index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8', 'i7'], optional_levels=[]) \
+               == ([3, 2, 1, 0], [])
+        assert index_fns.pick_levels(index, required_levels=['c8', None, 'i8', 'i7'], optional_levels=[]) \
+               == ([3, 2, 1, 0], [])
+        assert index_fns.pick_levels(index, required_levels=[None, 'c7', 'i8', 'i7'], optional_levels=[]) \
+               == ([3, 2, 1, 0], [])
+        assert index_fns.pick_levels(index, required_levels=[None, None, None, None], optional_levels=[]) \
+               == ([0, 1, 2, 3], [])
+        assert index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8'], optional_levels=['i7']) \
+               == ([3, 2, 1], [0])
+        assert index_fns.pick_levels(index, required_levels=['c8', None, 'i8'], optional_levels=['i7']) \
+               == ([3, 2, 1], [0])
+        assert index_fns.pick_levels(index, required_levels=[None, 'c7', 'i8'], optional_levels=['i7']) \
+               == ([3, 2, 1], [0])
+        assert index_fns.pick_levels(index, required_levels=[None, None, None, None], optional_levels=[None]) \
+               == ([0, 1, 2, 3], [None])
+        try:
+            index_fns.pick_levels(index, required_levels=['i8', 'i8', 'i8', 'i8'], optional_levels=[])
+            raise ValueError
+        except:
+            pass
+        try:
+            index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8'], optional_levels=[])
+            raise ValueError
+        except:
+            pass
+        try:
+            index_fns.pick_levels(index, required_levels=['c8', 'c7'], optional_levels=['i7'])
+            raise ValueError
+        except:
+            pass
+        try:
+            index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8', 'i7'], optional_levels=['i7'])
+            raise ValueError
+        except:
+            pass
+
 
 # ############# reshape_fns.py ############# #
 

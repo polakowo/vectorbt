@@ -96,10 +96,24 @@ def assert_dtype(arg, dtype):
     if not is_array(arg):
         arg = np.asarray(arg)
     if is_frame(arg):
-        if (arg.dtypes != dtype).any():
-            raise AssertionError(f"Data type must be {dtype}, not {arg.dtypes}")
+        for i, col_dtype in enumerate(arg.dtypes):
+            if col_dtype != dtype:
+                raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
     else:
         if arg.dtype != dtype:
+            raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
+
+
+def assert_subdtype(arg, dtype):
+    """Raise exception if `arg` is not a sub data type of `dtype`."""
+    if not is_array(arg):
+        arg = np.asarray(arg)
+    if is_frame(arg):
+        for i, col_dtype in enumerate(arg.dtypes):
+            if not np.issubdtype(col_dtype, dtype):
+                raise AssertionError(f"Data type of column {i} must be {dtype}, not {col_dtype}")
+    else:
+        if not np.issubdtype(arg.dtype, dtype):
             raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
 
 

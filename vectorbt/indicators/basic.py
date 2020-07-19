@@ -37,7 +37,7 @@ from vectorbt import tseries, defaults
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.base import reshape_fns
-from vectorbt.indicators.factory import IndicatorFactory, build_param_product
+from vectorbt.indicators.factory import IndicatorFactory, create_param_product
 from vectorbt.indicators import nb
 
 # ############# MA ############# #
@@ -198,7 +198,7 @@ class MA(MA):
             names = ['ma' + str(i + 1) for i in range(r)]
         param_list = [windows, ewm]
         if param_product:
-            param_list = build_param_product(param_list)
+            param_list = create_param_product(param_list)
         else:
             param_list = reshape_fns.broadcast(*param_list, writeable=True)
         windows, ewm = param_list

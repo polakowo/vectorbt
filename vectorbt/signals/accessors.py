@@ -46,7 +46,7 @@ from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
 from vectorbt.signals import nb
-from vectorbt.utils.widgets import DefaultFigureWidget
+from vectorbt.utils.widgets import CustomFigureWidget
 
 
 @add_nb_methods([
@@ -690,7 +690,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
             ![](/vectorbt/docs/img/signals_sr_plot.png)"""
         # Set up figure
         if fig is None:
-            fig = DefaultFigureWidget()
+            fig = CustomFigureWidget()
         fig.update_layout(
             yaxis=dict(
                 tickmode='array',
@@ -740,7 +740,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         checks.assert_same_index(self._obj, ts)
 
         if fig is None:
-            fig = DefaultFigureWidget()
+            fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
         if name is None:
             name = self._obj.name

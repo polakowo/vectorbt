@@ -243,3 +243,45 @@ def align_index_to(index1, index2):
             return pd.IndexSlice[xsorted[ypos]]
 
     raise ValueError("Indexes could not be aligned together")
+
+
+def pick_levels(index, required_levels=[], optional_levels=[]):
+    """Pick optional and required levels and return their indices.
+
+    Raises an exception if index has less or more levels than expected."""
+    checks.assert_type(index, pd.MultiIndex)
+
+    n_opt_set = len(list(filter(lambda x: x is not None, optional_levels)))
+    n_req_set = len(list(filter(lambda x: x is not None, required_levels)))
+    n_levels_left = index.nlevels - n_opt_set
+    if n_req_set < len(required_levels):
+        if n_levels_left != len(required_levels):
+            n_expected = len(required_levels) + n_opt_set
+            raise ValueError(f"Expected {n_expected} levels, found {index.nlevels}")
+
+    levels_left = list(range(index.nlevels))
+
+    # Pick optional levels
+    _optional_levels = []
+    for level in optional_levels:
+        if level is not None:
+            checks.assert_type(level, (int, str))
+            if isinstance(level, str):
+                level = index.names.index(level)
+            levels_left.remove(level)
+        _optional_levels.append(level)
+
+    # Pick required levels
+    _required_levels = []
+    for level in required_levels:
+        if level is not None:
+            checks.assert_type(level, (int, str))
+            if isinstance(level, str):
+                level = index.names.index(level)
+            levels_left.remove(level)
+        _required_levels.append(level)
+    for i, level in enumerate(_required_levels):
+        if level is None:
+            _required_levels[i] = levels_left.pop(0)
+
+    return _required_levels, _optional_levels

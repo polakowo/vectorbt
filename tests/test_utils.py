@@ -292,9 +292,19 @@ class TestChecks:
     def test_assert_dtype(self):
         checks.assert_dtype(np.zeros(1), np.float)
         checks.assert_dtype(pd.Series([1, 2, 3]), np.int)
-        checks.assert_dtype(pd.DataFrame([[1, 2, 3]]), np.int)
+        checks.assert_dtype(pd.DataFrame({'a': [1, 2], 'b': [3, 4]}), np.int)
         try:
-            checks.assert_dtype(pd.DataFrame([[1, 2, 3.]]), np.int)
+            checks.assert_dtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.int)
+            raise Exception
+        except:
+            pass
+
+    def test_assert_subdtype(self):
+        checks.assert_subdtype(np.zeros(1), np.number)
+        checks.assert_subdtype(pd.Series([1, 2, 3]), np.number)
+        checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.number)
+        try:
+            checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.object)
             raise Exception
         except:
             pass

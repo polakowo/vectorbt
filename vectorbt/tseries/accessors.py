@@ -45,7 +45,7 @@ from vectorbt.base.common import add_nb_methods
 from vectorbt.tseries import nb
 from vectorbt.tseries.common import TSArrayWrapper
 from vectorbt.records.drawdowns import Drawdowns
-from vectorbt.utils.widgets import DefaultFigureWidget
+from vectorbt.utils.widgets import CustomFigureWidget
 
 try:  # pragma: no cover
     # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
@@ -113,7 +113,7 @@ class TimeSeries_Accessor(TSArrayWrapper, Base_Accessor):
             ndim=wrapper.ndim,
             freq=freq)
 
-    def split_into_ranges(self, range_len=None, n=None):
+    def split_into_ranges(self, n=None, range_len=None):
         """Split time series into `n` ranges each `range_len` long.
 
         At least one of `range_len` and `n` must be set.
@@ -537,7 +537,7 @@ class TimeSeries_SRAccessor(TimeSeries_Accessor, Base_SRAccessor):
 
             ![](/vectorbt/docs/img/tseries_sr_plot.png)"""
         if fig is None:
-            fig = DefaultFigureWidget()
+            fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
         if name is None:
             name = self._obj.name
@@ -636,7 +636,7 @@ class OHLCV_DFAccessor(TimeSeries_DFAccessor):  # pragma: no cover
 
         # Set up figure
         if fig is None:
-            fig = DefaultFigureWidget()
+            fig = CustomFigureWidget()
         candlestick = go.Candlestick(
             x=self.index,
             open=open,
