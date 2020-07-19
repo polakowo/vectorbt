@@ -320,7 +320,7 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 >>> # Multiple strategy instances and instruments
 >>> eth_price = yf.Ticker("ETH-USD").history(start=start, end=end)['Open']
 >>> comb_price = btc_price.vbt.concat(eth_price,
-...     as_columns=pd.Index(['BTC', 'ETH'], name='asset'))
+...     keys=pd.Index(['BTC', 'ETH'], name='asset'))
 >>> print(comb_price)
 asset           BTC     ETH
 Date

@@ -57,7 +57,7 @@ Example:
     >>> ma_df = pd.DataFrame.vbt.concat(
     ...     price_sm.rolling(window=2).mean(), 
     ...     price_sm.rolling(window=3).mean(), 
-    ...     as_columns=pd.Index([2, 3], name='ma_window'))
+    ...     keys=pd.Index([2, 3], name='ma_window'))
     >>> print(ma_df)
     ma_window          2         3
                 a    b    a    b
@@ -437,8 +437,8 @@ def from_params_pipeline(
 
         ```python-repl
         >>> new_ts_list = [
-        ...     ts_list[0].vbt.tile(len(param_list[0]), as_columns=p_columns),
-        ...     ts_list[1].vbt.tile(len(param_list[0]), as_columns=p_columns)
+        ...     ts_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
+        ...     ts_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
         ... ]
         >>> print(new_ts_list[0])
         p1                                         1                        
@@ -530,7 +530,7 @@ def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
     checks.assert_type(name, str)
 
 
-def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None, **kwargs):
+def compare(obj, other, compare_func, multiple=False, name=None, keys=None, **kwargs):
     """Compares `obj` to `other` to generate signals.
 
     Both will be broadcast together. Set `multiple` to `True` to compare with multiple arguments.
@@ -538,9 +538,9 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
 
     See `vectorbt.base.accessors.Base_Accessor.combine_with`."""
     if multiple:
-        if as_columns is None:
-            as_columns = index_fns.index_from_values(other, name=name)
-        return obj.vbt.combine_with_multiple(other, combine_func=compare_func, as_columns=as_columns, concat=True, **kwargs)
+        if keys is None:
+            keys = index_fns.index_from_values(other, name=name)
+        return obj.vbt.combine_with_multiple(other, combine_func=compare_func, keys=keys, concat=True, **kwargs)
     return obj.vbt.combine_with(other, combine_func=compare_func, **kwargs)
 
 

@@ -1740,7 +1740,7 @@ class TestAccessors:
 
     def test_tile(self):
         pd.testing.assert_frame_equal(
-            df4.vbt.tile(2, as_columns=['a', 'b']),
+            df4.vbt.tile(2, keys=['a', 'b']),
             pd.DataFrame(
                 np.asarray([
                     [1, 2, 3, 1, 2, 3],
@@ -1761,7 +1761,7 @@ class TestAccessors:
 
     def test_repeat(self):
         pd.testing.assert_frame_equal(
-            df4.vbt.repeat(2, as_columns=['a', 'b']),
+            df4.vbt.repeat(2, keys=['a', 'b']),
             pd.DataFrame(
                 np.asarray([
                     [1, 1, 2, 2, 3, 3],
@@ -1841,11 +1841,11 @@ class TestAccessors:
             ], names=[None, 'c6'])
         )
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.concat(sr2, 10, df4, as_columns=['a', 'b', 'c']),
+            pd.DataFrame.vbt.concat(sr2, 10, df4, keys=['a', 'b', 'c']),
             target
         )
         pd.testing.assert_frame_equal(
-            sr2.vbt.concat(10, df4, as_columns=['a', 'b', 'c']),
+            sr2.vbt.concat(10, df4, keys=['a', 'b', 'c']),
             target
         )
 
@@ -1869,14 +1869,14 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target
         )
@@ -1897,7 +1897,7 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([[1], [2], [3]]), 10, apply_func=apply_func2, d=100,
-                as_columns=['a', 'b', 'c'],
+                keys=['a', 'b', 'c'],
                 pass_2d=True  # otherwise (3, 1) + (1, 3) = (3, 3) != (3, 1) -> error
             ),
             pd.DataFrame(
@@ -1922,14 +1922,14 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target2
         )
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target2
         )
@@ -2084,7 +2084,7 @@ class TestAccessors:
                 [10, df4], 10, b=100,
                 combine_func=lambda x, y, a, b=1: x + y + a + b,
                 concat=True,
-                as_columns=['a', 'b']
+                keys=['a', 'b']
             ),
             pd.DataFrame(
                 target2.values,

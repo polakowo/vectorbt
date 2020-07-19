@@ -57,7 +57,7 @@ factor_returns = price.vbt.combine_with_multiple(
     [0.9, 1., 1.1],
     combine_func=np.multiply,
     concat=True,
-    as_columns=entries.columns
+    keys=entries.columns
 )
 test_portfolio = vbt.Portfolio.from_signals(
     price, entries, exits,
@@ -656,7 +656,7 @@ class TestPortfolio:
             pd.Series(np.array([97.9799, 98.9401, 94.8798, 95.84, 93.8199]), index=price.index, name=price.name)
         )
         portfolio2 = vbt.Portfolio.from_order_func(
-            price.vbt.tile(3, as_columns=entries.columns),
+            price.vbt.tile(3, keys=entries.columns),
             order_func_nb,
             price.vbt.tile(3).values,
             np.full((price.shape[0], 3), 0.01),
@@ -699,7 +699,7 @@ class TestPortfolio:
 
     def test_from_order_func_init_capital(self):
         portfolio = vbt.Portfolio.from_order_func(
-            price.vbt.tile(3, as_columns=entries.columns),
+            price.vbt.tile(3, keys=entries.columns),
             order_func_nb,
             price.vbt.tile(3).values,
             np.full((price.shape[0], 3), 0.01),

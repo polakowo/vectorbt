@@ -340,13 +340,13 @@ class Signals_Accessor(TimeSeries_Accessor):
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_stop_loss_exits(self, ts, stops, trailing=False, first=True, as_columns=None, broadcast_kwargs={}):
+    def generate_stop_loss_exits(self, ts, stops, trailing=False, first=True, keys=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_stop_loss_exits_nb`.
 
         Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
-        Use `as_columns` as a top-level column level.
+        Use `keys` as the outermost level.
 
         Example:
             For each entry in `sig`, set stop loss for 10% and 20% below the entry price:
@@ -383,21 +383,21 @@ class Signals_Accessor(TimeSeries_Accessor):
             first=first)
 
         # Build column hierarchy
-        if as_columns is not None:
-            param_columns = as_columns
+        if keys is not None:
+            param_columns = keys
         else:
             name = 'trail_stop' if trailing else 'stop_loss'
             param_columns = index_fns.index_from_values(stops, name=name)
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
         return entries.vbt.wrap(exits, columns=columns)
 
-    def generate_take_profit_exits(self, ts, stops, first=True, as_columns=None, broadcast_kwargs={}):
+    def generate_take_profit_exits(self, ts, stops, first=True, keys=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_take_profit_exits_nb`.
 
         Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
-        Use `as_columns` as a top-level column level.
+        Use `keys` as the outermost level.
 
         Example:
             For each entry in `sig`, set take profit for 10% and 20% above the entry price:
@@ -425,8 +425,8 @@ class Signals_Accessor(TimeSeries_Accessor):
             first=first)
 
         # Build column hierarchy
-        if as_columns is not None:
-            param_columns = as_columns
+        if keys is not None:
+            param_columns = keys
         else:
             param_columns = index_fns.index_from_values(stops, name='take_profit')
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
@@ -643,7 +643,7 @@ class Signals_Accessor(TimeSeries_Accessor):
             ```python-repl
             >>> ts = pd.Series([1, 2, 3, 2, 1])
             >>> print(sig.vbt.signals.OR(ts > 1, ts > 2,
-            ...     concat=True, as_columns=['>1', '>2']))
+            ...     concat=True, keys=['>1', '>2']))
                                         >1                   >2
                             a     b      c      a      b      c
             2020-01-01   True  True   True   True   True   True

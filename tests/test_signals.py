@@ -523,7 +523,7 @@ class TestAccessors:
             target
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.2], as_columns=['sl1', 'sl2']),
+            sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.2], keys=['sl1', 'sl2']),
             pd.DataFrame(
                 target.values,
                 index=target.index,
@@ -626,7 +626,7 @@ class TestAccessors:
             target
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_take_profit_exits(ts, [0.1, 0.2], as_columns=['tp1', 'tp2']),
+            sig.vbt.signals.generate_take_profit_exits(ts, [0.1, 0.2], keys=['tp1', 'tp2']),
             pd.DataFrame(
                 target.values,
                 index=target.index,
