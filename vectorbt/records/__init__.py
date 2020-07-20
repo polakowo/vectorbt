@@ -54,7 +54,7 @@ drawdown records for any time series and analyze them right away.
 Moreover, all time series accessors have cached property `drawdowns`:
 
 ```python-repl
->>> price.vbt.tseries.drawdowns.active.current_drawdown
+>>> price.vbt.drawdowns.active.current_drawdown
 -0.8339901730487141
 ```
 

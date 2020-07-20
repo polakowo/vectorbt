@@ -10,7 +10,7 @@
 from numba import njit
 import numpy as np
 
-from vectorbt import tseries
+from vectorbt import generic
 from vectorbt.base import combine_fns
 
 
@@ -217,7 +217,7 @@ def stop_loss_choice_nb(col, from_i, to_i, ts, stop, trailing, first):
     stop = stop[from_i - 1:to_i, col]
     if trailing:
         # Propagate the maximum value from the entry using expanding max
-        stop = (1 - stop) * tseries.nb.expanding_max_1d_nb(ts)
+        stop = (1 - stop) * generic.nb.expanding_max_1d_nb(ts)
         # Get the absolute index of the first ts being below that stop
         exits = from_i + np.flatnonzero(ts[1:] <= stop[1:])
     else:

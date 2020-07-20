@@ -4,8 +4,8 @@
 
 You can access methods listed in `vectorbt.signals.accessors` as follows:
 
-* `vectorbt.signals.accessors.Signals_SRAccessor` -> `pd.Series.vbt.signals.*`
-* `vectorbt.signals.accessors.Signals_DFAccessor` -> `pd.DataFrame.vbt.signals.*`
+* `vectorbt.signals.accessors.Signals_SRAccessor` -> `pd.Series.vbt.signals`
+* `vectorbt.signals.accessors.Signals_DFAccessor` -> `pd.DataFrame.vbt.signals`
 
 ```python-repl
 >>> import numpy as np
@@ -22,7 +22,7 @@ You can access methods listed in `vectorbt.signals.accessors` as follows:
 dtype: int64
 ```
 
-Since signals are a special case of time series, their accessors extend `vectorbt.tseries.accessors`.
+The accessors extend `vectorbt.generic.accessors`.
 
 ## Numba-compiled functions
 

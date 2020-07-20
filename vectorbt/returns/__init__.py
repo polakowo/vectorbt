@@ -7,8 +7,8 @@ but Numba-compiled and optimized for 2-dim arrays.
 
 You can access methods listed in `vectorbt.returns.accessors` as follows:
 
-* `vectorbt.returns.accessors.Returns_SRAccessor` -> `pd.Series.vbt.returns.*`
-* `vectorbt.returns.accessors.Returns_DFAccessor` -> `pd.DataFrame.vbt.returns.*`
+* `vectorbt.returns.accessors.Returns_SRAccessor` -> `pd.Series.vbt.returns`
+* `vectorbt.returns.accessors.Returns_DFAccessor` -> `pd.DataFrame.vbt.returns`
 
 ```python-repl
 >>> import numpy as np
@@ -20,10 +20,10 @@ You can access methods listed in `vectorbt.returns.accessors` as follows:
 -0.049599999999999866
 ```
 
-Since returns are a special case of time series, their accessors extend `vectorbt.tseries.accessors`.
+The accessors extend `vectorbt.generic.accessors`.
 
 ```python-repl
->>> # inherited from TimeSeries_Accessor
+>>> # inherited from Generic_Accessor
 >>> pd.Series([0.2, 0.1, 0, -0.1, -0.2]).vbt.returns.max()
 0.2
 ```

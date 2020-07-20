@@ -25,7 +25,7 @@ Date
 
 [185 rows x 5 columns]
 
->>> price['Close'].vbt.tseries.plot()
+>>> price['Close'].vbt.plot()
 ```
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
@@ -33,7 +33,7 @@ import numpy as np
 import itertools
 import plotly.graph_objects as go
 
-from vectorbt import tseries, defaults
+from vectorbt import generic, defaults
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.base import reshape_fns
@@ -183,7 +183,7 @@ class MA(MA):
             it for indexing as follows:
 
             ```py
-            fig = price['Close'].vbt.tseries.plot(name='Price')
+            fig = price['Close'].vbt.plot(name='Price')
             fig = entry_signals[(10, False, 20, False)]\\
                 .vbt.signals.plot_as_markers(price['Close'], signal_type='entry', fig=fig)
             fig = exit_signals[(10, False, 20, False)]\\
@@ -238,8 +238,8 @@ class MA(MA):
             name=f'MA ({self.name})'
         ), ma_trace_kwargs)
 
-        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.tseries.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ma.vbt.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -322,7 +322,7 @@ class MSTD(MSTD):
             name=f'MSTD ({self.name})'
         ), mstd_trace_kwargs)
 
-        fig = self.mstd.vbt.tseries.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.mstd.vbt.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -501,10 +501,10 @@ class BollingerBands(BollingerBands):
             line=dict(color=defaults.layout['colorway'][0])
         ), ts_trace_kwargs)
 
-        fig = self.lower.vbt.tseries.plot(trace_kwargs=lower_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.upper.vbt.tseries.plot(trace_kwargs=upper_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.middle.vbt.tseries.plot(trace_kwargs=middle_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.lower.vbt.plot(trace_kwargs=lower_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.upper.vbt.plot(trace_kwargs=upper_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.middle.vbt.plot(trace_kwargs=middle_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -592,7 +592,7 @@ class RSI(RSI):
         ), rsi_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
-        fig = self.rsi.vbt.tseries.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.rsi.vbt.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Fill void between levels
         fig.add_shape(
@@ -727,8 +727,8 @@ class Stochastic(Stochastic):
         ), percent_d_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
-        fig = self.percent_k.vbt.tseries.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.percent_d.vbt.tseries.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.percent_k.vbt.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.percent_d.vbt.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Plot levels
         # Fill void between levels
@@ -888,12 +888,12 @@ class MACD(MACD):
         ), histogram_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(bargap=0), layout_kwargs)
-        fig = self.macd.vbt.tseries.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.signal.vbt.tseries.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.macd.vbt.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.signal.vbt.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Plot histogram
         hist = self.histogram.values
-        hist_diff = tseries.nb.diff_1d_nb(hist)
+        hist_diff = generic.nb.diff_1d_nb(hist)
         marker_colors = np.full(hist.shape, 'silver', dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
@@ -1014,8 +1014,8 @@ class ATR(ATR):
             name=f'ATR ({self.name})'
         ), atr_trace_kwargs)
 
-        fig = self.tr.vbt.tseries.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.atr.vbt.tseries.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.tr.vbt.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.atr.vbt.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 
@@ -1094,7 +1094,7 @@ class OBV(OBV):
             name=f'OBV ({self.name})'
         ), obv_trace_kwargs)
 
-        fig = self.obv.vbt.tseries.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.obv.vbt.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
 
         return fig
 

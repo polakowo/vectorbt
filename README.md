@@ -122,7 +122,7 @@ This way, it is often much faster than pandas alone:
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
->>> %timeit big_ts.vbt.tseries.expanding_max()
+>>> %timeit big_ts.vbt.expanding_max()
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -170,17 +170,17 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 2  4  5  6
 ```
     
-- Functions for working with time series - `vbt.tseries`
+- Functions for working with time series
     - Compiled versions of common pandas functions, such as rolling, groupby, and resample
     - Drawdown analysis
 
 ```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.tseries.drawdowns.plot()
+>>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot()
 ```
 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
 
-- Functions for working with signals - `vbt.signals`
+- Functions for working with signals
     - Entry, exit and random signal generation, ranking and distance functions
     - Stop loss, trailing stop and take profit signal generation
     
@@ -193,7 +193,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 dtype: bool
 ```
     
-- Functions for working with returns - `vbt.returns`
+- Functions for working with returns
     - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
 
 ```python-repl

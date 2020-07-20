@@ -4,6 +4,7 @@ from vectorbt.utils import (
     checks,
     colors,
     config,
+    datetime,
     decorators,
     docs,
     math,

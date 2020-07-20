@@ -87,12 +87,12 @@ Name: a, dtype: float64
 import numpy as np
 import pandas as pd
 
-from vectorbt import tseries, defaults
+from vectorbt import generic, defaults
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns
 from vectorbt.base.indexing import PandasIndexer
-from vectorbt.tseries.common import TSArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.portfolio import nb
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
 
@@ -200,7 +200,7 @@ class Portfolio(PandasIndexer):
         self._cash = cash
         self._shares = shares
 
-        freq = main_price.vbt.tseries(freq=freq).freq
+        freq = main_price.vbt(freq=freq).freq
         if freq is None:
             raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         self._freq = freq
@@ -219,7 +219,7 @@ class Portfolio(PandasIndexer):
 
         # Supercharge
         PandasIndexer.__init__(self, _indexing_func)
-        self.wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        self.wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
 
     # ############# Class methods ############# #
 
@@ -342,7 +342,7 @@ class Portfolio(PandasIndexer):
             accumulate)
 
         # Bring to the same meta
-        wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
         cash = wrapper.wrap(cash)
         shares = wrapper.wrap(shares)
         orders = Orders(order_records, main_price, freq=freq)
@@ -453,7 +453,7 @@ class Portfolio(PandasIndexer):
             is_target)
 
         # Bring to the same meta
-        wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
         cash = wrapper.wrap(cash)
         shares = wrapper.wrap(shares)
         orders = Orders(order_records, main_price, freq=freq)
@@ -544,7 +544,7 @@ class Portfolio(PandasIndexer):
             *args)
 
         # Bring to the same meta
-        wrapper = TSArrayWrapper.from_obj(main_price, freq=freq)
+        wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
         cash = wrapper.wrap(cash)
         shares = wrapper.wrap(shares)
         orders = Orders(order_records, main_price, freq=freq)
@@ -667,12 +667,12 @@ class Portfolio(PandasIndexer):
     def drawdown(self):
         """Drawdown series."""
         equity = self.equity.vbt.to_2d_array()
-        return self.wrapper.wrap(equity / tseries.nb.expanding_max_nb(equity) - 1)
+        return self.wrapper.wrap(equity / generic.nb.expanding_max_nb(equity) - 1)
 
     @cached_property
     def max_drawdown(self):
         """Max drawdown."""
-        return self.drawdown.vbt.tseries.min()
+        return self.drawdown.vbt.min()
 
     # ############# Returns ############# #
 
@@ -682,14 +682,14 @@ class Portfolio(PandasIndexer):
 
         !!! note:
             Does not take into account fees and slippage. For this, create a separate portfolio."""
-        returns = tseries.nb.pct_change_nb(self.main_price.vbt.to_2d_array())
+        returns = generic.nb.pct_change_nb(self.main_price.vbt.to_2d_array())
         return self.wrapper.wrap(returns).vbt.returns.total()
 
     @cached_property
     def returns(self):
         """Portfolio return series."""
         equity = self.equity.vbt.to_2d_array()
-        returns = tseries.nb.pct_change_nb(equity)
+        returns = generic.nb.pct_change_nb(equity)
         init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
         returns[0, :] = (equity[0, :] - init_capital) / init_capital
         return self.wrapper.wrap(returns)

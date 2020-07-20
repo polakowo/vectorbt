@@ -35,7 +35,7 @@ outperforms pandas significantly, especially for basic operations:
 >>> %timeit big_ts.pct_change()
 280 ms ± 12.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
->>> %timeit big_ts.vbt.tseries.pct_change()
+>>> %timeit big_ts.vbt.pct_change()
 5.95 ms ± 380 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -45,7 +45,7 @@ But also pandas functions already compiled with Cython/Numba are slower:
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
->>> %timeit big_ts.vbt.tseries.expanding_max()
+>>> %timeit big_ts.vbt.expanding_max()
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -398,7 +398,7 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 
 ```python-repl
 >>> # Multiple strategy instances, instruments and time periods
->>> mult_comb_price = comb_price.vbt.tseries.split_into_ranges(n=2)
+>>> mult_comb_price = comb_price.vbt.split_into_ranges(n=2)
 >>> print(mult_comb_price)
 asset             BTC                   ETH
 range_start 2018-12-31 2019-07-02 2018-12-31 2019-07-02
@@ -471,15 +471,16 @@ There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/m
 
 from vectorbt import (
     base,
+    generic,
     indicators,
     portfolio,
     records,
     returns,
     signals,
-    tseries,
     utils,
     accessors,
-    defaults
+    defaults,
+    ohlcv
 )
 
 # Most important classes

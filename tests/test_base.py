@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import pytest
+from datetime import datetime
 
 from vectorbt import defaults
 from vectorbt.base import (
@@ -16,6 +17,8 @@ from vectorbt.base import (
 
 defaults.broadcasting['index_from'] = 'stack'
 defaults.broadcasting['columns_from'] = 'stack'
+
+day_dt = np.timedelta64(86400000000000)
 
 # Initialize global variables
 a1 = np.array([1])
@@ -110,6 +113,85 @@ class TestArrayWrapper:
             df_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y']),
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=df4.columns)
         )
+
+    def test_to_time_units(self):
+        sr = pd.Series([1, 2, np.nan], index=['x', 'y', 'z'], name='name')
+        pd.testing.assert_series_equal(
+            array_wrapper.to_time_units(sr, '1 days'),
+            pd.Series(
+                np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=sr.index,
+                name=sr.name
+            )
+        )
+        df = sr.to_frame()
+        pd.testing.assert_frame_equal(
+            array_wrapper.to_time_units(df, '1 days'),
+            pd.DataFrame(
+                np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=df.index,
+                columns=df.columns
+            )
+        )
+        np.testing.assert_array_equal(
+            array_wrapper.to_time_units([1, 2], '1 days'),
+            np.array([86400000000000, 172800000000000], dtype='timedelta64[ns]')
+        )
+        assert array_wrapper.to_time_units(1, '1 days') == day_dt
+
+    def test_freq_delta(self):
+        assert array_wrapper.freq_delta('1D') == array_wrapper.freq_delta('D') == day_dt
+
+    def test_ts_array_wrapper(self):
+        # freq
+        assert array_wrapper.ArrayWrapper(
+            index=[1, 2, 3]
+        ).freq is None
+        assert array_wrapper.ArrayWrapper(
+            index=[1, 2, 3],
+            freq='1 days'
+        ).freq == day_dt
+        assert array_wrapper.ArrayWrapper(
+            index=pd.Index([datetime(2020, 1, 1), datetime(2020, 1, 2), datetime(2020, 1, 3)]),
+            freq=None
+        ).freq == day_dt  # inferred_freq
+        assert array_wrapper.ArrayWrapper(
+            index=pd.date_range(start=datetime(2020, 1, 1), end=datetime(2020, 1, 3), freq='1D'),
+            freq=None
+        ).freq == day_dt  # freq
+        # to_time_units
+        try:
+            _ = array_wrapper.ArrayWrapper(
+                index=[1, 2, 3]
+            ).to_time_units([1, 2, 3])
+            raise Exception
+        except:
+            pass
+        np.testing.assert_array_equal(
+            array_wrapper.ArrayWrapper(
+                index=[1, 2, 3],
+                freq='1 days'
+            ).to_time_units([1, 2, 3]),
+            np.array([86400000000000, 172800000000000, 259200000000000], dtype='timedelta64[ns]')
+        )
+        # wrap_reduced
+        assert array_wrapper.ArrayWrapper(
+            index=[1, 2, 3],
+            freq='1 days',
+            ndim=1,
+        ).wrap_reduced(1, time_units=True) == day_dt
+
+    def test_freq(self):
+        ts = pd.Series([1, 2, 3], index=pd.DatetimeIndex([
+            datetime(2018, 1, 1),
+            datetime(2018, 1, 2),
+            datetime(2018, 1, 3)
+        ]))
+        assert ts.vbt.freq == day_dt
+        assert ts.vbt(freq='2D').freq == day_dt * 2
+        assert pd.Series([1, 2, 3]).vbt.freq is None
+        assert pd.Series([1, 2, 3]).vbt(freq='3D').freq == day_dt * 3
+        assert pd.Series([1, 2, 3]).vbt(freq=np.timedelta64(4, 'D')).freq == day_dt * 4
 
     def test_eq(self):
         assert array_wrapper.ArrayWrapper.from_obj(sr2) == array_wrapper.ArrayWrapper.from_obj(sr2)

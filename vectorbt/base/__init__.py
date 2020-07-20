@@ -57,8 +57,8 @@ in Jupyter Notebook and JupyterLab environments. For more details on using Plotl
 The base accessor of vectorbt is `vectorbt.base.accessors.Base_Accessor`.
 You can access its methods as follows:
 
-* `vectorbt.base.accessors.Base_SRAccessor` -> `pd.Series.vbt.*`
-* `vectorbt.base.accessors.Base_DFAccessor` -> `pd.DataFrame.vbt.*`
+* `vectorbt.base.accessors.Base_SRAccessor` -> `pd.Series.vbt`
+* `vectorbt.base.accessors.Base_DFAccessor` -> `pd.DataFrame.vbt`
 
 For example:
 

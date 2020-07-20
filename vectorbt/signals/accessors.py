@@ -44,7 +44,7 @@ from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
-from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
+from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
 from vectorbt.signals import nb
 from vectorbt.utils.widgets import CustomFigureWidget
 
@@ -53,7 +53,7 @@ from vectorbt.utils.widgets import CustomFigureWidget
     nb.shuffle_nb,
     nb.fshift_nb,
 ], module_name='vectorbt.signals.nb')
-class Signals_Accessor(TimeSeries_Accessor):
+class Signals_Accessor(Generic_Accessor):
     """Accessor on top of signal series. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
@@ -64,7 +64,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
         checks.assert_dtype(obj, np.bool)
 
-        TimeSeries_Accessor.__init__(self, obj, freq=freq)
+        Generic_Accessor.__init__(self, obj, freq=freq)
 
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
@@ -89,7 +89,7 @@ class Signals_Accessor(TimeSeries_Accessor):
             2020-01-04  False  False  False
             2020-01-05  False  False  False
             ```"""
-        return TimeSeries_Accessor.empty(*args, fill_value=fill_value, **kwargs)
+        return Generic_Accessor.empty(*args, fill_value=fill_value, **kwargs)
 
     @classmethod
     def empty_like(cls, *args, fill_value=False, **kwargs):
@@ -112,7 +112,7 @@ class Signals_Accessor(TimeSeries_Accessor):
             2020-01-04  False  False  False
             2020-01-05  False  False  False
             ```"""
-        return TimeSeries_Accessor.empty_like(*args, fill_value=fill_value, **kwargs)
+        return Generic_Accessor.empty_like(*args, fill_value=fill_value, **kwargs)
 
     # ############# Signal generation ############# #
 
@@ -662,7 +662,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
 
 @register_series_accessor('signals')
-class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
+class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
     """Accessor on top of signal series. For Series only.
 
     Accessible through `pd.Series.vbt.signals`."""
@@ -671,7 +671,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        TimeSeries_SRAccessor.__init__(self, obj, freq=freq)
+        Generic_SRAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
@@ -730,7 +730,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         Example:
             ```py
             ts = pd.Series([1, 2, 3, 2, 1], index=sig.index)
-            fig = ts.vbt.tseries.plot()
+            fig = ts.vbt.plot()
             sig['b'].vbt.signals.plot_as_entry_markers(ts, fig=fig)
             (~sig['b']).vbt.signals.plot_as_exit_markers(ts, fig=fig)
             ```
@@ -802,7 +802,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
 
 
 @register_dataframe_accessor('signals')
-class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
+class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
     """Accessor on top of signal series. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.signals`."""
@@ -811,7 +811,7 @@ class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        TimeSeries_DFAccessor.__init__(self, obj, freq=freq)
+        Generic_DFAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover

@@ -27,7 +27,7 @@ from vectorbt.base.common import (
     lambda self, np_func: self.apply(apply_func=np_func)
 )
 class Base_Accessor(ArrayWrapper):
-    """Accessor on top of any data series. For both, Series and DataFrames.
+    """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
 
@@ -35,14 +35,14 @@ class Base_Accessor(ArrayWrapper):
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
     by using `Base_Accessor.wrap`, we will convert the 2-dim output back to a Series."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._obj = obj
 
         # Initialize array wrapper
         wrapper = ArrayWrapper.from_obj(obj)
-        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
+        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim, freq=freq)
 
     def __call__(self, *args, **kwargs):
         """Allows passing arguments to the initializer."""
@@ -506,7 +506,7 @@ class Base_Accessor(ArrayWrapper):
         )
 
     def hist(self, trace_names=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.base.plotting.create_histogram`."""
+        """See `vectorbt.base.plotting.create_hist`."""
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
                 trace_names = self.columns
@@ -529,16 +529,16 @@ class Base_Accessor(ArrayWrapper):
 
 
 class Base_SRAccessor(Base_Accessor):
-    """Accessor on top of any data series. For Series only.
+    """Accessor on top of Series.
 
     Accessible through `pd.Series.vbt` and all child accessors."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         checks.assert_type(obj, pd.Series)
 
-        Base_Accessor.__init__(self, obj)
+        Base_Accessor.__init__(self, obj, freq=freq)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -744,16 +744,16 @@ class Base_SRAccessor(Base_Accessor):
 
 
 class Base_DFAccessor(Base_Accessor):
-    """Accessor on top of any data series. For DataFrames only.
+    """Accessor on top of DataFrames.
 
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         checks.assert_type(obj, pd.DataFrame)
 
-        Base_Accessor.__init__(self, obj)
+        Base_Accessor.__init__(self, obj, freq=freq)
 
     @class_or_instancemethod
     def is_series(self_or_cls):

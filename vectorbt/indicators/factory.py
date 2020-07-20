@@ -98,7 +98,7 @@ Example:
     ...     param_names=['window'],
     ...     output_names=['ma'],
     ...     name='myma'
-    ... ).from_apply_func(vbt.tseries.nb.rolling_mean_nb)
+    ... ).from_apply_func(vbt.generic.nb.rolling_mean_nb)
 
     >>> myma = MyMA.from_params(price_sm, [2, 3])
     >>> above_signals = myma.price_sm_above(myma.ma, crossed=True)
@@ -215,7 +215,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
-from vectorbt.tseries.common import TSArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper
 
 
 def flatten_param_tuples(param_tuples):
@@ -696,7 +696,7 @@ class IndicatorFactory():
 
             for i, ts_name in enumerate(ts_names):
                 setattr(self, f'_{ts_name}', ts_list[i])
-            self.wrapper = TSArrayWrapper.from_obj(ts_list[0])
+            self.wrapper = ArrayWrapper.from_obj(ts_list[0])
             for i, output_name in enumerate(output_names):
                 setattr(self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):
