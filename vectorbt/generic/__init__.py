@@ -32,7 +32,7 @@ These only accept NumPy arrays and other Numba-compatible types.
 
 ```python-repl
 >>> # vectorbt.generic.nb.rolling_mean_1d_nb
->>> vbt.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
+>>> vbt.generic.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
 array([nan, 1.5, 2.5, 3.5])
 ```"""
 

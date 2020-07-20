@@ -1,7 +1,7 @@
 """Custom pandas accessors.
 
 !!! note
-    Input arrays can be of any column-oriented data type, but most output arrays are `np.float64`.
+    Input arrays can be of any type, but most output arrays are `np.float64`.
     
 ```python-repl
 >>> import vectorbt as vbt
