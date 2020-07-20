@@ -45,13 +45,6 @@ holding objects that have rows and/or columns. This is done by forwarding indexi
 to each structured object and constructing the new user-defined class using them. This way,
 one can manupulate complex classes with dozens of pandas objects using a single command.
 
-## Plotting
-
-`vectorbt.base.plotting` provides functions for visualizing data in an efficient and convenient way.
-Each creates a figure widget that is compatible with ipywidgets and enables interactive data visualization
-in Jupyter Notebook and JupyterLab environments. For more details on using Plotly, see
-[Getting Started with Plotly in Python](https://plotly.com/python/getting-started/).
-
 ## Accessors
 
 The base accessor of vectorbt is `vectorbt.base.accessors.Base_Accessor`.
@@ -122,6 +115,5 @@ from vectorbt.base import (
     common,
     index_fns,
     indexing,
-    reshape_fns,
-    plotting
+    reshape_fns
 )

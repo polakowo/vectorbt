@@ -87,12 +87,13 @@ Name: a, dtype: float64
 import numpy as np
 import pandas as pd
 
-from vectorbt import generic, defaults
+from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio import nb
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
 
@@ -667,7 +668,7 @@ class Portfolio(PandasIndexer):
     def drawdown(self):
         """Drawdown series."""
         equity = self.equity.vbt.to_2d_array()
-        return self.wrapper.wrap(equity / generic.nb.expanding_max_nb(equity) - 1)
+        return self.wrapper.wrap(equity / generic_nb.expanding_max_nb(equity) - 1)
 
     @cached_property
     def max_drawdown(self):
@@ -682,14 +683,14 @@ class Portfolio(PandasIndexer):
 
         !!! note:
             Does not take into account fees and slippage. For this, create a separate portfolio."""
-        returns = generic.nb.pct_change_nb(self.main_price.vbt.to_2d_array())
+        returns = generic_nb.pct_change_nb(self.main_price.vbt.to_2d_array())
         return self.wrapper.wrap(returns).vbt.returns.total()
 
     @cached_property
     def returns(self):
         """Portfolio return series."""
         equity = self.equity.vbt.to_2d_array()
-        returns = generic.nb.pct_change_nb(equity)
+        returns = generic_nb.pct_change_nb(equity)
         init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
         returns[0, :] = (equity[0, :] - init_capital) / init_capital
         return self.wrapper.wrap(returns)

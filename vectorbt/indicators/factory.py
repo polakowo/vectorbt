@@ -98,7 +98,7 @@ Example:
     ...     param_names=['window'],
     ...     output_names=['ma'],
     ...     name='myma'
-    ... ).from_apply_func(vbt.generic.nb.rolling_mean_nb)
+    ... ).from_apply_func(vbt.nb.rolling_mean_nb)
 
     >>> myma = MyMA.from_params(price_sm, [2, 3])
     >>> above_signals = myma.price_sm_above(myma.ma, crossed=True)

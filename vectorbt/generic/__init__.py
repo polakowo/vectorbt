@@ -1,5 +1,7 @@
 """Modules for working with data of any type.
 
+In contrast to the `vectorbt.base` sub-package, focuses on the data itself.
+
 ## Accessors
 
 You can access methods listed in `vectorbt.generic.accessors` as follows:
@@ -24,16 +26,28 @@ dtype: float64
 The accessors inherit `vectorbt.base.accessors` and are inherited by more
 specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.returns.accessors`.
 
+## Plotting
+
+`vectorbt.generic.plotting` provides functions for visualizing data in an efficient and convenient way.
+Each creates a figure widget that is compatible with ipywidgets and enables interactive data visualization
+in Jupyter Notebook and JupyterLab environments. For more details on using Plotly, see
+[Getting Started with Plotly in Python](https://plotly.com/python/getting-started/).
+
+The module can be accessed directly via `vbt.plotting`.
+
 ## Numba-compiled functions
 
 `vectorbt.generic.nb` provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
+The module can be accessed directly via `vbt.nb`.
+
 ```python-repl
 >>> # vectorbt.generic.nb.rolling_mean_1d_nb
->>> vbt.generic.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
+>>> vbt.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
 array([nan, 1.5, 2.5, 3.5])
-```"""
+```
+"""
 
-from vectorbt.generic import accessors, nb
+from vectorbt.generic import accessors, nb, plotting

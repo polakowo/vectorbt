@@ -10,7 +10,7 @@
 >>> from numba import njit
 >>> from datetime import datetime
 
->>> ts = pd.DataFrame({
+>>> df = pd.DataFrame({
 ...     'a': [1, 2, 3, 4, 5],
 ...     'b': [5, 4, 3, 2, 1],
 ...     'c': [1, 2, 3, 2, 1]
@@ -21,7 +21,7 @@
 ...     datetime(2020, 1, 4),
 ...     datetime(2020, 1, 5)
 ... ]))
->>> print(ts)
+>>> print(df)
             a  b  c
 2020-01-01  1  5  1
 2020-01-02  2  4  2
@@ -34,13 +34,15 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 from numba.typed import Dict
+import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.config import merge_kwargs
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.base.common import add_nb_methods
-from vectorbt.generic import nb
+from vectorbt.generic import plotting, nb
 from vectorbt.records.drawdowns import Drawdowns
 from vectorbt.utils.widgets import CustomFigureWidget
 
@@ -91,9 +93,7 @@ except ImportError:
 class Generic_Accessor(Base_Accessor):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
-    Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`.
-
-    You can call the accessor and specify index frequency if your index isn't datetime-like."""
+    Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
     def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
@@ -114,13 +114,13 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> print(ts.vbt.split_into_ranges(n=2))
+            >>> print(df.vbt.split_into_ranges(n=2))
                                             a                     b                     c
             range_start 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
             range_end   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
             0                  1.0        4.0        5.0        2.0        1.0        2.0
             1                  2.0        5.0        4.0        1.0        2.0        1.0
-            >>> print(ts.vbt.split_into_ranges(range_len=4))
+            >>> print(df.vbt.split_into_ranges(range_len=4))
                                             a                     b                     c
             range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
             range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
@@ -156,7 +156,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(ts.vbt.rolling_apply(3, mean_nb))
+            >>> print(df.vbt.rolling_apply(3, mean_nb))
                           a    b         c
             2020-01-01  1.0  5.0  1.000000
             2020-01-02  1.5  4.5  1.500000
@@ -164,7 +164,7 @@ class Generic_Accessor(Base_Accessor):
             2020-01-04  3.0  3.0  2.333333
             2020-01-05  4.0  2.0  2.000000
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(ts.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True))
+            >>> print(df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True))
                                a         b         c
             2020-01-01  2.333333  2.333333  2.333333
             2020-01-02  2.500000  2.500000  2.500000
@@ -187,7 +187,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(ts.vbt.expanding_apply(mean_nb))
+            >>> print(df.vbt.expanding_apply(mean_nb))
                           a    b    c
             2020-01-01  1.0  5.0  1.0
             2020-01-02  1.5  4.5  1.5
@@ -195,7 +195,7 @@ class Generic_Accessor(Base_Accessor):
             2020-01-04  2.5  3.5  2.0
             2020-01-05  3.0  3.0  1.8
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(ts.vbt.expanding_apply(mean_matrix_nb, on_matrix=True))
+            >>> print(df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True))
                                a         b         c
             2020-01-01  2.333333  2.333333  2.333333
             2020-01-02  2.500000  2.500000  2.500000
@@ -220,13 +220,13 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(ts.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb))
+            >>> print(df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb))
                  a    b    c
             1  1.5  4.5  1.5
             2  3.5  2.5  2.5
             3  5.0  1.0  1.0
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(ts.vbt.groupby_apply([1, 1, 2, 2, 3],
+            >>> print(df.vbt.groupby_apply([1, 1, 2, 2, 3],
             ...     mean_matrix_nb, on_matrix=True))
                       a         b         c
             1  2.500000  2.500000  2.500000
@@ -254,13 +254,13 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(ts.vbt.resample_apply('2d', mean_nb))
+            >>> print(df.vbt.resample_apply('2d', mean_nb))
                           a    b    c
             2020-01-01  1.5  4.5  1.5
             2020-01-03  3.5  2.5  2.5
             2020-01-05  5.0  1.0  1.0
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(ts.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True))
+            >>> print(df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True))
                                a         b         c
             2020-01-01  2.500000  2.500000  2.500000
             2020-01-03  2.833333  2.833333  2.833333
@@ -288,7 +288,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> multiply_nb = njit(lambda col, i, a: a ** 2)
-            >>> print(ts.vbt.applymap(multiply_nb))
+            >>> print(df.vbt.applymap(multiply_nb))
                            a     b    c
             2020-01-01   1.0  25.0  1.0
             2020-01-02   4.0  16.0  4.0
@@ -307,7 +307,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> greater_nb = njit(lambda col, i, a: a > 2)
-            >>> print(ts.vbt.filter(greater_nb))
+            >>> print(df.vbt.filter(greater_nb))
                           a    b    c
             2020-01-01  NaN  5.0  NaN
             2020-01-02  NaN  4.0  NaN
@@ -329,7 +329,7 @@ class Generic_Accessor(Base_Accessor):
             ```python-repl
             >>> greater_nb = njit(lambda col, a: a[a > 2])
             >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(ts.vbt.apply_and_reduce(greater_nb, mean_nb))
+            >>> print(df.vbt.apply_and_reduce(greater_nb, mean_nb))
             a    4.0
             b    4.0
             c    3.0
@@ -349,7 +349,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(ts.vbt.reduce(mean_nb))
+            >>> print(df.vbt.reduce(mean_nb))
             a    3.0
             b    3.0
             c    1.8
@@ -368,7 +368,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-            >>> print(ts.vbt.reduce_to_array(min_max_nb, index=['min', 'max']))
+            >>> print(df.vbt.reduce_to_array(min_max_nb, index=['min', 'max']))
                    a    b    c
             min  1.0  1.0  1.0
             max  5.0  5.0  3.0
@@ -453,13 +453,13 @@ class Generic_Accessor(Base_Accessor):
     def describe(self, percentiles=None, ddof=1, **kwargs):
         """See `vectorbt.generic.nb.describe_reduce_nb`.
 
-        `**kwargs` will be passed to `Generic_Accessor.wrap_reduced`.
+        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
 
         For `percentiles`, see `pd.DataFrame.describe`.
 
         Example:
             ```python-repl
-            >>> print(ts.vbt.describe())
+            >>> print(df.vbt.describe())
                           a         b        c
             count  5.000000  5.000000  5.00000
             mean   3.000000  3.000000  1.80000
@@ -493,6 +493,58 @@ class Generic_Accessor(Base_Accessor):
         See `vectorbt.records.drawdowns.Drawdowns`."""
         return Drawdowns.from_ts(self._obj, freq=self.freq)
 
+    # ############# Plotting ############# #
+
+    def bar(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_bar`."""
+        if x_labels is None:
+            x_labels = self.index
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_bar(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            x_labels=x_labels,
+            **kwargs
+        )
+
+    def scatter(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_scatter`."""
+        if x_labels is None:
+            x_labels = self.index
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_scatter(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            x_labels=x_labels,
+            **kwargs
+        )
+
+    def hist(self, trace_names=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_hist`."""
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_hist(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            **kwargs
+        )
+
+    def box(self, trace_names=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_box`."""
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.name is not None):
+                trace_names = self.columns
+        return plotting.create_box(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            **kwargs
+        )
+
 
 class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
     """Accessor on top of data of any type. For Series only.
@@ -516,10 +568,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            ts['a'].vbt.plot()
+            df['a'].vbt.plot()
             ```
 
-            ![](/vectorbt/docs/img/tseries_sr_plot.png)"""
+            ![](/vectorbt/docs/img/sr_plot.png)"""
         if fig is None:
             fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
@@ -536,6 +588,200 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         scatter.update(**trace_kwargs)
         fig.add_trace(scatter)
 
+        return fig
+
+    def heatmap(self, x_level=None, y_level=None, symmetric=False, x_labels=None, y_labels=None,
+                slider_level=None, slider_labels=None, **kwargs):  # pragma: no cover
+        """Create a heatmap figure based on object's multi-index and values.
+
+        If multi-index contains more than two levels or you want them in specific order,
+        pass `x_level` and `y_level`, each (`int` if index or `str` if name) corresponding
+        to an axis of the heatmap. Optionally, pass `slider_level` to use a level as a slider.
+
+        See `vectorbt.generic.plotting.create_heatmap` for other keyword arguments."""
+        (x_level, y_level), (slider_level,) = index_fns.pick_levels(
+            self.index,
+            required_levels=(x_level, y_level),
+            optional_levels=(slider_level,)
+        )
+
+        x_level_vals = self.index.get_level_values(x_level)
+        y_level_vals = self.index.get_level_values(y_level)
+        x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
+        y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
+        kwargs = merge_kwargs(dict(
+            trace_kwargs=dict(
+                hovertemplate=f"{x_name}: %{{x}}<br>" +
+                              f"{y_name}: %{{y}}<br>" +
+                              "value: %{z}<extra></extra>"
+            ),
+            xaxis_title=x_level_vals.name,
+            yaxis_title=y_level_vals.name
+        ), kwargs)
+
+        if slider_level is None:
+            # No grouping
+            df = self.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
+            fig = df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, **kwargs)
+        else:
+            # Requires grouping
+            # See https://plotly.com/python/sliders/
+            fig = None
+            _slider_labels = []
+            for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
+                if slider_labels is not None:
+                    name = slider_labels[i]
+                _slider_labels.append(name)
+                df = group.vbt.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
+                if x_labels is None:
+                    x_labels = df.columns
+                if y_labels is None:
+                    y_labels = df.index
+                _kwargs = merge_kwargs(dict(
+                    trace_kwargs=dict(
+                        name=str(name) if name is not None else None,
+                        visible=False
+                    ),
+                    width=600,
+                    height=520,
+                ), kwargs)
+                fig = plotting.create_heatmap(
+                    data=df.vbt.to_2d_array(),
+                    x_labels=x_labels,
+                    y_labels=y_labels,
+                    fig=fig,
+                    **_kwargs
+                )
+            fig.data[0].visible = True
+            steps = []
+            for i in range(len(fig.data)):
+                step = dict(
+                    method="update",
+                    args=[{"visible": [False] * len(fig.data)}, {}],
+                    label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
+                )
+                step["args"][0]["visible"][i] = True
+                steps.append(step)
+            prefix = f'{self.index.names[slider_level]}: ' if self.index.names[slider_level] is not None else None
+            sliders = [dict(
+                active=0,
+                currentvalue={"prefix": prefix},
+                pad={"t": 50},
+                steps=steps
+            )]
+            fig.update_layout(
+                sliders=sliders
+            )
+
+        return fig
+
+    def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None,
+               z_labels=None, slider_level=None, slider_labels=None, **kwargs):  # pragma: no cover
+        """Create a 3D volume figure based on object's multi-index and values.
+
+        If multi-index contains more than three levels or you want them in specific order, pass
+        `x_level`, `y_level`, and `z_level`, each (`int` if index or `str` if name) corresponding
+        to an axis of the volume. Optionally, pass `slider_level` to use a level as a slider.
+
+        See `vectorbt.generic.plotting.create_volume` for other keyword arguments."""
+        (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
+            self.index,
+            required_levels=(x_level, y_level, z_level),
+            optional_levels=(slider_level,)
+        )
+
+        x_level_vals = self.index.get_level_values(x_level)
+        y_level_vals = self.index.get_level_values(y_level)
+        z_level_vals = self.index.get_level_values(z_level)
+        # Labels are just unique level values
+        if x_labels is None:
+            x_labels = np.unique(x_level_vals)
+        if y_labels is None:
+            y_labels = np.unique(y_level_vals)
+        if z_labels is None:
+            z_labels = np.unique(z_level_vals)
+
+        x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
+        y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
+        z_name = z_level_vals.name if z_level_vals.name is not None else 'z'
+        kwargs = merge_kwargs(dict(
+            trace_kwargs=dict(
+                hovertemplate=f"{x_name}: %{{x}}<br>" +
+                              f"{y_name}: %{{y}}<br>" +
+                              f"{z_name}: %{{z}}<br>" +
+                              "value: %{value}<extra></extra>"
+            ),
+            scene=dict(
+                xaxis_title=x_level_vals.name,
+                yaxis_title=y_level_vals.name,
+                zaxis_title=z_level_vals.name
+            )
+        ), kwargs)
+
+        contains_nans = False
+        if slider_level is None:
+            # No grouping
+            v = self.unstack_to_array(levels=(x_level, y_level, z_level))
+            if np.isnan(v).any():
+                contains_nans = True
+            fig = plotting.create_volume(
+                data=v,
+                x_labels=x_labels,
+                y_labels=y_labels,
+                z_labels=z_labels,
+                **kwargs
+            )
+        else:
+            # Requires grouping
+            # See https://plotly.com/python/sliders/
+            fig = None
+            _slider_labels = []
+            for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
+                if slider_labels is not None:
+                    name = slider_labels[i]
+                _slider_labels.append(name)
+                v = group.vbt.unstack_to_array(levels=(x_level, y_level, z_level))
+                if np.isnan(v).any():
+                    contains_nans = True
+                _kwargs = merge_kwargs(dict(
+                    trace_kwargs=dict(
+                        name=str(name) if name is not None else None,
+                        visible=False
+                    ),
+                    width=700,
+                    height=520,
+                ), kwargs)
+                fig = plotting.create_volume(
+                    data=v,
+                    x_labels=x_labels,
+                    y_labels=y_labels,
+                    z_labels=z_labels,
+                    fig=fig,
+                    **_kwargs
+                )
+            fig.data[0].visible = True
+            steps = []
+            for i in range(len(fig.data)):
+                step = dict(
+                    method="update",
+                    args=[{"visible": [False] * len(fig.data)}, {}],
+                    label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
+                )
+                step["args"][0]["visible"][i] = True
+                steps.append(step)
+            prefix = f'{self.index.names[slider_level]}: ' if self.index.names[slider_level] is not None else None
+            sliders = [dict(
+                active=0,
+                currentvalue={"prefix": prefix},
+                pad={"t": 50},
+                steps=steps
+            )]
+            fig.update_layout(
+                sliders=sliders
+            )
+
+        if contains_nans:
+            warnings.warn("Data contains NaNs. In case of visualization issues, use .show() method on the widget.")
         return fig
 
 
@@ -560,10 +806,10 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            ts[['a', 'b']].vbt.plot()
+            df[['a', 'b']].vbt.plot()
             ```
 
-            ![](/vectorbt/docs/img/tseries_df_plot.png)"""
+            ![](/vectorbt/docs/img/df_plot.png)"""
 
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.plot(
@@ -573,3 +819,16 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             )
 
         return fig
+
+    def heatmap(self, x_labels=None, y_labels=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_heatmap`."""
+        if x_labels is None:
+            x_labels = self.columns
+        if y_labels is None:
+            y_labels = self.index
+        return plotting.create_heatmap(
+            data=self.to_2d_array(),
+            x_labels=x_labels,
+            y_labels=y_labels,
+            **kwargs
+        )

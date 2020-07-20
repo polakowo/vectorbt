@@ -3,12 +3,10 @@
 import numpy as np
 import pandas as pd
 from collections.abc import Iterable
-import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
-from vectorbt.utils.config import merge_kwargs
-from vectorbt.base import combine_fns, index_fns, reshape_fns, plotting
+from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.common import (
     add_binary_magic_methods,
@@ -30,6 +28,8 @@ class Base_Accessor(ArrayWrapper):
     """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
+
+    You can call the accessor and specify index frequency if your index isn't datetime-like.
 
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
@@ -475,58 +475,6 @@ class Base_Accessor(ArrayWrapper):
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
             return new_obj.vbt.wrap(result)
 
-    # ############# Plotting ############# #
-
-    def bar(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.base.plotting.create_bar`."""
-        if x_labels is None:
-            x_labels = self.index
-        if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
-        return plotting.create_bar(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            x_labels=x_labels,
-            **kwargs
-        )
-
-    def scatter(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.base.plotting.create_scatter`."""
-        if x_labels is None:
-            x_labels = self.index
-        if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
-        return plotting.create_scatter(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            x_labels=x_labels,
-            **kwargs
-        )
-
-    def hist(self, trace_names=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.base.plotting.create_hist`."""
-        if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
-        return plotting.create_hist(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            **kwargs
-        )
-
-    def box(self, trace_names=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.base.plotting.create_box`."""
-        if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
-        return plotting.create_box(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            **kwargs
-        )
-
 
 class Base_SRAccessor(Base_Accessor):
     """Accessor on top of Series.
@@ -547,200 +495,6 @@ class Base_SRAccessor(Base_Accessor):
     @class_or_instancemethod
     def is_frame(self_or_cls):
         return False
-
-    def heatmap(self, x_level=None, y_level=None, symmetric=False, x_labels=None, y_labels=None,
-                slider_level=None, slider_labels=None, **kwargs):  # pragma: no cover
-        """Create a heatmap figure based on object's multi-index and values.
-
-        If multi-index contains more than two levels or you want them in specific order,
-        pass `x_level` and `y_level`, each (`int` if index or `str` if name) corresponding
-        to an axis of the heatmap. Optionally, pass `slider_level` to use a level as a slider.
-
-        See `vectorbt.base.plotting.create_heatmap` for other keyword arguments."""
-        (x_level, y_level), (slider_level,) = index_fns.pick_levels(
-            self.index,
-            required_levels=(x_level, y_level),
-            optional_levels=(slider_level,)
-        )
-
-        x_level_vals = self.index.get_level_values(x_level)
-        y_level_vals = self.index.get_level_values(y_level)
-        x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
-        y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
-        kwargs = merge_kwargs(dict(
-            trace_kwargs=dict(
-                hovertemplate=f"{x_name}: %{{x}}<br>" +
-                              f"{y_name}: %{{y}}<br>" +
-                              "value: %{z}<extra></extra>"
-            ),
-            xaxis_title=x_level_vals.name,
-            yaxis_title=y_level_vals.name
-        ), kwargs)
-
-        if slider_level is None:
-            # No grouping
-            df = self.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
-            fig = df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, **kwargs)
-        else:
-            # Requires grouping
-            # See https://plotly.com/python/sliders/
-            fig = None
-            _slider_labels = []
-            for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
-                if slider_labels is not None:
-                    name = slider_labels[i]
-                _slider_labels.append(name)
-                df = group.vbt.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
-                if x_labels is None:
-                    x_labels = df.columns
-                if y_labels is None:
-                    y_labels = df.index
-                _kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        name=str(name) if name is not None else None,
-                        visible=False
-                    ),
-                    width=600,
-                    height=520,
-                ), kwargs)
-                fig = plotting.create_heatmap(
-                    data=df.vbt.to_2d_array(),
-                    x_labels=x_labels,
-                    y_labels=y_labels,
-                    fig=fig,
-                    **_kwargs
-                )
-            fig.data[0].visible = True
-            steps = []
-            for i in range(len(fig.data)):
-                step = dict(
-                    method="update",
-                    args=[{"visible": [False] * len(fig.data)}, {}],
-                    label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
-                )
-                step["args"][0]["visible"][i] = True
-                steps.append(step)
-            prefix = f'{self.index.names[slider_level]}: ' if self.index.names[slider_level] is not None else None
-            sliders = [dict(
-                active=0,
-                currentvalue={"prefix": prefix},
-                pad={"t": 50},
-                steps=steps
-            )]
-            fig.update_layout(
-                sliders=sliders
-            )
-
-        return fig
-
-    def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None,
-               z_labels=None, slider_level=None, slider_labels=None, **kwargs):  # pragma: no cover
-        """Create a 3D volume figure based on object's multi-index and values.
-
-        If multi-index contains more than three levels or you want them in specific order, pass
-        `x_level`, `y_level`, and `z_level`, each (`int` if index or `str` if name) corresponding
-        to an axis of the volume. Optionally, pass `slider_level` to use a level as a slider.
-
-        See `vectorbt.base.plotting.create_volume` for other keyword arguments."""
-        (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
-            self.index,
-            required_levels=(x_level, y_level, z_level),
-            optional_levels=(slider_level,)
-        )
-
-        x_level_vals = self.index.get_level_values(x_level)
-        y_level_vals = self.index.get_level_values(y_level)
-        z_level_vals = self.index.get_level_values(z_level)
-        # Labels are just unique level values
-        if x_labels is None:
-            x_labels = np.unique(x_level_vals)
-        if y_labels is None:
-            y_labels = np.unique(y_level_vals)
-        if z_labels is None:
-            z_labels = np.unique(z_level_vals)
-
-        x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
-        y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
-        z_name = z_level_vals.name if z_level_vals.name is not None else 'z'
-        kwargs = merge_kwargs(dict(
-            trace_kwargs=dict(
-                hovertemplate=f"{x_name}: %{{x}}<br>" +
-                              f"{y_name}: %{{y}}<br>" +
-                              f"{z_name}: %{{z}}<br>" +
-                              "value: %{value}<extra></extra>"
-            ),
-            scene=dict(
-                xaxis_title=x_level_vals.name,
-                yaxis_title=y_level_vals.name,
-                zaxis_title=z_level_vals.name
-            )
-        ), kwargs)
-
-        contains_nans = False
-        if slider_level is None:
-            # No grouping
-            v = self.unstack_to_array(levels=(x_level, y_level, z_level))
-            if np.isnan(v).any():
-                contains_nans = True
-            fig = plotting.create_volume(
-                data=v,
-                x_labels=x_labels,
-                y_labels=y_labels,
-                z_labels=z_labels,
-                **kwargs
-            )
-        else:
-            # Requires grouping
-            # See https://plotly.com/python/sliders/
-            fig = None
-            _slider_labels = []
-            for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
-                if slider_labels is not None:
-                    name = slider_labels[i]
-                _slider_labels.append(name)
-                v = group.vbt.unstack_to_array(levels=(x_level, y_level, z_level))
-                if np.isnan(v).any():
-                    contains_nans = True
-                _kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        name=str(name) if name is not None else None,
-                        visible=False
-                    ),
-                    width=700,
-                    height=520,
-                ), kwargs)
-                fig = plotting.create_volume(
-                    data=v,
-                    x_labels=x_labels,
-                    y_labels=y_labels,
-                    z_labels=z_labels,
-                    fig=fig,
-                    **_kwargs
-                )
-            fig.data[0].visible = True
-            steps = []
-            for i in range(len(fig.data)):
-                step = dict(
-                    method="update",
-                    args=[{"visible": [False] * len(fig.data)}, {}],
-                    label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
-                )
-                step["args"][0]["visible"][i] = True
-                steps.append(step)
-            prefix = f'{self.index.names[slider_level]}: ' if self.index.names[slider_level] is not None else None
-            sliders = [dict(
-                active=0,
-                currentvalue={"prefix": prefix},
-                pad={"t": 50},
-                steps=steps
-            )]
-            fig.update_layout(
-                sliders=sliders
-            )
-
-        if contains_nans:
-            warnings.warn("Data contains NaNs. In case of visualization issues, use .show() method on the widget.")
-        return fig
 
 
 class Base_DFAccessor(Base_Accessor):
@@ -763,15 +517,3 @@ class Base_DFAccessor(Base_Accessor):
     def is_frame(self_or_cls):
         return True
 
-    def heatmap(self, x_labels=None, y_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.base.plotting.create_heatmap`."""
-        if x_labels is None:
-            x_labels = self.columns
-        if y_labels is None:
-            y_labels = self.index
-        return plotting.create_heatmap(
-            data=self.to_2d_array(),
-            x_labels=x_labels,
-            y_labels=y_labels,
-            **kwargs
-        )

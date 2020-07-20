@@ -33,10 +33,11 @@ import numpy as np
 import itertools
 import plotly.graph_objects as go
 
-from vectorbt import generic, defaults
+from vectorbt import defaults
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.base import reshape_fns
+from vectorbt.generic import nb as generic_nb
 from vectorbt.indicators.factory import IndicatorFactory, create_param_product
 from vectorbt.indicators import nb
 
@@ -893,7 +894,7 @@ class MACD(MACD):
 
         # Plot histogram
         hist = self.histogram.values
-        hist_diff = generic.nb.diff_1d_nb(hist)
+        hist_diff = generic_nb.diff_1d_nb(hist)
         marker_colors = np.full(hist.shape, 'silver', dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'

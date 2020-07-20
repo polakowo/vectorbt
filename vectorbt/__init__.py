@@ -484,6 +484,7 @@ from vectorbt import (
 )
 
 # Most important classes
+from vectorbt.generic import nb, plotting
 from vectorbt.records import (
     MappedArray,
     Records,
