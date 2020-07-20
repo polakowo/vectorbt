@@ -5,7 +5,6 @@
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from vectorbt import defaults
 from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
@@ -219,14 +218,6 @@ class Returns_Accessor(Generic_Accessor):
             reshape_fns.to_2d(self._obj, raw=True))
         return self.wrap_reduced(nb.down_capture_nb(self.to_2d_array(), factor_returns, self.ann_factor))
 
-    def skew(self):
-        """Skewness of returns."""
-        return self.wrap_reduced(stats.skew(self.to_2d_array(), axis=0, nan_policy='omit'))
-
-    def kurtosis(self):
-        """Kurtosis of returns."""
-        return self.wrap_reduced(stats.kurtosis(self.to_2d_array(), axis=0, nan_policy='omit'))
-
     def drawdown(self):
         """Relative decline from a peak."""
         return self.wrap(nb.drawdown_nb(self.to_2d_array()))
@@ -254,7 +245,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
             obj = obj._obj
 
         Generic_SRAccessor.__init__(self, obj, freq=freq)
-        Returns_Accessor.__init__(self, obj, freq=freq, year_freq=year_freq, **kwargs)
+        Returns_Accessor.__init__(self, obj, freq=freq, year_freq=year_freq)
 
 
 @register_dataframe_accessor('returns')

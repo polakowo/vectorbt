@@ -376,20 +376,6 @@ class TestAccessors:
             )
         )
 
-    def test_skew(self):
-        assert isclose(ret['a'].vbt.returns.skew(), 0.848320696939021)
-        pd.testing.assert_series_equal(
-            ret.vbt.returns.skew(),
-            pd.Series([0.8483207, -0.61509129, 0.2116843], index=ret.columns)
-        )
-
-    def test_kurtosis(self):
-        assert isclose(ret['a'].vbt.returns.kurtosis(), -0.92923077)
-        pd.testing.assert_series_equal(
-            ret.vbt.returns.kurtosis(),
-            pd.Series([-0.92923077, -1.11397128, -1.65843621], index=ret.columns)
-        )
-
     def test_max_drawdown(self):
         res_a = empyrical.max_drawdown(ret['a'])
         res_b = empyrical.max_drawdown(ret['b'])
