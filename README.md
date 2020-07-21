@@ -35,27 +35,25 @@ import yfinance as yf
 # Fetch daily price of Bitcoin
 price = yf.Ticker("BTC-USD").history(period="max")['Close']
 
-# Generate signals
-fast_ma, slow_ma = vbt.MA.from_combs(price, np.arange(2, 101), 2, 
-    names=['fast', 'slow'], hide_params=['ewm'])
+# Compute moving averages for all combinations of fast and slow windows
+fast_ma, slow_ma = vbt.MA.from_combs(
+    price, np.arange(2, 101), 2, 
+    names=['fast', 'slow'],
+    hide_params=['ewm']
+)
+
+# Generate crossover signals for each combination
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
-# Model portfolio
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.001, freq='1 day')
+# Model performance
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.001, freq='1D')
 
-# Get total return and reshape into a matrix indexed by windows
-window_ret_matrix = portfolio.total_return.vbt.unstack_to_df(
-    index_levels='fast_window', 
-    column_levels='slow_window', 
-    symmetric=True)
-
-# Plot the whole thing
-window_ret_matrix.vbt.heatmap(
-    xaxis_title='Slow window', 
-    yaxis_title='Fast window', 
-    trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')),
-    width=600, height=450)
+# Get total return, reshape to symmetric matrix, and plot the whole thing
+portfolio.total_return.vbt.heatmap(
+    x_level='fast_window', y_level='slow_window', symmetric=True,
+    trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%'))
+)
 ```
 
 ![dmac_heatmap.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.png)
@@ -119,9 +117,11 @@ This way, it is often much faster than pandas alone:
 
 >>> big_ts = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
 
+# pandas
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
+# vectorbt
 >>> %timeit big_ts.vbt.expanding_max()
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
@@ -143,19 +143,20 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 - Extends pandas using a custom `vbt` accessor
     -> Compatible with any library
 - For high performance, most operations are done strictly using NumPy and Numba 
-    -> Much faster than comparable functions in pandas
+    -> Much faster than comparable operations in pandas
     
 ```python-repl
 # pandas
 >>> %timeit big_ts + 1
 242 ms ± 3.58 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
+# vectorbt
 >>> %timeit big_ts.vbt + 1
 3.32 ms ± 19.7 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
     
-- Utility functions for working with arrays and pandas objects
-    - NumPy-like broadcasting for pandas, among other features.
+- Helper functions for combining, transforming, and indexing NumPy and pandas objects
+    - NumPy-like broadcasting for pandas, among other features
     
 ```python-repl
 # pandas
@@ -163,16 +164,28 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
    0  1  2
 0  2  4  6
 
+# vectorbt
 >>> pd.Series([1, 2, 3]).vbt + pd.DataFrame([[1, 2, 3]])
    0  1  2
 0  2  3  4
 1  3  4  5
 2  4  5  6
 ```
-    
-- Functions for working with time series
-    - Compiled versions of common pandas functions, such as rolling, groupby, and resample
-    - Drawdown analysis
+   
+- Compiled versions of common pandas functions, such as rolling, groupby, and resample
+
+```python-repl
+# pandas
+>>> %timeit big_ts.rolling(2).apply(np.mean, raw=True)
+7.32 s ± 431 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+# vectorbt
+>>> mean_nb = njit(lambda col, i, x: np.mean(x))
+>>> %timeit big_ts.vbt.rolling_apply(2, mean_nb)
+86.2 ms ± 7.97 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+```
+
+- Drawdown analysis
 
 ```python-repl
 >>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot()
@@ -217,8 +230,8 @@ dtype: bool
     
 - Technical indicators with full Numba support
     - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
-    - Each indicator offers methods for generating signals and plotting
-    - Each indicator allows arbitrary parameter combinations, from arrays to Cartesian products
+    - Each offering methods for generating signals and plotting
+    - Each allowing arbitrary parameter combinations, from arrays to Cartesian products
     - Indicator factory for building complex technical indicators in a simple way
     
 ```python-repl

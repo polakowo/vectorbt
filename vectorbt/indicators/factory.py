@@ -3,7 +3,7 @@
 Each indicator is basically a pipeline that
 
 * Accepts a list of time series objects (for example, OHLCV data)
-* Accepts a list of parameter arrays (for example, rolling windows)
+* Accepts a list of parameter arrays (for example, size of rolling window)
 * Accepts other relevant arguments and keyword arguments
 * Performs calculations to produce new time series objects (for example, rolling average)
 
@@ -11,13 +11,13 @@ This pipeline can be well standardized, which is done by this indicatory factory
 
 On top of this pipeline, it also does the following:
 
-* Creates a new indicator class
+* Generates a new Python class
 * Creates an `__init__` method where it stores all inputs, outputs, and other artifacts
 * Creates a `from_params` method that runs the main pipeline using `from_params_pipeline`
 * Adds pandas indexing, i.e., you can use `iloc`, `loc`, `xs`, and `__getitem__` on the class itself
 * Adds parameter indexing, i.e., use `*your_param*_loc` on the class to slice using parameters
 * Adds user-defined properties
-* Adds common comparison methods for all inputs, outputs and properties, e.g., crossovers
+* Adds common comparison methods for all inputs, outputs and properties, e.g., crossover
 
 Example:
     Consider the following smaller price DataFrame `price_sm`:
@@ -109,7 +109,7 @@ Example:
     an arbitrary number of windows. 
 
     For all our inputs in `ts_names` and outputs in `output_names`, it created a bunch of comparison methods 
-    for generating signals, such as `above`, `below` and `equal` (use `doc()`): 
+    for generating signals, such as `above`, `below` and `equal` (use `dir()`):
 
     ```python-repl
     'ma_above'

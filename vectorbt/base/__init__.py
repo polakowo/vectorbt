@@ -11,6 +11,9 @@ It stores the metadata of the original pandas object and offers methods `wrap` a
 for wrapping NumPy arrays to match the stored metadata as closest as possible.
 
 ```python-repl
+>>> import numpy as np
+>>> import pandas as pd
+>>> import vectorbt as vbt
 >>> from vectorbt.base.array_wrapper import ArrayWrapper
 
 >>> aw = ArrayWrapper(index=['a', 'b', 'c'], columns=['name'], ndim=1)
@@ -50,8 +53,8 @@ one can manupulate complex classes with dozens of pandas objects using a single 
 The base accessor of vectorbt is `vectorbt.base.accessors.Base_Accessor`.
 You can access its methods as follows:
 
-* `vectorbt.base.accessors.Base_SRAccessor` -> `pd.Series.vbt`
-* `vectorbt.base.accessors.Base_DFAccessor` -> `pd.DataFrame.vbt`
+* `vectorbt.base.accessors.Base_SRAccessor` -> `pd.Series.vbt.*`
+* `vectorbt.base.accessors.Base_DFAccessor` -> `pd.DataFrame.vbt.*`
 
 For example:
 
@@ -70,9 +73,6 @@ of combine/reshape/index functions that can work with pandas objects. For exampl
 you can find its variations as accessor methods.
 
 ```python-repl
->>> import pandas as pd
->>> import vectorbt as vbt
-
 >>> sr = pd.Series([1])
 >>> df = pd.DataFrame([1, 2, 3])
 
@@ -93,10 +93,6 @@ comparison (such as `>`) and logical operators (such as `&`) by doing 1) NumPy-l
 and 2) the compuation with NumPy under the hood, which is mostly much faster than with pandas.
 
 ```python-repl
->>> import numpy as np
->>> import pandas as pd
->>> import vectorbt as vbt
-
 >>> df = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
 >>> %timeit df * 2
 296 ms ± 27.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
@@ -108,12 +104,3 @@ and 2) the compuation with NumPy under the hood, which is mostly much faster tha
     You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
 """
 
-from vectorbt.base import (
-    accessors,
-    array_wrapper,
-    combine_fns,
-    common,
-    index_fns,
-    indexing,
-    reshape_fns
-)

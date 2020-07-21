@@ -4,8 +4,8 @@
 
 You can access methods listed in `vectorbt.signals.accessors` as follows:
 
-* `vectorbt.signals.accessors.Signals_SRAccessor` -> `pd.Series.vbt.signals`
-* `vectorbt.signals.accessors.Signals_DFAccessor` -> `pd.DataFrame.vbt.signals`
+* `vectorbt.signals.accessors.Signals_SRAccessor` -> `pd.Series.vbt.signals.*`
+* `vectorbt.signals.accessors.Signals_DFAccessor` -> `pd.DataFrame.vbt.signals.*`
 
 ```python-repl
 >>> import numpy as np
@@ -36,5 +36,3 @@ These only accept NumPy arrays and other Numba-compatible types.
 array([0, 1, 2, 3, 0])
 ```
 """
-
-from vectorbt.signals import accessors, nb

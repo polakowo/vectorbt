@@ -27,6 +27,7 @@ While it might seem tempting to perform all sorts of computations with pandas al
 outperforms pandas significantly, especially for basic operations:
 
 ```python-repl
+>>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
@@ -80,9 +81,6 @@ it is SMA or EMA. Each of these hyper-parameters becomes an additional dimension
 and gets stored as a separate column level. Below is an example of a column hierarchy for MACD:
 
 ```python-repl
->>> import pandas as pd
->>> import vectorbt as vbt
-
 >>> macd = vbt.MACD.from_params(
 ...     pd.Series([1, 2, 3, 4, 3, 2, 1]),
 ...     fast_window=(2, 3),
@@ -428,15 +426,15 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     mult_comb_price.vbt.tile(2), entries, exits, freq='1D')
 >>> print(portfolio.total_return)
-fast_window  slow_window  asset  start_date  end_date
-10           30           BTC    2018-12-31  2019-07-01    1.631617
-                                 2019-07-02  2019-12-31   -0.281432
-                          ETH    2018-12-31  2019-07-01    0.941945
-                                 2019-07-02  2019-12-31   -0.306689
-20           30           BTC    2018-12-31  2019-07-01    1.725547
-                                 2019-07-02  2019-12-31   -0.417770
-                          ETH    2018-12-31  2019-07-01    0.336136
-                                 2019-07-02  2019-12-31   -0.257854
+fast_window  slow_window  asset  range_start  range_end
+10           30           BTC    2018-12-31   2019-07-01    1.631617
+                                 2019-07-02   2019-12-31   -0.281432
+                          ETH    2018-12-31   2019-07-01    0.941945
+                                 2019-07-02   2019-12-31   -0.306689
+20           30           BTC    2018-12-31   2019-07-01    1.725547
+                                 2019-07-02   2019-12-31   -0.417770
+                          ETH    2018-12-31   2019-07-01    0.336136
+                                 2019-07-02   2019-12-31   -0.257854
 dtype: float64
 ```
 
@@ -448,7 +446,7 @@ The index hierarchy of the final performance series can be then used to group pe
 by any feature, such as window pair, asset, and time period.
 
 ```python-repl
->>> mean_return = portfolio.total_return.groupby(['end_date', 'asset']).mean()
+>>> mean_return = portfolio.total_return.groupby(['range_end', 'asset']).mean()
 >>> mean_return = mean_return.unstack(level=-1).vbt.bar(
 ...     xaxis_title='End date',
 ...     yaxis_title='Mean total return',
@@ -469,19 +467,13 @@ modeling portfolio performance and visualizing results.
 There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/master/tests/notebooks) for testing purposes.
 """
 
-from vectorbt import (
-    base,
-    generic,
-    indicators,
-    portfolio,
-    records,
-    returns,
-    signals,
-    utils,
-    accessors,
-    defaults,
-    ohlcv
-)
+# Load all accessors
+import vectorbt.root_accessors
+import vectorbt.base.accessors
+import vectorbt.generic.accessors
+import vectorbt.signals.accessors
+import vectorbt.returns.accessors
+import vectorbt.ohlcv.accessors
 
 # Most important classes
 from vectorbt.generic import nb, plotting

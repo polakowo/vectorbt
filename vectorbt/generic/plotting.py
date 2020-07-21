@@ -40,13 +40,13 @@ def create_indicator(value=None, label=None, value_range=None, cmap_name='Spectr
         **layout_kwargs: Keyword arguments for layout.
     Example:
         ```py
-        >>> from vectorbt.generic.plotting import create_indicator
+        import vectorbt as vbt
 
-        >>> create_indicator(
-        ...     value=2,
-        ...     value_range=(1, 3),
-        ...     label='My Indicator'
-        ... )
+        vbt.plotting.create_indicator(
+            value=2,
+            value_range=(1, 3),
+            label='My Indicator'
+        )
         ```
         ![](/vectorbt/docs/img/create_indicator.png)
         """
@@ -114,13 +114,13 @@ def create_bar(data=None, trace_names=None, x_labels=None,
         **layout_kwargs: Keyword arguments for layout.
     Example:
         ```py
-        >>> from vectorbt.generic.plotting import create_bar
+        import vectorbt as vbt
 
-        >>> create_bar(
-        ...     data=[[1, 2], [3, 4]],
-        ...     trace_names=['a', 'b'],
-        ...     x_labels=['x', 'y']
-        ... )
+        vbt.plotting.create_bar(
+            data=[[1, 2], [3, 4]],
+            trace_names=['a', 'b'],
+            x_labels=['x', 'y']
+        )
         ```
         ![](/vectorbt/docs/img/create_bar.png)
         """
@@ -158,13 +158,7 @@ def update_bar_data(fig, data, trace_idx=None):
 
     Example:
         ```py
-        >>> import pandas as pd
-        >>> from vectorbt.generic.plotting import update_bar_data
-
-        >>> fig = pd.Series([1, 2], index=['x', 'y'], name='a').vbt.bar()
-        >>> fig.show()
-
-        >>> update_bar_data(fig, [2, 1])
+        vbt.plotting.update_bar_data(fig, [[2, 1], [4, 3]])
         ```
         ![](/vectorbt/docs/img/update_bar_data.png)"""
     data = reshape_fns.to_2d(np.array(data))
@@ -205,13 +199,13 @@ def create_scatter(data=None, trace_names=None, x_labels=None,
         **layout_kwargs: Keyword arguments for layout.
     Example:
         ```py
-        >>> from vectorbt.generic.plotting import create_scatter
+        import vectorbt as vbt
 
-        >>> create_scatter(
-        ...     data=[[1, 2], [3, 4]],
-        ...     trace_names=['a', 'b'],
-        ...     x_labels=['x', 'y']
-        ... )
+        vbt.plotting.create_scatter(
+            data=[[1, 2], [3, 4]],
+            trace_names=['a', 'b'],
+            x_labels=['x', 'y']
+        )
         ```
         ![](/vectorbt/docs/img/create_scatter.png)
         """
@@ -282,12 +276,12 @@ def create_hist(data=None, trace_names=None, horizontal=False,
         **layout_kwargs: Keyword arguments for layout.
     Example:
         ```py
-        >>> from vectorbt.generic.plotting import create_hist
+        import vectorbt as vbt
 
-        >>> create_hist(
-        ...     data=[[1, 2], [3, 4], [2, 1]],
-        ...     trace_names=['a', 'b']
-        ... )
+        vbt.plotting.create_hist(
+            data=[[1, 2], [3, 4], [2, 1]],
+            trace_names=['a', 'b']
+        )
         ```
         ![](/vectorbt/docs/img/create_hist.png)
         """
@@ -363,12 +357,12 @@ def create_box(data=None, trace_names=None, horizontal=False,
         **layout_kwargs: Keyword arguments for layout.
     Example:
         ```py
-        >>> from vectorbt.generic.plotting import create_box
+        import vectorbt as vbt
 
-        >>> create_box(
-        ...     data=[[1, 2], [3, 4], [2, 1]],
-        ...     trace_names=['a', 'b']
-        ... )
+        vbt.plotting.create_box(
+            data=[[1, 2], [3, 4], [2, 1]],
+            trace_names=['a', 'b']
+        )
         ```
         ![](/vectorbt/docs/img/create_box.png)
         """
@@ -444,13 +438,13 @@ def create_heatmap(data=None, x_labels=None, y_labels=None, horizontal=False,
         **layout_kwargs: Keyword arguments for layout.
     Example:
         ```py
-        >>> from vectorbt.generic.plotting import create_heatmap
+        import vectorbt as vbt
 
-        >>> create_heatmap(
-        ...     data=[[1, 2], [3, 4]],
-        ...     x_labels=['a', 'b'],
-        ...     y_labels=['x', 'y']
-        ... )
+        vbt.plotting.create_heatmap(
+            data=[[1, 2], [3, 4]],
+            x_labels=['a', 'b'],
+            y_labels=['x', 'y']
+        )
         ```
         ![](/vectorbt/docs/img/create_heatmap.png)
         """
@@ -518,7 +512,23 @@ def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False,
 
     !!! note
         Figure widgets have currently problems displaying NaNs.
-        Use `.show()` method for rendering."""
+        Use `.show()` method for rendering.
+
+    Example:
+        ```py
+        import vectorbt as vbt
+        import numpy as np
+
+        vbt.plotting.create_volume(
+            data=np.random.randint(1, 10, size=(3, 3, 3)),
+            x_labels=['a', 'b', 'c'],
+            y_labels=['d', 'e', 'f'],
+            z_labels=['g', 'h', 'i']
+        )
+        ```
+        ![](/vectorbt/docs/img/create_volume.png)
+        """
+
     if data is None:
         raise ValueError("Data must be passed")
     data = np.asarray(data)
@@ -549,11 +559,11 @@ def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False,
     if not np.issubdtype(y_labels.dtype, np.number):
         y_ticktext = y_labels
         y_labels = np.arange(data.shape[1])
-        fig.update_layout(scene=dict(xaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode='array')))
+        fig.update_layout(scene=dict(yaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode='array')))
     if not np.issubdtype(z_labels.dtype, np.number):
         z_ticktext = z_labels
         z_labels = np.arange(data.shape[2])
-        fig.update_layout(scene=dict(xaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode='array')))
+        fig.update_layout(scene=dict(zaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode='array')))
 
     # Arrays must have the same length as the flattened data array
     x = np.repeat(x_labels, len(y_labels) * len(z_labels))

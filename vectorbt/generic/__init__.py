@@ -6,8 +6,8 @@ In contrast to the `vectorbt.base` sub-package, focuses on the data itself.
 
 You can access methods listed in `vectorbt.generic.accessors` as follows:
 
-* `vectorbt.generic.accessors.Generic_SRAccessor` -> `pd.Series.vbt`
-* `vectorbt.generic.accessors.Generic_DFAccessor` -> `pd.DataFrame.vbt`
+* `vectorbt.generic.accessors.Generic_SRAccessor` -> `pd.Series.vbt.*`
+* `vectorbt.generic.accessors.Generic_DFAccessor` -> `pd.DataFrame.vbt.*`
 
 ```python-repl
 >>> import numpy as np
@@ -50,4 +50,3 @@ array([nan, 1.5, 2.5, 3.5])
 ```
 """
 
-from vectorbt.generic import accessors, nb, plotting

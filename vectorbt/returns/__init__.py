@@ -7,8 +7,8 @@ but Numba-compiled and optimized for 2-dim arrays.
 
 You can access methods listed in `vectorbt.returns.accessors` as follows:
 
-* `vectorbt.returns.accessors.Returns_SRAccessor` -> `pd.Series.vbt.returns`
-* `vectorbt.returns.accessors.Returns_DFAccessor` -> `pd.DataFrame.vbt.returns`
+* `vectorbt.returns.accessors.Returns_SRAccessor` -> `pd.Series.vbt.returns.*`
+* `vectorbt.returns.accessors.Returns_DFAccessor` -> `pd.DataFrame.vbt.returns.*`
 
 ```python-repl
 >>> import numpy as np
@@ -39,4 +39,3 @@ and for measuring portfolio performance. These only accept NumPy arrays and othe
 array([0.2, 0.32, 0.32, 0.188, -0.0496])
 ```"""
 
-from vectorbt.returns import accessors, nb

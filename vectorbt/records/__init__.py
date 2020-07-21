@@ -66,7 +66,7 @@ with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vect
 
 ```python-repl
 >>> entries, exits = pd.Series.vbt.signals.generate_random_entries_and_exits(price.shape, 10, seed=42)
->>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.01)
+>>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.01, freq='1D')
 
 >>> portfolio.orders.records.head()
    col  idx      size   price      fees  side
@@ -161,8 +161,6 @@ natively supported by `vectorbt.portfolio.base.Portfolio`.
 mapping, and reducing records. These only accept NumPy arrays and other Numba-compatible types.
 
 """
-
-from vectorbt.records import base, enums, events, nb, orders
 
 from vectorbt.records.enums import (
     DrawdownStatus,

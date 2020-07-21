@@ -55,18 +55,18 @@ class PandasIndexer:
         >>> df2 = pd.DataFrame({'a': [5, 6], 'b': [7, 8]})
         >>> c = C(df1, df2)
 
-        >>> print(c.iloc[0])
+        >>> print(c.iloc[:, 0])
         <__main__.C object at 0x1a1cacbbe0>
 
-        >>> print(c.iloc[0].df1)
-        a    1
-        b    3
-        Name: 0, dtype: int64
+        >>> print(c.iloc[:, 0].df1)
+        0    1
+        1    2
+        Name: a, dtype: int64
 
-        >>> print(c.iloc[0].df2)
-        a    5
-        b    7
-        Name: 0, dtype: int64
+        >>> print(c.iloc[:, 0].df2)
+        0    5
+        1    6
+        Name: a, dtype: int64
         ```
         """
 
@@ -188,17 +188,16 @@ class ParamIndexerFactory:
         ...     return C(pd_indexing_func(c.df), indexing_on_mapper(
                     c._my_param_mapper, c.df, pd_indexing_func))
 
-        >>> MyParamIndexer = ParamIndexerFactory(['my_param'], indexing_func)
+        >>> MyParamIndexer = ParamIndexerFactory(['my_param'])
         ... class C(MyParamIndexer):
         ...     def __init__(self, df, param_mapper):
         ...         self.df = df
         ...         self._my_param_mapper = param_mapper
-        ...         MyParamIndexer.__init__(self, [param_mapper])
+        ...         MyParamIndexer.__init__(self, [param_mapper], indexing_func)
 
         >>> df = pd.DataFrame({'a': [1, 2], 'b': [3, 4]})
         >>> param_mapper = pd.Series(['First', 'Second'], index=['a', 'b'])
         >>> c = C(df, param_mapper)
-        <__main__.C object at 0x61f8b0a58>
 
         >>> print(c.my_param_loc['First'].df)
         0    1

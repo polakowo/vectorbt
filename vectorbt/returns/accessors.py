@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from vectorbt import defaults
-from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
+from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns
@@ -50,6 +50,8 @@ class Returns_Accessor(Generic_Accessor):
     @property
     def ann_factor(self):
         """Annualization factor."""
+        if self.freq is None:
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         return self.year_freq / self.freq
 
     def daily(self):
