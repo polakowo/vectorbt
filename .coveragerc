@@ -9,7 +9,7 @@ exclude_lines =
     if __name__ == .__main__.:
 ignore_errors = True
 omit =
-    vectorbt/generic/plotting/*
-    vectorbt/utils/colors/*
-    vectorbt/utils/docs/*
-    vectorbt/utils/widgets/*
+    */generic/plotting.py
+    */utils/colors.py
+    */utils/docs.py
+    */utils/widgets.py
