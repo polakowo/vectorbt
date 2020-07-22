@@ -4,6 +4,7 @@ import pandas as pd
 from numba import njit
 from datetime import datetime
 import pytest
+from itertools import product, combinations
 
 seed = 42
 
@@ -35,6 +36,26 @@ custom_ind = CustomInd.from_params(ts, ts * 2, [1, 2], [3, 4])
 
 
 class TestFactory:
+    def test_create_param_combs(self):
+        assert vbt.indicators.create_param_combs(
+            (combinations, [0, 1, 2, 3], 2)) == [
+            [0, 0, 0, 1, 1, 2],
+            [1, 2, 3, 2, 3, 3]
+        ]
+        assert vbt.indicators.create_param_combs(
+            (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
+            [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
+            [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
+            [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
+        ]
+        assert vbt.indicators.create_param_combs(
+            (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
+            [0, 0, 0, 0, 0, 0, 1, 1, 1],
+            [1, 1, 1, 2, 2, 2, 2, 2, 2],
+            [3, 3, 4, 3, 3, 4, 3, 3, 4],
+            [4, 5, 5, 4, 5, 5, 4, 5, 5]
+        ]
+
     def test_from_custom_func(self):
         def apply_func(i, ts, p, a, b=10):
             return ts * p[i] + a + b
