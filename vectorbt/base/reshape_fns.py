@@ -570,7 +570,7 @@ def unstack_to_array(arg, levels=None):
     unique_idx_list = []
     vals_idx_list = []
     if levels is None:
-        levels = range(len(arg.index.levels))
+        levels = range(arg.index.nlevels)
     for level in levels:
         vals = index_fns.select_levels(arg.index, level).to_numpy()
         unique_vals = np.unique(vals)

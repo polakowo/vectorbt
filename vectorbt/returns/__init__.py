@@ -20,10 +20,10 @@ You can access methods listed in `vectorbt.returns.accessors` as follows:
 -0.049599999999999866
 ```
 
-Since returns are a special case of time series, their accessors extend `vectorbt.tseries.accessors`.
+The accessors extend `vectorbt.generic.accessors`.
 
 ```python-repl
->>> # inherited from TimeSeries_Accessor
+>>> # inherited from Generic_Accessor
 >>> pd.Series([0.2, 0.1, 0, -0.1, -0.2]).vbt.returns.max()
 0.2
 ```
@@ -39,4 +39,3 @@ and for measuring portfolio performance. These only accept NumPy arrays and othe
 array([0.2, 0.32, 0.32, 0.188, -0.0496])
 ```"""
 
-from vectorbt.returns import accessors, nb

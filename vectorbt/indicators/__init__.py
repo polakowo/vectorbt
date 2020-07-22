@@ -62,9 +62,7 @@ ma_ewm    False False
 classes. These only accept NumPy arrays and other Numba-compatible types.
 """
 
-from vectorbt.indicators import factory, basic, nb
-
-from vectorbt.indicators.factory import IndicatorFactory
+from vectorbt.indicators.factory import IndicatorFactory, create_param_combs
 from vectorbt.indicators.basic import (
     MA,
     MSTD,

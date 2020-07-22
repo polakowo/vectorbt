@@ -27,6 +27,7 @@ While it might seem tempting to perform all sorts of computations with pandas al
 outperforms pandas significantly, especially for basic operations:
 
 ```python-repl
+>>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
@@ -35,7 +36,7 @@ outperforms pandas significantly, especially for basic operations:
 >>> %timeit big_ts.pct_change()
 280 ms ± 12.6 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
->>> %timeit big_ts.vbt.tseries.pct_change()
+>>> %timeit big_ts.vbt.pct_change()
 5.95 ms ± 380 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -45,7 +46,7 @@ But also pandas functions already compiled with Cython/Numba are slower:
 >>> %timeit big_ts.expanding().max()
 48.4 ms ± 557 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 
->>> %timeit big_ts.vbt.tseries.expanding_max()
+>>> %timeit big_ts.vbt.expanding_max()
 8.82 ms ± 121 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -80,9 +81,6 @@ it is SMA or EMA. Each of these hyper-parameters becomes an additional dimension
 and gets stored as a separate column level. Below is an example of a column hierarchy for MACD:
 
 ```python-repl
->>> import pandas as pd
->>> import vectorbt as vbt
-
 >>> macd = vbt.MACD.from_params(
 ...     pd.Series([1, 2, 3, 4, 3, 2, 1]),
 ...     fast_window=(2, 3),
@@ -320,7 +318,7 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 >>> # Multiple strategy instances and instruments
 >>> eth_price = yf.Ticker("ETH-USD").history(start=start, end=end)['Open']
 >>> comb_price = btc_price.vbt.concat(eth_price,
-...     as_columns=pd.Index(['BTC', 'ETH'], name='asset'))
+...     keys=pd.Index(['BTC', 'ETH'], name='asset'))
 >>> print(comb_price)
 asset           BTC     ETH
 Date
@@ -398,7 +396,7 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 
 ```python-repl
 >>> # Multiple strategy instances, instruments and time periods
->>> mult_comb_price = comb_price.vbt.tseries.split_into_ranges(n=2)
+>>> mult_comb_price = comb_price.vbt.split_into_ranges(n=2)
 >>> print(mult_comb_price)
 asset             BTC                   ETH
 range_start 2018-12-31 2019-07-02 2018-12-31 2019-07-02
@@ -428,15 +426,15 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     mult_comb_price.vbt.tile(2), entries, exits, freq='1D')
 >>> print(portfolio.total_return)
-fast_window  slow_window  asset  start_date  end_date
-10           30           BTC    2018-12-31  2019-07-01    1.631617
-                                 2019-07-02  2019-12-31   -0.281432
-                          ETH    2018-12-31  2019-07-01    0.941945
-                                 2019-07-02  2019-12-31   -0.306689
-20           30           BTC    2018-12-31  2019-07-01    1.725547
-                                 2019-07-02  2019-12-31   -0.417770
-                          ETH    2018-12-31  2019-07-01    0.336136
-                                 2019-07-02  2019-12-31   -0.257854
+fast_window  slow_window  asset  range_start  range_end
+10           30           BTC    2018-12-31   2019-07-01    1.631617
+                                 2019-07-02   2019-12-31   -0.281432
+                          ETH    2018-12-31   2019-07-01    0.941945
+                                 2019-07-02   2019-12-31   -0.306689
+20           30           BTC    2018-12-31   2019-07-01    1.725547
+                                 2019-07-02   2019-12-31   -0.417770
+                          ETH    2018-12-31   2019-07-01    0.336136
+                                 2019-07-02   2019-12-31   -0.257854
 dtype: float64
 ```
 
@@ -448,7 +446,7 @@ The index hierarchy of the final performance series can be then used to group pe
 by any feature, such as window pair, asset, and time period.
 
 ```python-repl
->>> mean_return = portfolio.total_return.groupby(['end_date', 'asset']).mean()
+>>> mean_return = portfolio.total_return.groupby(['range_end', 'asset']).mean()
 >>> mean_return = mean_return.unstack(level=-1).vbt.bar(
 ...     xaxis_title='End date',
 ...     yaxis_title='Mean total return',
@@ -469,21 +467,16 @@ modeling portfolio performance and visualizing results.
 There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/master/tests/notebooks) for testing purposes.
 """
 
-from vectorbt import (
-    base,
-    indicators,
-    portfolio,
-    records,
-    returns,
-    signals,
-    tseries,
-    utils,
-    widgets,
-    accessors,
-    defaults
-)
+# Load all accessors
+import vectorbt.root_accessors
+import vectorbt.base.accessors
+import vectorbt.generic.accessors
+import vectorbt.signals.accessors
+import vectorbt.returns.accessors
+import vectorbt.ohlcv.accessors
 
 # Most important classes
+from vectorbt.generic import nb, plotting
 from vectorbt.records import (
     MappedArray,
     Records,
@@ -492,15 +485,6 @@ from vectorbt.records import (
     Trades,
     Positions,
     Drawdowns
-)
-from vectorbt.widgets import (
-    DefaultFigureWidget,
-    Indicator,
-    Bar,
-    Scatter,
-    Histogram,
-    Box,
-    Heatmap
 )
 from vectorbt.portfolio import Portfolio
 from vectorbt.indicators import (

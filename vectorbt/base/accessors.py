@@ -25,22 +25,24 @@ from vectorbt.base.common import (
     lambda self, np_func: self.apply(apply_func=np_func)
 )
 class Base_Accessor(ArrayWrapper):
-    """Accessor on top of any data series. For both, Series and DataFrames.
+    """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
+
+    You can call the accessor and specify index frequency if your index isn't datetime-like.
 
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
     by using `Base_Accessor.wrap`, we will convert the 2-dim output back to a Series."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._obj = obj
 
         # Initialize array wrapper
         wrapper = ArrayWrapper.from_obj(obj)
-        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim)
+        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim, freq=freq)
 
     def __call__(self, *args, **kwargs):
         """Allows passing arguments to the initializer."""
@@ -169,23 +171,23 @@ class Base_Accessor(ArrayWrapper):
         See `vectorbt.base.reshape_fns.to_2d`."""
         return reshape_fns.to_2d(self._obj, raw=True)
 
-    def tile(self, n, as_columns=None):
+    def tile(self, n, keys=None):
         """See `vectorbt.base.reshape_fns.tile`.
 
-        Use `as_columns` as a top-level column level."""
+        Use `keys` as the outermost level."""
         tiled = reshape_fns.tile(self._obj, n, axis=1)
-        if as_columns is not None:
-            new_columns = index_fns.combine_indexes(as_columns, self.columns)
+        if keys is not None:
+            new_columns = index_fns.combine_indexes(keys, self.columns)
             return self.wrap(tiled.values, columns=new_columns)
         return tiled
 
-    def repeat(self, n, as_columns=None):
+    def repeat(self, n, keys=None):
         """See `vectorbt.base.reshape_fns.repeat`.
 
-        Use `as_columns` as a top-level column level."""
+        Use `keys` as the outermost level."""
         repeated = reshape_fns.repeat(self._obj, n, axis=1)
-        if as_columns is not None:
-            new_columns = index_fns.combine_indexes(self.columns, as_columns)
+        if keys is not None:
+            new_columns = index_fns.combine_indexes(self.columns, keys)
             return self.wrap(repeated.values, columns=new_columns)
         return repeated
 
@@ -275,11 +277,11 @@ class Base_Accessor(ArrayWrapper):
         return self.wrap(result)
 
     @class_or_instancemethod
-    def concat(self_or_cls, *others, as_columns=None, broadcast_kwargs={}):
+    def concat(self_or_cls, *others, keys=None, broadcast_kwargs={}):
         """Concatenate with `others` along columns.
 
         All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
-        with `broadcast_kwargs`. Use `as_columns` as a top-level column level.
+        with `broadcast_kwargs`. Use `keys` as the outermost level.
 
         Example:
             ```python-repl
@@ -288,7 +290,7 @@ class Base_Accessor(ArrayWrapper):
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-            >>> print(sr.vbt.concat(df, as_columns=['c', 'd']))
+            >>> print(sr.vbt.concat(df, keys=['c', 'd']))
                   c     d
                a  b  a  b
             x  1  1  3  4
@@ -302,17 +304,17 @@ class Base_Accessor(ArrayWrapper):
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
         broadcasted = tuple(map(reshape_fns.to_2d, broadcasted))
         concatenated = pd.concat(broadcasted, axis=1)
-        if as_columns is not None:
-            concatenated.columns = index_fns.combine_indexes(as_columns, broadcasted[0].columns)
+        if keys is not None:
+            concatenated.columns = index_fns.combine_indexes(keys, broadcasted[0].columns)
         return concatenated
 
-    def apply_and_concat(self, ntimes, *args, apply_func=None, pass_2d=False, as_columns=None, **kwargs):
+    def apply_and_concat(self, ntimes, *args, apply_func=None, pass_2d=False, keys=None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
         See `vectorbt.base.combine_fns.apply_and_concat_one`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
-        Use `as_columns` as a top-level column level.
+        Use `keys` as the outermost level.
 
         !!! note
             The resulted arrays to be concatenated must have the same shape as broadcasted input arrays.
@@ -324,7 +326,7 @@ class Base_Accessor(ArrayWrapper):
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
             >>> print(df.vbt.apply_and_concat(3, [1, 2, 3], 
-            ...     apply_func=lambda i, a, b: a * b[i], as_columns=['c', 'd', 'e']))
+            ...     apply_func=lambda i, a, b: a * b[i], keys=['c', 'd', 'e']))
                   c       d       e    
                a  b   a   b   a   b
             x  3  4   6   8   9  12
@@ -341,8 +343,8 @@ class Base_Accessor(ArrayWrapper):
         else:
             result = combine_fns.apply_and_concat_one(ntimes, apply_func, obj_arr, *args, **kwargs)
         # Build column hierarchy
-        if as_columns is not None:
-            new_columns = index_fns.combine_indexes(as_columns, self.columns)
+        if keys is not None:
+            new_columns = index_fns.combine_indexes(keys, self.columns)
         else:
             top_columns = pd.Index(np.arange(ntimes), name='apply_idx')
             new_columns = index_fns.combine_indexes(top_columns, self.columns)
@@ -390,7 +392,7 @@ class Base_Accessor(ArrayWrapper):
         return new_obj.vbt.wrap(result)
 
     def combine_with_multiple(self, others, *args, combine_func=None, pass_2d=False,
-                              concat=False, broadcast_kwargs={}, as_columns=None, **kwargs):
+                              concat=False, broadcast_kwargs={}, keys=None, **kwargs):
         """Combine with `others` using `combine_func`.
 
         All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
@@ -403,7 +405,7 @@ class Base_Accessor(ArrayWrapper):
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`. 
         If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
-        Use `as_columns` as a top-level column level.
+        Use `keys` as the outermost level.
 
         !!! note
             If `combine_func` is Numba-compiled, will broadcast using `writeable=True` and
@@ -427,7 +429,7 @@ class Base_Accessor(ArrayWrapper):
             y  17  20
 
             >>> print(sr.vbt.combine_with_multiple([df, df*2], 
-            ...     combine_func=lambda x, y: x + y, concat=True, as_columns=['c', 'd']))
+            ...     combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd']))
                   c       d    
                a  b   a   b
             x  4  5   7   9
@@ -457,8 +459,8 @@ class Base_Accessor(ArrayWrapper):
             else:
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             columns = new_obj.vbt.columns
-            if as_columns is not None:
-                new_columns = index_fns.combine_indexes(as_columns, columns)
+            if keys is not None:
+                new_columns = index_fns.combine_indexes(keys, columns)
             else:
                 top_columns = pd.Index(np.arange(len(new_others)), name='combine_idx')
                 new_columns = index_fns.combine_indexes(top_columns, columns)
@@ -475,16 +477,16 @@ class Base_Accessor(ArrayWrapper):
 
 
 class Base_SRAccessor(Base_Accessor):
-    """Accessor on top of any data series. For Series only.
+    """Accessor on top of Series.
 
     Accessible through `pd.Series.vbt` and all child accessors."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         checks.assert_type(obj, pd.Series)
 
-        Base_Accessor.__init__(self, obj)
+        Base_Accessor.__init__(self, obj, freq=freq)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -496,16 +498,16 @@ class Base_SRAccessor(Base_Accessor):
 
 
 class Base_DFAccessor(Base_Accessor):
-    """Accessor on top of any data series. For DataFrames only.
+    """Accessor on top of DataFrames.
 
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
-    def __init__(self, obj):
+    def __init__(self, obj, freq=None):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         checks.assert_type(obj, pd.DataFrame)
 
-        Base_Accessor.__init__(self, obj)
+        Base_Accessor.__init__(self, obj, freq=freq)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -514,3 +516,4 @@ class Base_DFAccessor(Base_Accessor):
     @class_or_instancemethod
     def is_frame(self_or_cls):
         return True
+

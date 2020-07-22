@@ -60,7 +60,7 @@ it to the matrix form; for example, to compute various statistics by column, suc
 >>> import pandas as pd
 >>> from numba import njit
 >>> from collections import namedtuple
->>> from vectorbt.tseries.common import TSArrayWrapper
+>>> from vectorbt.base.array_wrapper import ArrayWrapper
 >>> from vectorbt.records import Records
 
 >>> example_dt = np.dtype([
@@ -76,7 +76,7 @@ it to the matrix form; for example, to compute various statistics by column, suc
 ...     (1, 1, 14.),
 ...     (1, 2, 15.)
 ... ], dtype=example_dt)
->>> wrapper = TSArrayWrapper(index=['x', 'y', 'z'],
+>>> wrapper = ArrayWrapper(index=['x', 'y', 'z'],
 ...     columns=['a', 'b'], ndim=2, freq='1 day')
 >>> records = Records(records_arr, wrapper)
 
@@ -262,8 +262,8 @@ from vectorbt.base.common import (
     binary_magic_methods,
     unary_magic_methods
 )
-from vectorbt.tseries.common import TSArrayWrapper
-from vectorbt.tseries import nb as tseries_nb
+from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.generic import nb as generic_nb
 from vectorbt.records import nb
 
 
@@ -290,7 +290,7 @@ def _mapped_indexing_func(obj, pd_indexing_func):
         new_idx_arr = obj.idx_arr[new_indices]
     else:
         new_idx_arr = None
-    new_wrapper = TSArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
+    new_wrapper = ArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
     return obj.__class__(new_mapped_arr, new_col_arr, new_wrapper, idx_arr=new_idx_arr)
 
 
@@ -340,7 +340,7 @@ class MappedArray(PandasIndexer):
         col_arr (array_like): A one-dimensional column array.
 
             Must be of the same size as `mapped_arr`.
-        wrapper (TSArrayWrapper): Array wrapper of type `vectorbt.tseries.common.TSArrayWrapper`.
+        wrapper (ArrayWrapper): Array wrapper of type `vectorbt.base.array_wrapper.ArrayWrapper`.
         idx_arr (array_like): A one-dimensional index array. Optional.
 
             Must be of the same size as `mapped_arr`."""
@@ -351,7 +351,7 @@ class MappedArray(PandasIndexer):
         if not isinstance(col_arr, np.ndarray):
             col_arr = np.asarray(col_arr)
         checks.assert_same_shape(mapped_arr, col_arr, axis=0)
-        checks.assert_type(wrapper, TSArrayWrapper)
+        checks.assert_type(wrapper, ArrayWrapper)
         if idx_arr is not None:
             if not isinstance(idx_arr, np.ndarray):
                 idx_arr = np.asarray(idx_arr)
@@ -405,7 +405,7 @@ class MappedArray(PandasIndexer):
 
         See `vectorbt.records.nb.reduce_mapped_nb`.
 
-        `**kwargs` will be passed to `vectorbt.tseries.common.TSArrayWrapper.wrap_reduced`."""
+        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.reduce_mapped_nb(
@@ -425,7 +425,7 @@ class MappedArray(PandasIndexer):
 
         See `vectorbt.records.nb.reduce_mapped_to_array_nb`.
 
-        `**kwargs` will be passed to `vectorbt.tseries.common.TSArrayWrapper.wrap_reduced`."""
+        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
         checks.assert_numba_func(reduce_func_nb)
 
         result = nb.reduce_mapped_to_array_nb(
@@ -442,35 +442,35 @@ class MappedArray(PandasIndexer):
 
     def nst(self, n, **kwargs):
         """Return nst element of each column."""
-        return self.reduce(tseries_nb.nst_reduce_nb, n, **kwargs)
+        return self.reduce(generic_nb.nst_reduce_nb, n, **kwargs)
 
     def min(self, **kwargs):
         """Return min of each column."""
-        return self.reduce(tseries_nb.min_reduce_nb, **kwargs)
+        return self.reduce(generic_nb.min_reduce_nb, **kwargs)
 
     def max(self, **kwargs):
         """Return max of each column."""
-        return self.reduce(tseries_nb.max_reduce_nb, **kwargs)
+        return self.reduce(generic_nb.max_reduce_nb, **kwargs)
 
     def mean(self, **kwargs):
         """Return mean of each column."""
-        return self.reduce(tseries_nb.mean_reduce_nb, **kwargs)
+        return self.reduce(generic_nb.mean_reduce_nb, **kwargs)
 
     def median(self, **kwargs):
         """Return median of each column."""
-        return self.reduce(tseries_nb.median_reduce_nb, **kwargs)
+        return self.reduce(generic_nb.median_reduce_nb, **kwargs)
 
     def std(self, ddof=1, **kwargs):
         """Return std of each column."""
-        return self.reduce(tseries_nb.std_reduce_nb, ddof, **kwargs)
+        return self.reduce(generic_nb.std_reduce_nb, ddof, **kwargs)
 
     def sum(self, default_val=0., **kwargs):
         """Return sum of each column."""
-        return self.reduce(tseries_nb.sum_reduce_nb, default_val=default_val, **kwargs)
+        return self.reduce(generic_nb.sum_reduce_nb, default_val=default_val, **kwargs)
 
     def count(self, default_val=0., cast=np.int64, **kwargs):
         """Return count of each column."""
-        return self.reduce(tseries_nb.count_reduce_nb, default_val=default_val, cast=cast, **kwargs)
+        return self.reduce(generic_nb.count_reduce_nb, default_val=default_val, cast=cast, **kwargs)
 
     def describe(self, percentiles=None, ddof=1, **kwargs):
         """Return stats of each column."""
@@ -484,7 +484,7 @@ class MappedArray(PandasIndexer):
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
-        result = self.reduce_to_array(tseries_nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
+        result = self.reduce_to_array(generic_nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
         if isinstance(result, pd.DataFrame):
             result.loc['count'].fillna(0., inplace=True)
         else:
@@ -498,7 +498,7 @@ class MappedArray(PandasIndexer):
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
-        result = reshape_fns.to_1d(self.reduce(tseries_nb.argmin_reduce_nb), raw=True)
+        result = reshape_fns.to_1d(self.reduce(generic_nb.argmin_reduce_nb), raw=True)
         mask = np.isnan(result)
         if mask.any():
             # Contains NaNs
@@ -517,7 +517,7 @@ class MappedArray(PandasIndexer):
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
-        result = reshape_fns.to_1d(self.reduce(tseries_nb.argmax_reduce_nb), raw=True)
+        result = reshape_fns.to_1d(self.reduce(generic_nb.argmax_reduce_nb), raw=True)
         mask = np.isnan(result)
         if mask.any():
             # Contains NaNs
@@ -571,7 +571,7 @@ def indexing_on_records(obj, pd_indexing_func):
         obj.col_index,
         new_cols
     )
-    wrapper = TSArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
+    wrapper = ArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
     return records, wrapper
 
 
@@ -587,7 +587,7 @@ class Records(PandasIndexer):
         records_arr (array_like): A structured NumPy array of records.
 
             Must have the field `col` (column position in a matrix).
-        wrapper (TSArrayWrapper): Array wrapper of type `vectorbt.tseries.common.TSArrayWrapper`.
+        wrapper (ArrayWrapper): Array wrapper of type `vectorbt.base.array_wrapper.ArrayWrapper`.
         idx_field (str): The name of the field corresponding to the index. Optional.
 
             Will be derived automatically if records contain field `'idx'`."""
@@ -597,7 +597,7 @@ class Records(PandasIndexer):
             records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
         checks.assert_value_in('col', records_arr.dtype.names)
-        checks.assert_type(wrapper, TSArrayWrapper)
+        checks.assert_type(wrapper, ArrayWrapper)
         if idx_field is not None:
             checks.assert_value_in(idx_field, records_arr.dtype.names)
         else:

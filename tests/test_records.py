@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records import (
     drawdown_dt,
     order_dt,
@@ -13,7 +14,6 @@ from vectorbt.records import (
 from vectorbt.records.drawdowns import ActiveDrawdowns, RecoveredDrawdowns
 from vectorbt.records.orders import BaseOrders
 from vectorbt.records.events import BaseEvents, BaseEventsByResult
-from vectorbt.tseries.common import TSArrayWrapper
 
 from tests.utils import record_arrays_close
 
@@ -40,7 +40,7 @@ records_arr = np.array([
     (2, 2, 18, 29)
 ], dtype=example_dt)
 
-wrapper = TSArrayWrapper(
+wrapper = ArrayWrapper(
     index=['x', 'y', 'z'],
     columns=['a', 'b', 'c', 'd'],
     ndim=2,
@@ -410,7 +410,7 @@ class TestMappedArray:
             np.testing.assert_array_equal((a * vbt.MappedArray(
                 records_arr['some_field2'],
                 records_arr['col'],
-                TSArrayWrapper(
+                ArrayWrapper(
                     index=['x', 'y', 'z'],
                     columns=['a', 'b', 'c', 'd'],
                     ndim=2,

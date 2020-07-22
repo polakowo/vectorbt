@@ -5,23 +5,22 @@
 
 import numpy as np
 import pandas as pd
-from scipy import stats
 
 from vectorbt import defaults
-from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
+from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns
-from vectorbt.tseries.accessors import (
-    TimeSeries_Accessor,
-    TimeSeries_SRAccessor,
-    TimeSeries_DFAccessor
+from vectorbt.generic.accessors import (
+    Generic_Accessor,
+    Generic_SRAccessor,
+    Generic_DFAccessor
 )
-from vectorbt.tseries.common import freq_delta, DatetimeTypes
+from vectorbt.utils.datetime import freq_delta, DatetimeTypes
 from vectorbt.returns import nb
 
 
-class Returns_Accessor(TimeSeries_Accessor):
+class Returns_Accessor(Generic_Accessor):
     """Accessor on top of return series. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`."""
@@ -30,15 +29,15 @@ class Returns_Accessor(TimeSeries_Accessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
+        Generic_Accessor.__init__(self, obj, freq=freq)
+
         # Set year frequency
         self._year_freq = year_freq
-
-        TimeSeries_Accessor.__init__(self, obj, freq=freq)
 
     @classmethod
     def from_price(cls, price, **kwargs):
         """Returns a new `Returns_Accessor` instance with returns from `price`."""
-        return cls(price.vbt.tseries.pct_change(), **kwargs)
+        return cls(price.vbt.pct_change(), **kwargs)
 
     @property
     def year_freq(self):
@@ -51,6 +50,8 @@ class Returns_Accessor(TimeSeries_Accessor):
     @property
     def ann_factor(self):
         """Annualization factor."""
+        if self.freq is None:
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
         return self.year_freq / self.freq
 
     def daily(self):
@@ -219,14 +220,6 @@ class Returns_Accessor(TimeSeries_Accessor):
             reshape_fns.to_2d(self._obj, raw=True))
         return self.wrap_reduced(nb.down_capture_nb(self.to_2d_array(), factor_returns, self.ann_factor))
 
-    def skew(self):
-        """Skewness of returns."""
-        return self.wrap_reduced(stats.skew(self.to_2d_array(), axis=0, nan_policy='omit'))
-
-    def kurtosis(self):
-        """Kurtosis of returns."""
-        return self.wrap_reduced(stats.kurtosis(self.to_2d_array(), axis=0, nan_policy='omit'))
-
     def drawdown(self):
         """Relative decline from a peak."""
         return self.wrap(nb.drawdown_nb(self.to_2d_array()))
@@ -240,11 +233,11 @@ class Returns_Accessor(TimeSeries_Accessor):
         """Drawdown records of cumulative returns.
 
         See `vectorbt.records.drawdowns.Drawdowns`."""
-        return self.cumulative(start_value=1.).vbt.tseries(freq=self.freq).drawdowns
+        return self.cumulative(start_value=1.).vbt(freq=self.freq).drawdowns
 
 
 @register_series_accessor('returns')
-class Returns_SRAccessor(Returns_Accessor, TimeSeries_SRAccessor):
+class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
     """Accessor on top of return series. For Series only.
 
     Accessible through `pd.Series.vbt.returns`."""
@@ -253,12 +246,12 @@ class Returns_SRAccessor(Returns_Accessor, TimeSeries_SRAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        TimeSeries_SRAccessor.__init__(self, obj, freq=freq)
+        Generic_SRAccessor.__init__(self, obj, freq=freq)
         Returns_Accessor.__init__(self, obj, freq=freq, year_freq=year_freq)
 
 
 @register_dataframe_accessor('returns')
-class Returns_DFAccessor(Returns_Accessor, TimeSeries_DFAccessor):
+class Returns_DFAccessor(Returns_Accessor, Generic_DFAccessor):
     """Accessor on top of return series. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.returns`."""
@@ -267,5 +260,5 @@ class Returns_DFAccessor(Returns_Accessor, TimeSeries_DFAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        TimeSeries_DFAccessor.__init__(self, obj, freq=freq)
+        Generic_DFAccessor.__init__(self, obj, freq=freq)
         Returns_Accessor.__init__(self, obj, freq=freq, year_freq=year_freq)

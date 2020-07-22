@@ -22,7 +22,7 @@ You can access methods listed in `vectorbt.signals.accessors` as follows:
 dtype: int64
 ```
 
-Since signals are a special case of time series, their accessors extend `vectorbt.tseries.accessors`.
+The accessors extend `vectorbt.generic.accessors`.
 
 ## Numba-compiled functions
 
@@ -36,5 +36,3 @@ These only accept NumPy arrays and other Numba-compatible types.
 array([0, 1, 2, 3, 0])
 ```
 """
-
-from vectorbt.signals import accessors, nb

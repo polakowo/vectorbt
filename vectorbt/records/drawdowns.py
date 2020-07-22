@@ -8,9 +8,10 @@ from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.indexing import PandasIndexer
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.tseries.common import TSArrayWrapper, DatetimeTypes
+from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.records.base import Records, indexing_on_records
 from vectorbt.records.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records import nb
@@ -28,7 +29,7 @@ class BaseDrawdowns(Records):
     Requires `records_arr` to have all fields defined in `vectorbt.records.enums.drawdown_dt`."""
 
     def __init__(self, records_arr, ts, freq=None, idx_field='end_idx'):
-        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(ts, freq=freq), idx_field=idx_field)
+        Records.__init__(self, records_arr, ArrayWrapper.from_obj(ts, freq=freq), idx_field=idx_field)
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
@@ -85,7 +86,7 @@ class BaseDrawdowns(Records):
         if self.wrapper.ndim > 1:
             raise TypeError("You must select a column first")
 
-        fig = self.ts.vbt.tseries.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
 
         if self.records_arr.shape[0] == 0:
             return fig

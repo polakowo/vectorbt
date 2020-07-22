@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import pytest
+from datetime import datetime
 
 from vectorbt import defaults
 from vectorbt.base import (
@@ -16,6 +17,8 @@ from vectorbt.base import (
 
 defaults.broadcasting['index_from'] = 'stack'
 defaults.broadcasting['columns_from'] = 'stack'
+
+day_dt = np.timedelta64(86400000000000)
 
 # Initialize global variables
 a1 = np.array([1])
@@ -110,6 +113,34 @@ class TestArrayWrapper:
             df_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y']),
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=df4.columns)
         )
+
+    def test_to_time_units(self):
+        sr = pd.Series([1, 2, np.nan], index=['x', 'y', 'z'], name='name')
+        pd.testing.assert_series_equal(
+            array_wrapper.to_time_units(sr, '1 days'),
+            pd.Series(
+                np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=sr.index,
+                name=sr.name
+            )
+        )
+        df = sr.to_frame()
+        pd.testing.assert_frame_equal(
+            array_wrapper.to_time_units(df, '1 days'),
+            pd.DataFrame(
+                np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
+                index=df.index,
+                columns=df.columns
+            )
+        )
+        np.testing.assert_array_equal(
+            array_wrapper.to_time_units([1, 2], '1 days'),
+            np.array([86400000000000, 172800000000000], dtype='timedelta64[ns]')
+        )
+        assert array_wrapper.to_time_units(1, '1 days') == day_dt
+
+    def test_freq_delta(self):
+        assert array_wrapper.freq_delta('1D') == array_wrapper.freq_delta('D') == day_dt
 
     def test_eq(self):
         assert array_wrapper.ArrayWrapper.from_obj(sr2) == array_wrapper.ArrayWrapper.from_obj(sr2)
@@ -376,6 +407,47 @@ class TestIndexFns:
         multi_c1 = pd.MultiIndex.from_arrays([['a8', 'b8']], names=['c8'])
         multi_c2 = pd.MultiIndex.from_arrays([['a7', 'a7', 'c7', 'c7'], ['a8', 'b8', 'a8', 'b8']], names=['c7', 'c8'])
         np.testing.assert_array_equal(index_fns.align_index_to(multi_c1, multi_c2), np.array([0, 1, 0, 1]))
+
+    def test_pick_levels(self):
+        index = index_fns.stack_indexes(multi_i, multi_c)
+        assert index_fns.pick_levels(index, required_levels=[], optional_levels=[]) \
+               == ([], [])
+        assert index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8', 'i7'], optional_levels=[]) \
+               == ([3, 2, 1, 0], [])
+        assert index_fns.pick_levels(index, required_levels=['c8', None, 'i8', 'i7'], optional_levels=[]) \
+               == ([3, 2, 1, 0], [])
+        assert index_fns.pick_levels(index, required_levels=[None, 'c7', 'i8', 'i7'], optional_levels=[]) \
+               == ([3, 2, 1, 0], [])
+        assert index_fns.pick_levels(index, required_levels=[None, None, None, None], optional_levels=[]) \
+               == ([0, 1, 2, 3], [])
+        assert index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8'], optional_levels=['i7']) \
+               == ([3, 2, 1], [0])
+        assert index_fns.pick_levels(index, required_levels=['c8', None, 'i8'], optional_levels=['i7']) \
+               == ([3, 2, 1], [0])
+        assert index_fns.pick_levels(index, required_levels=[None, 'c7', 'i8'], optional_levels=['i7']) \
+               == ([3, 2, 1], [0])
+        assert index_fns.pick_levels(index, required_levels=[None, None, None, None], optional_levels=[None]) \
+               == ([0, 1, 2, 3], [None])
+        try:
+            index_fns.pick_levels(index, required_levels=['i8', 'i8', 'i8', 'i8'], optional_levels=[])
+            raise ValueError
+        except:
+            pass
+        try:
+            index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8'], optional_levels=[])
+            raise ValueError
+        except:
+            pass
+        try:
+            index_fns.pick_levels(index, required_levels=['c8', 'c7'], optional_levels=['i7'])
+            raise ValueError
+        except:
+            pass
+        try:
+            index_fns.pick_levels(index, required_levels=['c8', 'c7', 'i8', 'i7'], optional_levels=['i7'])
+            raise ValueError
+        except:
+            pass
 
 
 # ############# reshape_fns.py ############# #
@@ -1528,6 +1600,18 @@ class TestCommon:
 # ############# accessors.py ############# #
 
 class TestAccessors:
+    def test_freq(self):
+        ts = pd.Series([1, 2, 3], index=pd.DatetimeIndex([
+            datetime(2018, 1, 1),
+            datetime(2018, 1, 2),
+            datetime(2018, 1, 3)
+        ]))
+        assert ts.vbt.freq == day_dt
+        assert ts.vbt(freq='2D').freq == day_dt * 2
+        assert pd.Series([1, 2, 3]).vbt.freq is None
+        assert pd.Series([1, 2, 3]).vbt(freq='3D').freq == day_dt * 3
+        assert pd.Series([1, 2, 3]).vbt(freq=np.timedelta64(4, 'D')).freq == day_dt * 4
+
     def test_props(self):
         assert sr1.vbt.is_series()
         assert not sr1.vbt.is_frame()
@@ -1699,7 +1783,7 @@ class TestAccessors:
 
     def test_tile(self):
         pd.testing.assert_frame_equal(
-            df4.vbt.tile(2, as_columns=['a', 'b']),
+            df4.vbt.tile(2, keys=['a', 'b']),
             pd.DataFrame(
                 np.asarray([
                     [1, 2, 3, 1, 2, 3],
@@ -1720,7 +1804,7 @@ class TestAccessors:
 
     def test_repeat(self):
         pd.testing.assert_frame_equal(
-            df4.vbt.repeat(2, as_columns=['a', 'b']),
+            df4.vbt.repeat(2, keys=['a', 'b']),
             pd.DataFrame(
                 np.asarray([
                     [1, 1, 2, 2, 3, 3],
@@ -1800,11 +1884,11 @@ class TestAccessors:
             ], names=[None, 'c6'])
         )
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.concat(sr2, 10, df4, as_columns=['a', 'b', 'c']),
+            pd.DataFrame.vbt.concat(sr2, 10, df4, keys=['a', 'b', 'c']),
             target
         )
         pd.testing.assert_frame_equal(
-            sr2.vbt.concat(10, df4, as_columns=['a', 'b', 'c']),
+            sr2.vbt.concat(10, df4, keys=['a', 'b', 'c']),
             target
         )
 
@@ -1828,14 +1912,14 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target
         )
@@ -1856,7 +1940,7 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([[1], [2], [3]]), 10, apply_func=apply_func2, d=100,
-                as_columns=['a', 'b', 'c'],
+                keys=['a', 'b', 'c'],
                 pass_2d=True  # otherwise (3, 1) + (1, 3) = (3, 3) != (3, 1) -> error
             ),
             pd.DataFrame(
@@ -1881,14 +1965,14 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target2
         )
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
-                as_columns=['a', 'b', 'c']
+                keys=['a', 'b', 'c']
             ),
             target2
         )
@@ -2043,7 +2127,7 @@ class TestAccessors:
                 [10, df4], 10, b=100,
                 combine_func=lambda x, y, a, b=1: x + y + a + b,
                 concat=True,
-                as_columns=['a', 'b']
+                keys=['a', 'b']
             ),
             pd.DataFrame(
                 target2.values,

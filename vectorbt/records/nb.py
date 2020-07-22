@@ -145,7 +145,7 @@ def mapped_to_matrix_nb(mapped_arr, col_arr, idx_arr, target_shape, default_val)
 def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *args):
     """Reduce mapped array by column to a scalar value.
 
-    Faster than `mapped_to_matrix_nb` and `vbt.tseries.*` used together, and also
+    Faster than `mapped_to_matrix_nb` and `vbt.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
     `reduce_func_nb` must accept index of the current column, mapped array and `*args`,

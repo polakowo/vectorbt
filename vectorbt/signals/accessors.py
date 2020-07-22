@@ -37,23 +37,23 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
-from vectorbt.accessors import register_dataframe_accessor, register_series_accessor
+from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
-from vectorbt.tseries.accessors import TimeSeries_Accessor, TimeSeries_SRAccessor, TimeSeries_DFAccessor
+from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
 from vectorbt.signals import nb
-from vectorbt.widgets import DefaultFigureWidget
+from vectorbt.utils.widgets import CustomFigureWidget
 
 
 @add_nb_methods([
     nb.shuffle_nb,
     nb.fshift_nb,
 ], module_name='vectorbt.signals.nb')
-class Signals_Accessor(TimeSeries_Accessor):
+class Signals_Accessor(Generic_Accessor):
     """Accessor on top of signal series. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
@@ -64,7 +64,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
         checks.assert_dtype(obj, np.bool)
 
-        TimeSeries_Accessor.__init__(self, obj, freq=freq)
+        Generic_Accessor.__init__(self, obj, freq=freq)
 
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
@@ -89,7 +89,7 @@ class Signals_Accessor(TimeSeries_Accessor):
             2020-01-04  False  False  False
             2020-01-05  False  False  False
             ```"""
-        return TimeSeries_Accessor.empty(*args, fill_value=fill_value, **kwargs)
+        return Generic_Accessor.empty(*args, fill_value=fill_value, **kwargs)
 
     @classmethod
     def empty_like(cls, *args, fill_value=False, **kwargs):
@@ -112,7 +112,7 @@ class Signals_Accessor(TimeSeries_Accessor):
             2020-01-04  False  False  False
             2020-01-05  False  False  False
             ```"""
-        return TimeSeries_Accessor.empty_like(*args, fill_value=fill_value, **kwargs)
+        return Generic_Accessor.empty_like(*args, fill_value=fill_value, **kwargs)
 
     # ############# Signal generation ############# #
 
@@ -340,13 +340,13 @@ class Signals_Accessor(TimeSeries_Accessor):
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_stop_loss_exits(self, ts, stops, trailing=False, first=True, as_columns=None, broadcast_kwargs={}):
+    def generate_stop_loss_exits(self, ts, stops, trailing=False, first=True, keys=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_stop_loss_exits_nb`.
 
         Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
-        Use `as_columns` as a top-level column level.
+        Use `keys` as the outermost level.
 
         Example:
             For each entry in `sig`, set stop loss for 10% and 20% below the entry price:
@@ -383,21 +383,21 @@ class Signals_Accessor(TimeSeries_Accessor):
             first=first)
 
         # Build column hierarchy
-        if as_columns is not None:
-            param_columns = as_columns
+        if keys is not None:
+            param_columns = keys
         else:
             name = 'trail_stop' if trailing else 'stop_loss'
             param_columns = index_fns.index_from_values(stops, name=name)
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
         return entries.vbt.wrap(exits, columns=columns)
 
-    def generate_take_profit_exits(self, ts, stops, first=True, as_columns=None, broadcast_kwargs={}):
+    def generate_take_profit_exits(self, ts, stops, first=True, keys=None, broadcast_kwargs={}):
         """See `vectorbt.signals.nb.generate_take_profit_exits_nb`.
 
         Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of 
         numbers, or a 3D array, where each matrix corresponds to a single configuration. 
-        Use `as_columns` as a top-level column level.
+        Use `keys` as the outermost level.
 
         Example:
             For each entry in `sig`, set take profit for 10% and 20% above the entry price:
@@ -425,8 +425,8 @@ class Signals_Accessor(TimeSeries_Accessor):
             first=first)
 
         # Build column hierarchy
-        if as_columns is not None:
-            param_columns = as_columns
+        if keys is not None:
+            param_columns = keys
         else:
             param_columns = index_fns.index_from_values(stops, name='take_profit')
         columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
@@ -643,7 +643,7 @@ class Signals_Accessor(TimeSeries_Accessor):
             ```python-repl
             >>> ts = pd.Series([1, 2, 3, 2, 1])
             >>> print(sig.vbt.signals.OR(ts > 1, ts > 2,
-            ...     concat=True, as_columns=['>1', '>2']))
+            ...     concat=True, keys=['>1', '>2']))
                                         >1                   >2
                             a     b      c      a      b      c
             2020-01-01   True  True   True   True   True   True
@@ -662,7 +662,7 @@ class Signals_Accessor(TimeSeries_Accessor):
 
 
 @register_series_accessor('signals')
-class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
+class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
     """Accessor on top of signal series. For Series only.
 
     Accessible through `pd.Series.vbt.signals`."""
@@ -671,7 +671,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        TimeSeries_SRAccessor.__init__(self, obj, freq=freq)
+        Generic_SRAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
@@ -690,7 +690,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
             ![](/vectorbt/docs/img/signals_sr_plot.png)"""
         # Set up figure
         if fig is None:
-            fig = DefaultFigureWidget()
+            fig = CustomFigureWidget()
         fig.update_layout(
             yaxis=dict(
                 tickmode='array',
@@ -730,7 +730,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         Example:
             ```py
             ts = pd.Series([1, 2, 3, 2, 1], index=sig.index)
-            fig = ts.vbt.tseries.plot()
+            fig = ts.vbt.plot()
             sig['b'].vbt.signals.plot_as_entry_markers(ts, fig=fig)
             (~sig['b']).vbt.signals.plot_as_exit_markers(ts, fig=fig)
             ```
@@ -740,7 +740,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
         checks.assert_same_index(self._obj, ts)
 
         if fig is None:
-            fig = DefaultFigureWidget()
+            fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
         if name is None:
             name = self._obj.name
@@ -802,7 +802,7 @@ class Signals_SRAccessor(Signals_Accessor, TimeSeries_SRAccessor):
 
 
 @register_dataframe_accessor('signals')
-class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
+class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
     """Accessor on top of signal series. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.signals`."""
@@ -811,7 +811,7 @@ class Signals_DFAccessor(Signals_Accessor, TimeSeries_DFAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        TimeSeries_DFAccessor.__init__(self, obj, freq=freq)
+        Generic_DFAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover

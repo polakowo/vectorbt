@@ -56,6 +56,11 @@ class TestAccessors:
     def test_ann_factor(self):
         assert ret['a'].vbt.returns(year_freq='365 days').ann_factor == 365
         assert ret.vbt.returns(year_freq='365 days').ann_factor == 365
+        try:
+            assert ret.vbt.returns(year_freq=None).ann_factor
+            raise Exception
+        except:
+            pass
 
     def test_from_price(self):
         pd.testing.assert_series_equal(pd.Series.vbt.returns.from_price(ts['a'])._obj, ts['a'].pct_change())
@@ -374,20 +379,6 @@ class TestAccessors:
                 ], dtype='datetime64[ns]', freq=None),
                 columns=ret.columns
             )
-        )
-
-    def test_skew(self):
-        assert isclose(ret['a'].vbt.returns.skew(), 0.848320696939021)
-        pd.testing.assert_series_equal(
-            ret.vbt.returns.skew(),
-            pd.Series([0.8483207, -0.61509129, 0.2116843], index=ret.columns)
-        )
-
-    def test_kurtosis(self):
-        assert isclose(ret['a'].vbt.returns.kurtosis(), -0.92923077)
-        pd.testing.assert_series_equal(
-            ret.vbt.returns.kurtosis(),
-            pd.Series([-0.92923077, -1.11397128, -1.65843621], index=ret.columns)
         )
 
     def test_max_drawdown(self):

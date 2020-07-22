@@ -10,7 +10,7 @@
 import numpy as np
 from numba import njit
 
-from vectorbt import tseries
+from vectorbt.generic import nb as generic_nb
 
 
 @njit(cache=True)
@@ -21,9 +21,9 @@ def ma_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                ma = tseries.nb.ewm_mean_nb(ts, windows[i])
+                ma = generic_nb.ewm_mean_nb(ts, windows[i])
             else:
-                ma = tseries.nb.rolling_mean_nb(ts, windows[i])
+                ma = generic_nb.rolling_mean_nb(ts, windows[i])
             cache_dict[h] = ma
     return cache_dict
 
@@ -43,9 +43,9 @@ def mstd_caching_nb(ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                mstd = tseries.nb.ewm_std_nb(ts, windows[i])
+                mstd = generic_nb.ewm_std_nb(ts, windows[i])
             else:
-                mstd = tseries.nb.rolling_std_nb(ts, windows[i])
+                mstd = generic_nb.rolling_std_nb(ts, windows[i])
             cache_dict[h] = mstd
     return cache_dict
 
@@ -79,23 +79,23 @@ def bb_apply_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
 @njit(cache=True)
 def rsi_caching_nb(ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.RSI`."""
-    delta = tseries.nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
+    delta = generic_nb.diff_nb(ts)[1:, :]  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
-    up = tseries.nb.set_by_mask_nb(up, up < 0, 0)
-    down = np.abs(tseries.nb.set_by_mask_nb(down, down > 0, 0))
+    up = generic_nb.set_by_mask_nb(up, up < 0, 0)
+    down = np.abs(generic_nb.set_by_mask_nb(down, down > 0, 0))
     # Cache
     cache_dict = dict()
     for i in range(windows.shape[0]):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                roll_up = tseries.nb.ewm_mean_nb(up, windows[i])
-                roll_down = tseries.nb.ewm_mean_nb(down, windows[i])
+                roll_up = generic_nb.ewm_mean_nb(up, windows[i])
+                roll_down = generic_nb.ewm_mean_nb(down, windows[i])
             else:
-                roll_up = tseries.nb.rolling_mean_nb(up, windows[i])
-                roll_down = tseries.nb.rolling_mean_nb(down, windows[i])
-            roll_up = tseries.nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
-            roll_down = tseries.nb.prepend_nb(roll_down, 1, np.nan)
+                roll_up = generic_nb.rolling_mean_nb(up, windows[i])
+                roll_down = generic_nb.rolling_mean_nb(down, windows[i])
+            roll_up = generic_nb.prepend_nb(roll_up, 1, np.nan)  # bring to old shape
+            roll_down = generic_nb.prepend_nb(roll_down, 1, np.nan)
             cache_dict[h] = roll_up, roll_down
     return cache_dict
 
@@ -115,8 +115,8 @@ def stoch_caching_nb(close_ts, high_ts, low_ts, k_windows, d_windows, d_ewms):
     for i in range(k_windows.shape[0]):
         h = hash(k_windows[i])
         if h not in cache_dict:
-            roll_min = tseries.nb.rolling_min_nb(low_ts, k_windows[i])
-            roll_max = tseries.nb.rolling_max_nb(high_ts, k_windows[i])
+            roll_min = generic_nb.rolling_min_nb(low_ts, k_windows[i])
+            roll_max = generic_nb.rolling_max_nb(high_ts, k_windows[i])
             cache_dict[h] = roll_min, roll_max
     return cache_dict
 
@@ -128,9 +128,9 @@ def stoch_apply_nb(close_ts, high_ts, low_ts, k_window, d_window, d_ewm, cache_d
     roll_min, roll_max = cache_dict[h]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
     if d_ewm:
-        percent_d = tseries.nb.ewm_mean_nb(percent_k, d_window)
+        percent_d = generic_nb.ewm_mean_nb(percent_k, d_window)
     else:
-        percent_d = tseries.nb.rolling_mean_nb(percent_k, d_window)
+        percent_d = generic_nb.rolling_mean_nb(percent_k, d_window)
     return percent_k, percent_d
 
 
@@ -149,9 +149,9 @@ def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_
     slow_ma = cache_dict[slow_h]
     macd_ts = fast_ma - slow_ma
     if signal_ewm:
-        signal_ts = tseries.nb.ewm_mean_nb(macd_ts, signal_window)
+        signal_ts = generic_nb.ewm_mean_nb(macd_ts, signal_window)
     else:
-        signal_ts = tseries.nb.rolling_mean_nb(macd_ts, signal_window)
+        signal_ts = generic_nb.rolling_mean_nb(macd_ts, signal_window)
     return macd_ts, signal_ts
 
 
@@ -170,8 +170,8 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_nb
     tr0 = high_ts - low_ts
-    tr1 = np.abs(high_ts - tseries.nb.fshift_nb(close_ts, 1))
-    tr2 = np.abs(low_ts - tseries.nb.fshift_nb(close_ts, 1))
+    tr1 = np.abs(high_ts - generic_nb.fshift_nb(close_ts, 1))
+    tr2 = np.abs(low_ts - generic_nb.fshift_nb(close_ts, 1))
     tr = nanmax_cube_nb(np.stack((tr0, tr1, tr2)))
 
     cache_dict = dict()
@@ -179,9 +179,9 @@ def atr_caching_nb(close_ts, high_ts, low_ts, windows, ewms):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             if ewms[i]:
-                atr = tseries.nb.ewm_mean_nb(tr, windows[i])
+                atr = generic_nb.ewm_mean_nb(tr, windows[i])
             else:
-                atr = tseries.nb.rolling_mean_nb(tr, windows[i])
+                atr = generic_nb.rolling_mean_nb(tr, windows[i])
             cache_dict[h] = atr
     return tr, cache_dict
 

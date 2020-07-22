@@ -8,7 +8,7 @@ from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.base.indexing import PandasIndexer
-from vectorbt.tseries.common import TSArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records.base import Records, indexing_on_records
 from vectorbt.records.enums import OrderSide, order_dt
 
@@ -40,7 +40,7 @@ class BaseOrders(Records):
         ```"""
 
     def __init__(self, records_arr, main_price, freq=None, idx_field='idx'):
-        Records.__init__(self, records_arr, TSArrayWrapper.from_obj(main_price, freq=freq), idx_field=idx_field)
+        Records.__init__(self, records_arr, ArrayWrapper.from_obj(main_price, freq=freq), idx_field=idx_field)
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
@@ -76,7 +76,7 @@ class BaseOrders(Records):
             raise TypeError("You must select a column first")
 
         # Plot main price
-        fig = self.main_price.vbt.tseries.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.main_price.vbt.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         idx = self.records_arr['idx']

@@ -3,7 +3,7 @@
 Each indicator is basically a pipeline that
 
 * Accepts a list of time series objects (for example, OHLCV data)
-* Accepts a list of parameter arrays (for example, rolling windows)
+* Accepts a list of parameter arrays (for example, size of rolling window)
 * Accepts other relevant arguments and keyword arguments
 * Performs calculations to produce new time series objects (for example, rolling average)
 
@@ -11,13 +11,13 @@ This pipeline can be well standardized, which is done by this indicatory factory
 
 On top of this pipeline, it also does the following:
 
-* Creates a new indicator class
+* Generates a new Python class
 * Creates an `__init__` method where it stores all inputs, outputs, and other artifacts
 * Creates a `from_params` method that runs the main pipeline using `from_params_pipeline`
 * Adds pandas indexing, i.e., you can use `iloc`, `loc`, `xs`, and `__getitem__` on the class itself
 * Adds parameter indexing, i.e., use `*your_param*_loc` on the class to slice using parameters
 * Adds user-defined properties
-* Adds common comparison methods for all inputs, outputs and properties, e.g., crossovers
+* Adds common comparison methods for all inputs, outputs and properties, e.g., crossover
 
 Example:
     Consider the following smaller price DataFrame `price_sm`:
@@ -57,7 +57,7 @@ Example:
     >>> ma_df = pd.DataFrame.vbt.concat(
     ...     price_sm.rolling(window=2).mean(), 
     ...     price_sm.rolling(window=3).mean(), 
-    ...     as_columns=pd.Index([2, 3], name='ma_window'))
+    ...     keys=pd.Index([2, 3], name='ma_window'))
     >>> print(ma_df)
     ma_window          2         3
                 a    b    a    b
@@ -98,7 +98,7 @@ Example:
     ...     param_names=['window'],
     ...     output_names=['ma'],
     ...     name='myma'
-    ... ).from_apply_func(vbt.tseries.nb.rolling_mean_nb)
+    ... ).from_apply_func(vbt.nb.rolling_mean_nb)
 
     >>> myma = MyMA.from_params(price_sm, [2, 3])
     >>> above_signals = myma.price_sm_above(myma.ma, crossed=True)
@@ -109,7 +109,7 @@ Example:
     an arbitrary number of windows. 
 
     For all our inputs in `ts_names` and outputs in `output_names`, it created a bunch of comparison methods 
-    for generating signals, such as `above`, `below` and `equal` (use `doc()`): 
+    for generating signals, such as `above`, `below` and `equal` (use `dir()`):
 
     ```python-repl
     'ma_above'
@@ -215,10 +215,55 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
-from vectorbt.tseries.common import TSArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper
 
 
-def build_param_product(param_list):
+def flatten_param_tuples(param_tuples):
+    """Flattens a nested list of tuples using unzipping."""
+    param_list = []
+    unzipped_tuples = zip(*param_tuples)
+    for i, unzipped in enumerate(unzipped_tuples):
+        unzipped = list(unzipped)
+        if isinstance(unzipped[0], tuple):
+            param_list.extend(flatten_param_tuples(unzipped))
+        else:
+            param_list.append(unzipped)
+    return param_list
+
+
+def create_param_combs(op_tree, depth=0):
+    """Create arbitrary parameter combinations from the operation tree `op_tree`.
+
+    `op_tree` must be a tuple of tuples, each being an instruction to generate parameters.
+    The first element of each tuple should a function that takes remaining elements as arguments.
+    If one of the elements is a tuple, it will be unfolded in the same way.
+
+    Example:
+        ```python-repl
+        >>> import numpy as np
+        >>> from itertools import combinations, product
+
+        >>> create_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
+        [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
+         [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
+         [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]]
+        ```
+    """
+    checks.assert_type(op_tree, tuple)
+    new_op_tree = (op_tree[0],)
+    for elem in op_tree[1:]:
+        if isinstance(elem, tuple):
+            new_op_tree += (create_param_combs(elem, depth=depth+1),)
+        else:
+            new_op_tree += (elem,)
+    result = list(new_op_tree[0](*new_op_tree[1:]))
+    if depth == 0:
+        # do something
+        return flatten_param_tuples(result)
+    return result
+
+
+def create_param_product(param_list):
     """Make Cartesian product out of all params in `param_list`."""
     param_list = list(map(reshape_fns.to_1d, param_list))
     param_list = list(zip(*list(itertools.product(*param_list))))
@@ -392,8 +437,8 @@ def from_params_pipeline(
 
         ```python-repl
         >>> new_ts_list = [
-        ...     ts_list[0].vbt.tile(len(param_list[0]), as_columns=p_columns),
-        ...     ts_list[1].vbt.tile(len(param_list[0]), as_columns=p_columns)
+        ...     ts_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
+        ...     ts_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
         ... ]
         >>> print(new_ts_list[0])
         p1                                         1                        
@@ -426,7 +471,7 @@ def from_params_pipeline(
                         checks.assert_level_not_exists(ts.columns, level_name)
         if param_product:
             # Make Cartesian product out of all params
-            param_list = build_param_product(param_list)
+            param_list = create_param_product(param_list)
         else:
             # Broadcast such that each array has the same length
             param_list = reshape_fns.broadcast(*param_list, writeable=True)
@@ -485,7 +530,7 @@ def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
     checks.assert_type(name, str)
 
 
-def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None, **kwargs):
+def compare(obj, other, compare_func, multiple=False, name=None, keys=None, **kwargs):
     """Compares `obj` to `other` to generate signals.
 
     Both will be broadcast together. Set `multiple` to `True` to compare with multiple arguments.
@@ -493,9 +538,9 @@ def compare(obj, other, compare_func, multiple=False, name=None, as_columns=None
 
     See `vectorbt.base.accessors.Base_Accessor.combine_with`."""
     if multiple:
-        if as_columns is None:
-            as_columns = index_fns.index_from_values(other, name=name)
-        return obj.vbt.combine_with_multiple(other, combine_func=compare_func, as_columns=as_columns, concat=True, **kwargs)
+        if keys is None:
+            keys = index_fns.index_from_values(other, name=name)
+        return obj.vbt.combine_with_multiple(other, combine_func=compare_func, keys=keys, concat=True, **kwargs)
     return obj.vbt.combine_with(other, combine_func=compare_func, **kwargs)
 
 
@@ -651,7 +696,7 @@ class IndicatorFactory():
 
             for i, ts_name in enumerate(ts_names):
                 setattr(self, f'_{ts_name}', ts_list[i])
-            self.wrapper = TSArrayWrapper.from_obj(ts_list[0])
+            self.wrapper = ArrayWrapper.from_obj(ts_list[0])
             for i, output_name in enumerate(output_names):
                 setattr(self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):
