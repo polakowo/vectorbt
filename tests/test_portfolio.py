@@ -40,7 +40,9 @@ order_size = pd.DataFrame({
 
 
 @njit
-def order_func_nb(col, i, run_cash, run_shares, price, fees, fixed_fees, slippage):
+def order_func_nb(order_context, price, fees, fixed_fees, slippage):
+    col = order_context.col
+    i = order_context.i
     size = col + 1
     if i % 2 == 1:
         size *= -1

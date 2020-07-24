@@ -44,7 +44,7 @@ def repeat_index(index, n):
     """Repeat each element in `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges without name
+    if checks.is_default_index(index):  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=n, step=1)
     return np.repeat(index, n)
 
@@ -53,31 +53,32 @@ def tile_index(index, n):
     """Tile the whole `index` `n` times."""
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):  # ignore simple ranges without name
+    if checks.is_default_index(index):  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=n, step=1)
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack_indexes(*indexes):
+def stack_indexes(*indexes, drop_duplicates=None, keep=None):
     """Stack each index in `indexes` on top of each other, from top to bottom."""
-    new_index = indexes[0]
-    for i in range(1, len(indexes)):
-        index1, index2 = new_index, indexes[i]
-        checks.assert_same_shape(index1, index2)
-        if not isinstance(index1, pd.MultiIndex):
-            index1 = pd.MultiIndex.from_arrays([index1])
-        if not isinstance(index2, pd.MultiIndex):
-            index2 = pd.MultiIndex.from_arrays([index2])
+    if drop_duplicates is None:
+        drop_duplicates = defaults.broadcasting['drop_duplicates']
 
-        levels = []
-        for i in range(index1.nlevels):
-            levels.append(index1.get_level_values(i))
-        for i in range(index2.nlevels):
-            levels.append(index2.get_level_values(i))
+    levels = []
+    for i in range(len(indexes)):
+        index = indexes[i]
+        if not isinstance(index, pd.MultiIndex):
+            if not isinstance(index, pd.Index):
+                index = pd.Index(index)
+            levels.append(index)
+        else:
+            for j in range(index.nlevels):
+                levels.append(index.get_level_values(j))
 
-        new_index = pd.MultiIndex.from_arrays(levels)
+    new_index = pd.MultiIndex.from_arrays(levels)
+    if drop_duplicates:
+        return drop_duplicate_levels(new_index, keep=keep)
     return new_index
 
 
@@ -176,22 +177,23 @@ def drop_redundant_levels(index):
         return index
 
     levels_to_drop = []
-    for i, level in enumerate(index.levels):
-        if len(level) == 1:
+    for i in range(index.nlevels):
+        if len(index.levels[i]) == 1:
             levels_to_drop.append(i)
-        elif level.name is None and (level == np.arange(len(level))).all():  # basic range
-            if len(index.get_level_values(i)) == len(level):
-                levels_to_drop.append(i)
+        elif checks.is_default_index(index.get_level_values(i)):
+            levels_to_drop.append(i)
     # Remove redundant levels only if there are some non-redundant levels left
     if len(levels_to_drop) < index.nlevels:
         return index.droplevel(levels_to_drop)
     return index
 
 
-def drop_duplicate_levels(index, keep='last'):
+def drop_duplicate_levels(index, keep=None):
     """Drop levels in `index` with the same name and values.
 
     Set `keep` to 'last' to keep last levels, otherwise 'first'."""
+    if keep is None:
+        keep = defaults.broadcasting['keep']
     if not isinstance(index, pd.MultiIndex):
         return index
 
@@ -211,9 +213,9 @@ def drop_duplicate_levels(index, keep='last'):
 
 
 def align_index_to(index1, index2):
-    """Align `index1` to have the same shape of `index2`.
+    """Align `index1` to have the same shape as `index2`.
 
-    Returns integer indices of occurrences and None if aligning not needed.
+    Returns index slice for the aligning.
 
     The second one must contain all levels from the first (and can have some more). In all these levels, 
     both must share the same elements."""

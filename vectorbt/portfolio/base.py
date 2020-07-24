@@ -49,14 +49,13 @@ indexing operation to each `__init__` argument with pandas type:
 >>> from numba import njit
 >>> from datetime import datetime
 
->>> index = pd.Index([
+>>> price = pd.Series([1, 2, 3, 2, 1], index=pd.Index([
 ...     datetime(2020, 1, 1),
 ...     datetime(2020, 1, 2),
 ...     datetime(2020, 1, 3),
 ...     datetime(2020, 1, 4),
 ...     datetime(2020, 1, 5)
-... ])
->>> price = pd.Series([1, 2, 3, 2, 1], index=index, name='a')
+... ]), name='a')
 >>> orders = pd.DataFrame({
 ...     'a': [np.inf, 0, 0, 0, 0],
 ...     'b': [1, 1, 1, 1, -np.inf],
@@ -146,9 +145,9 @@ class Portfolio(PandasIndexer):
 
     Args:
         main_price (pandas_like): Main price of the asset.
-        init_capital (int, float or pd.Series): The initial capital.
+        init_capital (float or pd.Series): The initial capital.
 
-            If `pd.Series`, must have the same index as columns in `main_price`.
+            Each element must correspond to a column in `main_price`.
         orders (vectorbt.records.orders.Orders): Order records.
         cash (pandas_like): Cash held at each time step.
 
@@ -230,31 +229,27 @@ class Portfolio(PandasIndexer):
                      broadcast_kwargs={}, freq=None, **kwargs):
         """Build portfolio from entry and exit signals.
 
-        At each entry signal in `entries`, buys `size` of shares for `entry_price` to enter
-        a position. At each exit signal in `exits`, sells everything for `exit_price`
+        For each signal in `entries`, buys `size` of shares for `entry_price` to enter
+        a position. For each signal in `exits`, sells everything for `exit_price`
         to exit the position. Accumulation of orders is disabled by default.
 
+        For more details, see `vectorbt.portfolio.nb.simulate_from_signals_nb`.
+
         Args:
-            main_price (pandas_like): Main price of the asset, such as close.
-            entries (array_like): Boolean array of entry signals.
-            exits (array_like): Boolean array of exit signals.
-            size (int, float or array_like): The amount of shares to order.
+            main_price (pandas_like): Main price of the asset, such as close. Will broadcast.
+            entries (array_like): Boolean array of entry signals. Will broadcast.
+            exits (array_like): Boolean array of exit signals. Will broadcast.
+            size (float or array_like): The amount of shares to order. Will broadcast.
 
                 To buy/sell everything, set the size to `np.inf`.
-            entry_price (array_like): Entry price. Defaults to `main_price`.
-            exit_price (array_like): Exit price. Defaults to `main_price`.
-            init_capital (int, float or array_like): The initial capital.
+            entry_price (array_like): Entry price. Defaults to `main_price`. Will broadcast.
+            exit_price (array_like): Exit price. Defaults to `main_price`. Will broadcast.
+            init_capital (float or array_like): The initial capital. Will broadcast.
 
-                Single value or value per column.
-            fees (float or array_like): Fees in percentage of the order value.
-
-                Single value, value per column, or value per element.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
-
-                Single value, value per column, or value per element.
-            slippage (float or array_like): Slippage in percentage of price.
-
-                Single value, value per column, or value per element.
+                Allowed is either a single value or value per column.
+            fees (float or array_like): Fees in percentage of the order value. Will broadcast.
+            fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
+            slippage (float or array_like): Slippage in percentage of price. Will broadcast.
             accumulate (bool): If `accumulate` is `True`, entering the market when already
                 in the market will be allowed to increase a position.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
@@ -321,36 +316,29 @@ class Portfolio(PandasIndexer):
         checks.assert_dtype(exits, np.bool_)
 
         # Broadcast inputs
-        main_price, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage = \
+        # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
+        keep_raw = (False, True, True, True, True, True, True, True, True, True)
+        main_price, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, init_capital = \
             reshape_fns.broadcast(
                 main_price, entries, exits, size, entry_price, exit_price, fees,
-                fixed_fees, slippage, **broadcast_kwargs, writeable=True)
+                fixed_fees, slippage, init_capital, **broadcast_kwargs,
+                writeable=True, keep_raw=keep_raw)
         target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
-        init_capital = np.broadcast_to(init_capital, (target_shape[1],))
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_from_signals_nb(
-            target_shape,
-            init_capital,
-            reshape_fns.to_2d(entries, raw=True),
-            reshape_fns.to_2d(exits, raw=True),
-            reshape_fns.to_2d(size, raw=True),
-            reshape_fns.to_2d(entry_price, raw=True),
-            reshape_fns.to_2d(exit_price, raw=True),
-            reshape_fns.to_2d(fees, raw=True),
-            reshape_fns.to_2d(fixed_fees, raw=True),
-            reshape_fns.to_2d(slippage, raw=True),
-            accumulate)
+            target_shape, init_capital, entries, exits, size, entry_price,
+            exit_price, fees, fixed_fees, slippage, accumulate, is_2d=main_price.ndim == 2)
 
         # Bring to the same meta
-        wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
-        cash = wrapper.wrap(cash)
-        shares = wrapper.wrap(shares)
+        cash = main_price.vbt.wrap(cash)
+        shares = main_price.vbt.wrap(shares)
         orders = Orders(order_records, main_price, freq=freq)
         if checks.is_series(main_price):
-            init_capital = init_capital[0]
+            init_capital = init_capital.item(0)
         else:
-            init_capital = wrapper.wrap_reduced(init_capital)
+            init_capital = np.broadcast_to(init_capital, (target_shape[1],))
+            init_capital = main_price.vbt.wrap_reduced(init_capital)
 
         return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 
@@ -362,26 +350,22 @@ class Portfolio(PandasIndexer):
         Starting with initial capital `init_capital`, at each time step, orders the number
         of shares specified in `order_size` for `order_price`.
 
+        For more details, see `vectorbt.portfolio.nb.simulate_from_orders_nb`.
+
         Args:
-            main_price (pandas_like): Main price of the asset, such as close.
-            order_size (int, float or array_like): The amount of shares to order.
+            main_price (pandas_like): Main price of the asset, such as close. Will broadcast.
+            order_size (float or array_like): The amount of shares to order. Will broadcast.
 
                 If the size is positive, this is the number of shares to buy.
                 If the size is negative, this is the number of shares to sell.
                 To buy/sell everything, set the size to `np.inf`.
-            order_price (array_like): Order price. Defaults to `main_price`.
-            init_capital (int, float or array_like): The initial capital.
+            order_price (array_like): Order price. Defaults to `main_price`. Will broadcast.
+            init_capital (float or array_like): The initial capital. Will broadcast.
 
-                Single value or value per column.
-            fees (float or array_like): Fees in percentage of the order value.
-
-                Single value, value per column, or value per element.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
-
-                Single value, value per column, or value per element.
-            slippage (float or array_like): Slippage in percentage of price.
-
-                Single value, value per column, or value per element.
+                Allowed is either a single value or value per column.
+            fees (float or array_like): Fees in percentage of the order value. Will broadcast.
+            fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
+            slippage (float or array_like): Slippage in percentage of price. Will broadcast.
             is_target (bool): If `True`, will order the difference between current and target size.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
@@ -436,56 +420,59 @@ class Portfolio(PandasIndexer):
         checks.assert_type(main_price, (pd.Series, pd.DataFrame))
 
         # Broadcast inputs
-        main_price, order_size, order_price, fees, fixed_fees, slippage = \
-            reshape_fns.broadcast(main_price, order_size, order_price, fees, fixed_fees,
-                                  slippage, **broadcast_kwargs, writeable=True)
+        # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
+        keep_raw = (False, True, True, True, True, True, True)
+        main_price, order_size, order_price, fees, fixed_fees, slippage, init_capital = \
+            reshape_fns.broadcast(
+                main_price, order_size, order_price, fees, fixed_fees, slippage, init_capital,
+                **broadcast_kwargs, writeable=True, keep_raw=keep_raw)
         target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
-        init_capital = np.broadcast_to(init_capital, (target_shape[1],))
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_from_orders_nb(
-            target_shape,
-            init_capital,
-            reshape_fns.to_2d(order_size, raw=True),
-            reshape_fns.to_2d(order_price, raw=True),
-            reshape_fns.to_2d(fees, raw=True),
-            reshape_fns.to_2d(fixed_fees, raw=True),
-            reshape_fns.to_2d(slippage, raw=True),
-            is_target)
+            target_shape, init_capital, order_size, order_price,
+            fees, fixed_fees, slippage, is_target, is_2d=main_price.ndim == 2)
 
         # Bring to the same meta
-        wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
-        cash = wrapper.wrap(cash)
-        shares = wrapper.wrap(shares)
+        cash = main_price.vbt.wrap(cash)
+        shares = main_price.vbt.wrap(shares)
         orders = Orders(order_records, main_price, freq=freq)
         if checks.is_series(main_price):
-            init_capital = init_capital[0]
+            init_capital = init_capital.item(0)
         else:
-            init_capital = wrapper.wrap_reduced(init_capital)
+            init_capital = np.broadcast_to(init_capital, (target_shape[1],))
+            init_capital = main_price.vbt.wrap_reduced(init_capital)
 
         return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 
     @classmethod
-    def from_order_func(cls, main_price, order_func_nb, *args, init_capital=None, freq=None, **kwargs):
+    def from_order_func(cls, main_price, order_func_nb, *args, init_capital=None, row_wise=False,
+                        row_prep_func_nb=None, broadcast_kwargs={}, freq=None, **kwargs):
         """Build portfolio from a custom order function.
 
         Starting with initial capital `init_capital`, iterates over shape `main_price.shape`, and for
         each data point, generates an order using `order_func_nb`. This way, you can specify order
         size, price and transaction costs dynamically (for example, based on the current balance).
 
-        To iterate over a bigger shape than `main_price`, you should tile/repeat `main_price` to the desired shape.
+        if `row_wise` is `True`, see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+        Otherwise, see `vectorbt.portfolio.nb.simulate_nb`.
 
         Args:
-            main_price (pandas_like): Main price of the asset, such as close.
-
-                Must be a pandas object.
+            main_price (pandas_like): Main price of the asset, such as close. Will broadcast.
             order_func_nb (function): Function that returns an order.
 
                 See `vectorbt.portfolio.enums.Order`.
             *args: Arguments passed to `order_func_nb`.
-            init_capital (int, float or array_like): The initial capital.
+            init_capital (float or array_like): The initial capital. Will broadcast.
 
-                Single value or value per column.
+                Allowed is either a single value or value per column.
+            row_wise (bool): If `True`, iterates over rows, otherwise over columns.
+
+                Set to `True` if columns depend upon each other.
+            row_prep_func_nb (function): Function to call before iterating over the next row.
+
+                Can be used to do preprocessing, such as to calculate past returns.
+            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
@@ -498,13 +485,13 @@ class Portfolio(PandasIndexer):
             `order_func_nb` must be Numba-compiled.
 
         Example:
-            Portfolio from buying daily:
+            Placing a buy order each day:
             ```python-repl
             >>> from vectorbt.portfolio import Order
 
             >>> @njit
-            ... def order_func_nb(col, i, run_cash, run_shares, price):
-            ...     return Order(10, price[i], fees=0.01, fixed_fees=1., slippage=0.01)
+            ... def order_func_nb(oc, price):
+            ...     return Order(10, price[oc.i], fees=0.01, fixed_fees=1., slippage=0.01)
 
             >>> portfolio = vbt.Portfolio.from_order_func(
             ...     price, order_func_nb, price.values, init_capital=100)
@@ -534,25 +521,34 @@ class Portfolio(PandasIndexer):
         checks.assert_numba_func(order_func_nb)
 
         # Broadcast inputs
+        # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
+        keep_raw = (False, True)
+        main_price, init_capital = reshape_fns.broadcast(
+                main_price, init_capital, **broadcast_kwargs,
+                writeable=True, keep_raw=keep_raw)
         target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
-        init_capital = np.broadcast_to(init_capital, (target_shape[1],))
 
         # Perform calculation
-        order_records, cash, shares = nb.simulate_nb(
-            target_shape,
-            init_capital,
-            order_func_nb,
-            *args)
+        if row_wise:
+            if row_prep_func_nb is None:
+                row_prep_func_nb = nb.none_row_prep_func_nb
+            order_records, cash, shares = nb.simulate_row_wise_nb(
+                target_shape, init_capital, row_prep_func_nb, order_func_nb, *args)
+        else:
+            if row_prep_func_nb is not None:
+                raise ValueError("Function row_prep_func_nb can be only called when row_wise=True")
+            order_records, cash, shares = nb.simulate_nb(
+                target_shape, init_capital, order_func_nb, *args)
 
         # Bring to the same meta
-        wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
-        cash = wrapper.wrap(cash)
-        shares = wrapper.wrap(shares)
+        cash = main_price.vbt.wrap(cash)
+        shares = main_price.vbt.wrap(shares)
         orders = Orders(order_records, main_price, freq=freq)
         if checks.is_series(main_price):
-            init_capital = init_capital[0]
+            init_capital = init_capital.item(0)
         else:
-            init_capital = wrapper.wrap_reduced(init_capital)
+            init_capital = np.broadcast_to(init_capital, (target_shape[1],))
+            init_capital = main_price.vbt.wrap_reduced(init_capital)
 
         return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 

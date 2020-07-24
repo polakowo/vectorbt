@@ -422,7 +422,9 @@ def trade_records_nb(price, order_records):
         >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
         >>> @njit
-        ... def order_func_nb(col, i, run_cash, run_shares):
+        ... def order_func_nb(order_context):
+        ...     i = order_context.i
+        ...     col = order_context.col
         ...     return Order(order_size[i, col], order_price[i, col],
         ...          fees=0.01, slippage=0., fixed_fees=0.)
 
@@ -602,7 +604,9 @@ def position_records_nb(price, order_records):
         >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
         >>> @njit
-        ... def order_func_nb(col, i, run_cash, run_shares):
+        ... def order_func_nb(order_context):
+        ...     i = order_context.i
+        ...     col = order_context.col
         ...     return Order(order_size[i, col], order_price[i, col],
         ...          fees=0.01, slippage=0., fixed_fees=0.)
 

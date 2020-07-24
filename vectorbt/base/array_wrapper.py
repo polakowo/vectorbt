@@ -86,7 +86,7 @@ class ArrayWrapper:
         if ndim is None:
             ndim = self.ndim
         if ndim is not None:
-            a = reshape_fns.soft_broadcast_to_ndim(a, self.ndim)
+            a = reshape_fns.soft_to_ndim(a, self.ndim)
         if index is None:
             index = self.index
         if columns is None:

@@ -240,6 +240,22 @@ class TestIndexFns:
                 ('z2', 'z4', 'z7', 'z8')
             ], names=['i2', 'i4', 'i7', 'i8'])
         )
+        pd.testing.assert_index_equal(
+            index_fns.stack_indexes(sr2.index, df2.index, sr2.index, drop_duplicates=False),
+            pd.MultiIndex.from_tuples([
+                ('x2', 'x4', 'x2'),
+                ('y2', 'y4', 'y2'),
+                ('z2', 'z4', 'z2')
+            ], names=['i2', 'i4', 'i2'])
+        )
+        pd.testing.assert_index_equal(
+            index_fns.stack_indexes(sr2.index, df2.index, sr2.index, drop_duplicates=True),
+            pd.MultiIndex.from_tuples([
+                ('x4', 'x2'),
+                ('y4', 'y2'),
+                ('z4', 'z2')
+            ], names=['i4', 'i2'])
+        )
 
     def test_combine_indexes(self):
         pd.testing.assert_index_equal(
@@ -454,14 +470,14 @@ class TestIndexFns:
 
 
 class TestReshapeFns:
-    def test_soft_broadcast_to_ndim(self):
-        np.testing.assert_array_equal(reshape_fns.soft_broadcast_to_ndim(a2, 1), a2)
-        pd.testing.assert_series_equal(reshape_fns.soft_broadcast_to_ndim(sr2, 1), sr2)
-        pd.testing.assert_series_equal(reshape_fns.soft_broadcast_to_ndim(df2, 1), df2.iloc[:, 0])
-        pd.testing.assert_frame_equal(reshape_fns.soft_broadcast_to_ndim(df4, 1), df4)  # cannot -> do nothing
-        np.testing.assert_array_equal(reshape_fns.soft_broadcast_to_ndim(a2, 2), a2[:, None])
-        pd.testing.assert_frame_equal(reshape_fns.soft_broadcast_to_ndim(sr2, 2), sr2.to_frame())
-        pd.testing.assert_frame_equal(reshape_fns.soft_broadcast_to_ndim(df2, 2), df2)
+    def test_soft_to_ndim(self):
+        np.testing.assert_array_equal(reshape_fns.soft_to_ndim(a2, 1), a2)
+        pd.testing.assert_series_equal(reshape_fns.soft_to_ndim(sr2, 1), sr2)
+        pd.testing.assert_series_equal(reshape_fns.soft_to_ndim(df2, 1), df2.iloc[:, 0])
+        pd.testing.assert_frame_equal(reshape_fns.soft_to_ndim(df4, 1), df4)  # cannot -> do nothing
+        np.testing.assert_array_equal(reshape_fns.soft_to_ndim(a2, 2), a2[:, None])
+        pd.testing.assert_frame_equal(reshape_fns.soft_to_ndim(sr2, 2), sr2.to_frame())
+        pd.testing.assert_frame_equal(reshape_fns.soft_to_ndim(df2, 2), df2)
 
     def test_to_1d(self):
         np.testing.assert_array_equal(reshape_fns.to_1d(None), np.asarray([None]))
@@ -942,6 +958,33 @@ class TestReshapeFns:
         a, _ = reshape_fns.broadcast(a5, a5, copy_kwargs={'order': 'F'})  # copy
         assert np.isfortran(a)
 
+    def test_broadcast_keep_raw(self):
+        _0, _a2, _sr2, _df2 = reshape_fns.broadcast(0, a2, sr2, df2, keep_raw=True)
+        assert _0 == 0
+        np.testing.assert_array_equal(_a2, a2)
+        np.testing.assert_array_equal(_sr2, sr2.values[:, None])
+        np.testing.assert_array_equal(_df2, df2.values)
+        _0, _a2, _sr2, _df2 = reshape_fns.broadcast(0, a2, sr2, df2, keep_raw=[False, True, True, True])
+        pd.testing.assert_frame_equal(
+            _0,
+            pd.DataFrame(
+                np.zeros((3, 3), dtype=int),
+                index=pd.MultiIndex.from_tuples([
+                    ('x2', 'x4'),
+                    ('y2', 'y4'),
+                    ('z2', 'z4')
+                ], names=['i2', 'i4']),
+                columns=pd.MultiIndex.from_tuples([
+                    ('a2', 'a4'),
+                    ('a2', 'a4'),
+                    ('a2', 'a4')
+                ], names=[None, 'c4'])
+            )
+        )
+        np.testing.assert_array_equal(_a2, a2)
+        np.testing.assert_array_equal(_sr2, sr2.values[:, None])
+        np.testing.assert_array_equal(_df2, df2.values)
+
     def test_broadcast_to(self):
         np.testing.assert_array_equal(reshape_fns.broadcast_to(0, a5), np.broadcast_to(0, a5.shape))
         pd.testing.assert_series_equal(
@@ -1160,6 +1203,26 @@ class TestReshapeFns:
                 columns=pd.Int64Index([1, 2, 3, 4], dtype='int64')
             )
         )
+
+    @pytest.mark.parametrize(
+        "test_inputs",
+        [
+            (0, a1, a2, sr_none, sr1, sr2),
+            (0, a1, a2, a3, a4, a5, sr_none, sr1, sr2, df_none, df1, df2, df3, df4)
+        ],
+    )
+    def test_flex(self, test_inputs):
+        raw_args = reshape_fns.broadcast(*test_inputs, keep_raw=True)
+        bc_args = reshape_fns.broadcast(*test_inputs, keep_raw=False)
+        for r in range(len(test_inputs)):
+            raw_arg = raw_args[r]
+            bc_arg = np.array(bc_args[r])
+            bc_arg_2d = reshape_fns.to_2d(bc_arg)
+            def_i, def_col = reshape_fns.flex_choose_i_and_col_nb(raw_arg, is_2d=bc_arg.ndim == 2)
+            for col in range(bc_arg_2d.shape[1]):
+                for i in range(bc_arg_2d.shape[0]):
+                    assert bc_arg_2d[i, col] == reshape_fns.flex_select_nb(
+                        i, col, raw_arg, def_i, def_col, bc_arg.ndim == 2)
 
 
 # ############# indexing.py ############# #
@@ -1783,7 +1846,29 @@ class TestAccessors:
 
     def test_tile(self):
         pd.testing.assert_frame_equal(
-            df4.vbt.tile(2, keys=['a', 'b']),
+            df4.vbt.tile(2, keys=['a', 'b'], axis=0),
+            pd.DataFrame(
+                np.asarray([
+                    [1, 2, 3],
+                    [4, 5, 6],
+                    [7, 8, 9],
+                    [1, 2, 3],
+                    [4, 5, 6],
+                    [7, 8, 9]
+                ]),
+                index=pd.MultiIndex.from_tuples([
+                    ('a', 'x6'),
+                    ('a', 'y6'),
+                    ('a', 'z6'),
+                    ('b', 'x6'),
+                    ('b', 'y6'),
+                    ('b', 'z6')
+                ], names=[None, 'i6']),
+                columns=df4.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df4.vbt.tile(2, keys=['a', 'b'], axis=1),
             pd.DataFrame(
                 np.asarray([
                     [1, 2, 3, 1, 2, 3],
@@ -1804,7 +1889,29 @@ class TestAccessors:
 
     def test_repeat(self):
         pd.testing.assert_frame_equal(
-            df4.vbt.repeat(2, keys=['a', 'b']),
+            df4.vbt.repeat(2, keys=['a', 'b'], axis=0),
+            pd.DataFrame(
+                np.asarray([
+                    [1, 2, 3],
+                    [1, 2, 3],
+                    [4, 5, 6],
+                    [4, 5, 6],
+                    [7, 8, 9],
+                    [7, 8, 9]
+                ]),
+                index=pd.MultiIndex.from_tuples([
+                    ('x6', 'a'),
+                    ('x6', 'b'),
+                    ('y6', 'a'),
+                    ('y6', 'b'),
+                    ('z6', 'a'),
+                    ('z6', 'b')
+                ], names=['i6', None]),
+                columns=df4.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df4.vbt.repeat(2, keys=['a', 'b'], axis=1),
             pd.DataFrame(
                 np.asarray([
                     [1, 1, 2, 2, 3, 3],

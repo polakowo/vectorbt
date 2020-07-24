@@ -2,18 +2,20 @@
 
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
-    2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
-    Data is processed along index (axis 0).
+    2-dim, unless function has suffix `_1d` or is meant to be input to another function.
     
     All functions passed as argument must be Numba-compiled.
     
-    Records must remain in the order they were created."""
+    Records must remain the order they were created in."""
 
 import numpy as np
 from numba import njit
 
 from vectorbt.utils.math import is_close_or_less_nb
+from vectorbt.base.reshape_fns import flex_choose_i_and_col_nb, flex_select_nb
 from vectorbt.portfolio.enums import (
+    OrderContext,
+    RowContext,
     Order,
     FilledOrder
 )
@@ -21,6 +23,7 @@ from vectorbt.records.enums import (
     OrderSide,
     order_dt
 )
+
 
 # ############# Simulation ############# #
 
@@ -80,7 +83,7 @@ def sell_nb(run_cash, run_shares, order):
 
     # Minus costs
     adj_cash = cash * (1 - order.fees)
-    if is_close_or_less_nb(adj_cash, order.fixed_fees):
+    if is_close_or_less_nb(run_cash + adj_cash, order.fixed_fees):
         # Can't cover
         return run_cash, run_shares, None
     adj_cash -= order.fixed_fees
@@ -118,19 +121,24 @@ def fill_order_nb(run_cash, run_shares, order):
 
 @njit
 def simulate_nb(target_shape, init_capital, order_func_nb, *args):
-    """Simulate a portfolio by generating and filling orders.
+    """Simulate a portfolio by iterating over columns and generating and filling orders.
 
-    Starting with initial capital `init_capital`, iterates over shape `target_shape`, 
-    and for each data point, generates an order using `order_func_nb`. Tries then to 
-    fulfill that order. If unsuccessful due to insufficient cash/shares, always orders 
-    the available fraction. Updates then the current cash and shares balance.
+    Starting with initial capital `init_capital`, iterates over each column in shape `target_shape`,
+    and for each data point, generates an order using `order_func_nb`. Tries then to fulfill that
+    order. If unsuccessful due to insufficient cash/shares, orders the available fraction.
+    Updates then the current cash and shares balance.
 
     Returns order records of layout `vectorbt.records.enums.order_dt`, but also
     cash and shares as time series.
 
-    `order_func_nb` must accept index of the current column `col`, the time step `i`,
-    the amount of cash `run_cash` and shares `run_shares` held at the time step `i`, and `*args`.
-    Must either return an `vectorbt.portfolio.enums.Order` tuple or `None` to do nothing.
+    `order_func_nb` should accept the current order context `vectorbt.portfolio.enums.OrderContext`,
+    and `*args`. Should either return an `vectorbt.portfolio.enums.Order` tuple or `None` to do nothing.
+
+    !!! note
+        This function assumes that all columns are independent of each other. Since iteration
+        happens over columns, all columns next to the current one will be empty. Accessing
+        these columns will not trigger any errors or warnings, but provide you with arbitrary data
+        (see [numpy.empty](https://numpy.org/doc/stable/reference/generated/numpy.empty.html)).
 
     !!! warning
         In some cases, passing large arrays as `*args` can negatively impact performance. What can help
@@ -156,10 +164,12 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         >>> fees = 0.001
         >>> fixed_fees = 1
         >>> slippage = 0.001
+
         >>> @njit
-        ... def order_func_nb(col, i, run_cash, run_shares):
-        ...     return Order(np.inf if i == 0 else 0, price[i, col], 
+        ... def order_func_nb(oc):
+        ...     return Order(np.inf if oc.i == 0 else 0, price[oc.i, oc.col],
         ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage)
+
         >>> order_records, cash, shares = simulate_nb(
         ...     price.shape, init_capital, order_func_nb)
 
@@ -188,12 +198,22 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
     shares = np.empty(target_shape, dtype=np.float_)
 
     for col in range(target_shape[1]):
-        run_cash = init_capital[col]
+        run_cash = float(flex_select_nb(0, col, init_capital, is_2d=True))
         run_shares = 0.
 
         for i in range(target_shape[0]):
-            # Generate the next oder or None to do nothing
-            order = order_func_nb(col, i, run_cash, run_shares, *args)
+            # Generate the next order or None to do nothing
+            order_context = OrderContext(
+                col, i,
+                target_shape,
+                init_capital,
+                order_records[:j],
+                cash,
+                shares,
+                run_cash,
+                run_shares
+            )
+            order = order_func_nb(order_context, *args)
 
             if order is not None:
                 # Fill the order
@@ -216,31 +236,195 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
 
 
 @njit(cache=True)
+def none_row_prep_func_nb(row_context, *args):
+    """`row_prep_func_nb` that returns an empty tuple."""
+    return ()
+
+
+@njit
+def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_func_nb, *args):
+    """Simulate a portfolio by iterating over rows and generating and filling orders.
+
+    As opposed to `simulate_nb`, iterates using C-like index order, with the rows
+    changing fastest, and the columns changing slowest.
+
+    `row_prep_func_nb` should accept the current row context `vectorbt.portfolio.enums.RowContext`,
+    and `*args`. Should return a tuple of any content.
+
+    `order_func_nb` should accept the current order context `vectorbt.portfolio.enums.OrderContext`,
+    unpacked result of `row_prep_func_nb`, and `*args`. Should either return an
+    `vectorbt.portfolio.enums.Order` tuple or `None` to do nothing.
+
+    !!! note
+        This function allows sharing information between columns. This allows complex logic
+        such as rebalancing.
+
+    Example:
+        Simulate random rebalancing. Note, however, that columns do not share the same capital.
+        ```python-repl
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from numba import njit
+        >>> from vectorbt.portfolio.nb import simulate_row_wise_nb
+        >>> from vectorbt.portfolio.enums import Order
+
+        >>> price = np.asarray([
+        ...     [1, 5, 1],
+        ...     [2, 4, 2],
+        ...     [3, 3, 3],
+        ...     [4, 2, 2],
+        ...     [5, 1, 1]
+        ... ])
+        >>> init_capital = np.full(3, 100)
+        >>> fees = 0.001
+        >>> fixed_fees = 1
+        >>> slippage = 0.001
+
+        >>> @njit
+        ... def row_prep_func_nb(rc):
+        ...     np.random.seed(rc.i)
+        ...     w = np.random.uniform(0, 1, size=rc.target_shape[1])
+        ...     return (w / np.sum(w),)
+
+        >>> @njit
+        ... def order_func_nb(oc, w):
+        ...     current_value = oc.run_cash / price[oc.i, oc.col] + oc.run_shares
+        ...     target_size = w[oc.col] * current_value
+        ...     return Order(target_size - oc.run_shares, price[oc.i, oc.col],
+        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage)
+
+        >>> order_records, cash, shares = simulate_row_wise_nb(
+        ...     price.shape, init_capital, row_prep_func_nb, order_func_nb)
+
+        >>> print(pd.DataFrame.from_records(order_records))
+            col  idx       size  price      fees  side
+        0     0    0  29.399155  1.001  1.029429     0
+        1     0    1   5.872746  1.998  1.011734     1
+        2     0    2   1.855144  2.997  1.005560     1
+        3     0    3   6.433713  3.996  1.025709     1
+        4     0    4   0.796768  4.995  1.003980     1
+        5     1    0   7.662334  5.005  1.038350     0
+        6     1    1   6.785973  4.004  1.027171     0
+        7     1    2  13.801094  2.997  1.041362     1
+        8     1    3  16.265081  2.002  1.032563     0
+        9     1    4   4.578725  0.999  1.004574     1
+        10    2    0  32.289173  1.001  1.032321     0
+        11    2    1  32.282575  1.998  1.064501     1
+        12    2    2  23.557854  3.003  1.070744     0
+        13    2    3  13.673091  1.998  1.027319     1
+        14    2    4  27.049616  1.001  1.027077     0
+        >>> print(cash)
+        [[ 69.5420172   60.61166607  66.64621673]
+         [ 80.26402911  32.41346024 130.08230128]
+         [ 84.81833559  72.73397843  58.26732111]
+         [109.50174358  39.13872328  84.55883717]
+         [112.47761836  42.70829586  56.45509534]]
+        >>> print(shares)
+        [[2.93991551e+01 7.66233445e+00 3.22891726e+01]
+         [2.35264095e+01 1.44483072e+01 6.59749521e-03]
+         [2.16712656e+01 6.47212729e-01 2.35644516e+01]
+         [1.52375526e+01 1.69122939e+01 9.89136108e+00]
+         [1.44407849e+01 1.23335684e+01 3.69409766e+01]]
+        ```
+    """
+    order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
+    j = 0
+    cash = np.empty(target_shape, dtype=np.float_)
+    shares = np.empty(target_shape, dtype=np.float_)
+
+    for i in range(target_shape[0]):
+        # Run a row preparation function and pass the result to each order function
+        row_context = RowContext(
+            i,
+            target_shape,
+            init_capital,
+            order_records[:j],  # not sorted!
+            cash,
+            shares
+        )
+        prep_result = row_prep_func_nb(row_context, *args)
+
+        for col in range(target_shape[1]):
+            if i == 0:
+                run_cash = float(flex_select_nb(0, col, init_capital, is_2d=True))
+                run_shares = 0.
+            else:
+                run_cash = cash[i - 1, col]
+                run_shares = shares[i - 1, col]
+
+            # Generate the next order or None to do nothing
+            order_context = OrderContext(
+                col, i,
+                target_shape,
+                init_capital,
+                order_records[:j],  # not sorted!
+                cash,
+                shares,
+                run_cash,
+                run_shares
+            )
+            order = order_func_nb(order_context, *prep_result, *args)
+
+            if order is not None:
+                # Fill the order
+                run_cash, run_shares, filled_order = fill_order_nb(run_cash, run_shares, order)
+
+                # Add a new record
+                if filled_order is not None:
+                    order_records[j]['col'] = col
+                    order_records[j]['idx'] = i
+                    order_records[j]['size'] = filled_order.size
+                    order_records[j]['price'] = filled_order.price
+                    order_records[j]['fees'] = filled_order.fees
+                    order_records[j]['side'] = filled_order.side
+                    j += 1
+
+            # Populate cash and shares
+            cash[i, col], shares[i, col] = run_cash, run_shares
+
+    # Order records are not sorted yet
+    order_records = order_records[:j]
+    return order_records[np.argsort(order_records['col'])], cash, shares
+
+
+@njit(cache=True)
 def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, entry_price,
-                             exit_price, fees, fixed_fees, slippage, accumulate):
+                             exit_price, fees, fixed_fees, slippage, accumulate, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
     cash = np.empty(target_shape, dtype=np.float_)
     shares = np.empty(target_shape, dtype=np.float_)
 
+    # Inputs were not broadcasted -> use flexible indexing
+    i1, col1 = flex_choose_i_and_col_nb(entries, is_2d=is_2d)
+    i2, col2 = flex_choose_i_and_col_nb(exits, is_2d=is_2d)
+    i3, col3 = flex_choose_i_and_col_nb(size, is_2d=is_2d)
+    i4, col4 = flex_choose_i_and_col_nb(entry_price, is_2d=is_2d)
+    i5, col5 = flex_choose_i_and_col_nb(exit_price, is_2d=is_2d)
+    i6, col6 = flex_choose_i_and_col_nb(fees, is_2d=is_2d)
+    i7, col7 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
+    i8, col8 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
+
     for col in range(target_shape[1]):
-        run_cash = init_capital[col]
+        run_cash = float(flex_select_nb(0, col, init_capital, is_2d=is_2d))
         run_shares = 0.
 
         for i in range(target_shape[0]):
             # Generate the next oder or None to do nothing
-            if entries[i, col] or exits[i, col]:
+            is_entry = flex_select_nb(i, col, entries, def_i=i1, def_col=col1, is_2d=is_2d)
+            is_exit = flex_select_nb(i, col, exits, def_i=i2, def_col=col2, is_2d=is_2d)
+            if is_entry or is_exit:
                 order = signals_order_func_nb(
                     run_shares,
-                    entries[i, col],
-                    exits[i, col],
-                    size[i, col],
-                    entry_price[i, col],
-                    exit_price[i, col],
-                    fees[i, col],
-                    fixed_fees[i, col],
-                    slippage[i, col],
+                    is_entry,
+                    is_exit,
+                    flex_select_nb(i, col, size, def_i=i3, def_col=col3, is_2d=is_2d),
+                    flex_select_nb(i, col, entry_price, def_i=i4, def_col=col4, is_2d=is_2d),
+                    flex_select_nb(i, col, exit_price, def_i=i5, def_col=col5, is_2d=is_2d),
+                    flex_select_nb(i, col, fees, def_i=i6, def_col=col6, is_2d=is_2d),
+                    flex_select_nb(i, col, fixed_fees, def_i=i7, def_col=col7, is_2d=is_2d),
+                    flex_select_nb(i, col, slippage, def_i=i8, def_col=col8, is_2d=is_2d),
                     accumulate)
 
                 if order is not None:
@@ -305,26 +489,34 @@ def signals_order_func_nb(run_shares, entries, exits, size, entry_price,
 
 
 @njit(cache=True)
-def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed_fees, slippage, is_target):
+def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed_fees,
+                            slippage, is_target, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on orders."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
     cash = np.empty(target_shape, dtype=np.float_)
     shares = np.empty(target_shape, dtype=np.float_)
 
+    # Inputs were not broadcasted -> use flexible indexing
+    i1, col1 = flex_choose_i_and_col_nb(size, is_2d=is_2d)
+    i2, col2 = flex_choose_i_and_col_nb(price, is_2d=is_2d)
+    i3, col3 = flex_choose_i_and_col_nb(fees, is_2d=is_2d)
+    i4, col4 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
+    i5, col5 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
+
     for col in range(target_shape[1]):
-        run_cash = init_capital[col]
+        run_cash = float(flex_select_nb(0, col, init_capital, is_2d=is_2d))
         run_shares = 0.
 
         for i in range(target_shape[0]):
             # Generate the next oder or None to do nothing
             order = size_order_func_nb(
                 run_shares,
-                size[i, col],
-                price[i, col],
-                fees[i, col],
-                fixed_fees[i, col],
-                slippage[i, col],
+                flex_select_nb(i, col, size, def_i=i1, def_col=col1, is_2d=is_2d),
+                flex_select_nb(i, col, price, def_i=i2, def_col=col2, is_2d=is_2d),
+                flex_select_nb(i, col, fees, def_i=i3, def_col=col3, is_2d=is_2d),
+                flex_select_nb(i, col, fixed_fees, def_i=i4, def_col=col4, is_2d=is_2d),
+                flex_select_nb(i, col, slippage, def_i=i5, def_col=col5, is_2d=is_2d),
                 is_target)
 
             if order is not None:
@@ -360,4 +552,3 @@ def size_order_func_nb(run_shares, size, price, fees, fixed_fees, slippage, is_t
         fees=fees,
         fixed_fees=fixed_fees,
         slippage=slippage)
-
