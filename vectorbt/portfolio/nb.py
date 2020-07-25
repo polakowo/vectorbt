@@ -16,6 +16,7 @@ from vectorbt.base.reshape_fns import flex_choose_i_and_col_nb, flex_select_nb
 from vectorbt.portfolio.enums import (
     OrderContext,
     RowContext,
+    SizeType,
     Order,
     FilledOrder
 )
@@ -27,77 +28,154 @@ from vectorbt.records.enums import (
 
 # ############# Simulation ############# #
 
+@njit(cache=True)
+def buy_in_cash_nb(run_cash, run_shares, order_price, order_cash, order_fees, order_fixed_fees, order_slippage):
+    """Buy shares for `order_cash` cash.
+
+    Returns an updated cash and shares balance, and `vectorbt.portfolio.enums.FilledOrder`."""
+    # Get offered cash
+    offer_cash = min(run_cash, order_cash)
+
+    # Get effective cash by subtracting costs
+    if is_close_or_less_nb(offer_cash, order_fixed_fees):
+        # Can't cover
+        return run_cash, run_shares, None
+    effect_cash = (offer_cash - order_fixed_fees) * (1 - order_fees)
+
+    # Get price adjusted with slippage
+    adj_price = order_price * (1 + order_slippage)
+
+    # Get final size for that cash
+    final_size = effect_cash / adj_price
+
+    # Get paid fees
+    fees_paid = offer_cash - effect_cash
+
+    # Update current cash and shares
+    run_shares += final_size
+    if is_close_or_less_nb(run_cash, order_cash):
+        run_cash = 0.  # numerical stability
+    else:
+        run_cash -= offer_cash
+    return run_cash, run_shares, FilledOrder(final_size, adj_price, fees_paid, OrderSide.Buy)
+
 
 @njit(cache=True)
-def buy_nb(run_cash, run_shares, order):
-    """Perform a Buy.
+def sell_in_cash_nb(run_cash, run_shares, order_price, order_cash, order_fees, order_fixed_fees, order_slippage):
+    """Sell shares for `order_cash` cash.
 
-    Returns an updated cash and shares balance, the number of shares bought,
-    the price adjusted with slippage, and fees paid."""
+    Returns an updated cash and shares balance, and `vectorbt.portfolio.enums.FilledOrder`."""
+    # Get price adjusted with slippage
+    adj_price = order_price * (1 - order_slippage)
 
-    # Compute cash required to complete this order
-    adj_price = order.price * (1 + order.slippage)
-    req_cash = order.size * adj_price
-    adj_req_cash = req_cash * (1 + order.fees) + order.fixed_fees
+    # Get value required to complete this order
+    req_value = (order_cash + order_fixed_fees) / (1 - order_fees)
+
+    # Translate this to shares
+    req_shares = req_value / adj_price
+
+    if is_close_or_less_nb(req_shares, run_shares):
+        # Sufficient shares
+        final_size = req_shares
+        fees_paid = req_value - order_cash
+
+        # Update current cash and shares
+        run_cash += order_cash
+        run_shares -= req_shares
+    else:
+        # Insufficient shares, cash will be less than requested
+        final_size = run_shares
+        acq_cash = final_size * adj_price
+
+        # Get final cash by subtracting costs
+        final_cash = acq_cash * (1 - order_fees)
+        if is_close_or_less_nb(run_cash + final_cash, order_fixed_fees):
+            # Can't cover
+            return run_cash, run_shares, None
+        final_cash -= order_fixed_fees
+
+        # Update fees
+        fees_paid = acq_cash - final_cash
+
+        # Update current cash and shares
+        run_cash += final_cash
+        run_shares = 0.
+    return run_cash, run_shares, FilledOrder(final_size, adj_price, fees_paid, OrderSide.Sell)
+
+
+@njit(cache=True)
+def buy_in_shares_nb(run_cash, run_shares, order_price, order_size, order_fees, order_fixed_fees, order_slippage):
+    """Buy `order_size` shares.
+
+    Returns an updated cash and shares balance, and `vectorbt.portfolio.enums.FilledOrder`."""
+
+    # Get price adjusted with slippage
+    adj_price = order_price * (1 + order_slippage)
+
+    # Get cash required to complete this order
+    req_cash = order_size * adj_price
+    adj_req_cash = req_cash * (1 + order_fees) + order_fixed_fees
 
     if is_close_or_less_nb(adj_req_cash, run_cash):
         # Sufficient cash
-        adj_size = order.size
+        final_size = order_size
         fees_paid = adj_req_cash - req_cash
 
         # Update current cash and shares
-        run_cash -= adj_size * adj_price + fees_paid
-        run_shares += adj_size
+        run_cash -= order_size * adj_price + fees_paid
+        run_shares += final_size
     else:
         # Insufficient cash, size will be less than requested
-        if is_close_or_less_nb(run_cash, order.fixed_fees):
+        if is_close_or_less_nb(run_cash, order_fixed_fees):
             # Can't cover
             return run_cash, run_shares, None
 
-        # For fees of 10%, you can buy shares for 90.9$ (adj_cash) to spend 100$ (run_cash) in total
-        adj_cash = (run_cash - order.fixed_fees) / (1 + order.fees)
+        # For fees of 10% and 1$ per transaction, you can buy shares for 90$ (effect_cash)
+        # to spend 100$ (adj_req_cash) in total
+        effect_cash = (run_cash - order_fixed_fees) / (1 + order_fees)
 
-        # Update size and feee
-        adj_size = adj_cash / adj_price
-        fees_paid = run_cash - adj_cash
+        # Update size and fees
+        final_size = effect_cash / adj_price
+        fees_paid = run_cash - effect_cash
 
         # Update current cash and shares
         run_cash = 0.  # numerical stability
-        run_shares += adj_size
+        run_shares += final_size
 
     # Return filled order
-    return run_cash, run_shares, FilledOrder(adj_size, adj_price, fees_paid, OrderSide.Buy)
+    return run_cash, run_shares, FilledOrder(final_size, adj_price, fees_paid, OrderSide.Buy)
 
 
 @njit(cache=True)
-def sell_nb(run_cash, run_shares, order):
-    """Perform a Sell.
+def sell_in_shares_nb(run_cash, run_shares, order_price, order_size, order_fees, order_fixed_fees, order_slippage):
+    """Sell `order_size` shares.
 
-    Returns an updated cash and shares balance, the number of shares sold,
-    the price adjusted with slippage, and fees paid."""
+    Returns an updated cash and shares balance, and `vectorbt.portfolio.enums.FilledOrder`."""
+
+    # Get price adjusted with slippage
+    adj_price = order_price * (1 - order_slippage)
 
     # Compute acquired cash
-    adj_price = order.price * (1 - order.slippage)
-    adj_size = min(run_shares, abs(order.size))
-    cash = adj_size * adj_price
+    final_size = min(run_shares, order_size)
+    acq_cash = final_size * adj_price
 
-    # Minus costs
-    adj_cash = cash * (1 - order.fees)
-    if is_close_or_less_nb(run_cash + adj_cash, order.fixed_fees):
+    # Get final cash by subtracting costs
+    final_cash = acq_cash * (1 - order_fees)
+    if is_close_or_less_nb(run_cash + final_cash, order_fixed_fees):
         # Can't cover
         return run_cash, run_shares, None
-    adj_cash -= order.fixed_fees
+    final_cash -= order_fixed_fees
 
     # Update fees
-    fees_paid = cash - adj_cash
+    fees_paid = acq_cash - final_cash
 
     # Update current cash and shares
-    run_cash += adj_size * adj_price - fees_paid
-    if is_close_or_less_nb(run_shares, abs(order.size)):
+    run_cash += final_size * adj_price - fees_paid
+    if is_close_or_less_nb(run_shares, order_size):
         run_shares = 0.  # numerical stability
     else:
-        run_shares -= adj_size
-    return run_cash, run_shares, FilledOrder(adj_size, adj_price, fees_paid, OrderSide.Sell)
+        run_shares -= final_size
+    return run_cash, run_shares, FilledOrder(final_size, adj_price, fees_paid, OrderSide.Sell)
 
 
 @njit(cache=True)
@@ -112,10 +190,71 @@ def fill_order_nb(run_cash, run_shares, order):
             raise ValueError("Fixed fees must be zero or greater")
         if order.slippage < 0.:
             raise ValueError("Slippage must be zero or greater")
-        if order.size > 0. and run_cash > 0.:
-            return buy_nb(run_cash, run_shares, order)
-        if order.size < 0. and run_shares > 0.:
-            return sell_nb(run_cash, run_shares, order)
+        if order.size_type == SizeType.Shares \
+                or order.size_type == SizeType.TargetShares \
+                or order.size_type == SizeType.TargetValue \
+                or order.size_type == SizeType.TargetPercent:
+            size = order.size
+            if order.size_type == SizeType.TargetShares:
+                # order.size contains target amount of shares
+                size = order.size - run_shares
+            elif order.size_type == SizeType.TargetValue:
+                # order.size contains value in monetary units of the asset
+                target_value = order.size
+                current_value = run_shares * order.price
+                size = (target_value - current_value) / order.price
+            elif order.size_type == SizeType.TargetPercent:
+                # order.size contains percentage from current portfolio value
+                target_perc = order.size
+                current_value = run_shares * order.price
+                current_total_value = run_cash + current_value
+                target_value = target_perc * current_total_value
+                size = (target_value - current_value) / order.price
+            if size > 0. and run_cash > 0.:
+                return buy_in_shares_nb(
+                    run_cash,
+                    run_shares,
+                    order.price,
+                    size,
+                    order.fees,
+                    order.fixed_fees,
+                    order.slippage
+                )
+            if size < 0. and run_shares > 0.:
+                return sell_in_shares_nb(
+                    run_cash,
+                    run_shares,
+                    order.price,
+                    abs(size),
+                    order.fees,
+                    order.fixed_fees,
+                    order.slippage
+                )
+        else:
+            cash = order.size
+            if order.size_type == SizeType.TargetCash:
+                # order.size contains target amount of cash
+                cash = run_cash - order.size
+            if cash > 0. and run_cash > 0.:
+                return buy_in_cash_nb(
+                    run_cash,
+                    run_shares,
+                    order.price,
+                    cash,
+                    order.fees,
+                    order.fixed_fees,
+                    order.slippage
+                )
+            if cash < 0. and run_shares > 0.:
+                return sell_in_cash_nb(
+                    run_cash,
+                    run_shares,
+                    order.price,
+                    abs(cash),
+                    order.fees,
+                    order.fixed_fees,
+                    order.slippage
+                )
     return run_cash, run_shares, None
 
 
@@ -131,7 +270,7 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
     Returns order records of layout `vectorbt.records.enums.order_dt`, but also
     cash and shares as time series.
 
-    `order_func_nb` should accept the current order context `vectorbt.portfolio.enums.OrderContext`,
+    `order_func_nb` must accept the current order context `vectorbt.portfolio.enums.OrderContext`,
     and `*args`. Should either return an `vectorbt.portfolio.enums.Order` tuple or `None` to do nothing.
 
     !!! note
@@ -151,7 +290,7 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         >>> import pandas as pd
         >>> from numba import njit
         >>> from vectorbt.portfolio.nb import simulate_nb
-        >>> from vectorbt.portfolio.enums import Order
+        >>> from vectorbt.portfolio.enums import Order, SizeType
 
         >>> price = np.asarray([
         ...     [1, 5, 1],
@@ -167,9 +306,8 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
 
         >>> @njit
         ... def order_func_nb(oc):
-        ...     return Order(np.inf if oc.i == 0 else 0, price[oc.i, oc.col],
-        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage)
-
+        ...     return Order(np.inf if oc.i == 0 else 0, SizeType.Shares,
+        ...         price[oc.i, oc.col], fees, fixed_fees, slippage)
         >>> order_records, cash, shares = simulate_nb(
         ...     price.shape, init_capital, order_func_nb)
 
@@ -248,10 +386,10 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
     As opposed to `simulate_nb`, iterates using C-like index order, with the rows
     changing fastest, and the columns changing slowest.
 
-    `row_prep_func_nb` should accept the current row context `vectorbt.portfolio.enums.RowContext`,
+    `row_prep_func_nb` must accept the current row context `vectorbt.portfolio.enums.RowContext`,
     and `*args`. Should return a tuple of any content.
 
-    `order_func_nb` should accept the current order context `vectorbt.portfolio.enums.OrderContext`,
+    `order_func_nb` must accept the current order context `vectorbt.portfolio.enums.OrderContext`,
     unpacked result of `row_prep_func_nb`, and `*args`. Should either return an
     `vectorbt.portfolio.enums.Order` tuple or `None` to do nothing.
 
@@ -266,7 +404,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         >>> import pandas as pd
         >>> from numba import njit
         >>> from vectorbt.portfolio.nb import simulate_row_wise_nb
-        >>> from vectorbt.portfolio.enums import Order
+        >>> from vectorbt.portfolio.enums import Order, SizeType
 
         >>> price = np.asarray([
         ...     [1, 5, 1],
@@ -290,8 +428,8 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         ... def order_func_nb(oc, w):
         ...     current_value = oc.run_cash / price[oc.i, oc.col] + oc.run_shares
         ...     target_size = w[oc.col] * current_value
-        ...     return Order(target_size - oc.run_shares, price[oc.i, oc.col],
-        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage)
+        ...     return Order(target_size - oc.run_shares, SizeType.Shares,
+        ...         price[oc.i, oc.col], fees, fixed_fees, slippage)
 
         >>> order_records, cash, shares = simulate_row_wise_nb(
         ...     price.shape, init_capital, row_prep_func_nb, order_func_nb)
@@ -388,7 +526,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
 
 
 @njit(cache=True)
-def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, entry_price,
+def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, size_type, entry_price,
                              exit_price, fees, fixed_fees, slippage, accumulate, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
@@ -400,11 +538,12 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, e
     i1, col1 = flex_choose_i_and_col_nb(entries, is_2d=is_2d)
     i2, col2 = flex_choose_i_and_col_nb(exits, is_2d=is_2d)
     i3, col3 = flex_choose_i_and_col_nb(size, is_2d=is_2d)
-    i4, col4 = flex_choose_i_and_col_nb(entry_price, is_2d=is_2d)
-    i5, col5 = flex_choose_i_and_col_nb(exit_price, is_2d=is_2d)
-    i6, col6 = flex_choose_i_and_col_nb(fees, is_2d=is_2d)
-    i7, col7 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
-    i8, col8 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
+    i4, col4 = flex_choose_i_and_col_nb(size_type, is_2d=is_2d)
+    i5, col5 = flex_choose_i_and_col_nb(entry_price, is_2d=is_2d)
+    i6, col6 = flex_choose_i_and_col_nb(exit_price, is_2d=is_2d)
+    i7, col7 = flex_choose_i_and_col_nb(fees, is_2d=is_2d)
+    i8, col8 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
+    i9, col9 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
 
     for col in range(target_shape[1]):
         run_cash = float(flex_select_nb(0, col, init_capital, is_2d=is_2d))
@@ -417,14 +556,16 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, e
             if is_entry or is_exit:
                 order = signals_order_func_nb(
                     run_shares,
+                    run_cash,
                     is_entry,
                     is_exit,
                     flex_select_nb(i, col, size, def_i=i3, def_col=col3, is_2d=is_2d),
-                    flex_select_nb(i, col, entry_price, def_i=i4, def_col=col4, is_2d=is_2d),
-                    flex_select_nb(i, col, exit_price, def_i=i5, def_col=col5, is_2d=is_2d),
-                    flex_select_nb(i, col, fees, def_i=i6, def_col=col6, is_2d=is_2d),
-                    flex_select_nb(i, col, fixed_fees, def_i=i7, def_col=col7, is_2d=is_2d),
-                    flex_select_nb(i, col, slippage, def_i=i8, def_col=col8, is_2d=is_2d),
+                    flex_select_nb(i, col, size_type, def_i=i4, def_col=col4, is_2d=is_2d),
+                    flex_select_nb(i, col, entry_price, def_i=i5, def_col=col5, is_2d=is_2d),
+                    flex_select_nb(i, col, exit_price, def_i=i6, def_col=col6, is_2d=is_2d),
+                    flex_select_nb(i, col, fees, def_i=i7, def_col=col7, is_2d=is_2d),
+                    flex_select_nb(i, col, fixed_fees, def_i=i8, def_col=col8, is_2d=is_2d),
+                    flex_select_nb(i, col, slippage, def_i=i9, def_col=col9, is_2d=is_2d),
                     accumulate)
 
                 if order is not None:
@@ -448,9 +589,11 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, e
 
 
 @njit(cache=True)
-def signals_order_func_nb(run_shares, entries, exits, size, entry_price,
+def signals_order_func_nb(run_shares, run_cash, entries, exits, size, size_type, entry_price,
                           exit_price, fees, fixed_fees, slippage, accumulate):
     """`order_func_nb` of `simulate_from_signals_nb`."""
+    if size_type != SizeType.Shares and size_type != SizeType.Cash:
+        raise ValueError("Only SizeType.Shares and SizeType.Cash are supported")
     if entries and not exits:
         # Buy the amount of shares specified in size (only once if not accumulate)
         if run_shares == 0. or accumulate:
@@ -471,7 +614,10 @@ def signals_order_func_nb(run_shares, entries, exits, size, entry_price,
             return None
     elif entries and exits:
         # Buy the difference between entry and exit size
-        order_size = abs(size) - run_shares
+        if size_type == SizeType.Shares:
+            order_size = abs(size) - run_shares
+        if size_type == SizeType.Cash:
+            order_size = run_cash - abs(size)
         if order_size > 0:
             order_price = entry_price
         elif order_size < 0:
@@ -480,17 +626,12 @@ def signals_order_func_nb(run_shares, entries, exits, size, entry_price,
             return None
     else:
         return None
-    return Order(
-        order_size,
-        order_price,
-        fees=fees,
-        fixed_fees=fixed_fees,
-        slippage=slippage)
+    return Order(order_size, size_type, order_price, fees, fixed_fees, slippage)
 
 
 @njit(cache=True)
-def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed_fees,
-                            slippage, is_target, is_2d=False):
+def simulate_from_orders_nb(target_shape, init_capital, size, size_type, price,
+                            fees, fixed_fees, slippage, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on orders."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
@@ -499,10 +640,11 @@ def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed
 
     # Inputs were not broadcasted -> use flexible indexing
     i1, col1 = flex_choose_i_and_col_nb(size, is_2d=is_2d)
-    i2, col2 = flex_choose_i_and_col_nb(price, is_2d=is_2d)
-    i3, col3 = flex_choose_i_and_col_nb(fees, is_2d=is_2d)
-    i4, col4 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
-    i5, col5 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
+    i2, col2 = flex_choose_i_and_col_nb(size_type, is_2d=is_2d)
+    i3, col3 = flex_choose_i_and_col_nb(price, is_2d=is_2d)
+    i4, col4 = flex_choose_i_and_col_nb(fees, is_2d=is_2d)
+    i5, col5 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
+    i6, col6 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
 
     for col in range(target_shape[1]):
         run_cash = float(flex_select_nb(0, col, init_capital, is_2d=is_2d))
@@ -510,14 +652,14 @@ def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed
 
         for i in range(target_shape[0]):
             # Generate the next oder or None to do nothing
-            order = size_order_func_nb(
-                run_shares,
+            order = Order(
                 flex_select_nb(i, col, size, def_i=i1, def_col=col1, is_2d=is_2d),
-                flex_select_nb(i, col, price, def_i=i2, def_col=col2, is_2d=is_2d),
-                flex_select_nb(i, col, fees, def_i=i3, def_col=col3, is_2d=is_2d),
-                flex_select_nb(i, col, fixed_fees, def_i=i4, def_col=col4, is_2d=is_2d),
-                flex_select_nb(i, col, slippage, def_i=i5, def_col=col5, is_2d=is_2d),
-                is_target)
+                flex_select_nb(i, col, size_type, def_i=i2, def_col=col2, is_2d=is_2d),
+                flex_select_nb(i, col, price, def_i=i3, def_col=col3, is_2d=is_2d),
+                flex_select_nb(i, col, fees, def_i=i4, def_col=col4, is_2d=is_2d),
+                flex_select_nb(i, col, fixed_fees, def_i=i5, def_col=col5, is_2d=is_2d),
+                flex_select_nb(i, col, slippage, def_i=i6, def_col=col6, is_2d=is_2d),
+            )
 
             if order is not None:
                 # Fill the order
@@ -538,17 +680,3 @@ def simulate_from_orders_nb(target_shape, init_capital, size, price, fees, fixed
 
     return order_records[:j], cash, shares
 
-
-@njit(cache=True)
-def size_order_func_nb(run_shares, size, price, fees, fixed_fees, slippage, is_target):
-    """`order_func_nb` of `simulate_from_orders_nb`."""
-    if is_target:
-        order_size = size - run_shares
-    else:
-        order_size = size
-    return Order(
-        order_size,
-        price,
-        fees=fees,
-        fixed_fees=fixed_fees,
-        slippage=slippage)

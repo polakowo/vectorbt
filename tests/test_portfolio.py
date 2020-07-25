@@ -5,6 +5,7 @@ from numba import njit
 from datetime import datetime
 
 from vectorbt.records import order_dt, trade_dt, position_dt, drawdown_dt
+from vectorbt.portfolio.enums import FilledOrder, SizeType
 
 from tests.utils import record_arrays_close
 
@@ -18,7 +19,7 @@ price = pd.Series([1, 2, 3, 2, 1], index=pd.Index([
     datetime(2020, 1, 3),
     datetime(2020, 1, 4),
     datetime(2020, 1, 5)
-]))
+]), name='Price')
 
 entries = pd.DataFrame({
     'a': [True, True, True, False, False],
@@ -46,7 +47,8 @@ def order_func_nb(order_context, price, fees, fixed_fees, slippage):
     size = col + 1
     if i % 2 == 1:
         size *= -1
-    return vbt.portfolio.nb.Order(size, price[i, col], fees[i, col], fixed_fees[i, col], slippage[i, col])
+    return vbt.portfolio.nb.Order(
+        size, SizeType.Shares, price[i, col], fees[i, col], fixed_fees[i, col], slippage[i, col])
 
 
 # test_portfolio
@@ -75,6 +77,98 @@ test_portfolio = vbt.Portfolio.from_signals(
 )
 
 
+# ############# nb.py ############# #
+
+class TestNumba:
+    def test_buy_in_cash_nb(self):
+        from vectorbt.portfolio.nb import buy_in_cash_nb
+
+        assert buy_in_cash_nb(5, 0, 10, 4, 0, 0, 0) == \
+               (1.0, 0.4, FilledOrder(size=0.4, price=10, fees=0, side=0))
+        assert buy_in_cash_nb(5, 0, 10, 5, 0, 0, 0) == \
+               (0.0, 0.5, FilledOrder(size=0.5, price=10, fees=0, side=0))
+        assert buy_in_cash_nb(5, 0, 10, 6, 0, 0, 0) == \
+               (0.0, 0.5, FilledOrder(size=0.5, price=10, fees=0, side=0))
+        assert buy_in_cash_nb(100, 0, 10, 5, 0, 4, 0) == \
+               (95.0, 0.1, FilledOrder(size=0.1, price=10, fees=4, side=0))
+        assert buy_in_cash_nb(100, 0, 10, 5, 0, 5, 0) == \
+               (100.0, 0.0, None)
+        assert buy_in_cash_nb(100, 0, 10, 5, 0, 6, 0) == \
+               (100.0, 0.0, None)
+        assert buy_in_cash_nb(100, 0, 10, 5, 0, 0, 0.1) == \
+               (95.0, 0.45454545454545453, FilledOrder(size=0.45454545454545453, price=11.0, fees=0, side=0))
+        assert buy_in_cash_nb(100, 0, 10, 5, 0.1, 0, 0) == \
+               (95.0, 0.45, FilledOrder(size=0.45, price=10, fees=0.5, side=0))
+        assert buy_in_cash_nb(100, 0, 10, 5, 1, 0, 0) == \
+               (95.0, 0.0, FilledOrder(size=0.0, price=10, fees=5, side=0))
+
+    def test_sell_in_cash_nb(self):
+        from vectorbt.portfolio.nb import sell_in_cash_nb
+
+        assert sell_in_cash_nb(0, 100, 10, 50, 0, 0, 0) == \
+               (50, 95.0, FilledOrder(size=5.0, price=10, fees=0.0, side=1))
+        assert sell_in_cash_nb(0, 100, 10, 50, 0, 0, 0.1) == \
+               (50.0, 94.44444444444444, FilledOrder(size=5.555555555555555, price=9.0, fees=0.0, side=1))
+        assert sell_in_cash_nb(0, 100, 10, 50, 0, 40, 0) == \
+               (50, 91.0, FilledOrder(size=9.0, price=10, fees=40.0, side=1))
+        assert sell_in_cash_nb(0, 100, 10, 50, 0.1, 0, 0) == \
+               (50.0, 94.44444444444444, FilledOrder(size=5.555555555555555, price=10, fees=5.555555555555557, side=1))
+        assert sell_in_cash_nb(0, 5, 10, 100, 0, 0, 0) == \
+               (50, 0.0, FilledOrder(size=5.0, price=10, fees=0.0, side=1))
+        assert sell_in_cash_nb(0, 5, 10, 100, 0, 0, 0.1) == \
+               (45.0, 0.0, FilledOrder(size=5.0, price=9.0, fees=0.0, side=1))
+        assert sell_in_cash_nb(0, 5, 10, 100, 0, 40, 0) == \
+               (10, 0.0, FilledOrder(size=5.0, price=10, fees=40.0, side=1))
+        assert sell_in_cash_nb(0, 5, 10, 100, 0.1, 0, 0) == \
+               (45.0, 0.0, FilledOrder(size=5.0, price=10, fees=5.0, side=1))
+        assert sell_in_cash_nb(100, 5, 10, 100, 0, 100, 0) == \
+               (50, 0.0, FilledOrder(size=5.0, price=10, fees=100.0, side=1))
+        assert sell_in_cash_nb(0, 5, 10, 100, 0, 100, 0) == \
+               (0, 5.0, None)
+
+    def test_buy_in_shares_nb(self):
+        from vectorbt.portfolio.nb import buy_in_shares_nb
+
+        assert buy_in_shares_nb(100, 0, 10, 5, 0, 0, 0) == \
+               (50.0, 5.0, FilledOrder(size=5.0, price=10, fees=0.0, side=0))
+        assert buy_in_shares_nb(100, 0, 10, 5, 0, 0, 0.1) == \
+               (45.0, 5.0, FilledOrder(size=5.0, price=11.0, fees=0.0, side=0))
+        assert buy_in_shares_nb(100, 0, 10, 5, 0, 40, 0) == \
+               (10.0, 5.0, FilledOrder(size=5.0, price=10, fees=40.0, side=0))
+        assert buy_in_shares_nb(100, 0, 10, 5, 0.1, 0, 0) == \
+               (44.99999999999999, 5.0, FilledOrder(size=5.0, price=10, fees=5.000000000000007, side=0))
+        assert buy_in_shares_nb(40, 0, 10, 5, 0, 0, 0) == \
+               (0.0, 4.0, FilledOrder(size=4.0, price=10, fees=0.0, side=0))
+        assert buy_in_shares_nb(40, 0, 10, 5, 0, 0, 0.1) == \
+               (0.0, 3.6363636363636362, FilledOrder(size=3.6363636363636362, price=11.0, fees=0.0, side=0))
+        assert buy_in_shares_nb(40, 0, 10, 5, 0, 40, 0) == \
+               (40.0, 0.0, None)
+        assert buy_in_shares_nb(40, 0, 10, 5, 0.1, 0, 0) == \
+               (0.0, 3.636363636363636, FilledOrder(size=3.636363636363636, price=10, fees=3.6363636363636402, side=0))
+
+    def test_sell_in_shares_nb(self):
+        from vectorbt.portfolio.nb import sell_in_shares_nb
+
+        assert sell_in_shares_nb(0, 5, 10, 4, 0, 0, 0) == \
+               (40, 1.0, FilledOrder(size=4, price=10, fees=0, side=1))
+        assert sell_in_shares_nb(0, 5, 10, 5, 0, 0, 0) == \
+               (50, 0.0, FilledOrder(size=5, price=10, fees=0, side=1))
+        assert sell_in_shares_nb(0, 5, 10, 6, 0, 0, 0) == \
+               (50, 0.0, FilledOrder(size=5, price=10, fees=0, side=1))
+        assert sell_in_shares_nb(0, 5, 10, 5, 0, 40, 0) == \
+               (10, 0.0, FilledOrder(size=5, price=10, fees=40, side=1))
+        assert sell_in_shares_nb(0, 5, 10, 5, 0, 50, 0) == \
+               (0, 5.0, None)
+        assert sell_in_shares_nb(0, 5, 10, 5, 0, 60, 0) == \
+               (0, 5.0, None)
+        assert sell_in_shares_nb(100, 5, 10, 5, 0, 60, 0) == \
+               (90, 0.0, FilledOrder(size=5, price=10, fees=60, side=1))
+        assert sell_in_shares_nb(0, 5, 10, 5, 0, 0, 0.1) == \
+               (45.0, 0.0, FilledOrder(size=5, price=9.0, fees=0.0, side=1))
+        assert sell_in_shares_nb(0, 5, 10, 5, 0.1, 0, 0) == \
+               (45.0, 0.0, FilledOrder(size=5, price=10, fees=5.0, side=1))
+
+
 # ############# base.py ############# #
 
 class TestPortfolio:
@@ -88,11 +182,11 @@ class TestPortfolio:
         )
         pd.testing.assert_series_equal(
             portfolio.shares,
-            pd.Series(np.array([1., 1., 1., 0., 0.]), index=price.index, name='a')
+            pd.Series(np.array([1., 1., 1., 0., 0.]), index=price.index, name=('a', 'Price'))
         )
         pd.testing.assert_series_equal(
             portfolio.cash,
-            pd.Series(np.array([99.,  99., 99., 101., 101.]), index=price.index, name='a')
+            pd.Series(np.array([99., 99., 99., 101., 101.]), index=price.index, name=('a', 'Price'))
         )
         portfolio2 = vbt.Portfolio.from_signals(price, entries, exits, size=1)
         record_arrays_close(
@@ -293,7 +387,7 @@ class TestPortfolio:
 
     def test_from_signals_price(self):
         portfolio = vbt.Portfolio.from_signals(
-            price, entries, exits, size=1, entry_price=price*0.9, exit_price=price*1.1)
+            price, entries, exits, size=1, entry_price=price * 0.9, exit_price=price * 1.1)
         record_arrays_close(
             portfolio.orders.records_arr,
             np.array([
@@ -361,6 +455,120 @@ class TestPortfolio:
             ]), index=price.index, columns=entries.columns)
         )
 
+    def test_from_signals_size_type(self):
+        entries = [True, False, True, True, True]
+        exits = [False, True, False, False, True]
+        portfolio = vbt.Portfolio.from_signals(
+            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+            size_type=SizeType.Shares, accumulate=False
+        )
+        record_arrays_close(
+            portfolio.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
+                (0, 2, 3., 3., 0., 0), (0, 4, 2., 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio.shares,
+            pd.Series(np.array([1., 0., 3., 3., 5.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio.cash,
+            pd.Series(np.array([ 99., 101.,  92.,  92.,  90.]), index=price.index, name=price.name)
+        )
+        portfolio2 = vbt.Portfolio.from_signals(
+            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+            size_type=SizeType.Cash, accumulate=False
+        )
+        record_arrays_close(
+            portfolio2.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
+                (0, 2, 1., 3., 0., 0), (0, 4, 93., 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio2.shares,
+            pd.Series(np.array([ 1.,  0.,  1.,  1., 94.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio2.cash,
+            pd.Series(np.array([ 99., 101.,  98.,  98.,   5.]), index=price.index, name=price.name)
+        )
+        portfolio3 = vbt.Portfolio.from_signals(
+            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+            size_type=SizeType.Shares, accumulate=True
+        )
+        record_arrays_close(
+            portfolio3.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
+                (0, 2, 3., 3., 0., 0), (0, 3, 4., 2., 0., 0),
+                (0, 4, 2., 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio3.shares,
+            pd.Series(np.array([1., 0., 3., 7., 5.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio3.cash,
+            pd.Series(np.array([ 99., 101.,  92.,  84.,  86.]), index=price.index, name=price.name)
+        )
+        portfolio4 = vbt.Portfolio.from_signals(
+            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+            size_type=SizeType.Cash, accumulate=True
+        )
+        record_arrays_close(
+            portfolio4.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
+                (0, 2, 1., 3., 0., 0), (0, 3, 2., 2., 0., 0),
+                (0, 4, 89., 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio4.shares,
+            pd.Series(np.array([ 1.,  0.,  1.,  3., 92.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio4.cash,
+            pd.Series(np.array([ 99., 101.,  98.,  94.,   5.]), index=price.index, name=price.name)
+        )
+        try:
+            _ = vbt.Portfolio.from_signals(
+                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+                size_type=SizeType.TargetShares
+            )
+            raise Exception
+        except:
+            pass
+        try:
+            _ = vbt.Portfolio.from_signals(
+                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+                size_type=SizeType.TargetCash
+            )
+            raise Exception
+        except:
+            pass
+        try:
+            _ = vbt.Portfolio.from_signals(
+                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+                size_type=SizeType.TargetValue
+            )
+            raise Exception
+        except:
+            pass
+        try:
+            _ = vbt.Portfolio.from_signals(
+                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
+                size_type=SizeType.TargetPercent
+            )
+            raise Exception
+        except:
+            pass
+
     def test_from_orders(self):
         portfolio = vbt.Portfolio.from_orders(price, order_size['a'])
         record_arrays_close(
@@ -372,11 +580,11 @@ class TestPortfolio:
         )
         pd.testing.assert_series_equal(
             portfolio.shares,
-            pd.Series(np.array([1., 1.1, 0.1, 0., 0.]), index=price.index, name='a')
+            pd.Series(np.array([1., 1.1, 0.1, 0., 0.]), index=price.index, name=('a', 'Price'))
         )
         pd.testing.assert_series_equal(
             portfolio.cash,
-            pd.Series(np.array([99., 98.8, 101.8, 102., 102.]), index=price.index, name='a')
+            pd.Series(np.array([99., 98.8, 101.8, 102., 102.]), index=price.index, name=('a', 'Price'))
         )
         portfolio2 = vbt.Portfolio.from_orders(price, order_size)
         record_arrays_close(
@@ -553,7 +761,7 @@ class TestPortfolio:
         )
 
     def test_from_orders_price(self):
-        portfolio = vbt.Portfolio.from_orders(price, order_size, order_price=0.9*price)
+        portfolio = vbt.Portfolio.from_orders(price, order_size, order_price=0.9 * price)
         record_arrays_close(
             portfolio.orders.records_arr,
             np.array([
@@ -594,42 +802,106 @@ class TestPortfolio:
             ]), index=price.index, columns=entries.columns)
         )
 
-    def test_from_orders_target(self):
-        portfolio = vbt.Portfolio.from_orders(price, order_size, is_target=True)
+    def test_from_orders_size_type(self):
+        portfolio = vbt.Portfolio.from_orders(price, [1, 2, 3, 4, 5], size_type=SizeType.Shares)
         record_arrays_close(
             portfolio.orders.records_arr,
             np.array([
-                (0, 0, 1.00000000e+00, 1., 0., 0),
-                (0, 1, 9.00000000e-01, 2., 0., 1),
-                (0, 2, 1.00000000e-01, 3., 0., 1),
-                (1, 0, 1.00000000e+00, 1., 0., 0),
-                (1, 4, 1.00000000e+00, 1., 0., 1),
-                (2, 0, 1.00000000e+02, 1., 0., 0),
-                (2, 1, 1.00000000e+02, 2., 0., 1),
-                (2, 2, 6.66666667e+01, 3., 0., 0),
-                (2, 3, 6.66666667e+01, 2., 0., 1),
-                (2, 4, 1.33333333e+02, 1., 0., 0)
+                (0, 0, 1., 1., 0., 0), (0, 1, 2., 2., 0., 0), (0, 2, 3., 3., 0., 0),
+                (0, 3, 4., 2., 0., 0), (0, 4, 5., 1., 0., 0)
             ], dtype=order_dt)
         )
-        pd.testing.assert_frame_equal(
+        pd.testing.assert_series_equal(
             portfolio.shares,
-            pd.DataFrame(np.array([
-                [1.00000000e+00, 1.00000000e+00, 1.00000000e+02],
-                [1.00000000e-01, 1.00000000e+00, 0.00000000e+00],
-                [0.00000000e+00, 1.00000000e+00, 6.66666667e+01],
-                [0.00000000e+00, 1.00000000e+00, 0.00000000e+00],
-                [0.00000000e+00, 0.00000000e+00, 1.33333333e+02]
-            ]), index=price.index, columns=entries.columns)
+            pd.Series(np.array([ 1.,  3.,  6., 10., 15.]), index=price.index, name=price.name)
         )
-        pd.testing.assert_frame_equal(
+        pd.testing.assert_series_equal(
             portfolio.cash,
-            pd.DataFrame(np.array([
-                [99., 99., 0.],
-                [100.8, 99., 200.],
-                [101.1, 99., 0.],
-                [101.1, 99., 133.33333333],
-                [101.1, 100., 0.]
-            ]), index=price.index, columns=entries.columns)
+            pd.Series(np.array([99., 95., 86., 78., 73.]), index=price.index, name=price.name)
+        )
+        portfolio2 = vbt.Portfolio.from_orders(price, [1, 2, 3, 4, 5], size_type=SizeType.TargetShares)
+        record_arrays_close(
+            portfolio2.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 2, 1., 3., 0., 0), (0, 3, 1., 2., 0., 0),
+                (0, 4, 1., 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio2.shares,
+            pd.Series(np.array([1., 2., 3., 4., 5.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio2.cash,
+            pd.Series(np.array([99., 97., 94., 92., 91.]), index=price.index, name=price.name)
+        )
+        portfolio3 = vbt.Portfolio.from_orders(price, [1, 2, 3, 4, 5], size_type=SizeType.Cash)
+        record_arrays_close(
+            portfolio3.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 2, 1., 3., 0., 0), (0, 3, 2., 2., 0., 0),
+                (0, 4, 5., 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio3.shares,
+            pd.Series(np.array([ 1.,  2.,  3.,  5., 10.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio3.cash,
+            pd.Series(np.array([99., 97., 94., 90., 85.]), index=price.index, name=price.name)
+        )
+        portfolio4 = vbt.Portfolio.from_orders(price, [1, 2, 3, 4, 5], size_type=SizeType.TargetCash)
+        record_arrays_close(
+            portfolio4.orders.records_arr,
+            np.array([
+                (0, 0, 99., 1., 0., 0), (0, 1, 0.5, 2., 0., 1),
+                (0, 2, 0.33333333, 3., 0., 1), (0, 3, 0.5, 2., 0., 1),
+                (0, 4, 1., 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio4.shares,
+            pd.Series(np.array([99., 98.5, 98.16666667, 97.66666667, 96.66666667]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio4.cash,
+            pd.Series(np.array([1., 2., 3., 4., 5.]), index=price.index, name=price.name)
+        )
+        portfolio5 = vbt.Portfolio.from_orders(price, [1, 2, 3, 4, 5], size_type=SizeType.TargetValue)
+        record_arrays_close(
+            portfolio5.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 3, 1., 2., 0., 0),
+                (0, 4, 3., 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio5.shares,
+            pd.Series(np.array([1., 1., 1., 2., 5.]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio5.cash,
+            pd.Series(np.array([99., 99., 99., 97., 94.]), index=price.index, name=price.name)
+        )
+        portfolio6 = vbt.Portfolio.from_orders(price, [0.1, 0.2, 0.3, 0.4, 0.5], size_type=SizeType.TargetPercent)
+        record_arrays_close(
+            portfolio6.orders.records_arr,
+            np.array([
+                (0, 0, 10., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 2, 1.1, 3., 0., 0), (0, 3, 9.68, 2., 0., 0),
+                (0, 4, 21.78, 1., 0., 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_series_equal(
+            portfolio6.shares,
+            pd.Series(np.array([10., 11., 12.1, 21.78, 43.56]), index=price.index, name=price.name)
+        )
+        pd.testing.assert_series_equal(
+            portfolio6.cash,
+            pd.Series(np.array([90., 88., 84.7, 65.34, 43.56]), index=price.index, name=price.name)
         )
 
     def test_from_order_func(self):
@@ -1042,21 +1314,21 @@ class TestPortfolio:
         assert test_portfolio['a'].annualized_return == 542161095949729.56
         pd.testing.assert_series_equal(
             test_portfolio.annualized_return,
-            pd.Series(np.array([5.42161096e+14,  1.59788495e+05, -9.99999933e-01]), index=entries.columns)
+            pd.Series(np.array([5.42161096e+14, 1.59788495e+05, -9.99999933e-01]), index=entries.columns)
         )
 
     def test_annualized_volatility(self):
         assert test_portfolio['a'].annualized_volatility == 132.2191242654978
         pd.testing.assert_series_equal(
             test_portfolio.annualized_volatility,
-            pd.Series(np.array([132.21912427,   7.94440058,   2.21101734]), index=entries.columns)
+            pd.Series(np.array([132.21912427, 7.94440058, 2.21101734]), index=entries.columns)
         )
 
     def test_calmar_ratio(self):
         assert test_portfolio['a'].calmar_ratio == 1594591458675675.2
         pd.testing.assert_series_equal(
             test_portfolio.calmar_ratio,
-            pd.Series(np.array([1.59459146e+15,  4.52652718e+05, -1.96116492e+00]), index=entries.columns)
+            pd.Series(np.array([1.59459146e+15, 4.52652718e+05, -1.96116492e+00]), index=entries.columns)
         )
 
     def test_omega_ratio(self):
@@ -1070,7 +1342,7 @@ class TestPortfolio:
         assert test_portfolio['a'].sharpe_ratio == 6.656842846055576
         pd.testing.assert_series_equal(
             test_portfolio.sharpe_ratio,
-            pd.Series(np.array([6.65684285,  3.23737078, -1.72149475]), index=entries.columns)
+            pd.Series(np.array([6.65684285, 3.23737078, -1.72149475]), index=entries.columns)
         )
 
     def test_downside_risk(self):
@@ -1084,7 +1356,7 @@ class TestPortfolio:
         assert test_portfolio['a'].sortino_ratio == 9.93783129438448
         pd.testing.assert_series_equal(
             test_portfolio.sortino_ratio,
-            pd.Series(np.array([9.93783129,  -4.24992412, -11.33482437]), index=entries.columns)
+            pd.Series(np.array([9.93783129, -4.24992412, -11.33482437]), index=entries.columns)
         )
 
     def test_information_ratio(self):
@@ -1189,4 +1461,3 @@ class TestPortfolio:
                 name='c'
             )
         )
-

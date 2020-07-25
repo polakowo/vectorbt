@@ -244,8 +244,6 @@ ma_ewm    False      True
 ``` 
     
 - Interactive Plotly-based widgets to visualize backtest results
-    - Bar, Scatter, Histogram, Box and Heatmap
-    - Each provides a method for efficiently updating data
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
 
 ```python-repl

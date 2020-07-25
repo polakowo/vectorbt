@@ -413,7 +413,7 @@ def trade_records_nb(price, order_records):
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio import Order
+        >>> from vectorbt.portfolio import Order, SizeType
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import trade_records_nb
 
@@ -425,8 +425,8 @@ def trade_records_nb(price, order_records):
         ... def order_func_nb(order_context):
         ...     i = order_context.i
         ...     col = order_context.col
-        ...     return Order(order_size[i, col], order_price[i, col],
-        ...          fees=0.01, slippage=0., fixed_fees=0.)
+        ...     return Order(order_size[i, col], SizeType.Shares,
+        ...          order_price[i, col], fees=0.01, slippage=0., fixed_fees=0.)
 
         >>> order_records, cash, shares = simulate_nb(
         ...     price.shape, init_capital, order_func_nb)
@@ -595,7 +595,7 @@ def position_records_nb(price, order_records):
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio import Order
+        >>> from vectorbt.portfolio import Order, SizeType
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import position_records_nb
 
@@ -607,8 +607,8 @@ def position_records_nb(price, order_records):
         ... def order_func_nb(order_context):
         ...     i = order_context.i
         ...     col = order_context.col
-        ...     return Order(order_size[i, col], order_price[i, col],
-        ...          fees=0.01, slippage=0., fixed_fees=0.)
+        ...     return Order(order_size[i, col], SizeType.Shares,
+        ...          order_price[i, col], fees=0.01, slippage=0., fixed_fees=0.)
 
         >>> order_records, cash, shares = simulate_nb(
         ...     price.shape, init_capital, order_func_nb)

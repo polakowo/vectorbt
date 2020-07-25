@@ -50,10 +50,10 @@ __pdoc__['RowContext.cash'] = __pdoc__['OrderContext.cash']
 __pdoc__['RowContext.shares'] = __pdoc__['OrderContext.shares']
 
 SizeType = namedtuple('SizeType', [
-    'Size',
-    'Value',
-    'Percent',
-    'TargetSize',
+    'Shares',
+    'TargetShares',
+    'Cash',
+    'TargetCash',
     'TargetValue',
     'TargetPercent'
 ])(*range(6))
@@ -68,6 +68,7 @@ __pdoc__['SizeType'] = f"""Size type.
 
 Order = namedtuple('Order', [
     'size',
+    'size_type',
     'price',
     'fees',
     'fixed_fees',
@@ -76,6 +77,7 @@ Order = namedtuple('Order', [
 
 __pdoc__['Order'] = "A named tuple representing an order."
 __pdoc__['Order.size'] = "Size in shares. Filled size will depend upon your funds."
+__pdoc__['Order.size'] = "See `SizeType`."
 __pdoc__['Order.price'] = "Price per share. Filled price will depend upon slippage."
 __pdoc__['Order.fees'] = "Fees in percentage of the order value."
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."

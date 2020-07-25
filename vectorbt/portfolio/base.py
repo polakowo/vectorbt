@@ -94,6 +94,7 @@ from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio import nb
+from vectorbt.portfolio.enums import SizeType
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
 
 
@@ -224,9 +225,9 @@ class Portfolio(PandasIndexer):
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, main_price, entries, exits, size=np.inf, entry_price=None, exit_price=None,
-                     init_capital=None, fees=None, fixed_fees=None, slippage=None, accumulate=False,
-                     broadcast_kwargs={}, freq=None, **kwargs):
+    def from_signals(cls, main_price, entries, exits, size=np.inf, size_type=SizeType.Shares,
+                     entry_price=None, exit_price=None, init_capital=None, fees=None, fixed_fees=None,
+                     slippage=None, accumulate=False, broadcast_kwargs={}, freq=None, **kwargs):
         """Build portfolio from entry and exit signals.
 
         For each signal in `entries`, buys `size` of shares for `entry_price` to enter
@@ -242,6 +243,9 @@ class Portfolio(PandasIndexer):
             size (float or array_like): The amount of shares to order. Will broadcast.
 
                 To buy/sell everything, set the size to `np.inf`.
+            size_type (int or array_like): See `vectorbt.portfolio.enums.SizeType`.
+
+                Only `SizeType.Shares` and `SizeType.Cash` are supported.
             entry_price (array_like): Entry price. Defaults to `main_price`. Will broadcast.
             exit_price (array_like): Exit price. Defaults to `main_price`. Will broadcast.
             init_capital (float or array_like): The initial capital. Will broadcast.
@@ -303,6 +307,10 @@ class Portfolio(PandasIndexer):
             exit_price = main_price
         if init_capital is None:
             init_capital = defaults.portfolio['init_capital']
+        if size is None:
+            size = defaults.portfolio['size']
+        if size_type is None:
+            size_type = defaults.portfolio['size_type']
         if fees is None:
             fees = defaults.portfolio['fees']
         if fixed_fees is None:
@@ -317,17 +325,18 @@ class Portfolio(PandasIndexer):
 
         # Broadcast inputs
         # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
-        keep_raw = (False, True, True, True, True, True, True, True, True, True)
-        main_price, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, init_capital = \
+        keep_raw = (False, True, True, True, True, True, True, True, True, True, True)
+        main_price, entries, exits, size, size_type, entry_price, \
+            exit_price, fees, fixed_fees, slippage, init_capital = \
             reshape_fns.broadcast(
-                main_price, entries, exits, size, entry_price, exit_price, fees,
+                main_price, entries, exits, size, size_type, entry_price, exit_price, fees,
                 fixed_fees, slippage, init_capital, **broadcast_kwargs,
                 writeable=True, keep_raw=keep_raw)
         target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_from_signals_nb(
-            target_shape, init_capital, entries, exits, size, entry_price,
+            target_shape, init_capital, entries, exits, size, size_type, entry_price,
             exit_price, fees, fixed_fees, slippage, accumulate, is_2d=main_price.ndim == 2)
 
         # Bring to the same meta
@@ -343,8 +352,9 @@ class Portfolio(PandasIndexer):
         return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
 
     @classmethod
-    def from_orders(cls, main_price, order_size, order_price=None, init_capital=None, fees=None, fixed_fees=None,
-                    slippage=None, is_target=False, broadcast_kwargs={}, freq=None, **kwargs):
+    def from_orders(cls, main_price, order_size, size_type=SizeType.Shares, order_price=None,
+                    init_capital=None, fees=None, fixed_fees=None, slippage=None, broadcast_kwargs={},
+                    freq=None, **kwargs):
         """Build portfolio from orders.
 
         Starting with initial capital `init_capital`, at each time step, orders the number
@@ -359,6 +369,7 @@ class Portfolio(PandasIndexer):
                 If the size is positive, this is the number of shares to buy.
                 If the size is negative, this is the number of shares to sell.
                 To buy/sell everything, set the size to `np.inf`.
+            size_type (int or array_like): See `vectorbt.portfolio.enums.SizeType`.
             order_price (array_like): Order price. Defaults to `main_price`. Will broadcast.
             init_capital (float or array_like): The initial capital. Will broadcast.
 
@@ -366,7 +377,6 @@ class Portfolio(PandasIndexer):
             fees (float or array_like): Fees in percentage of the order value. Will broadcast.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
             slippage (float or array_like): Slippage in percentage of price. Will broadcast.
-            is_target (bool): If `True`, will order the difference between current and target size.
             broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             freq (any): Index frequency in case `main_price.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
@@ -421,17 +431,17 @@ class Portfolio(PandasIndexer):
 
         # Broadcast inputs
         # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
-        keep_raw = (False, True, True, True, True, True, True)
-        main_price, order_size, order_price, fees, fixed_fees, slippage, init_capital = \
+        keep_raw = (False, True, True, True, True, True, True, True)
+        main_price, order_size, size_type, order_price, fees, fixed_fees, slippage, init_capital = \
             reshape_fns.broadcast(
-                main_price, order_size, order_price, fees, fixed_fees, slippage, init_capital,
+                main_price, order_size, size_type, order_price, fees, fixed_fees, slippage, init_capital,
                 **broadcast_kwargs, writeable=True, keep_raw=keep_raw)
         target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
 
         # Perform calculation
         order_records, cash, shares = nb.simulate_from_orders_nb(
-            target_shape, init_capital, order_size, order_price,
-            fees, fixed_fees, slippage, is_target, is_2d=main_price.ndim == 2)
+            target_shape, init_capital, order_size, size_type, order_price,
+            fees, fixed_fees, slippage, is_2d=main_price.ndim == 2)
 
         # Bring to the same meta
         cash = main_price.vbt.wrap(cash)
@@ -487,11 +497,12 @@ class Portfolio(PandasIndexer):
         Example:
             Placing a buy order each day:
             ```python-repl
-            >>> from vectorbt.portfolio import Order
+            >>> from vectorbt.portfolio import Order, SizeType
 
             >>> @njit
             ... def order_func_nb(oc, price):
-            ...     return Order(10, price[oc.i], fees=0.01, fixed_fees=1., slippage=0.01)
+            ...     return Order(10, SizeType.Shares, price[oc.i],
+            ...         fees=0.01, fixed_fees=1., slippage=0.01)
 
             >>> portfolio = vbt.Portfolio.from_order_func(
             ...     price, order_func_nb, price.values, init_capital=100)
