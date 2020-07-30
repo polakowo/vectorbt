@@ -111,7 +111,7 @@ class TestAccessors:
             ret['a'].vbt.returns.annual(),
             pd.Series(
                 np.array([4.]),
-                index=pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', freq='365D'),
+                index=pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', freq='252D'),
                 name=ret['a'].name
             )
         )
@@ -119,7 +119,7 @@ class TestAccessors:
             ret.vbt.returns.annual(),
             pd.DataFrame(
                 np.array([[4., -0.8, 0.]]),
-                index=pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', freq='365D'),
+                index=pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', freq='252D'),
                 columns=ret.columns
             )
         )
