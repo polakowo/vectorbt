@@ -56,11 +56,8 @@ class TestAccessors:
     def test_ann_factor(self):
         assert ret['a'].vbt.returns(year_freq='365 days').ann_factor == 365
         assert ret.vbt.returns(year_freq='365 days').ann_factor == 365
-        try:
-            assert ret.vbt.returns(year_freq=None).ann_factor
-            raise Exception
-        except:
-            pass
+        with pytest.raises(Exception) as e_info:
+            assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
     def test_from_price(self):
         pd.testing.assert_series_equal(pd.Series.vbt.returns.from_price(ts['a'])._obj, ts['a'].pct_change())

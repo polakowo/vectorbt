@@ -17,7 +17,7 @@ creates methods for signal generation and supports common pandas and parameter i
 
 >>> # Create indicator class
 >>> MyInd = vbt.IndicatorFactory(
-...     ts_names=['ts'],
+...     input_names=['ts'],
 ...     param_names=['param1', 'param2'],
 ...     output_names=['output']
 ... ).from_apply_func(
@@ -25,7 +25,7 @@ creates methods for signal generation and supports common pandas and parameter i
 ... )
 
 >>> # Create indicator instance
->>> myind = MyInd.from_params(pd.Series([1, 2, 3]), [1, 2], [3, 4], param_product=True)
+>>> myind = MyInd.run(pd.Series([1, 2, 3]), [1, 2], [3, 4], param_product=True)
 >>> print(myind.output)
 custom_param1       1       2
 custom_param2   3   4   3   4
@@ -39,22 +39,32 @@ custom_param2   3   4   3   4
 Name: (1, 3), dtype: int64
 ```
 
+### TA-Lib
+
+Indicator factory also provides a class method `vectorbt.indicators.factory.IndicatorFactory.from_talib`
+that can be used to wrap any function from TA-Lib. It automatically fills all the neccessary information,
+such as input, parameter and output names.
+
 ## Basic
 
-`vectorbt.indicators.basic` provides a collection of basic technical trading indicators, such as
+`vectorbt.indicators.basic` provides a collection of basic technical indicators, such as
 Bollinger Bands, all built with `vectorbt.indicators.factory.IndicatorFactory`.
 
 You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 
 ```python-repl
 >>> # vectorbt.indicators.basic.MA
->>> vbt.MA.from_params(pd.Series([1, 2, 3]), [2, 3]).ma
+>>> vbt.MA.run(pd.Series([1, 2, 3]), [2, 3]).ma
 ma_window     2     3
 ma_ewm    False False
 0           NaN   NaN
 1           1.5   NaN
 2           2.5   2.0
 ```
+
+The advantage of these indicators over TA-Lib's is that they work primarily on 2-dimensional arrays
+and utilize caching, which makes them faster for matrices with huge number of columns. They also
+have plotting methods.
 
 ## Numba-compiled functions
 

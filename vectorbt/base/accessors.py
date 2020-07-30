@@ -171,36 +171,56 @@ class Base_Accessor(ArrayWrapper):
         See `vectorbt.base.reshape_fns.to_2d`."""
         return reshape_fns.to_2d(self._obj, raw=True)
 
-    def tile(self, n, keys=None):
+    def tile(self, n, keys=None, axis=1):
         """See `vectorbt.base.reshape_fns.tile`.
 
+        Set `axis` to 1 for columns and 0 for index.
         Use `keys` as the outermost level."""
-        tiled = reshape_fns.tile(self._obj, n, axis=1)
+        tiled = reshape_fns.tile(self._obj, n, axis=axis)
         if keys is not None:
-            new_columns = index_fns.combine_indexes(keys, self.columns)
-            return self.wrap(tiled.values, columns=new_columns)
+            if axis == 1:
+                new_columns = index_fns.combine_indexes(keys, self.columns)
+                return self.wrap(tiled.values, columns=new_columns)
+            else:
+                new_index = index_fns.combine_indexes(keys, self.index)
+                return self.wrap(tiled.values, index=new_index)
         return tiled
 
-    def repeat(self, n, keys=None):
+    def repeat(self, n, keys=None, axis=1):
         """See `vectorbt.base.reshape_fns.repeat`.
 
+        Set `axis` to 1 for columns and 0 for index.
         Use `keys` as the outermost level."""
-        repeated = reshape_fns.repeat(self._obj, n, axis=1)
+        repeated = reshape_fns.repeat(self._obj, n, axis=axis)
         if keys is not None:
-            new_columns = index_fns.combine_indexes(self.columns, keys)
-            return self.wrap(repeated.values, columns=new_columns)
+            if axis == 1:
+                new_columns = index_fns.combine_indexes(self.columns, keys)
+                return self.wrap(repeated.values, columns=new_columns)
+            else:
+                new_index = index_fns.combine_indexes(self.index, keys)
+                return self.wrap(repeated.values, index=new_index)
         return repeated
 
     def align_to(self, other):
-        """Align to `other` by their indexes and columns.
+        """Align to `other` on their axes.
 
         Example:
             ```python-repl
             >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
-            >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'], 
+            >>> print(df1)
+               a  b
+            x  1  2
+            y  3  4
+
+            >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
             ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
+            >>> print(df2)
+                   1       2
+               a   b   a   b
+            x  5   6   7   8
+            y  9  10  11  12
 
             >>> print(df1.vbt.align_to(df2))
                   1     2   

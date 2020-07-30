@@ -2,25 +2,26 @@
 
 import numpy as np
 import pandas as pd
+from numba import njit
 
 from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.base import index_fns, array_wrapper
 
 
-def soft_broadcast_to_ndim(arg, ndim):
+def soft_to_ndim(arg, ndim):
     """Try to softly bring `arg` to the specified number of dimensions `ndim` (max 2)."""
     if not checks.is_array(arg):
         arg = np.asarray(arg)
     if ndim == 1:
         if arg.ndim == 2:
             if arg.shape[1] == 1:
-                if checks.is_pandas(arg):
+                if checks.is_frame(arg):
                     return arg.iloc[:, 0]
                 return arg[:, 0]  # downgrade
     if ndim == 2:
         if arg.ndim == 1:
-            if checks.is_pandas(arg):
+            if checks.is_series(arg):
                 return arg.to_frame()
             return arg[:, None]  # upgrade
     return arg  # do nothing
@@ -109,8 +110,7 @@ def tile(arg, n, axis=1):
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='default', drop_duplicates='default',
-                    keep='default'):
+def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
     """Produce a broadcasted index/columns.
 
     Args:
@@ -128,19 +128,10 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
-        ignore_single (bool): If `True`, won't consider index/columns with a single value.
-        drop_duplicates (bool): See `vectorbt.base.index_fns.drop_duplicate_levels`.
-        keep (bool): See `vectorbt.base.index_fns.drop_duplicate_levels`.
+        **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
     """
-
-    if ignore_single == 'default':
-        ignore_single = defaults.broadcasting['ignore_single']
-    if drop_duplicates == 'default':
-        drop_duplicates = defaults.broadcasting['drop_duplicates']
-    if keep == 'default':
-        keep = defaults.broadcasting['keep']
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
     if axis == 1 and len(to_shape) == 1:
@@ -160,7 +151,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                 for arg in args:
                     if checks.is_pandas(arg):
                         index = index_fns.get_index(arg, axis)
-                        if pd.Index.equals(index, pd.RangeIndex(start=0, stop=len(index), step=1)):
+                        if checks.is_default_index(index):
                             # ignore simple ranges without name
                             continue
                         if new_index is None:
@@ -181,17 +172,11 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                             if len(index) != len(new_index):
                                 if len(index) > 1 and len(new_index) > 1:
                                     raise ValueError("Indexes could not be broadcast together")
-                                if ignore_single:
-                                    # Columns of length 1 should be ignored
-                                    if len(index) > len(new_index):
-                                        new_index = index
-                                    continue
-                                else:
-                                    if len(index) > len(new_index):
-                                        new_index = index_fns.repeat_index(new_index, len(index))
-                                    elif len(index) < len(new_index):
-                                        index = index_fns.repeat_index(index, len(new_index))
-                            new_index = index_fns.stack_indexes(new_index, index)
+                                if len(index) > len(new_index):
+                                    new_index = index_fns.repeat_index(new_index, len(index))
+                                elif len(index) < len(new_index):
+                                    index = index_fns.repeat_index(index, len(new_index))
+                            new_index = index_fns.stack_indexes(new_index, index, **kwargs)
             else:
                 raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
         else:
@@ -205,8 +190,6 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single='defa
                 if maxlen > 1 and len(new_index) > 1:
                     raise ValueError("Indexes could not be broadcast together")
                 new_index = index_fns.repeat_index(new_index, maxlen)
-            if drop_duplicates:
-                new_index = index_fns.drop_duplicate_levels(new_index, keep=keep)
     return new_index
 
 
@@ -230,12 +213,16 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
                     new_columns = old_columns
                 else:
                     new_columns = index_fns.repeat_index(old_columns, new_ncols)
-        return array_wrapper.ArrayWrapper(index=new_index, columns=new_columns).wrap(new_arg)
+        return array_wrapper.ArrayWrapper(
+            index=new_index,
+            columns=new_columns,
+            ndim=new_arg.ndim
+        ).wrap(new_arg)
     return new_arg
 
 
-def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_from='default',
-              writeable=False, copy_kwargs={}, **kwargs):
+def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default', columns_from='default',
+              writeable=False, copy_kwargs={}, keep_raw=False, **kwargs):
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
 
     See [Broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html).
@@ -245,8 +232,9 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
     Args:
         *args (array_like): Array-like objects.
         to_shape (tuple): Target shape. If set, will broadcast every element in `args` to `to_shape`.
-        to_pd (bool): If `True`, converts all output arrays to pandas, otherwise returns raw NumPy
-            arrays. If `None`, converts only if there is at least one pandas object among them.
+        to_pd (bool, tuple or list): If `True`, converts all output arrays to pandas, otherwise returns
+            raw NumPy arrays. If `None`, converts only if there is at least one pandas object among them.
+        to_2d (bool): If `True`, converts all Series to DataFrames.
         index_from (None, int, str or array_like): Broadcasting rule for index.
         columns_from (None, int, str or array_like): Broadcasting rule for columns.
         writeable (bool): If `True`, makes broadcasted arrays writable, otherwise readonly.
@@ -263,6 +251,7 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
             !!! note
                 Has effect on every array, independent from whether broadcasting was needed or not.
 
+        keep_raw (bool, tuple or list): If `True`, will keep the unbroadcasted version of the array.
         **kwargs: Keyword arguments passed to `broadcast_index`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
@@ -401,14 +390,22 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
         if checks.is_pandas(args[i]):
             is_pd = True
 
-    if to_pd is not None:
-        is_pd = to_pd  # force either raw or pandas
-
     # If target shape specified, check again if we work on 2-dim data
     if to_shape is not None:
         checks.assert_type(to_shape, tuple)
         if len(to_shape) > 1:
             is_2d = True
+
+    if to_2d is not None:
+        # force either keeping Series or converting them to DataFrames
+        is_2d = to_2d
+
+    if to_pd is not None:
+        # force either raw or pandas
+        if isinstance(to_pd, (tuple, list)):
+            is_pd = np.array(to_pd).any()
+        else:
+            is_pd = to_pd
 
     # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
     args_2d = [arg.to_frame() if is_2d and checks.is_series(arg) else arg for arg in args]
@@ -418,9 +415,18 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
         to_shape = np.lib.stride_tricks._broadcast_shape(*args_2d)
 
     # Perform broadcasting
-    new_args = [np.broadcast_to(arg, to_shape, subok=True) for arg in args_2d]
+    new_args = []
+    for i, arg in enumerate(args_2d):
+        if isinstance(keep_raw, (tuple, list)):
+            _keep_raw = keep_raw[i]
+        else:
+            _keep_raw = keep_raw
+        if _keep_raw:
+            new_args.append(arg)
+            continue
+        new_args.append(np.broadcast_to(arg, to_shape, subok=True))
 
-    # The problem is that broadcasting creates readonly objects and numba requires writable ones.
+    # The problem is that broadcasting creates readonly objects and Numba requires writable ones.
     # To make them writable we must copy, which is ok for small-sized arrays and not ok for large ones.
     # Thus check if broadcasting was needed in the first place, and if so, copy
     for i in range(len(new_args)):
@@ -441,7 +447,23 @@ def broadcast(*args, to_shape=None, to_pd=None, index_from='default', columns_fr
 
     # Bring arrays to their old types (e.g. array -> pandas)
     for i in range(len(new_args)):
-        new_args[i] = wrap_broadcasted(args[i], new_args[i], is_pd=is_pd, new_index=new_index, new_columns=new_columns)
+        if isinstance(keep_raw, (tuple, list)):
+            _keep_raw = keep_raw[i]
+        else:
+            _keep_raw = keep_raw
+        if _keep_raw:
+            continue
+        if isinstance(to_pd, (tuple, list)):
+            _is_pd = to_pd[i]
+        else:
+            _is_pd = is_pd
+        new_args[i] = wrap_broadcasted(
+            args[i],
+            new_args[i],
+            is_pd=_is_pd,
+            new_index=new_index,
+            new_columns=new_columns
+        )
 
     if len(new_args) > 1:
         return tuple(new_args)
@@ -691,3 +713,56 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     if symmetric:
         return make_symmetric(df)
     return df
+
+
+@njit(cache=True)
+def flex_choose_i_and_col_nb(a, is_2d=False):
+    """Choose selection index and column based on the array's shape.
+
+    Instead of expensive broadcasting, keep original shape and do indexing in a smart way.
+    A nice feature of this is that it has almost no memory footprint and can broadcast in
+    any direction indefinitely.
+
+    Call it once before using `flex_select_nb`."""
+    i = -1
+    col = -1
+    if is_2d:
+        if a.ndim == 0:
+            i = 0
+            col = 0
+        elif a.ndim == 1:
+            i = 0
+            if a.shape[0] == 1:
+                col = 0
+        elif a.ndim == 2:
+            if a.shape[0] == 1:
+                i = 0
+            if a.shape[1] == 1:
+                col = 0
+    else:
+        if a.ndim == 0:
+            i = 0
+            col = 0
+        elif a.ndim == 1:
+            col = 0
+            if a.shape[0] == 1:
+                i = 0
+        else:
+            raise ValueError("Two-dimensional array in one-dimensional mode")
+    return i, col
+
+
+@njit(cache=True)
+def flex_select_nb(i, col, a, def_i=-1, def_col=-1, is_2d=False):
+    """Select element of `a` as if it has been broadcasted."""
+    if def_i == -1:
+        def_i = i
+    if def_col == -1:
+        def_col = col
+    if a.ndim == 0:
+        return a.item()
+    if a.ndim == 1:
+        if is_2d:
+            return a[def_col]
+        return a[def_i]
+    return a[def_i, def_col]

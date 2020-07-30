@@ -294,7 +294,7 @@ def nanmedian_nb(a):
 
 
 @njit(cache=True)
-def nanstd_1d_nb(a, ddof=1):
+def nanstd_1d_nb(a, ddof=0):
     """Compute the standard deviation while ignoring NaNs."""
     cnt = a.shape[0] - np.count_nonzero(np.isnan(a))
     rcount = max(cnt - ddof, 0)
@@ -305,7 +305,7 @@ def nanstd_1d_nb(a, ddof=1):
 
 
 @njit(cache=True)
-def nanstd_nb(a, ddof=1):
+def nanstd_nb(a, ddof=0):
     """2-dim version of `nanstd_1d_nb`."""
     result = np.empty(a.shape[1], dtype=np.float_)
     for col in range(a.shape[1]):
@@ -313,30 +313,31 @@ def nanstd_nb(a, ddof=1):
     return result
 
 
-# ############# Rolling functions ############# #
+# ############# Range functions ############# #
 
 
 @njit(cache=True)
-def rolling_window_1d_nb(a, window):
+def concat_ranges_1d_nb(a, start_idxs, end_idxs):
     """Roll a window.
 
-    Creates a matrix of rolled windows with first axis being window size."""
-    width = a.shape[0] - window + 1
-    result = np.empty((window, width), dtype=np.float_)
-    for col in range(width):
-        result[:, col] = a[col:col + window]
+    For each index pair from `start_idxs` and `end_idxs`, slices `a` along index and concatenates."""
+    result = np.empty((end_idxs[0] - start_idxs[0], start_idxs.shape[0]), dtype=a.dtype)
+    for idx in range(start_idxs.shape[0]):
+        result[:, idx] = a[start_idxs[idx]:end_idxs[idx]]
     return result
 
 
 @njit(cache=True)
-def rolling_window_nb(a, window):
-    """2-dim version of `rolling_window_1d_nb`.
-
-    Creates a cube of rolled windows with first axis being columns and second axis being window size."""
-    result = np.empty((a.shape[1], window, a.shape[0] - window + 1), dtype=np.float_)
+def concat_ranges_nb(a, start_idxs, end_idxs):
+    """2-dim version of `range_1d_nb`."""
+    result = np.empty((end_idxs[0] - start_idxs[0], start_idxs.shape[0] * a.shape[1]), dtype=a.dtype)
     for col in range(a.shape[1]):
-        result[col, :, :] = rolling_window_1d_nb(a[:, col], window)
+        result[:, col * start_idxs.shape[0]:(col + 1) * start_idxs.shape[0]] = \
+            concat_ranges_1d_nb(a[:, col], start_idxs, end_idxs)
     return result
+
+
+# ############# Rolling functions ############# #
 
 
 @njit(cache=True)
@@ -453,16 +454,14 @@ def rolling_mean_nb(a, window, minp=None):
 
 
 @njit(cache=True)
-def rolling_std_1d_nb(a, window, minp=None):
+def rolling_std_1d_nb(a, window, minp=None, ddof=0):
     """Return rolling standard deviation.
 
-    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std()`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`."""
     if minp is None:
         minp = window
     if minp > window:
         raise ValueError("minp must be <= window")
-    if minp == 1:
-        minp = 2
     result = np.empty_like(a, dtype=np.float_)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -488,29 +487,29 @@ def rolling_std_1d_nb(a, window, minp=None):
             window_len = window - (nancnt - nancnt_arr[i - window])
             window_cumsum = cumsum - cumsum_arr[i - window]
             window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - window]
-        if window_len < minp:
+        if window_len < minp or window_len == ddof:
             result[i] = np.nan
         else:
             mean = window_cumsum / window_len
             result[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum *
-                                       mean + window_len * mean ** 2) / (window_len - 1))
+                                       mean + window_len * mean ** 2) / (window_len - ddof))
     return result
 
 
 @njit(cache=True)
-def rolling_std_nb(a, window, minp=None):
+def rolling_std_nb(a, window, minp=None, ddof=0):
     """2-dim version of `rolling_std_1d_nb`."""
     result = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        result[:, col] = rolling_std_1d_nb(a[:, col], window, minp=minp)
+        result[:, col] = rolling_std_1d_nb(a[:, col], window, minp=minp, ddof=ddof)
     return result
 
 
 @njit(cache=True)
-def ewm_mean_1d_nb(a, span, minp=None):
+def ewm_mean_1d_nb(a, span, minp=None, adjust=False):
     """Return exponential weighted average.
 
-    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).mean()`.
+    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
 
     Adaptation of `pd._libs.window.aggregations.window_aggregations.ewma` with default arguments."""
     if minp is None:
@@ -524,7 +523,7 @@ def ewm_mean_1d_nb(a, span, minp=None):
     com = (span - 1) / 2.0
     alpha = 1. / (1. + com)
     old_wt_factor = 1. - alpha
-    new_wt = 1.
+    new_wt = 1. if adjust else alpha
     weighted_avg = a[0]
     is_observation = (weighted_avg == weighted_avg)
     nobs = int(is_observation)
@@ -541,7 +540,10 @@ def ewm_mean_1d_nb(a, span, minp=None):
                 # avoid numerical errors on constant series
                 if weighted_avg != cur:
                     weighted_avg = ((old_wt * weighted_avg) + (new_wt * cur)) / (old_wt + new_wt)
-                old_wt += new_wt
+                if adjust:
+                    old_wt += new_wt
+                else:
+                    old_wt = 1.
         elif is_observation:
             weighted_avg = cur
         result[i] = weighted_avg if (nobs >= minp) else np.nan
@@ -549,19 +551,19 @@ def ewm_mean_1d_nb(a, span, minp=None):
 
 
 @njit(cache=True)
-def ewm_mean_nb(a, span, minp=None):
+def ewm_mean_nb(a, span, minp=None, adjust=False):
     """2-dim version of `ewm_mean_1d_nb`."""
     result = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        result[:, col] = ewm_mean_1d_nb(a[:, col], span, minp=minp)
+        result[:, col] = ewm_mean_1d_nb(a[:, col], span, minp=minp, adjust=adjust)
     return result
 
 
 @njit(cache=True)
-def ewm_std_1d_nb(a, span, minp=None):
+def ewm_std_1d_nb(a, span, minp=None, adjust=False, ddof=0):
     """Return exponential weighted standard deviation.
 
-    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std()`.
+    Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std(ddof=ddof)`.
 
     Adaptation of `pd._libs.window.aggregations.window_aggregations.ewmcov` with default arguments."""
     if minp is None:
@@ -575,7 +577,7 @@ def ewm_std_1d_nb(a, span, minp=None):
     com = (span - 1) / 2.0
     alpha = 1. / (1. + com)
     old_wt_factor = 1. - alpha
-    new_wt = 1.
+    new_wt = 1. if adjust else alpha
     mean_x = a[0]
     mean_y = a[0]
     is_observation = ((mean_x == mean_x) and (mean_y == mean_y))
@@ -618,6 +620,10 @@ def ewm_std_1d_nb(a, span, minp=None):
                 sum_wt += new_wt
                 sum_wt2 += (new_wt * new_wt)
                 old_wt += new_wt
+                if not adjust:
+                    sum_wt /= old_wt
+                    sum_wt2 /= (old_wt * old_wt)
+                    old_wt = 1.
         elif is_observation:
             mean_x = cur_x
             mean_y = cur_y
@@ -635,11 +641,11 @@ def ewm_std_1d_nb(a, span, minp=None):
 
 
 @njit(cache=True)
-def ewm_std_nb(a, span, minp=None):
+def ewm_std_nb(a, span, minp=None, adjust=False, ddof=0):
     """2-dim version of `ewm_std_1d_nb`."""
     result = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        result[:, col] = ewm_std_1d_nb(a[:, col], span, minp=minp)
+        result[:, col] = ewm_std_1d_nb(a[:, col], span, minp=minp, adjust=adjust, ddof=ddof)
     return result
 
 
@@ -719,17 +725,17 @@ def expanding_mean_nb(a, minp=1):
 
 
 @njit(cache=True)
-def expanding_std_1d_nb(a, minp=1):
+def expanding_std_1d_nb(a, minp=1, ddof=0):
     """Return expanding standard deviation.
 
-    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).std()`."""
-    return rolling_std_1d_nb(a, a.shape[0], minp=minp)
+    Numba equivalent to `pd.Series(a).expanding(min_periods=minp).std(ddof=ddof)`."""
+    return rolling_std_1d_nb(a, a.shape[0], minp=minp, ddof=ddof)
 
 
 @njit(cache=True)
-def expanding_std_nb(a, minp=1):
+def expanding_std_nb(a, minp=1, ddof=0):
     """2-dim version of `expanding_std_1d_nb`."""
-    return rolling_std_nb(a, a.shape[0], minp=minp)
+    return rolling_std_nb(a, a.shape[0], minp=minp, ddof=ddof)
 
 
 # ############# Apply functions ############# #

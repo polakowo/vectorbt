@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='vectorbt',
-    version='0.12',
+    version='0.13',
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
@@ -19,7 +19,7 @@ setup(
         'matplotlib', 
         'ipywidgets', 
         'plotly', 
-        'numba>=0.49.0', 
+        'numba>=0.50.1', 
         'scipy'
     ],
     python_requires='>=3.6'

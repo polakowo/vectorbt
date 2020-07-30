@@ -79,5 +79,5 @@ Name: Close, dtype: object
 modeling, such as generating and filling orders. These only accept NumPy arrays and other Numba-compatible types.
 """
 
-from vectorbt.portfolio.enums import Order
+from vectorbt.portfolio.enums import Order, SizeType
 from vectorbt.portfolio.base import Portfolio
