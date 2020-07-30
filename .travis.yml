@@ -4,9 +4,16 @@ install:
     - pip install empyrical
     - pip install pytest-cov codecov
     - pip install pdoc3==0.8.1
+    - curl -O http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz
+    - tar -xzf ta-lib-0.4.0-src.tar.gz
+    - cd ta-lib/
+    - ./configure --prefix=/usr
+    - make
+    - sudo make install
+    - pip install TA-Lib
 script:
     - pytest tests/
-    - export NUMBA_DISABLE_JIT=1  # Numba doesn't support testing yet
+    - export NUMBA_DISABLE_JIT=1
     - pytest --cov=vectorbt tests/
 after_success:
     - codecov
@@ -18,7 +25,7 @@ after_success:
 deploy:
     provider: pages
     skip_cleanup: true
-    github_token: $GITHUB_TOKEN  # Set in the settings page of your repository, as a secure variable
+    github_token: $GITHUB_TOKEN
     keep_history: true
     on:
         branch: master
