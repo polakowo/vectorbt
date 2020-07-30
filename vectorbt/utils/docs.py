@@ -2,7 +2,7 @@
 
 import inspect
 import sys
-from types import FunctionType
+from types import FunctionType, MethodType
 
 from vectorbt.utils.decorators import custom_property
 
@@ -30,5 +30,5 @@ def fix_class_for_docs(cls):
     for func_name in dir(cls):
         if not func_name.startswith("_"):
             func = getattr(cls, func_name)
-            if isinstance(func, (FunctionType, property, custom_property)):
+            if isinstance(func, (FunctionType, MethodType, property, custom_property)):
                 setattr(cls, func_name, func)

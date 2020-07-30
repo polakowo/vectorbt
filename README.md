@@ -33,13 +33,12 @@ import numpy as np
 import yfinance as yf
 
 # Fetch daily price of Bitcoin
-price = yf.Ticker("BTC-USD").history(period="max")['Close']
+close = yf.Ticker("BTC-USD").history(period="max")['Close']
 
 # Compute moving averages for all combinations of fast and slow windows
-fast_ma, slow_ma = vbt.MA.from_combs(
-    price, np.arange(2, 101), 2, 
-    names=['fast', 'slow'],
-    hide_params=['ewm']
+fast_ma, slow_ma = vbt.MA.run_combs(
+    close, window=np.arange(2, 101), r=2, 
+    short_names=['fast', 'slow']
 )
 
 # Generate crossover signals for each combination
@@ -47,7 +46,7 @@ entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
 # Model performance
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.001, freq='1D')
+portfolio = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq='1D')
 
 # Get total return, reshape to symmetric matrix, and plot the whole thing
 portfolio.total_return.vbt.heatmap(
@@ -229,18 +228,29 @@ dtype: bool
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)
     
 - Technical indicators with full Numba support
-    - Moving average and STD, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
+    - Moving average, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
     - Each offering methods for generating signals and plotting
     - Each allowing arbitrary parameter combinations, from arrays to Cartesian products
-    - Indicator factory for building complex technical indicators in a simple way
     
 ```python-repl
->>> vbt.MA.from_params(pd.Series([1, 2, 3]), window=[2, 3], ewm=[False, True]).ma
+>>> vbt.MA.run(pd.Series([1, 2, 3]), window=[2, 3], ewm=[False, True]).ma
 ma_window     2         3
 ma_ewm    False      True 
 0           NaN       NaN
 1           1.5       NaN
 2           2.5  2.428571
+``` 
+
+- Indicator factory for building complex technical indicators in a simplified way
+    - Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
+    
+```python-repl
+>>> SMA = vbt.IndicatorFactory.from_talib('SMA')
+>>> SMA.run(pd.Series([1., 2., 3.]), timeperiod=[2, 3]).real
+sma_timeperiod    2    3
+0               NaN  NaN
+1               1.5  NaN
+2               2.5  2.0
 ``` 
     
 - Interactive Plotly-based widgets to visualize backtest results

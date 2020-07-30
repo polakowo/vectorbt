@@ -20,20 +20,14 @@ class TestConfig:
         conf = config.Config({'a': 0, 'b': {'c': 1}}, frozen=True)
         conf['a'] = 2
 
-        try:
+        with pytest.raises(Exception) as e_info:
             conf['d'] = 2
-            raise Exception
-        except:
-            pass
 
         # go deeper
         conf['b']['c'] = 2
 
-        try:
+        with pytest.raises(Exception) as e_info:
             conf['b']['d'] = 2
-            raise Exception
-        except:
-            pass
 
     def test_merge_kwargs(self):
         assert config.merge_kwargs({'a': 1}, {'b': 2}) == {'a': 1, 'b': 2}
@@ -222,11 +216,8 @@ class TestChecks:
 
     def test_assert_value_in(self):
         checks.assert_value_in(0, (0, 1))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_value_in(2, (0, 1))
-            raise Exception
-        except:
-            pass
 
     def test_assert_numba_func(self):
         def test_func(x):
@@ -237,29 +228,20 @@ class TestChecks:
             return x
 
         checks.assert_numba_func(test_func_nb)
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_numba_func(test_func)
-            raise Exception
-        except:
-            pass
 
     def test_assert_not_none(self):
         checks.assert_not_none(0)
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_not_none(None)
-            raise Exception
-        except:
-            pass
 
     def test_assert_type(self):
         checks.assert_type(0, int)
         checks.assert_type(np.zeros(1), (np.ndarray, pd.Series))
         checks.assert_type(pd.Series([1, 2, 3]), (np.ndarray, pd.Series))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_type(pd.DataFrame([1, 2, 3]), (np.ndarray, pd.Series))
-            raise Exception
-        except:
-            pass
 
     def test_assert_subclass(self):
         class A:
@@ -274,75 +256,51 @@ class TestChecks:
         checks.assert_subclass(B, A)
         checks.assert_subclass(C, B)
         checks.assert_subclass(C, A)
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_subclass(A, B)
-            raise Exception
-        except:
-            pass
 
     def test_assert_same_type(self):
         checks.assert_same_type(0, 1)
         checks.assert_same_type(np.zeros(1), np.empty(1))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_type(0, np.zeros(1))
-            raise Exception
-        except:
-            pass
 
     def test_assert_dtype(self):
         checks.assert_dtype(np.zeros(1), np.float)
         checks.assert_dtype(pd.Series([1, 2, 3]), np.int)
         checks.assert_dtype(pd.DataFrame({'a': [1, 2], 'b': [3, 4]}), np.int)
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_dtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.int)
-            raise Exception
-        except:
-            pass
 
     def test_assert_subdtype(self):
         checks.assert_subdtype([0], np.number)
         checks.assert_subdtype(np.array([1, 2, 3]), np.number)
         checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.number)
-        try:
-            checks.assert_subdtype(np.array([1, 2, 3]), np.object)
-            raise Exception
-        except:
-            pass
-        try:
-            checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.object)
-            raise Exception
-        except:
-            pass
+        with pytest.raises(Exception) as e_info:
+            checks.assert_subdtype(np.array([1, 2, 3]), np.float)
+        with pytest.raises(Exception) as e_info:
+            checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.float)
 
     def test_assert_same_dtype(self):
         checks.assert_same_dtype([1], [1, 1, 1])
         checks.assert_same_dtype(pd.Series([1, 2, 3]), pd.DataFrame([[1, 2, 3]]))
         checks.assert_same_dtype(pd.DataFrame([[1, 2, 3.]]), pd.DataFrame([[1, 2, 3.]]))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_dtype(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3.]]))
-            raise Exception
-        except:
-            pass
 
     def test_assert_ndim(self):
         checks.assert_ndim(0, 0)
         checks.assert_ndim(np.zeros(1), 1)
         checks.assert_ndim(pd.Series([1, 2, 3]), (1, 2))
         checks.assert_ndim(pd.DataFrame([1, 2, 3]), (1, 2))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_ndim(np.zeros((3, 3, 3)), (1, 2))
-            raise Exception
-        except:
-            pass
 
     def test_assert_same_len(self):
         checks.assert_same_len([[1]], [[2]])
         checks.assert_same_len([[1]], [[2, 3]])
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_len([[1]], [[2], [3]])
-            raise Exception
-        except:
-            pass
 
     def test_assert_same_shape(self):
         checks.assert_same_shape(0, 1)
@@ -350,29 +308,20 @@ class TestChecks:
         checks.assert_same_shape([1, 2, 3], pd.Series([1, 2, 3]))
         checks.assert_same_shape(np.zeros((3, 3)), pd.Series([1, 2, 3]), axis=0)
         checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(1, 0))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(0, 1))
-            raise Exception
-        except:
-            pass
 
     def test_assert_same_index(self):
         index = ['a', 'b', 'c']
         checks.assert_same_index(pd.Series([1, 2, 3], index=index), pd.DataFrame([1, 2, 3], index=index))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_index(pd.Series([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
-            raise Exception
-        except:
-            pass
 
     def test_assert_same_columns(self):
         columns = ['a', 'b', 'c']
-        checks.assert_same_index(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
-        try:
-            checks.assert_same_index(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
-            raise Exception
-        except:
-            pass
+        checks.assert_same_columns(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
+        with pytest.raises(Exception) as e_info:
+            checks.assert_same_columns(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
 
     def test_assert_same_meta(self):
         index = ['x', 'y', 'z']
@@ -380,29 +329,17 @@ class TestChecks:
         checks.assert_same_meta(np.array([1, 2, 3]), np.array([1, 2, 3]))
         checks.assert_same_meta(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
         checks.assert_same_meta(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_meta(pd.Series([1, 2]), pd.DataFrame([1, 2]))
-            raise Exception
-        except:
-            pass
 
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_meta(pd.DataFrame([1, 2]), pd.DataFrame([1, 2, 3]))
-            raise Exception
-        except:
-            pass
 
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_meta(pd.DataFrame([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
-            raise Exception
-        except:
-            pass
 
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same_meta(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
-            raise Exception
-        except:
-            pass
 
     def test_assert_same(self):
         index = ['x', 'y', 'z']
@@ -410,23 +347,18 @@ class TestChecks:
         checks.assert_same(np.array([1, 2, 3]), np.array([1, 2, 3]))
         checks.assert_same(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
         checks.assert_same(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_same(np.array([1, 2]), np.array([1, 2, 3]))
-            raise Exception
-        except:
-            pass
 
     def test_assert_level_not_exists(self):
         i = pd.Index(['x', 'y', 'z'], name='i')
         multi_i = pd.MultiIndex.from_arrays([['x', 'y', 'z'], ['x2', 'y2', 'z2']], names=['i', 'i2'])
         checks.assert_level_not_exists(i, 'i2')
         checks.assert_level_not_exists(multi_i, 'i3')
-        try:
+        with pytest.raises(Exception) as e_info:
             checks.assert_level_not_exists(i, 'i')
             checks.assert_level_not_exists(multi_i, 'i')
-            raise Exception
-        except:
-            pass
+
 
 # ############# math.py ############# #
 

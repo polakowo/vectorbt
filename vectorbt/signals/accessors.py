@@ -149,6 +149,8 @@ class Signals_Accessor(Generic_Accessor):
         result = nb.generate_nb(shape, choice_func_nb, *args)
 
         if cls.is_series():
+            if shape[1] > 1:
+                raise ValueError("Use DataFrame accessor")
             return pd.Series(result[:, 0], **kwargs)
         return pd.DataFrame(result, **kwargs)
 
@@ -220,6 +222,8 @@ class Signals_Accessor(Generic_Accessor):
 
         result1, result2 = nb.generate_iteratively_nb(shape, choice_func1_nb, choice_func2_nb, *args)
         if cls.is_series():
+            if shape[1] > 1:
+                raise ValueError("Use DataFrame accessor")
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
@@ -251,6 +255,8 @@ class Signals_Accessor(Generic_Accessor):
         result = nb.generate_rand_nb(shape, n, seed=seed)
 
         if cls.is_series():
+            if shape[1] > 1:
+                raise ValueError("Use DataFrame accessor")
             return pd.Series(result[:, 0], **kwargs)
         return pd.DataFrame(result, **kwargs)
 
@@ -282,6 +288,8 @@ class Signals_Accessor(Generic_Accessor):
         result = nb.generate_rand_by_prob_nb(shape, probs, seed=seed)
 
         if cls.is_series():
+            if shape[1] > 1:
+                raise ValueError("Use DataFrame accessor")
             return pd.Series(result[:, 0], **kwargs)
         return pd.DataFrame(result, **kwargs)
 
@@ -337,6 +345,8 @@ class Signals_Accessor(Generic_Accessor):
         entries, exits = nb.generate_rand_entries_and_exits_nb(shape, n_entries, seed=seed)
 
         if cls.is_series():
+            if shape[1] > 1:
+                raise ValueError("Use DataFrame accessor")
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 

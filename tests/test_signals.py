@@ -124,11 +124,8 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        try:
-            _ = pd.Series.vbt.signals.generate((5, 1), choice_func_nb, 1)
-            raise Exception
-        except:
-            pass
+        with pytest.raises(Exception) as e_info:
+            _ = pd.Series.vbt.signals.generate((5, 2), choice_func_nb, 1)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate((5, 3), choice_func_nb, 1, index=sig.index, columns=sig.columns),
             pd.DataFrame(
@@ -143,11 +140,6 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
-        try:
-            _ = pd.DataFrame.vbt.signals.generate((5,), choice_func_nb, 1)
-            raise Exception
-        except:
-            pass
 
     def test_generate_after(self):
         @njit
@@ -279,11 +271,8 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        try:
-            _ = pd.Series.vbt.signals.generate_random((5, 1), 3)
-            raise Exception
-        except:
-            pass
+        with pytest.raises(Exception) as e_info:
+            _ = pd.Series.vbt.signals.generate_random((5, 2), 3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random((5, 3), 3, seed=seed, index=sig.index, columns=sig.columns),
             pd.DataFrame(
@@ -298,11 +287,6 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
-        try:
-            _ = pd.DataFrame.vbt.signals.generate_random((5,), 3)
-            raise Exception
-        except:
-            pass
 
     def test_generate_random_by_prob(self):
         pd.testing.assert_series_equal(
@@ -323,11 +307,8 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        try:
-            _ = pd.Series.vbt.signals.generate_random((5, 1), 3)
-            raise Exception
-        except:
-            pass
+        with pytest.raises(Exception) as e_info:
+            _ = pd.Series.vbt.signals.generate_random((5, 2), 3)
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random_by_prob(
                 (5, 3), 0.5, seed=seed, index=sig.index, columns=sig.columns),
@@ -343,11 +324,6 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
-        try:
-            _ = pd.DataFrame.vbt.signals.generate_random((5,), 3)
-            raise Exception
-        except:
-            pass
         pd.testing.assert_frame_equal(
             pd.DataFrame.vbt.signals.generate_random_by_prob(
                 (5, 3), [0., 0.5, 1.], seed=seed, index=sig.index, columns=sig.columns),
@@ -478,7 +454,11 @@ class TestAccessors:
                     [True, False, False]
                 ]),
                 index=sig.index,
-                columns=sig.columns
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['stop_loss', None])
             )
         )
         pd.testing.assert_frame_equal(
@@ -492,7 +472,11 @@ class TestAccessors:
                     [True, False, True]
                 ]),
                 index=sig.index,
-                columns=sig.columns
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['stop_loss', None])
             )
         )
         target = pd.DataFrame(
@@ -581,7 +565,11 @@ class TestAccessors:
                     [False, False, False]
                 ]),
                 index=sig.index,
-                columns=sig.columns
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['take_profit', None])
             )
         )
         pd.testing.assert_frame_equal(
@@ -595,7 +583,11 @@ class TestAccessors:
                     [False, False, False]
                 ]),
                 index=sig.index,
-                columns=sig.columns
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['take_profit', None])
             )
         )
         target = pd.DataFrame(

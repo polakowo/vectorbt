@@ -45,7 +45,7 @@ def repeat_index(index, n):
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
     if checks.is_default_index(index):  # ignore simple ranges without name
-        return pd.RangeIndex(start=0, stop=n, step=1)
+        return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     return np.repeat(index, n)
 
 
@@ -54,16 +54,18 @@ def tile_index(index, n):
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
     if checks.is_default_index(index):  # ignore simple ranges without name
-        return pd.RangeIndex(start=0, stop=n, step=1)
+        return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack_indexes(*indexes, drop_duplicates=None, keep=None):
+def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None):
     """Stack each index in `indexes` on top of each other, from top to bottom."""
     if drop_duplicates is None:
         drop_duplicates = defaults.broadcasting['drop_duplicates']
+    if drop_redundant is None:
+        drop_redundant = defaults.broadcasting['drop_redundant']
 
     levels = []
     for i in range(len(indexes)):
@@ -78,20 +80,16 @@ def stack_indexes(*indexes, drop_duplicates=None, keep=None):
 
     new_index = pd.MultiIndex.from_arrays(levels)
     if drop_duplicates:
-        return drop_duplicate_levels(new_index, keep=keep)
+        new_index = drop_duplicate_levels(new_index, keep=keep)
+    if drop_redundant:
+        new_index = drop_redundant_levels(new_index)
     return new_index
 
 
-def combine_indexes(*indexes, ignore_single=None):
+def combine_indexes(*indexes, **kwargs):
     """Combine each index in `indexes` using Cartesian product.
 
-    If `ignore_single` is `True`, ignores indexes/columns with one value. If both are with one
-    value, will keep both regardless of `ignore_single`.
-
-    For defaults, see `vectorbt.defaults.broadcasting`."""
-    if ignore_single is None:
-        ignore_single = defaults.broadcasting['ignore_single']
-
+    Keyword arguments will be passed to `stack_indexes`."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
         index1, index2 = new_index, indexes[i]
@@ -100,14 +98,6 @@ def combine_indexes(*indexes, ignore_single=None):
         if not isinstance(index2, pd.Index):
             index2 = pd.Index(index2)
 
-        if ignore_single:
-            if len(index1) > 1 or len(index2) > 1:
-                if len(index1) == 1:
-                    new_index = index2
-                    continue
-                if len(index2) == 1:
-                    new_index = index1
-                    continue
         tuples1 = np.repeat(index1.to_numpy(), len(index2))
         tuples2 = np.tile(index2.to_numpy(), len(index1))
 
@@ -120,7 +110,7 @@ def combine_indexes(*indexes, ignore_single=None):
         else:
             index2 = pd.Index(tuples2, name=index2.name)
 
-        new_index = stack_indexes(index1, index2)
+        new_index = stack_indexes(index1, index2, **kwargs)
     return new_index
 
 
@@ -170,7 +160,7 @@ def select_levels(index, level_names):
 
 
 def drop_redundant_levels(index):
-    """Drop levels in `index` that either have a single value or a range from 0 to n."""
+    """Drop levels in `index` that either have a single unnamed value or a range from 0 to n."""
     if not isinstance(index, pd.MultiIndex):
         return index
     if len(index) == 1:
@@ -178,7 +168,7 @@ def drop_redundant_levels(index):
 
     levels_to_drop = []
     for i in range(index.nlevels):
-        if len(index.levels[i]) == 1:
+        if len(index.levels[i]) == 1 and index.levels[i].name is None:
             levels_to_drop.append(i)
         elif checks.is_default_index(index.get_level_values(i)):
             levels_to_drop.append(i)

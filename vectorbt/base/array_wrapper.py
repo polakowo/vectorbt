@@ -108,7 +108,7 @@ class ArrayWrapper:
             return pd.Series(a, index=index, name=name, dtype=dtype)
         return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
 
-    def wrap_reduced(self, a, index=None, time_units=False):
+    def wrap_reduced(self, a, index=None, name=None, time_units=False):
         """Wrap result of reduction.
 
         Argument `index` can be passed when reducing to an array of values (vs. one value) per column.
@@ -132,15 +132,17 @@ class ArrayWrapper:
                         return pd.to_timedelta(a[0])
                     return a[0]
                 # Array per series
-                name = self.columns[0]
+                if name is None:
+                    name = self.columns[0]
                 if name == 0:  # was a Series before
                     name = None
                 return pd.Series(a, index=index, name=name)
             # Value per column
-            return pd.Series(a, index=self.columns)
+            return pd.Series(a, index=self.columns, name=name)
         if self.ndim == 1:
             # Array per series
-            name = self.columns[0]
+            if name is None:
+                name = self.columns[0]
             if name == 0:  # was a Series before
                 name = None
             return pd.Series(a[:, 0], index=index, name=name)
@@ -155,5 +157,7 @@ class ArrayWrapper:
         if not pd.Index.equals(self.columns, other.columns):
             return False
         if self.ndim != other.ndim:
+            return False
+        if self.freq != other.freq:
             return False
         return True

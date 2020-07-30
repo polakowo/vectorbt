@@ -13,203 +13,275 @@ On top of this pipeline, it also does the following:
 
 * Generates a new Python class
 * Creates an `__init__` method where it stores all inputs, outputs, and other artifacts
-* Creates a `from_params` method that runs the main pipeline using `from_params_pipeline`
+* Creates a `run` method that runs the main pipeline using `run_pipeline`
 * Adds pandas indexing, i.e., you can use `iloc`, `loc`, `xs`, and `__getitem__` on the class itself
 * Adds parameter indexing, i.e., use `*your_param*_loc` on the class to slice using parameters
 * Adds user-defined properties
 * Adds common comparison methods for all inputs, outputs and properties, e.g., crossover
 
-Example:
-    Consider the following smaller price DataFrame `price_sm`:
+Consider the following smaller price DataFrame `price_sm`:
 
-    ```python-repl
-    >>> import vectorbt as vbt
-    >>> import numpy as np
-    >>> import pandas as pd
-    >>> from numba import njit
-    >>> from datetime import datetime
+```python-repl
+>>> import vectorbt as vbt
+>>> import numpy as np
+>>> import pandas as pd
+>>> from numba import njit
+>>> from datetime import datetime
 
-    >>> index = pd.Index([
-    ...     datetime(2020, 1, 1),
-    ...     datetime(2020, 1, 2),
-    ...     datetime(2020, 1, 3),
-    ...     datetime(2020, 1, 4),
-    ...     datetime(2020, 1, 5),
-    ... ])
-    >>> price_sm = pd.DataFrame({
-    ...     'a': [1, 2, 3, 4, 5], 
-    ...     'b': [5, 4, 3, 2, 1]}, index=index).astype(float)
-    >>> print(price_sm)
-                a    b
-    2020-01-01  1.0  5.0
-    2020-01-02  2.0  4.0
-    2020-01-03  3.0  3.0
-    2020-01-04  4.0  2.0
-    2020-01-05  5.0  1.0
-    ```
+>>> price = pd.DataFrame({
+...     'a': [1, 2, 3, 4, 5],
+...     'b': [5, 4, 3, 2, 1]
+... }, index=pd.Index([
+...     datetime(2020, 1, 1),
+...     datetime(2020, 1, 2),
+...     datetime(2020, 1, 3),
+...     datetime(2020, 1, 4),
+...     datetime(2020, 1, 5),
+... ])).astype(float)
+>>> print(price)
+            a    b
+2020-01-01  1.0  5.0
+2020-01-02  2.0  4.0
+2020-01-03  3.0  3.0
+2020-01-04  4.0  2.0
+2020-01-05  5.0  1.0
+```
 
-    For each column in the DataFrame, let's calculate a simple moving average and get signals 
-    of price crossing it. In particular, we want to test two different window sizes: 2 and 3.
+For each column in the DataFrame, let's calculate a simple moving average and get signals
+of price crossing it. In particular, we want to test two different window sizes: 2 and 3.
 
-    A naive way of doing this:
+## Naive approach
 
-    ```python-repl
-    >>> ma_df = pd.DataFrame.vbt.concat(
-    ...     price_sm.rolling(window=2).mean(), 
-    ...     price_sm.rolling(window=3).mean(), 
-    ...     keys=pd.Index([2, 3], name='ma_window'))
-    >>> print(ma_df)
-    ma_window          2         3
-                a    b    a    b
-    2020-01-01  NaN  NaN  NaN  NaN
-    2020-01-02  1.5  4.5  NaN  NaN
-    2020-01-03  2.5  3.5  2.0  4.0
-    2020-01-04  3.5  2.5  3.0  3.0
-    2020-01-05  4.5  1.5  4.0  2.0
+A naive way of doing this:
 
-    >>> above_signals = (price_sm.vbt.tile(2).vbt > ma_df)
-    >>> above_signals = above_signals.vbt.signals.first(after_false=True)
-    >>> print(above_signals)
-    ma_window              2             3
-                    a      b      a      b
-    2020-01-01  False  False  False  False
-    2020-01-02   True  False  False  False
-    2020-01-03  False  False   True  False
-    2020-01-04  False  False  False  False
-    2020-01-05  False  False  False  False
+```python-repl
+>>> ma_df = pd.DataFrame.vbt.concat(
+...     price.rolling(window=2).mean(),
+...     price.rolling(window=3).mean(),
+...     keys=pd.Index([2, 3], name='ma_window'))
+>>> print(ma_df)
+ma_window          2         3
+              a    b    a    b
+2020-01-01  NaN  NaN  NaN  NaN
+2020-01-02  1.5  4.5  NaN  NaN
+2020-01-03  2.5  3.5  2.0  4.0
+2020-01-04  3.5  2.5  3.0  3.0
+2020-01-05  4.5  1.5  4.0  2.0
 
-    >>> below_signals = (price_sm.vbt.tile(2).vbt < ma_df)
-    >>> below_signals = below_signals.vbt.signals.first(after_false=True)
-    >>> print(below_signals)
-    ma_window              2             3
-                    a      b      a      b
-    2020-01-01  False  False  False  False
-    2020-01-02  False   True  False  False
-    2020-01-03  False  False  False   True
-    2020-01-04  False  False  False  False
-    2020-01-05  False  False  False  False
-    ```
+>>> above_signals = (price.vbt.tile(2).vbt > ma_df)
+>>> above_signals = above_signals.vbt.signals.first(after_false=True)
+>>> print(above_signals)
+ma_window              2             3
+                a      b      a      b
+2020-01-01  False  False  False  False
+2020-01-02   True  False  False  False
+2020-01-03  False  False   True  False
+2020-01-04  False  False  False  False
+2020-01-05  False  False  False  False
 
-    Now the same using `IndicatorFactory`:
+>>> below_signals = (price.vbt.tile(2).vbt < ma_df)
+>>> below_signals = below_signals.vbt.signals.first(after_false=True)
+>>> print(below_signals)
+ma_window              2             3
+                a      b      a      b
+2020-01-01  False  False  False  False
+2020-01-02  False   True  False  False
+2020-01-03  False  False  False   True
+2020-01-04  False  False  False  False
+2020-01-05  False  False  False  False
+```
 
-    ```python-repl
-    >>> MyMA = vbt.IndicatorFactory(
-    ...     ts_names=['price_sm'],
-    ...     param_names=['window'],
-    ...     output_names=['ma'],
-    ...     name='myma'
-    ... ).from_apply_func(vbt.nb.rolling_mean_nb)
+## IndicatorFactory
 
-    >>> myma = MyMA.from_params(price_sm, [2, 3])
-    >>> above_signals = myma.price_sm_above(myma.ma, crossed=True)
-    >>> below_signals = myma.price_sm_below(myma.ma, crossed=True)
-    ```
+Now the same using `IndicatorFactory`:
 
-    It not only produced the handy `from_params` method, but generated a whole infrastructure to be run with
-    an arbitrary number of windows. 
+```python-repl
+>>> MyMA = vbt.IndicatorFactory(
+...     input_names=['price'],
+...     param_names=['window'],
+...     output_names=['ma'],
+...     short_name='myma'
+... ).from_apply_func(vbt.nb.rolling_mean_nb)
 
-    For all our inputs in `ts_names` and outputs in `output_names`, it created a bunch of comparison methods 
-    for generating signals, such as `above`, `below` and `equal` (use `dir()`):
+>>> myma = MyMA.run(price, [2, 3])
+>>> above_signals = myma.price_above(myma.ma, crossed=True)
+>>> below_signals = myma.price_below(myma.ma, crossed=True)
+```
 
-    ```python-repl
-    'ma_above'
-    'ma_below'
-    'ma_equal'
-    'price_sm_above'
-    'price_sm_below'
-    'price_sm_equal'
-    ```
+The `IndicatorFactory` class is used to construct indicator classes from UDFs. First, you provide
+all the necessary information to build the facade of the indicator, such as input, parameter and
+output names, and the actual calculation function. The factory then generates a self-contained
+indicator class capable of running arbitrary configurations of inputs and parameters. To run any
+configuration, you can either use the `IndicatorFactory.run` method (as we did above) or
+the `IndicatorFactory.run_combs` method.
 
-    Each of these methods uses vectorbt's own broadcasting, so you can compare time series objects with an 
-    arbitrary array-like object, given their shapes can be broadcasted together. You can also compare them
-    to multiple objects at once, for example:
+### run method
 
-    ```python-repl
-    >>> print(myma.ma_above([1.5, 2.5], multiple=True))
-    myma_ma_above                         1.5                         2.5
-    myma_window               2             3             2             3
-                    a      b      a      b      a      b      a      b
-    2020-01-01     False  False  False  False  False  False  False  False
-    2020-01-02     False   True  False  False  False   True  False  False
-    2020-01-03      True   True   True   True  False   True  False   True
-    2020-01-04      True   True   True   True   True  False   True   True
-    2020-01-05      True  False   True   True   True  False   True  False
-    ```
+The main method to run an indicator is `IndicatorFactory.run` that accepts 1) input time
+series, 2) parameters (either positional arguments or keyword arguments if you specified
+`param_defaults`), and 3) other arguments that are accepted by the calculation function.
 
-    `IndicatorFactory` also attached pandas indexing to the indicator class: 
+Input time series can have any shape as long as they are Series or DataFrames. Passing multiple time
+series with different shapes will broadcast them to a single shape.
 
-    ```python-repl
-    'iloc'
-    'loc'
-    'window_loc'
-    'xs'
-    ```
+```python-repl
+>>> MyInd = vbt.IndicatorFactory(
+...     input_names=['price1', 'price2'],
+...     param_names=['p1', 'p2']
+... ).from_apply_func(
+...     lambda price1, price2, p1, p2: price1 * p1 + price2 * p2
+... )
 
-    This makes accessing rows and columns by labels, integer positions, and parameters much easier.
+>>> myInd = MyInd.run(price['a'], price['b'], 1, 2)
+>>> print(myInd.output)
+2020-01-01    11.0
+2020-01-02    10.0
+2020-01-03     9.0
+2020-01-04     8.0
+2020-01-05     7.0
+Name: (1, 2, a, b), dtype: float64
 
-    The other advantage of using `IndicatorFactory` is broadcasting:
+>>> myInd = MyInd.run(price, price['b'], 1, 2)
+>>> print(myInd.output)
+custom_p1      1
+custom_p2      2
+               a     b
+2020-01-01  11.0  15.0
+2020-01-02  10.0  12.0
+2020-01-03   9.0   9.0
+2020-01-04   8.0   6.0
+2020-01-05   7.0   3.0
+```
 
-    * Passing multiple time series objects will broadcast them to the same shape and index/columns
+Parameters are also flexible: they can be either single values, or arrays to run multiple
+configurations at once. Multiple parameters will broadcast together to have the same length.
+You can even set `param_product` to `True` to run all possible combinations of passed parameter values.
 
-    ```python-repl
-    >>> price_sm2 = price_sm.copy() + 1
-    >>> price_sm2.columns = ['a2', 'b2']
+```python-repl
+>>> myInd = MyInd.run(price['a'], price['b'], 1, 2)
+>>> print(myInd._p1_array)
+>>> print(myInd._p2_array)
+[1]
+[2]
 
-    >>> MyInd = vbt.IndicatorFactory(
-    ...     ts_names=['price_sm', 'price_sm2'],
-    ...     param_names=['p1', 'p2']
-    ... ).from_apply_func(
-    ...     lambda price_sm, price_sm2, p1, p2: price_sm * p1 + price_sm2 * p2
-    ... )
+>>> myInd = MyInd.run(price['a'], price['b'], 1, [2, 3])
+>>> print(myInd._p1_array)
+>>> print(myInd._p2_array)
+[1 1]
+[2 3]
 
-    >>> myInd = MyInd.from_params(price_sm, price_sm2, 1, 2)
-    >>> print(myInd.price_sm)
-                a    b
-                a2   b2
-    2020-01-01  1.0  5.0
-    2020-01-02  2.0  4.0
-    2020-01-03  3.0  3.0
-    2020-01-04  4.0  2.0
-    2020-01-05  5.0  1.0
-    >>> print(myInd.price_sm2)
-                a    b
-                a2   b2
-    2020-01-01  2.0  6.0
-    2020-01-02  3.0  5.0
-    2020-01-03  4.0  4.0
-    2020-01-04  5.0  3.0
-    2020-01-05  6.0  2.0
-    ```
+>>> myInd = MyInd.run(price['a'], price['b'], [1, 2], [3, 4], param_product=True)
+>>> print(myInd._p1_array)
+>>> print(myInd._p2_array)
+[1 1 2 2]
+[3 4 3 4]
+```
 
-    * Passing multiple parameters will broadcast them to arrays of the same shape
+The output of the `IndicatorFactory.run` method will be the instance of the indicator.
+All outputs can be then accessed as variables of the instance.
 
-    ```python-repl
-    >>> myInd = MyInd.from_params(price_sm, price_sm2, 1, 2)
-    >>> print(myInd._p1_array)
-    >>> print(myInd._p2_array)
-    [1]
-    [2]
+### run_combs method
 
-    >>> myInd = MyInd.from_params(price_sm, price_sm2, 1, [2, 3])
-    >>> print(myInd._p1_array)
-    >>> print(myInd._p2_array)
-    [1 1]
-    [2 3]
+The `IndicatorFactory.run_combs` method takes the same inputs as the method above, but computes
+all combinations of passed parameters and returns multiple instances that can be compared with
+each other. For example, this is useful to generate crossover signals of multiple moving averages.
 
-    >>> myInd = MyInd.from_params(price_sm, price_sm2, [1, 2], [3, 4], param_product=True)
-    >>> print(myInd._p1_array)
-    >>> print(myInd._p2_array)
-    [1 1 2 2]
-    [3 4 3 4]
-    ```
+```python-repl
+>>> myma1, myma2 = MyMA.run_combs(price, [2, 3, 4])
 
-    This way, you can define parameter combinations of any order and shape. 
+>>> print(myma1.ma)
+myma_1_window                   2         3
+                 a    b    a    b    a    b
+2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
+2020-01-02     1.5  4.5  1.5  4.5  NaN  NaN
+2020-01-03     2.5  3.5  2.5  3.5  2.0  4.0
+2020-01-04     3.5  2.5  3.5  2.5  3.0  3.0
+2020-01-05     4.5  1.5  4.5  1.5  4.0  2.0
+
+>>> print(myma2.ma)
+myma_2_window         3                   4
+                 a    b    a    b    a    b
+2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
+2020-01-02     NaN  NaN  NaN  NaN  NaN  NaN
+2020-01-03     2.0  4.0  NaN  NaN  NaN  NaN
+2020-01-04     3.0  3.0  2.5  3.5  2.5  3.5
+2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
+
+>>> print(myma1.ma_above(myma2.ma, crossed=True))
+myma_1_window                           2             3
+myma_2_window             3             4             4
+                   a      b      a      b      a      b
+2020-01-01     False  False  False  False  False  False
+2020-01-02     False  False  False  False  False  False
+2020-01-03      True  False  False  False  False  False
+2020-01-04     False  False   True  False   True  False
+2020-01-05     False  False  False  False  False  False
+```
+
+The main advantage is that it doesn't re-compute each combination thanks to caching.
+
+### Comparison methods
+
+For all our inputs in `input_names` and outputs in `output_names`, it created a bunch of comparison methods
+for generating signals, such as `above`, `below` and `equal` (use `dir()`):
+
+```python-repl
+'ma_above',
+'ma_below',
+'ma_equal',
+'price_above',
+'price_below',
+'price_equal',
+```
+
+Each of these methods uses vectorbt's own broadcasting, so you can compare time series objects with an
+arbitrary array-like object, given their shapes can be broadcasted together. You can also compare them
+to multiple objects at once, for example:
+
+```python-repl
+>>> print(myma.ma_above([1.5, 2.5], multiple=True))
+myma_ma_above                         1.5                         2.5
+myma_window               2             3             2             3
+                a         b      a      b      a      b      a      b
+2020-01-01     False  False  False  False  False  False  False  False
+2020-01-02     False   True  False  False  False   True  False  False
+2020-01-03      True   True   True   True  False   True  False   True
+2020-01-04      True   True   True   True   True  False   True   True
+2020-01-05      True  False   True   True   True  False   True  False
+```
+
+### Indexing
+
+`IndicatorFactory` also attaches pandas indexing to the indicator class:
+
+```python-repl
+'iloc'
+'loc'
+'window_loc'
+'xs'
+```
+
+This makes accessing rows and columns by labels, integer positions, and parameters much easier.
+
+```python-repl
+>>> print(myma[(2, 'b')])
+<vectorbt.indicators.factory.CustomIndicator at 0x7fa4b3e0c4e0>
+
+>>> myma[(2, 'b')].ma
+2020-01-01    NaN
+2020-01-02    4.5
+2020-01-03    3.5
+2020-01-04    2.5
+2020-01-05    1.5
+Name: (2, b), dtype: float64
+```
 """
 import numpy as np
 import pandas as pd
 from numba import njit
 from numba.typed import List
 import itertools
+import inspect
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
@@ -253,7 +325,7 @@ def create_param_combs(op_tree, depth=0):
     new_op_tree = (op_tree[0],)
     for elem in op_tree[1:]:
         if isinstance(elem, tuple):
-            new_op_tree += (create_param_combs(elem, depth=depth+1),)
+            new_op_tree += (create_param_combs(elem, depth=depth + 1),)
         else:
             new_op_tree += (elem,)
     result = list(new_op_tree[0](*new_op_tree[1:]))
@@ -271,16 +343,21 @@ def create_param_product(param_list):
     return param_list
 
 
-def build_column_hierarchy(param_list, level_names, ts_columns):
+def reindex_outputs(new_params, run, n_ts_cols):
+    """Return indices of `new_params` in `run` corrected by the number of columns `n_ts_cols`."""
+    idxs = np.array([run.index(param_tuple) for param_tuple in new_params])
+    idx_map = np.arange(len(run) * n_ts_cols).reshape(len(run), n_ts_cols)
+    return idx_map[idxs].flatten()
+
+
+def build_column_hierarchy(param_list, level_names, ts_columns, hide_levels=[]):
     """For each parameter in `param_list`, create a new column level with parameter values. 
-    Combine this level with columns `ts_columns` using Cartesian product.
-    
-    Excludes level names that are `None`."""
+    Combine this level with columns `ts_columns` using Cartesian product."""
     checks.assert_same_shape(param_list, level_names, axis=0)
 
     param_indexes = []
     for i in range(len(param_list)):
-        if level_names[i] is not None:
+        if level_names[i] not in hide_levels:
             param_index = index_fns.index_from_values(param_list[i], name=level_names[i])
             param_indexes.append(param_index)
     if len(param_indexes) > 1:
@@ -292,6 +369,14 @@ def build_column_hierarchy(param_list, level_names, ts_columns):
     if param_columns is not None:
         return index_fns.combine_indexes(param_columns, ts_columns)
     return ts_columns
+
+
+def build_input_mapper(n_old_columns, n_params, new_columns):
+    """Build a mapper that maps old columns in inputs to new columns.
+
+    Instead of tiling all inputs to the shape of outputs and wasting memory, we just keep a mapper
+    and perform the tiling when needed."""
+    return pd.Series(np.tile(np.arange(n_old_columns), n_params), index=new_columns)
 
 
 def build_mapper(params, ts, new_columns, level_name):
@@ -321,34 +406,40 @@ def broadcast_ts(ts, params_len, new_columns):
         return ts.vbt.wrap(ts, columns=new_columns)
 
 
-def from_params_pipeline(
-        ts_list, param_list, level_names, num_outputs,
+def run_pipeline(
+        input_list, param_list, level_names, num_outputs,
         custom_func, *args,
+        hide_levels=[],
         pass_lists=False,
         pass_2d=True,
         param_product=False,
         broadcast_kwargs={},
         return_raw=False,
+        use_raw=None,
         **kwargs):
     """A pipeline for calculating an indicator, used by `IndicatorFactory`.
 
     Args:
-        ts_list (list of array_like): A list of time series objects. At least one must be a pandas object.
+        input_list (list of array_like): A list of time series objects. At least one must be a pandas object.
         param_list (list of array_like): A list of parameters. Each element is either an array-like object
             or a single value of any type.
         level_names (list of str): A list of column level names corresponding to each parameter.
+
+            Should have the same length as `param_list`.
         num_outputs (int): The number of output arrays.
         custom_func (function): A custom calculation function. See `IndicatorFactory.from_custom_func`.
         *args: Arguments passed to the `custom_func`.
+        hide_levels (list): A list of parameter levels to hide.
         pass_lists (bool): If `True`, arguments are passed to the `custom_func` as lists.
         pass_2d (bool): If `True`, time series arrays will be passed as two-dimensional, otherwise as is.
         param_product (bool): If `True`, builds a Cartesian product out of all parameters.
         broadcast_kwargs (dict): Keyword arguments passed to the `vectorbt.base.reshape_fns.broadcast`
             on time series objects.
-        return_raw (bool): If `True`, returns the raw output without post-processing.
+        return_raw (bool): If `True`, returns raw output without post-processing and hashed parameter tuples.
+        use_raw (bool): Takes the raw results and uses them instead of running `custom_func`.
         **kwargs: Keyword arguments passed to the `custom_func`.
 
-            Some common arguments include `return_cache` to return cache and `cache` to pass cache. 
+            Some common arguments include `return_cache` to return cache and `use_cache` to use cache.
             Those are only applicable to `custom_func` that supports it (`custom_func` created using
             `IndicatorFactory.from_apply_func` are supported by default).
             
@@ -361,19 +452,19 @@ def from_params_pipeline(
 
         Does the following:
 
-        * Takes one or multiple time series objects in `ts_list` and broadcasts them. For example:
+        * Takes one or multiple time series objects in `input_list` and broadcasts them. For example:
 
         ```python-repl
         >>> sr = pd.Series([1, 2], index=['x', 'y'])
         >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-        >>> ts_list = [sr, df]
+        >>> input_list = [sr, df]
 
-        >>> ts_list = vbt.base.reshape_fns.broadcast(*ts_list)
-        >>> print(ts_list[0])
+        >>> input_list = vbt.base.reshape_fns.broadcast(*input_list)
+        >>> print(input_list[0])
         a  b
         x  1  1
         y  2  2
-        >>> print(ts_list[1])
+        >>> print(input_list[1])
         a  b
         x  3  4
         y  5  6
@@ -406,7 +497,7 @@ def from_params_pipeline(
         ...         ts1 + ts2 + p1[2] * p2[2],
         ...     ))
 
-        >>> output = custom_func(*ts_list, *param_list)
+        >>> output = custom_func(*input_list, *param_list)
         >>> print(output)
         array([[ 6,  7,  7,  8,  8,  9],
                [ 9, 10, 10, 11, 11, 12]])
@@ -419,7 +510,7 @@ def from_params_pipeline(
         >>> p2_columns = pd.Index(param_list[1], name='p2')
         >>> p3_columns = pd.Index(param_list[2], name='p3')
         >>> p_columns = vbt.base.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
-        >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, ts_list[0].columns)
+        >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, input_list[0].columns)
 
         >>> output_df = pd.DataFrame(output, columns=new_columns)
         >>> print(output_df)
@@ -431,16 +522,16 @@ def from_params_pipeline(
         1       9     10     10     11     11     12
         ```
 
-        * Broadcasts objects in `ts_list` to match the shape of objects in `output_list` through tiling.
+        * Broadcasts objects in `input_list` to match the shape of objects in `output_list` through tiling.
             This is done to be able to compare them and generate signals, since you cannot compare NumPy 
             arrays that have totally different shapes, such as (2, 2) and (2, 6). For example:
 
         ```python-repl
-        >>> new_ts_list = [
-        ...     ts_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
-        ...     ts_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
+        >>> new_input_list = [
+        ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
+        ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
         ... ]
-        >>> print(new_ts_list[0])
+        >>> print(new_input_list[0])
         p1                                         1                        
         p2             2             3             4    
         p3  False  False  False  False  False  False     
@@ -450,20 +541,20 @@ def from_params_pipeline(
         ```
 
         * Builds parameter mappers that will link parameters from `param_list` to columns in 
-            `ts_list` and `output_list`. This is done to enable column indexing using parameter values.
+            `input_list` and `output_list`. This is done to enable column indexing using parameter values.
     """
-    if len(ts_list) > 1:
+    if len(input_list) > 1:
         # Broadcast time series
-        ts_list = reshape_fns.broadcast(*ts_list, **broadcast_kwargs, writeable=True)
+        input_list = reshape_fns.broadcast(*input_list, **broadcast_kwargs, writeable=True)
     # Check time series objects
-    checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
+    checks.assert_type(input_list[0], (pd.Series, pd.DataFrame))
     # Convert params to 1-dim arrays
     param_list = list(map(reshape_fns.to_1d, param_list))
     if len(param_list) > 1:
         # Check level names
         checks.assert_type(level_names, (list, tuple))
         checks.assert_same_len(param_list, level_names)
-        for ts in ts_list:
+        for ts in input_list:
             # Every time series object should be free of the specified level names in its columns
             for level_name in level_names:
                 if level_name is not None:
@@ -475,16 +566,28 @@ def from_params_pipeline(
         else:
             # Broadcast such that each array has the same length
             param_list = reshape_fns.broadcast(*param_list, writeable=True)
-    # Perform main calculation
+    if not isinstance(param_list, (tuple, list)):
+        param_list = [param_list]
     if pass_2d:
-        array_list = tuple(map(lambda x: reshape_fns.to_2d(np.asarray(x)), ts_list))
+        array_list = tuple(map(lambda x: reshape_fns.to_2d(np.asarray(x)), input_list))
     else:
-        array_list = tuple(map(lambda x: np.asarray(x), ts_list))
-    if pass_lists:
-        output_list = custom_func(array_list, param_list, *args, **kwargs)
+        array_list = tuple(map(lambda x: np.asarray(x), input_list))
+    if use_raw is not None:
+        # Use raw results of previous run to build outputs
+        raw_output_list, raw_map = use_raw
+        if not isinstance(raw_output_list, (tuple, list, List)):
+            raw_output_list = [raw_output_list]
+        idxs = reindex_outputs(list(zip(*param_list)), raw_map, array_list[0].shape[1])
+        output_list = [output[:, idxs] for output in raw_output_list]
     else:
-        output_list = custom_func(*array_list, *param_list, *args, **kwargs)
+        # Perform main calculation
+        if pass_lists:
+            output_list = custom_func(array_list, param_list, *args, **kwargs)
+        else:
+            output_list = custom_func(*array_list, *param_list, *args, **kwargs)
     if return_raw or kwargs.get('return_cache', False):
+        if return_raw:  # return raw outputs with param map
+            return output_list, list(zip(*param_list))
         return output_list  # return raw cache outputs
     if not isinstance(output_list, (tuple, list, List)):
         output_list = [output_list]
@@ -499,47 +602,50 @@ def from_params_pipeline(
     output_list = output_list[:num_outputs]
     if len(param_list) > 0:
         # Build new column levels on top of time series levels
-        new_columns = build_column_hierarchy(param_list, level_names, ts_list[0].vbt.columns)
-        # Wrap into new pandas objects both time series and output objects
-        new_ts_list = list(map(lambda x: broadcast_ts(x, param_list[0].shape[0], new_columns), ts_list))
+        new_columns = build_column_hierarchy(param_list, level_names, input_list[0].vbt.columns, hide_levels)
+        # Build column mapper for inputs
+        input_mapper = build_input_mapper(len(input_list[0].vbt.columns), param_list[0].shape[0], new_columns)
         # Build mappers to easily map between parameters and columns
-        mapper_list = [build_mapper(x, ts_list[0], new_columns, level_names[i]) for i, x in enumerate(param_list)]
+        mapper_list = [build_mapper(x, input_list[0], new_columns, level_names[i]) for i, x in enumerate(param_list)]
     else:
         # Some indicators don't have any params
-        new_columns = ts_list[0].vbt.columns
-        new_ts_list = list(ts_list)
+        new_columns = input_list[0].vbt.columns
+        input_mapper = None
         mapper_list = []
-    output_list = list(map(lambda x: wrap_output(x, ts_list[0], new_columns), output_list))
+    output_list = list(map(lambda x: wrap_output(x, input_list[0], new_columns), output_list))
     if len(mapper_list) > 1:
         # Tuple object is a mapper that accepts tuples of parameters
         tuple_mapper = build_tuple_mapper(mapper_list, new_columns, tuple(level_names))
         mapper_list.append(tuple_mapper)
-    return new_ts_list, output_list, param_list, mapper_list, other_list
+    return input_list, input_mapper, output_list, param_list, mapper_list, other_list
 
 
-def perform_init_checks(ts_list, output_list, param_list, mapper_list, name):
+def perform_init_checks(input_list, input_mapper, output_list, param_list, mapper_list, short_name):
     """Perform checks on objects created by running or slicing an indicator."""
-    checks.assert_type(ts_list[0], (pd.Series, pd.DataFrame))
-    for ts in ts_list + output_list:
-        checks.assert_same_meta(ts_list[0], ts)
+    checks.assert_type(input_list[0], (pd.Series, pd.DataFrame))
+    checks.assert_type(output_list[0], (pd.Series, pd.DataFrame))
+    if input_mapper is not None:
+        checks.assert_same_index(reshape_fns.to_2d(output_list[0]).iloc[0, :], input_mapper)
+    for ts in output_list:
+        checks.assert_same_meta(output_list[0], ts)
     for params in param_list:
         checks.assert_same_shape(param_list[0], params)
     for mapper in mapper_list:
         checks.assert_type(mapper, pd.Series)
-        checks.assert_same_index(reshape_fns.to_2d(ts_list[0]).iloc[0, :], mapper)
-    checks.assert_type(name, str)
+        checks.assert_same_index(reshape_fns.to_2d(output_list[0]).iloc[0, :], mapper)
+    checks.assert_type(short_name, str)
 
 
-def compare(obj, other, compare_func, multiple=False, name=None, keys=None, **kwargs):
+def compare(obj, other, compare_func, multiple=False, level_name=None, keys=None, **kwargs):
     """Compares `obj` to `other` to generate signals.
 
     Both will be broadcast together. Set `multiple` to `True` to compare with multiple arguments.
-    In this case, a new column level will be created with the name `name`.
+    In this case, a new column level will be created with the name `level_name`.
 
     See `vectorbt.base.accessors.Base_Accessor.combine_with`."""
     if multiple:
         if keys is None:
-            keys = index_fns.index_from_values(other, name=name)
+            keys = index_fns.index_from_values(other, name=level_name)
         return obj.vbt.combine_with_multiple(other, combine_func=compare_func, keys=keys, concat=True, **kwargs)
     return obj.vbt.combine_with(other, combine_func=compare_func, **kwargs)
 
@@ -547,34 +653,57 @@ def compare(obj, other, compare_func, multiple=False, name=None, keys=None, **kw
 class IndicatorFactory():
     def __init__(self,
                  class_name='CustomIndicator',
+                 class_docstring='',
                  module_name=__name__,
-                 ts_names=['ts'],
+                 short_name='custom',
+                 input_names=['ts'],
                  param_names=['param'],
+                 param_defaults={},
                  output_names=['output'],
-                 name='custom',
-                 custom_outputs={}):
+                 output_flags={},
+                 custom_output_funcs={}):
         """A factory for creating new indicators.
 
         Args:
-            ts_names (list of str): A list of names of input time series objects.
+            class_name (str): Name for the created Python class.
+            class_docstring (str): Docstring for the created Python class.
+            module_name (str): Specify the module the class originates from.
+            short_name (str): A short name of the indicator.
+            input_names (list of str): A list of names of input time series objects.
             param_names (list of str): A list of names of parameters.
+            param_defaults (dict): A dictionary of parameter defaults.
+
+                Params with defaults should be on the right in `param_names`.
             output_names (list of str): A list of names of outputs time series objects.
-            name (str): A short name of the indicator.
-            custom_outputs (dict): A dictionary with user-defined functions that will be
+            output_flags (dict): A dictionary of output flags.
+            custom_output_funcs (dict): A dictionary with user-defined functions that will be
                 bound to the indicator class and wrapped with `@cached_property`.
 
         !!! note
-            The `__init__` method is never used for running the indicator, for this use `from_params`.
+            The `__init__` method is not used for running the indicator, for this use `run`.
             The reason for this is indexing, which requires a clean `__init__` method for creating 
             a new indicator object with newly indexed attributes.
         """
         self.class_name = class_name
+        self.class_docstring = class_docstring
         self.module_name = module_name
-        self.ts_names = ts_names
+        self.short_name = short_name
+        self.input_names = input_names
         self.param_names = param_names
+        if len(param_defaults) > 0:
+            for param_name in param_defaults:
+                if param_name not in param_names:
+                    raise ValueError(f"Param {param_name} not in param_names")
+            if sorted(param_names[-len(param_defaults):]) != sorted(param_defaults.keys()):
+                raise ValueError("Params with defaults should be on the right in param_names")
+        self.param_defaults = param_defaults
         self.output_names = output_names
-        self.name = name
-        self.custom_outputs = custom_outputs
+        if len(output_flags) > 0:
+            for output_name in output_flags:
+                if output_name not in output_names:
+                    raise ValueError(f"Output {output_name} not in output_names")
+        self.output_flags = output_flags
+        self.custom_output_funcs = custom_output_funcs
 
     def from_custom_func(self, custom_func, **pipeline_kwargs):
         """Build indicator class around a custom calculation function.
@@ -590,11 +719,11 @@ class IndicatorFactory():
 
         Args:
             custom_func (function): A function that takes broadcasted time series corresponding 
-                to `ts_names`, broadcasted parameter arrays corresponding to `param_names`, and other 
+                to `input_names`, broadcasted parameter arrays corresponding to `param_names`, and other
                 arguments and keyword arguments, and returns outputs corresponding to `output_names`
                 and other objects that are then returned with the indicator class instance.
                 Can be Numba-compiled.
-            **pipeline_kwargs: Default keyword arguments passed to `from_params_pipeline`.
+            **pipeline_kwargs: Default keyword arguments passed to `run_pipeline`.
         Returns:
             `CustomIndicator`, and optionally other objects that are returned by `custom_func`
             and exceed `output_names`.
@@ -612,12 +741,12 @@ class IndicatorFactory():
             ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, *args)
 
             >>> MyInd = vbt.IndicatorFactory(
-            ...     ts_names=['ts1', 'ts2'],
+            ...     input_names=['ts1', 'ts2'],
             ...     param_names=['p1', 'p2'],
             ...     output_names=['o1', 'o2']
             ... ).from_custom_func(custom_func)
 
-            >>> myInd = MyInd.from_params(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
+            >>> myInd = MyInd.run(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
             >>> print(myInd.o1)
             custom_p1              1             2
             custom_p2              3             4
@@ -638,20 +767,32 @@ class IndicatorFactory():
             2020-01-05  130.0  106.0  140.0  108.0
             ```
         """
-        ts_names = self.ts_names
+        short_name = self.short_name
+        input_names = self.input_names
         param_names = self.param_names
+        param_defaults = self.param_defaults
         output_names = self.output_names
-        name = self.name
-        custom_outputs = self.custom_outputs
+        output_flags = self.output_flags
+        custom_output_funcs = self.custom_output_funcs
 
         # Add indexing methods
         def indexing_func(obj, pd_indexing_func):
-            ts_list = []
-            for ts_name in ts_names:
-                ts_list.append(pd_indexing_func(getattr(obj, ts_name)))
+            input_mapper = getattr(obj, '_input_mapper', None)
+            if input_mapper is not None:
+                input_mapper = indexing_on_mapper(
+                    getattr(obj, '_input_mapper'),
+                    getattr(obj, output_names[0]),
+                    pd_indexing_func
+                )
             output_list = []
             for output_name in output_names:
                 output_list.append(pd_indexing_func(getattr(obj, output_name)))
+            input_list = []
+            for input_name in input_names:
+                input = getattr(obj, f'_{input_name}')
+                if not pd.Index.equals(output_list[0].index, input.index):
+                    input = input.loc[output_list[0].index]
+                input_list.append(input)
             param_list = []
             for param_name in param_names:
                 # TODO: adapt params array according to the indexing operation
@@ -660,43 +801,76 @@ class IndicatorFactory():
             for param_name in param_names:
                 mapper_list.append(indexing_on_mapper(
                     getattr(obj, f'_{param_name}_mapper'),
-                    getattr(obj, ts_names[0]), pd_indexing_func))
+                    getattr(obj, output_names[0]),
+                    pd_indexing_func
+                ))
             if len(param_names) > 1:
                 mapper_list.append(indexing_on_mapper(
-                    obj._tuple_mapper, getattr(obj, ts_names[0]), pd_indexing_func))
+                    obj._tuple_mapper,
+                    getattr(obj, output_names[0]),
+                    pd_indexing_func
+                ))
 
-            return obj.__class__(ts_list, output_list, param_list, mapper_list, obj.name)
+            return obj.__class__(
+                input_list,
+                input_mapper,
+                output_list,
+                param_list,
+                mapper_list,
+                obj.short_name
+            )
 
         ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
         CustomIndicator = type(self.class_name, (PandasIndexer, ParamIndexer), {})
         CustomIndicator.__module__ = self.module_name
+        CustomIndicator.__doc__ = self.class_docstring
 
-        # For name and each input and output, create read-only properties
-        prop = property(lambda self: self._name)
-        prop.__doc__ = f"""Name of the indicator (read-only)."""
-        setattr(CustomIndicator, 'name', prop)
+        # For short_name and each input and output, create read-only properties
+        prop = property(lambda self: self._short_name)
+        prop.__doc__ = f"""Short name of the indicator (read-only)."""
+        setattr(CustomIndicator, 'short_name', prop)
 
-        for ts_name in ts_names:
-            prop = property(lambda self, ts_name=ts_name: getattr(self, '_' + ts_name))
-            prop.__doc__ = f"""Input time series (read-only)."""
-            setattr(CustomIndicator, ts_name, prop)
+        for input_name in input_names:
+            def input_prop(self, input_name=input_name):
+                """Input time series (read-only).
+
+                Will broadcast to match the shape of outputs."""
+                old_input = reshape_fns.to_2d(getattr(self, '_' + input_name), raw=True)
+                input_mapper = getattr(self, '_input_mapper')
+                if input_mapper is None:
+                    return old_input
+                return self.wrapper.wrap(old_input[:, input_mapper.values])
+
+            input_prop.__name__ = input_name
+            setattr(CustomIndicator, input_name, cached_property(input_prop))
 
         for output_name in output_names:
-            prop = property(lambda self, output_name=output_name: getattr(self, '_' + output_name))
-            prop.__doc__ = f"""Output time series (read-only)."""
-            setattr(CustomIndicator, output_name, prop)
+            def output_prop(self, output_name=output_name):
+                """Output time series (read-only)."""
+                return getattr(self, '_' + output_name)
 
-        for prop in custom_outputs.values():
-            if prop.__doc__ is None:
-                prop.__doc__ = f"""Custom property."""
+            output_prop.__name__ = output_name
+            if output_name in output_flags:
+                _output_flags = output_flags[output_name]
+                if isinstance(_output_flags, (tuple, list)):
+                    _output_flags = ', '.join(_output_flags)
+                output_prop.__doc__ += "\n\n" + _output_flags
+            setattr(CustomIndicator, output_name, property(output_prop))
 
         # Add __init__ method
-        def __init__(self, ts_list, output_list, param_list, mapper_list, name):
-            perform_init_checks(ts_list, output_list, param_list, mapper_list, name)
+        def __init__(self, input_list, input_mapper, output_list, param_list, mapper_list, short_name):
+            perform_init_checks(
+                input_list,
+                input_mapper,
+                output_list,
+                param_list,
+                mapper_list,
+                short_name
+            )
 
-            for i, ts_name in enumerate(ts_names):
-                setattr(self, f'_{ts_name}', ts_list[i])
-            self.wrapper = ArrayWrapper.from_obj(ts_list[0])
+            for i, ts_name in enumerate(input_names):
+                setattr(self, f'_{ts_name}', input_list[i])
+            setattr(self, '_input_mapper', input_mapper)
             for i, output_name in enumerate(output_names):
                 setattr(self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):
@@ -704,7 +878,10 @@ class IndicatorFactory():
                 setattr(self, f'_{param_name}_mapper', mapper_list[i])
             if len(param_names) > 1:
                 setattr(self, '_tuple_mapper', mapper_list[-1])
-            setattr(self, '_name', name)
+            setattr(self, '_short_name', short_name)
+
+            # Initialize wrapper
+            self.wrapper = ArrayWrapper.from_obj(output_list[0])
 
             # Initialize indexers
             PandasIndexer.__init__(self, indexing_func)
@@ -712,59 +889,217 @@ class IndicatorFactory():
 
         setattr(CustomIndicator, '__init__', __init__)
 
-        # Add from_params method
+        # Add private run method
+        def_run_kwargs = dict(
+            short_name=short_name,
+            hide_params=[],
+            hide_default=True
+        )
         @classmethod
-        def from_params(cls, *args, name=name.lower(), hide_params=[],
-                        pipeline_kwargs=pipeline_kwargs, **kwargs):
-            level_names = []
-            for param_name in param_names:
-                if param_name in hide_params:
-                    level_names.append(None)
-                else:
-                    level_names.append(name + '_' + param_name)
-
-            level_names = list(level_names)
+        def _run(cls,
+                 *args,
+                 short_name=def_run_kwargs['short_name'],
+                 hide_params=def_run_kwargs['hide_params'],
+                 hide_default=def_run_kwargs['hide_default'],
+                 pipeline_kwargs=pipeline_kwargs,
+                 **kwargs):
+            if len(args) < len(input_names) + len(param_names):
+                nmissed = len(input_names) + len(param_names) - len(args)
+                raise ValueError(f"Missing {nmissed} required positional arguments")
             args = list(args)
-            ts_list = args[:len(ts_names)]
-            param_list = args[len(ts_names):len(ts_names)+len(param_names)]
-            custom_func_args = args[len(ts_names)+len(param_names):]
+            input_list = args[:len(input_names)]
+            param_list = args[len(input_names):len(input_names) + len(param_names)]
+            level_names = []
+            hide_levels = []
+            for i, param_name in enumerate(param_names):
+                level_names.append(short_name + '_' + param_name)
+                if param_name in hide_params or \
+                        (hide_default and param_name in param_defaults and
+                         np.all(np.array(param_list[i]) == param_defaults[param_name])):
+                    hide_levels.append(short_name + '_' + param_name)
+            level_names = list(level_names)
+            custom_func_args = args[len(input_names) + len(param_names):]
             kwargs = {**pipeline_kwargs, **kwargs}  # overwrite default pipeline kwargs
-            results = from_params_pipeline(
-                ts_list, param_list, level_names, len(output_names),
-                custom_func, *custom_func_args, **kwargs)
+            results = run_pipeline(
+                input_list,
+                param_list,
+                level_names,
+                len(output_names),
+                custom_func,
+                *custom_func_args,
+                hide_levels=hide_levels,
+                **kwargs
+            )
             if kwargs.get('return_raw', False) or kwargs.get('return_cache', False):
                 return results
-            new_ts_list, output_list, new_param_list, mapper_list, other_list = results
-            obj = cls(new_ts_list, output_list, new_param_list, mapper_list, name)
+            new_input_list, input_mapper, output_list, new_param_list, mapper_list, other_list = results
+            obj = cls(
+                new_input_list,
+                input_mapper,
+                output_list,
+                new_param_list,
+                mapper_list,
+                short_name
+            )
             if len(other_list) > 0:
                 return (obj, *tuple(other_list))
             return obj
 
-        setattr(CustomIndicator, 'from_params', from_params)
+        setattr(CustomIndicator, '_run', _run)
+
+        # Add public run method
+        # Create function dynamically to provide user with a proper signature
+        def compile_run_function(func_name, docstring, default_kwargs):
+            pos_params = param_names[:len(param_names) - len(param_defaults)]
+            kw_params = [
+                (param_names[i], param_defaults[param_names[i]])
+                for i in range(-len(param_defaults), 0)
+            ]
+            kw_params_str = ['{}={}'.format(k, v) for k, v in kw_params]
+            kw_names_str = [param_names[i] for i in range(-len(param_defaults), 0)]
+            def_kw_str = ['{}={}'.format(k, k) for k, v in default_kwargs.items()]
+            func_str = "@classmethod\n" \
+                "def {0}(cls, {1}, *args, {2}, **kwargs):\n" \
+                "    \"\"\"{3}\"\"\"\n" \
+                "    return cls._{0}({4}, *args, {2}, **kwargs)".format(
+                    func_name,
+                    ', '.join(input_names + pos_params + kw_params_str),
+                    ', '.join(def_kw_str),
+                    docstring,
+                    ', '.join(input_names + pos_params + kw_names_str)
+            )
+            scope = default_kwargs
+            filename = inspect.getfile(lambda: None)
+            code = compile(func_str, filename, 'single')
+            exec(code, scope)
+            return scope[func_name]
+
+        def create_run_docstring(docstring_func):
+            as_code = lambda x: list(map(lambda y: f'`{y}`', x))
+            in_ts_str = ', '.join(as_code(input_names)[:-2] + [' and '.join(as_code(input_names[-2:]))])
+            if len(param_names) > 0:
+                param_str = ', '.join(as_code(param_names[:-2]) + [' and '.join(as_code(param_names[-2:]))])
+                param_str = 'parameters ' + param_str
+            else:
+                param_str = 'no parameters'
+            out_ts_str = ', '.join(as_code(output_names[:-2]) + [' and '.join(as_code(output_names[-2:]))])
+            return docstring_func(self.class_name, in_ts_str, param_str, out_ts_str)
+
+        def run_docstring_func(class_name, in_ts_str, param_str, out_ts_str):
+            return """Run the {0} indicator using input time series {1}, and {2}, to
+                produce output time series {3}.
+    
+                Pass a list of parameter names `hide_params` to hide their column levels.
+                Set `hide_default` to `False` to show column levels of parameters with the default value passed.
+                Keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.""".format(
+                class_name,
+                in_ts_str,
+                param_str,
+                out_ts_str,
+            )
+
+        run_docstring = create_run_docstring(run_docstring_func)
+        run = compile_run_function('run', run_docstring, def_run_kwargs)
+        setattr(CustomIndicator, 'run', run)
+
+        if len(param_names) > 0:
+            # Add private run_combs method
+            def_run_combs_kwargs = dict(
+                r=2,
+                param_product=False,
+                comb_func=itertools.combinations,
+                speed_up=True,
+                short_names=None
+            )
+            run_combs_scope = dict(itertools=itertools)
+            @classmethod
+            def _run_combs(cls,
+                           *args,
+                           r=def_run_combs_kwargs['r'],
+                           param_product=def_run_combs_kwargs['param_product'],
+                           comb_func=def_run_combs_kwargs['comb_func'],
+                           speed_up=def_run_combs_kwargs['speed_up'],
+                           short_names=def_run_combs_kwargs['short_names'],
+                           **kwargs):
+                if short_names is None:
+                    short_names = [f'{short_name}_{str(i + 1)}' for i in range(r)]
+                input_list = args[:len(input_names)]
+                param_list = args[len(input_names):len(input_names) + len(param_names)]
+                if param_product:
+                    param_list = create_param_product(param_list)
+                else:
+                    param_list = reshape_fns.broadcast(*param_list, writeable=True)
+                if not isinstance(param_list, (tuple, list)):
+                    param_list = [param_list]
+                custom_func_args = args[len(input_names) + len(param_names):]
+                if speed_up:
+                    raw_results = cls.run(
+                        *input_list,
+                        *param_list,
+                        *custom_func_args,
+                        return_raw=True,
+                        **kwargs
+                    )
+                    kwargs['use_raw'] = raw_results
+                instances = []
+                param_lists = zip(*comb_func(zip(*param_list), r))
+                for i, param_list in enumerate(param_lists):
+                    instances.append(cls.run(
+                        *input_list,
+                        *zip(*param_list),
+                        *custom_func_args,
+                        short_name=short_names[i],
+                        **kwargs
+                    ))
+                return tuple(instances)
+
+            setattr(CustomIndicator, '_run_combs', _run_combs)
+
+            # Add public run_combs method
+            def run_combs_docstring_func(class_name, in_ts_str, param_str, out_ts_str):
+                return """Create a combination of multiple {0} indicators using function `comb_func`. 
+                    Run each indicator using input time series {1}, and {2}, to produce output time series {3}.
+    
+                    Pass `r` to specify how many indicators to run. Pass `short_names` to specify the
+                    short name for each indicator. Set `speed_up` to `True` to first compute raw outputs 
+                    for all parameters, and then use them to build each indicator (faster).
+                    Keyword arguments are passed to `{0}.run`.""".format(
+                    class_name,
+                    in_ts_str,
+                    param_str,
+                    out_ts_str,
+                )
+
+            run_combs_docstring = create_run_docstring(run_combs_docstring_func)
+            run_combs = compile_run_function('run_combs', run_combs_docstring, def_run_combs_kwargs)
+            setattr(CustomIndicator, 'run_combs', run_combs)
 
         # Add user-defined outputs
-        for prop_name, prop in custom_outputs.items():
+        for prop_name, prop in custom_output_funcs.items():
+            if prop.__doc__ is None:
+                prop.__doc__ = f"""Custom property."""
             if not isinstance(prop, (property, cached_property)):
                 prop.__name__ = prop_name
                 prop = cached_property(prop)
             setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison methods for all inputs, outputs, and user-defined properties
-        comparison_attrs = set(ts_names + output_names + list(custom_outputs.keys()))
+        comparison_attrs = set(input_names + output_names + list(custom_output_funcs.keys()))
         for attr in comparison_attrs:
             def assign_comparison_method(func_name, compare_func, attr=attr):
-                def comparison_method(self, other, crossed=False, wait=0, name=None, after_false=True, **kwargs):
+                def comparison_method(self, other, crossed=False, wait=0, level_name=None, after_false=True, **kwargs):
                     if isinstance(other, self.__class__):
                         other = getattr(other, attr)
-                    if name is None:
-                        if attr == self.name:
-                            name = f'{self.name}_{func_name}'
+                    if level_name is None:
+                        if attr == self.short_name:
+                            level_name = f'{self.short_name}_{func_name}'
                         else:
-                            name = f'{self.name}_{attr}_{func_name}'
-                    result = compare(getattr(self, attr), other, compare_func, name=name, **kwargs)
+                            level_name = f'{self.short_name}_{attr}_{func_name}'
+                    result = compare(getattr(self, attr), other, compare_func, level_name=level_name, **kwargs)
                     if crossed:
-                        return result.vbt.signals.nst(wait+1, after_false=after_false)
+                        return result.vbt.signals.nst(wait + 1, after_false=after_false)
                     return result
+
                 comparison_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
                 comparison_method.__doc__ = f"""Return `True` for each element where `{attr}` is {func_name} `other`. 
 
@@ -804,7 +1139,7 @@ class IndicatorFactory():
 
         Args:
             apply_func (function): A function that takes broadcasted time series arrays corresponding 
-                to `ts_names`, single parameter selection corresponding to `param_names`, and other 
+                to `input_names`, single parameter selection corresponding to `param_names`, and other
                 arguments and keyword arguments, and returns outputs corresponding to `output_names`.
                 Can be Numba-compiled.
             caching_func (function): A caching function to preprocess data beforehand.
@@ -819,12 +1154,12 @@ class IndicatorFactory():
             ...     return ts1 * p1 + arg1, ts2 * p2 + arg1
 
             >>> MyInd = vbt.IndicatorFactory(
-            ...     ts_names=['ts1', 'ts2'],
+            ...     input_names=['ts1', 'ts2'],
             ...     param_names=['p1', 'p2'],
             ...     output_names=['o1', 'o2']
             ... ).from_apply_func(apply_func_nb)
 
-            >>> myInd = MyInd.from_params(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
+            >>> myInd = MyInd.run(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
             >>> print(myInd.o1)
             custom_p1              1             2
             custom_p2              3             4
@@ -860,7 +1195,7 @@ class IndicatorFactory():
                 # Select the next tuple of parameters
                 return apply_func(*ts_arr_list, *param_tuples[i], *args)
 
-            def custom_func(ts_arr_list, param_list, *args, return_cache=False, cache=None):
+            def custom_func(ts_arr_list, param_list, *args, return_cache=False, use_cache=None):
                 # avoid deprecation warnings
                 ts_arr_list = tuple(map(np.asarray, ts_arr_list))
                 typed_param_tuples = List()
@@ -868,6 +1203,7 @@ class IndicatorFactory():
                     typed_param_tuples.append(param_tuple)
 
                 # Caching
+                cache = use_cache
                 if cache is None and caching_func is not None:
                     cache = caching_func(*ts_arr_list, *param_list, *args)
                 if return_cache:
@@ -896,9 +1232,10 @@ class IndicatorFactory():
                 param_is = list(map(lambda x: x[i], param_list))
                 return apply_func(*ts_arr_list, *param_is, *args, **kwargs)
 
-            def custom_func(ts_arr_list, param_list, *args, return_cache=False, cache=None, **kwargs):
+            def custom_func(ts_arr_list, param_list, *args, return_cache=False, use_cache=None, **kwargs):
                 ts_arr_list = tuple(map(np.asarray, ts_arr_list))
                 # Caching
+                cache = use_cache
                 if cache is None and caching_func is not None:
                     cache = caching_func(*ts_arr_list, *param_list, *args, **kwargs)
                 if return_cache:
@@ -919,3 +1256,86 @@ class IndicatorFactory():
                     **kwargs)
 
         return self.from_custom_func(custom_func, pass_lists=True, **kwargs)
+
+    @classmethod
+    def from_talib(cls, func_name, module_name=__name__, **kwargs):
+        """Build indicator class around a TA-Lib function.
+
+        Requires [TA-Lib](https://github.com/mrjbq7/ta-lib) installed.
+
+        For input, parameter and output names, see [docs](https://github.com/mrjbq7/ta-lib/blob/master/docs/index.md).
+
+        Args:
+            func_name (str): Function name.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
+        Returns:
+            CustomIndicator
+        Example:
+            ```python-repl
+            >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
+
+            >>> sma = SMA.run(price_sm, timeperiod=[2, 3])
+            >>> print(sma.real)
+            sma_timeperiod         2         3
+                              a    b    a    b
+            2020-01-01      NaN  NaN  NaN  NaN
+            2020-01-02      1.5  4.5  NaN  NaN
+            2020-01-03      2.5  3.5  2.0  4.0
+            2020-01-04      3.5  2.5  3.0  3.0
+            2020-01-05      4.5  1.5  4.0  2.0
+            ```
+        """
+        import talib
+        from talib import abstract
+
+        func = getattr(talib, func_name)
+        info = abstract.Function(func_name)._Function__info
+        input_names = []
+        for in_names in info['input_names'].values():
+            if isinstance(in_names, (list, tuple)):
+                input_names.extend(list(in_names))
+            else:
+                input_names.append(in_names)
+
+        def custom_func(*args):
+            # TA-Lib functions can only process 1-dim arrays
+            # TODO: Find ways to call talib from within Numba
+            ts = args[:len(input_names)]
+            params = args[len(input_names):]
+            if len(params) == 0:
+                # No parameters
+                outputs = []
+                for col in range(ts[0].shape[1]):
+                    outputs.append(func(*map(lambda x: x[:, col], ts)))
+                idxs = slice(None, None)
+            else:
+                outputs = []
+                param_tuples = list(zip(*params))
+                unique_param_tuples = list(set(param_tuples))
+                for param_tuple in unique_param_tuples:
+                    for col in range(ts[0].shape[1]):
+                        outputs.append(func(
+                            *map(lambda x: x[:, col], ts),
+                            *param_tuple
+                        ))
+                if len(unique_param_tuples) == len(param_tuples):
+                    idxs = slice(None, None)
+                else:
+                    idxs = reindex_outputs(param_tuples, unique_param_tuples, ts[0].shape[1])
+            if isinstance(outputs[0], tuple):  # multiple outputs
+                outputs = list(zip(*outputs))
+                return list(map(lambda x: np.column_stack(x)[:, idxs], outputs))
+            return np.column_stack(outputs)[:, idxs]
+
+        TALibIndicator = cls(
+            class_name=info['name'],
+            class_docstring="{}, {}".format(info['display_name'], info['group']),
+            module_name=module_name,
+            short_name=info['name'].lower(),
+            input_names=input_names,
+            param_names=list(info['parameters'].keys()),
+            param_defaults=info['parameters'],
+            output_names=info['output_names'],
+            output_flags=info['output_flags']
+        ).from_custom_func(custom_func, **kwargs)
+        return TALibIndicator

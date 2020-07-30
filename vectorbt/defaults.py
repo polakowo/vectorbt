@@ -134,9 +134,9 @@ __pdoc__['returns'] = f"""Parameters for returns.
 broadcasting = Config(
     index_from='strict',
     columns_from='stack',
-    ignore_single=True,
     drop_duplicates=True,
-    keep='last'
+    keep='last',
+    drop_redundant=True
 )
 """_"""
 

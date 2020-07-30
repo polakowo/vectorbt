@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 from datetime import datetime
+import pytest
 
 from vectorbt.records import order_dt, trade_dt, position_dt, drawdown_dt
 from vectorbt.portfolio.enums import FilledOrder, SizeType
@@ -536,38 +537,26 @@ class TestPortfolio:
             portfolio4.cash,
             pd.Series(np.array([ 99., 101.,  98.,  94.,   5.]), index=price.index, name=price.name)
         )
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = vbt.Portfolio.from_signals(
                 price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
                 size_type=SizeType.TargetShares
             )
-            raise Exception
-        except:
-            pass
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = vbt.Portfolio.from_signals(
                 price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
                 size_type=SizeType.TargetCash
             )
-            raise Exception
-        except:
-            pass
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = vbt.Portfolio.from_signals(
                 price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
                 size_type=SizeType.TargetValue
             )
-            raise Exception
-        except:
-            pass
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = vbt.Portfolio.from_signals(
                 price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
                 size_type=SizeType.TargetPercent
             )
-            raise Exception
-        except:
-            pass
 
     def test_from_orders(self):
         portfolio = vbt.Portfolio.from_orders(price, order_size['a'])
@@ -970,6 +959,92 @@ class TestPortfolio:
                 [93.8199, 92.6398, 91.4597]
             ]), index=price.index, columns=entries.columns)
         )
+        portfolio3 = vbt.Portfolio.from_order_func(
+            price.vbt.tile(3, keys=entries.columns),
+            order_func_nb,
+            price.vbt.tile(3).values,
+            np.full((price.shape[0], 3), 0.01),
+            np.full((price.shape[0], 3), 1),
+            np.full((price.shape[0], 3), 0.01),
+            row_wise=True
+        )
+        record_arrays_close(
+            portfolio2.orders.records_arr,
+            portfolio3.orders.records_arr
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.shares,
+            portfolio3.shares
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.cash,
+            portfolio3.cash
+        )
+
+        @njit
+        def row_prep_func_nb(rc, price, fees, fixed_fees, slippage):
+            np.random.seed(rc.i)
+            w = np.random.uniform(0, 1, size=rc.target_shape[1])
+            return (w / np.sum(w),)
+
+        @njit
+        def order_func2_nb(oc, w, price, fees, fixed_fees, slippage):
+            current_value = oc.run_cash / price[oc.i, oc.col] + oc.run_shares
+            target_size = w[oc.col] * current_value
+            return vbt.portfolio.nb.Order(target_size - oc.run_shares, SizeType.Shares,
+                                          price[oc.i, oc.col], fees[oc.i, oc.col], fixed_fees[oc.i, oc.col],
+                                          slippage[oc.i, oc.col])
+
+        portfolio4 = vbt.Portfolio.from_order_func(
+            price.vbt.tile(3, keys=entries.columns),
+            order_func2_nb,
+            price.vbt.tile(3).values,
+            np.full((price.shape[0], 3), 0.01),
+            np.full((price.shape[0], 3), 1),
+            np.full((price.shape[0], 3), 0.01),
+            row_wise=True,
+            row_prep_func_nb=row_prep_func_nb
+        )
+        record_arrays_close(
+            portfolio4.orders.records_arr,
+            np.array([
+                (0, 0, 29.39915509, 1.01, 1.29693147, 0),
+                (0, 1, 5.97028539, 1.98, 1.11821165, 1),
+                (0, 2, 1.87882685, 2.97, 1.05580116, 1),
+                (0, 3, 1.07701246, 2.02, 1.02175565, 0),
+                (0, 4, 17.68302427, 1.01, 1.17859855, 0),
+                (1, 0, 38.31167227, 1.01, 1.38694789, 0),
+                (1, 1, 4.92245855, 2.02, 1.09943366, 0),
+                (1, 2, 41.70851928, 2.97, 2.23874302, 1),
+                (1, 3, 38.12586746, 2.02, 1.77014252, 0),
+                (1, 4, 10.7427999, 0.99, 1.10635372, 1),
+                (2, 0, 32.28917264, 1.01, 1.32612064, 0),
+                (2, 1, 32.28260453, 1.98, 1.63919557, 1),
+                (2, 2, 23.2426913, 3.03, 1.70425355, 0),
+                (2, 3, 13.60989657, 1.98, 1.26947595, 1),
+                (2, 4, 26.15949742, 1.01, 1.26421092, 0)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio4.shares,
+            pd.DataFrame(np.array([
+                [2.93991551e+01, 3.83116723e+01, 3.22891726e+01],
+                [2.34288697e+01, 4.32341308e+01, 6.56811360e-03],
+                [2.15500428e+01, 1.52561154e+00, 2.32492594e+01],
+                [2.26270553e+01, 3.96514790e+01, 9.63936284e+00],
+                [4.03100796e+01, 2.89086791e+01, 3.57988603e+01]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio4.cash,
+            pd.DataFrame(np.array([
+                [69.00992189, 59.91826312, 66.06181499],
+                [79.71287532, 48.87546318, 128.34217638],
+                [84.23718992, 170.51102243, 56.2125682],
+                [81.0398691, 91.72662765, 81.89068746],
+                [62.00141604, 101.25564583, 54.20538413]
+            ]), index=price.index, columns=entries.columns)
+        )
 
     def test_from_order_func_init_capital(self):
         portfolio = vbt.Portfolio.from_order_func(
@@ -1094,11 +1169,8 @@ class TestPortfolio:
             test_portfolio[['a', 'b']].main_price,
             test_portfolio.main_price[['a', 'b']]
         )
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = test_portfolio.iloc[::2, :]  # changing time not supported
-            raise Exception
-        except:
-            pass
         _ = test_portfolio.iloc[np.arange(test_portfolio.wrapper.shape[0]), :]  # won't change time
 
     def test_records(self):

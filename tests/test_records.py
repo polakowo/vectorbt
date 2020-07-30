@@ -2,6 +2,7 @@ import vectorbt as vbt
 import numpy as np
 import pandas as pd
 from numba import njit
+import pytest
 
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records import (
@@ -147,11 +148,8 @@ class TestMappedArray:
             wrapper,
             idx_arr=records_arr['idx'].tolist() + [2]
         )
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = mapped_array2.to_matrix()
-            raise Exception
-        except:
-            pass
 
     def test_reduce(self):
         @njit
@@ -217,11 +215,8 @@ class TestMappedArray:
             pd.Series(np.array([12., 15., 18., np.nan]), index=wrapper.columns)
         )
         assert mapped_array['a'].nst(-1) == 12.
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = mapped_array.nst(10)
-            raise Exception
-        except:
-            pass
 
     def test_min(self):
         pd.testing.assert_series_equal(
@@ -345,11 +340,8 @@ class TestMappedArray:
             mapped_array[['a', 'b']].wrapper.columns,
             pd.Index(['a', 'b'], dtype='object')
         )
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = mapped_array.iloc[::2, :]  # changing time not supported
-            raise Exception
-        except:
-            pass
         _ = mapped_array.iloc[np.arange(mapped_array.wrapper.shape[0]), :]  # won't change time
 
     def test_magic(self):
@@ -376,37 +368,28 @@ class TestMappedArray:
             wrapper,
             idx_arr=records_arr['idx']
         )).mapped_arr, a.mapped_arr * b)
-        try:
+        with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
                 records_arr['some_field2'],
                 records_arr['col'] * 2,
                 wrapper,
                 idx_arr=records_arr['idx']
             )).mapped_arr, a.mapped_arr * b)
-            raise Exception
-        except:
-            pass
-        try:
+        with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
                 records_arr['some_field2'],
                 records_arr['col'],
                 wrapper,
                 idx_arr=None
             )).mapped_arr, a.mapped_arr * b)
-            raise Exception
-        except:
-            pass
-        try:
+        with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
                 records_arr['some_field2'],
                 records_arr['col'],
                 wrapper,
                 idx_arr=records_arr['idx'] * 2
             )).mapped_arr, a.mapped_arr * b)
-            raise Exception
-        except:
-            pass
-        try:
+        with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
                 records_arr['some_field2'],
                 records_arr['col'],
@@ -418,9 +401,6 @@ class TestMappedArray:
                 ),
                 idx_arr=records_arr['idx']
             )).mapped_arr, a.mapped_arr * b)
-            raise Exception
-        except:
-            pass
 
         # binary ops
         # comparison ops
@@ -613,11 +593,8 @@ class TestRecords:
             records[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
-        try:
+        with pytest.raises(Exception) as e_info:
             _ = records.iloc[::2, :]  # changing time not supported
-            raise Exception
-        except:
-            pass
         _ = records.iloc[np.arange(records.wrapper.shape[0]), :]  # won't change time
 
     def test_filtering(self):

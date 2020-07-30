@@ -82,13 +82,9 @@ except ImportError:
     nb.rolling_min_nb,
     nb.rolling_max_nb,
     nb.rolling_mean_nb,
-    nb.rolling_std_nb,
-    nb.ewm_mean_nb,
-    nb.ewm_std_nb,
     nb.expanding_min_nb,
     nb.expanding_max_nb,
-    nb.expanding_mean_nb,
-    nb.expanding_std_nb
+    nb.expanding_mean_nb
 ], module_name='vectorbt.generic.nb')
 class Generic_Accessor(Base_Accessor):
     """Accessor on top of data of any type. For both, Series and DataFrames.
@@ -101,14 +97,34 @@ class Generic_Accessor(Base_Accessor):
 
         Base_Accessor.__init__(self, obj, freq=freq)
 
-    def split_into_ranges(self, n=None, range_len=None):
-        """Split into `n` ranges each `range_len` long.
+    def rolling_std(self, window, minp=1, ddof=1):  # pragma: no cover
+        return self.wrap(nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof))
 
-        At least one of `range_len` and `n` must be set.
+    def expanding_std(self, minp=1, ddof=1):  # pragma: no cover
+        return self.wrap(nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof))
+
+    def ewm_mean(self, span, minp=0, adjust=True):  # pragma: no cover
+        return self.wrap(nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust))
+
+    def ewm_std(self, span, minp=0, adjust=True, ddof=1):  # pragma: no cover
+        return self.wrap(nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof))
+
+    def split_into_ranges(self, n=None, range_len=None, start_idxs=None, end_idxs=None):
+        """Either split into `n` ranges each `range_len` long, or split into ranges between
+        `start_idxs` and `end_idxs`.
+
+        At least one of `range_len`, `n`, or `start_idxs` and `end_idxs` must be set.
         If `range_len` is `None`, will split evenly into `n` ranges.
         If `n` is `None`, will return the maximum number of ranges of length `range_len`.
+        If `start_idxs` and `end_idxs`, will split into ranges between both arrays.
+        Both index arrays must be either NumPy arrays with positions (last exclusive)
+        or pandas indexes with labels (last inclusive).
+
+        Created levels `range_start` and `range_end` will contain labels (last inclusive).
 
         !!! note
+            Ranges must have the same length.
+
             The datetime-like format of the index will be lost as result of this operation.
             Make sure to store the index metadata such as frequency information beforehand.
 
@@ -128,23 +144,55 @@ class Generic_Accessor(Base_Accessor):
             1                  2.0        3.0        4.0        3.0        2.0        3.0
             2                  3.0        4.0        3.0        2.0        3.0        2.0
             3                  4.0        5.0        2.0        1.0        2.0        1.0
+            >>> print(df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[4, 5]))
+                                            a                     b                     c
+            range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
+            range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
+            0                    1          2          5          4          1          2
+            1                    2          3          4          3          2          3
+            2                    3          4          3          2          3          2
+            3                    4          5          2          1          2          1
+            >>> print(df.vbt.split_into_ranges(
+            ...     start_idxs=pd.Index(['2020-01-01', '2020-01-03']),
+            ...     end_idxs=pd.Index(['2020-01-02', '2020-01-04'])
+            ... ))
+                                            a                     b                     c
+            range_start 2020-01-01 2020-01-03 2020-01-01 2020-01-03 2020-01-01 2020-01-03
+            range_end   2020-01-02 2020-01-04 2020-01-02 2020-01-04 2020-01-02 2020-01-04
+            0                    1          3          5          3          1          3
+            1                    2          4          4          2          2          2
             ```"""
-        if range_len is None and n is None:
-            raise ValueError("At least range_len or n must be set")
-
-        if range_len is None:
-            range_len = len(self.index) // n
-        cube = nb.rolling_window_nb(self.to_2d_array(), range_len)
-        if n is not None:
-            if n > cube.shape[2]:
-                raise ValueError(f"n cannot be bigger than the maximum number of ranges {cube.shape[2]}")
-            idxs = np.round(np.linspace(0, cube.shape[2] - 1, n)).astype(int)
-            cube = cube[:, :, idxs]
+        if start_idxs is None and end_idxs is None:
+            if range_len is None and n is None:
+                raise ValueError("At least range_len, n, or start_idxs and end_idxs must be set")
+            if range_len is None:
+                range_len = len(self.index) // n
+            start_idxs = np.arange(len(self.index) - range_len + 1)
+            end_idxs = np.arange(range_len, len(self.index) + 1)
+        elif start_idxs is None or end_idxs is None:
+            raise ValueError("Both start_idxs and end_idxs must be set")
         else:
-            idxs = np.arange(cube.shape[2])
-        matrix = np.hstack(cube)
-        range_starts = pd.Index(self.index[idxs], name='range_start')
-        range_ends = pd.Index(self.index[idxs + range_len - 1], name='range_end')
+            if isinstance(start_idxs, pd.Index):
+                start_idxs = np.where(self.index.isin(start_idxs))[0]
+            else:
+                start_idxs = np.asarray(start_idxs)
+            if isinstance(end_idxs, pd.Index):
+                end_idxs = np.where(self.index.isin(end_idxs))[0] + 1
+            else:
+                end_idxs = np.asarray(end_idxs)
+
+        if np.any((end_idxs - start_idxs) != (end_idxs - start_idxs).item(0)):
+            raise ValueError("Ranges must have the same length")
+
+        if n is not None:
+            if n > len(start_idxs):
+                raise ValueError(f"n cannot be bigger than the maximum number of ranges {len(start_idxs)}")
+            idxs = np.round(np.linspace(0, len(start_idxs) - 1, n)).astype(int)
+            start_idxs = start_idxs[idxs]
+            end_idxs = end_idxs[idxs]
+        matrix = nb.concat_ranges_nb(self.to_2d_array(), start_idxs, end_idxs)
+        range_starts = pd.Index(self.index[start_idxs], name='range_start')
+        range_ends = pd.Index(self.index[end_idxs - 1], name='range_end')
         range_columns = index_fns.stack_indexes(range_starts, range_ends)
         new_columns = index_fns.combine_indexes(self.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)

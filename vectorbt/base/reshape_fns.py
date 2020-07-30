@@ -110,7 +110,7 @@ def tile(arg, n, axis=1):
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single=None, **kwargs):
+def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
     """Produce a broadcasted index/columns.
 
     Args:
@@ -128,14 +128,10 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single=None,
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
-        ignore_single (bool): If `True`, won't consider index/columns with a single value.
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
     """
-
-    if ignore_single is None:
-        ignore_single = defaults.broadcasting['ignore_single']
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
     if axis == 1 and len(to_shape) == 1:
@@ -176,16 +172,10 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_single=None,
                             if len(index) != len(new_index):
                                 if len(index) > 1 and len(new_index) > 1:
                                     raise ValueError("Indexes could not be broadcast together")
-                                if ignore_single:
-                                    # Columns of length 1 should be ignored
-                                    if len(index) > len(new_index):
-                                        new_index = index
-                                    continue
-                                else:
-                                    if len(index) > len(new_index):
-                                        new_index = index_fns.repeat_index(new_index, len(index))
-                                    elif len(index) < len(new_index):
-                                        index = index_fns.repeat_index(index, len(new_index))
+                                if len(index) > len(new_index):
+                                    new_index = index_fns.repeat_index(new_index, len(index))
+                                elif len(index) < len(new_index):
+                                    index = index_fns.repeat_index(index, len(new_index))
                             new_index = index_fns.stack_indexes(new_index, index, **kwargs)
             else:
                 raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")

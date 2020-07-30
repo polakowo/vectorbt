@@ -81,7 +81,7 @@ it is SMA or EMA. Each of these hyper-parameters becomes an additional dimension
 and gets stored as a separate column level. Below is an example of a column hierarchy for MACD:
 
 ```python-repl
->>> macd = vbt.MACD.from_params(
+>>> macd = vbt.MACD.run(
 ...     pd.Series([1, 2, 3, 4, 3, 2, 1]),
 ...     fast_window=(2, 3),
 ...     slow_window=(3, 4),
@@ -221,8 +221,8 @@ average, and sell when the opposite happens.
 
 ```python-repl
 >>> # (10, 20) - 10 day moving average crosses 20 day moving average
->>> fast_ma = vbt.MA.from_params(btc_price, 10, name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.from_params(btc_price, 20, name='slow', hide_params=['ewm'])
+>>> fast_ma = vbt.MA.run(btc_price, 10, name='fast', hide_params=['ewm'])
+>>> slow_ma = vbt.MA.run(btc_price, 20, name='slow', hide_params=['ewm'])
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
 >>> print(entries)
@@ -261,9 +261,9 @@ average over the entire price series and store it as a distinct column.
 
 ```python-repl
 >>> # Multiple strategy instances: (10, 30) and (20, 30)
->>> fast_ma = vbt.MA.from_params(btc_price,
+>>> fast_ma = vbt.MA.run(btc_price,
 ...     [10, 20], name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.from_params(btc_price,
+>>> slow_ma = vbt.MA.run(btc_price,
 ...     [30, 30], name='slow', hide_params=['ewm'])
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
@@ -332,9 +332,9 @@ Date
 
 [366 rows x 2 columns]
 
->>> fast_ma = vbt.MA.from_params(comb_price,
+>>> fast_ma = vbt.MA.run(comb_price,
 ...     [10, 20], name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.from_params(comb_price,
+>>> slow_ma = vbt.MA.run(comb_price,
 ...     [30, 30], name='slow', hide_params=['ewm'])
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
@@ -415,9 +415,9 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 
 [183 rows x 4 columns]
 
->>> fast_ma = vbt.MA.from_params(mult_comb_price,
+>>> fast_ma = vbt.MA.run(mult_comb_price,
 ...     [10, 20], name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.from_params(mult_comb_price,
+>>> slow_ma = vbt.MA.run(mult_comb_price,
 ...     [30, 30], name='slow', hide_params=['ewm'])
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
