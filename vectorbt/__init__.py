@@ -221,8 +221,8 @@ average, and sell when the opposite happens.
 
 ```python-repl
 >>> # (10, 20) - 10 day moving average crosses 20 day moving average
->>> fast_ma = vbt.MA.run(btc_price, 10, name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.run(btc_price, 20, name='slow', hide_params=['ewm'])
+>>> fast_ma = vbt.MA.run(btc_price, 10, short_name='fast')
+>>> slow_ma = vbt.MA.run(btc_price, 20, short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
 >>> print(entries)
@@ -261,10 +261,8 @@ average over the entire price series and store it as a distinct column.
 
 ```python-repl
 >>> # Multiple strategy instances: (10, 30) and (20, 30)
->>> fast_ma = vbt.MA.run(btc_price,
-...     [10, 20], name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.run(btc_price,
-...     [30, 30], name='slow', hide_params=['ewm'])
+>>> fast_ma = vbt.MA.run(btc_price, [10, 20], short_name='fast')
+>>> slow_ma = vbt.MA.run(btc_price, [30, 30], short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
 >>> print(entries)
@@ -332,10 +330,8 @@ Date
 
 [366 rows x 2 columns]
 
->>> fast_ma = vbt.MA.run(comb_price,
-...     [10, 20], name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.run(comb_price,
-...     [30, 30], name='slow', hide_params=['ewm'])
+>>> fast_ma = vbt.MA.run(comb_price, [10, 20], short_name='fast')
+>>> slow_ma = vbt.MA.run(comb_price, [30, 30], short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
 >>> print(entries)
@@ -415,10 +411,8 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 
 [183 rows x 4 columns]
 
->>> fast_ma = vbt.MA.run(mult_comb_price,
-...     [10, 20], name='fast', hide_params=['ewm'])
->>> slow_ma = vbt.MA.run(mult_comb_price,
-...     [30, 30], name='slow', hide_params=['ewm'])
+>>> fast_ma = vbt.MA.run(mult_comb_price, [10, 20], short_name='fast')
+>>> slow_ma = vbt.MA.run(mult_comb_price, [30, 30], short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
 >>> exits = fast_ma.ma_below(slow_ma, crossed=True)
