@@ -10,6 +10,7 @@ install:
     - ./configure --prefix=/usr
     - make
     - sudo make install
+    - cd ..
     - pip install TA-Lib
 script:
     - pytest tests/
