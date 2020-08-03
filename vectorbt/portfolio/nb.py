@@ -181,80 +181,79 @@ def sell_in_shares_nb(run_cash, run_shares, order_price, order_size, order_fees,
 @njit(cache=True)
 def fill_order_nb(run_cash, run_shares, order):
     """Fill an order."""
-    if order.size != 0.:
-        if order.price <= 0.:
-            raise ValueError("Price must be greater than zero")
-        if order.fees < 0.:
-            raise ValueError("Fees must be zero or greater")
-        if order.fixed_fees < 0.:
-            raise ValueError("Fixed fees must be zero or greater")
-        if order.slippage < 0.:
-            raise ValueError("Slippage must be zero or greater")
-        if order.size_type == SizeType.Shares \
-                or order.size_type == SizeType.TargetShares \
-                or order.size_type == SizeType.TargetValue \
-                or order.size_type == SizeType.TargetPercent:
-            size = order.size
-            if order.size_type == SizeType.TargetShares:
-                # order.size contains target amount of shares
-                size = order.size - run_shares
-            elif order.size_type == SizeType.TargetValue:
-                # order.size contains value in monetary units of the asset
-                target_value = order.size
-                current_value = run_shares * order.price
-                size = (target_value - current_value) / order.price
-            elif order.size_type == SizeType.TargetPercent:
-                # order.size contains percentage from current portfolio value
-                target_perc = order.size
-                current_value = run_shares * order.price
-                current_total_value = run_cash + current_value
-                target_value = target_perc * current_total_value
-                size = (target_value - current_value) / order.price
-            if size > 0. and run_cash > 0.:
-                return buy_in_shares_nb(
-                    run_cash,
-                    run_shares,
-                    order.price,
-                    size,
-                    order.fees,
-                    order.fixed_fees,
-                    order.slippage
-                )
-            if size < 0. and run_shares > 0.:
-                return sell_in_shares_nb(
-                    run_cash,
-                    run_shares,
-                    order.price,
-                    abs(size),
-                    order.fees,
-                    order.fixed_fees,
-                    order.slippage
-                )
-        else:
-            cash = order.size
-            if order.size_type == SizeType.TargetCash:
-                # order.size contains target amount of cash
-                cash = run_cash - order.size
-            if cash > 0. and run_cash > 0.:
-                return buy_in_cash_nb(
-                    run_cash,
-                    run_shares,
-                    order.price,
-                    cash,
-                    order.fees,
-                    order.fixed_fees,
-                    order.slippage
-                )
-            if cash < 0. and run_shares > 0.:
-                return sell_in_cash_nb(
-                    run_cash,
-                    run_shares,
-                    order.price,
-                    abs(cash),
-                    order.fees,
-                    order.fixed_fees,
-                    order.slippage
-                )
+    if order.price <= 0.:
+        raise ValueError("Price must be greater than zero")
+    if order.fees < 0.:
+        raise ValueError("Fees must be zero or greater")
+    if order.fixed_fees < 0.:
+        raise ValueError("Fixed fees must be zero or greater")
+    if order.slippage < 0.:
+        raise ValueError("Slippage must be zero or greater")
+    if order.size_type == SizeType.Shares \
+            or order.size_type == SizeType.TargetShares \
+            or order.size_type == SizeType.TargetValue \
+            or order.size_type == SizeType.TargetPercent:
+        size = order.size
+        if order.size_type == SizeType.TargetShares:
+            # order.size contains target amount of shares
+            size = order.size - run_shares
+        elif order.size_type == SizeType.TargetValue:
+            # order.size contains value in monetary units of the asset
+            target_value = order.size
+            current_value = run_shares * order.price
+            size = (target_value - current_value) / order.price
+        elif order.size_type == SizeType.TargetPercent:
+            # order.size contains percentage from current portfolio value
+            target_perc = order.size
+            current_value = run_shares * order.price
+            current_total_value = run_cash + current_value
+            target_value = target_perc * current_total_value
+            size = (target_value - current_value) / order.price
+        if size > 0. and run_cash > 0.:
+            return buy_in_shares_nb(
+                run_cash,
+                run_shares,
+                order.price,
+                size,
+                order.fees,
+                order.fixed_fees,
+                order.slippage
+            )
+        if size < 0. and run_shares > 0.:
+            return sell_in_shares_nb(
+                run_cash,
+                run_shares,
+                order.price,
+                abs(size),
+                order.fees,
+                order.fixed_fees,
+                order.slippage
+            )
+    else:
+        cash = order.size
+        if order.size_type == SizeType.TargetCash:
+            # order.size contains target amount of cash
+            cash = run_cash - order.size
+        if cash > 0. and run_cash > 0.:
+            return buy_in_cash_nb(
+                run_cash,
+                run_shares,
+                order.price,
+                cash,
+                order.fees,
+                order.fixed_fees,
+                order.slippage
+            )
+        if cash < 0. and run_shares > 0.:
+            return sell_in_cash_nb(
+                run_cash,
+                run_shares,
+                order.price,
+                abs(cash),
+                order.fees,
+                order.fixed_fees,
+                order.slippage
+            )
     return run_cash, run_shares, None
 
 
