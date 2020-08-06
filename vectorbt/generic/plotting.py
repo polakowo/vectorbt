@@ -138,7 +138,7 @@ def create_bar(data=None, trace_names=None, x_labels=None,
     for i, trace_name in enumerate(trace_names):
         bar = go.Bar(
             x=x_labels,
-            name=trace_name,
+            name=str(trace_name),
             showlegend=trace_name is not None
         )
         bar.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
@@ -223,7 +223,7 @@ def create_scatter(data=None, trace_names=None, x_labels=None,
     for i, trace_name in enumerate(trace_names):
         scatter = go.Scatter(
             x=x_labels,
-            name=trace_name,
+            name=str(trace_name),
             showlegend=trace_name is not None
         )
         scatter.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
@@ -300,7 +300,7 @@ def create_hist(data=None, trace_names=None, horizontal=False,
     for i, trace_name in enumerate(trace_names):
         hist = go.Histogram(
             opacity=0.75 if len(trace_names) > 1 else 1,
-            name=trace_name,
+            name=str(trace_name),
             showlegend=trace_name is not None
         )
         hist.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
@@ -380,7 +380,7 @@ def create_box(data=None, trace_names=None, horizontal=False,
     fig.update_layout(**layout_kwargs)
     for i, trace_name in enumerate(trace_names):
         box = go.Box(
-            name=trace_name,
+            name=str(trace_name),
             showlegend=trace_name is not None
         )
         box.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
