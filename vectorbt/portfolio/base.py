@@ -655,19 +655,26 @@ class Portfolio(PandasIndexer):
     @cached_property
     def equity(self):
         """Portfolio equity series."""
-        return self.cash.vbt + self.shares.vbt * self.main_price.vbt
+        cash = self.cash.vbt.to_2d_array()
+        shares = self.shares.vbt.to_2d_array()
+        main_price = self.main_price.vbt.to_2d_array()
+        equity = cash + shares * main_price
+        zero_shares_mask = shares == 0.  # helps with initial NaNs
+        equity[zero_shares_mask] = cash[zero_shares_mask]
+        return self.wrapper.wrap(equity)
 
     @cached_property
     def final_equity(self):
         """Final equity."""
-        return self.wrapper.wrap_reduced(self.equity.values[-1])
+        final_equity = generic_nb.ffill_nb(self.equity.vbt.to_2d_array())[-1, :]
+        return self.wrapper.wrap_reduced(final_equity)
 
     @cached_property
     def total_profit(self):
         """Total profit."""
-        equity = self.equity.vbt.to_2d_array()[-1, :]
+        final_equity = reshape_fns.to_1d(self.final_equity, raw=True)
         init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
-        return self.wrapper.wrap_reduced(equity - init_capital)
+        return self.wrapper.wrap_reduced(final_equity - init_capital)
 
     # ############# Drawdown ############# #
 
@@ -699,7 +706,8 @@ class Portfolio(PandasIndexer):
         equity = self.equity.vbt.to_2d_array()
         returns = generic_nb.pct_change_nb(equity)
         init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
-        returns[0, :] = (equity[0, :] - init_capital) / init_capital
+        returns[0, :] = (equity[0, :] - init_capital) / init_capital  # initial capital is one tick before
+        returns[np.isnan(returns)] = 0.  # can happen if later price is unknown
         return self.wrapper.wrap(returns)
 
     @cached_property

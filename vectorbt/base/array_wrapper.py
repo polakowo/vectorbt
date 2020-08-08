@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes, to_time_units
@@ -19,14 +20,7 @@ class ArrayWrapper:
         self._index = index
         self._columns = columns
         self._ndim = ndim
-        self._freq = None
-        if freq is not None:
-            self._freq = freq_delta(freq)
-        elif isinstance(self.index, DatetimeTypes):
-            if self.index.freq is not None:
-                self._freq = freq_delta(self.index.freq)
-            elif self.index.inferred_freq is not None:
-                self._freq = freq_delta(self.index.inferred_freq)
+        self._freq = freq
 
     @property
     def index(self):
@@ -62,6 +56,19 @@ class ArrayWrapper:
     @property
     def freq(self):
         """Index frequency."""
+        if self._freq is not None:
+            return freq_delta(self._freq)
+        if isinstance(self.index, DatetimeTypes):
+            if self.index.freq is not None:
+                try:
+                    return freq_delta(self.index.freq)
+                except ValueError as e:
+                    warnings.warn(repr(e))
+            if self.index.inferred_freq is not None:
+                try:
+                    return freq_delta(self.index.inferred_freq)
+                except ValueError as e:
+                    warnings.warn(repr(e))
         return self._freq
 
     def to_time_units(self, a):
