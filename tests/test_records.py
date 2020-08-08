@@ -253,8 +253,8 @@ class TestMappedArray:
         )
         assert mapped_array['a'].std() == mapped_array['a'].to_matrix().std()
         pd.testing.assert_series_equal(
-            mapped_array.std(ddof=0.),
-            mapped_array.to_matrix().std(ddof=0.)
+            mapped_array.std(ddof=0),
+            mapped_array.to_matrix().std(ddof=0)
         )
 
     def test_sum(self):
