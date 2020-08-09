@@ -1495,32 +1495,98 @@ class TestPortfolio:
         )
 
     def test_stats(self):
+        portfolio = vbt.Portfolio.from_orders(
+            price, order_size,
+            fees=0.01,
+            init_capital=init_capital,
+            freq='1 days',
+            year_freq='252 days',
+            levy_alpha=levy_alpha,
+            risk_free=risk_free,
+            required_return=required_return,
+            cutoff=cutoff,
+            factor_returns=factor_returns,
+            incl_unrealized=False
+        )
         pd.testing.assert_series_equal(
-            test_portfolio['c'].stats,
+            portfolio['c'].stats,
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'),
                     pd.Timestamp('2020-01-05 00:00:00'),
                     pd.Timedelta('5 days 00:00:00'),
                     40.0,
-                    -83.82266444466228,
-                    -27.940888148220754,
+                    80.51016159355368,
+                    26.836720531184554,
                     0.0,
-                    50.99009900990099,
-                    25.99009900990099,
-                    pd.Timedelta('2 days 00:00:00'),
-                    pd.Timedelta('2 days 00:00:00'), 2,
+                    35.300460739143226,
+                    35.30046073914323,
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    2,
                     50.0,
-                    47.029702970297045,
-                    -50.99009900990099,
-                    -1.9801980198019735,
+                    96.03960396039604,
+                    -34.65346534653466,
+                    30.69306930693069,
                     pd.Timedelta('1 days 00:00:00'),
                     pd.Timedelta('1 days 00:00:00'),
-                    -41.91133222233114,
-                    -0.22902312127116764,
-                    -1.7214947542575758,
-                    -11.33482436788235,
-                    -1.9611649167074043
+                    42.15763160474461,
+                    0.17139953368804917,
+                    2.920166231470185,
+                    -7.561727237710307,
+                    452652.71835907444
+                ]),
+                index=pd.Index([
+                    'Start', 'End', 'Duration', 'Holding Duration [%]', 'Total Profit',
+                    'Total Return [%]', 'Buy & Hold Return [%]', 'Max. Drawdown [%]',
+                    'Avg. Drawdown [%]', 'Max. Drawdown Duration', 'Avg. Drawdown Duration',
+                    'Num. Trades', 'Win Rate [%]', 'Best Trade [%]', 'Worst Trade [%]',
+                    'Avg. Trade [%]', 'Max. Trade Duration', 'Avg. Trade Duration',
+                    'Expectancy', 'SQN', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
+                ], dtype='object'),
+                name='c'
+            )
+        )
+        portfolio2 = vbt.Portfolio.from_orders(
+            price, order_size,
+            fees=0.01,
+            init_capital=init_capital,
+            freq='1 days',
+            year_freq='252 days',
+            levy_alpha=levy_alpha,
+            risk_free=risk_free,
+            required_return=required_return,
+            cutoff=cutoff,
+            factor_returns=factor_returns,
+            incl_unrealized=True
+        )
+        pd.testing.assert_series_equal(
+            portfolio2['c'].stats,
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'),
+                    pd.Timestamp('2020-01-05 00:00:00'),
+                    pd.Timedelta('5 days 00:00:00'),
+                    40.0,
+                    80.51016159355368,
+                    26.836720531184554,
+                    0.0,
+                    35.300460739143226,
+                    35.30046073914323,
+                    pd.Timedelta('3 days 00:00:00'),
+                    pd.Timedelta('3 days 00:00:00'),
+                    3,
+                    33.33333333333333,
+                    96.03960396039604,
+                    -34.65346534653466,
+                    20.132013201320127,
+                    pd.Timedelta('1 days 00:00:00'),
+                    pd.Timedelta('0 days 16:00:00'),
+                    26.83672053118454,
+                    0.18789294834246575,
+                    2.920166231470185,
+                    -7.561727237710307,
+                    452652.71835907444
                 ]),
                 index=pd.Index([
                     'Start', 'End', 'Duration', 'Holding Duration [%]', 'Total Profit',

@@ -113,6 +113,10 @@ first buy operation and closes with last sell operation that results in zero sec
 !!! note
     Without distribution of orders, trades and positions yield the same results.
 
+!!! warning
+    Both record types return both closed AND open events, which may skew your performance results
+    significantly. To only consider closed events, you must query `closed` attribute explicitly.
+
 ### Trades
 
 `vectorbt.records.events.Trades` class accepts trade records and the corresponding time series
@@ -122,7 +126,7 @@ to generate trade records from order records. This is done automatically in the
 
 ```python-repl
 >>> portfolio.trades.records.head()
-   col      size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+   col      size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
 0    0  0.268778         70       368.37    0.990099       101      315.86
 1    0  0.341620        282       243.59    0.832152       284      249.01
 2    0  0.319607        290       260.89    0.833823       291      271.91

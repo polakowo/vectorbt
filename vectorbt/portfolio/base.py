@@ -137,7 +137,8 @@ def _indexing_func(obj, pd_indexing_func):
         risk_free=index_arraylike_param(obj.risk_free),
         required_return=index_arraylike_param(obj.required_return),
         cutoff=index_arraylike_param(obj.cutoff),
-        factor_returns=factor_returns
+        factor_returns=factor_returns,
+        incl_unrealized=obj.incl_unrealized
     )
 
 
@@ -174,6 +175,7 @@ class Portfolio(PandasIndexer):
         factor_returns (array_like): Benchmark return to compare returns against. Will broadcast.
 
             By default it's `None`, but it's required by some return-based metrics.
+        incl_unrealized (bool): Whether to include unrealized metrics in `Portfolio.stats`.
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
@@ -181,9 +183,9 @@ class Portfolio(PandasIndexer):
 
         All array objects must have the same metadata as `main_price`."""
 
-    def __init__(self, main_price, init_capital, orders, cash, shares, freq=None, year_freq=None,
-                 levy_alpha=None, risk_free=None, required_return=None, cutoff=None,
-                 factor_returns=None):
+    def __init__(self, main_price, init_capital, orders, cash, shares, freq=None,
+                 year_freq=None, levy_alpha=None, risk_free=None, required_return=None,
+                 cutoff=None, factor_returns=None, incl_unrealized=False):
         # Perform checks
         checks.assert_type(main_price, (pd.Series, pd.DataFrame))
         if checks.is_frame(main_price):
@@ -200,6 +202,7 @@ class Portfolio(PandasIndexer):
         self._orders = orders
         self._cash = cash
         self._shares = shares
+        self._incl_unrealized = incl_unrealized
 
         freq = main_price.vbt(freq=freq).freq
         if freq is None:
@@ -570,20 +573,25 @@ class Portfolio(PandasIndexer):
         """Initial capital."""
         return self._init_capital
 
-    @cached_property
+    @property
     def main_price(self):
         """Price per share series."""
         return self._main_price
 
-    @cached_property
+    @property
     def cash(self):
         """Cash series."""
         return self._cash
 
-    @cached_property
+    @property
     def shares(self):
         """Shares series."""
         return self._shares
+
+    @property
+    def incl_unrealized(self):
+        """Whether to include unrealized metrics in `Portfolio.stats`."""
+        return self._incl_unrealized
 
     @property
     def freq(self):
@@ -850,6 +858,9 @@ class Portfolio(PandasIndexer):
         if self.wrapper.ndim > 1:
             raise TypeError("You must select a column first")
 
+        trades = self.trades
+        if not self.incl_unrealized:
+            trades = trades.closed
         return pd.Series({
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
@@ -862,15 +873,15 @@ class Portfolio(PandasIndexer):
             'Avg. Drawdown [%]': -self.drawdowns.avg_drawdown * 100,
             'Max. Drawdown Duration': self.drawdowns.max_duration,
             'Avg. Drawdown Duration': self.drawdowns.avg_duration,
-            'Num. Trades': self.trades.count,
-            'Win Rate [%]': self.trades.win_rate * 100,
-            'Best Trade [%]': self.trades.returns.max() * 100,
-            'Worst Trade [%]': self.trades.returns.min() * 100,
-            'Avg. Trade [%]': self.trades.returns.mean() * 100,
-            'Max. Trade Duration': self.trades.duration.max(time_units=True),
-            'Avg. Trade Duration': self.trades.duration.mean(time_units=True),
-            'Expectancy': self.trades.expectancy,
-            'SQN': self.trades.sqn,
+            'Num. Trades': trades.count,
+            'Win Rate [%]': trades.win_rate * 100,
+            'Best Trade [%]': trades.returns.max() * 100,
+            'Worst Trade [%]': trades.returns.min() * 100,
+            'Avg. Trade [%]': trades.returns.mean() * 100,
+            'Max. Trade Duration': trades.duration.max(time_units=True),
+            'Avg. Trade Duration': trades.duration.mean(time_units=True),
+            'Expectancy': trades.expectancy,
+            'SQN': trades.sqn,
             'Sharpe Ratio': self.sharpe_ratio,
             'Sortino Ratio': self.sortino_ratio,
             'Calmar Ratio': self.calmar_ratio
