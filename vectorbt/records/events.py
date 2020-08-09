@@ -1,5 +1,8 @@
 """Classes for working with event records.
 
+!!! note
+    Without distribution of orders, trades and positions yield the same results.
+
 !!! warning
     Both record types return both closed AND open events, which may skew your performance results
     significantly. To only consider closed events, you must query `closed` attribute explicitly."""
@@ -381,7 +384,63 @@ class Trades(Events):
 
     Such records can be created by using `vectorbt.records.nb.trade_records_nb`.
 
+    In context of vectorbt, a trade is simply a sell operation. For example, if you have a single large
+    buy operation and 100 small sell operations, you will see 100 trades, each opening with a fraction
+    of the buy operation's size and fees. On the other hand, having 100 buy operations and just a single
+    sell operation will generate a single trade with buy price being a size-weighted average over all
+    purchase prices, and opening size and fees being the sum over all sizes and fees.
+
     Example:
+        Increasing position:
+        ```python-repl
+        >>> vbt.Portfolio.from_orders(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     pd.Series([1, 1, 1, 1, -4]),
+        ...     fixed_fees=1, freq='1D'
+        ... ).trades.records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0    0   4.0          0          2.5         4.0         4         5.0
+
+           exit_fees  pnl    return  status  position_idx
+        0        1.0  5.0  0.357143       1             0
+        ```
+
+        Decreasing position:
+        ```python-repl
+        >>> vbt.Portfolio.from_orders(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     pd.Series([4, -1, -1, -1, -1]),
+        ...     fixed_fees=1, freq='1D'
+        ... ).trades.records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0    0   1.0          0          1.0        0.25         1         2.0
+        1    0   1.0          0          1.0        0.25         2         3.0
+        2    0   1.0          0          1.0        0.25         3         4.0
+        3    0   1.0          0          1.0        0.25         4         5.0
+
+           exit_fees   pnl  return  status  position_idx
+        0        1.0 -0.25    -0.2       1             0
+        1        1.0  0.75     0.6       1             0
+        2        1.0  1.75     1.4       1             0
+        3        1.0  2.75     2.2       1             0
+        ```
+
+        Multiple positions:
+        ```python-repl
+        >>> vbt.Portfolio.from_orders(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     pd.Series([1, 1, -2, 1, -1]),
+        ...     fixed_fees=1, freq='1D'
+        ... ).trades.records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0    0   2.0          0          1.5         2.0         2         3.0
+        1    0   1.0          3          4.0         1.0         4         5.0
+
+           exit_fees  pnl  return  status  position_idx
+        0        1.0  0.0     0.0       1             0
+        1        1.0 -1.0    -0.2       1             1
+        ```
+
         Get count and P&L of trades:
         ```python-repl
         >>> import vectorbt as vbt
@@ -437,7 +496,56 @@ class Positions(Events):
 
     Such records can be created by using `vectorbt.records.nb.position_records_nb`.
 
+    Positions can incorporate multiple trades. They are allowed to increase/decrease over time.
+    Each buy/sell operation is tracked and then used for deriving P&L of the entire position.
+    A position opens with first buy operation and closes with last sell operation that results
+    in no security holdings.
+
     Example:
+        Increasing position:
+        ```python-repl
+        >>> vbt.Portfolio.from_orders(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     pd.Series([1, 1, 1, 1, -4]),
+        ...     fixed_fees=1, freq='1D'
+        ... ).positions.records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0    0   4.0          0          2.5         4.0         4         5.0
+
+           exit_fees  pnl    return  status
+        0        1.0  5.0  0.357143       1
+        ```
+
+        Decreasing position:
+        ```python-repl
+        >>> vbt.Portfolio.from_orders(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     pd.Series([4, -1, -1, -1, -1]),
+        ...     fixed_fees=1, freq='1D'
+        ... ).positions.records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0    0   4.0          0          1.0         1.0         4         3.5
+
+           exit_fees  pnl  return  status
+        0        4.0  5.0     1.0       1
+        ```
+
+        Multiple positions:
+        ```python-repl
+        >>> vbt.Portfolio.from_orders(
+        ...     pd.Series([1, 2, 3, 4, 5]),
+        ...     pd.Series([1, 1, -2, 1, -1]),
+        ...     fixed_fees=1, freq='1D'
+        ... ).positions.records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        0    0   2.0          0          1.5         2.0         2         3.0
+        1    0   1.0          3          4.0         1.0         4         5.0
+
+           exit_fees  pnl  return  status
+        0        1.0  0.0     0.0       1
+        1        1.0 -1.0    -0.2       1
+        ```
+
         Get count and P&L of positions:
         ```python-repl
         >>> import vectorbt as vbt
