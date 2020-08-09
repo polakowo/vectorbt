@@ -824,6 +824,7 @@ class TestFactory:
                    .output.columns.names == ['custom_p1', None]
 
     def test_run_combs(self):
+        # itertools.combinations
         ind1 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
             .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
             .run(ts, [2, 2, 3], [10, 10, 11], short_name='custom_1')
@@ -852,6 +853,36 @@ class TestFactory:
             ind2.output,
             ind2_2.output
         )
+        # itertools.product
+        ind3 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
+            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run(ts, [2, 2, 2, 3, 3, 3, 4, 4, 4], [10, 10, 10, 11, 11, 11, 12, 12, 12], short_name='custom_1')
+        ind4 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
+            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run(ts, [2, 3, 4, 2, 3, 4, 2, 3, 4], [10, 11, 12, 10, 11, 12, 10, 11, 12], short_name='custom_2')
+        ind3_1, ind4_1 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
+            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speed_up=False)
+        ind3_2, ind4_2 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
+            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speed_up=True)
+        pd.testing.assert_frame_equal(
+            ind3.output,
+            ind3_1.output
+        )
+        pd.testing.assert_frame_equal(
+            ind4.output,
+            ind4_1.output
+        )
+        pd.testing.assert_frame_equal(
+            ind3.output,
+            ind3_2.output
+        )
+        pd.testing.assert_frame_equal(
+            ind4.output,
+            ind4_2.output
+        )
+
 
     def test_wrapper(self):
         pd.testing.assert_index_equal(

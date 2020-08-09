@@ -1042,7 +1042,10 @@ class IndicatorFactory():
                     )
                     kwargs['use_raw'] = raw_results
                 instances = []
-                param_lists = zip(*comb_func(zip(*param_list), r))
+                if comb_func == itertools.product:
+                    param_lists = zip(*comb_func(zip(*param_list), repeat=r))
+                else:
+                    param_lists = zip(*comb_func(zip(*param_list), r))
                 for i, param_list in enumerate(param_lists):
                     instances.append(cls.run(
                         *input_list,
@@ -1059,6 +1062,9 @@ class IndicatorFactory():
             def run_combs_docstring_func(class_name, in_ts_str, param_str, out_ts_str):
                 return """Create a combination of multiple {0} indicators using function `comb_func`. 
                     Run each indicator using input time series {1}, and {2}, to produce output time series {3}.
+                    
+                    `comb_func` must accept an iterable of parameter tuples and `r`. Also accepts all
+                    combinatoric iterators from itertools such as `itertools.combinations`.
     
                     Pass `r` to specify how many indicators to run. Pass `short_names` to specify the
                     short name for each indicator. Set `speed_up` to `True` to first compute raw outputs 
