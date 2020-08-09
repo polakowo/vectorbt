@@ -1506,7 +1506,7 @@ class TestPortfolio:
             required_return=required_return,
             cutoff=cutoff,
             factor_returns=factor_returns,
-            incl_unrealized=False
+            incl_unrealized_stats=False
         )
         pd.testing.assert_series_equal(
             portfolio['c'].stats,
@@ -1558,7 +1558,7 @@ class TestPortfolio:
             required_return=required_return,
             cutoff=cutoff,
             factor_returns=factor_returns,
-            incl_unrealized=True
+            incl_unrealized_stats=True
         )
         pd.testing.assert_series_equal(
             portfolio2['c'].stats,
