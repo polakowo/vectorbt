@@ -1,4 +1,8 @@
-"""Classes for working with event records."""
+"""Classes for working with event records.
+
+!!! warning
+    Both record types return both closed AND open events, which may skew your performance results
+    significantly. To only consider closed events, you must query `closed` attribute explicitly."""
 
 import numpy as np
 import pandas as pd
