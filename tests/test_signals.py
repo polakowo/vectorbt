@@ -141,7 +141,7 @@ class TestAccessors:
             )
         )
 
-    def test_generate_after(self):
+    def test_generate_exits(self):
         @njit
         def choice_func_nb(col, from_i, to_i, n):
             if col == 0:
@@ -152,7 +152,7 @@ class TestAccessors:
                 return np.full(1, to_i - n)
 
         pd.testing.assert_series_equal(
-            sig['a'].vbt.signals.generate_after(choice_func_nb, 1),
+            sig['a'].vbt.signals.generate_exits(choice_func_nb, 1),
             pd.Series(
                 np.array([False, True, True, False, True]),
                 index=sig['a'].index,
@@ -160,7 +160,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_after(choice_func_nb, 1),
+            sig.vbt.signals.generate_exits(choice_func_nb, 1),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
@@ -174,23 +174,23 @@ class TestAccessors:
             )
         )
 
-    def test_generate_iteratively(self):
+    def test_generate_entries_and_exits(self):
         @njit
-        def choice_func1_nb(col, from_i, to_i, wait1):
+        def entry_choice_func_nb(col, from_i, to_i, wait1):
             next_pos = col + from_i + wait1
             if next_pos < to_i:
                 return np.array([next_pos])
             return np.empty(0, dtype=np.int_)
 
         @njit
-        def choice_func2_nb(col, from_i, to_i, wait2):
+        def exit_choice_func_nb(col, from_i, to_i, wait2):
             next_pos = col + from_i + wait2
             if next_pos < to_i:
                 return np.array([next_pos])
             return np.empty(0, dtype=np.int_)
 
-        a, b = pd.Series.vbt.signals.generate_iteratively(
-            5, choice_func1_nb, choice_func2_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
+        a, b = pd.Series.vbt.signals.generate_entries_and_exits(
+            5, entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
             pd.Series(
@@ -207,8 +207,8 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        a, b = pd.Series.vbt.signals.generate_iteratively(
-            (5,), choice_func1_nb, choice_func2_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
+        a, b = pd.Series.vbt.signals.generate_entries_and_exits(
+            (5,), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
             pd.Series(
@@ -225,8 +225,8 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        a, b = pd.DataFrame.vbt.signals.generate_iteratively(
-            (5, 3), choice_func1_nb, choice_func2_nb, (0,), (1,), index=sig.index, columns=sig.columns)
+        a, b = pd.DataFrame.vbt.signals.generate_entries_and_exits(
+            (5, 3), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
             a,
             pd.DataFrame(
