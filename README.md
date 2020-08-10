@@ -278,5 +278,6 @@ for Plotly figures.
 
 - [Who beats Bitcoin: Dual moving average crossover, trading randomly or holding?](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Bitcoin-DMAC.ipynb)
 - [How stop-loss and trailing stop orders perform on crypto?](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopLoss-vs-TrailingStop.ipynb)
+- [How to backtest per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Trading-Sessions.ipynb)
 
 Note: you will need to run the notebook to play with widgets.

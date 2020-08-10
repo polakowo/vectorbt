@@ -457,6 +457,7 @@ modeling portfolio performance and visualizing results.
 
 - [Who beats Bitcoin: Dual moving average crossover, trading randomly or holding?](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Bitcoin-DMAC.ipynb)
 - [How stop-loss and trailing stop orders perform on crypto?](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopLoss-vs-TrailingStop.ipynb)
+- [How to backtest per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Trading-Sessions.ipynb)
 
 There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/master/tests/notebooks) for testing purposes.
 """
