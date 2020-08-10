@@ -282,6 +282,7 @@ from numba import njit
 from numba.typed import List
 import itertools
 import inspect
+from collections import OrderedDict
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
@@ -343,10 +344,10 @@ def create_param_product(param_list):
     return param_list
 
 
-def reindex_outputs(new_params, run, n_ts_cols):
+def reindex_outputs(new_params, from_params, n_ts_cols):
     """Return indices of `new_params` in `run` corrected by the number of columns `n_ts_cols`."""
-    idxs = np.array([run.index(param_tuple) for param_tuple in new_params])
-    idx_map = np.arange(len(run) * n_ts_cols).reshape(len(run), n_ts_cols)
+    idxs = np.array([from_params.index(param_tuple) for param_tuple in new_params])
+    idx_map = np.arange(len(from_params) * n_ts_cols).reshape(len(from_params), n_ts_cols)
     return idx_map[idxs].flatten()
 
 
@@ -1317,14 +1318,14 @@ class IndicatorFactory():
             else:
                 outputs = []
                 param_tuples = list(zip(*params))
-                unique_param_tuples = list(set(param_tuples))
+                unique_param_tuples = list(OrderedDict.fromkeys(param_tuples).keys())
                 for param_tuple in unique_param_tuples:
                     for col in range(ts[0].shape[1]):
                         outputs.append(func(
                             *map(lambda x: x[:, col], ts),
                             *param_tuple
                         ))
-                if len(unique_param_tuples) == len(param_tuples):
+                if len(param_tuples) == len(unique_param_tuples):
                     idxs = slice(None, None)
                 else:
                     idxs = reindex_outputs(param_tuples, unique_param_tuples, ts[0].shape[1])
