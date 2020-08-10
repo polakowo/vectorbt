@@ -33,7 +33,7 @@ Simulation of trading randomly on Bitcoin:
 
 >>> price = yf.Ticker("BTC-USD").history(period="max")
 >>> entries, exits = pd.Series.vbt.signals.generate_random_entries_and_exits(
-...     price.shape[0], 10, seed=42
+...     price.shape[0], n=10, seed=42
 ... )
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     price['Close'], entries, exits,

@@ -176,23 +176,25 @@ class TestAccessors:
 
     def test_generate_iteratively(self):
         @njit
-        def choice_func1_nb(col, from_i, to_i, n):
-            if col == 2:
-                return np.array([to_i - n])
-            return np.array([from_i])
+        def choice_func1_nb(col, from_i, to_i, wait1):
+            next_pos = col + from_i + wait1
+            if next_pos < to_i:
+                return np.array([next_pos])
+            return np.empty(0, dtype=np.int_)
 
         @njit
-        def choice_func2_nb(col, from_i, to_i, n):
-            if col == 2:
-                return np.array([to_i - n])
-            return np.array([from_i])
+        def choice_func2_nb(col, from_i, to_i, wait2):
+            next_pos = col + from_i + wait2
+            if next_pos < to_i:
+                return np.array([next_pos])
+            return np.empty(0, dtype=np.int_)
 
         a, b = pd.Series.vbt.signals.generate_iteratively(
-            5, choice_func1_nb, choice_func2_nb, 1, index=sig['a'].index, name=sig['a'].name)
+            5, choice_func1_nb, choice_func2_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
             pd.Series(
-                np.array([True, False, True, False, True]),
+                np.array([True, False, False, True, False]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
@@ -200,17 +202,17 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             b,
             pd.Series(
-                np.array([False, True, False, True, False]),
+                np.array([False, False, True, False, False]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
         )
         a, b = pd.Series.vbt.signals.generate_iteratively(
-            (5,), choice_func1_nb, choice_func2_nb, 1, index=sig['a'].index, name=sig['a'].name)
+            (5,), choice_func1_nb, choice_func2_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
             pd.Series(
-                np.array([True, False, True, False, True]),
+                np.array([True, False, False, True, False]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
@@ -218,22 +220,22 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             b,
             pd.Series(
-                np.array([False, True, False, True, False]),
+                np.array([False, False, True, False, False]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
         )
         a, b = pd.DataFrame.vbt.signals.generate_iteratively(
-            (5, 3), choice_func1_nb, choice_func2_nb, 1, index=sig.index, columns=sig.columns)
+            (5, 3), choice_func1_nb, choice_func2_nb, (0,), (1,), index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
             a,
             pd.DataFrame(
                 np.array([
-                    [True, True, False],
-                    [False, False, False],
-                    [True, True, False],
-                    [False, False, False],
-                    [True, True, True]
+                    [True, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [True, False, False],
+                    [False, False, False]
                 ]),
                 index=sig.index,
                 columns=sig.columns
@@ -244,10 +246,10 @@ class TestAccessors:
             pd.DataFrame(
                 np.array([
                     [False, False, False],
-                    [True, True, False],
                     [False, False, False],
-                    [True, True, False],
-                    [False, False, False]
+                    [True, False, False],
+                    [False, False, False],
+                    [False, True, False]
                 ]),
                 index=sig.index,
                 columns=sig.columns
@@ -256,7 +258,7 @@ class TestAccessors:
 
     def test_generate_random(self):
         pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random(5, 3, seed=seed, index=sig['a'].index, name=sig['a'].name),
+            pd.Series.vbt.signals.generate_random(5, n=3, seed=seed, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([False, True, True, False, True]),
                 index=sig['a'].index,
@@ -264,7 +266,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random((5,), 3, seed=seed, index=sig['a'].index, name=sig['a'].name),
+            pd.Series.vbt.signals.generate_random((5,), n=3, seed=seed, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([False, True, True, False, True]),
                 index=sig['a'].index,
@@ -272,9 +274,9 @@ class TestAccessors:
             )
         )
         with pytest.raises(Exception) as e_info:
-            _ = pd.Series.vbt.signals.generate_random((5, 2), 3)
+            _ = pd.Series.vbt.signals.generate_random((5, 2), n=3)
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate_random((5, 3), 3, seed=seed, index=sig.index, columns=sig.columns),
+            pd.DataFrame.vbt.signals.generate_random((5, 3), n=3, seed=seed, index=sig.index, columns=sig.columns),
             pd.DataFrame(
                 np.array([
                     [False, False, True],
@@ -287,11 +289,9 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
-
-    def test_generate_random_by_prob(self):
         pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random_by_prob(
-                5, 0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
+            pd.Series.vbt.signals.generate_random(
+                5, prob=0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([True, False, False, False, True]),
                 index=sig['a'].index,
@@ -299,8 +299,8 @@ class TestAccessors:
             )
         )
         pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random_by_prob(
-                (5,), 0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
+            pd.Series.vbt.signals.generate_random(
+                (5,), prob=0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([True, False, False, False, True]),
                 index=sig['a'].index,
@@ -308,10 +308,10 @@ class TestAccessors:
             )
         )
         with pytest.raises(Exception) as e_info:
-            _ = pd.Series.vbt.signals.generate_random((5, 2), 3)
+            _ = pd.Series.vbt.signals.generate_random((5, 2), prob=3)
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate_random_by_prob(
-                (5, 3), 0.5, seed=seed, index=sig.index, columns=sig.columns),
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), prob=0.5, seed=seed, index=sig.index, columns=sig.columns),
             pd.DataFrame(
                 np.array([
                     [True, True, True],
@@ -325,8 +325,8 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate_random_by_prob(
-                (5, 3), [0., 0.5, 1.], seed=seed, index=sig.index, columns=sig.columns),
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), prob=[0., 0.5, 1.], seed=seed, index=sig.index, columns=sig.columns),
             pd.DataFrame(
                 np.array([
                     [False, True, True],
@@ -339,6 +339,8 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
+        with pytest.raises(Exception) as e_info:
+            pd.DataFrame.vbt.signals.generate_random((5, 3))
 
     def test_generate_random_exits(self):
         pd.testing.assert_series_equal(
@@ -363,10 +365,32 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
+        pd.testing.assert_series_equal(
+            sig['a'].vbt.signals.generate_random_exits(prob=0.5, seed=seed),
+            pd.Series(
+                np.array([False, True, False, False, False]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_random_exits(prob=0.5, seed=seed),
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
         
     def test_generate_random_entries_and_exits(self):
         a, b = pd.Series.vbt.signals.generate_random_entries_and_exits(
-            5, 1, seed=seed, index=sig['a'].index, name=sig['a'].name)
+            5, n=1, seed=seed, index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
             pd.Series(
@@ -384,7 +408,7 @@ class TestAccessors:
             )
         )
         a, b = pd.Series.vbt.signals.generate_random_entries_and_exits(
-            (5,), 1, seed=seed, index=sig['a'].index, name=sig['a'].name)
+            (5,), n=1, seed=seed, index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
             pd.Series(
@@ -402,7 +426,7 @@ class TestAccessors:
             )
         )
         a, b = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
-            (5, 3), 1, seed=seed, index=sig.index, columns=sig.columns)
+            (5, 3), n=1, seed=seed, index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
             a,
             pd.DataFrame(
@@ -431,6 +455,38 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
+        a, b = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
+            (5, 3), entry_prob=0.5, exit_prob=1., seed=seed, index=sig.index, columns=sig.columns)
+        pd.testing.assert_frame_equal(
+            a,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [True, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            b,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, True, True],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        with pytest.raises(Exception) as e_info:
+            pd.DataFrame.vbt.signals.generate_random((5, 3))
 
     def test_generate_stop_loss_exits(self):
         ts = pd.Series([1, 2, 3, 2, 1], index=index, name=sig['a'].name)
@@ -542,6 +598,43 @@ class TestAccessors:
                 ], names=['trail_stop', None])
             )
         )
+        new_entries, new_exits = sig.vbt.signals.generate_stop_loss_exits(ts, 0.1, iteratively=True)
+        pd.testing.assert_frame_equal(
+            new_entries,
+            pd.DataFrame(
+                np.array([
+                    [True, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [False, False, False],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['stop_loss', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            new_exits,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, True, False]
+                ]),
+                index=sig.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['stop_loss', None])
+            )
+        )
 
     def test_generate_take_profit_exits(self):
         ts = pd.Series([1, 2, 3, 2, 1], index=index, name=sig['a'].name)
@@ -630,6 +723,43 @@ class TestAccessors:
                     ('tp2', 'b'),
                     ('tp2', 'c')
                 ])
+            )
+        )
+        new_entries, new_exits = sig.vbt.signals.generate_take_profit_exits(ts, 0.1, iteratively=True)
+        pd.testing.assert_frame_equal(
+            new_entries,
+            pd.DataFrame(
+                np.array([
+                    [True, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [True, False, False],
+                    [False, True, False]
+                ]),
+                index=sig.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['take_profit', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            new_exits,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, False, False],
+                    [False, True, False],
+                    [False, False, False],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (0.1, 'a'),
+                    (0.1, 'b'),
+                    (0.1, 'c')
+                ], names=['take_profit', None])
             )
         )
 

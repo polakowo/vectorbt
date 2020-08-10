@@ -65,7 +65,7 @@ Moreover, all time series accessors have cached property `drawdowns`:
 with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vectorbt.portfolio.base.Portfolio.orders`.
 
 ```python-repl
->>> entries, exits = pd.Series.vbt.signals.generate_random_entries_and_exits(price.shape, 10, seed=42)
+>>> entries, exits = pd.Series.vbt.signals.generate_random_entries_and_exits(price.shape, n=10, seed=42)
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.01, freq='1D')
 
 >>> portfolio.orders.records.head()
