@@ -311,18 +311,18 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         >>> order_records, cash, shares = simulate_nb(
         ...     price.shape, init_capital, order_func_nb)
 
-        >>> print(pd.DataFrame.from_records(order_records))
+        >>> pd.DataFrame.from_records(order_records)
            col  idx       size  price      fees  side
         0    0    0  98.802297  1.001  1.098901     0
         1    1    0  19.760459  5.005  1.098901     0
         2    2    0  98.802297  1.001  1.098901     0
-        >>> print(cash)
+        >>> cash
         [[0. 0. 0.]
          [0. 0. 0.]
          [0. 0. 0.]
          [0. 0. 0.]
          [0. 0. 0.]]
-        >>> print(shares)
+        >>> shares
         [[98.8022966  19.76045932 98.8022966 ]
          [98.8022966  19.76045932 98.8022966 ]
          [98.8022966  19.76045932 98.8022966 ]
@@ -434,7 +434,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         >>> order_records, cash, shares = simulate_row_wise_nb(
         ...     price.shape, init_capital, row_prep_func_nb, order_func_nb)
 
-        >>> print(pd.DataFrame.from_records(order_records))
+        >>> pd.DataFrame.from_records(order_records)
             col  idx       size  price      fees  side
         0     0    0  29.399155  1.001  1.029429     0
         1     0    1   5.872746  1.998  1.011734     1
@@ -451,13 +451,13 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         12    2    2  23.557854  3.003  1.070744     0
         13    2    3  13.673091  1.998  1.027319     1
         14    2    4  27.049616  1.001  1.027077     0
-        >>> print(cash)
+        >>> cash
         [[ 69.5420172   60.61166607  66.64621673]
          [ 80.26402911  32.41346024 130.08230128]
          [ 84.81833559  72.73397843  58.26732111]
          [109.50174358  39.13872328  84.55883717]
          [112.47761836  42.70829586  56.45509534]]
-        >>> print(shares)
+        >>> shares
         [[2.93991551e+01 7.66233445e+00 3.22891726e+01]
          [2.35264095e+01 1.44483072e+01 6.59749521e-03]
          [2.16712656e+01 6.47212729e-01 2.35644516e+01]

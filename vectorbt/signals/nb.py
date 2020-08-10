@@ -37,7 +37,7 @@ def generate_nb(shape, choice_func_nb, *args):
         ... def choice_func_nb(col, from_i, to_i):
         ...     return np.array([from_i + col])
 
-        >>> print(generate_nb((5, 3), choice_func_nb))
+        >>> generate_nb((5, 3), choice_func_nb)
         [[ True False False]
          [False  True False]
          [False False  True]
@@ -338,8 +338,7 @@ def generate_sl_ex_nb(entries, ts, stops, trailing=False, first=True):
         >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
         >>> stops = broadcast_to_array_of([0.1, 0.5], ts)
 
-        >>> print(generate_sl_ex_nb(entries, ts, stops,
-        ...     trailing=True, first=True))
+        >>> generate_sl_ex_nb(entries, ts, stops, trailing=True, first=True)
         [[False False]
          [False False]
          [False False]
@@ -407,7 +406,7 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
         ...     return np.nanmean(map_res)
         >>> a = np.asarray([False, True, True, False, True])[:, None]
 
-        >>> print(map_reduce_between_nb(a, map_func_nb, reduce_func_nb))
+        >>> map_reduce_between_nb(a, map_func_nb, reduce_func_nb)
         [1.5]
         ```"""
     result = np.full(a.shape[1], np.nan, dtype=np.float_)
@@ -518,13 +517,13 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
         >>> signals = np.asarray([True, True, False, True, True])
         >>> reset_by = np.asarray([False, True, False, False, True])
 
-        >>> print(rank_1d_nb(signals))
+        >>> rank_1d_nb(signals)
         [1 2 0 1 2]
-        >>> print(rank_1d_nb(signals, after_false=True))
+        >>> rank_1d_nb(signals, after_false=True)
         [0 0 0 1 2]
-        >>> print(rank_1d_nb(signals, allow_gaps=True))
+        >>> rank_1d_nb(signals, allow_gaps=True)
         [1 2 0 3 4]
-        >>> print(rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by))
+        >>> rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by)
         [1 1 0 2 1]
         ```"""
     result = np.zeros(a.shape, dtype=np.int_)
@@ -577,11 +576,11 @@ def rank_partitions_1d_nb(a, reset_by=None, after_false=False):
         >>> signals = np.asarray([True, True, False, True, True])
         >>> reset_by = np.asarray([False, True, False, False, True])
 
-        >>> print(rank_partitions_1d_nb(signals))
+        >>> rank_partitions_1d_nb(signals)
         [1 1 0 2 2]
-        >>> print(rank_partitions_1d_nb(signals, after_false=True))
+        >>> rank_partitions_1d_nb(signals, after_false=True)
         [0 0 0 1 1]
-        >>> print(rank_partitions_1d_nb(signals, reset_by=reset_by))
+        >>> rank_partitions_1d_nb(signals, reset_by=reset_by)
         [1 1 0 2 1]
         ```"""
     result = np.zeros(a.shape, dtype=np.int_)

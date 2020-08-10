@@ -26,13 +26,13 @@ creates methods for signal generation and supports common pandas and parameter i
 
 >>> # Create indicator instance
 >>> myind = MyInd.run(pd.Series([1, 2, 3]), [1, 2], [3, 4], param_product=True)
->>> print(myind.output)
+>>> myind.output
 custom_param1       1       2
 custom_param2   3   4   3   4
 0               4   5   5   6
 1               8  10  10  12
 2              12  15  15  18
->>> print(myind[(1, 3)].output)
+>>> myind[(1, 3)].output
 0     4
 1     8
 2    12

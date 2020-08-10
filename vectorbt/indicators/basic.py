@@ -12,7 +12,7 @@
 >>> ticker = yf.Ticker("BTC-USD")
 >>> price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
 >>> price = price[['Open', 'High', 'Low', 'Close', 'Volume']]
->>> print(price)
+>>> price
                 Open      High       Low     Close       Volume
 Date
 2019-02-28   3848.26   3906.06   3845.82   3854.79   8399767798

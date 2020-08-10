@@ -21,7 +21,7 @@
 ...     datetime(2020, 1, 4),
 ...     datetime(2020, 1, 5)
 ... ]))
->>> print(df)
+>>> df
             a  b  c
 2020-01-01  1  5  1
 2020-01-02  2  4  2
@@ -130,13 +130,13 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> print(df.vbt.split_into_ranges(n=2))
+            >>> df.vbt.split_into_ranges(n=2)
                                             a                     b                     c
             range_start 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
             range_end   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
             0                  1.0        4.0        5.0        2.0        1.0        2.0
             1                  2.0        5.0        4.0        1.0        2.0        1.0
-            >>> print(df.vbt.split_into_ranges(range_len=4))
+            >>> df.vbt.split_into_ranges(range_len=4)
                                             a                     b                     c
             range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
             range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
@@ -144,7 +144,7 @@ class Generic_Accessor(Base_Accessor):
             1                  2.0        3.0        4.0        3.0        2.0        3.0
             2                  3.0        4.0        3.0        2.0        3.0        2.0
             3                  4.0        5.0        2.0        1.0        2.0        1.0
-            >>> print(df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[4, 5]))
+            >>> df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[4, 5])
                                             a                     b                     c
             range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
             range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
@@ -152,10 +152,10 @@ class Generic_Accessor(Base_Accessor):
             1                    2          3          4          3          2          3
             2                    3          4          3          2          3          2
             3                    4          5          2          1          2          1
-            >>> print(df.vbt.split_into_ranges(
+            >>> df.vbt.split_into_ranges(
             ...     start_idxs=pd.Index(['2020-01-01', '2020-01-03']),
             ...     end_idxs=pd.Index(['2020-01-02', '2020-01-04'])
-            ... ))
+            ... )
                                             a                     b                     c
             range_start 2020-01-01 2020-01-03 2020-01-01 2020-01-03 2020-01-01 2020-01-03
             range_end   2020-01-02 2020-01-04 2020-01-02 2020-01-04 2020-01-02 2020-01-04
@@ -204,7 +204,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.rolling_apply(3, mean_nb))
+            >>> df.vbt.rolling_apply(3, mean_nb)
                           a    b         c
             2020-01-01  1.0  5.0  1.000000
             2020-01-02  1.5  4.5  1.500000
@@ -212,7 +212,7 @@ class Generic_Accessor(Base_Accessor):
             2020-01-04  3.0  3.0  2.333333
             2020-01-05  4.0  2.0  2.000000
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True))
+            >>> df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True)
                                a         b         c
             2020-01-01  2.333333  2.333333  2.333333
             2020-01-02  2.500000  2.500000  2.500000
@@ -235,7 +235,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.expanding_apply(mean_nb))
+            >>> df.vbt.expanding_apply(mean_nb)
                           a    b    c
             2020-01-01  1.0  5.0  1.0
             2020-01-02  1.5  4.5  1.5
@@ -243,7 +243,7 @@ class Generic_Accessor(Base_Accessor):
             2020-01-04  2.5  3.5  2.0
             2020-01-05  3.0  3.0  1.8
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True))
+            >>> df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True)
                                a         b         c
             2020-01-01  2.333333  2.333333  2.333333
             2020-01-02  2.500000  2.500000  2.500000
@@ -268,14 +268,13 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb))
+            >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb)
                  a    b    c
             1  1.5  4.5  1.5
             2  3.5  2.5  2.5
             3  5.0  1.0  1.0
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.groupby_apply([1, 1, 2, 2, 3],
-            ...     mean_matrix_nb, on_matrix=True))
+            >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_matrix_nb, on_matrix=True)
                       a         b         c
             1  2.500000  2.500000  2.500000
             2  2.833333  2.833333  2.833333
@@ -302,13 +301,13 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
-            >>> print(df.vbt.resample_apply('2d', mean_nb))
+            >>> df.vbt.resample_apply('2d', mean_nb)
                           a    b    c
             2020-01-01  1.5  4.5  1.5
             2020-01-03  3.5  2.5  2.5
             2020-01-05  5.0  1.0  1.0
             >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> print(df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True))
+            >>> df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True)
                                a         b         c
             2020-01-01  2.500000  2.500000  2.500000
             2020-01-03  2.833333  2.833333  2.833333
@@ -336,7 +335,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> multiply_nb = njit(lambda col, i, a: a ** 2)
-            >>> print(df.vbt.applymap(multiply_nb))
+            >>> df.vbt.applymap(multiply_nb)
                            a     b    c
             2020-01-01   1.0  25.0  1.0
             2020-01-02   4.0  16.0  4.0
@@ -355,7 +354,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> greater_nb = njit(lambda col, i, a: a > 2)
-            >>> print(df.vbt.filter(greater_nb))
+            >>> df.vbt.filter(greater_nb)
                           a    b    c
             2020-01-01  NaN  5.0  NaN
             2020-01-02  NaN  4.0  NaN
@@ -377,7 +376,7 @@ class Generic_Accessor(Base_Accessor):
             ```python-repl
             >>> greater_nb = njit(lambda col, a: a[a > 2])
             >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(df.vbt.apply_and_reduce(greater_nb, mean_nb))
+            >>> df.vbt.apply_and_reduce(greater_nb, mean_nb)
             a    4.0
             b    4.0
             c    3.0
@@ -397,7 +396,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> print(df.vbt.reduce(mean_nb))
+            >>> df.vbt.reduce(mean_nb)
             a    3.0
             b    3.0
             c    1.8
@@ -416,7 +415,7 @@ class Generic_Accessor(Base_Accessor):
         Example:
             ```python-repl
             >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-            >>> print(df.vbt.reduce_to_array(min_max_nb, index=['min', 'max']))
+            >>> df.vbt.reduce_to_array(min_max_nb, index=['min', 'max'])
                    a    b    c
             min  1.0  1.0  1.0
             max  5.0  5.0  3.0
@@ -507,7 +506,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> print(df.vbt.describe())
+            >>> df.vbt.describe()
                           a         b        c
             count  5.000000  5.000000  5.00000
             mean   3.000000  3.000000  1.80000
@@ -615,8 +614,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            df['a'].vbt.plot()
+            ```python-repl
+            >>> df['a'].vbt.plot()
             ```
 
             ![](/vectorbt/docs/img/sr_plot.png)"""
@@ -853,8 +852,8 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            df[['a', 'b']].vbt.plot()
+            ```python-repl
+            >>> df[['a', 'b']].vbt.plot()
             ```
 
             ![](/vectorbt/docs/img/df_plot.png)"""

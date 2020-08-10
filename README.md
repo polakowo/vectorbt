@@ -60,7 +60,7 @@ portfolio.total_return.vbt.heatmap(
 Digging into each individual strategy instance is as simple as indexing with pandas:
 
 ```python-repl
->>> print(portfolio[(13, 21)].stats)
+>>> portfolio[(13, 21)].stats
 
 Start                     2014-09-17 00:00:00
 End                       2020-07-15 00:00:00

@@ -484,13 +484,13 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
         >>> a = np.array([1, 2, 3])
         >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
 
-        >>> print(broadcast_to(a, sr))
+        >>> broadcast_to(a, sr)
         x    1
         y    2
         z    3
         Name: a, dtype: int64
 
-        >>> print(broadcast_to(sr, a))
+        >>> broadcast_to(sr, a)
         array([4, 5, 6])
         ```"""
     if not checks.is_array(arg1):
@@ -518,7 +518,7 @@ def broadcast_to_array_of(arg1, arg2):
         >>> import numpy as np
         >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
 
-        >>> print(broadcast_to_array_of([0.1, 0.2], np.empty((2, 2))))
+        >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
         [[[0.1 0.1]
           [0.1 0.1]]
 
@@ -570,17 +570,17 @@ def unstack_to_array(arg, levels=None):
         ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
         >>> sr = pd.Series([1, 2, 3, 4], index=index)
 
-        >>> print(unstack_to_array(sr).shape)
+        >>> unstack_to_array(sr).shape
         (2, 2, 4)
 
-        >>> print(unstack_to_array(sr))
+        >>> unstack_to_array(sr)
         [[[ 1. nan nan nan]
          [nan  2. nan nan]]
 
          [[nan nan  3. nan]
         [nan nan nan  4.]]]
 
-        >>> print(unstack_to_array(sr, levels=(2, 0)))
+        >>> unstack_to_array(sr, levels=(2, 0))
         [[ 1. nan]
          [ 2. nan]
          [nan  3.]
@@ -620,7 +620,7 @@ def make_symmetric(arg):
 
         >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
 
-        >>> print(make_symmetric(df))
+        >>> make_symmetric(df)
              a    b    c    d
         a  NaN  NaN  1.0  2.0
         b  NaN  NaN  3.0  4.0
@@ -676,7 +676,7 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
         ...     names=['x', 'y', 'z'])
         >>> sr = pd.Series([1, 2, 3, 4], index=index)
 
-        >>> print(unstack_to_df(sr, index_levels=(0, 1), column_levels=2))
+        >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
         z      a    b    c    d
         x y                    
         1 3  1.0  NaN  NaN  NaN

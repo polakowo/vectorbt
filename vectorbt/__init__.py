@@ -90,7 +90,7 @@ and gets stored as a separate column level. Below is an example of a column hier
 ...     signal_ewm=(False, True)
 ... )
 
->>> print(macd.signal)
+>>> macd.signal
 macd_fast_window           2         3
 macd_slow_window           3         4
 macd_signal_window         2         3
@@ -120,14 +120,14 @@ For example, consider the following objects:
 
 ```python-repl
 >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
->>> print(sr)
+>>> sr
 x    1
 y    2
 z    3
 dtype: int64
 
 >>> df = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a', 'b', 'c'])
->>> print(df)
+>>> df
    a  b  c
 x  4  5  6
 y  4  5  6
@@ -137,7 +137,7 @@ z  4  5  6
 Despite both having the same index, pandas can't figure out how to add them correctly:
 
 ```python-repl
->>> print(sr + df)
+>>> sr + df
     a   b   c   x   y   z
 x NaN NaN NaN NaN NaN NaN
 y NaN NaN NaN NaN NaN NaN
@@ -147,7 +147,7 @@ z NaN NaN NaN NaN NaN NaN
 And here is the expected result using vectorbt:
 
 ```python-repl
->>> print(sr.vbt + df)
+>>> sr.vbt + df
    a  b  c
 x  5  6  7
 y  6  7  8
@@ -160,13 +160,13 @@ In case index or columns in both objects are different, thy are simply stacked u
 ```python-repl
 >>> df2 = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a2', 'b2', 'c2'])
 
->>> print(df + df2)
+>>> df + df2
     a  a2   b  b2   c  c2
 x NaN NaN NaN NaN NaN NaN
 y NaN NaN NaN NaN NaN NaN
 z NaN NaN NaN NaN NaN NaN
 
->>> print(df.vbt + df2)
+>>> df.vbt + df2
    a   b   c
   a2  b2  c2
 x  8  10  12
@@ -201,7 +201,7 @@ Let's start with fetching the daily price of Bitcoin:
 >>> end = datetime(2020, 1, 1)
 >>> btc_price = yf.Ticker("BTC-USD").history(start=start, end=end)['Open']
 
->>> print(btc_price)
+>>> btc_price
 Date
 2018-12-31    3866.84
 2019-01-01    3746.71
@@ -225,7 +225,7 @@ average, and sell when the opposite happens.
 >>> slow_ma = vbt.MA.run(btc_price, 20, short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
->>> print(entries)
+>>> entries
 Date
 2018-12-31    False
 2019-01-01    False
@@ -237,7 +237,7 @@ Date
 Name: (10, 20, Open), Length: 366, dtype: bool
 
 >>> exits = fast_ma.ma_below(slow_ma, crossed=True)
->>> print(exits)
+>>> exits
 Date
 2018-12-31    False
 2019-01-01    False
@@ -249,7 +249,7 @@ Date
 Name: (10, 20, Open), Length: 366, dtype: bool
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> print(portfolio.total_return)
+>>> portfolio.total_return
 0.6633185970977524
 ```
 
@@ -265,7 +265,7 @@ average over the entire price series and store it as a distinct column.
 >>> slow_ma = vbt.MA.run(btc_price, [30, 30], short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
->>> print(entries)
+>>> entries
 fast_window     10     20
 slow_window     30     30
 Date
@@ -280,7 +280,7 @@ Date
 [366 rows x 2 columns]
 
 >>> exits = fast_ma.ma_below(slow_ma, crossed=True)
->>> print(exits)
+>>> exits
 fast_window     10     20
 slow_window     30     30
 Date
@@ -295,7 +295,7 @@ Date
 [366 rows x 2 columns]
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> print(portfolio.total_return)
+>>> portfolio.total_return
 fast_window  slow_window
 10           30             0.865956
 20           30             0.547047
@@ -317,7 +317,7 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 >>> eth_price = yf.Ticker("ETH-USD").history(start=start, end=end)['Open']
 >>> comb_price = btc_price.vbt.concat(eth_price,
 ...     keys=pd.Index(['BTC', 'ETH'], name='asset'))
->>> print(comb_price)
+>>> comb_price
 asset           BTC     ETH
 Date
 2018-12-31  3866.84  140.03
@@ -334,7 +334,7 @@ Date
 >>> slow_ma = vbt.MA.run(comb_price, [30, 30], short_name='slow')
 
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
->>> print(entries)
+>>> entries
 fast_window     10            20
 slow_window     30            30
 asset          BTC    ETH    BTC    ETH
@@ -350,7 +350,7 @@ Date
 [366 rows x 4 columns]
 
 >>> exits = fast_ma.ma_below(slow_ma, crossed=True)
->>> print(exits)
+>>> exits
 fast_window     10            20
 slow_window     30            30
 asset          BTC    ETH    BTC    ETH
@@ -368,7 +368,7 @@ Date
 >>> # Notice that we need to align the price to the shape of signals
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     comb_price.vbt.tile(2), entries, exits)
->>> print(portfolio.total_return)
+>>> portfolio.total_return
 fast_window  slow_window  asset
 10           30           BTC      0.865956
                           ETH      0.249013
@@ -393,7 +393,7 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 ```python-repl
 >>> # Multiple strategy instances, instruments and time periods
 >>> mult_comb_price = comb_price.vbt.split_into_ranges(n=2)
->>> print(mult_comb_price)
+>>> mult_comb_price
 asset             BTC                   ETH
 range_start 2018-12-31 2019-07-02 2018-12-31 2019-07-02
 range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
@@ -419,7 +419,7 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     mult_comb_price.vbt.tile(2), entries, exits, freq='1D')
->>> print(portfolio.total_return)
+>>> portfolio.total_return
 fast_window  slow_window  asset  range_start  range_end
 10           30           BTC    2018-12-31   2019-07-01    1.631617
                                  2019-07-02   2019-12-31   -0.281432

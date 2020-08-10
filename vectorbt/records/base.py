@@ -80,7 +80,7 @@ it to the matrix form; for example, to compute various statistics by column, suc
 ...     columns=['a', 'b'], ndim=2, freq='1 day')
 >>> records = Records(records_arr, wrapper)
 
->>> print(records.records)
+>>> records.records
    col  idx  some_field
 0    0    0        10.0
 1    0    1        11.0
@@ -100,7 +100,7 @@ There are several options for mapping:
 >>> records.map_field('some_field')
 <vectorbt.records.base.MappedArray at 0x7ff49bd31a58>
 
->>> print(records.map_field('some_field').mapped_arr)
+>>> records.map_field('some_field').mapped_arr
 [10. 11. 12. 13. 14. 15.]
 ```
 
@@ -114,7 +114,7 @@ There are several options for mapping:
 >>> records.map(power_map_nb, 2)
 <vectorbt.records.base.MappedArray at 0x7ff49c990cf8>
 
->>> print(records.map(power_map_nb, 2).mapped_arr)
+>>> records.map(power_map_nb, 2).mapped_arr
 [100. 121. 144. 169. 196. 225.]
 ```
 
@@ -124,7 +124,7 @@ There are several options for mapping:
 >>> records.map_array(records_arr['some_field'] ** 2)
 <vectorbt.records.base.MappedArray object at 0x7fe9bccf2978>
 
->>> print(records.map_array(records_arr['some_field'] ** 2).mapped_arr)
+>>> records.map_array(records_arr['some_field'] ** 2).mapped_arr
 [100. 121. 144. 169. 196. 225.]
 ```
 
@@ -135,7 +135,7 @@ Using `MappedArray`, you can then reduce by column as follows:
 * Use already provided reducers such as `MappedArray.mean`:
 
 ```python-repl
->>> print(mapped.mean())
+>>> mapped.mean()
 a    11.0
 b    14.0
 dtype: float64
@@ -144,7 +144,7 @@ dtype: float64
 * Use `MappedArray.to_matrix` to map to a matrix and then reduce manually (expensive):
 
 ```python-repl
->>> print(mapped.to_matrix().mean())
+>>> mapped.to_matrix().mean()
 a    11.0
 b    14.0
 dtype: float64
@@ -159,7 +159,7 @@ dtype: float64
 ... def pow_mean_reduce_nb(col, a, pow):
 ...     return np.mean(a ** pow)
 
->>> print(mapped.reduce(pow_mean_reduce_nb, 2))
+>>> mapped.reduce(pow_mean_reduce_nb, 2)
 a    121.666667
 b    196.666667
 dtype: float64
@@ -172,7 +172,7 @@ dtype: float64
 ... def min_max_reduce_nb(col, a):
 ...     return np.array([np.min(a), np.max(a)])
 
->>> print(mapped.reduce_to_array(min_max_reduce_nb, index=['min', 'max']))
+>>> mapped.reduce_to_array(min_max_reduce_nb, index=['min', 'max'])
         a     b
 min  10.0  13.0
 max  12.0  15.0
@@ -216,13 +216,13 @@ You can use pandas indexing on both the `Records` and `MappedArray` class, which
 the indexing operation to each `__init__` argument with index:
 
 ```python-repl
->>> print(records['a'].records)
+>>> records['a'].records
    col  idx  some_field
 0    0    0        10.0
 1    0    1        11.0
 2    0    2        12.0
 
->>> print(mapped['a'].mapped_arr)
+>>> mapped['a'].mapped_arr
 [10. 11. 12.]
 ```
 

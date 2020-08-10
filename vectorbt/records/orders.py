@@ -33,9 +33,9 @@ class BaseOrders(Records):
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_capital=100, freq='1D')
 
-        >>> print(portfolio.orders.buy.count)
+        >>> portfolio.orders.buy.count
         4
-        >>> print(portfolio.orders.sell.count)
+        >>> portfolio.orders.sell.count
         1
         ```"""
 

@@ -222,7 +222,7 @@ def drawdown_records_nb(ts):
             ... ])
             >>> records = drawdown_records_nb(ts)
 
-            >>> print(pd.DataFrame.from_records(records))
+            >>> pd.DataFrame.from_records(records)
                col  start_idx  valley_idx  end_idx  status
             0    1          0           4        4       0
             1    2          2           4        4       0
@@ -432,7 +432,7 @@ def trade_records_nb(price, order_records):
         ...     price.shape, init_capital, order_func_nb)
         >>> records = trade_records_nb(price, order_records)
 
-        >>> print(pd.DataFrame.from_records(records))
+        >>> pd.DataFrame.from_records(records)
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
         0    0   1.0          0          1.0        0.01         1         2.0
         1    0   1.0          2          3.0        0.03         3         4.0
@@ -614,7 +614,7 @@ def position_records_nb(price, order_records):
         ...     price.shape, init_capital, order_func_nb)
         >>> records = position_records_nb(price, order_records)
 
-        >>> print(pd.DataFrame.from_records(records))
+        >>> pd.DataFrame.from_records(records)
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
         0    0   1.0          0          1.0        0.01         1         2.0
         1    0   1.0          2          3.0        0.03         3         4.0

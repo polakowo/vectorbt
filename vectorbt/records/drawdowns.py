@@ -365,18 +365,18 @@ class Drawdowns(BaseDrawdowns):
         ... ], columns=['a', 'b', 'c'])
         >>> drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days')
 
-        >>> print(drawdowns.records)
+        >>> drawdowns.records
            col  start_idx  valley_idx  end_idx  status
         0    0          2           4        4       0
         1    1          2           3        4       1
         2    2          1           2        3       1
         3    2          3           4        4       0
-        >>> print(drawdowns.active.avg_duration)
+        >>> drawdowns.active.avg_duration
         a   2 days
         b      NaT
         c   1 days
         dtype: timedelta64[ns]
-        >>> print(drawdowns.recovered.avg_duration)
+        >>> drawdowns.recovered.avg_duration
         a      NaT
         b   2 days
         c   2 days

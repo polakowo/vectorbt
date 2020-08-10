@@ -209,20 +209,20 @@ class Base_Accessor(ArrayWrapper):
             >>> import vectorbt as vbt
             >>> import pandas as pd
             >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
-            >>> print(df1)
+            >>> df1
                a  b
             x  1  2
             y  3  4
 
             >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
             ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
-            >>> print(df2)
+            >>> df2
                    1       2
                a   b   a   b
             x  5   6   7   8
             y  9  10  11  12
 
-            >>> print(df1.vbt.align_to(df2))
+            >>> df1.vbt.align_to(df2)
                   1     2   
                a  b  a  b
             x  1  2  1  2
@@ -280,7 +280,7 @@ class Base_Accessor(ArrayWrapper):
             >>> import pandas as pd
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
 
-            >>> print(sr2.vbt.apply(apply_func=lambda x: x ** 2))
+            >>> sr2.vbt.apply(apply_func=lambda x: x ** 2)
             i2
             x2    1
             y2    4
@@ -310,7 +310,7 @@ class Base_Accessor(ArrayWrapper):
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-            >>> print(sr.vbt.concat(df, keys=['c', 'd']))
+            >>> sr.vbt.concat(df, keys=['c', 'd'])
                   c     d
                a  b  a  b
             x  1  1  3  4
@@ -345,8 +345,8 @@ class Base_Accessor(ArrayWrapper):
             >>> import pandas as pd
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-            >>> print(df.vbt.apply_and_concat(3, [1, 2, 3], 
-            ...     apply_func=lambda i, a, b: a * b[i], keys=['c', 'd', 'e']))
+            >>> df.vbt.apply_and_concat(3, [1, 2, 3],
+            ...     apply_func=lambda i, a, b: a * b[i], keys=['c', 'd', 'e'])
                   c       d       e    
                a  b   a   b   a   b
             x  3  4   6   8   9  12
@@ -389,7 +389,7 @@ class Base_Accessor(ArrayWrapper):
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-            >>> print(sr.vbt.combine_with(df, combine_func=lambda x, y: x + y))
+            >>> sr.vbt.combine_with(df, combine_func=lambda x, y: x + y)
                a  b
             x  4  5
             y  7  8
@@ -442,14 +442,14 @@ class Base_Accessor(ArrayWrapper):
             >>> sr = pd.Series([1, 2], index=['x', 'y'])
             >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-            >>> print(sr.vbt.combine_with_multiple([df, df*2], 
-            ...     combine_func=lambda x, y: x + y))
+            >>> sr.vbt.combine_with_multiple([df, df*2],
+            ...     combine_func=lambda x, y: x + y)
                 a   b
             x  10  13
             y  17  20
 
-            >>> print(sr.vbt.combine_with_multiple([df, df*2], 
-            ...     combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd']))
+            >>> sr.vbt.combine_with_multiple([df, df*2],
+            ...     combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd'])
                   c       d    
                a  b   a   b
             x  4  5   7   9
@@ -536,4 +536,3 @@ class Base_DFAccessor(Base_Accessor):
     @class_or_instancemethod
     def is_frame(self_or_cls):
         return True
-

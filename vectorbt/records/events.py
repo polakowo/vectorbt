@@ -452,13 +452,13 @@ class Trades(Events):
         ...      init_capital=100, freq='1D')
 
         >>> trades = vbt.Trades.from_orders(portfolio.orders)
-        >>> print(trades.count)
+        >>> trades.count
         6
-        >>> print(trades.pnl.sum())
+        >>> trades.pnl.sum()
         -3.0
-        >>> print(trades.winning.count)
+        >>> trades.winning.count
         2
-        >>> print(trades.winning.pnl.sum())
+        >>> trades.winning.pnl.sum()
         1.5
         ```
 
@@ -466,9 +466,9 @@ class Trades(Events):
         ```python-repl
         >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
         >>> trades_filtered = trades.filter_by_mask(mask)
-        >>> print(trades_filtered.count)
+        >>> trades_filtered.count
         2
-        >>> print(trades_filtered.pnl.sum())
+        >>> trades_filtered.pnl.sum()
         -3.0
         ```"""
 
@@ -557,13 +557,13 @@ class Positions(Events):
         ...      init_capital=100, freq='1D')
 
         >>> positions = vbt.Positions.from_orders(portfolio.orders)
-        >>> print(positions.count)
+        >>> positions.count
         3
-        >>> print(positions.pnl.sum())
+        >>> positions.pnl.sum()
         -1.5
-        >>> print(positions.open.pnl.sum())
+        >>> positions.open.pnl.sum()
         -2.0
-        >>> print(positions.closed.pnl.sum())
+        >>> positions.closed.pnl.sum()
         0.5
         ```
 
@@ -571,9 +571,9 @@ class Positions(Events):
         ```python-repl
         >>> mask = positions.records['size'] > 1
         >>> positions_filtered = positions.filter_by_mask(mask)
-        >>> print(positions_filtered.count)
+        >>> positions_filtered.count
         1
-        >>> print(positions_filtered.pnl.sum())
+        >>> positions_filtered.pnl.sum()
         -2.0
         ```"""
 

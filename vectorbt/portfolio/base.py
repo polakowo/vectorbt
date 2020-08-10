@@ -63,7 +63,7 @@ indexing operation to each `__init__` argument with pandas type:
 ... }, index=index)
 >>> portfolio = vbt.Portfolio.from_orders(price, orders, init_capital=100)
 
->>> print(portfolio.equity)
+>>> portfolio.equity
                 a      b           c
 2020-01-01  100.0  100.0  100.000000
 2020-01-02  200.0  101.0  200.000000
@@ -71,7 +71,7 @@ indexing operation to each `__init__` argument with pandas type:
 2020-01-04  200.0  100.0  133.333333
 2020-01-05  100.0   96.0  133.333333
 
->>> print(portfolio['a'].equity)
+>>> portfolio['a'].equity
 2020-01-01    100.0
 2020-01-02    200.0
 2020-01-03    300.0
@@ -285,7 +285,7 @@ class Portfolio(PandasIndexer):
             ...     price, entries, exits, size=10,
             ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
 
-            >>> print(portfolio.orders.records)
+            >>> portfolio.orders.records
                col  idx  size  price      fees  side
             0    0    0  10.0  1.001  1.025025     0
             1    1    0  10.0  1.001  1.025025     0
@@ -294,7 +294,7 @@ class Portfolio(PandasIndexer):
             4    1    3  10.0  1.998  1.049950     1
             5    1    4  10.0  1.001  1.025025     0
             6    2    0  10.0  1.001  1.025025     0
-            >>> print(portfolio.equity)
+            >>> portfolio.equity
                                  a           b           c
             2020-01-01   98.964975   98.964975   98.964975
             2020-01-02  108.964975  107.895025  108.964975
@@ -395,7 +395,7 @@ class Portfolio(PandasIndexer):
             >>> portfolio = vbt.Portfolio.from_orders(price, orders,
             ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
 
-            >>> print(portfolio.orders.records)
+            >>> portfolio.orders.records
                 col  idx        size  price      fees  side
             0     0    0   98.654463  1.001  1.246883     0
             1     1    0    1.000000  1.001  1.002502     0
@@ -408,7 +408,7 @@ class Portfolio(PandasIndexer):
             8     2    2   64.646521  3.003  1.485334     0
             9     2    3   64.646521  1.998  1.322909     1
             10    2    4  126.398131  1.001  1.316311     0
-            >>> print(portfolio.equity)
+            >>> portfolio.equity
                                  a          b           c
             2020-01-01   98.654463  98.996498   98.654463
             2020-01-02  197.308925  98.989493  195.618838
@@ -510,14 +510,14 @@ class Portfolio(PandasIndexer):
             >>> portfolio = vbt.Portfolio.from_order_func(
             ...     price, order_func_nb, price.values, init_capital=100)
 
-            >>> print(portfolio.orders.records)
+            >>> portfolio.orders.records
                col  idx  size  price   fees  side
             0    0    0  10.0   1.01  1.101     0
             1    0    1  10.0   2.02  1.202     0
             2    0    2  10.0   3.03  1.303     0
             3    0    3  10.0   2.02  1.202     0
             4    0    4  10.0   1.01  1.101     0
-            >>> print(portfolio.equity)
+            >>> portfolio.equity
             2020-01-01     98.799
             2020-01-02    107.397
             2020-01-03    125.794

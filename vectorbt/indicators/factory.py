@@ -38,7 +38,7 @@ Consider the following smaller price DataFrame `price_sm`:
 ...     datetime(2020, 1, 4),
 ...     datetime(2020, 1, 5),
 ... ])).astype(float)
->>> print(price)
+>>> price
             a    b
 2020-01-01  1.0  5.0
 2020-01-02  2.0  4.0
@@ -59,7 +59,7 @@ A naive way of doing this:
 ...     price.rolling(window=2).mean(),
 ...     price.rolling(window=3).mean(),
 ...     keys=pd.Index([2, 3], name='ma_window'))
->>> print(ma_df)
+>>> ma_df
 ma_window          2         3
               a    b    a    b
 2020-01-01  NaN  NaN  NaN  NaN
@@ -70,7 +70,7 @@ ma_window          2         3
 
 >>> above_signals = (price.vbt.tile(2).vbt > ma_df)
 >>> above_signals = above_signals.vbt.signals.first(after_false=True)
->>> print(above_signals)
+>>> above_signals
 ma_window              2             3
                 a      b      a      b
 2020-01-01  False  False  False  False
@@ -81,7 +81,7 @@ ma_window              2             3
 
 >>> below_signals = (price.vbt.tile(2).vbt < ma_df)
 >>> below_signals = below_signals.vbt.signals.first(after_false=True)
->>> print(below_signals)
+>>> below_signals
 ma_window              2             3
                 a      b      a      b
 2020-01-01  False  False  False  False
@@ -133,7 +133,7 @@ series with different shapes will broadcast them to a single shape.
 ... )
 
 >>> myInd = MyInd.run(price['a'], price['b'], 1, 2)
->>> print(myInd.output)
+>>> myInd.output
 2020-01-01    11.0
 2020-01-02    10.0
 2020-01-03     9.0
@@ -142,7 +142,7 @@ series with different shapes will broadcast them to a single shape.
 Name: (1, 2, a, b), dtype: float64
 
 >>> myInd = MyInd.run(price, price['b'], 1, 2)
->>> print(myInd.output)
+>>> myInd.output
 custom_p1      1
 custom_p2      2
                a     b
@@ -159,21 +159,21 @@ You can even set `param_product` to `True` to run all possible combinations of p
 
 ```python-repl
 >>> myInd = MyInd.run(price['a'], price['b'], 1, 2)
->>> print(myInd._p1_array)
->>> print(myInd._p2_array)
+>>> myInd._p1_array
 [1]
+>>> myInd._p2_array
 [2]
 
 >>> myInd = MyInd.run(price['a'], price['b'], 1, [2, 3])
->>> print(myInd._p1_array)
->>> print(myInd._p2_array)
+>>> myInd._p1_array
 [1 1]
+>>> myInd._p2_array
 [2 3]
 
 >>> myInd = MyInd.run(price['a'], price['b'], [1, 2], [3, 4], param_product=True)
->>> print(myInd._p1_array)
->>> print(myInd._p2_array)
+>>> myInd._p1_array
 [1 1 2 2]
+>>> myInd._p2_array
 [3 4 3 4]
 ```
 
@@ -189,7 +189,7 @@ each other. For example, this is useful to generate crossover signals of multipl
 ```python-repl
 >>> myma1, myma2 = MyMA.run_combs(price, [2, 3, 4])
 
->>> print(myma1.ma)
+>>> myma1.ma
 myma_1_window                   2         3
                  a    b    a    b    a    b
 2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
@@ -198,7 +198,7 @@ myma_1_window                   2         3
 2020-01-04     3.5  2.5  3.5  2.5  3.0  3.0
 2020-01-05     4.5  1.5  4.5  1.5  4.0  2.0
 
->>> print(myma2.ma)
+>>> myma2.ma
 myma_2_window         3                   4
                  a    b    a    b    a    b
 2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
@@ -207,7 +207,7 @@ myma_2_window         3                   4
 2020-01-04     3.0  3.0  2.5  3.5  2.5  3.5
 2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
 
->>> print(myma1.ma_above(myma2.ma, crossed=True))
+>>> myma1.ma_above(myma2.ma, crossed=True)
 myma_1_window                           2             3
 myma_2_window             3             4             4
                    a      b      a      b      a      b
@@ -239,7 +239,7 @@ arbitrary array-like object, given their shapes can be broadcasted together. You
 to multiple objects at once, for example:
 
 ```python-repl
->>> print(myma.ma_above([1.5, 2.5], multiple=True))
+>>> myma.ma_above([1.5, 2.5], multiple=True)
 myma_ma_above                         1.5                         2.5
 myma_window               2             3             2             3
                 a         b      a      b      a      b      a      b
@@ -264,7 +264,7 @@ myma_window               2             3             2             3
 This makes accessing rows and columns by labels, integer positions, and parameters much easier.
 
 ```python-repl
->>> print(myma[(2, 'b')])
+>>> myma[(2, 'b')]
 <vectorbt.indicators.factory.CustomIndicator at 0x7fa4b3e0c4e0>
 
 >>> myma[(2, 'b')].ma
@@ -460,11 +460,11 @@ def run_pipeline(
         >>> input_list = [sr, df]
 
         >>> input_list = vbt.base.reshape_fns.broadcast(*input_list)
-        >>> print(input_list[0])
+        >>> input_list[0]
         a  b
         x  1  1
         y  2  2
-        >>> print(input_list[1])
+        >>> input_list[1]
         a  b
         x  3  4
         y  5  6
@@ -478,11 +478,11 @@ def run_pipeline(
         >>> param_list = [p1, p2, p3]
 
         >>> param_list = vbt.base.reshape_fns.broadcast(*param_list)
-        >>> print(param_list[0])
+        >>> param_list[0]
         array([1, 1, 1])
-        >>> print(param_list[1])
+        >>> param_list[1]
         array([2, 3, 4])
-        >>> print(param_list[2])
+        >>> param_list[2]
         array([False, False, False])
         ```
 
@@ -498,7 +498,7 @@ def run_pipeline(
         ...     ))
 
         >>> output = custom_func(*input_list, *param_list)
-        >>> print(output)
+        >>> output
         array([[ 6,  7,  7,  8,  8,  9],
                [ 9, 10, 10, 11, 11, 12]])
         ```
@@ -513,7 +513,7 @@ def run_pipeline(
         >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, input_list[0].columns)
 
         >>> output_df = pd.DataFrame(output, columns=new_columns)
-        >>> print(output_df)
+        >>> output_df
         p1                                         1                        
         p2             2             3             4    
         p3  False  False  False  False  False  False    
@@ -531,7 +531,7 @@ def run_pipeline(
         ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
         ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
         ... ]
-        >>> print(new_input_list[0])
+        >>> new_input_list[0]
         p1                                         1                        
         p2             2             3             4    
         p3  False  False  False  False  False  False     
@@ -747,7 +747,7 @@ class IndicatorFactory():
             ... ).from_custom_func(custom_func)
 
             >>> myInd = MyInd.run(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
-            >>> print(myInd.o1)
+            >>> myInd.o1
             custom_p1              1             2
             custom_p2              3             4
                             a      b      a      b
@@ -756,7 +756,7 @@ class IndicatorFactory():
             2020-01-03  103.0  103.0  106.0  106.0
             2020-01-04  104.0  102.0  108.0  104.0
             2020-01-05  105.0  101.0  110.0  102.0
-            >>> print(myInd.o2)
+            >>> myInd.o2
             custom_p1              1             2
             custom_p2              3             4
                             a      b      a      b
@@ -1166,7 +1166,7 @@ class IndicatorFactory():
             ... ).from_apply_func(apply_func_nb)
 
             >>> myInd = MyInd.run(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
-            >>> print(myInd.o1)
+            >>> myInd.o1
             custom_p1              1             2
             custom_p2              3             4
                             a      b      a      b
@@ -1175,7 +1175,7 @@ class IndicatorFactory():
             2020-01-03  103.0  103.0  106.0  106.0
             2020-01-04  104.0  102.0  108.0  104.0
             2020-01-05  105.0  101.0  110.0  102.0
-            >>> print(myInd.o2)
+            >>> myInd.o2
             custom_p1              1             2
             custom_p2              3             4
                             a      b      a      b
@@ -1281,7 +1281,7 @@ class IndicatorFactory():
             >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
 
             >>> sma = SMA.run(price_sm, timeperiod=[2, 3])
-            >>> print(sma.real)
+            >>> sma.real
             sma_timeperiod         2         3
                               a    b    a    b
             2020-01-01      NaN  NaN  NaN  NaN
