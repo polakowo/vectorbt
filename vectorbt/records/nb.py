@@ -267,7 +267,7 @@ def reduce_mapped_to_idx_array_nb(mapped_arr, col_arr, idx_arr, n_cols, n_rows, 
             prev_col = col
         if r == len(mapped_arr) - 1:
             col_result = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
-            result[:, col] = idx_arr[from_r:r][col_result]
+            result[:, col] = idx_arr[from_r:r + 1][col_result]
     return result
 
 
