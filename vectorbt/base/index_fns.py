@@ -155,8 +155,7 @@ def select_levels(index, level_names):
     if isinstance(level_names, (list, tuple)):
         levels = [index.get_level_values(level_name) for level_name in level_names]
         return pd.MultiIndex.from_arrays(levels)
-    else:
-        return index.get_level_values(level_names)
+    return index.get_level_values(level_names)
 
 
 def drop_redundant_levels(index):
@@ -277,3 +276,4 @@ def pick_levels(index, required_levels=[], optional_levels=[]):
             _required_levels[i] = levels_left.pop(0)
 
     return _required_levels, _optional_levels
+

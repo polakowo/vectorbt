@@ -490,12 +490,20 @@ class Generic_Accessor(Base_Accessor):
         return self.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **kwargs)
 
     def idxmin(self, **kwargs):
-        """Return index of min of non-NaN elements."""
-        return self.wrap_reduced(self.index[nanargmin(self.to_2d_array(), axis=0)], **kwargs)
+        """Return labeled index of min of non-NaN elements."""
+        obj = self.to_2d_array()
+        result = np.full(obj.shape[1], np.nan, dtype=np.object)
+        nan_mask = np.all(np.isnan(obj), axis=0)
+        result[~nan_mask] = self.index[nanargmin(obj[:, ~nan_mask], axis=0)]
+        return self.wrap_reduced(result, **kwargs)
 
     def idxmax(self, **kwargs):
-        """Return index of max of non-NaN elements."""
-        return self.wrap_reduced(self.index[nanargmax(self.to_2d_array(), axis=0)], **kwargs)
+        """Return labeled index of max of non-NaN elements."""
+        obj = self.to_2d_array()
+        result = np.full(obj.shape[1], np.nan, dtype=np.object)
+        nan_mask = np.all(np.isnan(obj), axis=0)
+        result[~nan_mask] = self.index[nanargmax(obj[:, ~nan_mask], axis=0)]
+        return self.wrap_reduced(result, **kwargs)
 
     def describe(self, percentiles=None, ddof=1, **kwargs):
         """See `vectorbt.generic.nb.describe_reduce_nb`.

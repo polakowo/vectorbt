@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from numba import njit
+from numba.typed import Dict
 import pytest
 from datetime import datetime
 
@@ -11,6 +12,7 @@ from vectorbt.base import (
     combine_fns,
     common,
     index_fns,
+    index_grouper,
     indexing,
     reshape_fns
 )
@@ -98,12 +100,16 @@ class TestArrayWrapper:
         assert sr_wrapper.wrap_reduced(np.array([0])) == 0  # result of computation on 2d
         # sr to array
         pd.testing.assert_series_equal(
+            sr_wrapper.wrap_reduced(np.array([0, 1])),
+            pd.Series(np.array([0, 1]), name=sr2.name)
+        )
+        pd.testing.assert_series_equal(
             sr_wrapper.wrap_reduced(np.array([0, 1]), index=['x', 'y']),
             pd.Series(np.array([0, 1]), index=['x', 'y'], name=sr2.name)
         )
         pd.testing.assert_series_equal(
-            sr_wrapper.wrap_reduced(np.array([0, 1]), index=['x', 'y'], name='test_name'),
-            pd.Series(np.array([0, 1]), index=['x', 'y'], name='test_name')
+            sr_wrapper.wrap_reduced(np.array([0, 1]), index=['x', 'y'], columns=[0]),
+            pd.Series(np.array([0, 1]), index=['x', 'y'], name=None)
         )
         # df to value
         assert sr_wrapper.wrap_reduced(0) == 0
@@ -113,13 +119,17 @@ class TestArrayWrapper:
             pd.Series(np.array([0, 1, 2]), index=df4.columns)
         )
         pd.testing.assert_series_equal(
-            df_wrapper.wrap_reduced(np.array([0, 1, 2]), name='test_name'),
-            pd.Series(np.array([0, 1, 2]), index=df4.columns, name='test_name')
+            df_wrapper.wrap_reduced(np.array([0, 1, 2]), columns=['m', 'n', 'l']),
+            pd.Series(np.array([0, 1, 2]), index=['m', 'n', 'l'])
         )
         # df to array per column
         pd.testing.assert_frame_equal(
             df_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y']),
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=df4.columns)
+        )
+        pd.testing.assert_frame_equal(
+            df_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=['m', 'n', 'l']),
+            pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=['m', 'n', 'l'])
         )
 
     def test_to_time_units(self):
@@ -155,6 +165,212 @@ class TestArrayWrapper:
         assert array_wrapper.ArrayWrapper.from_obj(df2) == array_wrapper.ArrayWrapper.from_obj(df2)
         assert array_wrapper.ArrayWrapper.from_obj(sr2) != array_wrapper.ArrayWrapper.from_obj(df2)
         assert array_wrapper.ArrayWrapper.from_obj(sr2) != [0, 1, 2]
+
+
+# ############# index_grouper.py ############# #
+
+
+some_index = pd.MultiIndex.from_arrays([
+    [1, 1, 1, 1, 0, 0, 0, 0],
+    [3, 3, 2, 2, 1, 1, 0, 0],
+    [7, 6, 5, 4, 3, 2, 1, 0]
+], names=['first', 'second', 'third'])
+
+
+class TestIndexGrouper:
+    def test_group_by_to_index(self):
+        pd.testing.assert_index_equal(
+            index_grouper.group_by_to_index(some_index, group_by=0),
+            pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.group_by_to_index(some_index, group_by='first'),
+            pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.group_by_to_index(some_index, group_by=[0, 1]),
+            pd.MultiIndex.from_tuples([
+                (1, 3),
+                (1, 3),
+                (1, 2),
+                (1, 2),
+                (0, 1),
+                (0, 1),
+                (0, 0),
+                (0, 0)
+            ], names=['first', 'second'])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.group_by_to_index(some_index, group_by=['first', 'second']),
+            pd.MultiIndex.from_tuples([
+                (1, 3),
+                (1, 3),
+                (1, 2),
+                (1, 2),
+                (0, 1),
+                (0, 1),
+                (0, 0),
+                (0, 0)
+            ], names=['first', 'second'])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.group_by_to_index(some_index, group_by=np.array([3, 2, 1, 1, 1, 0, 0, 0])),
+            pd.Int64Index([3, 2, 1, 1, 1, 0, 0, 0], dtype='int64')
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.group_by_to_index(some_index, group_by=pd.Index([3, 2, 1, 1, 1, 0, 0, 0], name='fourth')),
+            pd.Int64Index([3, 2, 1, 1, 1, 0, 0, 0], dtype='int64', name='fourth')
+        )
+
+    def test_group_index(self):
+        a, b = index_grouper.group_index(some_index, group_by=0)
+        np.testing.assert_array_equal(a, np.array([0, 0, 0, 0, 1, 1, 1, 1]))
+        pd.testing.assert_index_equal(b, pd.Int64Index([1, 0], dtype='int64', name='first'))
+        a, b = index_grouper.group_index(some_index, group_by=[0, 1])
+        np.testing.assert_array_equal(a, np.array([0, 0, 1, 1, 2, 2, 3, 3]))
+        pd.testing.assert_index_equal(b, pd.MultiIndex.from_tuples([
+            (1, 3),
+            (1, 2),
+            (0, 1),
+            (0, 0)
+        ], names=['first', 'second']))
+        a, _ = index_grouper.group_index(some_index, group_by=[0, 1], return_dict=True)
+        assert a == {0: [0, 1], 1: [2, 3], 2: [4, 5], 3: [6, 7]}
+        a, _ = index_grouper.group_index(some_index, group_by=[0, 1], return_dict=True, nb_compatible=True)
+        d = Dict()
+        d[0] = np.array([0, 1])
+        d[1] = np.array([2, 3])
+        d[2] = np.array([4, 5])
+        d[3] = np.array([6, 7])
+        assert type(a) == type(d)
+        assert len(a) == len(d)
+        for k, v in d.items():
+            np.testing.assert_array_equal(a[k], v)
+        with pytest.raises(Exception) as e_info:
+            index_grouper.group_index(some_index[[0, -1, 0]], group_by=[0, 1], assert_sorted=True)
+
+    def test_count_per_group_nb(self):
+        np.testing.assert_array_equal(
+            index_grouper.count_per_group_nb(np.array([0, 0, 0, 0, 1, 1, 1, 1])),
+            np.array([4, 4])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.count_per_group_nb(np.array([0, 1])),
+            np.array([1, 1])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.count_per_group_nb(np.array([0, 0])),
+            np.array([2])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.count_per_group_nb(np.array([0])),
+            np.array([1])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.count_per_group_nb(np.array([])),
+            np.array([])
+        )
+
+    def test_arguments(self):
+        assert index_grouper.IndexGrouper(some_index, group_by=None).resolve_group_by() is None  # default
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=None).resolve_group_by(group_by=0),  # overrides
+            pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=0).resolve_group_by(),  # default
+            pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=0).resolve_group_by(group_by=1),  # overrides
+            pd.Int64Index([3, 3, 2, 2, 1, 1, 0, 0], dtype='int64', name='second')
+        )
+        assert index_grouper.IndexGrouper(some_index, group_by=None).get_group_arr() is None
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=None).get_new_index(),
+            some_index
+        )
+        assert index_grouper.IndexGrouper(some_index, group_by=0).get_group_arr() is not None
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=0).get_new_index(),
+            pd.Int64Index([1, 0], dtype='int64', name='first')
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=None).get_group_counts(),
+            np.array([1, 1, 1, 1, 1, 1, 1, 1])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=0).get_group_counts(),
+            np.array([4, 4])
+        )
+
+    def test_indexing(self):
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].index,
+            pd.MultiIndex.from_tuples([
+                (1, 3, 7)
+            ], names=['first', 'second', 'third'])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].group_by,
+            pd.MultiIndex.from_tuples([
+                (1, 3)
+            ], names=['first', 'second'])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_group_arr(),
+            np.array([0])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_new_index(),
+            pd.MultiIndex.from_tuples([
+                (1, 3)
+            ], names=['first', 'second'])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_group_counts(),
+            np.array([1])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].index,
+            pd.MultiIndex.from_tuples([
+                (1, 3, 7),
+                (1, 3, 6),
+                (0, 0, 1),
+                (0, 0, 0)
+            ], names=['first', 'second', 'third'])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].group_by,
+            pd.MultiIndex.from_tuples([
+                (1, 3),
+                (1, 3),
+                (0, 0),
+                (0, 0)
+            ], names=['first', 'second'])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_group_arr(),
+            np.array([0, 0, 1, 1])
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_new_index(),
+            pd.MultiIndex.from_tuples([
+                (1, 3),
+                (0, 0)
+            ], names=['first', 'second'])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_group_counts(),
+            np.array([2, 2])
+        )
+
+    def test_eq(self):
+        assert index_grouper.IndexGrouper(some_index) == index_grouper.IndexGrouper(some_index)
+        assert index_grouper.IndexGrouper(some_index, group_by=0) == index_grouper.IndexGrouper(some_index, group_by=0)
+        assert index_grouper.IndexGrouper(some_index) != 0
+        assert index_grouper.IndexGrouper(some_index) != index_grouper.IndexGrouper(some_index, group_by=0)
+        assert index_grouper.IndexGrouper(some_index) != index_grouper.IndexGrouper(pd.Index([0]))
 
 
 # ############# index_fns.py ############# #

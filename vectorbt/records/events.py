@@ -13,7 +13,7 @@ import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.base.indexing import PandasIndexer
@@ -31,15 +31,31 @@ from vectorbt.records.enums import (
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseEvents`."""
-    records_arr, _ = indexing_on_records(obj, pd_indexing_func)
-    return obj.__class__(records_arr, pd_indexing_func(obj.main_price), freq=obj.wrapper.freq, idx_field=obj.idx_field)
+    new_cols, new_records, _ = indexing_on_records(obj, pd_indexing_func)
+    if obj.grouper.group_by is not None:
+        new_group_by = obj.grouper.group_by[new_cols]
+    else:
+        new_group_by = None
+    return obj.__class__(
+        new_records,
+        pd_indexing_func(obj.main_price),
+        freq=obj.wrapper.freq,
+        idx_field=obj.idx_field,
+        group_by=new_group_by
+    )
 
 
 class BaseEvents(Records):
     """Extends `Records` for working with event records."""
 
-    def __init__(self, records_arr, main_price, freq=None, idx_field='exit_idx'):
-        Records.__init__(self, records_arr, ArrayWrapper.from_obj(main_price, freq=freq), idx_field=idx_field)
+    def __init__(self, records_arr, main_price, freq=None, idx_field='exit_idx', group_by=None):
+        Records.__init__(
+            self,
+            records_arr,
+            ArrayWrapper.from_obj(main_price, freq=freq),
+            idx_field=idx_field,
+            group_by=group_by
+        )
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in event_dt.names):
@@ -47,9 +63,19 @@ class BaseEvents(Records):
 
         self.main_price = main_price
 
-    def filter_by_mask(self, mask):
+    def filter_by_mask(self, mask, idx_field=None, group_by=None):
         """Return a new class instance, filtered by mask."""
-        return self.__class__(self.records_arr[mask], self.main_price, freq=self.wrapper.freq, idx_field=self.idx_field)
+        if idx_field is None:
+            idx_field = self.idx_field
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return self.__class__(
+            self.records_arr[mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=idx_field,
+            group_by=group_by
+        )
 
     def plot(self,
              main_price_trace_kwargs={},
@@ -248,11 +274,13 @@ class BaseEvents(Records):
         """Duration of each event (in raw format)."""
         return self.map(nb.event_duration_map_nb)
 
-    @cached_property
-    def coverage(self):
+    @cached_method
+    def coverage(self, group_by=None, columns=None, **kwargs):
         """Coverage, that is, total duration divided by the whole period."""
-        coverage = to_1d(self.duration.sum(), raw=True) / self.wrapper.shape[0]
-        return self.wrapper.wrap_reduced(coverage)
+        total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
+        total_steps = self.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(total_duration / total_steps, columns=columns, **kwargs)
 
     # ############# PnL ############# #
 
@@ -280,7 +308,8 @@ class BaseEventsByResult(BaseEvents):
             self.records_arr[filter_mask],
             self.main_price,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )
 
     @cached_property
@@ -291,55 +320,58 @@ class BaseEventsByResult(BaseEvents):
             self.records_arr[filter_mask],
             self.main_price,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )
 
-    @cached_property
-    def win_rate(self):
+    @cached_method
+    def win_rate(self, group_by=None, columns=None, **kwargs):
         """Rate of profitable events."""
-        winning_count = to_1d(self.winning.count, raw=True)
-        count = to_1d(self.count, raw=True)
+        win_count = to_1d(self.winning.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(win_count / total_count, columns=columns, **kwargs)
 
-        win_rate = winning_count / count
-        return self.wrapper.wrap_reduced(win_rate)
-
-    @cached_property
-    def profit_factor(self):
+    @cached_method
+    def profit_factor(self, group_by=None, columns=None, **kwargs):
         """Profit factor."""
-        total_win = to_1d(self.winning.pnl.sum(), raw=True)
-        total_loss = to_1d(self.losing.pnl.sum(), raw=True)
+        total_win = to_1d(self.winning.pnl.sum(group_by=group_by), raw=True)
+        total_loss = to_1d(self.losing.pnl.sum(group_by=group_by), raw=True)
 
         # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d(self.count, raw=True) > 0
+        has_values = to_1d(self.count(group_by=group_by), raw=True) > 0
         total_win[np.isnan(total_win) & has_values] = 0.
         total_loss[np.isnan(total_loss) & has_values] = 0.
 
         profit_factor = total_win / np.abs(total_loss)
-        return self.wrapper.wrap_reduced(profit_factor)
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(profit_factor, columns=columns, **kwargs)
 
-    @cached_property
-    def expectancy(self):
+    @cached_method
+    def expectancy(self, group_by=None, columns=None, **kwargs):
         """Average profitability."""
-        win_rate = to_1d(self.win_rate, raw=True)
-        avg_win = to_1d(self.winning.pnl.mean(), raw=True)
-        avg_loss = to_1d(self.losing.pnl.mean(), raw=True)
+        win_rate = to_1d(self.win_rate(group_by=group_by), raw=True)
+        avg_win = to_1d(self.winning.pnl.mean(group_by=group_by), raw=True)
+        avg_loss = to_1d(self.losing.pnl.mean(group_by=group_by), raw=True)
 
         # Otherwise columns with only wins or losses will become NaNs
-        has_values = to_1d(self.count, raw=True) > 0
+        has_values = to_1d(self.count(group_by=group_by), raw=True) > 0
         avg_win[np.isnan(avg_win) & has_values] = 0.
         avg_loss[np.isnan(avg_loss) & has_values] = 0.
 
         expectancy = win_rate * avg_win - (1 - win_rate) * np.abs(avg_loss)
-        return self.wrapper.wrap_reduced(expectancy)
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(expectancy, columns=columns, **kwargs)
 
-    @cached_property
-    def sqn(self):
+    @cached_method
+    def sqn(self, group_by=None, columns=None, **kwargs):
         """System Quality Number (SQN)."""
-        count = to_1d(self.count, raw=True)
-        pnl_mean = to_1d(self.pnl.mean(), raw=True)
-        pnl_std = to_1d(self.pnl.std(), raw=True)
+        count = to_1d(self.count(group_by=group_by), raw=True)
+        pnl_mean = to_1d(self.pnl.mean(group_by=group_by), raw=True)
+        pnl_std = to_1d(self.pnl.std(group_by=group_by), raw=True)
         sqn = np.sqrt(count) * pnl_mean / pnl_std
-        return self.wrapper.wrap_reduced(sqn)
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(sqn, columns=columns, **kwargs)
 
 
 class Events(BaseEventsByResult):
@@ -350,11 +382,13 @@ class Events(BaseEventsByResult):
         """See `vectorbt.records.enums.EventStatus`."""
         return self.map_field('status')
 
-    @cached_property
-    def closed_rate(self):
+    @cached_method
+    def closed_rate(self, group_by=None, columns=None, **kwargs):
         """Rate of closed events."""
-        closed_rate = to_1d(self.closed.count, raw=True) / to_1d(self.count, raw=True)
-        return self.wrapper.wrap_reduced(closed_rate)
+        closed_count = to_1d(self.closed.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(closed_count / total_count, columns=columns, **kwargs)
 
     @cached_property
     def open(self):
@@ -364,7 +398,8 @@ class Events(BaseEventsByResult):
             self.records_arr[filter_mask],
             self.main_price,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )
 
     @cached_property
@@ -375,7 +410,8 @@ class Events(BaseEventsByResult):
             self.records_arr[filter_mask],
             self.main_price,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )
 
 
@@ -393,6 +429,9 @@ class Trades(Events):
     Example:
         Increasing position:
         ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
         >>> vbt.Portfolio.from_orders(
         ...     pd.Series([1, 2, 3, 4, 5]),
         ...     pd.Series([1, 1, 1, 1, -4]),
@@ -443,20 +482,17 @@ class Trades(Events):
 
         Get count and P&L of trades:
         ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
-
         >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
         >>> orders = pd.Series([1, -0.5, -0.5, 2, -0.5, -0.5, -0.5])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_capital=100, freq='1D')
 
         >>> trades = vbt.Trades.from_orders(portfolio.orders)
-        >>> trades.count
+        >>> trades.count()
         6
         >>> trades.pnl.sum()
         -3.0
-        >>> trades.winning.count
+        >>> trades.winning.count()
         2
         >>> trades.winning.pnl.sum()
         1.5
@@ -466,7 +502,7 @@ class Trades(Events):
         ```python-repl
         >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
         >>> trades_filtered = trades.filter_by_mask(mask)
-        >>> trades_filtered.count
+        >>> trades_filtered.count()
         2
         >>> trades_filtered.pnl.sum()
         -3.0
@@ -479,16 +515,17 @@ class Trades(Events):
             raise ValueError("Records array must have all fields defined in trade_dt")
 
     @classmethod
-    def from_orders(cls, orders, **kwargs):
+    def from_orders(cls, orders, group_by=None, **kwargs):
         """Build `Trades` from `Orders`."""
         trade_records = nb.trade_records_nb(orders.main_price.vbt.to_2d_array(), orders.records_arr)
-        return cls(trade_records, orders.main_price, freq=orders.wrapper.freq, **kwargs)
+        if group_by is None:
+            group_by = orders.grouper.group_by
+        return cls(trade_records, orders.main_price, freq=orders.wrapper.freq, group_by=group_by, **kwargs)
 
     @cached_property
     def position_idx(self):
         """Position index of each trade."""
         return self.map_field('position_idx')
-
 
 
 class Positions(Events):
@@ -504,6 +541,9 @@ class Positions(Events):
     Example:
         Increasing position:
         ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
         >>> vbt.Portfolio.from_orders(
         ...     pd.Series([1, 2, 3, 4, 5]),
         ...     pd.Series([1, 1, 1, 1, -4]),
@@ -548,16 +588,13 @@ class Positions(Events):
 
         Get count and P&L of positions:
         ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
-
         >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
         >>> orders = pd.Series([1, -0.5, -0.5, 1, -1, 2, -1])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_capital=100, freq='1D')
 
         >>> positions = vbt.Positions.from_orders(portfolio.orders)
-        >>> positions.count
+        >>> positions.count()
         3
         >>> positions.pnl.sum()
         -1.5
@@ -571,7 +608,7 @@ class Positions(Events):
         ```python-repl
         >>> mask = positions.records['size'] > 1
         >>> positions_filtered = positions.filter_by_mask(mask)
-        >>> positions_filtered.count
+        >>> positions_filtered.count()
         1
         >>> positions_filtered.pnl.sum()
         -2.0
@@ -584,8 +621,10 @@ class Positions(Events):
             raise ValueError("Records array must have all fields defined in position_dt")
 
     @classmethod
-    def from_orders(cls, orders, **kwargs):
+    def from_orders(cls, orders, group_by=None, **kwargs):
         """Build `Positions` from `Orders`."""
         position_records = nb.position_records_nb(orders.main_price.vbt.to_2d_array(), orders.records_arr)
-        return cls(position_records, orders.main_price, freq=orders.wrapper.freq, **kwargs)
+        if group_by is None:
+            group_by = orders.grouper.group_by
+        return cls(position_records, orders.main_price, freq=orders.wrapper.freq, group_by=group_by, **kwargs)
 

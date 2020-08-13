@@ -61,7 +61,7 @@ it to the matrix form; for example, to compute various statistics by column, suc
 >>> from numba import njit
 >>> from collections import namedtuple
 >>> from vectorbt.base.array_wrapper import ArrayWrapper
->>> from vectorbt.records import Records
+>>> from vectorbt.records import Records, MappedArray
 
 >>> example_dt = np.dtype([
 ...     ('col', np.int64),
@@ -135,6 +135,8 @@ Using `MappedArray`, you can then reduce by column as follows:
 * Use already provided reducers such as `MappedArray.mean`:
 
 ```python-repl
+>>> mapped = records.map_field('some_field')
+
 >>> mapped.mean()
 a    11.0
 b    14.0
@@ -150,11 +152,9 @@ b    14.0
 dtype: float64
 ```
 
-* Use `MappedArray.reduce` to reduce to a scalar using a custom function:
+* Use `MappedArray.reduce` to reduce using a custom function:
 
 ```python-repl
->>> mapped = records.map_field('some_field')
-
 >>> @njit
 ... def pow_mean_reduce_nb(col, a, pow):
 ...     return np.mean(a ** pow)
@@ -163,19 +163,26 @@ dtype: float64
 a    121.666667
 b    196.666667
 dtype: float64
-```
 
-* Use `MappedArray.reduce_to_array` to reduce to an array:
-
-```python-repl
 >>> @njit
 ... def min_max_reduce_nb(col, a):
 ...     return np.array([np.min(a), np.max(a)])
 
->>> mapped.reduce_to_array(min_max_reduce_nb, index=['min', 'max'])
+>>> mapped.reduce(min_max_reduce_nb, to_array=True,
+...     n_rows=2, index=['min', 'max'])
         a     b
 min  10.0  13.0
 max  12.0  15.0
+
+>>> @njit
+... def idxmin_idxmax_reduce_nb(col, a):
+...     return np.array([np.argmin(a), np.argmax(a)])
+
+>>> mapped.reduce(idxmin_idxmax_reduce_nb, to_array=True,
+...     n_rows=2, to_idx=True, index=['idxmin', 'idxmax'])
+        a  b
+idxmin  x  x
+idxmax  z  z
 ```
 
 ### Conversion
@@ -190,7 +197,8 @@ y  11.0  14.0
 z  12.0  15.0
 ```
 
-Note, though, that it will raise an error if there are multiple records pointing to the same matrix element.
+!!! note
+    Will raise an error if there are multiple records pointing to the same matrix element.
 
 ### Plotting
 
@@ -209,6 +217,41 @@ To use scatterplots or any other plots that require index, convert to matrix fir
 ```
 
 ![](/vectorbt/docs/img/mapped_scatter.png)
+
+## Grouping
+
+Additionally to reducing per column, you can also reduce per group of columns by providing
+`group_by`. The `group_by` variable can be anything from positions or names of column levels,
+to a NumPy array with actual groups, and can be passed to either `Records`, `MappedArray`,
+or the reducing method itself.
+
+```python-repl
+>>> np.random.seed(42)
+>>> index = pd.Index(['x', 'y'])
+>>> columns = pd.MultiIndex.from_arrays([
+...     [1, 1, 1, 2, 2, 2],
+...     [1, 2, 3, 1, 2, 3]
+... ], names=['a', 'b'])
+>>> mapped_group = MappedArray(
+...     mapped_arr=np.random.randint(1, 10, size=12),
+...     col_arr=np.repeat(np.arange(6), 2),
+...     wrapper=ArrayWrapper(index=index, columns=columns),
+...     idx_arr=np.tile([0, 1], 6)
+... )
+
+>>> mapped_group.hist()
+```
+
+![](/vectorbt/docs/img/mapped_hist.png)
+
+```python-repl
+>>> mapped_group.hist(group_by='a')
+```
+
+![](/vectorbt/docs/img/mapped_hist_grouped.png)
+
+!!! note
+    Grouping applies only to reducing and plotting operations.
 
 ## Indexing
 
@@ -247,15 +290,18 @@ You can perform basic operations (such as addition) on mapped arrays as if they 
 
 !!! note
     You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
+
+    Two mapped arrays must have the same metadata to be compared/combined.
 """
 
 import numpy as np
 import pandas as pd
 
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base import reshape_fns
+from vectorbt.base.index_grouper import IndexGrouper
 from vectorbt.base.common import (
     add_binary_magic_methods,
     add_unary_magic_methods,
@@ -291,7 +337,17 @@ def _mapped_indexing_func(obj, pd_indexing_func):
     else:
         new_idx_arr = None
     new_wrapper = ArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
-    return obj.__class__(new_mapped_arr, new_col_arr, new_wrapper, idx_arr=new_idx_arr)
+    if obj.grouper.group_by is not None:
+        new_group_by = obj.grouper.group_by[new_cols]
+    else:
+        new_group_by = None
+    return obj.__class__(
+        new_mapped_arr,
+        new_col_arr,
+        new_wrapper,
+        idx_arr=new_idx_arr,
+        group_by=new_group_by
+    )
 
 
 def _mapped_binary_translate_func(self, other, np_func):
@@ -300,13 +356,12 @@ def _mapped_binary_translate_func(self, other, np_func):
         passed = True
         if not np.array_equal(self.col_arr, other.col_arr):
             passed = False
-        if self.idx_arr is None or other.idx_arr is None:
-            if self.idx_arr != other.idx_arr:
-                passed = False
-        else:
+        if self.idx_arr is not None or other.idx_arr is not None:
             if not np.array_equal(self.idx_arr, other.idx_arr):
                 passed = False
         if self.wrapper != other.wrapper:
+            passed = False
+        if self.grouper != other.grouper:
             passed = False
         if not passed:
             raise ValueError("Both MappedArray instances must have same metadata")
@@ -315,7 +370,8 @@ def _mapped_binary_translate_func(self, other, np_func):
         np_func(self.mapped_arr, other),
         self.col_arr,
         self.wrapper,
-        idx_arr=self.idx_arr
+        idx_arr=self.idx_arr,
+        group_by=self.grouper.group_by
     )
 
 
@@ -329,7 +385,8 @@ def _mapped_binary_translate_func(self, other, np_func):
         np_func(self.mapped_arr),
         self.col_arr,
         self.wrapper,
-        idx_arr=self.idx_arr
+        idx_arr=self.idx_arr,
+        group_by=self.grouper.group_by
     )
 )
 class MappedArray(PandasIndexer):
@@ -343,9 +400,12 @@ class MappedArray(PandasIndexer):
         wrapper (ArrayWrapper): Array wrapper of type `vectorbt.base.array_wrapper.ArrayWrapper`.
         idx_arr (array_like): A one-dimensional index array. Optional.
 
-            Must be of the same size as `mapped_arr`."""
+            Must be of the same size as `mapped_arr`.
+        group_by (int, str or array_like): Group columns by a mapper when reducing.
 
-    def __init__(self, mapped_arr, col_arr, wrapper, idx_arr=None):
+            See `vectorbt.base.index_fns.group_index`."""
+
+    def __init__(self, mapped_arr, col_arr, wrapper, idx_arr=None, group_by=None):
         if not isinstance(mapped_arr, np.ndarray):
             mapped_arr = np.asarray(mapped_arr)
         if not isinstance(col_arr, np.ndarray):
@@ -361,6 +421,7 @@ class MappedArray(PandasIndexer):
         self.col_arr = col_arr
         self.wrapper = wrapper
         self.idx_arr = idx_arr
+        self.grouper = IndexGrouper(self.wrapper.columns, group_by=group_by)
 
         PandasIndexer.__init__(self, _mapped_indexing_func)
 
@@ -369,13 +430,21 @@ class MappedArray(PandasIndexer):
         """Column index for `MappedArray.mapped_arr`."""
         return nb.mapped_col_index_nb(self.mapped_arr, self.col_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask):
+    def filter_by_mask(self, mask, idx_arr=None, group_by=None):
         """Return a new class instance, filtered by mask."""
-        if self.idx_arr is not None:
+        if idx_arr is None:
+            idx_arr = self.idx_arr
+        if idx_arr is not None:
             idx_arr = self.idx_arr[mask]
-        else:
-            idx_arr = None
-        return self.__class__(self.mapped_arr[mask], self.col_arr[mask], self.wrapper, idx_arr=idx_arr)
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return self.__class__(
+            self.mapped_arr[mask],
+            self.col_arr[mask],
+            self.wrapper,
+            idx_arr=idx_arr,
+            group_by=group_by
+        )
 
     def to_matrix(self, idx_arr=None, default_val=np.nan):
         """Convert mapped array to the matrix form.
@@ -384,96 +453,174 @@ class MappedArray(PandasIndexer):
 
         !!! warning
             Mapped arrays represent information in the most memory-friendly format.
-            Mapping back to the matrix form may occupy lots of memory if records are sparse.
-
-        !!! note
-            Will raise an error if there are multiple values pointing at the same matrix element."""
+            Mapping back to the matrix form may occupy lots of memory if records are sparse."""
         if idx_arr is None:
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
-        # Check many-to-one relationship
-        n_unique = np.unique(np.hstack((self.col_arr[:, None], idx_arr[:, None])), axis=0).shape[0]
-        if n_unique < self.col_arr.shape[0]:
-            raise ValueError("Multiple values are pointing at the same matrix element")
         target_shape = (len(self.wrapper.index), len(self.wrapper.columns))
         result = nb.mapped_to_matrix_nb(self.mapped_arr, self.col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(result)
 
-    def reduce(self, reduce_func_nb, *args, default_val=np.nan, cast=None, **kwargs):
-        """Reduce mapped array by column to a scalar value.
+    def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False,
+               n_rows=None, to_idx=False, idx_labeled=True, default_val=np.nan,
+               cast=None, group_by=None, columns=None, **kwargs):
+        """Reduce mapped array by column.
 
-        See `vectorbt.records.nb.reduce_mapped_nb`.
+        If `to_array` is `False` and `to_idx` is `False`, see `vectorbt.records.nb.reduce_mapped_nb`.
+        If `to_array` is `False` and `to_idx` is `True`, see `vectorbt.records.nb.reduce_mapped_to_idx_nb`.
+        If `to_array` is `True` and `to_idx` is `False`, see `vectorbt.records.nb.reduce_mapped_to_array_nb`.
+        If `to_array` is `True` and `to_idx` is `True`, see `vectorbt.records.nb.reduce_mapped_to_idx_array_nb`.
 
-        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
-        checks.assert_numba_func(reduce_func_nb)
-
-        result = nb.reduce_mapped_nb(
-            self.mapped_arr,
-            self.col_arr,
-            len(self.wrapper.columns),
-            default_val,
-            reduce_func_nb,
-            *args
-        )
-        if cast is not None:
-            result = result.astype(cast)
-        return self.wrapper.wrap_reduced(result, **kwargs)
-
-    def reduce_to_array(self, reduce_func_nb, *args, default_val=np.nan, cast=None, **kwargs):
-        """Reduce mapped array by column to an array.
-
-        See `vectorbt.records.nb.reduce_mapped_to_array_nb`.
+        If `to_array` is `True`, must pass `n_rows` indicating the number of elements in the array.
+        If `to_idx` is `True`, must pass `idx_arr`. Set `idx_labeled` to `False` to return raw positions
+        instead of labels. Use `default_val` to set the default value and `cast` to perform casting
+        on the resulting pandas object. Set `group_by` to `False` to disable grouping. Use `columns` to
+        override the existing columns and the columns coming from `group_by`.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
+        # Perform checks
         checks.assert_numba_func(reduce_func_nb)
+        if idx_arr is None:
+            if self.idx_arr is None:
+                if to_idx:
+                    raise ValueError("Must pass idx_arr")
+            idx_arr = self.idx_arr
 
-        result = nb.reduce_mapped_to_array_nb(
-            self.mapped_arr,
-            self.col_arr,
-            len(self.wrapper.columns),
-            default_val,
-            reduce_func_nb,
-            *args
-        )
+        # Perform main computation
+        group_arr, columns = self.grouper.group_index(group_by=group_by, new_index=columns)
+        if group_arr is not None:
+            col_arr = group_arr[self.col_arr]
+        else:
+            col_arr = self.col_arr
+        if not to_array:
+            if not to_idx:
+                result = nb.reduce_mapped_nb(
+                    self.mapped_arr,
+                    col_arr,
+                    len(columns),
+                    default_val,
+                    reduce_func_nb,
+                    *args
+                )
+            else:
+                result = nb.reduce_mapped_to_idx_nb(
+                    self.mapped_arr,
+                    col_arr,
+                    idx_arr,
+                    len(columns),
+                    default_val,
+                    reduce_func_nb,
+                    *args
+                )
+        else:
+            checks.assert_not_none(n_rows)
+            if not to_idx:
+                result = nb.reduce_mapped_to_array_nb(
+                    self.mapped_arr,
+                    col_arr,
+                    len(columns),
+                    n_rows,
+                    default_val,
+                    reduce_func_nb,
+                    *args
+                )
+            else:
+                result = nb.reduce_mapped_to_idx_array_nb(
+                    self.mapped_arr,
+                    col_arr,
+                    idx_arr,
+                    len(columns),
+                    n_rows,
+                    default_val,
+                    reduce_func_nb,
+                    *args
+                )
+
+        # Perform post-processing
+        if to_idx:
+            if idx_labeled:
+                result_shape = result.shape
+                result = result.flatten()
+                mask = np.isnan(result)
+                if mask.any():
+                    # Contains NaNs
+                    result[mask] = 0
+                    result = result.astype(int)
+                    result = self.wrapper.index[result].to_numpy()
+                    result = result.astype(np.object)
+                    result[mask] = np.nan
+                else:
+                    result = self.wrapper.index[result.astype(int)].to_numpy()
+                result = np.reshape(result, result_shape)
+            else:
+                mask = np.isnan(result)
+                result[mask] = -1
+                result = result.astype(int)
+        result = self.wrapper.wrap_reduced(result, columns=columns, **kwargs)
         if cast is not None:
             result = result.astype(cast)
-        return self.wrapper.wrap_reduced(result, **kwargs)
+        return result
 
-    def nst(self, n, **kwargs):
+    @cached_method
+    def nst(self, n, group_by=None, **kwargs):
         """Return nst element of each column."""
-        return self.reduce(generic_nb.nst_reduce_nb, n, **kwargs)
+        group_by = self.grouper.resolve_group_by(group_by=group_by)
+        if group_by is not None:
+            raise ValueError("MappedArray.nst() does not support group_by. Set group_by to False.")
+        return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, group_by=False, **kwargs)
 
+    @cached_method
     def min(self, **kwargs):
-        """Return min of each column."""
-        return self.reduce(generic_nb.min_reduce_nb, **kwargs)
+        """Return min by column."""
+        return self.reduce(generic_nb.min_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
+    @cached_method
     def max(self, **kwargs):
-        """Return max of each column."""
-        return self.reduce(generic_nb.max_reduce_nb, **kwargs)
+        """Return max by column."""
+        return self.reduce(generic_nb.max_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
+    @cached_method
     def mean(self, **kwargs):
-        """Return mean of each column."""
-        return self.reduce(generic_nb.mean_reduce_nb, **kwargs)
+        """Return mean by column."""
+        return self.reduce(generic_nb.mean_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
+    @cached_method
     def median(self, **kwargs):
-        """Return median of each column."""
-        return self.reduce(generic_nb.median_reduce_nb, **kwargs)
+        """Return median by column."""
+        return self.reduce(generic_nb.median_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
+    @cached_method
     def std(self, ddof=1, **kwargs):
-        """Return std of each column."""
-        return self.reduce(generic_nb.std_reduce_nb, ddof, **kwargs)
+        """Return std by column."""
+        return self.reduce(generic_nb.std_reduce_nb, ddof, to_array=False, to_idx=False, **kwargs)
 
+    @cached_method
     def sum(self, default_val=0., **kwargs):
-        """Return sum of each column."""
-        return self.reduce(generic_nb.sum_reduce_nb, default_val=default_val, **kwargs)
+        """Return sum by column."""
+        return self.reduce(
+            generic_nb.sum_reduce_nb,
+            to_array=False,
+            to_idx=False,
+            default_val=default_val,
+            **kwargs
+        )
 
+    @cached_method
     def count(self, default_val=0., cast=np.int64, **kwargs):
-        """Return count of each column."""
-        return self.reduce(generic_nb.count_reduce_nb, default_val=default_val, cast=cast, **kwargs)
+        """Return count by column."""
+        return self.reduce(
+            generic_nb.count_reduce_nb,
+            to_array=False,
+            to_idx=False,
+            default_val=default_val,
+            cast=cast,
+            **kwargs
+        )
 
+    @cached_method
     def describe(self, percentiles=None, ddof=1, **kwargs):
-        """Return stats of each column."""
+        """Return statistics by column."""
         if percentiles is not None:
             percentiles = reshape_fns.to_1d(percentiles, raw=True)
         else:
@@ -484,7 +631,16 @@ class MappedArray(PandasIndexer):
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
-        result = self.reduce_to_array(generic_nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
+        result = self.reduce(
+            generic_nb.describe_reduce_nb,
+            percentiles,
+            ddof,
+            to_array=True,
+            n_rows=len(index),
+            to_idx=False,
+            index=index,
+            **kwargs
+        )
         if isinstance(result, pd.DataFrame):
             result.loc['count'].fillna(0., inplace=True)
         else:
@@ -492,65 +648,53 @@ class MappedArray(PandasIndexer):
                 result.loc['count'] = 0.
         return result
 
-    def idxmin(self, idx_arr=None, **kwargs):
-        """Return index of min of each column."""
-        if idx_arr is None:
-            if self.idx_arr is None:
-                raise ValueError("Must pass idx_arr")
-            idx_arr = self.idx_arr
-        result = reshape_fns.to_1d(self.reduce(generic_nb.argmin_reduce_nb), raw=True)
-        mask = np.isnan(result)
-        if mask.any():
-            # Contains NaNs
-            result[mask] = 0
-            result = result.astype(int)
-            result = self.wrapper.index[idx_arr[result]].to_numpy()
-            result = result.astype(np.object)
-            result[mask] = np.nan
-        else:
-            result = self.wrapper.index[idx_arr[result.astype(int)]].to_numpy()
-        return self.wrapper.wrap_reduced(result, **kwargs)
+    @cached_method
+    def idxmin(self, **kwargs):
+        """Return index of min by column."""
+        return self.reduce(generic_nb.argmin_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
-    def idxmax(self, idx_arr=None, **kwargs):
-        """Return index of max of each column."""
-        if idx_arr is None:
-            if self.idx_arr is None:
-                raise ValueError("Must pass idx_arr")
-            idx_arr = self.idx_arr
-        result = reshape_fns.to_1d(self.reduce(generic_nb.argmax_reduce_nb), raw=True)
-        mask = np.isnan(result)
-        if mask.any():
-            # Contains NaNs
-            result[mask] = 0
-            result = result.astype(int)
-            result = self.wrapper.index[idx_arr[result]].to_numpy()
-            result = result.astype(np.object)
-            result[mask] = np.nan
-        else:
-            result = self.wrapper.index[idx_arr[result.astype(int)]].to_numpy()
-        return self.wrapper.wrap_reduced(result, **kwargs)
+    @cached_method
+    def idxmax(self, **kwargs):
+        """Return index of max by column."""
+        return self.reduce(generic_nb.argmax_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
-    def _transform_and_plot(self, plot_func):  # pragma: no cover
+    def plot_by_func(self, plot_func, group_by=None, columns=None):  # pragma: no cover
         """Transform data to the format suitable for plotting, and plot.
 
-        Should only be used by plotting methods that disregard X axis labels."""
+        Function `pd_plot_func` should receive Series or DataFrame and plot it.
+        Should only be used by plotting methods that disregard X axis labels.
+
+        Set `group_by` to `False` to disable grouping."""
+        # We can't simply do to_matrix since there can be multiple records for one position in matrix
         if self.wrapper.ndim == 1:
             name = None if self.wrapper.columns[0] == 0 else self.wrapper.columns[0]
             return plot_func(pd.Series(self.mapped_arr, name=name))
-        # We can't simply do to_matrix since there can be multiple records for one position in matrix
-        a = np.full((self.mapped_arr.shape[0], self.wrapper.shape[1]), np.nan)
-        for col in range(self.wrapper.shape[1]):
-            masked_arr = self.mapped_arr[self.col_arr == col]
+        group_arr, columns = self.grouper.group_index(group_by=group_by, new_index=columns)
+        if group_arr is not None:
+            col_arr = group_arr[self.col_arr]
+        else:
+            col_arr = self.col_arr
+        a = np.full((self.mapped_arr.shape[0], len(columns)), np.nan)
+        for col in range(len(columns)):
+            masked_arr = self.mapped_arr[col_arr == col]
             a[:masked_arr.shape[0], col] = masked_arr
-        return plot_func(pd.DataFrame(a, columns=self.wrapper.columns))
+        return plot_func(pd.DataFrame(a, columns=columns))
 
-    def hist(self, **kwargs):  # pragma: no cover
+    def hist(self, group_by=None, columns=None, **kwargs):  # pragma: no cover
         """Plot histogram by column."""
-        return self._transform_and_plot(lambda x: x.vbt.hist(**kwargs))
+        return self.plot_by_func(
+            lambda x: x.vbt.hist(**kwargs),
+            group_by=group_by,
+            columns=columns
+        )
 
-    def box(self, **kwargs):  # pragma: no cover
+    def box(self, group_by=None, columns=None, **kwargs):  # pragma: no cover
         """Plot box plot by column."""
-        return self._transform_and_plot(lambda x: x.vbt.box(**kwargs))
+        return self.plot_by_func(
+            lambda x: x.vbt.box(**kwargs),
+            group_by=group_by,
+            columns=columns
+        )
 
 
 def indexing_on_records(obj, pd_indexing_func):
@@ -572,12 +716,22 @@ def indexing_on_records(obj, pd_indexing_func):
         new_cols
     )
     wrapper = ArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
-    return records, wrapper
+    return new_cols, records, wrapper
 
 
 def _records_indexing_func(obj, pd_indexing_func):
     """See `indexing_on_records`."""
-    return obj.__class__(*indexing_on_records(obj, pd_indexing_func), idx_field=obj.idx_field)
+    new_cols, new_records, new_wrapper = indexing_on_records(obj, pd_indexing_func)
+    if obj.grouper.group_by is not None:
+        new_group_by = obj.grouper.group_by[new_cols]
+    else:
+        new_group_by = None
+    return obj.__class__(
+        new_records,
+        new_wrapper,
+        idx_field=obj.idx_field,
+        group_by=new_group_by
+    )
 
 
 class Records(PandasIndexer):
@@ -590,9 +744,12 @@ class Records(PandasIndexer):
         wrapper (ArrayWrapper): Array wrapper of type `vectorbt.base.array_wrapper.ArrayWrapper`.
         idx_field (str): The name of the field corresponding to the index. Optional.
 
-            Will be derived automatically if records contain field `'idx'`."""
+            Will be derived automatically if records contain field `'idx'`.
+        group_by (int, str or array_like): Group columns by a mapper when reducing.
 
-    def __init__(self, records_arr, wrapper, idx_field=None):
+            See `vectorbt.base.index_fns.group_index`."""
+
+    def __init__(self, records_arr, wrapper, idx_field=None, group_by=None):
         if not isinstance(records_arr, np.ndarray):
             records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
@@ -607,6 +764,7 @@ class Records(PandasIndexer):
         self.records_arr = records_arr
         self.wrapper = wrapper
         self.idx_field = idx_field
+        self.grouper = IndexGrouper(self.wrapper.columns, group_by=group_by)
 
         PandasIndexer.__init__(self, _records_indexing_func)
 
@@ -624,11 +782,20 @@ class Records(PandasIndexer):
         """Column index for `Records.records`."""
         return nb.record_col_index_nb(self.records_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask):
+    def filter_by_mask(self, mask, idx_field=None, group_by=None):
         """Return a new class instance, filtered by mask."""
-        return self.__class__(self.records_arr[mask], self.wrapper, idx_field=self.idx_field)
+        if idx_field is None:
+            idx_field = self.idx_field
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return self.__class__(
+            self.records_arr[mask],
+            self.wrapper,
+            idx_field=idx_field,
+            group_by=group_by
+        )
 
-    def map(self, map_func_nb, *args, idx_arr=None):
+    def map(self, map_func_nb, *args, idx_arr=None, group_by=None):
         """Map each record to a scalar value. Returns `MappedArray`.
 
         See `vectorbt.records.nb.map_records_nb`."""
@@ -640,18 +807,34 @@ class Records(PandasIndexer):
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        return MappedArray(mapped_arr, self.records_arr['col'], self.wrapper, idx_arr=idx_arr)
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return MappedArray(
+            mapped_arr,
+            self.records_arr['col'],
+            self.wrapper,
+            idx_arr=idx_arr,
+            group_by=group_by
+        )
 
-    def map_field(self, field, idx_arr=None):
+    def map_field(self, field, idx_arr=None, group_by=None):
         """Convert field to `MappedArray`."""
         if idx_arr is None:
             if self.idx_field is not None:
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        return MappedArray(self.records_arr[field], self.records_arr['col'], self.wrapper, idx_arr=idx_arr)
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return MappedArray(
+            self.records_arr[field],
+            self.records_arr['col'],
+            self.wrapper,
+            idx_arr=idx_arr,
+            group_by=group_by
+        )
 
-    def map_array(self, a, idx_arr=None):
+    def map_array(self, a, idx_arr=None, group_by=None):
         """Convert array to `MappedArray`.
 
          The length of the array should match that of the records."""
@@ -664,11 +847,23 @@ class Records(PandasIndexer):
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        return MappedArray(a, self.records_arr['col'], self.wrapper, idx_arr=idx_arr)
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return MappedArray(
+            a,
+            self.records_arr['col'],
+            self.wrapper,
+            idx_arr=idx_arr,
+            group_by=group_by
+        )
 
-    @cached_property
-    def count(self):
+    @cached_method
+    def count(self, **kwargs):
         """Number of records."""
-        mapped_arr = np.full(len(self.records_arr), 1)
-        return MappedArray(mapped_arr, self.records_arr['col'], self.wrapper).count(default_val=0.)
+        return MappedArray(
+            self.records_arr['col'],  # doesn't matter which column to take
+            self.records_arr['col'],
+            self.wrapper,
+            group_by=self.grouper.group_by
+        ).count(default_val=0., **kwargs)
 

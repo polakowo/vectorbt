@@ -38,14 +38,16 @@ def record_col_index_nb(records, n_cols):
     # Record start and end indices for each column
     # Instead of doing np.flatnonzero and masking, this is much faster
     col_index = np.full((n_cols, 2), -1, dtype=np.int_)
-    last_col = -1
+    prev_col = -1
     for r in range(records.shape[0]):
         col = records['col'][r]
-        if last_col != col:
-            if last_col != -1:
-                col_index[last_col, 1] = r
+        if col < prev_col:
+            raise ValueError("records must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
+                col_index[prev_col, 1] = r
             col_index[col, 0] = r
-            last_col = col
+            prev_col = col
         if r == records.shape[0] - 1:
             col_index[col, 1] = r + 1
     return col_index
@@ -77,14 +79,16 @@ def select_record_cols_nb(records, col_index, new_cols):
 def mapped_col_index_nb(mapped_arr, col_arr, n_cols):
     """Identical to `record_col_index_nb`, but for mapped arrays."""
     col_index = np.full((n_cols, 2), -1, dtype=np.int_)
-    last_col = -1
+    prev_col = -1
     for r in range(mapped_arr.shape[0]):
         col = col_arr[r]
-        if last_col != col:
-            if last_col != -1:
-                col_index[last_col, 1] = r
+        if col < prev_col:
+            raise ValueError("col_arr must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
+                col_index[prev_col, 1] = r
             col_index[col, 0] = r
-            last_col = col
+            prev_col = col
         if r == mapped_arr.shape[0] - 1:
             col_index[col, 1] = r + 1
     return col_index
@@ -131,11 +135,27 @@ def map_records_nb(records, map_func_nb, *args):
 
 @njit(cache=True)
 def mapped_to_matrix_nb(mapped_arr, col_arr, idx_arr, target_shape, default_val):
-    """Convert mapped array to the matrix form."""
+    """Convert mapped array to the matrix form.
+
+    !!! note
+        Will raise an error if there are multiple values pointing to the same matrix element."""
 
     result = np.full(target_shape, default_val, dtype=np.float_)
+    last_idx = -1
+    last_col = -1
     for r in range(mapped_arr.shape[0]):
-        result[idx_arr[r], col_arr[r]] = mapped_arr[r]
+        cur_idx = idx_arr[r]
+        cur_col = col_arr[r]
+        if cur_col == last_col:
+            if cur_idx == last_idx:
+                raise ValueError("Multiple values are pointing to the same matrix element")
+            if cur_idx < last_idx:
+                raise ValueError("col_arr and idx_arr must be sorted")
+        if cur_col < last_col:
+            raise ValueError("col_arr and idx_arr must be sorted")
+        result[cur_idx, cur_col] = mapped_arr[r]
+        last_idx = cur_idx
+        last_col = cur_col
     return result
 
 
@@ -152,50 +172,102 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
     and return a scalar value."""
     result = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
-    col = -1
+    prev_col = -1
+    
     for r in range(mapped_arr.shape[0]):
-        record_col = col_arr[r]
-        if record_col != col:
-            if col != -1:
+        col = col_arr[r]
+        if col < prev_col:
+            raise ValueError("col_arr must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
                 # At the beginning of second column do reduce on the first
-                result[col] = reduce_func_nb(record_col, mapped_arr[from_r:r], *args)
+                result[prev_col] = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
             from_r = r
-            col = record_col
+            prev_col = col
         if r == len(mapped_arr) - 1:
             result[col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
     return result
 
 
 @njit
-def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *args):
-    """Reduce mapped array by column to an array.
+def reduce_mapped_to_idx_nb(mapped_arr, col_arr, idx_arr, n_cols, default_val, reduce_func_nb, *args):
+    """Reduce mapped array by column to an index.
 
-    `reduce_func_nb` same as for `reduce_mapped_nb` but must return an array.
+    Same as `reduce_mapped_nb` except `idx_arr` must be passed.
 
     !!! note
-        Output of `reduce_func_nb` must be strictly homogeneous."""
+        Must return integers or raise an exception."""
+    result = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
-    col = -1
-    result_inited = False
+    prev_col = -1
 
     for r in range(mapped_arr.shape[0]):
-        record_col = col_arr[r]
-        if record_col != col:
-            if col != -1:
+        col = col_arr[r]
+        if col < prev_col:
+            raise ValueError("col_arr must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
                 # At the beginning of second column do reduce on the first
-                result0 = reduce_func_nb(col, mapped_arr[from_r:r], *args)
-                if not result_inited:
-                    result = np.full((result0.shape[0], n_cols), default_val, dtype=np.float_)
-                    result_inited = True
-                result[:, col] = result0
+                col_result = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
+                result[prev_col] = idx_arr[from_r:r][col_result]
             from_r = r
-            col = record_col
+            prev_col = col
         if r == len(mapped_arr) - 1:
-            result0 = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
-            if not result_inited:
-                result = np.full((result0.shape[0], n_cols), default_val, dtype=np.float_)
-                result_inited = True
-            result[:, col] = result0
+            col_result = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
+            result[col] = idx_arr[from_r:r][col_result]
+    return result
+
+
+@njit
+def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, n_rows, default_val, reduce_func_nb, *args):
+    """Reduce mapped array by column to an array.
+
+    `reduce_func_nb` same as for `reduce_mapped_nb` but must return an array."""
+    result = np.full((n_rows, n_cols), default_val, dtype=np.float_)
+    from_r = 0
+    prev_col = -1
+    
+    for r in range(mapped_arr.shape[0]):
+        col = col_arr[r]
+        if col < prev_col:
+            raise ValueError("col_arr must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
+                # At the beginning of second column do reduce on the first
+                result[:, prev_col] = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
+            from_r = r
+            prev_col = col
+        if r == len(mapped_arr) - 1:
+            result[:, col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
+    return result
+
+
+@njit
+def reduce_mapped_to_idx_array_nb(mapped_arr, col_arr, idx_arr, n_cols, n_rows, default_val, reduce_func_nb, *args):
+    """Reduce mapped array by column to an index array.
+
+    Same as `reduce_mapped_to_array_nb` except `idx_arr` must be passed.
+
+    !!! note
+        Must return integers or raise an exception."""
+    result = np.full((n_rows, n_cols), default_val, dtype=np.float_)
+    from_r = 0
+    prev_col = -1
+
+    for r in range(mapped_arr.shape[0]):
+        col = col_arr[r]
+        if col < prev_col:
+            raise ValueError("col_arr must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
+                # At the beginning of second column do reduce on the first
+                col_result = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
+                result[:, prev_col] = idx_arr[from_r:r][col_result]
+            from_r = r
+            prev_col = col
+        if r == len(mapped_arr) - 1:
+            col_result = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
+            result[:, col] = idx_arr[from_r:r][col_result]
     return result
 
 
@@ -454,6 +526,8 @@ def trade_records_nb(price, order_records):
 
     for r in range(order_records.shape[0]):
         col = int(order_records[r]['col'])
+        if col < prev_col:
+            raise ValueError("order_records must be sorted")
         i = int(order_records[r]['idx'])
         order_size = order_records[r]['size']
         order_price = order_records[r]['price']
@@ -638,6 +712,8 @@ def position_records_nb(price, order_records):
 
     for r in range(order_records.shape[0]):
         col = int(order_records[r]['col'])
+        if col < prev_col:
+            raise ValueError("order_records must be sorted")
         i = int(order_records[r]['idx'])
         order_size = order_records[r]['size']
         order_price = order_records[r]['price']

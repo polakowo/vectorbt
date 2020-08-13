@@ -22,17 +22,20 @@ drawdown records for any time series and analyze them right away.
 >>> import numpy as np
 >>> import pandas as pd
 >>> import yfinance as yf
+>>> from datetime import datetime
 
->>> price = yf.Ticker("BTC-USD").history(period="max")['Close']
+>>> start = datetime(2019, 1, 1)
+>>> end = datetime(2020, 1, 1)
+>>> price = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
 >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
 
 >>> drawdowns.records.head()
    col  start_idx  valley_idx  end_idx  status
-0    0          0         119      454       1
-1    0        454         485      587       1
-2    0        587         610      618       1
-3    0        619         620      621       1
-4    0        621         622      623       1
+0    0          2           3        6       1
+1    0          6          38       54       1
+2    0         54          63       91       1
+3    0         93          94       95       1
+4    0         98          99      100       1
 
 >>> drawdowns.plot()
 ```
@@ -44,7 +47,7 @@ drawdown records for any time series and analyze them right away.
 <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
 
 >>> drawdowns.drawdown.min()
--0.8339901730487141
+-0.48982769972565016
 
 >>> drawdowns.drawdown.hist(trace_kwargs=dict(nbinsx=50))
 ```
@@ -54,8 +57,8 @@ drawdown records for any time series and analyze them right away.
 Moreover, all time series accessors have cached property `drawdowns`:
 
 ```python-repl
->>> price.vbt.drawdowns.active.current_drawdown
--0.8339901730487141
+>>> price.vbt.drawdowns.active.current_drawdown()
+-0.4473361334272673
 ```
 
 ## Orders
@@ -65,16 +68,16 @@ Moreover, all time series accessors have cached property `drawdowns`:
 with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vectorbt.portfolio.base.Portfolio.orders`.
 
 ```python-repl
->>> entries, exits = pd.Series.vbt.signals.generate_random_entries_and_exits(price.shape, n=10, seed=42)
+>>> entries, exits = pd.Series.vbt.signals.generate_random_both(price.shape, n=10, seed=42)
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.01, freq='1D')
 
 >>> portfolio.orders.records.head()
-   col  idx      size   price      fees  side
-0    0   70  0.268778  368.37  0.990099     0
-1    0  101  0.268778  315.86  0.848963     1
-2    0  282  0.341620  243.59  0.832152     0
-3    0  284  0.341620  249.01  0.850668     1
-4    0  290  0.319607  260.89  0.833823     0
+   col  idx      size    price      fees  side
+0    0    0  0.026454  3742.70  0.990099     0
+1    0   15  0.026454  3630.68  0.960465     1
+2    0   33  0.026738  3521.06  0.941446     0
+3    0   39  0.026738  3666.78  0.980408     1
+4    0   55  0.025220  3810.43  0.960994     0
 
 >>> portfolio.orders.plot()
 ```
@@ -83,14 +86,14 @@ with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vect
 
 
 ```python-repl
->>> portfolio.orders.count
+>>> portfolio.orders.count()
 20
 
 >>> portfolio.orders.buy.price.mean()
-4740.3949999999995
+6359.48
 
 >>> portfolio.orders.sell.price.mean()
-4528.465999999999
+6815.132
 ```
 
 ## Events
@@ -110,18 +113,18 @@ to generate trade records from order records. This is done automatically in the
 ```python-repl
 >>> portfolio.trades.records.head()
    col      size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-0    0  0.268778         70       368.37    0.990099       101      315.86
-1    0  0.341620        282       243.59    0.832152       284      249.01
-2    0  0.319607        290       260.89    0.833823       291      271.91
-3    0  0.290620        297       293.11    0.851835       924     1039.97
-4    0  0.037243       1288      7954.48    2.962508      1309     8163.42
+0    0  0.026454          0      3742.70    0.990099        15     3630.68
+1    0  0.026738         33      3521.06    0.941446        39     3666.78
+2    0  0.025220         55      3810.43    0.960994        57     3854.36
+3    0  0.023671         76      4025.23    0.952824       101     5064.49
+4    0  0.022394        119      5247.35    1.175091       126     5746.81
 
-   exit_fees         pnl    return  status  position_idx
-0   0.848963  -15.952617 -0.159526       1             0
-1   0.850668    0.168760  0.002008       1             1
-2   0.869044    1.819204  0.021602       1             2
-3   3.022357  213.177967  2.477795       1             3
-4   3.040324    1.778776  0.005945       1             4
+   exit_fees        pnl    return  status  position_idx
+0   0.960465  -4.913957 -0.049140       1             0
+1   0.980408   1.974345  0.020764       1             1
+2   0.972073  -0.825148 -0.008501       1             2
+3   1.198830  22.448978  0.233272       1             3
+4   1.286940   8.722873  0.073496       1             4
 
 >>> portfolio.trades.plot()
 ```
@@ -129,8 +132,8 @@ to generate trade records from order records. This is done automatically in the
 ![](/vectorbt/docs/img/trades_plot.png)
 
 ```python-repl
->>> portfolio.trades.expectancy
-6.984101462164443
+>>> portfolio.trades.expectancy()
+5.8270083764704275
 ```
 
 ### Positions

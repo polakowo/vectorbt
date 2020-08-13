@@ -17,6 +17,9 @@ class ArrayWrapper:
             index = pd.Index(index)
         if columns is not None and not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
+        if ndim is None:
+            if len(columns) > 1:
+                ndim = 2
         self._index = index
         self._columns = columns
         self._ndim = ndim
@@ -115,13 +118,16 @@ class ArrayWrapper:
             return pd.Series(a, index=index, name=name, dtype=dtype)
         return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
 
-    def wrap_reduced(self, a, index=None, name=None, time_units=False):
+    def wrap_reduced(self, a, index=None, columns=None, time_units=False):
         """Wrap result of reduction.
 
-        Argument `index` can be passed when reducing to an array of values (vs. one value) per column.
+        `index` can be set when reducing to an array of values (vs. one value) per column.
+        `columns` can be set to override object's default columns.
 
         If `time_units` is set, calls `to_time_units`."""
         checks.assert_not_none(self.ndim)
+        if columns is None:
+            columns = self.columns
 
         a = np.asarray(a)
         if time_units:
@@ -131,7 +137,7 @@ class ArrayWrapper:
             if time_units:
                 return pd.to_timedelta(a.item())
             return a.item()
-        elif a.ndim == 1:
+        if a.ndim == 1:
             if self.ndim == 1:
                 if a.shape[0] == 1:
                     # Scalar value
@@ -139,29 +145,29 @@ class ArrayWrapper:
                         return pd.to_timedelta(a[0])
                     return a[0]
                 # Array per series
-                if name is None:
-                    name = self.columns[0]
+                name = columns[0]
                 if name == 0:  # was a Series before
                     name = None
                 return pd.Series(a, index=index, name=name)
             # Value per column
-            return pd.Series(a, index=self.columns, name=name)
+            if index is None:
+                index = columns
+            return pd.Series(a, index=index)
         if self.ndim == 1:
             # Array per series
-            if name is None:
-                name = self.columns[0]
+            name = columns[0]
             if name == 0:  # was a Series before
                 name = None
             return pd.Series(a[:, 0], index=index, name=name)
         # Value per column
-        return pd.DataFrame(a, index=index, columns=self.columns)
+        return pd.DataFrame(a, index=index, columns=columns)
 
     def __eq__(self, other):
         if type(self) != type(other):
             return False
-        if not pd.Index.equals(self.index, other.index):
+        if not checks.is_equal(self.index, other.index, pd.Index.equals):
             return False
-        if not pd.Index.equals(self.columns, other.columns):
+        if not checks.is_equal(self.columns, other.columns, pd.Index.equals):
             return False
         if self.ndim != other.ndim:
             return False

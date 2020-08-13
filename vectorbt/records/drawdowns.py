@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
-from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -19,8 +19,18 @@ from vectorbt.records import nb
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseDrawdowns`."""
-    records_arr, _ = indexing_on_records(obj, pd_indexing_func)
-    return obj.__class__(records_arr, pd_indexing_func(obj.ts), freq=obj.wrapper.freq, idx_field=obj.idx_field)
+    new_cols, new_records, _ = indexing_on_records(obj, pd_indexing_func)
+    if obj.grouper.group_by is not None:
+        new_group_by = obj.grouper.group_by[new_cols]
+    else:
+        new_group_by = None
+    return obj.__class__(
+        new_records,
+        pd_indexing_func(obj.ts),
+        freq=obj.wrapper.freq,
+        idx_field=obj.idx_field,
+        group_by=new_group_by
+    )
 
 
 class BaseDrawdowns(Records):
@@ -28,8 +38,14 @@ class BaseDrawdowns(Records):
 
     Requires `records_arr` to have all fields defined in `vectorbt.records.enums.drawdown_dt`."""
 
-    def __init__(self, records_arr, ts, freq=None, idx_field='end_idx'):
-        Records.__init__(self, records_arr, ArrayWrapper.from_obj(ts, freq=freq), idx_field=idx_field)
+    def __init__(self, records_arr, ts, freq=None, idx_field='end_idx', group_by=None):
+        Records.__init__(
+            self,
+            records_arr,
+            ArrayWrapper.from_obj(ts, freq=freq),
+            idx_field=idx_field,
+            group_by=group_by
+        )
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
@@ -45,9 +61,19 @@ class BaseDrawdowns(Records):
         records_arr = nb.drawdown_records_nb(ts.vbt.to_2d_array())
         return cls(records_arr, ts, **kwargs)
 
-    def filter_by_mask(self, mask):
+    def filter_by_mask(self, mask, idx_field=None, group_by=None):
         """Return a new class instance, filtered by mask."""
-        return self.__class__(self.records_arr[mask], self.ts, freq=self.wrapper.freq, idx_field=self.idx_field)
+        if idx_field is None:
+            idx_field = self.idx_field
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return self.__class__(
+            self.records_arr[mask],
+            self.ts,
+            freq=self.wrapper.freq,
+            idx_field=idx_field,
+            group_by=group_by
+        )
 
     def plot(self,
              ts_trace_kwargs={},
@@ -273,36 +299,38 @@ class BaseDrawdowns(Records):
         """Drawdown value (in percentage)."""
         return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
 
-    @cached_property
-    def avg_drawdown(self):
+    @cached_method
+    def avg_drawdown(self, default_val=0., **kwargs):
         """Average drawdown (ADD)."""
-        return self.drawdown.mean(default_val=0.)
+        return self.drawdown.mean(default_val=default_val, **kwargs)
 
-    @cached_property
-    def max_drawdown(self):
+    @cached_method
+    def max_drawdown(self, default_val=0., **kwargs):
         """Maximum drawdown (MDD)."""
-        return self.drawdown.min(default_val=0.)
+        return self.drawdown.min(default_val=default_val, **kwargs)
 
     @cached_property
     def duration(self):
         """Duration of each drawdown (in raw format)."""
         return self.map(nb.dd_duration_map_nb)
 
-    @cached_property
-    def avg_duration(self):
+    @cached_method
+    def avg_duration(self, time_units=True, **kwargs):
         """Average drawdown duration (in time units)."""
-        return self.duration.mean(time_units=True)
+        return self.duration.mean(time_units=time_units, **kwargs)
 
-    @cached_property
-    def max_duration(self):
+    @cached_method
+    def max_duration(self, time_units=True, **kwargs):
         """Maximum drawdown duration (in time units)."""
-        return self.duration.max(time_units=True)
+        return self.duration.max(time_units=time_units, **kwargs)
 
-    @cached_property
-    def coverage(self):
+    @cached_method
+    def coverage(self, group_by=None, columns=None, **kwargs):
         """Coverage, that is, total duration divided by the whole period."""
-        coverage = to_1d(self.duration.sum(), raw=True) / self.wrapper.shape[0]
-        return self.wrapper.wrap_reduced(coverage)
+        total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
+        total_steps = self.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(total_duration / total_steps, columns=columns, **kwargs)
 
     @cached_property
     def ptv_duration(self):
@@ -313,17 +341,30 @@ class BaseDrawdowns(Records):
 class ActiveDrawdowns(BaseDrawdowns):
     """Extends `BaseDrawdowns` by properties for active drawdowns."""
 
-    @cached_property
-    def current_drawdown(self):
-        return self.drawdown.nst(-1)
+    @cached_method
+    def current_drawdown(self, group_by=None, **kwargs):
+        """Current drawdown from peak.
 
-    @cached_property
-    def current_duration(self):
-        return self.duration.nst(-1, time_units=True)
+        Does not support `group_by`."""
+        curr_end_val = self.end_value.nst(-1, group_by=group_by)
+        curr_start_val = self.start_value.nst(-1, group_by=group_by)
+        curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
+        return self.wrapper.wrap_reduced(curr_drawdown, **kwargs)
 
-    @cached_property
-    def current_return(self):
-        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array()).nst(-1)
+    @cached_method
+    def current_duration(self, time_units=True, **kwargs):
+        """Current duration from peak.
+
+        Does not support `group_by`."""
+        return self.duration.nst(-1, time_units=time_units, **kwargs)
+
+    @cached_method
+    def current_return(self, **kwargs):
+        """Current return from valley.
+
+        Does not support `group_by`."""
+        recovery_return = self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+        return recovery_return.nst(-1, **kwargs)
 
 
 class RecoveredDrawdowns(BaseDrawdowns):
@@ -371,12 +412,12 @@ class Drawdowns(BaseDrawdowns):
         1    1          2           3        4       1
         2    2          1           2        3       1
         3    2          3           4        4       0
-        >>> drawdowns.active.avg_duration
+        >>> drawdowns.active.avg_duration()
         a   2 days
         b      NaT
         c   1 days
         dtype: timedelta64[ns]
-        >>> drawdowns.recovered.avg_duration
+        >>> drawdowns.recovered.avg_duration()
         a      NaT
         b   2 days
         c   2 days
@@ -388,10 +429,13 @@ class Drawdowns(BaseDrawdowns):
         """See `vectorbt.records.enums.DrawdownStatus`."""
         return self.map_field('status')
 
-    @cached_property
-    def recovered_rate(self):
+    @cached_method
+    def recovered_rate(self, group_by=None, columns=None, **kwargs):
         """Rate of recovered drawdowns."""
-        return self.wrapper.wrap_reduced(to_1d(self.recovered.count, raw=True) / to_1d(self.count, raw=True))
+        recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        return self.wrapper.wrap_reduced(recovered_count / total_count, columns=columns, **kwargs)
 
     @cached_property
     def active(self):
@@ -401,7 +445,8 @@ class Drawdowns(BaseDrawdowns):
             self.records_arr[filter_mask],
             self.ts,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )
 
     @cached_property
@@ -412,5 +457,6 @@ class Drawdowns(BaseDrawdowns):
             self.records_arr[filter_mask],
             self.ts,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )

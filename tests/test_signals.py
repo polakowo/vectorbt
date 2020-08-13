@@ -174,7 +174,7 @@ class TestAccessors:
             )
         )
 
-    def test_generate_entries_and_exits(self):
+    def test_generate_both(self):
         @njit
         def entry_choice_func_nb(col, from_i, to_i, wait1):
             next_pos = col + from_i + wait1
@@ -189,7 +189,7 @@ class TestAccessors:
                 return np.array([next_pos])
             return np.empty(0, dtype=np.int_)
 
-        a, b = pd.Series.vbt.signals.generate_entries_and_exits(
+        a, b = pd.Series.vbt.signals.generate_both(
             5, entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
@@ -207,7 +207,7 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        a, b = pd.Series.vbt.signals.generate_entries_and_exits(
+        a, b = pd.Series.vbt.signals.generate_both(
             (5,), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
@@ -225,7 +225,7 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        a, b = pd.DataFrame.vbt.signals.generate_entries_and_exits(
+        a, b = pd.DataFrame.vbt.signals.generate_both(
             (5, 3), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
             a,
@@ -388,8 +388,8 @@ class TestAccessors:
             )
         )
         
-    def test_generate_random_entries_and_exits(self):
-        a, b = pd.Series.vbt.signals.generate_random_entries_and_exits(
+    def test_generate_random_both(self):
+        a, b = pd.Series.vbt.signals.generate_random_both(
             5, n=1, seed=seed, index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
@@ -407,7 +407,7 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        a, b = pd.Series.vbt.signals.generate_random_entries_and_exits(
+        a, b = pd.Series.vbt.signals.generate_random_both(
             (5,), n=1, seed=seed, index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
             a,
@@ -425,7 +425,7 @@ class TestAccessors:
                 name=sig['a'].name
             )
         )
-        a, b = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
+        a, b = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), n=1, seed=seed, index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
             a,
@@ -455,7 +455,7 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
-        a, b = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
+        a, b = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), entry_prob=0.5, exit_prob=1., seed=seed, index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
             a,

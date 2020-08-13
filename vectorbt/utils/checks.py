@@ -50,7 +50,7 @@ def is_hashable(arg):
 def is_index_equal(arg1, arg2):
     """Determine whether indexes are equal.
 
-    Introduces more tests on top of `pd.Index.equals`."""
+    Introduces naming tests on top of `pd.Index.equals`, but still doesn't check for types."""
     if isinstance(arg1, pd.MultiIndex) and isinstance(arg2, pd.MultiIndex):
         if arg1.names != arg2.names:
             return False
@@ -65,6 +65,17 @@ def is_index_equal(arg1, arg2):
 def is_default_index(arg):
     """Determine whether index is a basic range."""
     return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1))
+
+
+def is_equal(arg1, arg2, equality_func):
+    """Determines whether two objects are equal."""
+    if arg1 is None or arg2 is None:
+        if arg1 is not None or arg2 is not None:
+            return False
+    else:
+        if not equality_func(arg1, arg2):
+            return False
+    return True
 
 
 # ############# Asserts ############# #

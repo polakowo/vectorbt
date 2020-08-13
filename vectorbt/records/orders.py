@@ -15,8 +15,18 @@ from vectorbt.records.enums import OrderSide, order_dt
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseOrders`."""
-    records_arr, _ = indexing_on_records(obj, pd_indexing_func)
-    return obj.__class__(records_arr, pd_indexing_func(obj.main_price), freq=obj.wrapper.freq, idx_field=obj.idx_field)
+    new_cols, new_records, _ = indexing_on_records(obj, pd_indexing_func)
+    if obj.grouper.group_by is not None:
+        new_group_by = obj.grouper.group_by[new_cols]
+    else:
+        new_group_by = None
+    return obj.__class__(
+        new_records,
+        pd_indexing_func(obj.main_price),
+        freq=obj.wrapper.freq,
+        idx_field=obj.idx_field,
+        group_by=new_group_by
+    )
 
 
 class BaseOrders(Records):
@@ -33,14 +43,20 @@ class BaseOrders(Records):
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_capital=100, freq='1D')
 
-        >>> portfolio.orders.buy.count
+        >>> portfolio.orders.buy.count()
         4
-        >>> portfolio.orders.sell.count
+        >>> portfolio.orders.sell.count()
         1
         ```"""
 
-    def __init__(self, records_arr, main_price, freq=None, idx_field='idx'):
-        Records.__init__(self, records_arr, ArrayWrapper.from_obj(main_price, freq=freq), idx_field=idx_field)
+    def __init__(self, records_arr, main_price, freq=None, idx_field='idx', group_by=None):
+        Records.__init__(
+            self,
+            records_arr,
+            ArrayWrapper.from_obj(main_price, freq=freq),
+            idx_field=idx_field,
+            group_by=group_by
+        )
         PandasIndexer.__init__(self, _indexing_func)
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
@@ -48,9 +64,19 @@ class BaseOrders(Records):
 
         self.main_price = main_price
 
-    def filter_by_mask(self, mask):
+    def filter_by_mask(self, mask, idx_field=None, group_by=None):
         """Return a new class instance, filtered by mask."""
-        return self.__class__(self.records_arr[mask], self.main_price, freq=self.wrapper.freq, idx_field=self.idx_field)
+        if idx_field is None:
+            idx_field = self.idx_field
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return self.__class__(
+            self.records_arr[mask],
+            self.main_price,
+            freq=self.wrapper.freq,
+            idx_field=idx_field,
+            group_by=group_by
+        )
 
     def plot(self,
              main_price_trace_kwargs={},
@@ -167,7 +193,8 @@ class Orders(BaseOrders):
             self.records_arr[filter_mask],
             self.main_price,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )
 
     @cached_property
@@ -178,5 +205,6 @@ class Orders(BaseOrders):
             self.records_arr[filter_mask],
             self.main_price,
             freq=self.wrapper.freq,
-            idx_field=self.idx_field
+            idx_field=self.idx_field,
+            group_by=self.grouper.group_by
         )

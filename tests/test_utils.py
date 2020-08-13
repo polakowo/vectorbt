@@ -2,10 +2,9 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import pytest
-import os
 
 from vectorbt import defaults
-from vectorbt.utils import checks, config, decorators, math
+from vectorbt.utils import checks, config, decorators, math, array
 
 from tests.utils import hash
 
@@ -213,6 +212,48 @@ class TestChecks:
     def test_is_hashable(self):
         assert checks.is_hashable(2)
         assert not checks.is_hashable(np.asarray(2))
+
+    def test_is_index_equal(self):
+        assert checks.is_index_equal(
+            pd.Index([0]),
+            pd.Index([0])
+        )
+        assert not checks.is_index_equal(
+            pd.Index([0]),
+            pd.Index([1])
+        )
+        assert not checks.is_index_equal(
+            pd.Index([0], name='name'),
+            pd.Index([0])
+        )
+        assert not checks.is_index_equal(
+            pd.MultiIndex.from_arrays([[0], [1]]),
+            pd.Index([0])
+        )
+        assert checks.is_index_equal(
+            pd.MultiIndex.from_arrays([[0], [1]]),
+            pd.MultiIndex.from_arrays([[0], [1]])
+        )
+        assert checks.is_index_equal(
+            pd.MultiIndex.from_arrays([[0], [1]], names=['name1', 'name2']),
+            pd.MultiIndex.from_arrays([[0], [1]], names=['name1', 'name2'])
+        )
+        assert not checks.is_index_equal(
+            pd.MultiIndex.from_arrays([[0], [1]], names=['name1', 'name2']),
+            pd.MultiIndex.from_arrays([[0], [1]], names=['name3', 'name4'])
+        )
+
+    def test_is_default_index(self):
+        assert checks.is_default_index(pd.DataFrame([[1, 2, 3]]).columns)
+        assert checks.is_default_index(pd.Series([1, 2, 3]).to_frame().columns)
+        assert checks.is_default_index(pd.Index([0, 1, 2]))
+        assert not checks.is_default_index(pd.Index([0, 1, 2], name='name'))
+
+    def test_is_equal(self):
+        assert checks.is_equal(np.arange(3), np.arange(3), np.array_equal)
+        assert not checks.is_equal(np.arange(3), None, np.array_equal)
+        assert not checks.is_equal(None, np.arange(3), np.array_equal)
+        assert checks.is_equal(None, None, np.array_equal)
 
     def test_assert_value_in(self):
         checks.assert_value_in(0, (0, 1))
@@ -449,3 +490,20 @@ class TestMath:
         assert not test_func(-np.inf, -np.inf)
         assert not test_func(np.inf, np.inf)
         assert test_func(-np.inf, np.inf)
+
+
+# ############# array.py ############# #
+
+class TestArray:
+    def test_is_sorted(self):
+        assert array.is_sorted(np.array([0, 1, 2, 3, 4]))
+        assert array.is_sorted(np.array([0, 1]))
+        assert array.is_sorted(np.array([0]))
+        assert not array.is_sorted(np.array([1, 0]))
+        assert not array.is_sorted(np.array([0, 1, 2, 4, 3]))
+        # nb
+        assert array.is_sorted_nb(np.array([0, 1, 2, 3, 4]))
+        assert array.is_sorted_nb(np.array([0, 1]))
+        assert array.is_sorted_nb(np.array([0]))
+        assert not array.is_sorted_nb(np.array([1, 0]))
+        assert not array.is_sorted_nb(np.array([0, 1, 2, 4, 3]))

@@ -152,8 +152,8 @@ class Signals_Accessor(Generic_Accessor):
         return pd.DataFrame(result, **kwargs)
 
     @classmethod
-    def generate_entries_and_exits(cls, shape, entry_choice_func_nb, exit_choice_func_nb,
-                                   entry_args, exit_args, **kwargs):
+    def generate_both(cls, shape, entry_choice_func_nb, exit_choice_func_nb,
+                      entry_args, exit_args, **kwargs):
         """See `vectorbt.signals.nb.generate_enex_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -174,7 +174,7 @@ class Signals_Accessor(Generic_Accessor):
             ...          return np.array([next_pos])
             ...     return np.empty(0, dtype=np.int_)
 
-            >>> en, ex = pd.DataFrame.vbt.signals.generate_entries_and_exits(
+            >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
             ...     (5, 3), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,),
             ...     index=sig.index, columns=sig.columns)
             >>> en
@@ -293,7 +293,7 @@ class Signals_Accessor(Generic_Accessor):
     # ############# Exits ############# #
 
     @classmethod
-    def generate_random_entries_and_exits(cls, shape, n=None, entry_prob=None, exit_prob=None, seed=None, **kwargs):
+    def generate_random_both(cls, shape, n=None, entry_prob=None, exit_prob=None, seed=None, **kwargs):
         """Generate entry and exit signals randomly and iteratively.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_enex_nb`.
@@ -305,7 +305,7 @@ class Signals_Accessor(Generic_Accessor):
         Example:
             For each column, generate two entries and exits randomly:
             ```python-repl
-            >>> en, ex = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
+            >>> en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             ...      (5, 3), n=2, seed=42, index=sig.index, columns=sig.columns)
             >>> en
                             a      b      c
@@ -325,7 +325,7 @@ class Signals_Accessor(Generic_Accessor):
 
             For each column and time step, pick entry with 50% probability and exit right after:
             ```python-repl
-            >>> en, ex = pd.DataFrame.vbt.signals.generate_random_entries_and_exits(
+            >>> en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             ...     (5, 3), entry_prob=0.5, exit_prob=1.,
             ...     seed=42, index=sig.index, columns=sig.columns)
             >>> en

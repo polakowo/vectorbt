@@ -393,8 +393,8 @@ class TestAccessors:
         assert ret['a'].vbt.returns.drawdowns.wrapper.freq == ret['a'].vbt.returns.freq
         assert ret['a'].vbt.returns.drawdowns.wrapper.ndim == ret['a'].ndim
         assert ret.vbt.returns.drawdowns.wrapper.ndim == ret.ndim
-        assert isclose(ret['a'].vbt.returns.drawdowns.max_drawdown, ret['a'].vbt.returns.max_drawdown())
+        assert isclose(ret['a'].vbt.returns.drawdowns.max_drawdown(), ret['a'].vbt.returns.max_drawdown())
         pd.testing.assert_series_equal(
-            ret.vbt.returns.drawdowns.max_drawdown,
+            ret.vbt.returns.drawdowns.max_drawdown(),
             ret.vbt.returns.max_drawdown()
         )
