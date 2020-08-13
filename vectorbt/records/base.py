@@ -42,18 +42,13 @@ which is impossible to represent in a matrix form without using complex data typ
 ## Records class
 
 `Records` are just [structured arrays](https://numpy.org/doc/stable/user/basics.rec.html) with a bunch
-of methods and properties for processing them. Its main feature is to map the records array and
+of methods and properties for processing them. Their main feature is to map the records array and
 to reduce it by column (similar to the MapReduce paradigm). The main advantage is that it all happens
 without conversion to the matrix form and wasting memory resources.
 
-## MappedArray class
+### Mapping
 
-When mapping records using `Records`, for example, to compute P&L of each trade record, the mapping
-result is wrapped with `MappedArray` class. This class takes the mapped array and the corresponding column
-and (optionally) index arrays, and offers features to directly process the mapped array without converting
-it to the matrix form; for example, to compute various statistics by column, such as standard deviation.
-
-## Example
+Consider the following example:
 
 ```python-repl
 >>> import numpy as np
@@ -90,9 +85,7 @@ it to the matrix form; for example, to compute various statistics by column, suc
 5    1    2        15.0
 ```
 
-### Mapping
-
-There are several options for mapping:
+`Records` can be mapped to `MappedArray` in several ways:
 
 * Use `Records.map_field` to map a record field:
 
@@ -127,6 +120,13 @@ There are several options for mapping:
 >>> records.map_array(records_arr['some_field'] ** 2).mapped_arr
 [100. 121. 144. 169. 196. 225.]
 ```
+
+## MappedArray class
+
+When mapping records using `Records`, for example, to compute P&L of each trade record, the mapping
+result is wrapped with `MappedArray` class. This class takes the mapped array and the corresponding column
+and (optionally) index arrays, and offers features to directly process the mapped array without converting
+it to the matrix form; for example, to compute various statistics by column, such as standard deviation.
 
 ### Reducing
 
@@ -218,7 +218,7 @@ To use scatterplots or any other plots that require index, convert to matrix fir
 
 ![](/vectorbt/docs/img/mapped_scatter.png)
 
-## Grouping
+### Grouping
 
 Additionally to reducing per column, you can also reduce per group of columns by providing
 `group_by`. The `group_by` variable can be anything from positions or names of column levels,
@@ -232,26 +232,48 @@ or the reducing method itself.
 ...     [1, 1, 1, 2, 2, 2],
 ...     [1, 2, 3, 1, 2, 3]
 ... ], names=['a', 'b'])
->>> mapped_group = MappedArray(
+>>> mapped_grouped = MappedArray(
 ...     mapped_arr=np.random.randint(1, 10, size=12),
 ...     col_arr=np.repeat(np.arange(6), 2),
 ...     wrapper=ArrayWrapper(index=index, columns=columns),
-...     idx_arr=np.tile([0, 1], 6)
+...     idx_arr=np.tile([0, 1], 6),
+...     group_by='a'
 ... )
 
->>> mapped_group.hist()
-```
-
-![](/vectorbt/docs/img/mapped_hist.png)
-
-```python-repl
->>> mapped_group.hist(group_by='a')
+>>> mapped_grouped.hist()
 ```
 
 ![](/vectorbt/docs/img/mapped_hist_grouped.png)
 
+```python-repl
+>>> mapped_grouped.hist(group_by=False)
+```
+
+![](/vectorbt/docs/img/mapped_hist.png)
+
 !!! note
-    Grouping applies only to reducing and plotting operations.
+    Grouping applies only to reducing operations, there is no change to the arrays.
+
+### Operators
+
+`MappedArray` implements arithmetic, comparison and logical operators. You can perform basic
+operations (such as addition) on mapped arrays as if they were NumPy arrays.
+
+```python-repl
+>>> mapped ** 2
+<vectorbt.records.base.MappedArray at 0x7f97bfc49358>
+
+>>> mapped * np.array([1, 2, 3, 4, 5, 6])
+<vectorbt.records.base.MappedArray at 0x7f97bfc65e80>
+
+>>> mapped + mapped
+<vectorbt.records.base.MappedArray at 0x7f97bfc492e8>
+```
+
+!!! note
+    You should ensure that your `MappedArray` operand is on the left if the other operand is an array.
+
+    Two mapped arrays must have the same metadata to be compared/combined.
 
 ## Indexing
 
@@ -271,27 +293,6 @@ the indexing operation to each `__init__` argument with index:
 
 !!! note
     Changing index (time axis) is not supported.
-
-## Operators
-
-Additionally, `MappedArray` implements arithmetic, comparison and logical operators.
-You can perform basic operations (such as addition) on mapped arrays as if they were NumPy arrays.
-
-```python-repl
->>> mapped ** 2
-<vectorbt.records.base.MappedArray at 0x7f97bfc49358>
-
->>> mapped * np.array([1, 2, 3, 4, 5, 6])
-<vectorbt.records.base.MappedArray at 0x7f97bfc65e80>
-
->>> mapped + mapped
-<vectorbt.records.base.MappedArray at 0x7f97bfc492e8>
-```
-
-!!! note
-    You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
-
-    Two mapped arrays must have the same metadata to be compared/combined.
 """
 
 import numpy as np
