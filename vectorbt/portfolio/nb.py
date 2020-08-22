@@ -17,6 +17,8 @@ from vectorbt.portfolio.enums import (
     OrderContext,
     RowContext,
     SizeType,
+    AccumulateExitMode,
+    ConflictMode,
     Order,
     FilledOrder
 )
@@ -526,8 +528,9 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
 
 
 @njit(cache=True)
-def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, size_type, entry_price,
-                             exit_price, fees, fixed_fees, slippage, accumulate, is_2d=False):
+def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, size_type,
+                             entry_price, exit_price, fees, fixed_fees, slippage, accumulate,
+                             accumulate_exit_mode, conflict_mode, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
@@ -566,7 +569,10 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, s
                     flex_select_nb(i, col, fees, def_i=i7, def_col=col7, is_2d=is_2d),
                     flex_select_nb(i, col, fixed_fees, def_i=i8, def_col=col8, is_2d=is_2d),
                     flex_select_nb(i, col, slippage, def_i=i9, def_col=col9, is_2d=is_2d),
-                    accumulate)
+                    accumulate,
+                    accumulate_exit_mode,
+                    conflict_mode
+                )
 
                 if order is not None:
                     # Fill the order
@@ -589,39 +595,65 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, s
 
 
 @njit(cache=True)
-def signals_order_func_nb(run_shares, run_cash, entries, exits, size, size_type, entry_price,
-                          exit_price, fees, fixed_fees, slippage, accumulate):
+def signals_order_func_nb(run_shares, run_cash, is_entry, is_exit, size, size_type, entry_price,
+                          exit_price, fees, fixed_fees, slippage, accumulate, accumulate_exit_mode, conflict_mode):
     """`order_func_nb` of `simulate_from_signals_nb`."""
-    if size_type != SizeType.Shares and size_type != SizeType.Cash:
+    if size_type is not SizeType.Shares and size_type is not SizeType.Cash:
         raise ValueError("Only SizeType.Shares and SizeType.Cash are supported")
-    if entries and not exits:
-        # Buy the amount of shares specified in size (only once if not accumulate)
+    if is_entry and not is_exit:
+        # Open or increase the position
         if run_shares == 0. or accumulate:
             order_size = abs(size)
             order_price = entry_price
         else:
             return None
-    elif not entries and exits:
-        if run_shares > 0. and not accumulate:
-            # If accumulation is turned off, sell everything
-            order_size = -np.inf
-            order_price = exit_price
-        elif run_shares > 0. and accumulate:
-            # If accumulation is turned on, sell size
-            order_size = -abs(size)
-            order_price = exit_price
+    elif not is_entry and is_exit:
+        if run_shares > 0.:
+            # If in position
+            if not accumulate or (accumulate and accumulate_exit_mode is AccumulateExitMode.Close):
+                # Close the position
+                order_size = -np.inf
+                order_price = exit_price
+            elif accumulate and accumulate_exit_mode is AccumulateExitMode.Reduce:
+                # Decrease the position
+                order_size = -abs(size)
+                order_price = exit_price
         else:
             return None
-    elif entries and exits:
-        # Buy the difference between entry and exit size
-        if size_type == SizeType.Shares:
-            order_size = abs(size) - run_shares
-        if size_type == SizeType.Cash:
-            order_size = run_cash - abs(size)
-        if order_size > 0:
-            order_price = entry_price
-        elif order_size < 0:
-            order_price = exit_price
+    elif is_entry and is_exit:
+        # Conflict
+        if conflict_mode is ConflictMode.Ignore:
+            return None
+        if run_shares > 0.:
+            # If in position
+            if accumulate and accumulate_exit_mode is AccumulateExitMode.Reduce:
+                # Selling and buying the same size makes no sense
+                return None
+            if conflict_mode is ConflictMode.Exit:
+                # Close the position
+                order_size = -np.inf
+                order_price = exit_price
+            elif conflict_mode is ConflictMode.ExitAndEntry:
+                # Do not sell and then buy, but buy/sell the difference (less fees)
+                if size_type is SizeType.Shares:
+                    # Target size in shares
+                    order_size = abs(size) - run_shares
+                else:
+                    # Target size in cash, not to be confused with SizeType.TargetCash
+                    # Must be converted to shares the same way as in buy_in_cash_nb
+                    # At the end the number of shares must be the same as if we had a clear entry signal
+                    order_cash = (abs(size) - fixed_fees) * (1 - fees)
+                    target_size = order_cash / (entry_price * (1 + slippage))
+                    order_size = target_size - run_shares
+                    size_type = SizeType.Shares
+                if order_size > 0:
+                    order_price = entry_price
+                elif order_size < 0:
+                    order_price = exit_price
+                else:
+                    return None
+            else:
+                return None
         else:
             return None
     else:
@@ -679,4 +711,3 @@ def simulate_from_orders_nb(target_shape, init_capital, size, size_type, price,
             cash[i, col], shares[i, col] = run_cash, run_shares
 
     return order_records[:j], cash, shares
-

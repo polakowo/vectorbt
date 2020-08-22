@@ -66,6 +66,37 @@ __pdoc__['SizeType'] = f"""Size type.
 ```
 """
 
+AccumulateExitMode = namedtuple('AccumulateExitMode', [
+    'Close',
+    'Reduce'
+])(*range(2))
+"""_"""
+
+__pdoc__['AccumulateExitMode'] = f"""Accumulation exit mode.
+
+What should happen if exit signal occurs and accumulation is turned on?
+
+```plaintext
+{json.dumps(dict(zip(AccumulateExitMode._fields, AccumulateExitMode)), indent=2)}
+```
+"""
+
+ConflictMode = namedtuple('ConflictMode', [
+    'Ignore',
+    'Exit',
+    'ExitAndEntry'
+])(*range(3))
+"""_"""
+
+__pdoc__['ConflictMode'] = f"""Conflict mode.
+
+What should happen if both entry and exit signals occur simultaneously?
+
+```plaintext
+{json.dumps(dict(zip(ConflictMode._fields, ConflictMode)), indent=2)}
+```
+"""
+
 Order = namedtuple('Order', [
     'size',
     'size_type',
