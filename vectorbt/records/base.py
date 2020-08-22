@@ -404,7 +404,7 @@ class MappedArray(PandasIndexer):
             Must be of the same size as `mapped_arr`.
         group_by (int, str or array_like): Group columns by a mapper when reducing.
 
-            See `vectorbt.base.index_fns.group_index`."""
+            See `vectorbt.base.index_fns.IndexGrouper`."""
 
     def __init__(self, mapped_arr, col_arr, wrapper, idx_arr=None, group_by=None):
         if not isinstance(mapped_arr, np.ndarray):
@@ -463,9 +463,8 @@ class MappedArray(PandasIndexer):
         result = nb.mapped_to_matrix_nb(self.mapped_arr, self.col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(result)
 
-    def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False,
-               n_rows=None, to_idx=False, idx_labeled=True, default_val=np.nan,
-               cast=None, group_by=None, columns=None, **kwargs):
+    def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False, n_rows=None, to_idx=False,
+               idx_labeled=True, default_val=np.nan, cast=None, group_by=None, **kwargs):
         """Reduce mapped array by column.
 
         If `to_array` is `False` and `to_idx` is `False`, see `vectorbt.records.nb.reduce_mapped_nb`.
@@ -476,8 +475,7 @@ class MappedArray(PandasIndexer):
         If `to_array` is `True`, must pass `n_rows` indicating the number of elements in the array.
         If `to_idx` is `True`, must pass `idx_arr`. Set `idx_labeled` to `False` to return raw positions
         instead of labels. Use `default_val` to set the default value and `cast` to perform casting
-        on the resulting pandas object. Set `group_by` to `False` to disable grouping. Use `columns` to
-        override the existing columns and the columns coming from `group_by`.
+        on the resulting pandas object. Set `group_by` to `False` to disable grouping.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
         # Perform checks
@@ -489,7 +487,7 @@ class MappedArray(PandasIndexer):
             idx_arr = self.idx_arr
 
         # Perform main computation
-        group_arr, columns = self.grouper.group_index(group_by=group_by, new_index=columns)
+        group_arr, columns = self.grouper.get_groups_and_index(group_by=group_by)
         if group_arr is not None:
             col_arr = group_arr[self.col_arr]
         else:
@@ -566,7 +564,7 @@ class MappedArray(PandasIndexer):
     @cached_method
     def nst(self, n, group_by=None, **kwargs):
         """Return nst element of each column."""
-        group_by = self.grouper.resolve_group_by(group_by=group_by)
+        group_by = self.grouper.get_group_by(group_by=group_by)
         if group_by is not None:
             raise ValueError("MappedArray.nst() does not support group_by. Set group_by to False.")
         return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, group_by=False, **kwargs)
@@ -659,7 +657,7 @@ class MappedArray(PandasIndexer):
         """Return index of max by column."""
         return self.reduce(generic_nb.argmax_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
-    def plot_by_func(self, plot_func, group_by=None, columns=None):  # pragma: no cover
+    def plot_by_func(self, plot_func, group_by=None):  # pragma: no cover
         """Transform data to the format suitable for plotting, and plot.
 
         Function `pd_plot_func` should receive Series or DataFrame and plot it.
@@ -670,7 +668,7 @@ class MappedArray(PandasIndexer):
         if self.wrapper.ndim == 1:
             name = None if self.wrapper.columns[0] == 0 else self.wrapper.columns[0]
             return plot_func(pd.Series(self.mapped_arr, name=name))
-        group_arr, columns = self.grouper.group_index(group_by=group_by, new_index=columns)
+        group_arr, columns = self.grouper.get_groups_and_index(group_by=group_by)
         if group_arr is not None:
             col_arr = group_arr[self.col_arr]
         else:
@@ -681,21 +679,13 @@ class MappedArray(PandasIndexer):
             a[:masked_arr.shape[0], col] = masked_arr
         return plot_func(pd.DataFrame(a, columns=columns))
 
-    def hist(self, group_by=None, columns=None, **kwargs):  # pragma: no cover
+    def hist(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot histogram by column."""
-        return self.plot_by_func(
-            lambda x: x.vbt.hist(**kwargs),
-            group_by=group_by,
-            columns=columns
-        )
+        return self.plot_by_func(lambda x: x.vbt.hist(**kwargs), group_by=group_by)
 
-    def box(self, group_by=None, columns=None, **kwargs):  # pragma: no cover
+    def box(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot box plot by column."""
-        return self.plot_by_func(
-            lambda x: x.vbt.box(**kwargs),
-            group_by=group_by,
-            columns=columns
-        )
+        return self.plot_by_func(lambda x: x.vbt.box(**kwargs), group_by=group_by)
 
 
 def indexing_on_records(obj, pd_indexing_func):
@@ -748,7 +738,7 @@ class Records(PandasIndexer):
             Will be derived automatically if records contain field `'idx'`.
         group_by (int, str or array_like): Group columns by a mapper when reducing.
 
-            See `vectorbt.base.index_fns.group_index`."""
+            See `vectorbt.base.index_fns.IndexGrouper`."""
 
     def __init__(self, records_arr, wrapper, idx_field=None, group_by=None):
         if not isinstance(records_arr, np.ndarray):

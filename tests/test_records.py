@@ -182,10 +182,6 @@ class TestMappedArray:
             pd.Series([12.5, 17.], index=[1, 2])
         )
         pd.testing.assert_series_equal(
-            mapped_array_grouped.reduce(mean_reduce_nb, columns=['a', 'b']),
-            pd.Series([12.5, 17.], index=['a', 'b'])
-        )
-        pd.testing.assert_series_equal(
             mapped_array.reduce(mean_reduce_nb),
             mapped_array_grouped.reduce(mean_reduce_nb, group_by=False)
         )
@@ -280,16 +276,6 @@ class TestMappedArray:
                     [15., 18.]
                 ]),
                 columns=[1, 2]
-            )
-        )
-        pd.testing.assert_frame_equal(
-            mapped_array_grouped.reduce(min_max_reduce_nb, to_array=True, n_rows=2, columns=['a', 'b']),
-            pd.DataFrame(
-                np.array([
-                    [10., 16.],
-                    [15., 18.]
-                ]),
-                columns=['a', 'b']
             )
         )
         pd.testing.assert_frame_equal(
@@ -1374,7 +1360,7 @@ class TestOrders:
                 (3, 6, 24.26232722, 4., 0.97049309, 0)
             ], dtype=order_dt)
         )
-        pd.testing.assert_frame_equal(filtered.main_price, orders.main_price)
+        pd.testing.assert_frame_equal(filtered.ref_price, orders.ref_price)
         assert filtered.wrapper == orders.wrapper
         mask_a = orders['a'].records_arr['col'] > 1
         record_arrays_close(
@@ -1551,7 +1537,7 @@ class TestEvents:
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
             ], dtype=event_dt)
         )
-        pd.testing.assert_frame_equal(filtered.main_price, events.main_price)
+        pd.testing.assert_frame_equal(filtered.ref_price, events.ref_price)
         assert filtered.wrapper == events.wrapper
         mask_a = events['a'].records_arr['col'] > 1
         record_arrays_close(
@@ -1812,7 +1798,7 @@ class TestTrades:
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0, 7)
             ], dtype=trade_dt)
         )
-        pd.testing.assert_frame_equal(trades.main_price, price)
+        pd.testing.assert_frame_equal(trades.ref_price, price)
         assert trades.wrapper.freq == day_dt
         assert trades.idx_field == 'exit_idx'
         pd.testing.assert_index_equal(
@@ -1851,7 +1837,7 @@ class TestPositions:
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
             ], dtype=position_dt)
         )
-        pd.testing.assert_frame_equal(positions.main_price, price)
+        pd.testing.assert_frame_equal(positions.ref_price, price)
         assert positions.wrapper.freq == day_dt
         assert positions.idx_field == 'exit_idx'
         pd.testing.assert_index_equal(

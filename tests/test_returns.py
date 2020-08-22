@@ -151,9 +151,9 @@ class TestAccessors:
         res_a = empyrical.annual_return(ret['a'])
         res_b = empyrical.annual_return(ret['b'])
         res_c = empyrical.annual_return(ret['c'])
-        assert isclose(ret['a'].vbt.returns.annualized_return(), res_a)
+        assert isclose(ret['a'].vbt.returns.annualized(), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.annualized_return(),
+            ret.vbt.returns.annualized(),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 

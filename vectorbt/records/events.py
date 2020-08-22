@@ -38,7 +38,7 @@ def _indexing_func(obj, pd_indexing_func):
         new_group_by = None
     return obj.__class__(
         new_records,
-        pd_indexing_func(obj.main_price),
+        pd_indexing_func(obj.ref_price),
         freq=obj.wrapper.freq,
         idx_field=obj.idx_field,
         group_by=new_group_by
@@ -48,11 +48,11 @@ def _indexing_func(obj, pd_indexing_func):
 class BaseEvents(Records):
     """Extends `Records` for working with event records."""
 
-    def __init__(self, records_arr, main_price, freq=None, idx_field='exit_idx', group_by=None):
+    def __init__(self, records_arr, ref_price, freq=None, idx_field='exit_idx', group_by=None):
         Records.__init__(
             self,
             records_arr,
-            ArrayWrapper.from_obj(main_price, freq=freq),
+            ArrayWrapper.from_obj(ref_price, freq=freq),
             idx_field=idx_field,
             group_by=group_by
         )
@@ -61,7 +61,7 @@ class BaseEvents(Records):
         if not all(field in records_arr.dtype.names for field in event_dt.names):
             raise ValueError("Records array must have all fields defined in event_dt")
 
-        self.main_price = main_price
+        self.ref_price = ref_price
 
     def filter_by_mask(self, mask, idx_field=None, group_by=None):
         """Return a new class instance, filtered by mask."""
@@ -71,14 +71,14 @@ class BaseEvents(Records):
             group_by = self.grouper.group_by
         return self.__class__(
             self.records_arr[mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=idx_field,
             group_by=group_by
         )
 
     def plot(self,
-             main_price_trace_kwargs={},
+             ref_price_trace_kwargs={},
              entry_trace_kwargs={},
              exit_trace_kwargs={},
              exit_profit_trace_kwargs={},
@@ -91,7 +91,7 @@ class BaseEvents(Records):
         """Plot orders.
 
         Args:
-            main_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
+            ref_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
             entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Entry" markers.
             exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit" markers.
             exit_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit - Profit" markers.
@@ -118,7 +118,7 @@ class BaseEvents(Records):
             raise TypeError("You must select a column first")
 
         # Plot main price
-        fig = self.main_price.vbt.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ref_price.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         size = self.records_arr['size']
@@ -275,11 +275,11 @@ class BaseEvents(Records):
         return self.map(nb.event_duration_map_nb)
 
     @cached_method
-    def coverage(self, group_by=None, columns=None, **kwargs):
+    def coverage(self, group_by=None, **kwargs):
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(total_duration / total_steps, columns=columns, **kwargs)
 
     # ############# PnL ############# #
@@ -306,7 +306,7 @@ class BaseEventsByResult(BaseEvents):
         filter_mask = self.records_arr['pnl'] > 0.
         return BaseEvents(
             self.records_arr[filter_mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=self.idx_field,
             group_by=self.grouper.group_by
@@ -318,22 +318,22 @@ class BaseEventsByResult(BaseEvents):
         filter_mask = self.records_arr['pnl'] < 0.
         return BaseEvents(
             self.records_arr[filter_mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=self.idx_field,
             group_by=self.grouper.group_by
         )
 
     @cached_method
-    def win_rate(self, group_by=None, columns=None, **kwargs):
+    def win_rate(self, group_by=None, **kwargs):
         """Rate of profitable events."""
         win_count = to_1d(self.winning.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(win_count / total_count, columns=columns, **kwargs)
 
     @cached_method
-    def profit_factor(self, group_by=None, columns=None, **kwargs):
+    def profit_factor(self, group_by=None, **kwargs):
         """Profit factor."""
         total_win = to_1d(self.winning.pnl.sum(group_by=group_by), raw=True)
         total_loss = to_1d(self.losing.pnl.sum(group_by=group_by), raw=True)
@@ -344,11 +344,11 @@ class BaseEventsByResult(BaseEvents):
         total_loss[np.isnan(total_loss) & has_values] = 0.
 
         profit_factor = total_win / np.abs(total_loss)
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(profit_factor, columns=columns, **kwargs)
 
     @cached_method
-    def expectancy(self, group_by=None, columns=None, **kwargs):
+    def expectancy(self, group_by=None, **kwargs):
         """Average profitability."""
         win_rate = to_1d(self.win_rate(group_by=group_by), raw=True)
         avg_win = to_1d(self.winning.pnl.mean(group_by=group_by), raw=True)
@@ -360,17 +360,17 @@ class BaseEventsByResult(BaseEvents):
         avg_loss[np.isnan(avg_loss) & has_values] = 0.
 
         expectancy = win_rate * avg_win - (1 - win_rate) * np.abs(avg_loss)
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(expectancy, columns=columns, **kwargs)
 
     @cached_method
-    def sqn(self, group_by=None, columns=None, **kwargs):
+    def sqn(self, group_by=None, **kwargs):
         """System Quality Number (SQN)."""
         count = to_1d(self.count(group_by=group_by), raw=True)
         pnl_mean = to_1d(self.pnl.mean(group_by=group_by), raw=True)
         pnl_std = to_1d(self.pnl.std(group_by=group_by), raw=True)
         sqn = np.sqrt(count) * pnl_mean / pnl_std
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(sqn, columns=columns, **kwargs)
 
 
@@ -383,11 +383,11 @@ class Events(BaseEventsByResult):
         return self.map_field('status')
 
     @cached_method
-    def closed_rate(self, group_by=None, columns=None, **kwargs):
+    def closed_rate(self, group_by=None, **kwargs):
         """Rate of closed events."""
         closed_count = to_1d(self.closed.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(closed_count / total_count, columns=columns, **kwargs)
 
     @cached_property
@@ -396,7 +396,7 @@ class Events(BaseEventsByResult):
         filter_mask = self.records_arr['status'] == EventStatus.Open
         return BaseEventsByResult(
             self.records_arr[filter_mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=self.idx_field,
             group_by=self.grouper.group_by
@@ -408,7 +408,7 @@ class Events(BaseEventsByResult):
         filter_mask = self.records_arr['status'] == EventStatus.Closed
         return BaseEventsByResult(
             self.records_arr[filter_mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=self.idx_field,
             group_by=self.grouper.group_by
@@ -485,7 +485,7 @@ class Trades(Events):
         >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
         >>> orders = pd.Series([1, -0.5, -0.5, 2, -0.5, -0.5, -0.5])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_capital=100, freq='1D')
+        ...      init_cash=100, freq='1D')
 
         >>> trades = vbt.Trades.from_orders(portfolio.orders)
         >>> trades.count()
@@ -508,8 +508,8 @@ class Trades(Events):
         -3.0
         ```"""
 
-    def __init__(self, records_arr, main_price, **kwargs):
-        Events.__init__(self, records_arr, main_price, **kwargs)
+    def __init__(self, records_arr, ref_price, **kwargs):
+        Events.__init__(self, records_arr, ref_price, **kwargs)
 
         if not all(field in records_arr.dtype.names for field in trade_dt.names):
             raise ValueError("Records array must have all fields defined in trade_dt")
@@ -517,10 +517,10 @@ class Trades(Events):
     @classmethod
     def from_orders(cls, orders, group_by=None, **kwargs):
         """Build `Trades` from `Orders`."""
-        trade_records = nb.trade_records_nb(orders.main_price.vbt.to_2d_array(), orders.records_arr)
+        trade_records = nb.trade_records_nb(orders.ref_price.vbt.to_2d_array(), orders.records_arr)
         if group_by is None:
             group_by = orders.grouper.group_by
-        return cls(trade_records, orders.main_price, freq=orders.wrapper.freq, group_by=group_by, **kwargs)
+        return cls(trade_records, orders.ref_price, freq=orders.wrapper.freq, group_by=group_by, **kwargs)
 
     @cached_property
     def position_idx(self):
@@ -591,7 +591,7 @@ class Positions(Events):
         >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
         >>> orders = pd.Series([1, -0.5, -0.5, 1, -1, 2, -1])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_capital=100, freq='1D')
+        ...      init_cash=100, freq='1D')
 
         >>> positions = vbt.Positions.from_orders(portfolio.orders)
         >>> positions.count()
@@ -614,8 +614,8 @@ class Positions(Events):
         -2.0
         ```"""
 
-    def __init__(self, records_arr, main_price, **kwargs):
-        Events.__init__(self, records_arr, main_price, **kwargs)
+    def __init__(self, records_arr, ref_price, **kwargs):
+        Events.__init__(self, records_arr, ref_price, **kwargs)
 
         if not all(field in records_arr.dtype.names for field in position_dt.names):
             raise ValueError("Records array must have all fields defined in position_dt")
@@ -623,8 +623,8 @@ class Positions(Events):
     @classmethod
     def from_orders(cls, orders, group_by=None, **kwargs):
         """Build `Positions` from `Orders`."""
-        position_records = nb.position_records_nb(orders.main_price.vbt.to_2d_array(), orders.records_arr)
+        position_records = nb.position_records_nb(orders.ref_price.vbt.to_2d_array(), orders.records_arr)
         if group_by is None:
             group_by = orders.grouper.group_by
-        return cls(position_records, orders.main_price, freq=orders.wrapper.freq, group_by=group_by, **kwargs)
+        return cls(position_records, orders.ref_price, freq=orders.wrapper.freq, group_by=group_by, **kwargs)
 

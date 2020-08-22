@@ -222,11 +222,14 @@ class TestIndexGrouper:
             pd.Int64Index([3, 2, 1, 1, 1, 0, 0, 0], dtype='int64', name='fourth')
         )
 
-    def test_group_index(self):
-        a, b = index_grouper.group_index(some_index, group_by=0)
+    def test_get_groups_and_index(self):
+        a, b = index_grouper.get_groups_and_index(some_index, group_by=None)
+        np.testing.assert_array_equal(a, np.array([0, 1, 2, 3, 4, 5, 6, 7]))
+        pd.testing.assert_index_equal(b, some_index)
+        a, b = index_grouper.get_groups_and_index(some_index, group_by=0)
         np.testing.assert_array_equal(a, np.array([0, 0, 0, 0, 1, 1, 1, 1]))
         pd.testing.assert_index_equal(b, pd.Int64Index([1, 0], dtype='int64', name='first'))
-        a, b = index_grouper.group_index(some_index, group_by=[0, 1])
+        a, b = index_grouper.get_groups_and_index(some_index, group_by=[0, 1])
         np.testing.assert_array_equal(a, np.array([0, 0, 1, 1, 2, 2, 3, 3]))
         pd.testing.assert_index_equal(b, pd.MultiIndex.from_tuples([
             (1, 3),
@@ -234,74 +237,82 @@ class TestIndexGrouper:
             (0, 1),
             (0, 0)
         ], names=['first', 'second']))
-        a, _ = index_grouper.group_index(some_index, group_by=[0, 1], return_dict=True)
-        assert a == {0: [0, 1], 1: [2, 3], 2: [4, 5], 3: [6, 7]}
-        a, _ = index_grouper.group_index(some_index, group_by=[0, 1], return_dict=True, nb_compatible=True)
-        d = Dict()
-        d[0] = np.array([0, 1])
-        d[1] = np.array([2, 3])
-        d[2] = np.array([4, 5])
-        d[3] = np.array([6, 7])
-        assert type(a) == type(d)
-        assert len(a) == len(d)
-        for k, v in d.items():
-            np.testing.assert_array_equal(a[k], v)
         with pytest.raises(Exception) as e_info:
-            index_grouper.group_index(some_index[[0, -1, 0]], group_by=[0, 1], assert_sorted=True)
+            index_grouper.get_groups_and_index(some_index[[0, -1, 0]], group_by=[0, 1])
 
-    def test_count_per_group_nb(self):
+    def test_get_group_counts_nb(self):
         np.testing.assert_array_equal(
-            index_grouper.count_per_group_nb(np.array([0, 0, 0, 0, 1, 1, 1, 1])),
+            index_grouper.get_group_counts_nb(np.array([0, 0, 0, 0, 1, 1, 1, 1])),
             np.array([4, 4])
         )
         np.testing.assert_array_equal(
-            index_grouper.count_per_group_nb(np.array([0, 1])),
+            index_grouper.get_group_counts_nb(np.array([0, 1])),
             np.array([1, 1])
         )
         np.testing.assert_array_equal(
-            index_grouper.count_per_group_nb(np.array([0, 0])),
+            index_grouper.get_group_counts_nb(np.array([0, 0])),
             np.array([2])
         )
         np.testing.assert_array_equal(
-            index_grouper.count_per_group_nb(np.array([0])),
+            index_grouper.get_group_counts_nb(np.array([0])),
             np.array([1])
         )
         np.testing.assert_array_equal(
-            index_grouper.count_per_group_nb(np.array([])),
+            index_grouper.get_group_counts_nb(np.array([])),
             np.array([])
         )
 
+    def test_strict(self):
+        _ = index_grouper.IndexGrouper(some_index, group_by=None, strict=True).get_group_by(group_by=0)
+        _ = index_grouper.IndexGrouper(some_index, group_by=0, strict=True).get_group_by(group_by=0)
+        with pytest.raises(Exception) as e_info:
+            index_grouper.IndexGrouper(some_index, group_by=0, strict=True).get_group_by(group_by=1)
+
     def test_arguments(self):
-        assert index_grouper.IndexGrouper(some_index, group_by=None).resolve_group_by() is None  # default
+        assert index_grouper.IndexGrouper(some_index, group_by=None).get_group_by() is None  # default
         pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=None).resolve_group_by(group_by=0),  # overrides
+            index_grouper.IndexGrouper(some_index, group_by=None).get_group_by(group_by=0),  # overrides
             pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
         )
         pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=0).resolve_group_by(),  # default
+            index_grouper.IndexGrouper(some_index, group_by=0).get_group_by(),  # default
             pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
         )
         pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=0).resolve_group_by(group_by=1),  # overrides
+            index_grouper.IndexGrouper(some_index, group_by=0).get_group_by(group_by=1),  # overrides
             pd.Int64Index([3, 3, 2, 2, 1, 1, 0, 0], dtype='int64', name='second')
         )
-        assert index_grouper.IndexGrouper(some_index, group_by=None).get_group_arr() is None
-        pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=None).get_new_index(),
-            some_index
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index).get_groups(),
+            np.array([0, 1, 2, 3, 4, 5, 6, 7])
         )
-        assert index_grouper.IndexGrouper(some_index, group_by=0).get_group_arr() is not None
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index).get_groups(group_by=0),
+            np.array([0, 0, 0, 0, 1, 1, 1, 1])
+        )
         pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=0).get_new_index(),
+            index_grouper.IndexGrouper(some_index).get_index(),
+            index_grouper.IndexGrouper(some_index).index
+        )
+        pd.testing.assert_index_equal(
+            index_grouper.IndexGrouper(some_index).get_index(group_by=0),
             pd.Int64Index([1, 0], dtype='int64', name='first')
         )
         np.testing.assert_array_equal(
-            index_grouper.IndexGrouper(some_index, group_by=None).get_group_counts(),
+            index_grouper.IndexGrouper(some_index).get_group_counts(),
             np.array([1, 1, 1, 1, 1, 1, 1, 1])
         )
         np.testing.assert_array_equal(
-            index_grouper.IndexGrouper(some_index, group_by=0).get_group_counts(),
+            index_grouper.IndexGrouper(some_index).get_group_counts(group_by=0),
             np.array([4, 4])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index).get_group_last_idxs(),
+            np.array([0, 1, 2, 3, 4, 5, 6, 7])
+        )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index).get_group_last_idxs(group_by=0),
+            np.array([3, 7])
         )
 
     def test_indexing(self):
@@ -318,11 +329,11 @@ class TestIndexGrouper:
             ], names=['first', 'second'])
         )
         np.testing.assert_array_equal(
-            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_group_arr(),
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_groups(),
             np.array([0])
         )
         pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_new_index(),
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_index(),
             pd.MultiIndex.from_tuples([
                 (1, 3)
             ], names=['first', 'second'])
@@ -331,6 +342,11 @@ class TestIndexGrouper:
             index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_group_counts(),
             np.array([1])
         )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[0].get_group_last_idxs(),
+            np.array([0])
+        )
+        assert index_grouper.IndexGrouper(some_index, group_by=[0, 1], strict=True).iloc[0].strict
         pd.testing.assert_index_equal(
             index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].index,
             pd.MultiIndex.from_tuples([
@@ -350,11 +366,11 @@ class TestIndexGrouper:
             ], names=['first', 'second'])
         )
         np.testing.assert_array_equal(
-            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_group_arr(),
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_groups(),
             np.array([0, 0, 1, 1])
         )
         pd.testing.assert_index_equal(
-            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_new_index(),
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_index(),
             pd.MultiIndex.from_tuples([
                 (1, 3),
                 (0, 0)
@@ -364,6 +380,11 @@ class TestIndexGrouper:
             index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_group_counts(),
             np.array([2, 2])
         )
+        np.testing.assert_array_equal(
+            index_grouper.IndexGrouper(some_index, group_by=[0, 1]).iloc[[0, 1, -2, -1]].get_group_last_idxs(),
+            np.array([1, 3])
+        )
+        assert index_grouper.IndexGrouper(some_index, group_by=[0, 1], strict=True).iloc[[0, 1, -2, -1]].strict
 
     def test_eq(self):
         assert index_grouper.IndexGrouper(some_index) == index_grouper.IndexGrouper(some_index)
@@ -371,6 +392,7 @@ class TestIndexGrouper:
         assert index_grouper.IndexGrouper(some_index) != 0
         assert index_grouper.IndexGrouper(some_index) != index_grouper.IndexGrouper(some_index, group_by=0)
         assert index_grouper.IndexGrouper(some_index) != index_grouper.IndexGrouper(pd.Index([0]))
+        assert index_grouper.IndexGrouper(some_index) != index_grouper.IndexGrouper(some_index, strict=True)
 
 
 # ############# index_fns.py ############# #

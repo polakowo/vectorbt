@@ -325,11 +325,11 @@ class BaseDrawdowns(Records):
         return self.duration.max(time_units=time_units, **kwargs)
 
     @cached_method
-    def coverage(self, group_by=None, columns=None, **kwargs):
+    def coverage(self, group_by=None, **kwargs):
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(total_duration / total_steps, columns=columns, **kwargs)
 
     @cached_property
@@ -430,11 +430,11 @@ class Drawdowns(BaseDrawdowns):
         return self.map_field('status')
 
     @cached_method
-    def recovered_rate(self, group_by=None, columns=None, **kwargs):
+    def recovered_rate(self, group_by=None, **kwargs):
         """Rate of recovered drawdowns."""
         recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
+        columns = self.grouper.get_index(group_by=group_by)
         return self.wrapper.wrap_reduced(recovered_count / total_count, columns=columns, **kwargs)
 
     @cached_property

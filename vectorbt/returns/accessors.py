@@ -82,7 +82,7 @@ class Returns_Accessor(Generic_Accessor):
         """Total return."""
         return self.wrap_reduced(nb.cum_returns_final_nb(self.to_2d_array(), np.full(len(self.columns), 0.)))
 
-    def annualized_return(self):
+    def annualized(self):
         """Mean annual growth rate of returns.
 
         This is equivalent to the compound annual growth rate."""

@@ -3,7 +3,6 @@
 import numpy as np
 import pandas as pd
 from numba import njit
-from numba.typed import Dict
 
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.array import is_sorted
@@ -14,10 +13,7 @@ from vectorbt.base.indexing import PandasIndexer
 
 
 def group_by_to_index(index, group_by):
-    """Convert mapper to `pd.Index`.
-
-    `group_by` can be integer (level by position), string (level by name), tuple or list
-    (multiple levels), index or series (named index with groups), or NumPy array (raw groups).
+    """Convert mapper `group_by` to `pd.Index`.
 
     !!! note
         Index and mapper must have the same length."""
@@ -25,55 +21,40 @@ def group_by_to_index(index, group_by):
         group_by = select_levels(index, group_by)
     if not isinstance(group_by, pd.Index):
         group_by = pd.Index(group_by)
-    checks.assert_same_len(index, group_by)
+    if len(group_by) != len(index):
+        raise ValueError("group_by and index must have the same length")
     return group_by
 
 
-def group_index(index, group_by, return_dict=False, nb_compatible=False, assert_sorted=False):
-    """Group index by some mapper.
-
-    By default, returns an array of group indices pointing to the original index, and the new index.
-    Set `return_dict` to `True` to return a dict instead of array.
-    Set `nb_compatible` to `True` to make the dict Numba-compatible (Dict out of arrays).
-    Set `assert_sorted` to `True` to verify that group indices are increasing.
+def get_groups_and_index(index, group_by):
+    """Return array of group indices pointing to the original index, and grouped index.
     """
-    group_by = group_by_to_index(index, group_by)
-    group_arr, new_index = pd.factorize(group_by)
-    if not isinstance(new_index, pd.Index):
-        new_index = pd.Index(new_index)
-    if isinstance(group_by, pd.MultiIndex):
-        new_index.names = group_by.names
-    elif isinstance(group_by, (pd.Index, pd.Series)):
-        new_index.name = group_by.name
-    if assert_sorted:
-        if not is_sorted(group_arr):
-            raise ValueError("Group indices are not increasing. Use .sort_values() on the index.")
-    if return_dict:
-        groups = dict()
-        for i, idx in enumerate(group_arr):
-            if idx not in groups:
-                groups[idx] = []
-            groups[idx].append(i)
-        if nb_compatible:
-            numba_groups = Dict()
-            for k, v in groups.items():
-                numba_groups[k] = np.array(v)
-            return numba_groups, new_index
-        return groups, new_index
-    return group_arr, new_index
+    if group_by is not None:
+        group_by = group_by_to_index(index, group_by)
+        groups, index = pd.factorize(group_by)
+        if not isinstance(index, pd.Index):
+            index = pd.Index(index)
+        if isinstance(group_by, pd.MultiIndex):
+            index.names = group_by.names
+        elif isinstance(group_by, (pd.Index, pd.Series)):
+            index.name = group_by.name
+        if not is_sorted(groups):
+            raise ValueError("Groups must be coherent and sorted")
+        return groups, index
+    return np.arange(len(index)), index
 
 
-@njit
-def count_per_group_nb(group_arr):
+@njit(cache=True)
+def get_group_counts_nb(groups):
     """Return count per group."""
-    result = np.empty(group_arr.shape[0], dtype=np.int_)
+    result = np.empty(groups.shape[0], dtype=np.int_)
     j = 0
     prev_group = -1
     run_count = 0
-    for i in range(group_arr.shape[0]):
-        cur_group = group_arr[i]
+    for i in range(groups.shape[0]):
+        cur_group = groups[i]
         if cur_group < prev_group:
-            raise ValueError("group_arr must be sorted")
+            raise ValueError("Groups must be coherent and sorted")
         if cur_group != prev_group:
             if prev_group != -1:
                 # Process previous group
@@ -82,7 +63,7 @@ def count_per_group_nb(group_arr):
                 run_count = 0
             prev_group = cur_group
         run_count += 1
-        if i == group_arr.shape[0] - 1:
+        if i == groups.shape[0] - 1:
             # Process last group
             result[j] = run_count
             j += 1
@@ -95,26 +76,69 @@ def _indexing_func(obj, pd_indexing_func):
     range_sr = pd.Series(np.arange(len(obj.index)), index=obj.index)
     range_sr = pd_indexing_func(range_sr)
     idx_arr = to_1d(range_sr, raw=True)
-    new_index = obj.index[idx_arr]
+    index = obj.index[idx_arr]
     new_group_by = obj.group_by[idx_arr]
-    return obj.__class__(new_index, group_by=new_group_by)
+    return obj.__class__(
+        index,
+        group_by=new_group_by,
+        allow_change=obj.allow_change,
+        allow_enable=obj.allow_enable,
+        allow_disable=obj.allow_disable
+    )
 
 
 class IndexGrouper(PandasIndexer):
-    """Class that exposes methods to group index."""
+    """Class that exposes methods to group index.
 
-    def __init__(self, index, group_by=None):
+    `group_by` can be integer (level by position), string (level by name), tuple or list
+    (multiple levels), index or series (named index with groups), or NumPy array (raw groups).
+
+    Set `allow_change` to `False` to prohibit changing groups (you can still change their labels).
+    Set `allow_enable` to `False` to prohibit grouping if `IndexGrouper.group_by` is `None`.
+    Set `allow_disable` to `False` to prohibit disabling of grouping if `IndexGrouper.group_by` is not `None`.
+
+    !!! note
+        Columns must build groups that are coherent and sorted."""
+
+    def __init__(self, index, group_by=None, allow_change=True, allow_enable=True, allow_disable=True):
         self.index = index
-        self.group_by = None
-        self.group_by = self.resolve_group_by(group_by=group_by)
+
+        if group_by is False:
+            # Disable completely
+            group_by = None
+        if group_by is not None:
+            group_by = group_by_to_index(index, group_by)
+        self.group_by = group_by
+
+        # Everything is allowed by default
+        self.allow_change = allow_change
+        self.allow_enable = allow_enable
+        self.allow_disable = allow_disable
 
         PandasIndexer.__init__(self, _indexing_func)
 
-    def resolve_group_by(self, group_by=None):
-        """Resolve `group_by` from either object variable or keyword argument."""
+    def get_group_by(self, group_by=None, allow_change=None, allow_enable=None, allow_disable=None):
+        """Get `group_by` from either object variable or keyword argument."""
+        if allow_change is None:
+            allow_change = self.allow_change
+        if allow_enable is None:
+            allow_enable = self.allow_enable
+        if allow_disable is None:
+            allow_disable = self.allow_disable
+        if group_by is not None:
+            if not allow_change:
+                if self.group_by is not None and group_by is not False:
+                    if not np.array_equal(self.get_groups(), get_groups_and_index(self.index, group_by)[0]):
+                        raise ValueError("Changing groups is not allowed")
+            if not allow_enable:
+                if self.group_by is None and group_by is not False:
+                    raise ValueError("Enabling grouping is not allowed")
+            if not allow_disable:
+                if self.group_by is not None and group_by is False:
+                    raise ValueError("Disabling grouping is not allowed")
         if group_by is None:
             group_by = self.group_by
-        if isinstance(group_by, bool) and not group_by:
+        if group_by is False:
             # Disable completely
             group_by = None
         if group_by is not None:
@@ -122,30 +146,48 @@ class IndexGrouper(PandasIndexer):
         return group_by
 
     @cached_method
-    def group_index(self, group_by=None, new_index=None, **kwargs):
-        """See `group_index`."""
-        group_by = self.resolve_group_by(group_by=group_by)
-        if group_by is not None:
-            group_arr, _new_index = group_index(self.index, group_by, **kwargs)
-        else:
-            group_arr = None
-            _new_index = self.index
-        if new_index is None:
-            new_index = _new_index
-        return group_arr, new_index
+    def get_groups_and_index(self, **kwargs):
+        """See `get_groups_and_index`."""
+        group_by = self.get_group_by(**kwargs)
+        return get_groups_and_index(self.index, group_by)
 
-    def get_group_arr(self, **kwargs):
-        return self.group_index(**kwargs)[0]
+    def get_groups(self, **kwargs):
+        """Return groups array."""
+        return self.get_groups_and_index(**kwargs)[0]
 
-    def get_new_index(self, **kwargs):
-        return self.group_index(**kwargs)[1]
+    def get_index(self, **kwargs):
+        """Return grouped index."""
+        return self.get_groups_and_index(**kwargs)[1]
 
     @cached_method
     def get_group_counts(self, **kwargs):
-        group_arr, new_index = self.group_index(**kwargs)
-        if group_arr is None:
-            return np.full(len(new_index), 1)
-        return count_per_group_nb(group_arr)
+        """See get_group_counts_nb."""
+        group_by = self.get_group_by(**kwargs)
+        if group_by is None:
+            # No grouping
+            return np.full(len(self.index), 1)
+        groups = self.get_groups(**kwargs)
+        return get_group_counts_nb(groups)
+
+    @cached_method
+    def get_group_first_idxs(self, **kwargs):
+        """Get first index of each group as an array."""
+        group_by = self.get_group_by(**kwargs)
+        if group_by is None:
+            # No grouping
+            return np.arange(len(self.index))
+        group_counts = self.get_group_counts(**kwargs)
+        return np.cumsum(group_counts) - group_counts
+    
+    @cached_method
+    def get_group_last_idxs(self, **kwargs):
+        """Get last index of each group as an array."""
+        group_by = self.get_group_by(**kwargs)
+        if group_by is None:
+            # No grouping
+            return np.arange(len(self.index))
+        group_counts = self.get_group_counts(**kwargs)
+        return np.cumsum(group_counts) - 1
 
     def __eq__(self, other):
         if type(self) != type(other):
@@ -153,5 +195,11 @@ class IndexGrouper(PandasIndexer):
         if not checks.is_equal(self.index, other.index, pd.Index.equals):
             return False
         if not checks.is_equal(self.group_by, other.group_by, pd.Index.equals):
+            return False
+        if self.allow_change != other.allow_change:
+            return False
+        if self.allow_enable != other.allow_enable:
+            return False
+        if self.allow_disable != other.allow_disable:
             return False
         return True

@@ -259,13 +259,18 @@ def fill_order_nb(run_cash, run_shares, order):
 
 
 @njit
-def simulate_nb(target_shape, init_capital, order_func_nb, *args):
+def simulate_nb(target_shape, init_cash, order_func_nb, *args):
     """Simulate a portfolio by iterating over columns and generating and filling orders.
 
-    Starting with initial capital `init_capital`, iterates over each column in shape `target_shape`,
+    Starting with initial capital `init_cash`, iterates over each column in shape `target_shape`,
     and for each data point, generates an order using `order_func_nb`. Tries then to fulfill that
     order. If unsuccessful due to insufficient cash/shares, orders the available fraction.
     Updates then the current cash and shares balance.
+
+    When simulating a grouped portfolio, calculation of cash happens in row-major order,
+    that is, moving from top to bottom (throughout time) and from left to right (throughout assets).
+    Cash at each step depends not only upon time but also upon orders at previous assets,
+    thus order of assets in the group DOES matter.
 
     Returns order records of layout `vectorbt.records.enums.order_dt`, but also
     cash and shares as time series.
@@ -299,7 +304,7 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         ...     [4, 2, 2],
         ...     [5, 1, 1]
         ... ])
-        >>> init_capital = np.full(3, 100)
+        >>> init_cash = np.full(3, 100)
         >>> fees = 0.001
         >>> fixed_fees = 1
         >>> slippage = 0.001
@@ -309,7 +314,7 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
         ...     return Order(np.inf if oc.i == 0 else 0, SizeType.Shares,
         ...         price[oc.i, oc.col], fees, fixed_fees, slippage)
         >>> order_records, cash, shares = simulate_nb(
-        ...     price.shape, init_capital, order_func_nb)
+        ...     price.shape, init_cash, order_func_nb)
 
         >>> pd.DataFrame.from_records(order_records)
            col  idx       size  price      fees  side
@@ -336,7 +341,7 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
     shares = np.empty(target_shape, dtype=np.float_)
 
     for col in range(target_shape[1]):
-        run_cash = float(flex_select_nb(0, col, init_capital, is_2d=True))
+        run_cash = float(flex_select_nb(0, col, init_cash, is_2d=True))
         run_shares = 0.
 
         for i in range(target_shape[0]):
@@ -344,7 +349,7 @@ def simulate_nb(target_shape, init_capital, order_func_nb, *args):
             order_context = OrderContext(
                 col, i,
                 target_shape,
-                init_capital,
+                init_cash,
                 order_records[:j],
                 cash,
                 shares,
@@ -380,7 +385,7 @@ def none_row_prep_func_nb(row_context, *args):
 
 
 @njit
-def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_func_nb, *args):
+def simulate_row_wise_nb(target_shape, init_cash, row_prep_func_nb, order_func_nb, *args):
     """Simulate a portfolio by iterating over rows and generating and filling orders.
 
     As opposed to `simulate_nb`, iterates using C-like index order, with the rows
@@ -413,7 +418,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         ...     [4, 2, 2],
         ...     [5, 1, 1]
         ... ])
-        >>> init_capital = np.full(3, 100)
+        >>> init_cash = np.full(3, 100)
         >>> fees = 0.001
         >>> fixed_fees = 1
         >>> slippage = 0.001
@@ -432,7 +437,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         ...         price[oc.i, oc.col], fees, fixed_fees, slippage)
 
         >>> order_records, cash, shares = simulate_row_wise_nb(
-        ...     price.shape, init_capital, row_prep_func_nb, order_func_nb)
+        ...     price.shape, init_cash, row_prep_func_nb, order_func_nb)
 
         >>> pd.DataFrame.from_records(order_records)
             col  idx       size  price      fees  side
@@ -475,7 +480,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
         row_context = RowContext(
             i,
             target_shape,
-            init_capital,
+            init_cash,
             order_records[:j],  # not sorted!
             cash,
             shares
@@ -484,7 +489,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
 
         for col in range(target_shape[1]):
             if i == 0:
-                run_cash = float(flex_select_nb(0, col, init_capital, is_2d=True))
+                run_cash = float(flex_select_nb(0, col, init_cash, is_2d=True))
                 run_shares = 0.
             else:
                 run_cash = cash[i - 1, col]
@@ -494,7 +499,7 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
             order_context = OrderContext(
                 col, i,
                 target_shape,
-                init_capital,
+                init_cash,
                 order_records[:j],  # not sorted!
                 cash,
                 shares,
@@ -526,8 +531,9 @@ def simulate_row_wise_nb(target_shape, init_capital, row_prep_func_nb, order_fun
 
 
 @njit(cache=True)
-def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, size_type, entry_price,
-                             exit_price, fees, fixed_fees, slippage, accumulate, is_2d=False):
+def simulate_from_signals_nb(target_shape, group_counts, group_init_cash, init_shares,
+                             entries, exits, size, size_type, entry_price, exit_price, fees,
+                             fixed_fees, slippage, accumulate, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     j = 0
@@ -545,47 +551,56 @@ def simulate_from_signals_nb(target_shape, init_capital, entries, exits, size, s
     i8, col8 = flex_choose_i_and_col_nb(fixed_fees, is_2d=is_2d)
     i9, col9 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
 
-    for col in range(target_shape[1]):
-        run_cash = float(flex_select_nb(0, col, init_capital, is_2d=is_2d))
-        run_shares = 0.
+    from_col = 0
+    for gc in range(len(group_counts)):
+        to_col = from_col + group_counts[gc]
+        # Cash per group
+        run_cash = float(group_init_cash[gc])
 
         for i in range(target_shape[0]):
-            # Generate the next oder or None to do nothing
-            is_entry = flex_select_nb(i, col, entries, def_i=i1, def_col=col1, is_2d=is_2d)
-            is_exit = flex_select_nb(i, col, exits, def_i=i2, def_col=col2, is_2d=is_2d)
-            if is_entry or is_exit:
-                order = signals_order_func_nb(
-                    run_shares,
-                    run_cash,
-                    is_entry,
-                    is_exit,
-                    flex_select_nb(i, col, size, def_i=i3, def_col=col3, is_2d=is_2d),
-                    flex_select_nb(i, col, size_type, def_i=i4, def_col=col4, is_2d=is_2d),
-                    flex_select_nb(i, col, entry_price, def_i=i5, def_col=col5, is_2d=is_2d),
-                    flex_select_nb(i, col, exit_price, def_i=i6, def_col=col6, is_2d=is_2d),
-                    flex_select_nb(i, col, fees, def_i=i7, def_col=col7, is_2d=is_2d),
-                    flex_select_nb(i, col, fixed_fees, def_i=i8, def_col=col8, is_2d=is_2d),
-                    flex_select_nb(i, col, slippage, def_i=i9, def_col=col9, is_2d=is_2d),
-                    accumulate)
+            for col in range(from_col, to_col):
+                # Shares per column
+                run_shares = float(init_shares[col]) if i == 0 else shares[i - 1, col]
 
-                if order is not None:
-                    # Fill the order
-                    run_cash, run_shares, filled_order = fill_order_nb(run_cash, run_shares, order)
+                # Generate the next oder or None to do nothing
+                is_entry = flex_select_nb(i, col, entries, def_i=i1, def_col=col1, is_2d=is_2d)
+                is_exit = flex_select_nb(i, col, exits, def_i=i2, def_col=col2, is_2d=is_2d)
+                if is_entry or is_exit:
+                    order = signals_order_func_nb(
+                        run_shares,
+                        run_cash,
+                        is_entry,
+                        is_exit,
+                        flex_select_nb(i, col, size, def_i=i3, def_col=col3, is_2d=is_2d),
+                        flex_select_nb(i, col, size_type, def_i=i4, def_col=col4, is_2d=is_2d),
+                        flex_select_nb(i, col, entry_price, def_i=i5, def_col=col5, is_2d=is_2d),
+                        flex_select_nb(i, col, exit_price, def_i=i6, def_col=col6, is_2d=is_2d),
+                        flex_select_nb(i, col, fees, def_i=i7, def_col=col7, is_2d=is_2d),
+                        flex_select_nb(i, col, fixed_fees, def_i=i8, def_col=col8, is_2d=is_2d),
+                        flex_select_nb(i, col, slippage, def_i=i9, def_col=col9, is_2d=is_2d),
+                        accumulate)
 
-                    # Add a new record
-                    if filled_order is not None:
-                        order_records[j]['col'] = col
-                        order_records[j]['idx'] = i
-                        order_records[j]['size'] = filled_order.size
-                        order_records[j]['price'] = filled_order.price
-                        order_records[j]['fees'] = filled_order.fees
-                        order_records[j]['side'] = filled_order.side
-                        j += 1
+                    if order is not None:
+                        # Fill the order
+                        run_cash, run_shares, filled_order = fill_order_nb(run_cash, run_shares, order)
 
-            # Populate cash and shares
-            cash[i, col], shares[i, col] = run_cash, run_shares
+                        # Add a new record
+                        if filled_order is not None:
+                            order_records[j]['col'] = col
+                            order_records[j]['idx'] = i
+                            order_records[j]['size'] = filled_order.size
+                            order_records[j]['price'] = filled_order.price
+                            order_records[j]['fees'] = filled_order.fees
+                            order_records[j]['side'] = filled_order.side
+                            j += 1
 
-    return order_records[:j], cash, shares
+                # Populate cash and shares
+                cash[i, col], shares[i, col] = run_cash, run_shares
+        from_col = to_col
+
+    # Order records are not sorted yet
+    order_records = order_records[:j]
+    return order_records[np.argsort(order_records['col'])], cash, shares
 
 
 @njit(cache=True)
@@ -630,7 +645,7 @@ def signals_order_func_nb(run_shares, run_cash, entries, exits, size, size_type,
 
 
 @njit(cache=True)
-def simulate_from_orders_nb(target_shape, init_capital, size, size_type, price,
+def simulate_from_orders_nb(target_shape, init_cash, size, size_type, price,
                             fees, fixed_fees, slippage, is_2d=False):
     """Adaptation of `simulate_nb` for simulation based on orders."""
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
@@ -647,7 +662,7 @@ def simulate_from_orders_nb(target_shape, init_capital, size, size_type, price,
     i6, col6 = flex_choose_i_and_col_nb(slippage, is_2d=is_2d)
 
     for col in range(target_shape[1]):
-        run_cash = float(flex_select_nb(0, col, init_capital, is_2d=is_2d))
+        run_cash = float(flex_select_nb(0, col, init_cash, is_2d=is_2d))
         run_shares = 0.
 
         for i in range(target_shape[0]):
@@ -680,3 +695,103 @@ def simulate_from_orders_nb(target_shape, init_capital, size, size_type, price,
 
     return order_records[:j], cash, shares
 
+
+# ############# Properties ############# #
+
+@njit(cache=True)
+def check_group_counts(n_cols, group_counts):
+    """Check if group counts sum up to the total number of columns."""
+    if np.sum(group_counts) != n_cols:
+        raise ValueError("group_counts has incorrect total number of columns")
+
+
+@njit(cache=True)
+def ungrouped_cash_flow_nb(cash, init_cash, group_counts):
+    """Get cash flow per asset in the group."""
+    check_group_counts(cash.shape[1], group_counts)
+    result = np.empty(cash.shape, dtype=np.float_)
+    from_col = 0
+    for gc in range(len(group_counts)):
+        to_col = from_col + group_counts[gc]
+        n_cols = to_col - from_col
+        cash_flat = cash[:, from_col:to_col].flatten()
+        cash_flow_flat = np.empty(cash_flat.shape, dtype=np.float_)
+        cash_flow_flat[0] = cash_flat[0] - init_cash[gc]
+        cash_flow_flat[1:] = cash_flat[1:] - cash_flat[:-1]
+        result[:, from_col:to_col] = np.reshape(cash_flow_flat, (cash.shape[0], n_cols))
+        from_col = to_col
+    return result
+
+
+@njit(cache=True)
+def ungrouped_iter_value_nb(cash, holding_value, group_counts):
+    """Get value per asset in the group in simulation order (iteratively in row-major order).
+
+    !!! note
+        The value of each asset depends upon its position in the group."""
+    check_group_counts(cash.shape[1], group_counts)
+    result = np.empty(cash.shape, dtype=np.float_)
+    from_col = 0
+    for gc in range(len(group_counts)):
+        to_col = from_col + group_counts[gc]
+        n_cols = to_col - from_col
+        cash_flat = cash[:, from_col:to_col].flatten()
+        holding_value_flat = holding_value[:, from_col:to_col].flatten()
+        curr_holding_value = 0.
+
+        for j in range(cash_flat.shape[0]):
+            if j >= n_cols:
+                prev_j = j - n_cols
+                curr_holding_value -= holding_value_flat[prev_j]
+            curr_holding_value += holding_value_flat[j]
+            result[j // n_cols, from_col + j % n_cols] = cash_flat[j] + curr_holding_value
+
+        from_col = to_col
+    return result
+
+
+@njit(cache=True)
+def ungrouped_iter_returns_nb(iter_value, init_value, group_counts):
+    """Get returns per asset in the group in simulation order (iteratively in row-major order)."""
+    check_group_counts(iter_value.shape[1], group_counts)
+    result = np.empty(iter_value.shape, dtype=np.float_)
+    from_col = 0
+    for gc in range(len(group_counts)):
+        to_col = from_col + group_counts[gc]
+        n_cols = to_col - from_col
+        iter_value_flat = iter_value[:, from_col:to_col].flatten()
+        iter_returns_flat = np.empty(iter_value_flat.shape, dtype=np.float_)
+        iter_returns_flat[0] = (iter_value_flat[0] - init_value[gc]) / init_value[gc]
+        iter_returns_flat[1:] = (iter_value_flat[1:] - iter_value_flat[:-1]) / iter_value_flat[:-1]
+        result[:, from_col:to_col] = iter_returns_flat.reshape((iter_value.shape[0], n_cols))
+        from_col = to_col
+    return result
+
+
+@njit(cache=True)
+def grouped_holding_value_nb(price, shares, group_counts):
+    """Get holding value per group."""
+    check_group_counts(price.shape[1], group_counts)
+    result = np.empty((price.shape[0], len(group_counts)), dtype=np.float_)
+    from_col = 0
+    for gc in range(len(group_counts)):
+        to_col = from_col + group_counts[gc]
+        result[:, gc] = np.sum(shares[:, from_col:to_col] * price[:, from_col:to_col], axis=1)
+        from_col = to_col
+    return result
+
+
+@njit(cache=True)
+def grouped_buy_and_hold_return_nb(price, group_counts):
+    """Get total return of buy-and-hold per group."""
+    check_group_counts(price.shape[1], group_counts)
+    result = np.empty(len(group_counts), dtype=np.float_)
+    holding_value = 100. / price[0, :] * price
+    from_col = 0
+    for gc in range(len(group_counts)):
+        to_col = from_col + group_counts[gc]
+        first_val = np.sum(holding_value[0, from_col:to_col])
+        last_val = np.sum(holding_value[-1, from_col:to_col])
+        result[gc] = (last_val - first_val) / first_val
+        from_col = to_col
+    return result

@@ -489,7 +489,7 @@ def trade_records_nb(price, order_records):
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import trade_records_nb
 
-        >>> init_capital = np.full(1, 100)
+        >>> init_cash = np.full(1, 100)
         >>> order_price = price = np.arange(1, 6)[:, None]
         >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
@@ -501,7 +501,7 @@ def trade_records_nb(price, order_records):
         ...          order_price[i, col], fees=0.01, slippage=0., fixed_fees=0.)
 
         >>> order_records, cash, shares = simulate_nb(
-        ...     price.shape, init_capital, order_func_nb)
+        ...     price.shape, init_cash, order_func_nb)
         >>> records = trade_records_nb(price, order_records)
 
         >>> pd.DataFrame.from_records(records)
@@ -673,7 +673,7 @@ def position_records_nb(price, order_records):
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import position_records_nb
 
-        >>> init_capital = np.full(1, 100)
+        >>> init_cash = np.full(1, 100)
         >>> order_price = price = np.arange(1, 6)[:, None]
         >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
@@ -685,7 +685,7 @@ def position_records_nb(price, order_records):
         ...          order_price[i, col], fees=0.01, slippage=0., fixed_fees=0.)
 
         >>> order_records, cash, shares = simulate_nb(
-        ...     price.shape, init_capital, order_func_nb)
+        ...     price.shape, init_cash, order_func_nb)
         >>> records = position_records_nb(price, order_records)
 
         >>> pd.DataFrame.from_records(records)

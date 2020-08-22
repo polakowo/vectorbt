@@ -98,15 +98,11 @@ __pdoc__['ohlcv'] = f"""Parameters for OHLCV.
 
 # Portfolio
 portfolio = Config(
-    init_capital=100.,
+    init_cash=100.,
+    init_shares=0.,
     fees=0.,
     fixed_fees=0.,
-    slippage=0.,
-    levy_alpha=2.0,
-    risk_free=0.,
-    required_return=0.,
-    cutoff=0.05,
-    factor_returns=None
+    slippage=0.
 )
 """_"""
 

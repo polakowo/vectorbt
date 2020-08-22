@@ -22,7 +22,7 @@ def _indexing_func(obj, pd_indexing_func):
         new_group_by = None
     return obj.__class__(
         new_records,
-        pd_indexing_func(obj.main_price),
+        pd_indexing_func(obj.ref_price),
         freq=obj.wrapper.freq,
         idx_field=obj.idx_field,
         group_by=new_group_by
@@ -41,7 +41,7 @@ class BaseOrders(Records):
         >>> price = pd.Series([1, 2, 3, 2, 1])
         >>> orders = pd.Series([1, 1, 1, 1, -1])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_capital=100, freq='1D')
+        ...      init_cash=100, freq='1D')
 
         >>> portfolio.orders.buy.count()
         4
@@ -49,11 +49,11 @@ class BaseOrders(Records):
         1
         ```"""
 
-    def __init__(self, records_arr, main_price, freq=None, idx_field='idx', group_by=None):
+    def __init__(self, records_arr, ref_price, freq=None, idx_field='idx', group_by=None):
         Records.__init__(
             self,
             records_arr,
-            ArrayWrapper.from_obj(main_price, freq=freq),
+            ArrayWrapper.from_obj(ref_price, freq=freq),
             idx_field=idx_field,
             group_by=group_by
         )
@@ -62,7 +62,7 @@ class BaseOrders(Records):
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise ValueError("Records array must have all fields defined in order_dt")
 
-        self.main_price = main_price
+        self.ref_price = ref_price
 
     def filter_by_mask(self, mask, idx_field=None, group_by=None):
         """Return a new class instance, filtered by mask."""
@@ -72,14 +72,14 @@ class BaseOrders(Records):
             group_by = self.grouper.group_by
         return self.__class__(
             self.records_arr[mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=idx_field,
             group_by=group_by
         )
 
     def plot(self,
-             main_price_trace_kwargs={},
+             ref_price_trace_kwargs={},
              buy_trace_kwargs={},
              sell_trace_kwargs={},
              fig=None,
@@ -87,7 +87,7 @@ class BaseOrders(Records):
         """Plot orders.
 
         Args:
-            main_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
+            ref_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -102,7 +102,7 @@ class BaseOrders(Records):
             raise TypeError("You must select a column first")
 
         # Plot main price
-        fig = self.main_price.vbt.plot(trace_kwargs=main_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self.ref_price.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         idx = self.records_arr['idx']
@@ -191,7 +191,7 @@ class Orders(BaseOrders):
         filter_mask = self.records_arr['side'] == OrderSide.Buy
         return BaseOrders(
             self.records_arr[filter_mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=self.idx_field,
             group_by=self.grouper.group_by
@@ -203,7 +203,7 @@ class Orders(BaseOrders):
         filter_mask = self.records_arr['side'] == OrderSide.Sell
         return BaseOrders(
             self.records_arr[filter_mask],
-            self.main_price,
+            self.ref_price,
             freq=self.wrapper.freq,
             idx_field=self.idx_field,
             group_by=self.grouper.group_by

@@ -38,7 +38,7 @@ Simulation of trading randomly on Bitcoin:
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     price['Close'], entries, exits,
 ...     fees=0.001,
-...     init_capital=100,
+...     init_cash=100,
 ...     freq='1D'
 ... )
 

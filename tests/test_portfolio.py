@@ -49,11 +49,13 @@ def order_func_nb(order_context, price, fees, fixed_fees, slippage):
     if i % 2 == 1:
         size *= -1
     return vbt.portfolio.nb.Order(
-        size, SizeType.Shares, price[i, col], fees[i, col], fixed_fees[i, col], slippage[i, col])
+        size, SizeType.Shares, price[i, col], fees[i, col],
+        fixed_fees[i, col], slippage[i, col]
+    )
 
 
 # test_portfolio
-init_capital = [100, 200, 300]
+init_cash = [100, 200, 300]
 levy_alpha = [1., 2., 3.]
 risk_free = [0.01, 0.02, 0.03]
 required_return = [0.1, 0.2, 0.3]
@@ -67,7 +69,7 @@ factor_returns = price.vbt.combine_with_multiple(
 test_portfolio = vbt.Portfolio.from_signals(
     price, entries, exits,
     fees=0.01,
-    init_capital=init_capital,
+    init_cash=init_cash,
     freq='1 days',
     year_freq='252 days',
     levy_alpha=levy_alpha,
@@ -256,8 +258,8 @@ class TestPortfolio:
             ]), index=price.index, columns=entries.columns)
         )
 
-    def test_from_signals_init_capital(self):
-        portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_capital=[1, 10, 100])
+    def test_from_signals_init_cash(self):
+        portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_cash=[1, 10, 100])
         record_arrays_close(
             portfolio.orders.records_arr,
             np.array([
@@ -616,8 +618,8 @@ class TestPortfolio:
             ]), index=price.index, columns=entries.columns)
         )
 
-    def test_from_orders_init_capital(self):
-        portfolio = vbt.Portfolio.from_orders(price, order_size, init_capital=[1, 10, 100])
+    def test_from_orders_init_cash(self):
+        portfolio = vbt.Portfolio.from_orders(price, order_size, init_cash=[1, 10, 100])
         record_arrays_close(
             portfolio.orders.records_arr,
             np.array([
@@ -1046,7 +1048,7 @@ class TestPortfolio:
             ]), index=price.index, columns=entries.columns)
         )
 
-    def test_from_order_func_init_capital(self):
+    def test_from_order_func_init_cash(self):
         portfolio = vbt.Portfolio.from_order_func(
             price.vbt.tile(3, keys=entries.columns),
             order_func_nb,
@@ -1054,7 +1056,7 @@ class TestPortfolio:
             np.full((price.shape[0], 3), 0.01),
             np.full((price.shape[0], 3), 1),
             np.full((price.shape[0], 3), 0.01),
-            init_capital=[1, 10, 100]
+            init_cash=[1, 10, 100]
         )
         record_arrays_close(
             portfolio.orders.records_arr,
@@ -1090,7 +1092,7 @@ class TestPortfolio:
     def test_single_params(self):
         portfolio = vbt.Portfolio.from_signals(
             price, entries, exits,
-            init_capital=init_capital[0],
+            init_cash=init_cash[0],
             freq='1 days',
             year_freq='252 days',
             levy_alpha=levy_alpha[0],
@@ -1100,8 +1102,8 @@ class TestPortfolio:
             factor_returns=factor_returns['a']
         )
         pd.testing.assert_series_equal(
-            portfolio.init_capital,
-            pd.Series(np.full(3, init_capital[0]), index=entries.columns)
+            portfolio.init_cash,
+            pd.Series(np.full(3, init_cash[0]), index=entries.columns)
         )
         assert portfolio.freq == day_dt
         assert portfolio.year_freq == 252 * day_dt
@@ -1112,7 +1114,7 @@ class TestPortfolio:
         pd.testing.assert_series_equal(portfolio.factor_returns, factor_returns['a'])
 
         # indexing
-        assert portfolio['a'].init_capital == init_capital[0]
+        assert portfolio['a'].init_cash == init_cash[0]
         assert portfolio.freq == day_dt
         assert portfolio.year_freq == 252 * day_dt
         assert portfolio['a'].levy_alpha == levy_alpha[0]
@@ -1123,8 +1125,8 @@ class TestPortfolio:
 
     def test_multiple_params(self):
         pd.testing.assert_series_equal(
-            test_portfolio.init_capital,
-            pd.Series(init_capital, index=entries.columns)
+            test_portfolio.init_cash,
+            pd.Series(init_cash, index=entries.columns)
         )
         assert test_portfolio.freq == day_dt
         assert test_portfolio.year_freq == 252 * day_dt
@@ -1135,7 +1137,7 @@ class TestPortfolio:
         pd.testing.assert_frame_equal(test_portfolio.factor_returns, factor_returns)
 
         # indexing
-        assert test_portfolio['a'].init_capital == init_capital[0]
+        assert test_portfolio['a'].init_cash == init_cash[0]
         assert test_portfolio['a'].freq == day_dt
         assert test_portfolio['a'].year_freq == 252 * day_dt
         assert test_portfolio['a'].levy_alpha == levy_alpha[0]
@@ -1146,28 +1148,28 @@ class TestPortfolio:
 
     def test_indexing(self):
         pd.testing.assert_series_equal(
-            test_portfolio.iloc[:, 0].main_price,
-            test_portfolio.main_price.iloc[:, 0]
+            test_portfolio.iloc[:, 0].ref_price,
+            test_portfolio.ref_price.iloc[:, 0]
         )
         pd.testing.assert_series_equal(
-            test_portfolio.loc[:, 'a'].main_price,
-            test_portfolio.main_price.loc[:, 'a']
+            test_portfolio.loc[:, 'a'].ref_price,
+            test_portfolio.ref_price.loc[:, 'a']
         )
         pd.testing.assert_series_equal(
-            test_portfolio['a'].main_price,
-            test_portfolio.main_price['a']
+            test_portfolio['a'].ref_price,
+            test_portfolio.ref_price['a']
         )
         pd.testing.assert_frame_equal(
-            test_portfolio.iloc[:, [0, 1]].main_price,
-            test_portfolio.main_price.iloc[:, [0, 1]]
+            test_portfolio.iloc[:, [0, 1]].ref_price,
+            test_portfolio.ref_price.iloc[:, [0, 1]]
         )
         pd.testing.assert_frame_equal(
-            test_portfolio.loc[:, ['a', 'b']].main_price,
-            test_portfolio.main_price.loc[:, ['a', 'b']]
+            test_portfolio.loc[:, ['a', 'b']].ref_price,
+            test_portfolio.ref_price.loc[:, ['a', 'b']]
         )
         pd.testing.assert_frame_equal(
-            test_portfolio[['a', 'b']].main_price,
-            test_portfolio.main_price[['a', 'b']]
+            test_portfolio[['a', 'b']].ref_price,
+            test_portfolio.ref_price[['a', 'b']]
         )
         with pytest.raises(Exception) as e_info:
             _ = test_portfolio.iloc[::2, :]  # changing time not supported
@@ -1191,7 +1193,7 @@ class TestPortfolio:
                 (2, 4, 218.36094501, 1., 2.18360945, 1)
             ], dtype=order_dt)
         )
-        pd.testing.assert_frame_equal(test_portfolio.orders.main_price, test_portfolio.main_price)
+        pd.testing.assert_frame_equal(test_portfolio.orders.ref_price, test_portfolio.ref_price)
         assert test_portfolio.orders.wrapper.freq == day_dt
         # trades
         record_arrays_close(
@@ -1205,7 +1207,7 @@ class TestPortfolio:
                 (2, 218.36094501, 3, 2., 4.3672189, 4, 1., 2.18360945, -224.91177336, -0.50990099, 1, 5)
             ], dtype=trade_dt)
         )
-        pd.testing.assert_frame_equal(test_portfolio.trades.main_price, test_portfolio.main_price)
+        pd.testing.assert_frame_equal(test_portfolio.trades.ref_price, test_portfolio.ref_price)
         assert test_portfolio.trades.wrapper.freq == day_dt
         # positions
         record_arrays_close(
@@ -1219,7 +1221,7 @@ class TestPortfolio:
                 (2, 218.36094501, 3, 2., 4.3672189, 4, 1., 2.18360945, -224.91177336, -0.50990099, 1)
             ], dtype=position_dt)
         )
-        pd.testing.assert_frame_equal(test_portfolio.positions.main_price, test_portfolio.main_price)
+        pd.testing.assert_frame_equal(test_portfolio.positions.ref_price, test_portfolio.ref_price)
         assert test_portfolio.positions.wrapper.freq == day_dt
         # drawdowns
         record_arrays_close(
@@ -1498,7 +1500,7 @@ class TestPortfolio:
         portfolio = vbt.Portfolio.from_orders(
             price, order_size,
             fees=0.01,
-            init_capital=init_capital,
+            init_cash=init_cash,
             freq='1 days',
             year_freq='252 days',
             levy_alpha=levy_alpha,
@@ -1506,7 +1508,7 @@ class TestPortfolio:
             required_return=required_return,
             cutoff=cutoff,
             factor_returns=factor_returns,
-            incl_unrealized_stats=False
+            incl_unrealized=False
         )
         pd.testing.assert_series_equal(
             portfolio['c'].stats,
@@ -1550,7 +1552,7 @@ class TestPortfolio:
         portfolio2 = vbt.Portfolio.from_orders(
             price, order_size,
             fees=0.01,
-            init_capital=init_capital,
+            init_cash=init_cash,
             freq='1 days',
             year_freq='252 days',
             levy_alpha=levy_alpha,
@@ -1558,7 +1560,7 @@ class TestPortfolio:
             required_return=required_return,
             cutoff=cutoff,
             factor_returns=factor_returns,
-            incl_unrealized_stats=True
+            incl_unrealized=True
         )
         pd.testing.assert_series_equal(
             portfolio2['c'].stats,
