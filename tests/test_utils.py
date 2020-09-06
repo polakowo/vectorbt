@@ -353,16 +353,9 @@ class TestChecks:
             checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(0, 1))
 
     def test_assert_same_index(self):
-        index = ['a', 'b', 'c']
-        checks.assert_same_index(pd.Series([1, 2, 3], index=index), pd.DataFrame([1, 2, 3], index=index))
+        checks.assert_same_index(pd.Index([1, 2, 3]), pd.Index([1, 2, 3]))
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_index(pd.Series([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
-
-    def test_assert_same_columns(self):
-        columns = ['a', 'b', 'c']
-        checks.assert_same_columns(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
-        with pytest.raises(Exception) as e_info:
-            checks.assert_same_columns(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
+            checks.assert_same_index(pd.Index([1, 2, 3]), pd.Index([2, 3, 4]))
 
     def test_assert_same_meta(self):
         index = ['x', 'y', 'z']
@@ -507,3 +500,19 @@ class TestArray:
         assert array.is_sorted_nb(np.array([0]))
         assert not array.is_sorted_nb(np.array([1, 0]))
         assert not array.is_sorted_nb(np.array([0, 1, 2, 4, 3]))
+
+    def test_get_ranges_arr(self):
+        np.testing.assert_array_equal(
+            array.get_ranges_arr(0, 3),
+            np.array([0, 1, 2])
+        )
+        np.testing.assert_array_equal(
+            array.get_ranges_arr(0, [1, 2, 3]),
+            np.array([0, 0, 1, 0, 1, 2])
+        )
+        np.testing.assert_array_equal(
+            array.get_ranges_arr([0, 3], [3, 6]),
+            np.array([0, 1, 2, 3, 4, 5])
+        )
+
+

@@ -96,33 +96,18 @@ __pdoc__['ohlcv'] = f"""Parameters for OHLCV.
 ```
 """
 
-# Portfolio
-portfolio = Config(
-    init_cash=100.,
-    init_shares=0.,
-    fees=0.,
-    fixed_fees=0.,
-    slippage=0.
+# Array wrapper
+array_wrapper = Config(
+    column_only_select=False,
+    group_select=True,
+    freq=None
 )
 """_"""
 
-__pdoc__['portfolio'] = f"""Parameters for portfolio.
+__pdoc__['array_wrapper'] = f"""Parameters for array wrapper.
 
 ```plaintext
-{json.dumps(portfolio, indent=2)}
-```
-"""
-
-# Returns
-returns = Config(
-    year_freq='365 days'
-)
-"""_"""
-
-__pdoc__['returns'] = f"""Parameters for returns.
-
-```plaintext
-{json.dumps(returns, indent=2)}
+{json.dumps(array_wrapper, indent=2)}
 ```
 """
 
@@ -148,3 +133,42 @@ caching = True
 """If `True`, will cache properties and methods decorated accordingly.
 
 Disable for performance tests."""
+
+# Returns
+returns = Config(
+    year_freq='365 days'
+)
+"""_"""
+
+__pdoc__['returns'] = f"""Parameters for returns.
+
+```plaintext
+{json.dumps(returns, indent=2)}
+```
+"""
+
+# Portfolio
+portfolio = Config(
+    call_seq='Default',
+    init_cash=100.,
+    size_type='Shares',
+    fees=0.,
+    fixed_fees=0.,
+    slippage=0.,
+    accumulate=False,
+    accumulate_exit_mode='Close',
+    conflict_mode='Ignore',
+    cash_sharing=False,
+    row_wise=False,
+    freq=None,
+    incl_unrealized=False
+)
+"""_"""
+
+__pdoc__['portfolio'] = f"""Parameters for portfolio.
+
+```plaintext
+{json.dumps(portfolio, indent=2)}
+```
+"""
+

@@ -211,15 +211,9 @@ def assert_same_shape(arg1, arg2, axis=None):
 
 
 def assert_same_index(arg1, arg2):
-    """Raise exception if `arg1` and `arg2` have different index."""
-    if not pd.Index.equals(arg1.index, arg2.index):
-        raise AssertionError(f"Indexes {arg1.index} and {arg2.index} do not match")
-
-
-def assert_same_columns(arg1, arg2):
-    """Raise exception if `arg1` and `arg2` have different columns."""
-    if not pd.Index.equals(arg1.columns, arg2.columns):
-        raise AssertionError(f"Columns {arg1.columns} and {arg2.columns} do not match")
+    """Raise exception if `arg1` and `arg2` have different index/columns."""
+    if not is_index_equal(arg1, arg2):
+        raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
 def assert_same_meta(arg1, arg2):
@@ -227,9 +221,9 @@ def assert_same_meta(arg1, arg2):
     assert_same_type(arg1, arg2)
     assert_same_shape(arg1, arg2)
     if is_pandas(arg1):
-        assert_same_index(arg1, arg2)
+        assert_same_index(arg1.index, arg2.index)
         if is_frame(arg1):
-            assert_same_columns(arg1, arg2)
+            assert_same_index(arg1.columns, arg2.columns)
 
 
 def assert_same(arg1, arg2):

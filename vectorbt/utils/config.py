@@ -4,15 +4,18 @@
 class Config(dict):
     """A simple dict with (optionally) frozen keys."""
 
-    def __init__(self, *args, frozen=True, **kwargs):
+    def __init__(self, *args, frozen=True, read_only=False, **kwargs):
         super().__init__(*args, **kwargs)
         self.frozen = frozen
+        self.read_only = read_only
         self.default_config = dict(self)
         for key, value in dict.items(self):
             if isinstance(value, dict):
                 dict.__setitem__(self, key, Config(value, frozen=frozen))
 
     def __setitem__(self, key, val):
+        if self.read_only:
+            raise ValueError("Config is read-only")
         if self.frozen and key not in self:
             raise KeyError(f"Key {key} is not a valid parameter")
         dict.__setitem__(self, key, val)
@@ -38,3 +41,18 @@ def merge_kwargs(x, y):
     for key in y.keys() - overlapping_keys:
         z[key] = y[key]
     return z
+
+
+class Configured:
+    """Class with an initialization config."""
+    def __init__(self, **config):
+        self._config = Config(config, read_only=True)
+
+    def copy(self, **new_config):
+        """Create a new instance based on the config.
+
+        !!! warning
+            This "copy" operation won't return a copy of the instance but a new instance
+            initialized with the same config. If the instance has writable attributes,
+            their values won't be copied over."""
+        return self.__class__(**merge_kwargs(self._config, new_config))

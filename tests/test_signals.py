@@ -827,20 +827,18 @@ class TestAccessors:
         )
 
     def test_num_signals(self):
-        assert sig['a'].vbt.signals.num_signals == 2
+        assert sig['a'].vbt.signals.num_signals() == 2
         pd.testing.assert_series_equal(
-            sig.vbt.signals.num_signals,
+            sig.vbt.signals.num_signals(),
             pd.Series([2, 2, 1], index=sig.columns)
         )
 
     def test_avg_distance(self):
-        assert sig['a'].vbt.signals.avg_distance == 3.
+        assert sig['a'].vbt.signals.avg_distance() == 3.
         pd.testing.assert_series_equal(
-            sig.vbt.signals.avg_distance,
+            sig.vbt.signals.avg_distance(),
             pd.Series([3., 3., np.nan], index=sig.columns)
         )
-
-    def test_avg_distance_to(self):
         other_sig = pd.DataFrame([
             [False, False, False],
             [False, False, False],
@@ -848,10 +846,9 @@ class TestAccessors:
             [False, True, False],
             [True, False, True]
         ], index=index, columns=columns)
-
-        assert sig['a'].vbt.signals.avg_distance_to(other_sig['a']) == 1.5
+        assert sig['a'].vbt.signals.avg_distance(other=other_sig['a']) == 1.5
         pd.testing.assert_series_equal(
-            sig.vbt.signals.avg_distance_to(other_sig),
+            sig.vbt.signals.avg_distance(other=other_sig),
             pd.Series([1.5, 2., 2.], index=sig.columns)
         )
 

@@ -7,26 +7,26 @@ import plotly.graph_objects as go
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
+from vectorbt.utils.config import Configured
 from vectorbt.base.indexing import PandasIndexer
-from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.records.base import Records, indexing_on_records
+from vectorbt.records.base import Records, indexing_on_records_meta
 from vectorbt.records.enums import OrderSide, order_dt
 
 
-def _indexing_func(obj, pd_indexing_func):
+def indexing_on_orders_meta(obj, pd_indexing_func):
     """Perform indexing on `BaseOrders`."""
-    new_cols, new_records, _ = indexing_on_records(obj, pd_indexing_func)
-    if obj.grouper.group_by is not None:
-        new_group_by = obj.grouper.group_by[new_cols]
-    else:
-        new_group_by = None
-    return obj.__class__(
-        new_records,
-        pd_indexing_func(obj.ref_price),
-        freq=obj.wrapper.freq,
-        idx_field=obj.idx_field,
-        group_by=new_group_by
-    )
+    new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
+    new_ref_price = new_wrapper.wrap(obj.ref_price.values[:, col_idxs], group_by=False)
+    return obj.copy(
+        wrapper=new_wrapper,
+        records_arr=new_records_arr,
+        ref_price=new_ref_price
+    ), group_idxs, col_idxs
+
+
+def _indexing_func(obj, pd_indexing_func):
+    """See `indexing_on_orders`."""
+    return indexing_on_orders_meta(obj, pd_indexing_func)[0]
 
 
 class BaseOrders(Records):
@@ -49,44 +49,38 @@ class BaseOrders(Records):
         1
         ```"""
 
-    def __init__(self, records_arr, ref_price, freq=None, idx_field='idx', group_by=None):
+    def __init__(self, wrapper, records_arr, ref_price, idx_field='idx'):
         Records.__init__(
             self,
+            wrapper,
             records_arr,
-            ArrayWrapper.from_obj(ref_price, freq=freq),
-            idx_field=idx_field,
-            group_by=group_by
+            idx_field=idx_field
         )
-        PandasIndexer.__init__(self, _indexing_func)
+        Configured.__init__(
+            self,
+            wrapper=wrapper,
+            records_arr=records_arr,
+            ref_price=ref_price,
+            idx_field=idx_field
+        )
+        self.ref_price = ref_price
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise ValueError("Records array must have all fields defined in order_dt")
 
-        self.ref_price = ref_price
-
-    def filter_by_mask(self, mask, idx_field=None, group_by=None):
-        """Return a new class instance, filtered by mask."""
-        if idx_field is None:
-            idx_field = self.idx_field
-        if group_by is None:
-            group_by = self.grouper.group_by
-        return self.__class__(
-            self.records_arr[mask],
-            self.ref_price,
-            freq=self.wrapper.freq,
-            idx_field=idx_field,
-            group_by=group_by
-        )
+        PandasIndexer.__init__(self, _indexing_func)
 
     def plot(self,
-             ref_price_trace_kwargs={},
-             buy_trace_kwargs={},
-             sell_trace_kwargs={},
+             column=None,
+             ref_price_trace_kwargs=None,
+             buy_trace_kwargs=None,
+             sell_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot orders.
 
         Args:
+            column (str): Name of the column to plot.
             ref_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
@@ -98,24 +92,38 @@ class BaseOrders(Records):
             ```
 
             ![](/vectorbt/docs/img/orders.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+        if column is not None:
+            if self.wrapper.grouper.group_by is None:
+                self_col = self[column]
+            else:
+                self_col = self.copy(wrapper=self.wrapper.copy(group_by=None))[column]
+        else:
+            self_col = self
+        if self_col.wrapper.ndim > 1:
+            raise TypeError("Select a column first. Use indexing or column argument.")
+
+        if ref_price_trace_kwargs is None:
+            ref_price_trace_kwargs = {}
+        if buy_trace_kwargs is None:
+            buy_trace_kwargs = {}
+        if sell_trace_kwargs is None:
+            sell_trace_kwargs = {}
 
         # Plot main price
-        fig = self.ref_price.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.ref_price.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
-        idx = self.records_arr['idx']
-        size = self.records_arr['size']
-        price = self.records_arr['price']
-        fees = self.records_arr['fees']
-        side = self.records_arr['side']
+        idx = self_col.records_arr['idx']
+        size = self_col.records_arr['size']
+        price = self_col.records_arr['price']
+        fees = self_col.records_arr['fees']
+        side = self_col.records_arr['side']
 
         # Plot Buy markers
         buy_mask = side == OrderSide.Buy
         buy_customdata = np.stack((size[buy_mask], fees[buy_mask]), axis=1)
         buy_scatter = go.Scatter(
-            x=self.wrapper.index[idx[buy_mask]],
+            x=self_col.wrapper.index[idx[buy_mask]],
             y=price[buy_mask],
             mode='markers',
             marker=dict(
@@ -138,7 +146,7 @@ class BaseOrders(Records):
         sell_mask = side == OrderSide.Sell
         sell_customdata = np.stack((size[sell_mask], fees[sell_mask]), axis=1)
         sell_scatter = go.Scatter(
-            x=self.wrapper.index[idx[sell_mask]],
+            x=self_col.wrapper.index[idx[sell_mask]],
             y=price[sell_mask],
             mode='markers',
             marker=dict(
@@ -190,11 +198,10 @@ class Orders(BaseOrders):
         """Buy operations of type `BaseOrders`."""
         filter_mask = self.records_arr['side'] == OrderSide.Buy
         return BaseOrders(
+            self.wrapper,
             self.records_arr[filter_mask],
             self.ref_price,
-            freq=self.wrapper.freq,
-            idx_field=self.idx_field,
-            group_by=self.grouper.group_by
+            idx_field=self.idx_field
         )
 
     @cached_property
@@ -202,9 +209,8 @@ class Orders(BaseOrders):
         """Sell operations of type `BaseOrders`."""
         filter_mask = self.records_arr['side'] == OrderSide.Sell
         return BaseOrders(
+            self.wrapper,
             self.records_arr[filter_mask],
             self.ref_price,
-            freq=self.wrapper.freq,
-            idx_field=self.idx_field,
-            group_by=self.grouper.group_by
+            idx_field=self.idx_field
         )

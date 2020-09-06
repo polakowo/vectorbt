@@ -5,7 +5,7 @@
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
     Data is processed along index (axis 0).
     
-    All functions passed as argument must be Numba-compiled.
+    All functions passed as argument should be Numba-compiled.
 
     Returned indices must be absolute."""
 
@@ -44,12 +44,12 @@ def generate_nb(shape, choice_func_nb, *args):
          [False False False]
          [False False False]]
         ```"""
-    result = np.full(shape, False, dtype=np.bool_)
+    out = np.full(shape, False, dtype=np.bool_)
 
-    for col in range(result.shape[1]):
+    for col in range(out.shape[1]):
         idxs = choice_func_nb(col, 0, shape[0], *args)
-        result[idxs, col] = True
-    return result
+        out[idxs, col] = True
+    return out
 
 
 @njit
@@ -135,11 +135,11 @@ def shuffle_nb(a, seed=None):
     """2-dim version of `shuffle_1d_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    result = np.empty_like(a, dtype=np.bool_)
+    out = np.empty_like(a, dtype=np.bool_)
 
     for col in range(a.shape[1]):
-        result[:, col] = np.random.permutation(a[:, col])
-    return result
+        out[:, col] = np.random.permutation(a[:, col])
+    return out
 
 
 @njit(cache=True)
@@ -164,15 +164,15 @@ def rand_by_prob_choice_nb(col, from_i, to_i, probs, return_first):
     """`choice_func_nb` to randomly pick values from range `[from_i, to_i)` with probabilities `probs`.
 
     `probs` must be a 1-dim array."""
-    result = np.empty(to_i - from_i, dtype=np.int_)
+    out = np.empty(to_i - from_i, dtype=np.int_)
     j = 0
     for i in np.arange(from_i, to_i):
         if np.random.uniform(0, 1) <= probs[i, col]:
-            result[j] = i
+            out[j] = i
             j += 1
             if return_first:
                 break
-    return result[:j]
+    return out[:j]
 
 
 @njit
@@ -409,7 +409,7 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
         >>> map_reduce_between_nb(a, map_func_nb, reduce_func_nb)
         [1.5]
         ```"""
-    result = np.full(a.shape[1], np.nan, dtype=np.float_)
+    out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -422,8 +422,8 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
                 map_res[k] = map_func_nb(col, from_i, to_i, *args)
                 k += 1
             if k > 0:
-                result[col] = reduce_func_nb(col, map_res[:k], *args)
-    return result
+                out[col] = reduce_func_nb(col, map_res[:k], *args)
+    return out
 
 
 @njit
@@ -434,7 +434,7 @@ def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
     Iterates over `b`, and for each found signal, looks for the preceding signal in `a`.
 
     `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
-    result = np.full((a.shape[1],), np.nan, dtype=np.float_)
+    out = np.full((a.shape[1],), np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
@@ -450,8 +450,8 @@ def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
                         map_res[k] = map_func_nb(col, from_i, to_i, *args)
                         k += 1
                 if k > 0:
-                    result[col] = reduce_func_nb(col, map_res[:k], *args)
-    return result
+                    out[col] = reduce_func_nb(col, map_res[:k], *args)
+    return out
 
 
 @njit
@@ -459,7 +459,7 @@ def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each partition of signals in `a`.
 
     `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
-    result = np.full(a.shape[1], np.nan, dtype=np.float_)
+    out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
         is_partition = False
@@ -482,8 +482,8 @@ def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
                     map_res[k] = map_func_nb(col, from_i, to_i, *args)
                     k += 1
         if k > 0:
-            result[col] = reduce_func_nb(col, map_res[:k], *args)
-    return result
+            out[col] = reduce_func_nb(col, map_res[:k], *args)
+    return out
 
 
 @njit(cache=True)
@@ -526,7 +526,7 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
         >>> rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by)
         [1 1 0 2 1]
         ```"""
-    result = np.zeros(a.shape, dtype=np.int_)
+    out = np.zeros(a.shape, dtype=np.int_)
 
     false_seen = not after_false
     inc = 0
@@ -539,27 +539,27 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
         if a[i]:
             if false_seen:
                 inc += 1
-                result[i] = inc
+                out[i] = inc
         else:
             false_seen = True
             if not allow_gaps:
                 inc = 0
-    return result
+    return out
 
 
 @njit(cache=True)
 def rank_nb(a, reset_by=None, after_false=False, allow_gaps=False):
     """2-dim version of `rank_1d_nb`."""
-    result = np.zeros(a.shape, dtype=np.int_)
+    out = np.zeros(a.shape, dtype=np.int_)
 
     for col in range(a.shape[1]):
-        result[:, col] = rank_1d_nb(
+        out[:, col] = rank_1d_nb(
             a[:, col],
             None if reset_by is None else reset_by[:, col],
             after_false=after_false,
             allow_gaps=allow_gaps
         )
-    return result
+    return out
 
 
 @njit(cache=True)
@@ -583,7 +583,7 @@ def rank_partitions_1d_nb(a, reset_by=None, after_false=False):
         >>> rank_partitions_1d_nb(signals, reset_by=reset_by)
         [1 1 0 2 1]
         ```"""
-    result = np.zeros(a.shape, dtype=np.int_)
+    out = np.zeros(a.shape, dtype=np.int_)
 
     false_seen = not after_false
     first_seen = False
@@ -600,25 +600,25 @@ def rank_partitions_1d_nb(a, reset_by=None, after_false=False):
                 if not first_seen:
                     inc += 1
                     first_seen = True
-                result[i] = inc
+                out[i] = inc
         else:
             false_seen = True
             first_seen = False
-    return result
+    return out
 
 
 @njit(cache=True)
 def rank_partitions_nb(a, reset_by=None, after_false=False):
     """2-dim version of `rank_partitions_1d_nb`."""
-    result = np.zeros(a.shape, dtype=np.int_)
+    out = np.zeros(a.shape, dtype=np.int_)
 
     for col in range(a.shape[1]):
-        result[:, col] = rank_partitions_1d_nb(
+        out[:, col] = rank_partitions_1d_nb(
             a[:, col],
             None if reset_by is None else reset_by[:, col],
             after_false=after_false
         )
-    return result
+    return out
 
 
 # ############# Boolean operations ############# #
@@ -630,10 +630,10 @@ def rank_partitions_nb(a, reset_by=None, after_false=False):
 @njit(cache=True)
 def fshift_1d_nb(a, n):
     """Shift forward `a` by `n` positions."""
-    result = np.empty_like(a, dtype=np.bool_)
-    result[:n] = False
-    result[n:] = a[:-n]
-    return result
+    out = np.empty_like(a, dtype=np.bool_)
+    out[:n] = False
+    out[n:] = a[:-n]
+    return out
 
 
 @njit(cache=True)

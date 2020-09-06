@@ -1,7 +1,10 @@
 """Custom pandas accessors.
 
 !!! note
-    The underlying Series/DataFrame must already be a return series."""
+    The underlying Series/DataFrame must already be a return series.
+
+    Accessors do not utilize caching.
+"""
 
 import numpy as np
 import pandas as pd
@@ -9,7 +12,6 @@ import pandas as pd
 from vectorbt import defaults
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns
 from vectorbt.generic.accessors import (
     Generic_Accessor,
@@ -228,12 +230,11 @@ class Returns_Accessor(Generic_Accessor):
         """Total maximum drawdown (MDD)."""
         return self.wrap_reduced(nb.max_drawdown_nb(self.to_2d_array()))
 
-    @cached_property
-    def drawdowns(self):
-        """Drawdown records of cumulative returns.
+    def drawdowns(self, **kwargs):
+        """Generate drawdown records of cumulative returns.
 
         See `vectorbt.records.drawdowns.Drawdowns`."""
-        return self.cumulative(start_value=1.).vbt(freq=self.freq).drawdowns
+        return self.cumulative(start_value=1.).vbt(freq=self.freq).drawdowns(**kwargs)
 
 
 @register_series_accessor('returns')

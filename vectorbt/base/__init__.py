@@ -29,11 +29,6 @@ Name: name, dtype: int64
 Index functions perform operations on index objects, such as stacking, combining,
 and cleansing MultiIndex levels. "Index" in pandas context is referred to both index and columns.
 
-## Index grouper
-
-Index grouper groups index either by its levels or by some array, and exposes methods for working
-with groups. It's mainly used for grouping columns in records and portfolio.
-
 ## Reshape functions
 
 Reshape functions transform a pandas object/NumPy array in some way, such as tiling, broadcasting,

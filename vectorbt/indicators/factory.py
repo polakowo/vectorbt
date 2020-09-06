@@ -286,6 +286,7 @@ from collections import OrderedDict
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.config import merge_kwargs
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -329,11 +330,11 @@ def create_param_combs(op_tree, depth=0):
             new_op_tree += (create_param_combs(elem, depth=depth + 1),)
         else:
             new_op_tree += (elem,)
-    result = list(new_op_tree[0](*new_op_tree[1:]))
+    out = list(new_op_tree[0](*new_op_tree[1:]))
     if depth == 0:
         # do something
-        return flatten_param_tuples(result)
-    return result
+        return flatten_param_tuples(out)
+    return out
 
 
 def create_param_product(param_list):
@@ -546,7 +547,8 @@ def run_pipeline(
     """
     if len(input_list) > 1:
         # Broadcast time series
-        input_list = reshape_fns.broadcast(*input_list, **broadcast_kwargs, writeable=True)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        input_list = reshape_fns.broadcast(*input_list, **broadcast_kwargs)
     # Check time series objects
     checks.assert_type(input_list[0], (pd.Series, pd.DataFrame))
     # Convert params to 1-dim arrays
@@ -566,7 +568,7 @@ def run_pipeline(
             param_list = create_param_product(param_list)
         else:
             # Broadcast such that each array has the same length
-            param_list = reshape_fns.broadcast(*param_list, writeable=True)
+            param_list = reshape_fns.broadcast(*param_list, require_kwargs=dict(requirements='W'))
     if not isinstance(param_list, (tuple, list)):
         param_list = [param_list]
     if pass_2d:
@@ -626,14 +628,14 @@ def perform_init_checks(input_list, input_mapper, output_list, param_list, mappe
     checks.assert_type(input_list[0], (pd.Series, pd.DataFrame))
     checks.assert_type(output_list[0], (pd.Series, pd.DataFrame))
     if input_mapper is not None:
-        checks.assert_same_index(reshape_fns.to_2d(output_list[0]).iloc[0, :], input_mapper)
+        checks.assert_same_index(output_list[0].vbt.columns, input_mapper.index)
     for ts in output_list:
         checks.assert_same_meta(output_list[0], ts)
     for params in param_list:
         checks.assert_same_shape(param_list[0], params)
     for mapper in mapper_list:
         checks.assert_type(mapper, pd.Series)
-        checks.assert_same_index(reshape_fns.to_2d(output_list[0]).iloc[0, :], mapper)
+        checks.assert_same_index(output_list[0].vbt.columns, mapper.index)
     checks.assert_type(short_name, str)
 
 
@@ -1029,7 +1031,7 @@ class IndicatorFactory():
                 if param_product:
                     param_list = create_param_product(param_list)
                 else:
-                    param_list = reshape_fns.broadcast(*param_list, writeable=True)
+                    param_list = reshape_fns.broadcast(*param_list, require_kwargs=dict(requirements='W'))
                 if not isinstance(param_list, (tuple, list)):
                     param_list = [param_list]
                 custom_func_args = args[len(input_names) + len(param_names):]
@@ -1102,10 +1104,10 @@ class IndicatorFactory():
                             level_name = f'{self.short_name}_{func_name}'
                         else:
                             level_name = f'{self.short_name}_{attr}_{func_name}'
-                    result = compare(getattr(self, attr), other, compare_func, level_name=level_name, **kwargs)
+                    out = compare(getattr(self, attr), other, compare_func, level_name=level_name, **kwargs)
                     if crossed:
-                        return result.vbt.signals.nst(wait + 1, after_false=after_false)
-                    return result
+                        return out.vbt.signals.nst(wait + 1, after_false=after_false)
+                    return out
 
                 comparison_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
                 comparison_method.__doc__ = f"""Return `True` for each element where `{attr}` is {func_name} `other`. 

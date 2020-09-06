@@ -6,7 +6,7 @@ from datetime import datetime
 import pytest
 
 from vectorbt.records import order_dt, trade_dt, position_dt, drawdown_dt
-from vectorbt.portfolio.enums import FilledOrder, SizeType
+from vectorbt.portfolio.enums import FilledOrder, SizeType, AccumulateExitMode, ConflictMode
 
 from tests.utils import record_arrays_close
 
@@ -423,13 +423,12 @@ class TestPortfolio:
             ]), index=price.index, columns=entries.columns)
         )
 
-    def test_from_signals_accumulate(self):
-        portfolio = vbt.Portfolio.from_signals(price, entries, exits, size=1, accumulate=True)
+    def test_from_signals_size_type(self):
+        portfolio = vbt.Portfolio.from_signals(price, entries, exits, size=1, size_type=SizeType.Shares)
         record_arrays_close(
             portfolio.orders.records_arr,
             np.array([
-                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
-                (0, 2, 1., 3., 0., 1), (0, 3, 1., 2., 0., 1),
+                (0, 0, 1., 1., 0., 0), (0, 3, 1., 2., 0., 1),
                 (1, 0, 1., 1., 0., 0), (1, 1, 1., 2., 0., 1),
                 (1, 2, 1., 3., 0., 0), (1, 3, 1., 2., 0., 1),
                 (1, 4, 1., 1., 0., 0), (2, 1, 1., 2., 0., 0),
@@ -441,7 +440,7 @@ class TestPortfolio:
             portfolio.shares,
             pd.DataFrame(np.array([
                 [1., 1., 0.],
-                [2., 0., 1.],
+                [1., 0., 1.],
                 [1., 1., 0.],
                 [0., 0., 1.],
                 [0., 1., 0.]
@@ -451,114 +450,348 @@ class TestPortfolio:
             portfolio.cash,
             pd.DataFrame(np.array([
                 [99., 99., 100.],
+                [99., 101., 98.],
+                [99., 98., 101.],
+                [101., 100., 99.],
+                [101., 99., 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        portfolio2 = vbt.Portfolio.from_signals(price, entries, exits, size=1, size_type=SizeType.Cash)
+        record_arrays_close(
+            portfolio2.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 3, 1., 2., 0., 1),
+                (1, 0, 1., 1., 0., 0), (1, 1, 1., 2., 0., 1),
+                (1, 2, 0.33333333, 3., 0., 0), (1, 3, 0.33333333, 2., 0., 1),
+                (1, 4, 1., 1., 0., 0), (2, 1, 0.5, 2., 0., 0),
+                (2, 2, 0.5, 3., 0., 1), (2, 3, 0.5, 2., 0., 0),
+                (2, 4, 0.5, 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [1., 0., 0.5],
+                [1., 0.33333333, 0.],
+                [0., 0., 0.5],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [99., 101., 99.],
+                [99., 100., 100.5],
+                [101., 100.66666667, 99.5],
+                [101., 99.66666667, 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = vbt.Portfolio.from_signals(price, entries, exits, size=1, size_type=SizeType.TargetShares)
+        with pytest.raises(Exception) as e_info:
+            _ = vbt.Portfolio.from_signals(price, entries, exits, size=1, size_type=SizeType.TargetCash)
+        with pytest.raises(Exception) as e_info:
+            _ = vbt.Portfolio.from_signals(price, entries, exits, size=1, size_type=SizeType.TargetValue)
+        with pytest.raises(Exception) as e_info:
+            _ = vbt.Portfolio.from_signals(price, entries, exits, size=1, size_type=SizeType.TargetPercent)
+
+    def test_from_signals_accumulate(self):
+        portfolio = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Shares,
+            accumulate=True,
+            accumulate_exit_mode=AccumulateExitMode.Close)
+        record_arrays_close(
+            portfolio.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 3, 2., 2., 0., 1), (1, 0, 1., 1., 0., 0),
+                (1, 1, 1., 2., 0., 1), (1, 2, 1., 3., 0., 0),
+                (1, 3, 1., 2., 0., 1), (1, 4, 1., 1., 0., 0),
+                (2, 1, 1., 2., 0., 0), (2, 2, 1., 3., 0., 1),
+                (2, 3, 1., 2., 0., 0), (2, 4, 1., 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [2., 0., 1.],
+                [2., 1., 0.],
+                [0., 0., 1.],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [97., 101., 98.],
+                [97., 98., 101.],
+                [101., 100., 99.],
+                [101., 99., 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        portfolio2 = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Cash,
+            accumulate=True,
+            accumulate_exit_mode=AccumulateExitMode.Close)
+        record_arrays_close(
+            portfolio2.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 0.5, 2., 0., 0),
+                (0, 3, 1.5, 2., 0., 1), (1, 0, 1., 1., 0., 0),
+                (1, 1, 1., 2., 0., 1), (1, 2, 0.33333333, 3., 0., 0),
+                (1, 3, 0.33333333, 2., 0., 1), (1, 4, 1., 1., 0., 0),
+                (2, 1, 0.5, 2., 0., 0), (2, 2, 0.5, 3., 0., 1),
+                (2, 3, 0.5, 2., 0., 0), (2, 4, 0.5, 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [1.5, 0., 0.5],
+                [1.5, 0.33333333, 0.],
+                [0., 0., 0.5],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [98., 101., 99.],
+                [98., 100., 100.5],
+                [101., 100.66666667, 99.5],
+                [101., 99.66666667, 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        portfolio3 = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Shares,
+            accumulate=True,
+            accumulate_exit_mode=AccumulateExitMode.Reduce)
+        record_arrays_close(
+            portfolio3.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 3, 1., 2., 0., 1), (0, 4, 1., 1., 0., 1),
+                (1, 0, 1., 1., 0., 0), (1, 1, 1., 2., 0., 1),
+                (1, 2, 1., 3., 0., 0), (1, 3, 1., 2., 0., 1),
+                (1, 4, 1., 1., 0., 0), (2, 1, 1., 2., 0., 0),
+                (2, 2, 1., 3., 0., 1), (2, 3, 1., 2., 0., 0),
+                (2, 4, 1., 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio3.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [2., 0., 1.],
+                [2., 1., 0.],
+                [1., 0., 1.],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio3.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [97., 101., 98.],
+                [97., 98., 101.],
+                [99., 100., 99.],
+                [100., 99., 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        portfolio4 = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Cash,
+            accumulate=True,
+            accumulate_exit_mode=AccumulateExitMode.Reduce)
+        record_arrays_close(
+            portfolio4.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 0.5, 2., 0., 0),
+                (0, 3, 0.5, 2., 0., 1), (0, 4, 1., 1., 0., 1),
+                (1, 0, 1., 1., 0., 0), (1, 1, 0.5, 2., 0., 1),
+                (1, 2, 0.33333333, 3., 0., 0), (1, 3, 0.5, 2., 0., 1),
+                (1, 4, 1., 1., 0., 0), (2, 1, 0.5, 2., 0., 0),
+                (2, 2, 0.33333333, 3., 0., 1), (2, 3, 0.5, 2., 0., 0),
+                (2, 4, 0.66666667, 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio4.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [1.5, 0.5, 0.5],
+                [1.5, 0.83333333, 0.16666667],
+                [1., 0.33333333, 0.66666667],
+                [0., 1.33333333, 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio4.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [98., 100., 99.],
+                [98., 99., 100.],
+                [99., 100., 99.],
+                [100., 99., 99.66666667]
+            ]), index=price.index, columns=entries.columns)
+        )
+
+    def test_from_signals_conflicts(self):
+        portfolio = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Shares,
+            accumulate=True,
+            conflict_mode=ConflictMode.Exit)
+        record_arrays_close(
+            portfolio.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 2, 2., 3., 0., 1), (1, 0, 1., 1., 0., 0),
+                (1, 1, 1., 2., 0., 1), (1, 2, 1., 3., 0., 0),
+                (1, 3, 1., 2., 0., 1), (1, 4, 1., 1., 0., 0),
+                (2, 1, 1., 2., 0., 0), (2, 2, 1., 3., 0., 1),
+                (2, 3, 1., 2., 0., 0), (2, 4, 1., 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [2., 0., 1.],
+                [0., 1., 0.],
+                [0., 0., 1.],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [97., 101., 98.],
+                [103., 98., 101.],
+                [103., 100., 99.],
+                [103., 99., 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        portfolio2 = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Cash,
+            accumulate=True,
+            conflict_mode=ConflictMode.Exit)
+        record_arrays_close(
+            portfolio2.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 0.5, 2., 0., 0),
+                (0, 2, 1.5, 3., 0., 1), (1, 0, 1., 1., 0., 0),
+                (1, 1, 1., 2., 0., 1), (1, 2, 0.33333333, 3., 0., 0),
+                (1, 3, 0.33333333, 2., 0., 1), (1, 4, 1., 1., 0., 0),
+                (2, 1, 0.5, 2., 0., 0), (2, 2, 0.5, 3., 0., 1),
+                (2, 3, 0.5, 2., 0., 0), (2, 4, 0.5, 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [1.5, 0., 0.5],
+                [0., 0.33333333, 0.],
+                [0., 0., 0.5],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio2.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [98., 101., 99.],
+                [102.5, 100., 100.5],
+                [102.5, 100.66666667, 99.5],
+                [102.5, 99.66666667, 100.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        portfolio3 = vbt.Portfolio.from_signals(
+            price, entries, exits, size=1,
+            size_type=SizeType.Shares,
+            accumulate=True,
+            conflict_mode=ConflictMode.ExitAndEntry)
+        record_arrays_close(
+            portfolio3.orders.records_arr,
+            np.array([
+                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 0),
+                (0, 2, 1., 3., 0., 1), (0, 3, 1., 2., 0., 1),
+                (1, 0, 1., 1., 0., 0), (1, 1, 1., 2., 0., 1),
+                (1, 2, 1., 3., 0., 0), (1, 3, 1., 2., 0., 1),
+                (1, 4, 1., 1., 0., 0), (2, 1, 1., 2., 0., 0),
+                (2, 2, 1., 3., 0., 1), (2, 3, 1., 2., 0., 0),
+                (2, 4, 1., 1., 0., 1)
+            ], dtype=order_dt)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio3.shares,
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [2., 0., 1.],
+                [1., 1., 0.],
+                [0., 0., 1.],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
+        )
+        pd.testing.assert_frame_equal(
+            portfolio3.cash,
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
                 [97., 101., 98.],
                 [100., 98., 101.],
                 [102., 100., 99.],
                 [102., 99., 100.]
             ]), index=price.index, columns=entries.columns)
         )
-
-    def test_from_signals_size_type(self):
-        entries = [True, False, True, True, True]
-        exits = [False, True, False, False, True]
-        portfolio = vbt.Portfolio.from_signals(
-            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-            size_type=SizeType.Shares, accumulate=False
-        )
-        record_arrays_close(
-            portfolio.orders.records_arr,
-            np.array([
-                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
-                (0, 2, 3., 3., 0., 0), (0, 4, 2., 1., 0., 0)
-            ], dtype=order_dt)
-        )
-        pd.testing.assert_series_equal(
-            portfolio.shares,
-            pd.Series(np.array([1., 0., 3., 3., 5.]), index=price.index, name=price.name)
-        )
-        pd.testing.assert_series_equal(
-            portfolio.cash,
-            pd.Series(np.array([ 99., 101.,  92.,  92.,  90.]), index=price.index, name=price.name)
-        )
-        portfolio2 = vbt.Portfolio.from_signals(
-            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-            size_type=SizeType.Cash, accumulate=False
-        )
-        record_arrays_close(
-            portfolio2.orders.records_arr,
-            np.array([
-                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
-                (0, 2, 1., 3., 0., 0), (0, 4, 93., 1., 0., 0)
-            ], dtype=order_dt)
-        )
-        pd.testing.assert_series_equal(
-            portfolio2.shares,
-            pd.Series(np.array([ 1.,  0.,  1.,  1., 94.]), index=price.index, name=price.name)
-        )
-        pd.testing.assert_series_equal(
-            portfolio2.cash,
-            pd.Series(np.array([ 99., 101.,  98.,  98.,   5.]), index=price.index, name=price.name)
-        )
-        portfolio3 = vbt.Portfolio.from_signals(
-            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-            size_type=SizeType.Shares, accumulate=True
-        )
-        record_arrays_close(
-            portfolio3.orders.records_arr,
-            np.array([
-                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
-                (0, 2, 3., 3., 0., 0), (0, 3, 4., 2., 0., 0),
-                (0, 4, 2., 1., 0., 1)
-            ], dtype=order_dt)
-        )
-        pd.testing.assert_series_equal(
-            portfolio3.shares,
-            pd.Series(np.array([1., 0., 3., 7., 5.]), index=price.index, name=price.name)
-        )
-        pd.testing.assert_series_equal(
-            portfolio3.cash,
-            pd.Series(np.array([ 99., 101.,  92.,  84.,  86.]), index=price.index, name=price.name)
-        )
         portfolio4 = vbt.Portfolio.from_signals(
-            price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-            size_type=SizeType.Cash, accumulate=True
-        )
+            price, entries, exits, size=1,
+            size_type=SizeType.Cash,
+            accumulate=True,
+            conflict_mode=ConflictMode.ExitAndEntry)
         record_arrays_close(
             portfolio4.orders.records_arr,
             np.array([
-                (0, 0, 1., 1., 0., 0), (0, 1, 1., 2., 0., 1),
-                (0, 2, 1., 3., 0., 0), (0, 3, 2., 2., 0., 0),
-                (0, 4, 89., 1., 0., 0)
+                (0, 0, 1., 1., 0., 0), (0, 1, 0.5, 2., 0., 0),
+                (0, 2, 1.16666667, 3., 0., 1), (0, 3, 0.33333333, 2., 0., 1),
+                (1, 0, 1., 1., 0., 0), (1, 1, 1., 2., 0., 1),
+                (1, 2, 0.33333333, 3., 0., 0), (1, 3, 0.33333333, 2., 0., 1),
+                (1, 4, 1., 1., 0., 0), (2, 1, 0.5, 2., 0., 0),
+                (2, 2, 0.5, 3., 0., 1), (2, 3, 0.5, 2., 0., 0),
+                (2, 4, 0.5, 1., 0., 1)
             ], dtype=order_dt)
         )
-        pd.testing.assert_series_equal(
+        pd.testing.assert_frame_equal(
             portfolio4.shares,
-            pd.Series(np.array([ 1.,  0.,  1.,  3., 92.]), index=price.index, name=price.name)
+            pd.DataFrame(np.array([
+                [1., 1., 0.],
+                [1.5, 0., 0.5],
+                [0.33333333, 0.33333333, 0.],
+                [0., 0., 0.5],
+                [0., 1., 0.]
+            ]), index=price.index, columns=entries.columns)
         )
-        pd.testing.assert_series_equal(
+        pd.testing.assert_frame_equal(
             portfolio4.cash,
-            pd.Series(np.array([ 99., 101.,  98.,  94.,   5.]), index=price.index, name=price.name)
+            pd.DataFrame(np.array([
+                [99., 99., 100.],
+                [98., 101., 99.],
+                [101.5, 100., 100.5],
+                [102.16666667, 100.66666667, 99.5],
+                [102.16666667, 99.66666667, 100.]
+            ]), index=price.index, columns=entries.columns)
         )
-        with pytest.raises(Exception) as e_info:
-            _ = vbt.Portfolio.from_signals(
-                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-                size_type=SizeType.TargetShares
-            )
-        with pytest.raises(Exception) as e_info:
-            _ = vbt.Portfolio.from_signals(
-                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-                size_type=SizeType.TargetCash
-            )
-        with pytest.raises(Exception) as e_info:
-            _ = vbt.Portfolio.from_signals(
-                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-                size_type=SizeType.TargetValue
-            )
-        with pytest.raises(Exception) as e_info:
-            _ = vbt.Portfolio.from_signals(
-                price, entries=entries, exits=exits, size=[1, 2, 3, 4, 5],
-                size_type=SizeType.TargetPercent
-            )
 
     def test_from_orders(self):
         portfolio = vbt.Portfolio.from_orders(price, order_size['a'])
@@ -991,9 +1224,9 @@ class TestPortfolio:
 
         @njit
         def order_func2_nb(oc, w, price, fees, fixed_fees, slippage):
-            current_value = oc.run_cash / price[oc.i, oc.col] + oc.run_shares
+            current_value = oc.cash_now / price[oc.i, oc.col] + oc.shares_now
             target_size = w[oc.col] * current_value
-            return vbt.portfolio.nb.Order(target_size - oc.run_shares, SizeType.Shares,
+            return vbt.portfolio.nb.Order(target_size - oc.shares_now, SizeType.Shares,
                                           price[oc.i, oc.col], fees[oc.i, oc.col], fixed_fees[oc.i, oc.col],
                                           slippage[oc.i, oc.col])
 

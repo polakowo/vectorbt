@@ -221,8 +221,8 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
     return new_arg
 
 
-def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default', columns_from='default',
-              writeable=False, copy_kwargs={}, keep_raw=False, **kwargs):
+def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default',
+              columns_from='default', require_kwargs=None, keep_raw=False, **kwargs):
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
 
     See [Broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html).
@@ -237,20 +237,7 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
         to_2d (bool): If `True`, converts all Series to DataFrames.
         index_from (None, int, str or array_like): Broadcasting rule for index.
         columns_from (None, int, str or array_like): Broadcasting rule for columns.
-        writeable (bool): If `True`, makes broadcasted arrays writable, otherwise readonly.
-
-            !!! note
-                Has effect only if broadcasting was needed for that particular array.
-
-                Making arrays writable is possible only through copying them, which is pretty expensive.
-
-                Numba requires arrays to be writable.
-
-        copy_kwargs (dict): Keyword arguments passed to `np.array`. For example, to specify `order`.
-
-            !!! note
-                Has effect on every array, independent from whether broadcasting was needed or not.
-
+        require_kwargs (dict): Keyword arguments passed to `np.require`.
         keep_raw (bool, tuple or list): If `True`, will keep the unbroadcasted version of the array.
         **kwargs: Keyword arguments passed to `broadcast_index`.
 
@@ -258,7 +245,6 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
 
     Example:
         Without broadcasting index and columns:
-
         ```python-repl
         >>> import numpy as np
         >>> import pandas as pd
@@ -295,7 +281,6 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
         ```
 
         Taking new index and columns from position:
-
         ```python-repl
         >>> for i in broadcast(
         ...     v, a, sr, df,
@@ -321,7 +306,6 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
         ```
 
         Broadcasting index and columns through stacking:
-
         ```python-repl
         >>> for i in broadcast(
         ...     v, a, sr, df,
@@ -347,7 +331,6 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
         ```
 
         Setting index and columns manually:
-
         ```python-repl
         >>> for i in broadcast(
         ...     v, a, sr, df,
@@ -375,6 +358,8 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
     is_pd = False
     is_2d = False
     args = list(args)
+    if require_kwargs is None:
+        require_kwargs = {}
     if isinstance(index_from, str) and index_from == 'default':
         index_from = defaults.broadcasting['index_from']
     if isinstance(columns_from, str) and columns_from == 'default':
@@ -426,16 +411,8 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
             continue
         new_args.append(np.broadcast_to(arg, to_shape, subok=True))
 
-    # The problem is that broadcasting creates readonly objects and Numba requires writable ones.
-    # To make them writable we must copy, which is ok for small-sized arrays and not ok for large ones.
-    # Thus check if broadcasting was needed in the first place, and if so, copy
-    for i in range(len(new_args)):
-        if new_args[i].shape == args_2d[i].shape:
-            # Broadcasting was not needed, take old array
-            new_args[i] = np.array(args_2d[i], copy=False, **copy_kwargs)
-        else:
-            # Broadcasting was needed, take new array
-            new_args[i] = np.array(new_args[i], copy=writeable, **copy_kwargs)
+    # Force to match requirements
+    new_args = [np.require(arg, **require_kwargs) for arg in new_args]
 
     if is_pd:
         # Decide on index and columns
@@ -542,18 +519,21 @@ def broadcast_to_array_of(arg1, arg2):
     return np.tile(arg1, (1, *arg2.shape))
 
 
-def broadcast_to_axis_of(arg1, arg2, axis, writeable=False, copy_kwargs={}):
+def broadcast_to_axis_of(arg1, arg2, axis, require_kwargs=None):
     """Broadcast `arg1` to an axis of `arg2`.
 
     If `arg2` has less dimensions than requested, will broadcast `arg1` to a single number.
 
     For other keyword arguments, see `broadcast`."""
+    if require_kwargs is None:
+        require_kwargs = {}
     if not checks.is_array(arg2):
         arg2 = np.asarray(arg2)
     if arg2.ndim < axis + 1:
         return np.broadcast_to(arg1, (1,))[0]  # to a single number
     arg1 = np.broadcast_to(arg1, (arg2.shape[axis],))
-    return np.array(arg1, copy=writeable, **copy_kwargs)  # to shape of axis
+    arg1 = np.require(arg1, **require_kwargs)
+    return arg1
 
 
 def unstack_to_array(arg, levels=None):
@@ -716,7 +696,7 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
 
 
 @njit(cache=True)
-def flex_choose_i_and_col_nb(a, is_2d=False):
+def flex_choose_i_and_col_nb(a, is_2d):
     """Choose selection index and column based on the array's shape.
 
     Instead of expensive broadcasting, keep original shape and do indexing in a smart way.
@@ -753,7 +733,7 @@ def flex_choose_i_and_col_nb(a, is_2d=False):
 
 
 @njit(cache=True)
-def flex_select_nb(i, col, a, def_i=-1, def_col=-1, is_2d=False):
+def flex_select_nb(i, col, a, def_i, def_col, is_2d):
     """Select element of `a` as if it has been broadcasted."""
     if def_i == -1:
         def_i = i

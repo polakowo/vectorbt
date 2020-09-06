@@ -2,6 +2,8 @@
 
 !!! note
     Input arrays can be of any type, but most output arrays are `np.float64`.
+
+    Accessors do not utilize caching.
     
 ```python-repl
 >>> import vectorbt as vbt
@@ -37,7 +39,6 @@ from numba.typed import Dict
 import warnings
 
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
@@ -98,15 +99,19 @@ class Generic_Accessor(Base_Accessor):
         Base_Accessor.__init__(self, obj, freq=freq)
 
     def rolling_std(self, window, minp=1, ddof=1):  # pragma: no cover
+        """See `vectorbt.generic.nb.rolling_std_nb`."""
         return self.wrap(nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof))
 
     def expanding_std(self, minp=1, ddof=1):  # pragma: no cover
+        """See `vectorbt.generic.nb.expanding_std_nb`."""
         return self.wrap(nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof))
 
     def ewm_mean(self, span, minp=0, adjust=True):  # pragma: no cover
+        """See `vectorbt.generic.nb.ewm_mean_nb`."""
         return self.wrap(nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust))
 
     def ewm_std(self, span, minp=0, adjust=True, ddof=1):  # pragma: no cover
+        """See `vectorbt.generic.nb.ewm_std_nb`."""
         return self.wrap(nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof))
 
     def split_into_ranges(self, n=None, range_len=None, start_idxs=None, end_idxs=None):
@@ -223,10 +228,10 @@ class Generic_Accessor(Base_Accessor):
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
-            result = nb.rolling_apply_matrix_nb(self.to_2d_array(), window, apply_func_nb, *args)
+            out = nb.rolling_apply_matrix_nb(self.to_2d_array(), window, apply_func_nb, *args)
         else:
-            result = nb.rolling_apply_nb(self.to_2d_array(), window, apply_func_nb, *args)
-        return self.wrap(result)
+            out = nb.rolling_apply_nb(self.to_2d_array(), window, apply_func_nb, *args)
+        return self.wrap(out)
 
     def expanding_apply(self, apply_func_nb, *args, on_matrix=False):
         """See `vectorbt.generic.nb.expanding_apply_nb` and
@@ -254,10 +259,10 @@ class Generic_Accessor(Base_Accessor):
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
-            result = nb.expanding_apply_matrix_nb(self.to_2d_array(), apply_func_nb, *args)
+            out = nb.expanding_apply_matrix_nb(self.to_2d_array(), apply_func_nb, *args)
         else:
-            result = nb.expanding_apply_nb(self.to_2d_array(), apply_func_nb, *args)
-        return self.wrap(result)
+            out = nb.expanding_apply_nb(self.to_2d_array(), apply_func_nb, *args)
+        return self.wrap(out)
 
     def groupby_apply(self, by, apply_func_nb, *args, on_matrix=False, **kwargs):
         """See `vectorbt.generic.nb.groupby_apply_nb` and
@@ -287,10 +292,10 @@ class Generic_Accessor(Base_Accessor):
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            result = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
-            result = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        return self.wrap_reduced(result, index=list(regrouped.indices.keys()))
+            out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+        return self.wrap_reduced(out, index=list(regrouped.indices.keys()))
 
     def resample_apply(self, freq, apply_func_nb, *args, on_matrix=False, **kwargs):
         """See `vectorbt.generic.nb.groupby_apply_nb` and
@@ -320,13 +325,13 @@ class Generic_Accessor(Base_Accessor):
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            result = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
-            result = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        result_obj = self.wrap(result, index=list(resampled.indices.keys()))
+            out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+        out_obj = self.wrap(out, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrap(resampled_arr, index=pd.Index(list(resampled.groups.keys()), freq=freq))
-        resampled_obj.loc[result_obj.index] = result_obj.values
+        resampled_obj.loc[out_obj.index] = out_obj.values
         return resampled_obj
 
     def applymap(self, apply_func_nb, *args):
@@ -345,8 +350,8 @@ class Generic_Accessor(Base_Accessor):
             ```"""
         checks.assert_numba_func(apply_func_nb)
 
-        result = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
-        return self.wrap(result)
+        out = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
+        return self.wrap(out)
 
     def filter(self, filter_func_nb, *args):
         """See `vectorbt.generic.nb.filter_nb`.
@@ -364,8 +369,8 @@ class Generic_Accessor(Base_Accessor):
             ```"""
         checks.assert_numba_func(filter_func_nb)
 
-        result = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
-        return self.wrap(result)
+        out = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
+        return self.wrap(out)
 
     def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.generic.nb.apply_and_reduce_nb`.
@@ -385,8 +390,8 @@ class Generic_Accessor(Base_Accessor):
         checks.assert_numba_func(apply_func_nb)
         checks.assert_numba_func(reduce_func_nb)
 
-        result = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, reduce_func_nb, *args)
-        return self.wrap_reduced(result, **kwargs)
+        out = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, reduce_func_nb, *args)
+        return self.wrap_reduced(out, **kwargs)
 
     def reduce(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.generic.nb.reduce_nb`.
@@ -404,8 +409,8 @@ class Generic_Accessor(Base_Accessor):
             ```"""
         checks.assert_numba_func(reduce_func_nb)
 
-        result = nb.reduce_nb(self.to_2d_array(), reduce_func_nb, *args)
-        return self.wrap_reduced(result, **kwargs)
+        out = nb.reduce_nb(self.to_2d_array(), reduce_func_nb, *args)
+        return self.wrap_reduced(out, **kwargs)
 
     def reduce_to_array(self, reduce_func_nb, *args, **kwargs):
         """See `vectorbt.generic.nb.reduce_to_array_nb`.
@@ -422,8 +427,8 @@ class Generic_Accessor(Base_Accessor):
             ```"""
         checks.assert_numba_func(reduce_func_nb)
 
-        result = nb.reduce_to_array_nb(self.to_2d_array(), reduce_func_nb, *args)
-        return self.wrap_reduced(result, **kwargs)
+        out = nb.reduce_to_array_nb(self.to_2d_array(), reduce_func_nb, *args)
+        return self.wrap_reduced(out, **kwargs)
 
     def min(self, **kwargs):
         """Return min of non-NaN elements."""
@@ -492,18 +497,18 @@ class Generic_Accessor(Base_Accessor):
     def idxmin(self, **kwargs):
         """Return labeled index of min of non-NaN elements."""
         obj = self.to_2d_array()
-        result = np.full(obj.shape[1], np.nan, dtype=np.object)
+        out = np.full(obj.shape[1], np.nan, dtype=np.object)
         nan_mask = np.all(np.isnan(obj), axis=0)
-        result[~nan_mask] = self.index[nanargmin(obj[:, ~nan_mask], axis=0)]
-        return self.wrap_reduced(result, **kwargs)
+        out[~nan_mask] = self.index[nanargmin(obj[:, ~nan_mask], axis=0)]
+        return self.wrap_reduced(out, **kwargs)
 
     def idxmax(self, **kwargs):
         """Return labeled index of max of non-NaN elements."""
         obj = self.to_2d_array()
-        result = np.full(obj.shape[1], np.nan, dtype=np.object)
+        out = np.full(obj.shape[1], np.nan, dtype=np.object)
         nan_mask = np.all(np.isnan(obj), axis=0)
-        result[~nan_mask] = self.index[nanargmax(obj[:, ~nan_mask], axis=0)]
-        return self.wrap_reduced(result, **kwargs)
+        out[~nan_mask] = self.index[nanargmax(obj[:, ~nan_mask], axis=0)]
+        return self.wrap_reduced(out, **kwargs)
 
     def describe(self, percentiles=None, ddof=1, **kwargs):
         """See `vectorbt.generic.nb.describe_reduce_nb`.
@@ -541,12 +546,11 @@ class Generic_Accessor(Base_Accessor):
         """Drawdown series."""
         return self.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
 
-    @cached_property
-    def drawdowns(self):
-        """Drawdown records.
+    def drawdowns(self, **kwargs):
+        """Generate drawdown records.
 
         See `vectorbt.records.drawdowns.Drawdowns`."""
-        return Drawdowns.from_ts(self._obj, freq=self.freq)
+        return Drawdowns.from_ts(self._obj, freq=self.freq, **kwargs)
 
     # ############# Plotting ############# #
 

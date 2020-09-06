@@ -80,7 +80,7 @@ class MA(MA):
 
             ![](/vectorbt/docs/img/MA.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         close_trace_kwargs = merge_kwargs(dict(
             name=f'Close ({self.short_name})'
@@ -134,7 +134,7 @@ class MSTD(MSTD):
 
             ![](/vectorbt/docs/img/MSTD.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         mstd_trace_kwargs = merge_kwargs(dict(
             name=f'MSTD ({self.short_name})'
@@ -200,7 +200,7 @@ class BollingerBands(BollingerBands):
 
             ![](/vectorbt/docs/img/BollingerBands.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         lower_trace_kwargs = merge_kwargs(dict(
             name=f'Lower Band ({self.short_name})',
@@ -273,7 +273,7 @@ class RSI(RSI):
 
             ![](/vectorbt/docs/img/RSI.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         rsi_trace_kwargs = merge_kwargs(dict(
             name=f'RSI ({self.short_name})'
@@ -347,7 +347,7 @@ class Stochastic(Stochastic):
 
             ![](/vectorbt/docs/img/Stochastic.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         percent_k_trace_kwargs = merge_kwargs(dict(
             name=f'%K ({self.short_name})'
@@ -428,7 +428,7 @@ class MACD(MACD):
 
             ![](/vectorbt/docs/img/MACD.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         macd_trace_kwargs = merge_kwargs(dict(
             name=f'MACD ({self.short_name})'
@@ -509,7 +509,7 @@ class ATR(ATR):
 
             ![](/vectorbt/docs/img/ATR.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         tr_trace_kwargs = merge_kwargs(dict(
             name=f'TR ({self.short_name})'
@@ -564,7 +564,7 @@ class OBV(OBV):
 
             ![](/vectorbt/docs/img/OBV.png)"""
         if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+            raise TypeError("Select a column first. Use indexing.")
 
         obv_trace_kwargs = merge_kwargs(dict(
             name=f'OBV ({self.short_name})'

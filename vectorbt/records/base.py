@@ -300,54 +300,46 @@ import pandas as pd
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.config import Configured
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base import reshape_fns
-from vectorbt.base.index_grouper import IndexGrouper
 from vectorbt.base.common import (
     add_binary_magic_methods,
     add_unary_magic_methods,
     binary_magic_methods,
     unary_magic_methods
 )
-from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
 from vectorbt.generic import nb as generic_nb
 from vectorbt.records import nb
 
 
-def _mapped_indexing_func(obj, pd_indexing_func):
-    """Perform indexing on `MappedArray`."""
-    if obj.wrapper.ndim == 1:
-        raise TypeError("Indexing on Series is not supported")
-
-    n_rows = len(obj.wrapper.index)
-    n_cols = len(obj.wrapper.columns)
-    col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
-    col_mapper = pd_indexing_func(col_mapper)
-    if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise NotImplementedError("Changing index (time axis) is not supported")
-
-    new_cols = reshape_fns.to_1d(col_mapper.values[0])  # array required
+def indexing_on_mapped_array_meta(obj, pd_indexing_func):
+    """Perform indexing on `MappedArray` and return metadata."""
+    new_wrapper, _, group_idxs, col_idxs = \
+        indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
     new_indices, new_col_arr = nb.select_mapped_cols_nb(
         obj.col_arr,
         obj.col_index,
-        new_cols
+        reshape_fns.to_1d(col_idxs)
     )
     new_mapped_arr = obj.mapped_arr[new_indices]
     if obj.idx_arr is not None:
         new_idx_arr = obj.idx_arr[new_indices]
     else:
         new_idx_arr = None
-    new_wrapper = ArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
-    if obj.grouper.group_by is not None:
-        new_group_by = obj.grouper.group_by[new_cols]
-    else:
-        new_group_by = None
-    return obj.__class__(
-        new_mapped_arr,
-        new_col_arr,
-        new_wrapper,
-        idx_arr=new_idx_arr,
-        group_by=new_group_by
+    return new_wrapper, new_mapped_arr, new_col_arr, new_idx_arr, group_idxs, col_idxs
+
+
+def _mapped_array_indexing_func(obj, pd_indexing_func):
+    """Perform indexing on `MappedArray`."""
+    new_wrapper, new_mapped_arr, new_col_arr, new_idx_arr, _, _ = \
+        indexing_on_mapped_array_meta(obj, pd_indexing_func)
+    return obj.copy(
+        wrapper=new_wrapper,
+        mapped_arr=new_mapped_arr,
+        col_arr=new_col_arr,
+        idx_arr=new_idx_arr
     )
 
 
@@ -355,24 +347,21 @@ def _mapped_binary_translate_func(self, other, np_func):
     """Perform operation between two instances of `MappedArray`."""
     if isinstance(other, self.__class__):
         passed = True
+        if self.wrapper != other.wrapper:
+            passed = False
         if not np.array_equal(self.col_arr, other.col_arr):
             passed = False
         if self.idx_arr is not None or other.idx_arr is not None:
             if not np.array_equal(self.idx_arr, other.idx_arr):
                 passed = False
-        if self.wrapper != other.wrapper:
-            passed = False
-        if self.grouper != other.grouper:
-            passed = False
         if not passed:
             raise ValueError("Both MappedArray instances must have same metadata")
         other = other.mapped_arr
     return self.__class__(
+        self.wrapper,
         np_func(self.mapped_arr, other),
         self.col_arr,
-        self.wrapper,
-        idx_arr=self.idx_arr,
-        group_by=self.grouper.group_by
+        idx_arr=self.idx_arr
     )
 
 
@@ -383,68 +372,101 @@ def _mapped_binary_translate_func(self, other, np_func):
 @add_unary_magic_methods(
     unary_magic_methods,
     lambda self, np_func: self.__class__(
+        self.wrapper,
         np_func(self.mapped_arr),
         self.col_arr,
-        self.wrapper,
-        idx_arr=self.idx_arr,
-        group_by=self.grouper.group_by
+        idx_arr=self.idx_arr
     )
 )
-class MappedArray(PandasIndexer):
+class MappedArray(Configured, PandasIndexer):
     """Exposes methods and properties for working with records.
 
     Args:
+        wrapper (ArrayWrapper): Array wrapper.
+
+            See `vectorbt.base.array_wrapper.GroupedWrapper`.
         mapped_arr (array_like): A one-dimensional array of mapped record values.
         col_arr (array_like): A one-dimensional column array.
 
             Must be of the same size as `mapped_arr`.
-        wrapper (ArrayWrapper): Array wrapper of type `vectorbt.base.array_wrapper.ArrayWrapper`.
         idx_arr (array_like): A one-dimensional index array. Optional.
 
-            Must be of the same size as `mapped_arr`.
-        group_by (int, str or array_like): Group columns by a mapper when reducing.
+            Must be of the same size as `mapped_arr`."""
 
-            See `vectorbt.base.index_fns.IndexGrouper`."""
-
-    def __init__(self, mapped_arr, col_arr, wrapper, idx_arr=None, group_by=None):
+    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None):
+        Configured.__init__(
+            self,
+            wrapper=wrapper,
+            mapped_arr=mapped_arr,
+            col_arr=col_arr,
+            idx_arr=idx_arr
+        )
+        checks.assert_type(wrapper, ArrayWrapper)
         if not isinstance(mapped_arr, np.ndarray):
             mapped_arr = np.asarray(mapped_arr)
         if not isinstance(col_arr, np.ndarray):
             col_arr = np.asarray(col_arr)
         checks.assert_same_shape(mapped_arr, col_arr, axis=0)
-        checks.assert_type(wrapper, ArrayWrapper)
         if idx_arr is not None:
             if not isinstance(idx_arr, np.ndarray):
                 idx_arr = np.asarray(idx_arr)
             checks.assert_same_shape(mapped_arr, idx_arr, axis=0)
 
-        self.mapped_arr = mapped_arr
-        self.col_arr = col_arr
-        self.wrapper = wrapper
-        self.idx_arr = idx_arr
-        self.grouper = IndexGrouper(self.wrapper.columns, group_by=group_by)
+        self._wrapper = wrapper
+        self._mapped_arr = mapped_arr
+        self._col_arr = col_arr
+        self._idx_arr = idx_arr
 
-        PandasIndexer.__init__(self, _mapped_indexing_func)
+        PandasIndexer.__init__(self, _mapped_array_indexing_func)
+
+    @property
+    def wrapper(self):
+        """Array wrapper."""
+        return self._wrapper
+
+    def regroup(self, group_by=None):
+        """Regroup this object."""
+        if group_by is None or group_by is True:
+            return self
+        self.wrapper.grouper.check_group_by(group_by=group_by)
+        return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+
+    @property
+    def mapped_arr(self):
+        """Mapped array."""
+        return self._mapped_arr
+
+    @property
+    def col_arr(self):
+        """Column array."""
+        return self._col_arr
+
+    @property
+    def idx_arr(self):
+        """Index array."""
+        return self._idx_arr
 
     @cached_property
     def col_index(self):
         """Column index for `MappedArray.mapped_arr`."""
         return nb.mapped_col_index_nb(self.mapped_arr, self.col_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask, idx_arr=None, group_by=None):
+    def filter_by_mask(self, mask, idx_arr=None, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         if idx_arr is not None:
             idx_arr = self.idx_arr[mask]
-        if group_by is None:
-            group_by = self.grouper.group_by
-        return self.__class__(
-            self.mapped_arr[mask],
-            self.col_arr[mask],
-            self.wrapper,
+        if group_by is None or group_by is True:
+            wrapper = self.wrapper
+        else:
+            wrapper = self.wrapper.copy(group_by=group_by)
+        return self.copy(
+            wrapper=wrapper,
+            mapped_arr=self.mapped_arr[mask],
+            col_arr=self.col_arr[mask],
             idx_arr=idx_arr,
-            group_by=group_by
+            **kwargs
         )
 
     def to_matrix(self, idx_arr=None, default_val=np.nan):
@@ -461,7 +483,7 @@ class MappedArray(PandasIndexer):
             idx_arr = self.idx_arr
         target_shape = (len(self.wrapper.index), len(self.wrapper.columns))
         result = nb.mapped_to_matrix_nb(self.mapped_arr, self.col_arr, idx_arr, target_shape, default_val)
-        return self.wrapper.wrap(result)
+        return self.wrapper.wrap(result, group_by=False)
 
     def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False, n_rows=None, to_idx=False,
                idx_labeled=True, default_val=np.nan, cast=None, group_by=None, **kwargs):
@@ -487,7 +509,7 @@ class MappedArray(PandasIndexer):
             idx_arr = self.idx_arr
 
         # Perform main computation
-        group_arr, columns = self.grouper.get_groups_and_index(group_by=group_by)
+        group_arr, columns = self.wrapper.grouper.get_groups_and_columns(group_by=group_by)
         if group_arr is not None:
             col_arr = group_arr[self.col_arr]
         else:
@@ -556,7 +578,7 @@ class MappedArray(PandasIndexer):
                 mask = np.isnan(result)
                 result[mask] = -1
                 result = result.astype(int)
-        result = self.wrapper.wrap_reduced(result, columns=columns, **kwargs)
+        result = self.wrapper.wrap_reduced(result, group_by=group_by, **kwargs)
         if cast is not None:
             result = result.astype(cast)
         return result
@@ -564,8 +586,8 @@ class MappedArray(PandasIndexer):
     @cached_method
     def nst(self, n, group_by=None, **kwargs):
         """Return nst element of each column."""
-        group_by = self.grouper.get_group_by(group_by=group_by)
-        if group_by is not None:
+        group_by = self.wrapper.grouper.resolve_group_by(group_by=group_by)
+        if group_by is not None and group_by is not False:
             raise ValueError("MappedArray.nst() does not support group_by. Set group_by to False.")
         return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, group_by=False, **kwargs)
 
@@ -668,7 +690,7 @@ class MappedArray(PandasIndexer):
         if self.wrapper.ndim == 1:
             name = None if self.wrapper.columns[0] == 0 else self.wrapper.columns[0]
             return plot_func(pd.Series(self.mapped_arr, name=name))
-        group_arr, columns = self.grouper.get_groups_and_index(group_by=group_by)
+        group_arr, columns = self.wrapper.grouper.get_groups_and_columns(group_by=group_by)
         if group_arr is not None:
             col_arr = group_arr[self.col_arr]
         else:
@@ -688,76 +710,86 @@ class MappedArray(PandasIndexer):
         return self.plot_by_func(lambda x: x.vbt.box(**kwargs), group_by=group_by)
 
 
-def indexing_on_records(obj, pd_indexing_func):
-    """Perform indexing on `Records`."""
-    if obj.wrapper.ndim == 1:
-        raise TypeError("Indexing on Series is not supported")
-
-    n_rows = len(obj.wrapper.index)
-    n_cols = len(obj.wrapper.columns)
-    col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
-    col_mapper = pd_indexing_func(col_mapper)
-    if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise NotImplementedError("Changing index (time axis) is not supported")
-
-    new_cols = reshape_fns.to_1d(col_mapper.values[0])  # array required
-    records = nb.select_record_cols_nb(
+def indexing_on_records_meta(obj, pd_indexing_func):
+    """Perform indexing on `Records` and return metadata."""
+    new_wrapper, _, group_idxs, col_idxs = \
+        indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
+    new_records_arr = nb.select_record_cols_nb(
         obj.records_arr,
         obj.col_index,
-        new_cols
+        reshape_fns.to_1d(col_idxs)
     )
-    wrapper = ArrayWrapper.from_obj(col_mapper, freq=obj.wrapper.freq)
-    return new_cols, records, wrapper
+    return new_wrapper, new_records_arr, group_idxs, col_idxs
 
 
 def _records_indexing_func(obj, pd_indexing_func):
-    """See `indexing_on_records`."""
-    new_cols, new_records, new_wrapper = indexing_on_records(obj, pd_indexing_func)
-    if obj.grouper.group_by is not None:
-        new_group_by = obj.grouper.group_by[new_cols]
-    else:
-        new_group_by = None
-    return obj.__class__(
-        new_records,
-        new_wrapper,
-        idx_field=obj.idx_field,
-        group_by=new_group_by
+    """Perform indexing on `Records`."""
+    new_wrapper, new_records_arr, _, _ = indexing_on_records_meta(obj, pd_indexing_func)
+    return obj.copy(
+        wrapper=new_wrapper,
+        records_arr=new_records_arr
     )
 
 
-class Records(PandasIndexer):
+class Records(Configured, PandasIndexer):
     """Exposes methods and properties for working with records.
 
     Args:
+        wrapper (ArrayWrapper): Array wrapper.
+
+            See `vectorbt.base.array_wrapper.GroupedWrapper`.
         records_arr (array_like): A structured NumPy array of records.
 
             Must have the field `col` (column position in a matrix).
-        wrapper (ArrayWrapper): Array wrapper of type `vectorbt.base.array_wrapper.ArrayWrapper`.
         idx_field (str): The name of the field corresponding to the index. Optional.
 
-            Will be derived automatically if records contain field `'idx'`.
-        group_by (int, str or array_like): Group columns by a mapper when reducing.
+            Will be derived automatically if records contain field `'idx'`."""
 
-            See `vectorbt.base.index_fns.IndexGrouper`."""
-
-    def __init__(self, records_arr, wrapper, idx_field=None, group_by=None):
+    def __init__(self, wrapper, records_arr, idx_field=None):
+        Configured.__init__(
+            self,
+            wrapper=wrapper,
+            records_arr=records_arr,
+            idx_field=idx_field
+        )
+        checks.assert_type(wrapper, ArrayWrapper)
         if not isinstance(records_arr, np.ndarray):
             records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
         checks.assert_value_in('col', records_arr.dtype.names)
-        checks.assert_type(wrapper, ArrayWrapper)
         if idx_field is not None:
             checks.assert_value_in(idx_field, records_arr.dtype.names)
         else:
             if 'idx' in records_arr.dtype.names:
                 idx_field = 'idx'
 
-        self.records_arr = records_arr
-        self.wrapper = wrapper
-        self.idx_field = idx_field
-        self.grouper = IndexGrouper(self.wrapper.columns, group_by=group_by)
+        self._wrapper = wrapper
+        self._records_arr = records_arr
+        self._idx_field = idx_field
 
         PandasIndexer.__init__(self, _records_indexing_func)
+
+    @property
+    def wrapper(self):
+        """Array wrapper."""
+        return self._wrapper
+
+    def regroup(self, group_by=None):
+        """Regroup this object."""
+        if group_by is None or group_by is True:
+            return self
+        self.wrapper.grouper.check_group_by(group_by=group_by)
+        return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+
+    @property
+    def records_arr(self):
+        """Records array."""
+        return self._records_arr
+
+    @property
+    def idx_field(self):
+        """Index field."""
+        return self._idx_field
 
     @cached_property
     def records(self):
@@ -773,20 +805,20 @@ class Records(PandasIndexer):
         """Column index for `Records.records`."""
         return nb.record_col_index_nb(self.records_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask, idx_field=None, group_by=None):
+    def filter_by_mask(self, mask, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
-        if idx_field is None:
-            idx_field = self.idx_field
-        if group_by is None:
-            group_by = self.grouper.group_by
-        return self.__class__(
-            self.records_arr[mask],
-            self.wrapper,
-            idx_field=idx_field,
-            group_by=group_by
+        if group_by is None or group_by is True:
+            wrapper = self.wrapper
+        else:
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            wrapper = self.wrapper.copy(group_by=group_by)
+        return self.copy(
+            wrapper=wrapper,
+            records_arr=self.records_arr[mask],
+            **kwargs
         )
 
-    def map(self, map_func_nb, *args, idx_arr=None, group_by=None):
+    def map(self, map_func_nb, *args, idx_arr=None, group_by=None, **kwargs):
         """Map each record to a scalar value. Returns `MappedArray`.
 
         See `vectorbt.records.nb.map_records_nb`."""
@@ -798,34 +830,38 @@ class Records(PandasIndexer):
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        if group_by is None:
-            group_by = self.grouper.group_by
+        if group_by is None or group_by is True:
+            wrapper = self.wrapper
+        else:
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            wrapper = self.wrapper.copy(group_by=group_by)
         return MappedArray(
+            wrapper,
             mapped_arr,
             self.records_arr['col'],
-            self.wrapper,
-            idx_arr=idx_arr,
-            group_by=group_by
+            idx_arr=idx_arr
         )
 
-    def map_field(self, field, idx_arr=None, group_by=None):
+    def map_field(self, field, idx_arr=None, group_by=None, **kwargs):
         """Convert field to `MappedArray`."""
         if idx_arr is None:
             if self.idx_field is not None:
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        if group_by is None:
-            group_by = self.grouper.group_by
+        if group_by is None or group_by is True:
+            wrapper = self.wrapper
+        else:
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            wrapper = self.wrapper.copy(group_by=group_by)
         return MappedArray(
+            wrapper,
             self.records_arr[field],
             self.records_arr['col'],
-            self.wrapper,
-            idx_arr=idx_arr,
-            group_by=group_by
+            idx_arr=idx_arr
         )
 
-    def map_array(self, a, idx_arr=None, group_by=None):
+    def map_array(self, a, idx_arr=None, group_by=None, **kwargs):
         """Convert array to `MappedArray`.
 
          The length of the array should match that of the records."""
@@ -838,23 +874,22 @@ class Records(PandasIndexer):
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        if group_by is None:
-            group_by = self.grouper.group_by
+        if group_by is None or group_by is True:
+            wrapper = self.wrapper
+        else:
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            wrapper = self.wrapper.copy(group_by=group_by)
         return MappedArray(
+            wrapper,
             a,
             self.records_arr['col'],
-            self.wrapper,
-            idx_arr=idx_arr,
-            group_by=group_by
+            idx_arr=idx_arr
         )
 
     @cached_method
     def count(self, **kwargs):
         """Number of records."""
-        return MappedArray(
-            self.records_arr['col'],  # doesn't matter which column to take
-            self.records_arr['col'],
-            self.wrapper,
-            group_by=self.grouper.group_by
-        ).count(default_val=0., **kwargs)
+        return self.map_field('col').count(default_val=0., **kwargs)
+
+
 

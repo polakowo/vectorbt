@@ -187,7 +187,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 - Drawdown analysis
 
 ```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot()
+>>> pd.Series([2, 1, 3, 2]).vbt.drawdowns().plot()
 ```
 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
