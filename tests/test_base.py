@@ -1946,11 +1946,13 @@ class TestAccessors:
         assert sr2.vbt.name == sr2.name
         assert pd.Series([1, 2, 3]).vbt.name is None
         assert sr2.vbt.shape == sr2.shape
+        assert sr2.vbt.shape_2d == (sr2.shape[0], 1)
         pd.testing.assert_index_equal(df4.vbt.index, df4.index)
         pd.testing.assert_index_equal(df4.vbt.columns, df4.columns)
         assert df4.vbt.ndim == df4.ndim
         assert df4.vbt.name is None
         assert df4.vbt.shape == df4.shape
+        assert df4.vbt.shape_2d == df4.shape
         pd.testing.assert_series_equal(sr2.vbt.wrap(a2), sr2)
         pd.testing.assert_series_equal(sr2.vbt.wrap(df2), sr2)
         pd.testing.assert_series_equal(

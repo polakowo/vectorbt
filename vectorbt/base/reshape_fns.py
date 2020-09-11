@@ -239,6 +239,8 @@ def broadcast(*args, to_shape=None, to_pd=None, to_2d=None, index_from='default'
         columns_from (None, int, str or array_like): Broadcasting rule for columns.
         require_kwargs (dict): Keyword arguments passed to `np.require`.
         keep_raw (bool, tuple or list): If `True`, will keep the unbroadcasted version of the array.
+
+            Only makes sure that the array can be broadcast to the target shape.
         **kwargs: Keyword arguments passed to `broadcast_index`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
@@ -733,16 +735,16 @@ def flex_choose_i_and_col_nb(a, is_2d):
 
 
 @njit(cache=True)
-def flex_select_nb(i, col, a, def_i, def_col, is_2d):
+def flex_select_nb(i, col, a, flex_i, flex_col, is_2d):
     """Select element of `a` as if it has been broadcasted."""
-    if def_i == -1:
-        def_i = i
-    if def_col == -1:
-        def_col = col
+    if flex_i == -1:
+        flex_i = i
+    if flex_col == -1:
+        flex_col = col
     if a.ndim == 0:
         return a.item()
     if a.ndim == 1:
         if is_2d:
-            return a[def_col]
-        return a[def_i]
-    return a[def_i, def_col]
+            return a[flex_col]
+        return a[flex_i]
+    return a[flex_i, flex_col]

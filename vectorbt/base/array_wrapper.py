@@ -258,6 +258,13 @@ class ArrayWrapper(Configured, PandasIndexer):
         return len(self.index), len(self.columns)
 
     @property
+    def shape_2d(self):
+        """Shape as if the object was two-dimensional."""
+        if len(self.shape) == 1:
+            return self.shape[0], 1
+        return self.shape
+
+    @property
     def freq(self):
         """Index frequency."""
         freq = self._freq

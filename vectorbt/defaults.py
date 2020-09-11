@@ -150,16 +150,20 @@ __pdoc__['returns'] = f"""Parameters for returns.
 # Portfolio
 portfolio = Config(
     call_seq='Default',
+    dynamic_call_seq=False,
     init_cash=100.,
     size_type='Shares',
     fees=0.,
     fixed_fees=0.,
     slippage=0.,
+    min_size=1e-4,
+    reject_prob=0.,
     accumulate=False,
     accumulate_exit_mode='Close',
     conflict_mode='Ignore',
     cash_sharing=False,
     row_wise=False,
+    seed=None,
     freq=None,
     incl_unrealized=False
 )

@@ -130,45 +130,45 @@ class TestNumba:
                (0, 5.0, None)
 
     def test_buy_in_shares_nb(self):
-        from vectorbt.portfolio.nb import buy_in_shares_nb
+        from vectorbt.portfolio.nb import buy_shares_nb
 
-        assert buy_in_shares_nb(100, 0, 10, 5, 0, 0, 0) == \
+        assert buy_shares_nb(100, 0, 10, 5, 0, 0, 0) == \
                (50.0, 5.0, FilledOrder(size=5.0, price=10, fees=0.0, side=0))
-        assert buy_in_shares_nb(100, 0, 10, 5, 0, 0, 0.1) == \
+        assert buy_shares_nb(100, 0, 10, 5, 0, 0, 0.1) == \
                (45.0, 5.0, FilledOrder(size=5.0, price=11.0, fees=0.0, side=0))
-        assert buy_in_shares_nb(100, 0, 10, 5, 0, 40, 0) == \
+        assert buy_shares_nb(100, 0, 10, 5, 0, 40, 0) == \
                (10.0, 5.0, FilledOrder(size=5.0, price=10, fees=40.0, side=0))
-        assert buy_in_shares_nb(100, 0, 10, 5, 0.1, 0, 0) == \
+        assert buy_shares_nb(100, 0, 10, 5, 0.1, 0, 0) == \
                (44.99999999999999, 5.0, FilledOrder(size=5.0, price=10, fees=5.000000000000007, side=0))
-        assert buy_in_shares_nb(40, 0, 10, 5, 0, 0, 0) == \
+        assert buy_shares_nb(40, 0, 10, 5, 0, 0, 0) == \
                (0.0, 4.0, FilledOrder(size=4.0, price=10, fees=0.0, side=0))
-        assert buy_in_shares_nb(40, 0, 10, 5, 0, 0, 0.1) == \
+        assert buy_shares_nb(40, 0, 10, 5, 0, 0, 0.1) == \
                (0.0, 3.6363636363636362, FilledOrder(size=3.6363636363636362, price=11.0, fees=0.0, side=0))
-        assert buy_in_shares_nb(40, 0, 10, 5, 0, 40, 0) == \
+        assert buy_shares_nb(40, 0, 10, 5, 0, 40, 0) == \
                (40.0, 0.0, None)
-        assert buy_in_shares_nb(40, 0, 10, 5, 0.1, 0, 0) == \
+        assert buy_shares_nb(40, 0, 10, 5, 0.1, 0, 0) == \
                (0.0, 3.636363636363636, FilledOrder(size=3.636363636363636, price=10, fees=3.6363636363636402, side=0))
 
     def test_sell_in_shares_nb(self):
-        from vectorbt.portfolio.nb import sell_in_shares_nb
+        from vectorbt.portfolio.nb import sell_shares_nb
 
-        assert sell_in_shares_nb(0, 5, 10, 4, 0, 0, 0) == \
+        assert sell_shares_nb(0, 5, 10, 4, 0, 0, 0) == \
                (40, 1.0, FilledOrder(size=4, price=10, fees=0, side=1))
-        assert sell_in_shares_nb(0, 5, 10, 5, 0, 0, 0) == \
+        assert sell_shares_nb(0, 5, 10, 5, 0, 0, 0) == \
                (50, 0.0, FilledOrder(size=5, price=10, fees=0, side=1))
-        assert sell_in_shares_nb(0, 5, 10, 6, 0, 0, 0) == \
+        assert sell_shares_nb(0, 5, 10, 6, 0, 0, 0) == \
                (50, 0.0, FilledOrder(size=5, price=10, fees=0, side=1))
-        assert sell_in_shares_nb(0, 5, 10, 5, 0, 40, 0) == \
+        assert sell_shares_nb(0, 5, 10, 5, 0, 40, 0) == \
                (10, 0.0, FilledOrder(size=5, price=10, fees=40, side=1))
-        assert sell_in_shares_nb(0, 5, 10, 5, 0, 50, 0) == \
+        assert sell_shares_nb(0, 5, 10, 5, 0, 50, 0) == \
                (0, 5.0, None)
-        assert sell_in_shares_nb(0, 5, 10, 5, 0, 60, 0) == \
+        assert sell_shares_nb(0, 5, 10, 5, 0, 60, 0) == \
                (0, 5.0, None)
-        assert sell_in_shares_nb(100, 5, 10, 5, 0, 60, 0) == \
+        assert sell_shares_nb(100, 5, 10, 5, 0, 60, 0) == \
                (90, 0.0, FilledOrder(size=5, price=10, fees=60, side=1))
-        assert sell_in_shares_nb(0, 5, 10, 5, 0, 0, 0.1) == \
+        assert sell_shares_nb(0, 5, 10, 5, 0, 0, 0.1) == \
                (45.0, 0.0, FilledOrder(size=5, price=9.0, fees=0.0, side=1))
-        assert sell_in_shares_nb(0, 5, 10, 5, 0.1, 0, 0) == \
+        assert sell_shares_nb(0, 5, 10, 5, 0.1, 0, 0) == \
                (45.0, 0.0, FilledOrder(size=5, price=10, fees=5.0, side=1))
 
 
@@ -1381,28 +1381,28 @@ class TestPortfolio:
 
     def test_indexing(self):
         pd.testing.assert_series_equal(
-            test_portfolio.iloc[:, 0].ref_price,
-            test_portfolio.ref_price.iloc[:, 0]
+            test_portfolio.iloc[:, 0].close,
+            test_portfolio.close.iloc[:, 0]
         )
         pd.testing.assert_series_equal(
-            test_portfolio.loc[:, 'a'].ref_price,
-            test_portfolio.ref_price.loc[:, 'a']
+            test_portfolio.loc[:, 'a'].close,
+            test_portfolio.close.loc[:, 'a']
         )
         pd.testing.assert_series_equal(
-            test_portfolio['a'].ref_price,
-            test_portfolio.ref_price['a']
+            test_portfolio['a'].close,
+            test_portfolio.close['a']
         )
         pd.testing.assert_frame_equal(
-            test_portfolio.iloc[:, [0, 1]].ref_price,
-            test_portfolio.ref_price.iloc[:, [0, 1]]
+            test_portfolio.iloc[:, [0, 1]].close,
+            test_portfolio.close.iloc[:, [0, 1]]
         )
         pd.testing.assert_frame_equal(
-            test_portfolio.loc[:, ['a', 'b']].ref_price,
-            test_portfolio.ref_price.loc[:, ['a', 'b']]
+            test_portfolio.loc[:, ['a', 'b']].close,
+            test_portfolio.close.loc[:, ['a', 'b']]
         )
         pd.testing.assert_frame_equal(
-            test_portfolio[['a', 'b']].ref_price,
-            test_portfolio.ref_price[['a', 'b']]
+            test_portfolio[['a', 'b']].close,
+            test_portfolio.close[['a', 'b']]
         )
         with pytest.raises(Exception) as e_info:
             _ = test_portfolio.iloc[::2, :]  # changing time not supported
@@ -1426,7 +1426,7 @@ class TestPortfolio:
                 (2, 4, 218.36094501, 1., 2.18360945, 1)
             ], dtype=order_dt)
         )
-        pd.testing.assert_frame_equal(test_portfolio.orders.ref_price, test_portfolio.ref_price)
+        pd.testing.assert_frame_equal(test_portfolio.orders.close, test_portfolio.close)
         assert test_portfolio.orders.wrapper.freq == day_dt
         # trades
         record_arrays_close(
@@ -1440,7 +1440,7 @@ class TestPortfolio:
                 (2, 218.36094501, 3, 2., 4.3672189, 4, 1., 2.18360945, -224.91177336, -0.50990099, 1, 5)
             ], dtype=trade_dt)
         )
-        pd.testing.assert_frame_equal(test_portfolio.trades.ref_price, test_portfolio.ref_price)
+        pd.testing.assert_frame_equal(test_portfolio.trades.close, test_portfolio.close)
         assert test_portfolio.trades.wrapper.freq == day_dt
         # positions
         record_arrays_close(
@@ -1454,7 +1454,7 @@ class TestPortfolio:
                 (2, 218.36094501, 3, 2., 4.3672189, 4, 1., 2.18360945, -224.91177336, -0.50990099, 1)
             ], dtype=position_dt)
         )
-        pd.testing.assert_frame_equal(test_portfolio.positions.ref_price, test_portfolio.ref_price)
+        pd.testing.assert_frame_equal(test_portfolio.positions.close, test_portfolio.close)
         assert test_portfolio.positions.wrapper.freq == day_dt
         # drawdowns
         record_arrays_close(

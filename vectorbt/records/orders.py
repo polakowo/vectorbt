@@ -16,11 +16,11 @@ from vectorbt.records.enums import OrderSide, order_dt
 def indexing_on_orders_meta(obj, pd_indexing_func):
     """Perform indexing on `BaseOrders`."""
     new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
-    new_ref_price = new_wrapper.wrap(obj.ref_price.values[:, col_idxs], group_by=False)
+    new_ref_price = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
         records_arr=new_records_arr,
-        ref_price=new_ref_price
+        close=new_ref_price
     ), group_idxs, col_idxs
 
 
@@ -49,7 +49,7 @@ class BaseOrders(Records):
         1
         ```"""
 
-    def __init__(self, wrapper, records_arr, ref_price, idx_field='idx'):
+    def __init__(self, wrapper, records_arr, close, idx_field='idx'):
         Records.__init__(
             self,
             wrapper,
@@ -60,10 +60,10 @@ class BaseOrders(Records):
             self,
             wrapper=wrapper,
             records_arr=records_arr,
-            ref_price=ref_price,
+            close=close,
             idx_field=idx_field
         )
-        self.ref_price = ref_price
+        self.close = close
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise ValueError("Records array must have all fields defined in order_dt")
@@ -110,7 +110,7 @@ class BaseOrders(Records):
             sell_trace_kwargs = {}
 
         # Plot main price
-        fig = self_col.ref_price.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.close.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         idx = self_col.records_arr['idx']
@@ -200,7 +200,7 @@ class Orders(BaseOrders):
         return BaseOrders(
             self.wrapper,
             self.records_arr[filter_mask],
-            self.ref_price,
+            self.close,
             idx_field=self.idx_field
         )
 
@@ -211,6 +211,6 @@ class Orders(BaseOrders):
         return BaseOrders(
             self.wrapper,
             self.records_arr[filter_mask],
-            self.ref_price,
+            self.close,
             idx_field=self.idx_field
         )

@@ -18,6 +18,23 @@ def is_sorted_nb(a):
     return True
 
 
+@njit(cache=True)
+def insert_argsort_nb(A, I):
+    """Perform argsort using insertion sort.
+
+    In-memory and without recursion -> very fast for smaller arrays."""
+    for j in range(1, len(A)):
+        key = A[j]
+        key2 = I[j]
+        i = j - 1
+        while (i >= 0) & (A[i] > key):
+            A[i + 1] = A[i]
+            I[i + 1] = I[i]
+            i = i - 1
+        A[i + 1] = key
+        I[i + 1] = key2
+
+
 def get_ranges_arr(starts, ends):
     """Build array from start and end indices.
 

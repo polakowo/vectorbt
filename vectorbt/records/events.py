@@ -31,11 +31,11 @@ from vectorbt.records.enums import (
 def indexing_on_orders_meta(obj, pd_indexing_func):
     """Perform indexing on `BaseEvents` and also return metadata."""
     new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
-    new_ref_price = new_wrapper.wrap(obj.ref_price.values[:, col_idxs], group_by=False)
+    new_ref_price = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
         records_arr=new_records_arr,
-        ref_price=new_ref_price
+        close=new_ref_price
     ), group_idxs, col_idxs
 
 
@@ -47,7 +47,7 @@ def _indexing_func(obj, pd_indexing_func):
 class BaseEvents(Records):
     """Extends `Records` for working with event records."""
 
-    def __init__(self, wrapper, records_arr, ref_price, idx_field='exit_idx'):
+    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx'):
         Records.__init__(
             self,
             wrapper,
@@ -58,10 +58,10 @@ class BaseEvents(Records):
             self,
             wrapper=wrapper,
             records_arr=records_arr,
-            ref_price=ref_price,
+            close=close,
             idx_field=idx_field
         )
-        self.ref_price = ref_price
+        self.close = close
 
         if not all(field in records_arr.dtype.names for field in event_dt.names):
             raise ValueError("Records array must have all fields defined in event_dt")
@@ -135,7 +135,7 @@ class BaseEvents(Records):
             loss_shape_kwargs = {}
 
         # Plot main price
-        fig = self_col.ref_price.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.close.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         size = self_col.records_arr['size']
@@ -317,7 +317,7 @@ class BaseEventsByResult(BaseEvents):
         return BaseEvents(
             self.wrapper,
             self.records_arr[filter_mask],
-            self.ref_price,
+            self.close,
             idx_field=self.idx_field
         )
 
@@ -328,7 +328,7 @@ class BaseEventsByResult(BaseEvents):
         return BaseEvents(
             self.wrapper,
             self.records_arr[filter_mask],
-            self.ref_price,
+            self.close,
             idx_field=self.idx_field
         )
 
@@ -400,7 +400,7 @@ class Events(BaseEventsByResult):
         return BaseEventsByResult(
             self.wrapper,
             self.records_arr[filter_mask],
-            self.ref_price,
+            self.close,
             idx_field=self.idx_field
         )
 
@@ -411,7 +411,7 @@ class Events(BaseEventsByResult):
         return BaseEventsByResult(
             self.wrapper,
             self.records_arr[filter_mask],
-            self.ref_price,
+            self.close,
             idx_field=self.idx_field
         )
 
@@ -518,8 +518,8 @@ class Trades(Events):
     @classmethod
     def from_orders(cls, orders, **kwargs):
         """Build `Trades` from `Orders`."""
-        trade_records_arr = nb.trade_records_nb(orders.ref_price.vbt.to_2d_array(), orders.records_arr)
-        return cls(orders.wrapper, trade_records_arr, orders.ref_price, **kwargs)
+        trade_records_arr = nb.trade_records_nb(orders.close.vbt.to_2d_array(), orders.records_arr)
+        return cls(orders.wrapper, trade_records_arr, orders.close, **kwargs)
 
     @cached_property
     def position_idx(self):
@@ -622,6 +622,6 @@ class Positions(Events):
     @classmethod
     def from_orders(cls, orders, **kwargs):
         """Build `Positions` from `Orders`."""
-        position_records_arr = nb.position_records_nb(orders.ref_price.vbt.to_2d_array(), orders.records_arr)
-        return cls(orders.wrapper, position_records_arr, orders.ref_price, **kwargs)
+        position_records_arr = nb.position_records_nb(orders.close.vbt.to_2d_array(), orders.records_arr)
+        return cls(orders.wrapper, position_records_arr, orders.close, **kwargs)
 
