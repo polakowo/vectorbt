@@ -8,6 +8,7 @@
 
 import numpy as np
 import pandas as pd
+from scipy.stats import skew, kurtosis
 
 from vectorbt import defaults
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
@@ -19,7 +20,7 @@ from vectorbt.generic.accessors import (
     Generic_DFAccessor
 )
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes
-from vectorbt.returns import nb
+from vectorbt.returns import nb, metrics
 
 
 class Returns_Accessor(Generic_Accessor):
@@ -120,6 +121,32 @@ class Returns_Accessor(Generic_Accessor):
             risk_free (float or array_like): Constant risk-free return throughout the period."""
         risk_free = np.broadcast_to(risk_free, (len(self.columns),))
         return self.wrap_reduced(nb.sharpe_ratio_nb(self.to_2d_array(), self.ann_factor, risk_free))
+
+    def deflated_sharpe_ratio(self, risk_free=0., var_sharpe=None, nb_trials=None, ddof=0, bias=True):
+        """Deflated Sharpe Ratio (DSR).
+
+        Expresses the chance that the advertized strategy has a positive Sharpe ratio.
+
+        If `var_sharpe` is `None`, is calculated based on all columns.
+        If `nb_trials` is `None`, is set to the number of columns."""
+        sharpe_ratio = reshape_fns.to_1d(self.sharpe_ratio(risk_free=risk_free), raw=True)
+        if var_sharpe is None:
+            var_sharpe = np.var(sharpe_ratio, ddof=ddof)
+        if nb_trials is None:
+            nb_trials = self.shape_2d[1]
+        returns = reshape_fns.to_2d(self._obj, raw=True)
+        nanmask = np.isnan(returns)
+        if nanmask.any():
+            returns = returns.copy()
+            returns[nanmask] = 0.
+        return self.wrap_reduced(metrics.deflated_sharpe_ratio(
+            est_sharpe=sharpe_ratio / np.sqrt(self.ann_factor),
+            var_sharpe=var_sharpe / self.ann_factor,
+            nb_trials=nb_trials,
+            backtest_horizon=self.shape_2d[0],
+            skew=skew(returns, axis=0, bias=bias),
+            kurtosis=kurtosis(returns, axis=0, bias=bias)
+        ))
 
     def downside_risk(self, required_return=0.):
         """Downside deviation below a threshold.

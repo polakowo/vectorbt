@@ -131,6 +131,12 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
+
+    !!! note
+        Series names are treated as columns with a single element but without a name.
+        If a column level without a name loses its meaning, better to convert Series to DataFrames
+        with one column prior to broadcasting. If the name of a Series is not that important,
+        better to drop it altogether by setting it to `None`.
     """
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
@@ -213,11 +219,15 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
                     new_columns = old_columns
                 else:
                     new_columns = index_fns.repeat_index(old_columns, new_ncols)
-        return array_wrapper.ArrayWrapper(
-            index=new_index,
-            columns=new_columns,
-            ndim=new_arg.ndim
-        ).wrap(new_arg)
+        if new_arg.ndim == 2:
+            return pd.DataFrame(new_arg, index=new_index, columns=new_columns)
+        if new_columns is not None and len(new_columns) == 1:
+            name = new_columns[0]
+            if name == 0:
+                name = None
+        else:
+            name = None
+        return pd.Series(new_arg, index=new_index, name=name)
     return new_arg
 
 
@@ -614,7 +624,7 @@ def make_symmetric(arg):
     if isinstance(arg.index, pd.MultiIndex) or isinstance(arg.columns, pd.MultiIndex):
         checks.assert_type(arg.index, pd.MultiIndex)
         checks.assert_type(arg.columns, pd.MultiIndex)
-        checks.assert_same(arg.index.nlevels, arg.columns.nlevels)
+        checks.assert_array_equal(arg.index.nlevels, arg.columns.nlevels)
         names1, names2 = tuple(arg.index.names), tuple(arg.columns.names)
     else:
         names1, names2 = arg.index.name, arg.columns.name

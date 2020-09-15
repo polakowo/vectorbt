@@ -434,10 +434,10 @@ class Trades(Events):
         >>> import pandas as pd
 
         >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     pd.Series([1, 1, 1, 1, -4]),
-        ...     fixed_fees=1, freq='1D'
-        ... ).trades.records
+        ...     pd.Series([1., 2., 3., 4., 5.]),
+        ...     pd.Series([1., 1., 1., 1., -4.]),
+        ...     fixed_fees=1., freq='1D'
+        ... ).trades().records
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
         0    0   4.0          0          2.5         4.0         4         5.0
 
@@ -448,11 +448,11 @@ class Trades(Events):
         Decreasing position:
         ```python-repl
         >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     pd.Series([4, -1, -1, -1, -1]),
-        ...     fixed_fees=1, freq='1D'
-        ... ).trades.records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+        ...     pd.Series([1., 2., 3., 4., 5.]),
+        ...     pd.Series([4., -1., -1., -1., -1.]),
+        ...     fixed_fees=1., freq='1D'
+        ... ).trades().records
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
         0    0   1.0          0          1.0        0.25         1         2.0
         1    0   1.0          0          1.0        0.25         2         3.0
         2    0   1.0          0          1.0        0.25         3         4.0
@@ -468,10 +468,10 @@ class Trades(Events):
         Multiple positions:
         ```python-repl
         >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     pd.Series([1, 1, -2, 1, -1]),
-        ...     fixed_fees=1, freq='1D'
-        ... ).trades.records
+        ...     pd.Series([1., 2., 3., 4., 5.]),
+        ...     pd.Series([1., 1., -2., 1., -1.]),
+        ...     fixed_fees=1., freq='1D'
+        ... ).trades().records
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
         0    0   2.0          0          1.5         2.0         2         3.0
         1    0   1.0          3          4.0         1.0         4         5.0
@@ -483,10 +483,10 @@ class Trades(Events):
 
         Get count and P&L of trades:
         ```python-repl
-        >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
-        >>> orders = pd.Series([1, -0.5, -0.5, 2, -0.5, -0.5, -0.5])
+        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
+        >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_cash=100, freq='1D')
+        ...      init_cash=100., freq='1D')
 
         >>> trades = vbt.Trades.from_orders(portfolio.orders)
         >>> trades.count()
@@ -544,10 +544,10 @@ class Positions(Events):
         >>> import pandas as pd
 
         >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     pd.Series([1, 1, 1, 1, -4]),
-        ...     fixed_fees=1, freq='1D'
-        ... ).positions.records
+        ...     pd.Series([1., 2., 3., 4., 5.]),
+        ...     pd.Series([1., 1., 1., 1., -4.]),
+        ...     fixed_fees=1., freq='1D'
+        ... ).positions().records
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
         0    0   4.0          0          2.5         4.0         4         5.0
 
@@ -558,10 +558,10 @@ class Positions(Events):
         Decreasing position:
         ```python-repl
         >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     pd.Series([4, -1, -1, -1, -1]),
-        ...     fixed_fees=1, freq='1D'
-        ... ).positions.records
+        ...     pd.Series([1., 2., 3., 4., 5.]),
+        ...     pd.Series([4., -1., -1., -1., -1.]),
+        ...     fixed_fees=1., freq='1D'
+        ... ).positions().records
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
         0    0   4.0          0          1.0         1.0         4         3.5
 
@@ -572,10 +572,10 @@ class Positions(Events):
         Multiple positions:
         ```python-repl
         >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1, 2, 3, 4, 5]),
-        ...     pd.Series([1, 1, -2, 1, -1]),
-        ...     fixed_fees=1, freq='1D'
-        ... ).positions.records
+        ...     pd.Series([1., 2., 3., 4., 5.]),
+        ...     pd.Series([1., 1., -2., 1., -1.]),
+        ...     fixed_fees=1., freq='1D'
+        ... ).positions().records
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
         0    0   2.0          0          1.5         2.0         2         3.0
         1    0   1.0          3          4.0         1.0         4         5.0
@@ -587,10 +587,10 @@ class Positions(Events):
 
         Get count and P&L of positions:
         ```python-repl
-        >>> price = pd.Series([1, 2, 3, 4, 3, 2, 1])
-        >>> orders = pd.Series([1, -0.5, -0.5, 1, -1, 2, -1])
+        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
+        >>> orders = pd.Series([1., -0.5, -0.5, 1., -1., 2., -1.])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_cash=100, freq='1D')
+        ...      init_cash=100., freq='1D')
 
         >>> positions = vbt.Positions.from_orders(portfolio.orders)
         >>> positions.count()

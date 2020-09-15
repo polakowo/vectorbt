@@ -111,7 +111,8 @@ to generate trade records from order records. This is done automatically in the
 `vectorbt.portfolio.base.Portfolio` class, available as `vectorbt.portfolio.base.Portfolio.trades`.
 
 ```python-repl
->>> portfolio.trades.records.head()
+>>> trades = portfolio.trades()
+>>> trades.records.head()
    col      size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
 0    0  0.026454          0      3742.70    0.990099        15     3630.68
 1    0  0.026738         33      3521.06    0.941446        39     3666.78
@@ -126,13 +127,13 @@ to generate trade records from order records. This is done automatically in the
 3   1.198830  22.448978  0.233272       1             3
 4   1.286940   8.722873  0.073496       1             4
 
->>> portfolio.trades.plot()
+>>> trades.plot()
 ```
 
 ![](/vectorbt/docs/img/trades_plot.png)
 
 ```python-repl
->>> portfolio.trades.expectancy()
+>>> trades.expectancy()
 5.8270083764704275
 ```
 

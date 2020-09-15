@@ -11,7 +11,7 @@ from vectorbt.utils import checks
 def get_index(arg, axis):
     """Get index of `arg` by `axis`."""
     checks.assert_type(arg, (pd.Series, pd.DataFrame))
-    checks.assert_value_in(axis, (0, 1))
+    checks.assert_in(axis, (0, 1))
 
     if axis == 0:
         return arg.index

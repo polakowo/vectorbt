@@ -94,15 +94,15 @@ and gets stored as a separate column level. Below is an example of a column hier
 macd_fast_window           2         3
 macd_slow_window           3         4
 macd_signal_window         2         3
-macd_macd_ewm           True     False
+macd_macd_ewm          True      False
 macd_signal_ewm        False      True
 0                        NaN       NaN
 1                        NaN       NaN
 2                        NaN       NaN
-3                   0.235073       NaN
-4                   0.168060       NaN
-5                  -0.054956  0.166667
-6                  -0.235246 -0.188889
+3                   0.349537       NaN
+4                   0.251929       NaN
+5                  -0.014982  0.208333
+6                  -0.221140 -0.145833
 ```
 
 Columns here capture different strategy configurations that can now be easily analyzed and compared.
@@ -137,7 +137,7 @@ z  4  5  6
 Despite both having the same index, pandas can't figure out how to add them correctly:
 
 ```python-repl
->>> sr + df
+>>> sr + df  # pandas
     a   b   c   x   y   z
 x NaN NaN NaN NaN NaN NaN
 y NaN NaN NaN NaN NaN NaN
@@ -147,7 +147,7 @@ z NaN NaN NaN NaN NaN NaN
 And here is the expected result using vectorbt:
 
 ```python-repl
->>> sr.vbt + df
+>>> sr.vbt + df  # vectorbt
    a  b  c
 x  5  6  7
 y  6  7  8
@@ -160,13 +160,13 @@ In case index or columns in both objects are different, thy are simply stacked u
 ```python-repl
 >>> df2 = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a2', 'b2', 'c2'])
 
->>> df + df2
+>>> df + df2  # pandas
     a  a2   b  b2   c  c2
 x NaN NaN NaN NaN NaN NaN
 y NaN NaN NaN NaN NaN NaN
 z NaN NaN NaN NaN NaN NaN
 
->>> df.vbt + df2
+>>> df.vbt + df2  # vectorbt
    a   b   c
   a2  b2  c2
 x  8  10  12
@@ -183,8 +183,8 @@ from different indicators.
 To better understand how these concepts fit together in vectorbt, consider the following example.
 You have a complex strategy that has lots of parameters. While brute-forcing all parameter combinations
 seems to be a rather unrealistic attempt, vectorbt makes exactly this possible. It doesn't care whether
-you have one strategy instance or millions. As soon as their vectors can be concatenated into a matrix,
-you can analyze them in one go.
+you have one strategy instance or millions. As soon as their vectors can be concatenated into a matrix
+and you have enough memory, you can analyze them in one go.
 
 Let's start with fetching the daily price of Bitcoin:
 
@@ -249,8 +249,8 @@ Date
 Name: (10, 20, Open), Length: 366, dtype: bool
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> portfolio.total_return
-0.6633185970977524
+>>> portfolio.total_return()
+0.6633185970977526
 ```
 
 One strategy instance of DMAC produced one column in signals and one performance value.
@@ -295,7 +295,7 @@ Date
 [366 rows x 2 columns]
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> portfolio.total_return
+>>> portfolio.total_return()
 fast_window  slow_window
 10           30             0.865956
 20           30             0.547047
@@ -368,7 +368,7 @@ Date
 >>> # Notice that we need to align the price to the shape of signals
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     comb_price.vbt.tile(2), entries, exits)
->>> portfolio.total_return
+>>> portfolio.total_return()
 fast_window  slow_window  asset
 10           30           BTC      0.865956
                           ETH      0.249013
@@ -376,7 +376,7 @@ fast_window  slow_window  asset
                           ETH     -0.319945
 dtype: float64
 
->>> mean_return = portfolio.total_return.groupby('asset').mean()
+>>> mean_return = portfolio.total_return().groupby('asset').mean()
 >>> mean_return.vbt.bar(
 ...     xaxis_title='Asset',
 ...     yaxis_title='Mean total return').show_png()
@@ -419,7 +419,7 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 
 >>> portfolio = vbt.Portfolio.from_signals(
 ...     mult_comb_price.vbt.tile(2), entries, exits, freq='1D')
->>> portfolio.total_return
+>>> portfolio.total_return()
 fast_window  slow_window  asset  range_start  range_end
 10           30           BTC    2018-12-31   2019-07-01    1.631617
                                  2019-07-02   2019-12-31   -0.281432
@@ -440,7 +440,7 @@ The index hierarchy of the final performance series can be then used to group pe
 by any feature, such as window pair, asset, and time period.
 
 ```python-repl
->>> mean_return = portfolio.total_return.groupby(['range_end', 'asset']).mean()
+>>> mean_return = portfolio.total_return().groupby(['range_end', 'asset']).mean()
 >>> mean_return = mean_return.unstack(level=-1).vbt.bar(
 ...     xaxis_title='End date',
 ...     yaxis_title='Mean total return',

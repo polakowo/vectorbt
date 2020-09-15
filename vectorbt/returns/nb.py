@@ -29,7 +29,7 @@ def cum_returns_1d_nb(returns, start_value=0.):
     nanmask = np.isnan(returns)
     if nanmask.any():
         returns = returns.copy()
-        returns[nanmask] = 0
+        returns[nanmask] = 0.
     out = generic_nb.cumprod_1d_nb(returns + 1.)
     if start_value == 0.:
         return out - 1.

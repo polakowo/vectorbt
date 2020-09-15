@@ -38,10 +38,10 @@ class BaseOrders(Records):
         >>> import vectorbt as vbt
         >>> import pandas as pd
 
-        >>> price = pd.Series([1, 2, 3, 2, 1])
-        >>> orders = pd.Series([1, 1, 1, 1, -1])
+        >>> price = pd.Series([1., 2., 3., 2., 1.])
+        >>> orders = pd.Series([1., 1., 1., 1., -1.])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_cash=100, freq='1D')
+        ...      init_cash=100., freq='1D')
 
         >>> portfolio.orders.buy.count()
         4

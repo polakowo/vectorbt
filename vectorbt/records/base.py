@@ -69,11 +69,14 @@ Consider the following example:
 ...     (0, 2, 12.),
 ...     (1, 0, 13.),
 ...     (1, 1, 14.),
-...     (1, 2, 15.)
+...     (1, 2, 15.),
+...     (2, 0, 16.),
+...     (2, 1, 17.),
+...     (2, 2, 18.)
 ... ], dtype=example_dt)
 >>> wrapper = ArrayWrapper(index=['x', 'y', 'z'],
-...     columns=['a', 'b'], ndim=2, freq='1 day')
->>> records = Records(records_arr, wrapper)
+...     columns=['a', 'b', 'c'], ndim=2, freq='1 day')
+>>> records = Records(wrapper, records_arr)
 
 >>> records.records
    col  idx  some_field
@@ -83,6 +86,9 @@ Consider the following example:
 3    1    0        13.0
 4    1    1        14.0
 5    1    2        15.0
+6    2    0        16.0
+7    2    1        17.0
+8    2    2        18.0
 ```
 
 `Records` can be mapped to `MappedArray` in several ways:
@@ -94,7 +100,7 @@ Consider the following example:
 <vectorbt.records.base.MappedArray at 0x7ff49bd31a58>
 
 >>> records.map_field('some_field').mapped_arr
-[10. 11. 12. 13. 14. 15.]
+array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
 ```
 
 * Use `Records.map` to map records using a custom function.
@@ -108,7 +114,7 @@ Consider the following example:
 <vectorbt.records.base.MappedArray at 0x7ff49c990cf8>
 
 >>> records.map(power_map_nb, 2).mapped_arr
-[100. 121. 144. 169. 196. 225.]
+array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 ```
 
 * Use `Records.map_array` to convert an array to `MappedArray`.
@@ -118,7 +124,7 @@ Consider the following example:
 <vectorbt.records.base.MappedArray object at 0x7fe9bccf2978>
 
 >>> records.map_array(records_arr['some_field'] ** 2).mapped_arr
-[100. 121. 144. 169. 196. 225.]
+array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 ```
 
 ## MappedArray class
@@ -135,20 +141,22 @@ Using `MappedArray`, you can then reduce by column as follows:
 * Use already provided reducers such as `MappedArray.mean`:
 
 ```python-repl
->>> mapped = records.map_field('some_field')
+>>> some_field = records.map_field('some_field')
 
->>> mapped.mean()
+>>> some_field.mean()
 a    11.0
 b    14.0
+c    17.0
 dtype: float64
 ```
 
 * Use `MappedArray.to_matrix` to map to a matrix and then reduce manually (expensive):
 
 ```python-repl
->>> mapped.to_matrix().mean()
+>>> some_field.to_matrix().mean()
 a    11.0
 b    14.0
+c    17.0
 dtype: float64
 ```
 
@@ -159,30 +167,31 @@ dtype: float64
 ... def pow_mean_reduce_nb(col, a, pow):
 ...     return np.mean(a ** pow)
 
->>> mapped.reduce(pow_mean_reduce_nb, 2)
+>>> some_field.reduce(pow_mean_reduce_nb, 2)
 a    121.666667
 b    196.666667
+c    289.666667
 dtype: float64
 
 >>> @njit
 ... def min_max_reduce_nb(col, a):
 ...     return np.array([np.min(a), np.max(a)])
 
->>> mapped.reduce(min_max_reduce_nb, to_array=True,
+>>> some_field.reduce(min_max_reduce_nb, to_array=True,
 ...     n_rows=2, index=['min', 'max'])
-        a     b
-min  10.0  13.0
-max  12.0  15.0
+        a     b     c
+min  10.0  13.0  16.0
+max  12.0  15.0  18.0
 
 >>> @njit
 ... def idxmin_idxmax_reduce_nb(col, a):
 ...     return np.array([np.argmin(a), np.argmax(a)])
 
->>> mapped.reduce(idxmin_idxmax_reduce_nb, to_array=True,
+>>> some_field.reduce(idxmin_idxmax_reduce_nb, to_array=True,
 ...     n_rows=2, to_idx=True, index=['idxmin', 'idxmax'])
-        a  b
-idxmin  x  x
-idxmax  z  z
+        a  b  c
+idxmin  x  x  x
+idxmax  z  z  z
 ```
 
 ### Conversion
@@ -190,11 +199,11 @@ idxmax  z  z
 You can convert any `MappedArray` instance to the matrix form, given `idx_arr` was provided:
 
 ```python-repl
->>> mapped.to_matrix()
-      a     b
-x  10.0  13.0
-y  11.0  14.0
-z  12.0  15.0
+>>> some_field.to_matrix()
+      a     b     c
+x  10.0  13.0  16.0
+y  11.0  14.0  17.0
+z  12.0  15.0  18.0
 ```
 
 !!! note
@@ -205,7 +214,7 @@ z  12.0  15.0
 You can build histograms and boxplots of `MappedArray` directly:
 
 ```python-repl
->>> mapped.box()
+>>> some_field.box()
 ```
 
 ![](/vectorbt/docs/img/mapped_box.png)
@@ -213,43 +222,61 @@ You can build histograms and boxplots of `MappedArray` directly:
 To use scatterplots or any other plots that require index, convert to matrix first:
 
 ```python-repl
->>> mapped.to_matrix().vbt.scatter(trace_kwargs=dict(connectgaps=True))
+>>> some_field.to_matrix().vbt.scatter(trace_kwargs=dict(connectgaps=True))
 ```
 
 ![](/vectorbt/docs/img/mapped_scatter.png)
 
 ### Grouping
 
-Additionally to reducing per column, you can also reduce per group of columns by providing
-`group_by`. The `group_by` variable can be anything from positions or names of column levels,
-to a NumPy array with actual groups, and can be passed to either `Records`, `MappedArray`,
-or the reducing method itself.
+One of the key features of `MappedArray` and `Records` is that you can perform reducing operations
+on a group of columns as if they were a single column. Groups can be specified by `group_by`, which
+can be anything from positions or names of column levels, to a NumPy array with actual groups.
+
+There are multiple ways of define grouping:
+
+* When creating `MappedArray` or `Records`, pass `group_by` to `vectorbt.base.array_wrapper.ArrayWrapper`:
 
 ```python-repl
->>> np.random.seed(42)
->>> index = pd.Index(['x', 'y'])
->>> columns = pd.MultiIndex.from_arrays([
-...     [1, 1, 1, 2, 2, 2],
-...     [1, 2, 3, 1, 2, 3]
-... ], names=['a', 'b'])
->>> mapped_grouped = MappedArray(
-...     mapped_arr=np.random.randint(1, 10, size=12),
-...     col_arr=np.repeat(np.arange(6), 2),
-...     wrapper=ArrayWrapper(index=index, columns=columns),
-...     idx_arr=np.tile([0, 1], 6),
-...     group_by='a'
-... )
+>>> group_by = np.array([0, 0, 1])
+>>> grouped_wrapper = ArrayWrapper(index=['x', 'y', 'z'],
+...     columns=['a', 'b', 'c'], ndim=2, freq='1 day', group_by=group_by)
+>>> grouped_records = Records(grouped_wrapper, records_arr)
+>>> grouped_some_field = grouped_records.map_field('some_field')
 
->>> mapped_grouped.hist()
+>>> grouped_some_field.mean()
+0    12.5
+1    17.0
+dtype: float64
 ```
 
-![](/vectorbt/docs/img/mapped_hist_grouped.png)
+* Regroup an existing `MappedArray` or `Records`:
 
 ```python-repl
->>> mapped_grouped.hist(group_by=False)
+>>> some_field.regroup(group_by).mean()
+0    12.5
+1    17.0
+dtype: float64
 ```
 
-![](/vectorbt/docs/img/mapped_hist.png)
+* Pass `group_by` directly to the reducing method:
+
+```python-repl
+>>> some_field.mean(group_by=group_by)
+0    12.5
+1    17.0
+dtype: float64
+```
+
+By the same way you can disable or modify existing grouping:
+
+```python-repl
+>>> grouped_some_field.mean(group_by=False)
+a    11.0
+b    14.0
+c    17.0
+dtype: float64
+```
 
 !!! note
     Grouping applies only to reducing operations, there is no change to the arrays.
@@ -260,20 +287,20 @@ or the reducing method itself.
 operations (such as addition) on mapped arrays as if they were NumPy arrays.
 
 ```python-repl
->>> mapped ** 2
+>>> some_field ** 2
 <vectorbt.records.base.MappedArray at 0x7f97bfc49358>
 
->>> mapped * np.array([1, 2, 3, 4, 5, 6])
+>>> some_field * np.array([1, 2, 3, 4, 5, 6])
 <vectorbt.records.base.MappedArray at 0x7f97bfc65e80>
 
->>> mapped + mapped
+>>> some_field + some_field
 <vectorbt.records.base.MappedArray at 0x7f97bfc492e8>
 ```
 
 !!! note
     You should ensure that your `MappedArray` operand is on the left if the other operand is an array.
 
-    Two mapped arrays must have the same metadata to be compared/combined.
+    Two mapped arrays must have the same metadata to be combined.
 
 ## Indexing
 
@@ -287,12 +314,28 @@ the indexing operation to each `__init__` argument with index:
 1    0    1        11.0
 2    0    2        12.0
 
->>> mapped['a'].mapped_arr
+>>> some_field['a'].mapped_arr
 [10. 11. 12.]
 ```
 
 !!! note
-    Changing index (time axis) is not supported.
+    Changing index (time axis) is not supported. The object should be treated as a Series
+    rather than a DataFrame; for example, use `some_field.iloc[0]` instead of `some_field.iloc[:, 0]`.
+
+    Indexing behavior depends solely upon `vectorbt.base.array_wrapper.ArrayWrapper`.
+    For example, if `group_select` is enabled indexing will be performed on groups,
+    otherwise on single columns.
+
+## Caching
+
+Both classes support caching. If a method or a property requires heavy computation, it's wrapped
+with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property` respectively.
+Caching can be disabled globally via `vectorbt.defaults` or locally via the method/property.
+There is currently no way to disable caching for an entire class.
+
+!!! note
+    Because of caching, both classes are meant to be immutable and all properties are read-only.
+    To change any attribute, use the `copy` method and pass the attribute as keyword argument.
 """
 
 import numpy as np
@@ -406,11 +449,11 @@ class MappedArray(Configured, PandasIndexer):
             mapped_arr = np.asarray(mapped_arr)
         if not isinstance(col_arr, np.ndarray):
             col_arr = np.asarray(col_arr)
-        checks.assert_same_shape(mapped_arr, col_arr, axis=0)
+        checks.assert_shape_equal(mapped_arr, col_arr, axis=0)
         if idx_arr is not None:
             if not isinstance(idx_arr, np.ndarray):
                 idx_arr = np.asarray(idx_arr)
-            checks.assert_same_shape(mapped_arr, idx_arr, axis=0)
+            checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
 
         self._wrapper = wrapper
         self._mapped_arr = mapped_arr
@@ -424,12 +467,12 @@ class MappedArray(Configured, PandasIndexer):
         """Array wrapper."""
         return self._wrapper
 
-    def regroup(self, group_by=None):
+    def regroup(self, group_by):
         """Regroup this object."""
-        if group_by is None or group_by is True:
-            return self
-        self.wrapper.grouper.check_group_by(group_by=group_by)
-        return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+        return self
 
     @property
     def mapped_arr(self):
@@ -457,10 +500,10 @@ class MappedArray(Configured, PandasIndexer):
             idx_arr = self.idx_arr
         if idx_arr is not None:
             idx_arr = self.idx_arr[mask]
-        if group_by is None or group_by is True:
-            wrapper = self.wrapper
-        else:
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             wrapper = self.wrapper.copy(group_by=group_by)
+        else:
+            wrapper = self.wrapper
         return self.copy(
             wrapper=wrapper,
             mapped_arr=self.mapped_arr[mask],
@@ -586,9 +629,8 @@ class MappedArray(Configured, PandasIndexer):
     @cached_method
     def nst(self, n, group_by=None, **kwargs):
         """Return nst element of each column."""
-        group_by = self.wrapper.grouper.resolve_group_by(group_by=group_by)
-        if group_by is not None and group_by is not False:
-            raise ValueError("MappedArray.nst() does not support group_by. Set group_by to False.")
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            raise ValueError("MappedArray.nst() does not support grouping. Set group_by to False.")
         return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, group_by=False, **kwargs)
 
     @cached_method
@@ -756,9 +798,9 @@ class Records(Configured, PandasIndexer):
         if not isinstance(records_arr, np.ndarray):
             records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
-        checks.assert_value_in('col', records_arr.dtype.names)
+        checks.assert_in('col', records_arr.dtype.names)
         if idx_field is not None:
-            checks.assert_value_in(idx_field, records_arr.dtype.names)
+            checks.assert_in(idx_field, records_arr.dtype.names)
         else:
             if 'idx' in records_arr.dtype.names:
                 idx_field = 'idx'
@@ -774,12 +816,12 @@ class Records(Configured, PandasIndexer):
         """Array wrapper."""
         return self._wrapper
 
-    def regroup(self, group_by=None):
+    def regroup(self, group_by):
         """Regroup this object."""
-        if group_by is None or group_by is True:
-            return self
-        self.wrapper.grouper.check_group_by(group_by=group_by)
-        return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+        return self
 
     @property
     def records_arr(self):
@@ -807,11 +849,11 @@ class Records(Configured, PandasIndexer):
 
     def filter_by_mask(self, mask, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
-        if group_by is None or group_by is True:
-            wrapper = self.wrapper
-        else:
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
+        else:
+            wrapper = self.wrapper
         return self.copy(
             wrapper=wrapper,
             records_arr=self.records_arr[mask],
@@ -830,16 +872,17 @@ class Records(Configured, PandasIndexer):
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        if group_by is None or group_by is True:
-            wrapper = self.wrapper
-        else:
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
+        else:
+            wrapper = self.wrapper
         return MappedArray(
             wrapper,
             mapped_arr,
             self.records_arr['col'],
-            idx_arr=idx_arr
+            idx_arr=idx_arr,
+            **kwargs
         )
 
     def map_field(self, field, idx_arr=None, group_by=None, **kwargs):
@@ -849,16 +892,17 @@ class Records(Configured, PandasIndexer):
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        if group_by is None or group_by is True:
-            wrapper = self.wrapper
-        else:
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
+        else:
+            wrapper = self.wrapper
         return MappedArray(
             wrapper,
             self.records_arr[field],
             self.records_arr['col'],
-            idx_arr=idx_arr
+            idx_arr=idx_arr,
+            **kwargs
         )
 
     def map_array(self, a, idx_arr=None, group_by=None, **kwargs):
@@ -867,23 +911,24 @@ class Records(Configured, PandasIndexer):
          The length of the array should match that of the records."""
         if not isinstance(a, np.ndarray):
             a = np.asarray(a)
-        checks.assert_same_shape(a, self.records_arr)
+        checks.assert_shape_equal(a, self.records_arr)
 
         if idx_arr is None:
             if self.idx_field is not None:
                 idx_arr = self.records_arr[self.idx_field]
             else:
                 idx_arr = None
-        if group_by is None or group_by is True:
-            wrapper = self.wrapper
-        else:
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
+        else:
+            wrapper = self.wrapper
         return MappedArray(
             wrapper,
             a,
             self.records_arr['col'],
-            idx_arr=idx_arr
+            idx_arr=idx_arr,
+            **kwargs
         )
 
     @cached_method

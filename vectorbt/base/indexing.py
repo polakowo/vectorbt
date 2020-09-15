@@ -103,26 +103,12 @@ class PandasIndexer:
         return self._indexing_func(self, lambda x: x.__getitem__(key), **self._indexing_kwargs)
 
 
-def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
-    """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
-    checks.assert_type(mapper, pd.Series)
-    checks.assert_type(ref_obj, (pd.Series, pd.DataFrame))
-
-    df_range_mapper = reshape_fns.broadcast_to(np.arange(len(mapper.index)), ref_obj)
-    loced_range_mapper = pd_indexing_func(df_range_mapper)
-    new_mapper = mapper.iloc[loced_range_mapper.values[0]]
-    if checks.is_frame(loced_range_mapper):
-        return pd.Series(new_mapper.values, index=loced_range_mapper.columns, name=mapper.name)
-    elif checks.is_series(loced_range_mapper):
-        return pd.Series([new_mapper], index=[loced_range_mapper.name], name=mapper.name)
-
-
 class _ParamLoc:
     """Access a group of columns by parameter using `pd.Series.loc`.
 
     Uses `mapper` to establish link between columns and parameter values."""
 
-    def __init__(self, obj, mapper, indexing_func, **kwargs):
+    def __init__(self, obj, mapper, indexing_func, level_name=None, **kwargs):
         checks.assert_type(mapper, pd.Series)
 
         self._obj = obj
@@ -132,6 +118,7 @@ class _ParamLoc:
             mapper = mapper.astype(str)
         self._mapper = mapper
         self._indexing_func = indexing_func
+        self._level_name = level_name
         self._indexing_kwargs = kwargs
 
     def get_indices(self, key):
@@ -157,19 +144,32 @@ class _ParamLoc:
     def __getitem__(self, key):
         indices = self.get_indices(key)
         is_multiple = isinstance(key, (slice, list, np.ndarray))
-        level_name = self._mapper.name  # name of the mapper should contain level names of the params
 
         def pd_indexing_func(obj):
             new_obj = obj.iloc[:, indices]
             if not is_multiple:
                 # If we selected only one param, then remove its columns levels to keep it clean
-                if level_name is not None:
+                if self._level_name is not None:
                     if checks.is_frame(new_obj):
                         if isinstance(new_obj.columns, pd.MultiIndex):
-                            new_obj.columns = index_fns.drop_levels(new_obj.columns, level_name)
+                            new_obj.columns = index_fns.drop_levels(new_obj.columns, self._level_name)
             return new_obj
 
         return self._indexing_func(self._obj, pd_indexing_func, **self._indexing_kwargs)
+
+
+def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
+    """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
+    checks.assert_type(mapper, pd.Series)
+    checks.assert_type(ref_obj, (pd.Series, pd.DataFrame))
+
+    df_range_mapper = reshape_fns.broadcast_to(np.arange(len(mapper.index)), ref_obj)
+    loced_range_mapper = pd_indexing_func(df_range_mapper)
+    new_mapper = mapper.iloc[loced_range_mapper.values[0]]
+    if checks.is_frame(loced_range_mapper):
+        return pd.Series(new_mapper.values, index=loced_range_mapper.columns, name=mapper.name)
+    elif checks.is_series(loced_range_mapper):
+        return pd.Series([new_mapper], index=[loced_range_mapper.name], name=mapper.name)
 
 
 class ParamIndexerFactory:
@@ -184,7 +184,7 @@ class ParamIndexerFactory:
     
     Args:
         param_names (list of str): Names of the parameters.
-        indexing_func (function): Indexing function that calls `pd_indexing_func` to pandas
+        indexing_func (callable): Indexing function that calls `pd_indexing_func` to pandas
             objects in question and returns a new instance of the class.
     
     Example:
@@ -194,7 +194,7 @@ class ParamIndexerFactory:
 
         >>> def indexing_func(c, pd_indexing_func):
         ...     return C(pd_indexing_func(c.df), indexing_on_mapper(
-                    c._my_param_mapper, c.df, pd_indexing_func))
+        ...         c._my_param_mapper, c.df, pd_indexing_func))
 
         >>> MyParamIndexer = ParamIndexerFactory(['my_param'])
         ... class C(MyParamIndexer):
@@ -226,11 +226,13 @@ class ParamIndexerFactory:
     def __new__(self, param_names, class_name='ParamIndexer', module_name='vectorbt.base.indexing'):
 
         class ParamIndexer:
-            def __init__(self, param_mappers, indexing_func, **kwargs):
-                checks.assert_same_len(param_names, param_mappers)
+            def __init__(self, param_mappers, indexing_func, level_names=None, **kwargs):
+                checks.assert_len_equal(param_names, param_mappers)
 
                 for i, param_name in enumerate(param_names):
-                    setattr(self, f'_{param_name}_loc', _ParamLoc(self, param_mappers[i], indexing_func, **kwargs))
+                    level_name = level_names[i] if level_names is not None else None
+                    _param_loc = _ParamLoc(self, param_mappers[i], indexing_func, level_name=level_name, **kwargs)
+                    setattr(self, f'_{param_name}_loc', _param_loc)
 
         for i, param_name in enumerate(param_names):
             @property

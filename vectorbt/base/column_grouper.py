@@ -82,22 +82,24 @@ class ColumnGrouper(Configured):
 
     Set `allow_enable` to `False` to prohibit grouping if `ColumnGrouper.group_by` is `None`.
     Set `allow_disable` to `False` to prohibit disabling of grouping if `ColumnGrouper.group_by` is not `None`.
-    Set `allow_change` to `False` to prohibit changing groups (you can still change their labels).
+    Set `allow_modify` to `False` to prohibit changing groups (you can still change their labels).
 
     All properties are read-only to enable caching.
 
     !!! note
         Columns must build groups that are coherent and sorted."""
 
-    def __init__(self, columns, group_by=None, allow_enable=True, allow_disable=True, allow_change=True):
+    def __init__(self, columns, group_by=None, allow_enable=True, allow_disable=True, allow_modify=True):
         Configured.__init__(
             self,
             columns=columns,
             group_by=group_by,
             allow_enable=allow_enable,
             allow_disable=allow_disable,
-            allow_change=allow_change
+            allow_modify=allow_modify
         )
+
+        checks.assert_not_none(columns)
         self._columns = columns
         if group_by is None or isinstance(group_by, bool):
             self._group_by = None
@@ -107,7 +109,7 @@ class ColumnGrouper(Configured):
         # Everything is allowed by default
         self._allow_enable = allow_enable
         self._allow_disable = allow_disable
-        self._allow_change = allow_change
+        self._allow_modify = allow_modify
 
     @property
     def columns(self):
@@ -130,9 +132,9 @@ class ColumnGrouper(Configured):
         return self._allow_disable
 
     @property
-    def allow_change(self):
+    def allow_modify(self):
         """Whether to allow changing groups."""
-        return self._allow_change
+        return self._allow_modify
 
     def is_grouped(self, group_by=None):
         """Check whether columns are grouped."""
@@ -150,8 +152,8 @@ class ColumnGrouper(Configured):
         """Check whether column grouping has been disabled."""
         return self.group_by is not None and not self.is_grouped(group_by=group_by)
 
-    def is_grouping_changed(self, group_by=None):
-        """Check whether column grouping has been changed."""
+    def is_grouping_modified(self, group_by=None):
+        """Check whether column grouping has been modified."""
         group_by = group_by_to_index(self.columns, group_by)
         if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
             if not pd.Index.equals(group_by, self.group_by):
@@ -161,20 +163,26 @@ class ColumnGrouper(Configured):
                     return True
         return False
 
-    def check_group_by(self, group_by=None, allow_enable=None, allow_disable=None, allow_change=None):
+    def is_grouping_changed(self, group_by=None):
+        """Check whether column grouping has been changed."""
+        return self.is_grouping_enabled(group_by=group_by) \
+            or self.is_grouping_disabled(group_by=group_by) \
+            or self.is_grouping_modified(group_by=group_by)
+
+    def check_group_by(self, group_by=None, allow_enable=None, allow_disable=None, allow_modify=None):
         """Check passed `group_by` object against restrictions."""
         if allow_enable is None:
             allow_enable = self.allow_enable
         if allow_disable is None:
             allow_disable = self.allow_disable
-        if allow_change is None:
-            allow_change = self.allow_change
+        if allow_modify is None:
+            allow_modify = self.allow_modify
 
         if not allow_enable and self.is_grouping_enabled(group_by=group_by):
             raise ValueError("Enabling grouping is not allowed")
         if not allow_disable and self.is_grouping_disabled(group_by=group_by):
             raise ValueError("Disabling grouping is not allowed")
-        if not allow_change and self.is_grouping_changed(group_by=group_by):
+        if not allow_modify and self.is_grouping_modified(group_by=group_by):
             raise ValueError("Changing groups is not allowed")
 
     def resolve_group_by(self, group_by=None, **kwargs):
@@ -232,6 +240,6 @@ class ColumnGrouper(Configured):
             return False
         if self.allow_disable != other.allow_disable:
             return False
-        if self.allow_change != other.allow_change:
+        if self.allow_modify != other.allow_modify:
             return False
         return True

@@ -18,6 +18,7 @@ SimulationContext = namedtuple('SimulationContext', [
     'cash_sharing',
     'call_seq',
     'active_mask',
+    'min_size',
     'order_records',
     'record_mask',
     'last_cash',
@@ -58,6 +59,10 @@ __pdoc__['SimulationContext.active_mask'] = """Mask of whether a particular segm
 A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
 Has shape `(target_shape[0], group_counts.shape[0])`.
+"""
+__pdoc__['SimulationContext.min_size'] = """Minimum size for an order to be accepted.
+
+Has shape `(target_shape[1],)`.
 """
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
@@ -200,13 +205,33 @@ Scalar value. Per group if cash sharing is enabled, otherwise per column.
 Current value is calculated using `val_price`.
 """
 
+# ############# InitCashMode ############# #
+
+InitCashMode = namedtuple('InitCashMode', [
+    'Auto',
+    'AutoAlign'
+])(*range(2))
+"""_"""
+
+__pdoc__['InitCashMode'] = f"""Initial cash mode.
+
+```plaintext
+{json.dumps(dict(zip(InitCashMode._fields, InitCashMode)), indent=2)}
+```
+
+Attributes:
+    Auto: Optimal initial cash for each column.
+    AutoAlign: Optimal initial cash aligned across all columns.
+"""
+
 # ############# CallSeqType ############# #
 
 CallSeqType = namedtuple('CallSeqType', [
     'Default',
     'Reversed',
-    'Random'
-])(*range(3))
+    'Random',
+    'Auto'
+])(*range(4))
 """_"""
 
 __pdoc__['CallSeqType'] = f"""Call sequence type.
@@ -219,6 +244,7 @@ Attributes:
     Default: Place calls from left to right.
     Reversed: Place calls from right to left.
     Random: Place calls randomly.
+    Auto: Place calls dynamically based on order value.
 """
 
 # ############# SizeType ############# #
@@ -238,10 +264,10 @@ __pdoc__['SizeType'] = f"""Size type.
 ```
 
 Attributes:
-    Shares: Amount of shares to buy/sell.
-    TargetShares: Target amount of shares to hold after transaction.
-    TargetValue: Target value of holdings.
-    TargetPercent: Target percentage of total value.
+    Shares: Number of shares.
+    TargetShares: Number of shares to hold after transaction.
+    TargetValue: Total value of holdings to hold after transaction.
+    TargetPercent: Percentage of total value to hold after transaction.
 """
 
 # ############# AccumulateExitMode ############# #
@@ -297,7 +323,6 @@ Order = namedtuple('Order', [
     'fees',
     'fixed_fees',
     'slippage',
-    'min_size',
     'reject_prob'
 ])
 
@@ -308,10 +333,9 @@ __pdoc__['Order.price'] = "Price per share. Filled price will depend upon slippa
 __pdoc__['Order.fees'] = "Fees in percentage of the order value."
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
-__pdoc__['Order.min_size'] = "Minimum size in shares required for this order to be processed."
 __pdoc__['Order.reject_prob'] = "Probability of rejecting this order."
 
-NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan)
+NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan)
 """_"""
 
 __pdoc__['NoOrder'] = "Order that will not be processed."

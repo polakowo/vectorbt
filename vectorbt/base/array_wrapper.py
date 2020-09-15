@@ -46,10 +46,10 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
             columns = obj.columns
     if group_select:
         # Groups as columns
-        i_wrapper = ArrayWrapper(index=index, columns=columns, ndim=obj.grouped_ndim)
+        i_wrapper = ArrayWrapper(index, columns, obj.grouped_ndim)
     else:
         # Columns as columns
-        i_wrapper = ArrayWrapper(index=index, columns=columns, ndim=obj.ndim)
+        i_wrapper = ArrayWrapper(index, columns, obj.ndim)
     n_rows = len(index)
     n_cols = len(columns)
 
@@ -109,9 +109,6 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
                     # One index selected
                     idx_idxs = idx_mapper.values[0]
                     col_idxs = col_mapper.values
-                else:
-                    idx_idxs = None  # cannot happen
-                    col_idxs = None
             else:
                 raise IndexingError("Selection of a scalar is not allowed")
         new_index = index_fns.get_index(idx_mapper, 0)
@@ -179,9 +176,11 @@ def _indexing_func(obj, pd_indexing_func, **kwargs):
 
 
 class ArrayWrapper(Configured, PandasIndexer):
-    """Class that stores index, columns and shape metadata for wrapping NumPy arrays."""
+    """Class that stores index, columns and shape metadata for wrapping NumPy arrays.
 
-    def __init__(self, index=None, columns=None, ndim=None, freq=None, column_only_select=None,
+    If the underlying object is a Series, pass `[sr.name]` as `columns`."""
+
+    def __init__(self, index, columns, ndim, freq=None, column_only_select=None,
                  group_select=None, grouped_ndim=None, **kwargs):
         Configured.__init__(
             self,
@@ -195,10 +194,14 @@ class ArrayWrapper(Configured, PandasIndexer):
             **kwargs
         )
 
-        if index is not None and not isinstance(index, pd.Index):
+        checks.assert_not_none(index)
+        checks.assert_not_none(columns)
+        checks.assert_not_none(ndim)
+        if not isinstance(index, pd.Index):
             index = pd.Index(index)
-        if columns is not None and not isinstance(columns, pd.Index):
+        if not isinstance(columns, pd.Index):
             columns = pd.Index(columns)
+
         self._index = index
         self._columns = columns
         self._ndim = ndim
@@ -221,7 +224,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         index = index_fns.get_index(obj, 0)
         columns = index_fns.get_index(obj, 1)
         ndim = obj.ndim
-        return cls(*args, index=index, columns=columns, ndim=ndim, **kwargs)
+        return cls(index, columns, ndim, *args, **kwargs)
 
     @property
     def index(self):
@@ -245,9 +248,6 @@ class ArrayWrapper(Configured, PandasIndexer):
     @property
     def ndim(self):
         """Number of dimensions."""
-        if self._ndim is None:
-            if len(self.columns) > 1:
-                return 2
         return self._ndim
 
     @property
@@ -260,7 +260,7 @@ class ArrayWrapper(Configured, PandasIndexer):
     @property
     def shape_2d(self):
         """Shape as if the object was two-dimensional."""
-        if len(self.shape) == 1:
+        if self.ndim == 1:
             return self.shape[0], 1
         return self.shape
 
@@ -307,6 +307,13 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.ndim
         return self._grouped_ndim
 
+    def regroup(self, group_by):
+        """Regroup this object."""
+        if self.grouper.is_grouping_changed(group_by=group_by):
+            self.grouper.check_group_by(group_by=group_by)
+            return self.copy(group_by=group_by)
+        return self
+
     def to_time_units(self, a):
         """Convert array to time units."""
         if self.freq is None:
@@ -335,9 +342,9 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         # Perform checks
         if index is not None:
-            checks.assert_same_shape(a, index, axis=(0, 0))
+            checks.assert_shape_equal(a, index, axis=(0, 0))
         if a.ndim == 2 and columns is not None:
-            checks.assert_same_shape(a, columns, axis=(1, 0))
+            checks.assert_shape_equal(a, columns, axis=(1, 0))
 
         if a.ndim == 1:
             return pd.Series(a, index=index, name=name, dtype=dtype)

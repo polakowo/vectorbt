@@ -588,12 +588,12 @@ class Signals_Accessor(Generic_Accessor):
         """Sum up `True` values."""
         return self.sum()
 
-    def avg_distance(self, other=None, **kwargs):
-        """Calculate the average distance between `True` values in `self` and optionally `other`.
+    def avg_distance(self, to=None, **kwargs):
+        """Calculate the average distance between `True` values in `self` and optionally `to`.
 
         See `Signals_Accessor.map_reduce_between`."""
         return self.map_reduce_between(
-            other=other,
+            other=to,
             map_func_nb=nb.distance_map_nb,
             reduce_func_nb=nb.mean_reduce_nb,
             **kwargs
@@ -813,7 +813,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
             ![](/vectorbt/docs/img/signals_plot_as_markers.png)"""
         checks.assert_type(ts, pd.Series)
-        checks.assert_same_index(self._obj.index, ts.index)
+        checks.assert_index_equal(self._obj.index, ts.index)
 
         if fig is None:
             fig = CustomFigureWidget()

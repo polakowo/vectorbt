@@ -15,6 +15,14 @@ class class_or_instancemethod(classmethod):
         return descr_get(instance, type_)
 
 
+class classproperty(object):
+    """Property that can be called on a class."""
+    def __init__(self, f):
+        self.f = f
+    def __get__(self, obj, owner):
+        return self.f(owner)
+
+
 class custom_property():
     """Custom extensible, read-only property.
 

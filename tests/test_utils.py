@@ -2,9 +2,10 @@ import numpy as np
 import pandas as pd
 from numba import njit
 import pytest
+import os
 
 from vectorbt import defaults
-from vectorbt.utils import checks, config, decorators, math, array
+from vectorbt.utils import checks, config, decorators, math, array, random
 
 from tests.utils import hash
 
@@ -33,6 +34,18 @@ class TestConfig:
         assert config.merge_kwargs({'a': 1}, {'a': 2}) == {'a': 2}
         assert config.merge_kwargs({'a': {'b': 2}}, {'a': {'c': 3}}) == {'a': {'b': 2, 'c': 3}}
         assert config.merge_kwargs({'a': {'b': 2}}, {'a': {'b': 3}}) == {'a': {'b': 3}}
+
+    def test_configured(self):
+        class H(config.Configured):
+            def __init__(self, a, b=2, **kwargs):
+                super().__init__(a=a, b=b, **kwargs)
+
+            def return_config(self):
+                return self._config
+
+        assert H(1).return_config() == {'a': 1, 'b': 2}
+        assert H(1).copy(b=3).return_config() == {'a': 1, 'b': 3}
+        assert H(1).copy(c=4).return_config() == {'a': 1, 'b': 2, 'c': 4}
 
 
 # ############# decorators.py ############# #
@@ -226,6 +239,11 @@ class TestChecks:
             pd.Index([0], name='name'),
             pd.Index([0])
         )
+        assert checks.is_index_equal(
+            pd.Index([0], name='name'),
+            pd.Index([0]),
+            strict=False
+        )
         assert not checks.is_index_equal(
             pd.MultiIndex.from_arrays([[0], [1]]),
             pd.Index([0])
@@ -255,10 +273,10 @@ class TestChecks:
         assert not checks.is_equal(None, np.arange(3), np.array_equal)
         assert checks.is_equal(None, None, np.array_equal)
 
-    def test_assert_value_in(self):
-        checks.assert_value_in(0, (0, 1))
+    def test_assert_in(self):
+        checks.assert_in(0, (0, 1))
         with pytest.raises(Exception) as e_info:
-            checks.assert_value_in(2, (0, 1))
+            checks.assert_in(2, (0, 1))
 
     def test_assert_numba_func(self):
         def test_func(x):
@@ -300,9 +318,9 @@ class TestChecks:
         with pytest.raises(Exception) as e_info:
             checks.assert_subclass(A, B)
 
-    def test_assert_same_type(self):
-        checks.assert_same_type(0, 1)
-        checks.assert_same_type(np.zeros(1), np.empty(1))
+    def test_assert_type_equal(self):
+        checks.assert_type_equal(0, 1)
+        checks.assert_type_equal(np.zeros(1), np.empty(1))
         with pytest.raises(Exception) as e_info:
             checks.assert_type(0, np.zeros(1))
 
@@ -322,12 +340,12 @@ class TestChecks:
         with pytest.raises(Exception) as e_info:
             checks.assert_subdtype(pd.DataFrame({'a': [1, 2], 'b': [3., 4.]}), np.float)
 
-    def test_assert_same_dtype(self):
-        checks.assert_same_dtype([1], [1, 1, 1])
-        checks.assert_same_dtype(pd.Series([1, 2, 3]), pd.DataFrame([[1, 2, 3]]))
-        checks.assert_same_dtype(pd.DataFrame([[1, 2, 3.]]), pd.DataFrame([[1, 2, 3.]]))
+    def test_assert_dtype_equal(self):
+        checks.assert_dtype_equal([1], [1, 1, 1])
+        checks.assert_dtype_equal(pd.Series([1, 2, 3]), pd.DataFrame([[1, 2, 3]]))
+        checks.assert_dtype_equal(pd.DataFrame([[1, 2, 3.]]), pd.DataFrame([[1, 2, 3.]]))
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_dtype(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3.]]))
+            checks.assert_dtype_equal(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3.]]))
 
     def test_assert_ndim(self):
         checks.assert_ndim(0, 0)
@@ -337,52 +355,52 @@ class TestChecks:
         with pytest.raises(Exception) as e_info:
             checks.assert_ndim(np.zeros((3, 3, 3)), (1, 2))
 
-    def test_assert_same_len(self):
-        checks.assert_same_len([[1]], [[2]])
-        checks.assert_same_len([[1]], [[2, 3]])
+    def test_assert_len_equal(self):
+        checks.assert_len_equal([[1]], [[2]])
+        checks.assert_len_equal([[1]], [[2, 3]])
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_len([[1]], [[2], [3]])
+            checks.assert_len_equal([[1]], [[2], [3]])
 
-    def test_assert_same_shape(self):
-        checks.assert_same_shape(0, 1)
-        checks.assert_same_shape([1, 2, 3], np.asarray([1, 2, 3]))
-        checks.assert_same_shape([1, 2, 3], pd.Series([1, 2, 3]))
-        checks.assert_same_shape(np.zeros((3, 3)), pd.Series([1, 2, 3]), axis=0)
-        checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(1, 0))
+    def test_assert_shape_equal(self):
+        checks.assert_shape_equal(0, 1)
+        checks.assert_shape_equal([1, 2, 3], np.asarray([1, 2, 3]))
+        checks.assert_shape_equal([1, 2, 3], pd.Series([1, 2, 3]))
+        checks.assert_shape_equal(np.zeros((3, 3)), pd.Series([1, 2, 3]), axis=0)
+        checks.assert_shape_equal(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(1, 0))
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_shape(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(0, 1))
+            checks.assert_shape_equal(np.zeros((2, 3)), pd.Series([1, 2, 3]), axis=(0, 1))
 
-    def test_assert_same_index(self):
-        checks.assert_same_index(pd.Index([1, 2, 3]), pd.Index([1, 2, 3]))
+    def test_assert_index_equal(self):
+        checks.assert_index_equal(pd.Index([1, 2, 3]), pd.Index([1, 2, 3]))
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_index(pd.Index([1, 2, 3]), pd.Index([2, 3, 4]))
+            checks.assert_index_equal(pd.Index([1, 2, 3]), pd.Index([2, 3, 4]))
 
-    def test_assert_same_meta(self):
+    def test_assert_meta_equal(self):
         index = ['x', 'y', 'z']
         columns = ['a', 'b', 'c']
-        checks.assert_same_meta(np.array([1, 2, 3]), np.array([1, 2, 3]))
-        checks.assert_same_meta(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
-        checks.assert_same_meta(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
+        checks.assert_meta_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
+        checks.assert_meta_equal(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
+        checks.assert_meta_equal(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_meta(pd.Series([1, 2]), pd.DataFrame([1, 2]))
+            checks.assert_meta_equal(pd.Series([1, 2]), pd.DataFrame([1, 2]))
 
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_meta(pd.DataFrame([1, 2]), pd.DataFrame([1, 2, 3]))
+            checks.assert_meta_equal(pd.DataFrame([1, 2]), pd.DataFrame([1, 2, 3]))
 
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_meta(pd.DataFrame([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
+            checks.assert_meta_equal(pd.DataFrame([1, 2, 3]), pd.DataFrame([1, 2, 3], index=index))
 
         with pytest.raises(Exception) as e_info:
-            checks.assert_same_meta(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
+            checks.assert_meta_equal(pd.DataFrame([[1, 2, 3]]), pd.DataFrame([[1, 2, 3]], columns=columns))
 
-    def test_assert_same(self):
+    def test_assert_array_equal(self):
         index = ['x', 'y', 'z']
         columns = ['a', 'b', 'c']
-        checks.assert_same(np.array([1, 2, 3]), np.array([1, 2, 3]))
-        checks.assert_same(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
-        checks.assert_same(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
+        checks.assert_array_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
+        checks.assert_array_equal(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
+        checks.assert_array_equal(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
         with pytest.raises(Exception) as e_info:
-            checks.assert_same(np.array([1, 2]), np.array([1, 2, 3]))
+            checks.assert_array_equal(np.array([1, 2]), np.array([1, 2, 3]))
 
     def test_assert_level_not_exists(self):
         i = pd.Index(['x', 'y', 'z'], name='i')
@@ -392,6 +410,12 @@ class TestChecks:
         with pytest.raises(Exception) as e_info:
             checks.assert_level_not_exists(i, 'i')
             checks.assert_level_not_exists(multi_i, 'i')
+
+    def test_assert_equal(self):
+        checks.assert_equal(0, 0)
+        checks.assert_equal(False, False)
+        with pytest.raises(Exception) as e_info:
+            checks.assert_equal(0, 1)
 
 
 # ############# math.py ############# #
@@ -501,6 +525,14 @@ class TestArray:
         assert not array.is_sorted_nb(np.array([1, 0]))
         assert not array.is_sorted_nb(np.array([0, 1, 2, 4, 3]))
 
+    def test_insert_argsort_nb(self):
+        a = np.random.uniform(size=1000)
+        A = a.copy()
+        I = np.arange(len(A))
+        array.insert_argsort_nb(A, I)
+        np.testing.assert_array_equal(np.sort(a), A)
+        np.testing.assert_array_equal(a[I], A)
+
     def test_get_ranges_arr(self):
         np.testing.assert_array_equal(
             array.get_ranges_arr(0, 3),
@@ -514,5 +546,24 @@ class TestArray:
             array.get_ranges_arr([0, 3], [3, 6]),
             np.array([0, 1, 2, 3, 4, 5])
         )
+
+# ############# random.py ############# #
+
+
+class TestRandom:
+    def test_set_seed(self):
+        random.set_seed(42)
+
+        def test_seed():
+            return np.random.uniform(0, 1)
+
+        assert test_seed() == 0.3745401188473625
+
+        if 'NUMBA_DISABLE_JIT' not in os.environ or os.environ['NUMBA_DISABLE_JIT'] != '1':
+            @njit
+            def test_seed_nb():
+                return np.random.uniform(0, 1)
+
+            assert test_seed_nb() == 0.3745401188473625
 
 

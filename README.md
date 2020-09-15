@@ -49,7 +49,7 @@ exits = fast_ma.ma_below(slow_ma, crossed=True)
 portfolio = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq='1D')
 
 # Get total return, reshape to symmetric matrix, and plot the whole thing
-portfolio.total_return.vbt.heatmap(
+portfolio.total_return().vbt.heatmap(
     x_level='fast_window', y_level='slow_window', symmetric=True,
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%'))
 )
@@ -60,31 +60,31 @@ portfolio.total_return.vbt.heatmap(
 Digging into each individual strategy instance is as simple as indexing with pandas:
 
 ```python-repl
->>> portfolio[(13, 21)].stats
+>>> portfolio[(13, 21)].stats()
 
-Start                     2014-09-17 00:00:00
-End                       2020-07-15 00:00:00
-Duration                   2129 days 00:00:00
-Holding Duration [%]                  56.4584
-Total Profit                          9626.46
-Total Return [%]                      9626.46
-Buy & Hold Return [%]                 1909.76
-Max. Drawdown [%]                     47.8405
-Avg. Drawdown [%]                     8.72147
-Max. Drawdown Duration      510 days 00:00:00
-Avg. Drawdown Duration       37 days 07:06:40
-Num. Trades                                54
-Win Rate [%]                          51.8519
-Best Trade [%]                        279.692
-Worst Trade [%]                      -23.4948
-Avg. Trade [%]                         13.459
-Max. Trade Duration         100 days 00:00:00
-Avg. Trade Duration          22 days 06:13:20
-Expectancy                            178.268
-SQN                                    1.9641
-Sharpe Ratio                          1.77836
-Sortino Ratio                         2.81075
-Calmar Ratio                          2.49139
+Start                            2014-09-17 00:00:00
+End                              2020-09-13 00:00:00
+Duration                          2188 days 00:00:00
+Holding Duration [%]                         56.9013
+Total Profit                                 12102.4
+Total Return [%]                             12102.4
+Buy & Hold Return [%]                         2156.3
+Max. Drawdown [%]                            47.8405
+Avg. Drawdown [%]                             8.3173
+Max. Drawdown Duration             510 days 00:00:00
+Avg. Drawdown Duration    35 days 01:37:37.627118644
+Num. Trades                                       54
+Win Rate [%]                                 53.7037
+Best Trade [%]                               279.692
+Worst Trade [%]                             -23.4948
+Avg. Trade [%]                               13.9273
+Max. Trade Duration                100 days 00:00:00
+Avg. Trade Duration                 23 days 01:20:00
+Expectancy                                   224.119
+SQN                                          2.25024
+Sharpe Ratio                                 1.81674
+Sortino Ratio                                2.87812
+Calmar Ratio                                 2.56841
 Name: (13, 21), dtype: object
 ```
 
@@ -218,11 +218,11 @@ dtype: bool
     - Provides metrics and tools for analyzing returns, orders, trades and positions
     
 ```python-repl
->>> price = pd.Series([1, 2, 3, 2, 1])
+>>> price = pd.Series([1., 2., 3., 2., 1.])
 >>> entries = pd.Series([True, False, True, False, False])
 >>> exits = pd.Series([False, True, False, True, False])
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
->>> portfolio.trades.plot()
+>>> portfolio.trades().plot()
 ```
 
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)

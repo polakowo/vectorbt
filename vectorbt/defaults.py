@@ -10,6 +10,7 @@ For example, you can change default width and height of each plot:
 
 Changes take effect immediately."""
 
+import numpy as np
 import json
 
 from vectorbt.utils.config import Config
@@ -150,8 +151,8 @@ __pdoc__['returns'] = f"""Parameters for returns.
 # Portfolio
 portfolio = Config(
     call_seq='Default',
-    dynamic_call_seq=False,
     init_cash=100.,
+    size=np.inf,
     size_type='Shares',
     fees=0.,
     fixed_fees=0.,

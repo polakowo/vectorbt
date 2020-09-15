@@ -76,7 +76,7 @@ class Base_Accessor(ArrayWrapper):
 
         Set `axis` to 1 for columns and 0 for index.
         If `inplace` is `True`, modifies the pandas object. Otherwise, returns a copy."""
-        checks.assert_value_in(axis, (0, 1))
+        checks.assert_in(axis, (0, 1))
 
         if axis == 1:
             obj_index = self.columns
@@ -476,7 +476,7 @@ class Base_Accessor(ArrayWrapper):
             # Concat the results horizontally
             if checks.is_numba_func(combine_func):
                 for i in range(1, len(bc_arrays)):
-                    checks.assert_same_meta(bc_arrays[i - 1], bc_arrays[i])
+                    checks.assert_meta_equal(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_and_concat_nb(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
@@ -491,7 +491,7 @@ class Base_Accessor(ArrayWrapper):
             # Combine arguments pairwise into one object
             if checks.is_numba_func(combine_func):
                 for i in range(1, len(bc_arrays)):
-                    checks.assert_same_dtype(bc_arrays[i - 1], bc_arrays[i])
+                    checks.assert_dtype_equal(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
