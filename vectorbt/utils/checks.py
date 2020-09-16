@@ -47,10 +47,12 @@ def is_hashable(arg):
     return True
 
 
-def is_index_equal(arg1, arg2):
+def is_index_equal(arg1, arg2, strict=True):
     """Determine whether indexes are equal.
 
     Introduces naming tests on top of `pd.Index.equals`, but still doesn't check for types."""
+    if not strict:
+        return pd.Index.equals(arg1, arg2)
     if isinstance(arg1, pd.MultiIndex) and isinstance(arg2, pd.MultiIndex):
         if arg1.names != arg2.names:
             return False
@@ -80,10 +82,10 @@ def is_equal(arg1, arg2, equality_func):
 
 # ############# Asserts ############# #
 
-def assert_value_in(value, lst):
-    """Raise exception if `value` is not in `lst`."""
-    if value not in lst:
-        raise AssertionError(f"Value {value} is outside of {lst}")
+def assert_in(arg1, arg2):
+    """Raise exception if `arg1` is not in `arg2`."""
+    if arg1 not in arg2:
+        raise AssertionError(f"{arg1} not found in {arg2}")
 
 
 def assert_numba_func(func):
@@ -116,7 +118,7 @@ def assert_subclass(arg, classes):
             raise AssertionError(f"Class must be a subclass of {classes}, not {arg}")
 
 
-def assert_same_type(arg1, arg2):
+def assert_type_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different types."""
     if type(arg1) != type(arg2):
         raise AssertionError(f"Types {type(arg1)} and {type(arg2)} do not match")
@@ -148,7 +150,7 @@ def assert_subdtype(arg, dtype):
             raise AssertionError(f"Data type must be {dtype}, not {arg.dtype}")
 
 
-def assert_same_dtype(arg1, arg2):
+def assert_dtype_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different data types."""
     if not is_array(arg1):
         arg1 = np.asarray(arg1)
@@ -183,7 +185,7 @@ def assert_ndim(arg, ndims):
             raise AssertionError(f"Number of dimensions must be {ndims}, not {arg.ndim}")
 
 
-def assert_same_len(arg1, arg2):
+def assert_len_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different length.
 
     Does not transform arguments to NumPy arrays."""
@@ -191,7 +193,7 @@ def assert_same_len(arg1, arg2):
         raise AssertionError(f"Lengths {len(arg1)} and {len(arg2)} do not match")
 
 
-def assert_same_shape(arg1, arg2, axis=None):
+def assert_shape_equal(arg1, arg2, axis=None):
     """Raise exception if `arg1` and `arg2` have different shapes along `axis`."""
     if not is_array(arg1):
         arg1 = np.asarray(arg1)
@@ -210,31 +212,25 @@ def assert_same_shape(arg1, arg2, axis=None):
                 raise AssertionError(f"Axis {axis} of {arg1.shape} and {arg2.shape} do not match")
 
 
-def assert_same_index(arg1, arg2):
-    """Raise exception if `arg1` and `arg2` have different index."""
-    if not pd.Index.equals(arg1.index, arg2.index):
-        raise AssertionError(f"Indexes {arg1.index} and {arg2.index} do not match")
+def assert_index_equal(arg1, arg2, **kwargs):
+    """Raise exception if `arg1` and `arg2` have different index/columns."""
+    if not is_index_equal(arg1, arg2, **kwargs):
+        raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
-def assert_same_columns(arg1, arg2):
-    """Raise exception if `arg1` and `arg2` have different columns."""
-    if not pd.Index.equals(arg1.columns, arg2.columns):
-        raise AssertionError(f"Columns {arg1.columns} and {arg2.columns} do not match")
-
-
-def assert_same_meta(arg1, arg2):
+def assert_meta_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different metadata."""
-    assert_same_type(arg1, arg2)
-    assert_same_shape(arg1, arg2)
+    assert_type_equal(arg1, arg2)
+    assert_shape_equal(arg1, arg2)
     if is_pandas(arg1):
-        assert_same_index(arg1, arg2)
+        assert_index_equal(arg1.index, arg2.index)
         if is_frame(arg1):
-            assert_same_columns(arg1, arg2)
+            assert_index_equal(arg1.columns, arg2.columns)
 
 
-def assert_same(arg1, arg2):
+def assert_array_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different metadata or values."""
-    assert_same_meta(arg1, arg2)
+    assert_meta_equal(arg1, arg2)
     if is_pandas(arg1):
         if arg1.equals(arg2):
             return
@@ -243,7 +239,7 @@ def assert_same(arg1, arg2):
         arg2 = np.asarray(arg2)
         if np.array_equal(arg1, arg2):
             return
-    raise AssertionError(f"Values do not match")
+    raise AssertionError(f"Arrays do not match")
 
 
 def assert_level_not_exists(arg, level_name):
@@ -254,3 +250,10 @@ def assert_level_not_exists(arg, level_name):
         names = [arg.name]
     if level_name in names:
         raise AssertionError(f"Level {level_name} already exists in {names}")
+
+
+def assert_equal(arg1, arg2):
+    """Raise exception if `arg1` and `arg2` are different."""
+    if arg1 != arg2:
+        raise AssertionError(f"{len(arg1)} and {len(arg2)} do not match")
+

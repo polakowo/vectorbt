@@ -632,7 +632,7 @@ class TestAccessors:
         )
 
     def test_drawdowns(self):
-        assert type(df['a'].vbt.drawdowns) is Drawdowns
-        assert df['a'].vbt.drawdowns.wrapper.freq == df['a'].vbt.freq
-        assert df['a'].vbt.drawdowns.wrapper.ndim == df['a'].ndim
-        assert df.vbt.drawdowns.wrapper.ndim == df.ndim
+        assert type(df['a'].vbt.drawdowns()) is Drawdowns
+        assert df['a'].vbt.drawdowns().wrapper.freq == df['a'].vbt.freq
+        assert df['a'].vbt.drawdowns().wrapper.ndim == df['a'].ndim
+        assert df.vbt.drawdowns().wrapper.ndim == df.ndim

@@ -6,30 +6,26 @@ import plotly.graph_objects as go
 
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.config import Configured
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeTypes
-from vectorbt.records.base import Records, indexing_on_records
+from vectorbt.records.base import Records, indexing_on_records_meta
 from vectorbt.records.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records import nb
 
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseDrawdowns`."""
-    new_cols, new_records, _ = indexing_on_records(obj, pd_indexing_func)
-    if obj.grouper.group_by is not None:
-        new_group_by = obj.grouper.group_by[new_cols]
-    else:
-        new_group_by = None
-    return obj.__class__(
-        new_records,
-        pd_indexing_func(obj.ts),
-        freq=obj.wrapper.freq,
-        idx_field=obj.idx_field,
-        group_by=new_group_by
+    new_wrapper, new_records_arr, _, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
+    new_ts = new_wrapper.wrap(obj.ts.values[:, col_idxs], group_by=False)
+    return obj.copy(
+        wrapper=new_wrapper,
+        records_arr=new_records_arr,
+        ts=new_ts
     )
 
 
@@ -38,57 +34,57 @@ class BaseDrawdowns(Records):
 
     Requires `records_arr` to have all fields defined in `vectorbt.records.enums.drawdown_dt`."""
 
-    def __init__(self, records_arr, ts, freq=None, idx_field='end_idx', group_by=None):
+    def __init__(self, wrapper, records_arr, ts, idx_field='end_idx'):
         Records.__init__(
             self,
+            wrapper,
             records_arr,
-            ArrayWrapper.from_obj(ts, freq=freq),
-            idx_field=idx_field,
-            group_by=group_by
+            idx_field=idx_field
         )
-        PandasIndexer.__init__(self, _indexing_func)
+        Configured.__init__(
+            self,
+            wrapper=wrapper,
+            records_arr=records_arr,
+            ts=ts,
+            idx_field=idx_field
+        )
+        self._ts = ts
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
             raise ValueError("Records array must have all fields defined in drawdown_dt")
 
-        self.ts = ts
+        PandasIndexer.__init__(self, _indexing_func)
 
     @classmethod
-    def from_ts(cls, ts, **kwargs):
+    def from_ts(cls, ts, idx_field='end_idx', **kwargs):
         """Build `BaseDrawdowns` from time series `ts`.
 
         `**kwargs` such as `freq` will be passed to `BaseDrawdowns.__init__`."""
         records_arr = nb.drawdown_records_nb(ts.vbt.to_2d_array())
-        return cls(records_arr, ts, **kwargs)
+        wrapper = ArrayWrapper.from_obj(ts, **kwargs)
+        return cls(wrapper, records_arr, ts, idx_field=idx_field)
 
-    def filter_by_mask(self, mask, idx_field=None, group_by=None):
-        """Return a new class instance, filtered by mask."""
-        if idx_field is None:
-            idx_field = self.idx_field
-        if group_by is None:
-            group_by = self.grouper.group_by
-        return self.__class__(
-            self.records_arr[mask],
-            self.ts,
-            freq=self.wrapper.freq,
-            idx_field=idx_field,
-            group_by=group_by
-        )
+    @property
+    def ts(self):
+        """Original time series that records are built from."""
+        return self._ts
 
     def plot(self,
-             ts_trace_kwargs={},
-             peak_trace_kwargs={},
-             valley_trace_kwargs={},
-             recovery_trace_kwargs={},
-             active_trace_kwargs={},
-             ptv_shape_kwargs={},
-             vtr_shape_kwargs={},
-             active_shape_kwargs={},
+             column=None,
+             ts_trace_kwargs=None,
+             peak_trace_kwargs=None,
+             valley_trace_kwargs=None,
+             recovery_trace_kwargs=None,
+             active_trace_kwargs=None,
+             ptv_shape_kwargs=None,
+             vtr_shape_kwargs=None,
+             active_shape_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot drawdowns over `Drawdowns.ts`.
 
         Args:
+            column (str): Name of the column to plot.
             ts_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for time series.
             peak_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for peak values.
             valley_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for valley values.
@@ -109,29 +105,53 @@ class BaseDrawdowns(Records):
             ```
 
             ![](/vectorbt/docs/img/drawdowns.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
+        if column is not None:
+            if self.wrapper.grouper.group_by is None:
+                self_col = self[column]
+            else:
+                self_col = self.copy(wrapper=self.wrapper.copy(group_by=None))[column]
+        else:
+            self_col = self
+        if self_col.wrapper.ndim > 1:
+            raise TypeError("Select a column first. Use indexing or column argument.")
 
-        fig = self.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+        if ts_trace_kwargs is None:
+            ts_trace_kwargs = {}
+        if peak_trace_kwargs is None:
+            peak_trace_kwargs = {}
+        if valley_trace_kwargs is None:
+            valley_trace_kwargs = {}
+        if recovery_trace_kwargs is None:
+            recovery_trace_kwargs = {}
+        if active_trace_kwargs is None:
+            active_trace_kwargs = {}
+        if ptv_shape_kwargs is None:
+            ptv_shape_kwargs = {}
+        if vtr_shape_kwargs is None:
+            vtr_shape_kwargs = {}
+        if active_shape_kwargs is None:
+            active_shape_kwargs = {}
 
-        if self.records_arr.shape[0] == 0:
+        fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
+
+        if self_col.records_arr.shape[0] == 0:
             return fig
 
         # Extract information
-        start_idx = self.records_arr['start_idx']
-        valley_idx = self.records_arr['valley_idx']
-        end_idx = self.records_arr['end_idx']
-        status = self.records_arr['status']
+        start_idx = self_col.records_arr['start_idx']
+        valley_idx = self_col.records_arr['valley_idx']
+        end_idx = self_col.records_arr['end_idx']
+        status = self_col.records_arr['status']
 
-        start_val = self.ts.values[start_idx]
-        valley_val = self.ts.values[valley_idx]
-        end_val = self.ts.values[end_idx]
+        start_val = self_col.ts.values[start_idx]
+        valley_val = self_col.ts.values[valley_idx]
+        end_val = self_col.ts.values[end_idx]
 
         def get_duration_str(from_idx, to_idx):
-            if isinstance(self.wrapper.index, DatetimeTypes):
-                duration = self.wrapper.index[to_idx] - self.wrapper.index[from_idx]
-            elif self.wrapper.freq is not None:
-                duration = self.wrapper.to_time_units(to_idx - from_idx)
+            if isinstance(self_col.wrapper.index, DatetimeTypes):
+                duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
+            elif self_col.wrapper.freq is not None:
+                duration = self_col.wrapper.to_time_units(to_idx - from_idx)
             else:
                 duration = to_idx - from_idx
             return np.vectorize(str)(duration)
@@ -139,7 +159,7 @@ class BaseDrawdowns(Records):
         # Plot peak markers and zones
         peak_mask = start_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
         peak_scatter = go.Scatter(
-            x=self.ts.index[start_idx[peak_mask]],
+            x=self_col.ts.index[start_idx[peak_mask]],
             y=start_val[peak_mask],
             mode='markers',
             marker=dict(
@@ -163,7 +183,7 @@ class BaseDrawdowns(Records):
             valley_duration = get_duration_str(start_idx[recovery_mask], valley_idx[recovery_mask])
             valley_customdata = np.stack((valley_drawdown, valley_duration), axis=1)
             valley_scatter = go.Scatter(
-                x=self.ts.index[valley_idx[recovery_mask]],
+                x=self_col.ts.index[valley_idx[recovery_mask]],
                 y=valley_val[recovery_mask],
                 mode='markers',
                 marker=dict(
@@ -187,9 +207,9 @@ class BaseDrawdowns(Records):
                     type="rect",
                     xref="x",
                     yref="paper",
-                    x0=self.ts.index[start_idx[i]],
+                    x0=self_col.ts.index[start_idx[i]],
                     y0=0,
-                    x1=self.ts.index[valley_idx[i]],
+                    x1=self_col.ts.index[valley_idx[i]],
                     y1=1,
                     fillcolor='red',
                     opacity=0.15,
@@ -202,7 +222,7 @@ class BaseDrawdowns(Records):
             recovery_duration = get_duration_str(valley_idx[recovery_mask], end_idx[recovery_mask])
             recovery_customdata = np.stack((recovery_return, recovery_duration), axis=1)
             recovery_scatter = go.Scatter(
-                x=self.ts.index[end_idx[recovery_mask]],
+                x=self_col.ts.index[end_idx[recovery_mask]],
                 y=end_val[recovery_mask],
                 mode='markers',
                 marker=dict(
@@ -226,9 +246,9 @@ class BaseDrawdowns(Records):
                     type="rect",
                     xref="x",
                     yref="paper",
-                    x0=self.ts.index[valley_idx[i]],
+                    x0=self_col.ts.index[valley_idx[i]],
                     y0=0,
-                    x1=self.ts.index[end_idx[i]],
+                    x1=self_col.ts.index[end_idx[i]],
                     y1=1,
                     fillcolor='green',
                     opacity=0.15,
@@ -243,7 +263,7 @@ class BaseDrawdowns(Records):
             active_duration = get_duration_str(valley_idx[active_mask], end_idx[active_mask])
             active_customdata = np.stack((active_drawdown, active_duration), axis=1)
             active_scatter = go.Scatter(
-                x=self.ts.index[end_idx[active_mask]],
+                x=self_col.ts.index[end_idx[active_mask]],
                 y=end_val[active_mask],
                 mode='markers',
                 marker=dict(
@@ -267,9 +287,9 @@ class BaseDrawdowns(Records):
                     type="rect",
                     xref="x",
                     yref="paper",
-                    x0=self.ts.index[start_idx[i]],
+                    x0=self_col.ts.index[start_idx[i]],
                     y0=0,
-                    x1=self.ts.index[end_idx[i]],
+                    x1=self_col.ts.index[end_idx[i]],
                     y1=1,
                     fillcolor='orange',
                     opacity=0.15,
@@ -325,12 +345,11 @@ class BaseDrawdowns(Records):
         return self.duration.max(time_units=time_units, **kwargs)
 
     @cached_method
-    def coverage(self, group_by=None, columns=None, **kwargs):
+    def coverage(self, group_by=None, **kwargs):
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
-        total_steps = self.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
-        return self.wrapper.wrap_reduced(total_duration / total_steps, columns=columns, **kwargs)
+        total_steps = self.wrapper.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
+        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **kwargs)
 
     @cached_property
     def ptv_duration(self):
@@ -349,7 +368,7 @@ class ActiveDrawdowns(BaseDrawdowns):
         curr_end_val = self.end_value.nst(-1, group_by=group_by)
         curr_start_val = self.start_value.nst(-1, group_by=group_by)
         curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
-        return self.wrapper.wrap_reduced(curr_drawdown, **kwargs)
+        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
 
     @cached_method
     def current_duration(self, time_units=True, **kwargs):
@@ -430,23 +449,21 @@ class Drawdowns(BaseDrawdowns):
         return self.map_field('status')
 
     @cached_method
-    def recovered_rate(self, group_by=None, columns=None, **kwargs):
+    def recovered_rate(self, group_by=None, **kwargs):
         """Rate of recovered drawdowns."""
         recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        columns = self.grouper.get_new_index(group_by=group_by, new_index=columns)
-        return self.wrapper.wrap_reduced(recovered_count / total_count, columns=columns, **kwargs)
+        return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **kwargs)
 
     @cached_property
     def active(self):
         """Active drawdowns of type `BaseDrawdowns`."""
         filter_mask = self.records_arr['status'] == DrawdownStatus.Active
         return ActiveDrawdowns(
+            self.wrapper,
             self.records_arr[filter_mask],
             self.ts,
-            freq=self.wrapper.freq,
-            idx_field=self.idx_field,
-            group_by=self.grouper.group_by
+            idx_field=self.idx_field
         )
 
     @cached_property
@@ -454,9 +471,8 @@ class Drawdowns(BaseDrawdowns):
         """Recovered drawdowns of type `RecoveredDrawdowns`."""
         filter_mask = self.records_arr['status'] == DrawdownStatus.Recovered
         return RecoveredDrawdowns(
+            self.wrapper,
             self.records_arr[filter_mask],
             self.ts,
-            freq=self.wrapper.freq,
-            idx_field=self.idx_field,
-            group_by=self.grouper.group_by
+            idx_field=self.idx_field
         )

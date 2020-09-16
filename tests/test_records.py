@@ -29,17 +29,19 @@ example_dt = np.dtype([
     ('some_field2', np.float64)
 ], align=True)
 
-records_arr = np.array([
+records_arr = np.asarray([
     (0, 0, 10, 21),
-    (0, 1, 11, 22),
-    (0, 2, 12, 23),
-    (1, 0, 13, 24),
-    (1, 1, 14, 25),
-    (1, 2, 15, 26),
-    (2, 0, 16, 27),
-    (2, 1, 17, 28),
-    (2, 2, 18, 29)
+    (0, 1, 11, 20),
+    (0, 2, 12, 19),
+    (1, 0, 13, 18),
+    (1, 1, 14, 17),
+    (1, 2, 13, 18),
+    (2, 0, 12, 19),
+    (2, 1, 11, 20),
+    (2, 2, 10, 21)
 ], dtype=example_dt)
+
+group_by = pd.Index([0, 1, 1, 1])
 
 wrapper = ArrayWrapper(
     index=['x', 'y', 'z'],
@@ -47,21 +49,26 @@ wrapper = ArrayWrapper(
     ndim=2,
     freq='1 days'
 )
+wrapper_grouped = wrapper.copy(group_by=group_by)
 
-group_by = np.array([1, 1, 2, 2])
-
-records = vbt.Records(records_arr, wrapper, idx_field='idx')
-records_grouped = vbt.Records(records_arr, wrapper, idx_field='idx', group_by=group_by)
+records = vbt.records.Records(wrapper, records_arr)
+records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
 
 mapped_array = records.map_field('some_field1')
 mapped_array_grouped = records_grouped.map_field('some_field1')
 
 
 class TestMappedArray:
+    def test_regroup(self):
+        pd.testing.assert_index_equal(
+            mapped_array.regroup(group_by=group_by).wrapper.grouper.group_by,
+            mapped_array_grouped.wrapper.grouper.group_by
+        )
+
     def test_mapped_arr(self):
         np.testing.assert_array_equal(
             mapped_array.mapped_arr,
-            np.array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
+            np.array([10., 11., 12., 13., 14., 13., 12., 11., 10.])
         )
         np.testing.assert_array_equal(
             mapped_array['a'].mapped_arr,
@@ -110,7 +117,7 @@ class TestMappedArray:
         filtered = mapped_array.filter_by_mask(mask)
         np.testing.assert_array_equal(
             filtered.mapped_arr,
-            np.array([14., 15., 16., 17., 18.])
+            np.array([12., 13., 14., 13., 12.])
         )
         np.testing.assert_array_equal(filtered.col_arr, mapped_array.col_arr[mask])
         np.testing.assert_array_equal(filtered.idx_arr, mapped_array.idx_arr[mask])
@@ -119,17 +126,15 @@ class TestMappedArray:
             mapped_array['a'].filter_by_mask(mask_a).mapped_arr,
             np.array([11., 12.])
         )
-        pd.testing.assert_index_equal(
-            mapped_array_grouped.filter_by_mask(mask).grouper.group_by,
-            mapped_array_grouped.grouper.group_by
-        )
+        assert mapped_array_grouped.filter_by_mask(mask).wrapper == mapped_array_grouped.wrapper
+        assert mapped_array_grouped.filter_by_mask(mask, group_by=False).wrapper.grouper.group_by is None
 
     def test_to_matrix(self):
         target = pd.DataFrame(
             np.array([
-                [10., 13., 16., np.nan],
-                [11., 14., 17., np.nan],
-                [12., 15., 18., np.nan]
+                [10., 13., 12., np.nan],
+                [11., 14., 11., np.nan],
+                [12., 13., 10., np.nan]
             ]),
             index=wrapper.index,
             columns=wrapper.columns
@@ -147,9 +152,9 @@ class TestMappedArray:
             target.fillna(0.)
         )
         mapped_array2 = vbt.MappedArray(
+            wrapper,
             records_arr['some_field1'].tolist() + [1],
             records_arr['col'].tolist() + [2],
-            wrapper,
             idx_arr=records_arr['idx'].tolist() + [2]
         )
         with pytest.raises(Exception) as e_info:
@@ -162,28 +167,29 @@ class TestMappedArray:
 
         pd.testing.assert_series_equal(
             mapped_array.reduce(mean_reduce_nb),
-            pd.Series(np.array([11., 14., 17., np.nan]), index=wrapper.columns)
+            pd.Series(np.array([11., 13.333333333333334, 11., np.nan]), index=wrapper.columns)
         )
         assert mapped_array['a'].reduce(mean_reduce_nb) == 11.
         pd.testing.assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, default_val=0.),
-            pd.Series(np.array([11., 14., 17., 0.]), index=wrapper.columns)
+            pd.Series(np.array([11., 13.333333333333334, 11., 0.]), index=wrapper.columns)
         )
         pd.testing.assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, default_val=0., cast=np.int_),
-            pd.Series(np.array([11, 14, 17, 0]), index=wrapper.columns)
+            pd.Series(np.array([11, 13, 11, 0]), index=wrapper.columns)
         )
         pd.testing.assert_series_equal(
             mapped_array.reduce(mean_reduce_nb, time_units=True),
-            pd.Series(np.array([11., 14., 17., np.nan]), index=wrapper.columns) * day_dt
+            pd.Series(np.array([11., 13.333333333333334, 11., np.nan]), index=wrapper.columns) * day_dt
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.reduce(mean_reduce_nb),
-            pd.Series([12.5, 17.], index=[1, 2])
+            pd.Series([11., 12.166666666666666], index=pd.Int64Index([0, 1], dtype='int64'))
         )
+        assert mapped_array_grouped[0].reduce(mean_reduce_nb) == 11.
         pd.testing.assert_series_equal(
-            mapped_array_grouped.reduce(mean_reduce_nb, columns=['a', 'b']),
-            pd.Series([12.5, 17.], index=['a', 'b'])
+            mapped_array_grouped[[0]].reduce(mean_reduce_nb),
+            pd.Series([11.], index=pd.Int64Index([0], dtype='int64'))
         )
         pd.testing.assert_series_equal(
             mapped_array.reduce(mean_reduce_nb),
@@ -193,11 +199,6 @@ class TestMappedArray:
             mapped_array.reduce(mean_reduce_nb, group_by=group_by),
             mapped_array_grouped.reduce(mean_reduce_nb)
         )
-        assert mapped_array_grouped['a'].reduce(mean_reduce_nb) == 11.
-        pd.testing.assert_series_equal(
-            mapped_array_grouped[['a', 'b']].reduce(mean_reduce_nb),
-            pd.Series([12.5], index=[1])
-        )
 
     def test_reduce_to_idx(self):
         @njit
@@ -206,16 +207,16 @@ class TestMappedArray:
 
         pd.testing.assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, to_idx=True),
-            pd.Series(np.array(['x', 'x', 'x', np.nan], dtype=np.object), index=wrapper.columns)
+            pd.Series(np.array(['x', 'x', 'z', np.nan], dtype=np.object), index=wrapper.columns)
         )
         assert mapped_array['a'].reduce(argmin_reduce_nb, to_idx=True) == 'x'
         pd.testing.assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, to_idx=True, idx_labeled=False),
-            pd.Series(np.array([0, 0, 0, -1], dtype=int), index=wrapper.columns)
+            pd.Series(np.array([0, 0, 2, -1], dtype=int), index=wrapper.columns)
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.reduce(argmin_reduce_nb, to_idx=True, idx_labeled=False),
-            pd.Series(np.array([0, 0], dtype=int), index=[1, 2])
+            pd.Series(np.array([0, 2], dtype=int), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_reduce_to_array(self):
@@ -231,8 +232,8 @@ class TestMappedArray:
             mapped_array.reduce(min_max_reduce_nb, to_array=True, n_rows=2),
             pd.DataFrame(
                 np.array([
-                    [10., 13., 16., np.nan],
-                    [12., 15., 18., np.nan]
+                    [10., 13., 10., np.nan],
+                    [12., 14., 12., np.nan]
                 ]),
                 columns=wrapper.columns
             )
@@ -241,8 +242,8 @@ class TestMappedArray:
             mapped_array.reduce(min_max_reduce_nb, to_array=True, n_rows=2, index=['min', 'max']),
             pd.DataFrame(
                 np.array([
-                    [10., 13., 16., np.nan],
-                    [12., 15., 18., np.nan]
+                    [10., 13., 10., np.nan],
+                    [12., 14., 12., np.nan]
                 ]),
                 index=pd.Index(['min', 'max'], dtype='object'),
                 columns=wrapper.columns
@@ -256,8 +257,8 @@ class TestMappedArray:
             mapped_array.reduce(min_max_reduce_nb, to_array=True, n_rows=2, default_val=0.),
             pd.DataFrame(
                 np.array([
-                    [10., 13., 16., 0.],
-                    [12., 15., 18., 0.]
+                    [10., 13., 10., 0.],
+                    [12., 14., 12., 0.]
                 ]),
                 columns=wrapper.columns
             )
@@ -266,8 +267,8 @@ class TestMappedArray:
             mapped_array.reduce(min_max_reduce_nb, to_array=True, n_rows=2, time_units=True),
             pd.DataFrame(
                 np.array([
-                    [10., 13., 16., np.nan],
-                    [12., 15., 18., np.nan]
+                    [10., 13., 10., np.nan],
+                    [12., 14., 12., np.nan]
                 ]),
                 columns=wrapper.columns
             ) * day_dt
@@ -276,20 +277,10 @@ class TestMappedArray:
             mapped_array_grouped.reduce(min_max_reduce_nb, to_array=True, n_rows=2),
             pd.DataFrame(
                 np.array([
-                    [10., 16.],
-                    [15., 18.]
+                    [10., 10.],
+                    [12., 14.]
                 ]),
-                columns=[1, 2]
-            )
-        )
-        pd.testing.assert_frame_equal(
-            mapped_array_grouped.reduce(min_max_reduce_nb, to_array=True, n_rows=2, columns=['a', 'b']),
-            pd.DataFrame(
-                np.array([
-                    [10., 16.],
-                    [15., 18.]
-                ]),
-                columns=['a', 'b']
+                columns=pd.Int64Index([0, 1], dtype='int64')
             )
         )
         pd.testing.assert_frame_equal(
@@ -301,12 +292,12 @@ class TestMappedArray:
             mapped_array_grouped.reduce(min_max_reduce_nb, to_array=True, n_rows=2)
         )
         pd.testing.assert_series_equal(
-            mapped_array_grouped['a'].reduce(min_max_reduce_nb, to_array=True, n_rows=2),
-            pd.Series([10., 12.], name=1)
+            mapped_array_grouped[0].reduce(min_max_reduce_nb, to_array=True, n_rows=2),
+            pd.Series([10., 12.])
         )
         pd.testing.assert_frame_equal(
-            mapped_array_grouped[['a', 'b']].reduce(min_max_reduce_nb, to_array=True, n_rows=2),
-            pd.DataFrame([[10.], [15.]], columns=[1])
+            mapped_array_grouped[[0]].reduce(min_max_reduce_nb, to_array=True, n_rows=2),
+            pd.DataFrame([[10.], [12.]], columns=pd.Int64Index([0], dtype='int64'))
         )
 
     def test_reduce_to_idx_array(self):
@@ -322,8 +313,8 @@ class TestMappedArray:
             mapped_array.reduce(idxmin_idxmax_reduce_nb, to_array=True, n_rows=2, to_idx=True),
             pd.DataFrame(
                 np.array([
-                    ['x', 'x', 'x', np.nan],
-                    ['z', 'z', 'z', np.nan]
+                    ['x', 'x', 'z', np.nan],
+                    ['z', 'y', 'x', np.nan]
                 ], dtype=np.object),
                 columns=wrapper.columns
             )
@@ -338,8 +329,8 @@ class TestMappedArray:
             ),
             pd.DataFrame(
                 np.array([
-                    ['x', 'x', 'x', np.nan],
-                    ['z', 'z', 'z', np.nan]
+                    ['x', 'x', 'z', np.nan],
+                    ['z', 'y', 'x', np.nan]
                 ], dtype=np.object),
                 index=pd.Index(['min', 'max'], dtype='object'),
                 columns=wrapper.columns
@@ -369,8 +360,8 @@ class TestMappedArray:
             ),
             pd.DataFrame(
                 np.array([
-                    [0, 0, 0, -1],
-                    [2, 2, 2, -1]
+                    [0, 0, 2, -1],
+                    [2, 1, 0, -1]
                 ]),
                 columns=wrapper.columns
             )
@@ -385,22 +376,22 @@ class TestMappedArray:
             ),
             pd.DataFrame(
                 np.array([
-                    [0, 0],
-                    [2, 2]
+                    [0, 2],
+                    [2, 1]
                 ]),
-                columns=[1, 2]
+                columns=pd.Int64Index([0, 1], dtype='int64')
             )
         )
 
     def test_nst(self):
         pd.testing.assert_series_equal(
             mapped_array.nst(0),
-            pd.Series(np.array([10., 13., 16., np.nan]), index=wrapper.columns)
+            pd.Series(np.array([10., 13., 12., np.nan]), index=wrapper.columns)
         )
         assert mapped_array['a'].nst(0) == 10.
         pd.testing.assert_series_equal(
             mapped_array.nst(-1),
-            pd.Series(np.array([12., 15., 18., np.nan]), index=wrapper.columns)
+            pd.Series(np.array([12., 13., 10., np.nan]), index=wrapper.columns)
         )
         assert mapped_array['a'].nst(-1) == 12.
         with pytest.raises(Exception) as e_info:
@@ -409,7 +400,7 @@ class TestMappedArray:
             _ = mapped_array_grouped.nst(0)
         pd.testing.assert_series_equal(
             mapped_array_grouped.nst(0, group_by=False),
-            pd.Series(np.array([10., 13., 16., np.nan]), index=wrapper.columns)
+            pd.Series(np.array([10., 13., 12., np.nan]), index=wrapper.columns)
         )
 
     def test_min(self):
@@ -420,7 +411,7 @@ class TestMappedArray:
         assert mapped_array['a'].min() == mapped_array['a'].to_matrix().min()
         pd.testing.assert_series_equal(
             mapped_array_grouped.min(),
-            pd.Series([10., 16.], index=[1, 2])
+            pd.Series([10., 10.], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_max(self):
@@ -431,7 +422,7 @@ class TestMappedArray:
         assert mapped_array['a'].max() == mapped_array['a'].to_matrix().max()
         pd.testing.assert_series_equal(
             mapped_array_grouped.max(),
-            pd.Series([15., 18.], index=[1, 2])
+            pd.Series([12., 14.], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_mean(self):
@@ -442,7 +433,7 @@ class TestMappedArray:
         assert mapped_array['a'].mean() == mapped_array['a'].to_matrix().mean()
         pd.testing.assert_series_equal(
             mapped_array_grouped.mean(),
-            pd.Series([12.5, 17.], index=[1, 2])
+            pd.Series([11., 12.166667], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_median(self):
@@ -453,7 +444,7 @@ class TestMappedArray:
         assert mapped_array['a'].median() == mapped_array['a'].to_matrix().median()
         pd.testing.assert_series_equal(
             mapped_array_grouped.median(),
-            pd.Series([12.5, 17.], index=[1, 2])
+            pd.Series([11., 12.5], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_std(self):
@@ -468,7 +459,7 @@ class TestMappedArray:
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.std(),
-            pd.Series([1.8708286933869707, 1.0], index=[1, 2])
+            pd.Series([1.0, 1.4719601443879746], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_sum(self):
@@ -479,7 +470,7 @@ class TestMappedArray:
         assert mapped_array['a'].sum() == mapped_array['a'].to_matrix().sum()
         pd.testing.assert_series_equal(
             mapped_array_grouped.sum(),
-            pd.Series([75.0, 51.0], index=[1, 2])
+            pd.Series([33.0, 73.0], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_count(self):
@@ -490,7 +481,7 @@ class TestMappedArray:
         assert mapped_array['a'].count() == mapped_array['a'].to_matrix().count()
         pd.testing.assert_series_equal(
             mapped_array_grouped.count(),
-            pd.Series([6, 3], index=[1, 2])
+            pd.Series([3, 6], index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_describe(self):
@@ -514,16 +505,16 @@ class TestMappedArray:
             mapped_array_grouped.describe(),
             pd.DataFrame(
                 np.array([
-                    [6., 3.],
-                    [12.5, 17.],
-                    [1.870829, 1.],
-                    [10., 16.],
-                    [11.25, 16.5],
-                    [12.5, 17.],
-                    [13.75, 17.5],
-                    [15., 18.],
+                    [3., 6.],
+                    [11., 12.16666667],
+                    [1., 1.47196014],
+                    [10., 10.],
+                    [10.5, 11.25],
+                    [11., 12.5],
+                    [11.5, 13.],
+                    [12., 14.]
                 ]),
-                columns=[1, 2],
+                columns=pd.Int64Index([0, 1], dtype='int64'),
                 index=mapped_array.describe().index
             )
         )
@@ -536,7 +527,7 @@ class TestMappedArray:
         assert mapped_array['a'].idxmin() == mapped_array['a'].to_matrix().idxmin()
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmin(),
-            pd.Series(np.array(['x', 'x'], dtype=np.object), index=[1, 2])
+            pd.Series(np.array(['x', 'z'], dtype=np.object), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_idxmax(self):
@@ -547,7 +538,7 @@ class TestMappedArray:
         assert mapped_array['a'].idxmax() == mapped_array['a'].to_matrix().idxmax()
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmax(),
-            pd.Series(np.array(['z', 'z'], dtype=np.object), index=[1, 2])
+            pd.Series(np.array(['z', 'y'], dtype=np.object), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_indexing(self):
@@ -564,6 +555,18 @@ class TestMappedArray:
             pd.Index(['a'], dtype='object')
         )
         np.testing.assert_array_equal(
+            mapped_array['b'].mapped_arr,
+            np.array([13., 14., 13.])
+        )
+        np.testing.assert_array_equal(
+            mapped_array['b'].col_arr,
+            np.array([0, 0, 0])
+        )
+        pd.testing.assert_index_equal(
+            mapped_array['b'].wrapper.columns,
+            pd.Index(['b'], dtype='object')
+        )
+        np.testing.assert_array_equal(
             mapped_array[['a', 'a']].mapped_arr,
             np.array([10., 11., 12., 10., 11., 12.])
         )
@@ -577,7 +580,7 @@ class TestMappedArray:
         )
         np.testing.assert_array_equal(
             mapped_array[['a', 'b']].mapped_arr,
-            np.array([10., 11., 12., 13., 14., 15.])
+            np.array([10., 11., 12., 13., 14., 13.])
         )
         np.testing.assert_array_equal(
             mapped_array[['a', 'b']].col_arr,
@@ -589,44 +592,59 @@ class TestMappedArray:
         )
         with pytest.raises(Exception) as e_info:
             _ = mapped_array.iloc[::2, :]  # changing time not supported
-        _ = mapped_array.iloc[np.arange(mapped_array.wrapper.shape[0]), :]  # won't change time
         pd.testing.assert_index_equal(
-            mapped_array_grouped['a'].grouper.index,
-            mapped_array_grouped.wrapper.columns[[0]]
+            mapped_array_grouped[0].wrapper.columns,
+            pd.Index(['a'], dtype='object')
+        )
+        assert mapped_array_grouped[0].wrapper.ndim == 1
+        assert mapped_array_grouped[0].wrapper.grouped_ndim == 1
+        pd.testing.assert_index_equal(
+            mapped_array_grouped[0].wrapper.grouper.group_by,
+            pd.Int64Index([0], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped['a'].grouper.group_by,
-            pd.Index(group_by)[[0]]
+            mapped_array_grouped[1].wrapper.columns,
+            pd.Index(['b', 'c', 'd'], dtype='object')
+        )
+        assert mapped_array_grouped[1].wrapper.ndim == 2
+        assert mapped_array_grouped[1].wrapper.grouped_ndim == 1
+        pd.testing.assert_index_equal(
+            mapped_array_grouped[1].wrapper.grouper.group_by,
+            pd.Int64Index([1, 1, 1], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['a', 'a']].grouper.index,
-            mapped_array_grouped.wrapper.columns[[0, 0]]
+            mapped_array_grouped[[0]].wrapper.columns,
+            pd.Index(['a'], dtype='object')
+        )
+        assert mapped_array_grouped[[0]].wrapper.ndim == 2
+        assert mapped_array_grouped[[0]].wrapper.grouped_ndim == 2
+        pd.testing.assert_index_equal(
+            mapped_array_grouped[[0]].wrapper.grouper.group_by,
+            pd.Int64Index([0], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['a', 'a']].grouper.group_by,
-            pd.Index(group_by)[[0, 0]]
+            mapped_array_grouped[[0, 1]].wrapper.columns,
+            pd.Index(['a', 'b', 'c', 'd'], dtype='object')
         )
+        assert mapped_array_grouped[[0, 1]].wrapper.ndim == 2
+        assert mapped_array_grouped[[0, 1]].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            mapped_array_grouped[['a', 'b']].grouper.index,
-            mapped_array_grouped.wrapper.columns[[0, 1]]
-        )
-        pd.testing.assert_index_equal(
-            mapped_array_grouped[['a', 'b']].grouper.group_by,
-            pd.Index(group_by)[[0, 1]]
+            mapped_array_grouped[[0, 1]].wrapper.grouper.group_by,
+            pd.Int64Index([0, 1, 1, 1], dtype='int64')
         )
 
     def test_magic(self):
         a = vbt.MappedArray(
+            wrapper,
             records_arr['some_field1'],
             records_arr['col'],
-            wrapper,
             idx_arr=records_arr['idx']
         )
         b = records_arr['some_field2']
         a_bool = vbt.MappedArray(
+            wrapper,
             records_arr['some_field1'] > np.mean(records_arr['some_field1']),
             records_arr['col'],
-            wrapper,
             idx_arr=records_arr['idx']
         )
         b_bool = records_arr['some_field2'] > np.mean(records_arr['some_field2'])
@@ -634,50 +652,49 @@ class TestMappedArray:
         # test what's allowed
         np.testing.assert_array_equal((a * b).mapped_arr, a.mapped_arr * b)
         np.testing.assert_array_equal((a * vbt.MappedArray(
+            wrapper,
             records_arr['some_field2'],
             records_arr['col'],
-            wrapper,
             idx_arr=records_arr['idx']
         )).mapped_arr, a.mapped_arr * b)
         with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
+                wrapper,
                 records_arr['some_field2'],
                 records_arr['col'] * 2,
-                wrapper,
                 idx_arr=records_arr['idx']
             )).mapped_arr, a.mapped_arr * b)
         with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
+                wrapper,
                 records_arr['some_field2'],
                 records_arr['col'],
-                wrapper,
                 idx_arr=None
             )).mapped_arr, a.mapped_arr * b)
         with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
+                wrapper,
                 records_arr['some_field2'],
                 records_arr['col'],
-                wrapper,
                 idx_arr=records_arr['idx'] * 2
             )).mapped_arr, a.mapped_arr * b)
         with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
+                wrapper.copy(group_by=group_by),
                 records_arr['some_field2'],
                 records_arr['col'],
-                wrapper,
                 idx_arr=records_arr['idx'],
-                group_by=group_by
             )).mapped_arr, a.mapped_arr * b)
         with pytest.raises(Exception) as e_info:
             np.testing.assert_array_equal((a * vbt.MappedArray(
-                records_arr['some_field2'],
-                records_arr['col'],
                 ArrayWrapper(
                     index=['x', 'y', 'z'],
                     columns=['a', 'b', 'c', 'd'],
                     ndim=2,
                     freq=None
                 ),
+                records_arr['some_field2'],
+                records_arr['col'],
                 idx_arr=records_arr['idx']
             )).mapped_arr, a.mapped_arr * b)
 
@@ -719,6 +736,12 @@ class TestMappedArray:
 
 
 class TestRecords:
+    def test_regroup(self):
+        pd.testing.assert_index_equal(
+            records.regroup(group_by=group_by).wrapper.grouper.group_by,
+            records_grouped.wrapper.grouper.group_by
+        )
+
     def test_records(self):
         pd.testing.assert_frame_equal(
             records.records,
@@ -750,30 +773,27 @@ class TestRecords:
         record_arrays_close(
             records.filter_by_mask(mask).records_arr,
             np.array([
-                (1, 1, 14., 25.),
-                (1, 2, 15., 26.),
-                (2, 0, 16., 27.),
-                (2, 1, 17., 28.),
-                (2, 2, 18., 29.)
+                (0, 2, 12., 19.),
+                (1, 0, 13., 18.),
+                (1, 1, 14., 17.),
+                (1, 2, 13., 18.),
+                (2, 0, 12., 19.)
             ], dtype=example_dt)
         )
         mask_a = records['a'].records_arr['some_field1'] >= records['a'].records_arr['some_field1'].mean()
         record_arrays_close(
             records['a'].filter_by_mask(mask_a).records_arr,
             np.array([
-                (0, 1, 11., 22.),
-                (0, 2, 12., 23.)
+                (0, 1, 11., 20.),
+                (0, 2, 12., 19.)
             ], dtype=example_dt)
         )
-        pd.testing.assert_index_equal(
-            records_grouped.filter_by_mask(mask).grouper.group_by,
-            records_grouped.grouper.group_by
-        )
+        assert records_grouped.filter_by_mask(mask).wrapper == records_grouped.wrapper
 
     def test_map_field(self):
         np.testing.assert_array_equal(
             records.map_field('some_field1').mapped_arr,
-            np.array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
+            np.array([10., 11., 12., 13., 14., 13., 12., 11., 10.])
         )
         np.testing.assert_array_equal(
             records['a'].map_field('some_field1').mapped_arr,
@@ -783,10 +803,8 @@ class TestRecords:
             records.map_field('some_field1', idx_arr=records_arr['idx'] * 2).idx_arr,
             records_arr['idx'] * 2
         )
-        pd.testing.assert_index_equal(
-            records_grouped.map_field('some_field1').grouper.group_by,
-            records_grouped.grouper.group_by
-        )
+        assert records_grouped.map_field('some_field1').wrapper == records_grouped.wrapper
+        assert records_grouped.map_field('some_field1', group_by=False).wrapper.grouper.group_by is None
 
     def test_map(self):
         @njit
@@ -795,39 +813,35 @@ class TestRecords:
 
         np.testing.assert_array_equal(
             records.map(map_func_nb).mapped_arr,
-            np.array([31., 33., 35., 37., 39., 41., 43., 45., 47.])
+            np.array([31., 31., 31., 31., 31., 31., 31., 31., 31.])
         )
         np.testing.assert_array_equal(
             records['a'].map(map_func_nb).mapped_arr,
-            np.array([31., 33., 35.])
+            np.array([31., 31., 31.])
         )
         np.testing.assert_array_equal(
             records.map(map_func_nb, idx_arr=records_arr['idx'] * 2).idx_arr,
             records_arr['idx'] * 2
         )
-        pd.testing.assert_index_equal(
-            records_grouped.map(map_func_nb).grouper.group_by,
-            records_grouped.grouper.group_by
-        )
+        assert records_grouped.map(map_func_nb).wrapper == records_grouped.wrapper
+        assert records_grouped.map(map_func_nb, group_by=False).wrapper.grouper.group_by is None
 
     def test_map_array(self):
         arr = records_arr['some_field1'] + records_arr['some_field2']
         np.testing.assert_array_equal(
             records.map_array(arr).mapped_arr,
-            np.array([31., 33., 35., 37., 39., 41., 43., 45., 47.])
+            np.array([31., 31., 31., 31., 31., 31., 31., 31., 31.])
         )
         np.testing.assert_array_equal(
             records['a'].map_array(arr[:3]).mapped_arr,
-            np.array([31., 33., 35.])
+            np.array([31., 31., 31.])
         )
         np.testing.assert_array_equal(
             records.map_array(arr, idx_arr=records_arr['idx'] * 2).idx_arr,
             records_arr['idx'] * 2
         )
-        pd.testing.assert_index_equal(
-            records_grouped.map_array(arr).grouper.group_by,
-            records_grouped.grouper.group_by
-        )
+        assert records_grouped.map_array(arr).wrapper == records_grouped.wrapper
+        assert records_grouped.map_array(arr, group_by=False).wrapper.grouper.group_by is None
 
     def test_count(self):
         pd.testing.assert_series_equal(
@@ -841,19 +855,19 @@ class TestRecords:
         pd.testing.assert_series_equal(
             records_grouped.count(),
             pd.Series(
-                np.array([6, 3]),
-                index=[1, 2]
+                np.array([3, 6]),
+                index=pd.Int64Index([0, 1], dtype='int64')
             )
         )
-        assert records_grouped['a'].count() == 3
+        assert records_grouped[0].count() == 3
 
     def test_indexing(self):
         record_arrays_close(
             records['a'].records_arr,
             np.array([
-                (0, 0, 10., 21.),
-                (0, 1, 11., 22.),
-                (0, 2, 12., 23.)
+                (0, 0, 10, 21),
+                (0, 1, 11, 20),
+                (0, 2, 12, 19)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
@@ -861,68 +875,95 @@ class TestRecords:
             pd.Index(['a'], dtype='object')
         )
         record_arrays_close(
-            records[['a', 'b']].records_arr,
+            records['b'].records_arr,
             np.array([
-                (0, 0, 10., 21.),
-                (0, 1, 11., 22.),
-                (0, 2, 12., 23.),
-                (1, 0, 13., 24.),
-                (1, 1, 14., 25.),
-                (1, 2, 15., 26.)
+                (0, 0, 13, 18),
+                (0, 1, 14, 17),
+                (0, 2, 13, 18)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
-            records[['a', 'a']].wrapper.columns,
-            pd.Index(['a', 'a'], dtype='object')
+            records['b'].wrapper.columns,
+            pd.Index(['b'], dtype='object')
         )
         record_arrays_close(
             records[['a', 'a']].records_arr,
             np.array([
-                (0, 0, 10., 21.),
-                (0, 1, 11., 22.),
-                (0, 2, 12., 23.),
-                (1, 0, 10., 21.),
-                (1, 1, 11., 22.),
-                (1, 2, 12., 23.)
+                (0, 0, 10, 21),
+                (0, 1, 11, 20),
+                (0, 2, 12, 19),
+                (1, 0, 10, 21),
+                (1, 1, 11, 20),
+                (1, 2, 12, 19)
             ], dtype=example_dt)
         )
         pd.testing.assert_index_equal(
             records[['a', 'a']].wrapper.columns,
             pd.Index(['a', 'a'], dtype='object')
         )
+        record_arrays_close(
+            records[['a', 'b']].records_arr,
+            np.array([
+                (0, 0, 10, 21),
+                (0, 1, 11, 20),
+                (0, 2, 12, 19),
+                (1, 0, 13, 18),
+                (1, 1, 14, 17),
+                (1, 2, 13, 18)
+            ], dtype=example_dt)
+        )
+        pd.testing.assert_index_equal(
+            records[['a', 'b']].wrapper.columns,
+            pd.Index(['a', 'b'], dtype='object')
+        )
         with pytest.raises(Exception) as e_info:
             _ = records.iloc[::2, :]  # changing time not supported
-        _ = records.iloc[np.arange(records.wrapper.shape[0]), :]  # won't change time
         pd.testing.assert_index_equal(
-            records_grouped['a'].grouper.index,
-            records_grouped.wrapper.columns[[0]]
+            records_grouped[0].wrapper.columns,
+            pd.Index(['a'], dtype='object')
+        )
+        assert records_grouped[0].wrapper.ndim == 1
+        assert records_grouped[0].wrapper.grouped_ndim == 1
+        pd.testing.assert_index_equal(
+            records_grouped[0].wrapper.grouper.group_by,
+            pd.Int64Index([0], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            records_grouped['a'].grouper.group_by,
-            pd.Index(group_by)[[0]]
+            records_grouped[1].wrapper.columns,
+            pd.Index(['b', 'c', 'd'], dtype='object')
+        )
+        assert records_grouped[1].wrapper.ndim == 2
+        assert records_grouped[1].wrapper.grouped_ndim == 1
+        pd.testing.assert_index_equal(
+            records_grouped[1].wrapper.grouper.group_by,
+            pd.Int64Index([1, 1, 1], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            records_grouped[['a', 'a']].grouper.index,
-            records_grouped.wrapper.columns[[0, 0]]
+            records_grouped[[0]].wrapper.columns,
+            pd.Index(['a'], dtype='object')
+        )
+        assert records_grouped[[0]].wrapper.ndim == 2
+        assert records_grouped[[0]].wrapper.grouped_ndim == 2
+        pd.testing.assert_index_equal(
+            records_grouped[[0]].wrapper.grouper.group_by,
+            pd.Int64Index([0], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            records_grouped[['a', 'a']].grouper.group_by,
-            pd.Index(group_by)[[0, 0]]
+            records_grouped[[0, 1]].wrapper.columns,
+            pd.Index(['a', 'b', 'c', 'd'], dtype='object')
         )
+        assert records_grouped[[0, 1]].wrapper.ndim == 2
+        assert records_grouped[[0, 1]].wrapper.grouped_ndim == 2
         pd.testing.assert_index_equal(
-            records_grouped[['a', 'b']].grouper.index,
-            records_grouped.wrapper.columns[[0, 1]]
-        )
-        pd.testing.assert_index_equal(
-            records_grouped[['a', 'b']].grouper.group_by,
-            pd.Index(group_by)[[0, 1]]
+            records_grouped[[0, 1]].wrapper.grouper.group_by,
+            pd.Int64Index([0, 1, 1, 1], dtype='int64')
         )
 
     def test_filtering(self):
-        filtered_records = vbt.Records(records_arr[[0, -1]], wrapper)
+        filtered_records = vbt.Records(wrapper, records_arr[[0, -1]])
         record_arrays_close(
             filtered_records.records_arr,
-            np.array([(0, 0, 10., 21.), (2, 2, 18., 29.)], dtype=example_dt)
+            np.array([(0, 0, 10., 21.), (2, 2, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
             filtered_records.col_index,
@@ -966,7 +1007,7 @@ class TestRecords:
         # c
         record_arrays_close(
             filtered_records['c'].records_arr,
-            np.array([(0, 2, 18.0, 29.0)], dtype=example_dt)
+            np.array([(0, 2, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
             filtered_records['c'].col_index,
@@ -974,9 +1015,9 @@ class TestRecords:
         )
         np.testing.assert_array_equal(
             filtered_records['c'].map_field('some_field1').mapped_arr,
-            np.array([18.])
+            np.array([10.])
         )
-        assert filtered_records['c'].map_field('some_field1').min() == 18.
+        assert filtered_records['c'].map_field('some_field1').min() == 10.
         assert filtered_records['c'].count() == 1.
         # d
         record_arrays_close(
@@ -1026,29 +1067,8 @@ class TestDrawdowns:
         assert drawdowns.wrapper.freq == day_dt
         assert drawdowns.idx_field == 'end_idx'
         pd.testing.assert_index_equal(
-            drawdowns_grouped.grouper.group_by,
-            pd.Index(group_by)
-        )
-
-    def test_filter_by_mask(self):
-        mask = drawdowns.records_arr['col'] > 0
-        filtered = drawdowns.filter_by_mask(mask)
-        record_arrays_close(
-            filtered.records_arr,
-            np.array([
-                (1, 1, 2, 3, 1),
-                (1, 3, 4, 5, 1),
-                (2, 2, 4, 5, 0)
-            ], dtype=drawdown_dt)
-        )
-        mask_a = drawdowns['a'].records_arr['col'] > 0
-        record_arrays_close(
-            drawdowns['a'].filter_by_mask(mask_a).records_arr,
-            np.array([], dtype=drawdown_dt)
-        )
-        pd.testing.assert_index_equal(
-            drawdowns_grouped.filter_by_mask(mask).grouper.group_by,
-            drawdowns_grouped.grouper.group_by
+            drawdowns_grouped.wrapper.grouper.group_by,
+            group_by
         )
 
     def test_start_value(self):
@@ -1114,7 +1134,7 @@ class TestDrawdowns:
         assert drawdowns['a'].avg_drawdown() == -0.6388888888888888
         pd.testing.assert_series_equal(
             drawdowns_grouped.avg_drawdown(),
-            pd.Series(np.array([-0.6166666666666666, -0.6666666666666666]), index=[1, 2])
+            pd.Series(np.array([-0.6388888888888888, -0.611111111111111]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_max_drawdown(self):
@@ -1125,7 +1145,7 @@ class TestDrawdowns:
         assert drawdowns['a'].max_drawdown() == -0.75
         pd.testing.assert_series_equal(
             drawdowns_grouped.max_drawdown(),
-            pd.Series(np.array([-0.75, -0.6666666666666666]), index=[1, 2])
+            pd.Series(np.array([-0.75, -0.6666666666666666]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_duration(self):
@@ -1149,7 +1169,7 @@ class TestDrawdowns:
         assert drawdowns['a'].avg_duration() == np.timedelta64(144000000000000)
         pd.testing.assert_series_equal(
             drawdowns_grouped.avg_duration(),
-            pd.Series(np.array([155520000000000, 259200000000000], dtype='timedelta64[ns]'), index=[1, 2])
+            pd.Series(np.array([144000000000000, 201600000000000], dtype='timedelta64[ns]'), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_max_duration(self):
@@ -1163,7 +1183,7 @@ class TestDrawdowns:
         assert drawdowns['a'].max_duration() == np.timedelta64(172800000000000)
         pd.testing.assert_series_equal(
             drawdowns_grouped.max_duration(),
-            pd.Series(np.array([172800000000000, 259200000000000], dtype='timedelta64[ns]'), index=[1, 2])
+            pd.Series(np.array([172800000000000, 259200000000000], dtype='timedelta64[ns]'), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_coverage(self):
@@ -1174,7 +1194,7 @@ class TestDrawdowns:
         assert drawdowns['a'].coverage() == 0.8333333333333334
         pd.testing.assert_series_equal(
             drawdowns_grouped.coverage(),
-            pd.Series(np.array([0.75, 0.25]), index=[1, 2])
+            pd.Series(np.array([0.8333333333333334, 0.3888888888888889]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_ptv_duration(self):
@@ -1205,17 +1225,12 @@ class TestDrawdowns:
         assert drawdowns['a'].recovered_rate() == 0.6666666666666666
         pd.testing.assert_series_equal(
             drawdowns_grouped.recovered_rate(),
-            pd.Series(np.array([0.8, 0.]), index=[1, 2])
+            pd.Series(np.array([0.6666666666666666, 0.6666666666666666]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_active_records(self):
         assert isinstance(drawdowns.active, ActiveDrawdowns)
-        assert drawdowns.active.idx_field == drawdowns.idx_field
-        assert drawdowns.active.wrapper.freq == drawdowns.wrapper.freq
-        pd.testing.assert_index_equal(
-            drawdowns_grouped.active.grouper.group_by,
-            drawdowns_grouped.grouper.group_by
-        )
+        assert drawdowns.active.wrapper == drawdowns.wrapper
         record_arrays_close(
             drawdowns.active.records_arr,
             np.array([
@@ -1268,12 +1283,7 @@ class TestDrawdowns:
 
     def test_recovered_records(self):
         assert isinstance(drawdowns.recovered, RecoveredDrawdowns)
-        assert drawdowns.recovered.idx_field == drawdowns.idx_field
-        assert drawdowns.recovered.wrapper.freq == drawdowns.wrapper.freq
-        pd.testing.assert_index_equal(
-            drawdowns_grouped.recovered.grouper.group_by,
-            drawdowns_grouped.grouper.group_by
-        )
+        assert drawdowns.recovered.wrapper == drawdowns.wrapper
         record_arrays_close(
             drawdowns.recovered.records_arr,
             np.array([
@@ -1355,37 +1365,13 @@ price = pd.DataFrame({
     'd': [4, 3, 2, 1, 2, 3, 4]
 })
 
-orders = vbt.Orders(order_records_arr, price, freq='1 days')
-orders_grouped = vbt.Orders(order_records_arr, price, freq='1 days', group_by=group_by)
+wrapper2 = vbt.base.array_wrapper.ArrayWrapper.from_obj(price, freq='1 days')
+wrapper2_grouped = wrapper2.copy(group_by=group_by)
+orders = vbt.Orders(wrapper2, order_records_arr, price)
+orders_grouped = vbt.Orders(wrapper2_grouped, order_records_arr, price)
 
 
 class TestOrders:
-    def test_filter_by_mask(self):
-        mask = orders.records_arr['col'] > 1
-        filtered = orders.filter_by_mask(mask)
-        record_arrays_close(
-            filtered.records_arr,
-            np.array([
-                (2, 0, 99.00990099, 1., 0.99009901, 0),
-                (2, 1, 99.00990099, 2., 1.98019802, 1),
-                (2, 6, 194.09861778, 1., 1.94098618, 0),
-                (3, 2, 49.5049505, 2., 0.99009901, 0),
-                (3, 4, 49.5049505, 2., 0.99009901, 1),
-                (3, 6, 24.26232722, 4., 0.97049309, 0)
-            ], dtype=order_dt)
-        )
-        pd.testing.assert_frame_equal(filtered.main_price, orders.main_price)
-        assert filtered.wrapper == orders.wrapper
-        mask_a = orders['a'].records_arr['col'] > 1
-        record_arrays_close(
-            orders['a'].filter_by_mask(mask_a).records_arr,
-            np.array([], dtype=order_dt)
-        )
-        pd.testing.assert_index_equal(
-            orders_grouped.filter_by_mask(mask).grouper.group_by,
-            orders_grouped.grouper.group_by
-        )
-
     def test_size(self):
         np.testing.assert_array_equal(
             orders.size.mapped_arr,
@@ -1452,12 +1438,7 @@ class TestOrders:
 
     def test_buy_records(self):
         assert isinstance(orders.buy, BaseOrders)
-        assert orders.buy.idx_field == orders.idx_field
-        assert orders.buy.wrapper.freq == orders.wrapper.freq
-        pd.testing.assert_index_equal(
-            orders_grouped.buy.grouper.group_by,
-            orders_grouped.grouper.group_by
-        )
+        assert orders.buy.wrapper == orders.wrapper
         record_arrays_close(
             orders.buy.records_arr,
             np.array([
@@ -1488,12 +1469,7 @@ class TestOrders:
 
     def test_sell_records(self):
         assert isinstance(orders.sell, BaseOrders)
-        assert orders.sell.idx_field == orders.idx_field
-        assert orders.sell.wrapper.freq == orders.wrapper.freq
-        pd.testing.assert_index_equal(
-            orders_grouped.sell.grouper.group_by,
-            orders_grouped.grouper.group_by
-        )
+        assert orders.sell.wrapper == orders.wrapper
         record_arrays_close(
             orders.sell.records_arr,
             np.array([
@@ -1534,35 +1510,11 @@ event_records_arr = np.array([
     (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
 ], dtype=event_dt)
 
-events = vbt.Events(event_records_arr, price, freq='1 days')
-events_grouped = vbt.Events(event_records_arr, price, freq='1 days', group_by=group_by)
+events = vbt.Events(wrapper2, event_records_arr, price)
+events_grouped = vbt.Events(wrapper2_grouped, event_records_arr, price)
 
 
 class TestEvents:
-    def test_filter_by_mask(self):
-        mask = events.records_arr['col'] > 1
-        filtered = events.filter_by_mask(mask)
-        record_arrays_close(
-            filtered.records_arr,
-            np.array([
-                (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1),
-                (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618, -0.00990099, 0),
-                (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1),
-                (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
-            ], dtype=event_dt)
-        )
-        pd.testing.assert_frame_equal(filtered.main_price, events.main_price)
-        assert filtered.wrapper == events.wrapper
-        mask_a = events['a'].records_arr['col'] > 1
-        record_arrays_close(
-            events['a'].filter_by_mask(mask_a).records_arr,
-            np.array([], dtype=event_dt)
-        )
-        pd.testing.assert_index_equal(
-            events_grouped.filter_by_mask(mask).grouper.group_by,
-            events_grouped.grouper.group_by
-        )
-
     def test_duration(self):
         np.testing.assert_array_almost_equal(
             events.duration.mapped_arr,
@@ -1581,7 +1533,7 @@ class TestEvents:
         assert events['a'].coverage() == 0.42857142857142855
         pd.testing.assert_series_equal(
             events_grouped.coverage(),
-            pd.Series(np.array([0.35714285714285715, 0.21428571428571427]), index=[1, 2])
+            pd.Series(np.array([0.42857142857142855, 0.23809523809523808]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_pnl(self):
@@ -1612,12 +1564,7 @@ class TestEvents:
 
     def test_winning_records(self):
         assert isinstance(events.winning, BaseEvents)
-        assert events.winning.idx_field == events.idx_field
-        assert events.winning.wrapper.freq == events.wrapper.freq
-        pd.testing.assert_index_equal(
-            events_grouped.winning.grouper.group_by,
-            events_grouped.grouper.group_by
-        )
+        assert events.winning.wrapper == events.wrapper
         record_arrays_close(
             events.winning.records_arr,
             np.array([
@@ -1643,12 +1590,7 @@ class TestEvents:
 
     def test_losing_records(self):
         assert isinstance(events.losing, BaseEvents)
-        assert events.losing.idx_field == events.idx_field
-        assert events.losing.wrapper.freq == events.wrapper.freq
-        pd.testing.assert_index_equal(
-            events_grouped.losing.grouper.group_by,
-            events_grouped.grouper.group_by
-        )
+        assert events.losing.wrapper == events.wrapper
         record_arrays_close(
             events.losing.records_arr,
             np.array([
@@ -1676,7 +1618,7 @@ class TestEvents:
         assert events['a'].win_rate() == 1.
         pd.testing.assert_series_equal(
             events_grouped.win_rate(),
-            pd.Series(np.array([0.5, 0.25]), index=[1, 2])
+            pd.Series(np.array([1.0, 0.16666666666666666]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_profit_factor(self):
@@ -1687,7 +1629,7 @@ class TestEvents:
         assert np.isinf(events['a'].profit_factor())
         pd.testing.assert_series_equal(
             events_grouped.profit_factor(),
-            pd.Series(np.array([2.3257095004452926, 19.633266519100243]), index=[1, 2])
+            pd.Series(np.array([np.inf, 2.461981963629304]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_expectancy(self):
@@ -1698,7 +1640,7 @@ class TestEvents:
         assert events['a'].expectancy() == 39.67356141
         pd.testing.assert_series_equal(
             events_grouped.expectancy(),
-            pd.Series(np.array([11.3074348425, 22.786981667499997]), index=[1, 2])
+            pd.Series(np.array([39.67356141, 9.505090536666662]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_sqn(self):
@@ -1709,7 +1651,7 @@ class TestEvents:
         assert events['a'].sqn() == 4.4177491576436
         pd.testing.assert_series_equal(
             events_grouped.sqn(),
-            pd.Series(np.array([0.673530969491643, 0.9331791438636519]), index=[1, 2])
+            pd.Series(np.array([4.4177491576436, 0.5405954574869949]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_status(self):
@@ -1730,17 +1672,12 @@ class TestEvents:
         assert events['a'].closed_rate() == 1.0
         pd.testing.assert_series_equal(
             events_grouped.closed_rate(),
-            pd.Series(np.array([1.0, 0.5]), index=[1, 2])
+            pd.Series(np.array([1.0, 0.6666666666666666]), index=pd.Int64Index([0, 1], dtype='int64'))
         )
 
     def test_open_records(self):
         assert isinstance(events.open, BaseEventsByResult)
-        assert events.open.idx_field == events.idx_field
-        assert events.open.wrapper.freq == events.wrapper.freq
-        pd.testing.assert_index_equal(
-            events_grouped.open.grouper.group_by,
-            events_grouped.grouper.group_by
-        )
+        assert events.open.wrapper == events.wrapper
         record_arrays_close(
             events.open.records_arr,
             np.array([
@@ -1759,12 +1696,7 @@ class TestEvents:
 
     def test_closed_records(self):
         assert isinstance(events.closed, BaseEventsByResult)
-        assert events.closed.idx_field == events.idx_field
-        assert events.closed.wrapper.freq == events.wrapper.freq
-        pd.testing.assert_index_equal(
-            events_grouped.closed.grouper.group_by,
-            events_grouped.grouper.group_by
-        )
+        assert events.closed.wrapper == events.wrapper
         record_arrays_close(
             events.closed.records_arr,
             np.array([
@@ -1812,12 +1744,19 @@ class TestTrades:
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0, 7)
             ], dtype=trade_dt)
         )
-        pd.testing.assert_frame_equal(trades.main_price, price)
+        record_arrays_close(
+            trades['a'].records_arr,
+            np.array([
+                (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1, 0),
+                (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1, 1)
+            ], dtype=trade_dt)
+        )
+        pd.testing.assert_frame_equal(trades.close, price)
         assert trades.wrapper.freq == day_dt
         assert trades.idx_field == 'exit_idx'
         pd.testing.assert_index_equal(
-            trades_grouped.grouper.group_by,
-            pd.Index(group_by)
+            trades_grouped.wrapper.grouper.group_by,
+            group_by
         )
 
     def test_position_idx(self):
@@ -1851,10 +1790,17 @@ class TestPositions:
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
             ], dtype=position_dt)
         )
-        pd.testing.assert_frame_equal(positions.main_price, price)
+        record_arrays_close(
+            positions['a'].records_arr,
+            np.array([
+                (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
+                (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
+            ], dtype=position_dt)
+        )
+        pd.testing.assert_frame_equal(positions.close, price)
         assert positions.wrapper.freq == day_dt
         assert positions.idx_field == 'exit_idx'
         pd.testing.assert_index_equal(
-            positions_grouped.grouper.group_by,
-            pd.Index(group_by)
+            positions_grouped.wrapper.grouper.group_by,
+            group_by
         )

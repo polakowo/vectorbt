@@ -1,4 +1,7 @@
-"""Custom pandas accessors."""
+"""Custom pandas accessors.
+
+!!! note
+    Accessors do not utilize caching."""
 
 import numpy as np
 import plotly.graph_objects as go

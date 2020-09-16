@@ -5,7 +5,7 @@
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.
     Data is processed along index (axis 0).
 
-    All functions passed as argument must be Numba-compiled."""
+    All functions passed as argument should be Numba-compiled."""
 
 import numpy as np
 from numba import njit
@@ -155,11 +155,11 @@ def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_
 @njit(cache=True)
 def nanmax_cube_nb(a):
     """Return max of a cube by reducing the axis 0."""
-    result = np.empty((a.shape[1], a.shape[2]), dtype=np.float_)
+    out = np.empty((a.shape[1], a.shape[2]), dtype=np.float_)
     for i in range(a.shape[1]):
         for j in range(a.shape[2]):
-            result[i, j] = np.nanmax(a[:, i, j])
-    return result
+            out[i, j] = np.nanmax(a[:, i, j])
+    return out
 
 
 @njit(cache=True)

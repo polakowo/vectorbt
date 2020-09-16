@@ -7,28 +7,34 @@ from vectorbt.utils import checks
 from vectorbt.base import index_fns, reshape_fns
 
 
+class IndexingError(Exception):
+    """Exception raised when an indexing error has occurred."""
+
+
 class _iLoc:
     """Forwards `pd.Series.iloc`/`pd.DataFrame.iloc`
     operation to each Series/DataFrame and returns a new class instance."""
 
-    def __init__(self, obj, indexing_func):
-        self.obj = obj
-        self.indexing_func = indexing_func
+    def __init__(self, obj, indexing_func, **kwargs):
+        self._obj = obj
+        self._indexing_func = indexing_func
+        self._indexing_kwargs = kwargs
 
     def __getitem__(self, key):
-        return self.indexing_func(self.obj, lambda x: x.iloc.__getitem__(key))
+        return self._indexing_func(self._obj, lambda x: x.iloc.__getitem__(key), **self._indexing_kwargs)
 
 
 class _Loc:
     """Forwards `pd.Series.loc`/`pd.DataFrame.loc`
     operation to each Series/DataFrame and returns a new class instance."""
 
-    def __init__(self, obj, indexing_func):
-        self.obj = obj
-        self.indexing_func = indexing_func
+    def __init__(self, obj, indexing_func, **kwargs):
+        self._obj = obj
+        self._indexing_func = indexing_func
+        self._indexing_kwargs = kwargs
 
     def __getitem__(self, key):
-        return self.indexing_func(self.obj, lambda x: x.loc.__getitem__(key))
+        return self._indexing_func(self._obj, lambda x: x.loc.__getitem__(key), **self._indexing_kwargs)
 
 
 class PandasIndexer:
@@ -70,10 +76,11 @@ class PandasIndexer:
         ```
         """
 
-    def __init__(self, indexing_func):
+    def __init__(self, indexing_func, **kwargs):
         self._indexing_func = indexing_func
-        self._iloc = _iLoc(self, indexing_func)
-        self._loc = _Loc(self, indexing_func)
+        self._iloc = _iLoc(self, indexing_func, **kwargs)
+        self._loc = _Loc(self, indexing_func, **kwargs)
+        self._indexing_kwargs = kwargs
 
     @property
     def iloc(self):
@@ -90,10 +97,65 @@ class PandasIndexer:
     def xs(self, *args, **kwargs):
         """Forwards `pd.Series.xs`/`pd.DataFrame.xs`
         operation to each Series/DataFrame and returns a new class instance."""
-        return self._indexing_func(self, lambda x: x.xs(*args, **kwargs))
+        return self._indexing_func(self, lambda x: x.xs(*args, **kwargs), **self._indexing_kwargs)
 
     def __getitem__(self, key):
-        return self._indexing_func(self, lambda x: x.__getitem__(key))
+        return self._indexing_func(self, lambda x: x.__getitem__(key), **self._indexing_kwargs)
+
+
+class _ParamLoc:
+    """Access a group of columns by parameter using `pd.Series.loc`.
+
+    Uses `mapper` to establish link between columns and parameter values."""
+
+    def __init__(self, obj, mapper, indexing_func, level_name=None, **kwargs):
+        checks.assert_type(mapper, pd.Series)
+
+        self._obj = obj
+        if mapper.dtype == 'O':
+            # If params are objects, we must cast them to string first
+            # The original mapper isn't touched
+            mapper = mapper.astype(str)
+        self._mapper = mapper
+        self._indexing_func = indexing_func
+        self._level_name = level_name
+        self._indexing_kwargs = kwargs
+
+    def get_indices(self, key):
+        if self._mapper.dtype == 'O':
+            # We must also cast the key to string
+            if isinstance(key, slice):
+                start = str(key.start) if key.start is not None else None
+                stop = str(key.stop) if key.stop is not None else None
+                key = slice(start, stop, key.step)
+            elif isinstance(key, (list, np.ndarray)):
+                key = list(map(str, key))
+            else:
+                # Tuples, objects, etc.
+                key = str(key)
+        mapper = self._mapper
+        # Use pandas to perform indexing
+        mapper = pd.Series(np.arange(len(mapper.index)), index=mapper.values)
+        indices = mapper.loc.__getitem__(key)
+        if isinstance(indices, pd.Series):
+            indices = indices.values
+        return indices
+
+    def __getitem__(self, key):
+        indices = self.get_indices(key)
+        is_multiple = isinstance(key, (slice, list, np.ndarray))
+
+        def pd_indexing_func(obj):
+            new_obj = obj.iloc[:, indices]
+            if not is_multiple:
+                # If we selected only one param, then remove its columns levels to keep it clean
+                if self._level_name is not None:
+                    if checks.is_frame(new_obj):
+                        if isinstance(new_obj.columns, pd.MultiIndex):
+                            new_obj.columns = index_fns.drop_levels(new_obj.columns, self._level_name)
+            return new_obj
+
+        return self._indexing_func(self._obj, pd_indexing_func, **self._indexing_kwargs)
 
 
 def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
@@ -110,60 +172,6 @@ def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
         return pd.Series([new_mapper], index=[loced_range_mapper.name], name=mapper.name)
 
 
-class _ParamLoc:
-    """Access a group of columns by parameter using `pd.Series.loc`.
-
-    Uses `mapper` to establish link between columns and parameter values."""
-
-    def __init__(self, obj, mapper, indexing_func):
-        checks.assert_type(mapper, pd.Series)
-
-        self.obj = obj
-        if mapper.dtype == 'O':
-            # If params are objects, we must cast them to string first
-            # The original mapper isn't touched
-            mapper = mapper.astype(str)
-        self.mapper = mapper
-        self.indexing_func = indexing_func
-
-    def get_indices(self, key):
-        if self.mapper.dtype == 'O':
-            # We must also cast the key to string
-            if isinstance(key, slice):
-                start = str(key.start) if key.start is not None else None
-                stop = str(key.stop) if key.stop is not None else None
-                key = slice(start, stop, key.step)
-            elif isinstance(key, (list, np.ndarray)):
-                key = list(map(str, key))
-            else:
-                # Tuples, objects, etc.
-                key = str(key)
-        mapper = self.mapper
-        # Use pandas to perform indexing
-        mapper = pd.Series(np.arange(len(mapper.index)), index=mapper.values)
-        indices = mapper.loc.__getitem__(key)
-        if isinstance(indices, pd.Series):
-            indices = indices.values
-        return indices
-
-    def __getitem__(self, key):
-        indices = self.get_indices(key)
-        is_multiple = isinstance(key, (slice, list, np.ndarray))
-        level_name = self.mapper.name  # name of the mapper should contain level names of the params
-
-        def pd_indexing_func(obj):
-            new_obj = obj.iloc[:, indices]
-            if not is_multiple:
-                # If we selected only one param, then remove its columns levels to keep it clean
-                if level_name is not None:
-                    if checks.is_frame(new_obj):
-                        if isinstance(new_obj.columns, pd.MultiIndex):
-                            new_obj.columns = index_fns.drop_levels(new_obj.columns, level_name)
-            return new_obj
-
-        return self.indexing_func(self.obj, pd_indexing_func)
-
-
 class ParamIndexerFactory:
     """A factory to create a class with parameter indexing.
 
@@ -176,7 +184,7 @@ class ParamIndexerFactory:
     
     Args:
         param_names (list of str): Names of the parameters.
-        indexing_func (function): Indexing function that calls `pd_indexing_func` to pandas
+        indexing_func (callable): Indexing function that calls `pd_indexing_func` to pandas
             objects in question and returns a new instance of the class.
     
     Example:
@@ -186,7 +194,7 @@ class ParamIndexerFactory:
 
         >>> def indexing_func(c, pd_indexing_func):
         ...     return C(pd_indexing_func(c.df), indexing_on_mapper(
-                    c._my_param_mapper, c.df, pd_indexing_func))
+        ...         c._my_param_mapper, c.df, pd_indexing_func))
 
         >>> MyParamIndexer = ParamIndexerFactory(['my_param'])
         ... class C(MyParamIndexer):
@@ -218,11 +226,13 @@ class ParamIndexerFactory:
     def __new__(self, param_names, class_name='ParamIndexer', module_name='vectorbt.base.indexing'):
 
         class ParamIndexer:
-            def __init__(self, param_mappers, indexing_func):
-                checks.assert_same_len(param_names, param_mappers)
+            def __init__(self, param_mappers, indexing_func, level_names=None, **kwargs):
+                checks.assert_len_equal(param_names, param_mappers)
 
                 for i, param_name in enumerate(param_names):
-                    setattr(self, f'_{param_name}_loc', _ParamLoc(self, param_mappers[i], indexing_func))
+                    level_name = level_names[i] if level_names is not None else None
+                    _param_loc = _ParamLoc(self, param_mappers[i], indexing_func, level_name=level_name, **kwargs)
+                    setattr(self, f'_{param_name}_loc', _param_loc)
 
         for i, param_name in enumerate(param_names):
             @property

@@ -207,17 +207,17 @@ class TestFactory:
         # inputs
         ts1 = ts
         ts2 = ts['a'].vbt.broadcast_to(ts)
-        pd.testing.assert_frame_equal(
+        np.testing.assert_array_equal(
             custom_ind._ts1,
-            ts1
+            ts1.values
         )
-        pd.testing.assert_frame_equal(
+        np.testing.assert_array_equal(
             custom_ind._ts2,
-            ts2
+            ts2.values
         )
-        pd.testing.assert_series_equal(
+        np.testing.assert_array_equal(
             custom_ind._input_mapper,
-            custom_ind.wrapper.wrap_reduced(np.array([0, 1, 2, 0, 1, 2]))
+            np.array([0, 1, 2, 0, 1, 2])
         )
         pd.testing.assert_frame_equal(
             custom_ind.ts1,
@@ -710,90 +710,27 @@ class TestFactory:
         obj = vbt.IndicatorFactory(param_names=['p1', 'p2']) \
             .from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
             .run(ts, 0, 2)
-        pd.testing.assert_series_equal(
+        np.testing.assert_array_equal(
             obj._p1_mapper,
-            pd.Series(
-                [0, 0, 0],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 2, 'a'),
-                    (0, 2, 'b'),
-                    (0, 2, 'c')
-                ], names=['custom_p1', 'custom_p2', None]),
-                name='custom_p1'
-            )
+            np.array([0, 0, 0])
         )
-        pd.testing.assert_series_equal(
+        np.testing.assert_array_equal(
             obj._p2_mapper,
-            pd.Series(
-                [2, 2, 2],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 2, 'a'),
-                    (0, 2, 'b'),
-                    (0, 2, 'c')
-                ], names=['custom_p1', 'custom_p2', None]),
-                name='custom_p2'
-            )
+            np.array([2, 2, 2])
         )
-        pd.testing.assert_series_equal(
-            obj._tuple_mapper,
-            pd.Series(
-                [(0, 2), (0, 2), (0, 2)],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 2, 'a'),
-                    (0, 2, 'b'),
-                    (0, 2, 'c')
-                ], names=['custom_p1', 'custom_p2', None]),
-                name=('custom_p1', 'custom_p2')
-            )
-        )
+        assert obj._tuple_mapper == [(0, 2), (0, 2), (0, 2)]
         obj = vbt.IndicatorFactory(param_names=['p1', 'p2']) \
             .from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
             .run(ts, [0, 1], [1, 2])
-        pd.testing.assert_series_equal(
+        np.testing.assert_array_equal(
             obj._p1_mapper,
-            pd.Series(
-                np.array([0, 0, 0, 1, 1, 1]),
-                index=pd.MultiIndex.from_tuples([
-                    (0, 1, 'a'),
-                    (0, 1, 'b'),
-                    (0, 1, 'c'),
-                    (1, 2, 'a'),
-                    (1, 2, 'b'),
-                    (1, 2, 'c')
-                ], names=['custom_p1', 'custom_p2', None]),
-                name='custom_p1'
-            )
+            np.array([0, 0, 0, 1, 1, 1])
         )
-        pd.testing.assert_series_equal(
+        np.testing.assert_array_equal(
             obj._p2_mapper,
-            pd.Series(
-                np.array([1, 1, 1, 2, 2, 2]),
-                index=pd.MultiIndex.from_tuples([
-                    (0, 1, 'a'),
-                    (0, 1, 'b'),
-                    (0, 1, 'c'),
-                    (1, 2, 'a'),
-                    (1, 2, 'b'),
-                    (1, 2, 'c')
-                ], names=['custom_p1', 'custom_p2', None]),
-                name='custom_p2'
-            )
+            np.array([1, 1, 1, 2, 2, 2])
         )
-        pd.testing.assert_series_equal(
-            obj._tuple_mapper,
-            pd.Series(
-                [(0, 1), (0, 1), (0, 1), (1, 2), (1, 2), (1, 2)],
-                index=pd.MultiIndex.from_tuples([
-                    (0, 1, 'a'),
-                    (0, 1, 'b'),
-                    (0, 1, 'c'),
-                    (1, 2, 'a'),
-                    (1, 2, 'b'),
-                    (1, 2, 'c')
-                ], names=['custom_p1', 'custom_p2', None]),
-                name=('custom_p1', 'custom_p2')
-            )
-        )
+        assert obj._tuple_mapper == [(0, 1), (0, 1), (0, 1), (1, 2), (1, 2), (1, 2)]
 
     def test_short_name(self):
         assert vbt.IndicatorFactory(short_name='my_ind') \
@@ -883,7 +820,6 @@ class TestFactory:
             ind4_2.output
         )
 
-
     def test_wrapper(self):
         pd.testing.assert_index_equal(
             custom_ind.wrapper.index,
@@ -909,6 +845,23 @@ class TestFactory:
         assert custom_ind.wrapper.ndim == 2
         assert custom_ind.wrapper.shape == (5, 6)
         assert custom_ind.wrapper.freq == pd.Timedelta('1 days 00:00:00')
+
+    def test_properties(self):
+        # Class properties
+        assert CustomInd.input_names == ['ts1', 'ts2']
+        assert CustomInd.param_names == ['p1', 'p2']
+        assert CustomInd.output_names == ['o1', 'o2']
+        assert CustomInd.output_flags == {}
+
+        # Instance properties
+        assert custom_ind.input_names == ['ts1', 'ts2']
+        assert custom_ind.param_names == ['p1', 'p2']
+        assert custom_ind.output_names == ['o1', 'o2']
+        assert custom_ind.output_flags == {}
+        assert custom_ind.short_name == 'custom'
+        assert custom_ind.level_names == ['custom_p1', 'custom_p2']
+        np.testing.assert_array_equal(custom_ind.p1_array, np.array([1, 2]))
+        np.testing.assert_array_equal(custom_ind.p2_array, np.array([3, 3]))
 
     @pytest.mark.parametrize(
         "test_attr",

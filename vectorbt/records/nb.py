@@ -5,9 +5,9 @@
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.
     Data is processed along index (axis 0).
 
-    All functions passed as argument must be Numba-compiled.
+    All functions passed as argument should be Numba-compiled.
 
-    Records must remain in the order they were created."""
+    Records should remain the order they were created in."""
 
 import numpy as np
 from numba import njit
@@ -58,7 +58,7 @@ def select_record_cols_nb(records, col_index, new_cols):
     """Select columns of `records` given column indices `col_index`."""
     col_index = col_index[new_cols]
     new_n = np.sum(col_index[:, 1] - col_index[:, 0])
-    result = np.empty(new_n, dtype=records.dtype)
+    out = np.empty(new_n, dtype=records.dtype)
     j = 0
     for c in range(new_cols.shape[0]):
         from_i = col_index[c, 0]
@@ -67,9 +67,9 @@ def select_record_cols_nb(records, col_index, new_cols):
             continue
         col_records = np.copy(records[from_i:to_i])
         col_records['col'][:] = c  # don't forget to assign new column indices
-        result[j:j + col_records.shape[0]] = col_records
+        out[j:j + col_records.shape[0]] = col_records
         j += col_records.shape[0]
-    return result
+    return out
 
 
 # ############# Indexing (mapped arrays) ############# #
@@ -124,10 +124,10 @@ def map_records_nb(records, map_func_nb, *args):
     """Map each record to a scalar value.
 
     `map_func_nb` must accept a single record and `*args`, and return a scalar value."""
-    result = np.empty(records.shape[0], dtype=np.float_)
+    out = np.empty(records.shape[0], dtype=np.float_)
     for r in range(records.shape[0]):
-        result[r] = map_func_nb(records[r], *args)
-    return result
+        out[r] = map_func_nb(records[r], *args)
+    return out
 
 
 # ############# Converting to matrix (mapped arrays) ############# #
@@ -140,7 +140,7 @@ def mapped_to_matrix_nb(mapped_arr, col_arr, idx_arr, target_shape, default_val)
     !!! note
         Will raise an error if there are multiple values pointing to the same matrix element."""
 
-    result = np.full(target_shape, default_val, dtype=np.float_)
+    out = np.full(target_shape, default_val, dtype=np.float_)
     last_idx = -1
     last_col = -1
     for r in range(mapped_arr.shape[0]):
@@ -153,10 +153,10 @@ def mapped_to_matrix_nb(mapped_arr, col_arr, idx_arr, target_shape, default_val)
                 raise ValueError("col_arr and idx_arr must be sorted")
         if cur_col < last_col:
             raise ValueError("col_arr and idx_arr must be sorted")
-        result[cur_idx, cur_col] = mapped_arr[r]
+        out[cur_idx, cur_col] = mapped_arr[r]
         last_idx = cur_idx
         last_col = cur_col
-    return result
+    return out
 
 
 # ############# Reducing (mapped arrays) ############# #
@@ -170,7 +170,7 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
 
     `reduce_func_nb` must accept index of the current column, mapped array and `*args`,
     and return a scalar value."""
-    result = np.full(n_cols, default_val, dtype=np.float_)
+    out = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
     prev_col = -1
     
@@ -181,12 +181,12 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
         if col != prev_col:
             if prev_col != -1:
                 # At the beginning of second column do reduce on the first
-                result[prev_col] = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
+                out[prev_col] = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
             from_r = r
             prev_col = col
         if r == len(mapped_arr) - 1:
-            result[col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
-    return result
+            out[col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
+    return out
 
 
 @njit
@@ -197,7 +197,7 @@ def reduce_mapped_to_idx_nb(mapped_arr, col_arr, idx_arr, n_cols, default_val, r
 
     !!! note
         Must return integers or raise an exception."""
-    result = np.full(n_cols, default_val, dtype=np.float_)
+    out = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
     prev_col = -1
 
@@ -209,13 +209,13 @@ def reduce_mapped_to_idx_nb(mapped_arr, col_arr, idx_arr, n_cols, default_val, r
             if prev_col != -1:
                 # At the beginning of second column do reduce on the first
                 col_result = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
-                result[prev_col] = idx_arr[from_r:r][col_result]
+                out[prev_col] = idx_arr[from_r:r][col_result]
             from_r = r
             prev_col = col
         if r == len(mapped_arr) - 1:
             col_result = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
-            result[col] = idx_arr[from_r:r + 1][col_result]
-    return result
+            out[col] = idx_arr[from_r:r + 1][col_result]
+    return out
 
 
 @njit
@@ -223,7 +223,7 @@ def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, n_rows, default_val, 
     """Reduce mapped array by column to an array.
 
     `reduce_func_nb` same as for `reduce_mapped_nb` but must return an array."""
-    result = np.full((n_rows, n_cols), default_val, dtype=np.float_)
+    out = np.full((n_rows, n_cols), default_val, dtype=np.float_)
     from_r = 0
     prev_col = -1
     
@@ -234,12 +234,12 @@ def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, n_rows, default_val, 
         if col != prev_col:
             if prev_col != -1:
                 # At the beginning of second column do reduce on the first
-                result[:, prev_col] = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
+                out[:, prev_col] = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
             from_r = r
             prev_col = col
         if r == len(mapped_arr) - 1:
-            result[:, col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
-    return result
+            out[:, col] = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
+    return out
 
 
 @njit
@@ -250,7 +250,7 @@ def reduce_mapped_to_idx_array_nb(mapped_arr, col_arr, idx_arr, n_cols, n_rows, 
 
     !!! note
         Must return integers or raise an exception."""
-    result = np.full((n_rows, n_cols), default_val, dtype=np.float_)
+    out = np.full((n_rows, n_cols), default_val, dtype=np.float_)
     from_r = 0
     prev_col = -1
 
@@ -262,13 +262,13 @@ def reduce_mapped_to_idx_array_nb(mapped_arr, col_arr, idx_arr, n_cols, n_rows, 
             if prev_col != -1:
                 # At the beginning of second column do reduce on the first
                 col_result = reduce_func_nb(prev_col, mapped_arr[from_r:r], *args)
-                result[:, prev_col] = idx_arr[from_r:r][col_result]
+                out[:, prev_col] = idx_arr[from_r:r][col_result]
             from_r = r
             prev_col = col
         if r == len(mapped_arr) - 1:
             col_result = reduce_func_nb(col, mapped_arr[from_r:r + 1], *args)
-            result[:, col] = idx_arr[from_r:r + 1][col_result]
-    return result
+            out[:, col] = idx_arr[from_r:r + 1][col_result]
+    return out
 
 
 # ############# Drawdowns ############# #
@@ -300,7 +300,7 @@ def drawdown_records_nb(ts):
             1    2          2           4        4       0
             2    3          0           2        4       1
             ```"""
-    result = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
+    out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
     j = 0
 
     for col in range(ts.shape[1]):
@@ -349,11 +349,11 @@ def drawdown_records_nb(ts):
 
                 if store_drawdown:
                     # Save drawdown to the records
-                    result[j]['col'] = col
-                    result[j]['start_idx'] = peak_idx
-                    result[j]['valley_idx'] = valley_idx
-                    result[j]['end_idx'] = i
-                    result[j]['status'] = status
+                    out[j]['col'] = col
+                    out[j]['start_idx'] = peak_idx
+                    out[j]['valley_idx'] = valley_idx
+                    out[j]['end_idx'] = i
+                    out[j]['status'] = status
                     j += 1
 
                     # Reset running vars for a new drawdown
@@ -364,7 +364,7 @@ def drawdown_records_nb(ts):
                     store_drawdown = False
                     status = -1
 
-    return result[:j]
+    return out[:j]
 
 
 @njit(cache=True)
@@ -489,7 +489,7 @@ def trade_records_nb(price, order_records):
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import trade_records_nb
 
-        >>> init_capital = np.full(1, 100)
+        >>> init_cash = np.full(1, 100)
         >>> order_price = price = np.arange(1, 6)[:, None]
         >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
@@ -501,7 +501,7 @@ def trade_records_nb(price, order_records):
         ...          order_price[i, col], fees=0.01, slippage=0., fixed_fees=0.)
 
         >>> order_records, cash, shares = simulate_nb(
-        ...     price.shape, init_capital, order_func_nb)
+        ...     price.shape, init_cash, order_func_nb)
         >>> records = trade_records_nb(price, order_records)
 
         >>> pd.DataFrame.from_records(records)
@@ -515,7 +515,7 @@ def trade_records_nb(price, order_records):
         1       0.04  0.93  0.306931       1             1
         2       0.00 -0.05 -0.009901       0             2
         ```"""
-    result = np.empty(price.shape[0] * price.shape[1], dtype=trade_dt)
+    out = np.empty(price.shape[0] * price.shape[1], dtype=trade_dt)
     position_idx = -1
     j = 0
     prev_col = -1
@@ -544,7 +544,7 @@ def trade_records_nb(price, order_records):
             if prev_col != -1 and buy_size_sum > 0.:
                 # If trade in previous column hasn't been closed, calculate its unrealized metrics
                 save_trade_nb(
-                    result[j],
+                    out[j],
                     prev_col,
                     price.shape[0] - 1,
                     buy_size_sum,
@@ -579,7 +579,7 @@ def trade_records_nb(price, order_records):
             # Sell operation
             # Close the current trade
             save_trade_nb(
-                result[j],
+                out[j],
                 col,
                 i,
                 order_size,
@@ -608,7 +608,7 @@ def trade_records_nb(price, order_records):
         if r == order_records.shape[0] - 1 and buy_size_sum > 0.:
             # If the last trade hasn't been closed, calculate its unrealized metrics
             save_trade_nb(
-                result[j],
+                out[j],
                 col,
                 price.shape[0] - 1,
                 buy_size_sum,
@@ -622,7 +622,7 @@ def trade_records_nb(price, order_records):
                 EventStatus.Open
             )
             j += 1
-    return result[:j]
+    return out[:j]
 
 
 # ############# Positions ############# #
@@ -673,7 +673,7 @@ def position_records_nb(price, order_records):
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import position_records_nb
 
-        >>> init_capital = np.full(1, 100)
+        >>> init_cash = np.full(1, 100)
         >>> order_price = price = np.arange(1, 6)[:, None]
         >>> order_size = np.asarray([1, -1, 1, -1, 1])[:, None]
 
@@ -685,7 +685,7 @@ def position_records_nb(price, order_records):
         ...          order_price[i, col], fees=0.01, slippage=0., fixed_fees=0.)
 
         >>> order_records, cash, shares = simulate_nb(
-        ...     price.shape, init_capital, order_func_nb)
+        ...     price.shape, init_cash, order_func_nb)
         >>> records = position_records_nb(price, order_records)
 
         >>> pd.DataFrame.from_records(records)
@@ -699,7 +699,7 @@ def position_records_nb(price, order_records):
         1       0.04  0.93  0.306931       1
         2       0.00 -0.05 -0.009901       0
         ```"""
-    result = np.empty(price.shape[0] * price.shape[1], dtype=position_dt)
+    out = np.empty(price.shape[0] * price.shape[1], dtype=position_dt)
     j = 0
     prev_col = -1
     buy_size_sum = 0.
@@ -733,7 +733,7 @@ def position_records_nb(price, order_records):
                 sell_size_sum = buy_size_sum
                 # NOTE: We have no information about fees here, so we don't add them
                 save_position_nb(
-                    result[j],
+                    out[j],
                     prev_col,
                     price.shape[0] - 1,
                     position_start,
@@ -780,7 +780,7 @@ def position_records_nb(price, order_records):
         if buy_size_sum == sell_size_sum:
             # Close the current position
             save_position_nb(
-                result[j],
+                out[j],
                 col,
                 i,
                 position_start,
@@ -808,7 +808,7 @@ def position_records_nb(price, order_records):
             sell_size_sum = buy_size_sum
             # NOTE: We have no information about fees here, so we don't add them
             save_position_nb(
-                result[j],
+                out[j],
                 col,
                 price.shape[0] - 1,
                 position_start,
@@ -822,4 +822,4 @@ def position_records_nb(price, order_records):
             )
             j += 1
 
-    return result[:j]
+    return out[:j]

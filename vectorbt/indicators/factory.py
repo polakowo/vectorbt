@@ -1,25 +1,24 @@
 """An indicator factory for building new indicators with ease.
 
-Each indicator is basically a pipeline that
+Each indicator is basically a pipeline that:
 
 * Accepts a list of time series objects (for example, OHLCV data)
 * Accepts a list of parameter arrays (for example, size of rolling window)
 * Accepts other relevant arguments and keyword arguments
 * Performs calculations to produce new time series objects (for example, rolling average)
 
-This pipeline can be well standardized, which is done by this indicatory factory.
+This pipeline can be well standardized, which is done by `run_pipeline`.
 
-On top of this pipeline, it also does the following:
+`IndicatorFactory` simplifies usage of `run_pipeline` by generating and pre-configuring
+a new Python class with various methods for running the indicator. It has the following features:
 
-* Generates a new Python class
-* Creates an `__init__` method where it stores all inputs, outputs, and other artifacts
-* Creates a `run` method that runs the main pipeline using `run_pipeline`
-* Adds pandas indexing, i.e., you can use `iloc`, `loc`, `xs`, and `__getitem__` on the class itself
-* Adds parameter indexing, i.e., use `*your_param*_loc` on the class to slice using parameters
-* Adds user-defined properties
-* Adds common comparison methods for all inputs, outputs and properties, e.g., crossover
+* Accepts time series of any shape thanks to broadcasting
+* Accepts arbitrary parameter combinations
+* Supports pandas indexing, i.e., you can use `iloc`, `loc`, `xs`, and `__getitem__` on the class itself
+* Supports parameter indexing, i.e., use `*your_param*_loc` on the class to slice using parameters
+* Exposes common signal generation methods for all inputs, outputs and properties, e.g., crossover
 
-Consider the following smaller price DataFrame `price_sm`:
+Consider the following price DataFrame:
 
 ```python-repl
 >>> import vectorbt as vbt
@@ -143,8 +142,8 @@ Name: (1, 2, a, b), dtype: float64
 
 >>> myInd = MyInd.run(price, price['b'], 1, 2)
 >>> myInd.output
-custom_p1      1
-custom_p2      2
+custom_p1            1
+custom_p2            2
                a     b
 2020-01-01  11.0  15.0
 2020-01-02  10.0  12.0
@@ -159,22 +158,22 @@ You can even set `param_product` to `True` to run all possible combinations of p
 
 ```python-repl
 >>> myInd = MyInd.run(price['a'], price['b'], 1, 2)
->>> myInd._p1_array
-[1]
->>> myInd._p2_array
-[2]
+>>> myInd.p1_array
+array([1])
+>>> myInd.p2_array
+array([2])
 
 >>> myInd = MyInd.run(price['a'], price['b'], 1, [2, 3])
->>> myInd._p1_array
-[1 1]
->>> myInd._p2_array
-[2 3]
+>>> myInd.p1_array
+array([1, 1])
+>>> myInd.p2_array
+array([2, 3])
 
 >>> myInd = MyInd.run(price['a'], price['b'], [1, 2], [3, 4], param_product=True)
->>> myInd._p1_array
-[1 1 2 2]
->>> myInd._p2_array
-[3 4 3 4]
+>>> myInd.p1_array
+array([1, 1, 2, 2])
+>>> myInd.p2_array
+array([3, 4, 3, 4])
 ```
 
 The output of the `IndicatorFactory.run` method will be the instance of the indicator.
@@ -285,10 +284,11 @@ import inspect
 from collections import OrderedDict
 
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.decorators import classproperty, cached_property
+from vectorbt.utils.config import merge_kwargs, Configured
 from vectorbt.base import index_fns, reshape_fns, combine_fns
-from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory, indexing_on_mapper
-from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory
+from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
 
 
 def flatten_param_tuples(param_tuples):
@@ -329,11 +329,11 @@ def create_param_combs(op_tree, depth=0):
             new_op_tree += (create_param_combs(elem, depth=depth + 1),)
         else:
             new_op_tree += (elem,)
-    result = list(new_op_tree[0](*new_op_tree[1:]))
+    out = list(new_op_tree[0](*new_op_tree[1:]))
     if depth == 0:
         # do something
-        return flatten_param_tuples(result)
-    return result
+        return flatten_param_tuples(out)
+    return out
 
 
 def create_param_product(param_list):
@@ -354,7 +354,7 @@ def reindex_outputs(new_params, from_params, n_ts_cols):
 def build_column_hierarchy(param_list, level_names, ts_columns, hide_levels=[]):
     """For each parameter in `param_list`, create a new column level with parameter values. 
     Combine this level with columns `ts_columns` using Cartesian product."""
-    checks.assert_same_shape(param_list, level_names, axis=0)
+    checks.assert_shape_equal(param_list, level_names, axis=0)
 
     param_indexes = []
     for i in range(len(param_list)):
@@ -372,41 +372,6 @@ def build_column_hierarchy(param_list, level_names, ts_columns, hide_levels=[]):
     return ts_columns
 
 
-def build_input_mapper(n_old_columns, n_params, new_columns):
-    """Build a mapper that maps old columns in inputs to new columns.
-
-    Instead of tiling all inputs to the shape of outputs and wasting memory, we just keep a mapper
-    and perform the tiling when needed."""
-    return pd.Series(np.tile(np.arange(n_old_columns), n_params), index=new_columns)
-
-
-def build_mapper(params, ts, new_columns, level_name):
-    """Build a mapper that maps parameter values in `params` to columns in `new_columns`."""
-    params_mapper = np.repeat(params, len(ts.vbt.columns))
-    params_mapper = pd.Series(params_mapper, index=new_columns, name=level_name)
-    return params_mapper
-
-
-def build_tuple_mapper(mappers_list, new_columns, level_names):
-    """Build a tuple mapper that maps tuples of parameter values to columns in `new_columns`."""
-    tuple_mapper = list(zip(*list(map(lambda x: x.values, mappers_list))))
-    tuple_mapper = pd.Series(tuple_mapper, index=new_columns, name=level_names)
-    return tuple_mapper
-
-
-def wrap_output(output, ts, new_columns):
-    """Wrap a NumPy array into a pandas object with meta from `ts` and `new_columns`."""
-    return ts.vbt.wrap(output, columns=new_columns)
-
-
-def broadcast_ts(ts, params_len, new_columns):
-    """Broadcast time series `ts` to match the length of `new_columns` through tiling."""
-    if checks.is_series(ts) or len(new_columns) > ts.shape[1]:
-        return ts.vbt.wrap(reshape_fns.tile(ts.values, params_len, axis=1), columns=new_columns)
-    else:
-        return ts.vbt.wrap(ts, columns=new_columns)
-
-
 def run_pipeline(
         input_list, param_list, level_names, num_outputs,
         custom_func, *args,
@@ -414,9 +379,10 @@ def run_pipeline(
         pass_lists=False,
         pass_2d=True,
         param_product=False,
-        broadcast_kwargs={},
+        broadcast_kwargs=None,
         return_raw=False,
         use_raw=None,
+        wrapper_kwargs=None,
         **kwargs):
     """A pipeline for calculating an indicator, used by `IndicatorFactory`.
 
@@ -428,7 +394,7 @@ def run_pipeline(
 
             Should have the same length as `param_list`.
         num_outputs (int): The number of output arrays.
-        custom_func (function): A custom calculation function. See `IndicatorFactory.from_custom_func`.
+        custom_func (callable): A custom calculation function. See `IndicatorFactory.from_custom_func`.
         *args: Arguments passed to the `custom_func`.
         hide_levels (list): A list of parameter levels to hide.
         pass_lists (bool): If `True`, arguments are passed to the `custom_func` as lists.
@@ -438,6 +404,7 @@ def run_pipeline(
             on time series objects.
         return_raw (bool): If `True`, returns raw output without post-processing and hashed parameter tuples.
         use_raw (bool): Takes the raw results and uses them instead of running `custom_func`.
+        wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
         **kwargs: Keyword arguments passed to the `custom_func`.
 
             Some common arguments include `return_cache` to return cache and `use_cache` to use cache.
@@ -445,12 +412,11 @@ def run_pipeline(
             `IndicatorFactory.from_apply_func` are supported by default).
             
     Returns:
-        A list of transformed inputs (`pandas_like`), a list of generated outputs (`pandas_like`), 
-        a list of parameter arrays (`np.ndarray`), a list of parameter mappers (`pd.Series`),
-        a list of other generated outputs that are outside of  `num_outputs`.
+        Array wrapper, list of inputs (`np.ndarray`), input mapper (`np.ndarray`), list of outputs
+        (`np.ndarray`), list of parameter arrays (`np.ndarray`), list of parameter mappers (`np.ndarray`),
+        list of outputs that are outside of `num_outputs`.
 
     Explanation:
-
         Does the following:
 
         * Takes one or multiple time series objects in `input_list` and broadcasts them. For example:
@@ -462,11 +428,11 @@ def run_pipeline(
 
         >>> input_list = vbt.base.reshape_fns.broadcast(*input_list)
         >>> input_list[0]
-        a  b
+           a  b
         x  1  1
         y  2  2
         >>> input_list[1]
-        a  b
+           a  b
         x  3  4
         y  5  6
         ```
@@ -544,17 +510,25 @@ def run_pipeline(
         * Builds parameter mappers that will link parameters from `param_list` to columns in 
             `input_list` and `output_list`. This is done to enable column indexing using parameter values.
     """
+    if broadcast_kwargs is None:
+        broadcast_kwargs = {}
+    if wrapper_kwargs is None:
+        wrapper_kwargs = {}
+
     if len(input_list) > 1:
         # Broadcast time series
-        input_list = reshape_fns.broadcast(*input_list, **broadcast_kwargs, writeable=True)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        input_list = reshape_fns.broadcast(*input_list, **broadcast_kwargs)
+
     # Check time series objects
     checks.assert_type(input_list[0], (pd.Series, pd.DataFrame))
+
     # Convert params to 1-dim arrays
     param_list = list(map(reshape_fns.to_1d, param_list))
     if len(param_list) > 1:
         # Check level names
         checks.assert_type(level_names, (list, tuple))
-        checks.assert_same_len(param_list, level_names)
+        checks.assert_len_equal(param_list, level_names)
         for ts in input_list:
             # Every time series object should be free of the specified level names in its columns
             for level_name in level_names:
@@ -566,13 +540,17 @@ def run_pipeline(
             param_list = create_param_product(param_list)
         else:
             # Broadcast such that each array has the same length
-            param_list = reshape_fns.broadcast(*param_list, writeable=True)
+            param_list = reshape_fns.broadcast(*param_list, require_kwargs=dict(requirements='W'))
     if not isinstance(param_list, (tuple, list)):
         param_list = [param_list]
+
+    # Convert pandas objects to NumPy arrays
     if pass_2d:
         array_list = tuple(map(lambda x: reshape_fns.to_2d(np.asarray(x)), input_list))
     else:
         array_list = tuple(map(lambda x: np.asarray(x), input_list))
+
+    # Get raw results
     if use_raw is not None:
         # Use raw results of previous run to build outputs
         raw_output_list, raw_map = use_raw
@@ -586,10 +564,14 @@ def run_pipeline(
             output_list = custom_func(array_list, param_list, *args, **kwargs)
         else:
             output_list = custom_func(*array_list, *param_list, *args, **kwargs)
+
+    # Return raw results if needed
     if return_raw or kwargs.get('return_cache', False):
         if return_raw:  # return raw outputs with param map
             return output_list, list(zip(*param_list))
         return output_list  # return raw cache outputs
+
+    # Post-process results
     if not isinstance(output_list, (tuple, list, List)):
         output_list = [output_list]
     else:
@@ -601,40 +583,47 @@ def run_pipeline(
         other_list = []
     # Process only the num_outputs outputs
     output_list = output_list[:num_outputs]
+
+    # Build column hierarchy and create mappers
     if len(param_list) > 0:
+        old_columns = input_list[0].vbt.columns
         # Build new column levels on top of time series levels
-        new_columns = build_column_hierarchy(param_list, level_names, input_list[0].vbt.columns, hide_levels)
-        # Build column mapper for inputs
-        input_mapper = build_input_mapper(len(input_list[0].vbt.columns), param_list[0].shape[0], new_columns)
+        new_columns = build_column_hierarchy(param_list, level_names, old_columns, hide_levels)
+        # Build a mapper that maps old columns in inputs to new columns.
+        # Instead of tiling all inputs to the shape of outputs and wasting memory,
+        # we just keep a mapper and perform the tiling when needed.
+        input_mapper = np.tile(np.arange(len(old_columns)), param_list[0].shape[0])
         # Build mappers to easily map between parameters and columns
-        mapper_list = [build_mapper(x, input_list[0], new_columns, level_names[i]) for i, x in enumerate(param_list)]
+        mapper_list = [np.repeat(x, len(old_columns)) for i, x in enumerate(param_list)]
     else:
         # Some indicators don't have any params
         new_columns = input_list[0].vbt.columns
         input_mapper = None
         mapper_list = []
-    output_list = list(map(lambda x: wrap_output(x, input_list[0], new_columns), output_list))
-    if len(mapper_list) > 1:
-        # Tuple object is a mapper that accepts tuples of parameters
-        tuple_mapper = build_tuple_mapper(mapper_list, new_columns, tuple(level_names))
-        mapper_list.append(tuple_mapper)
-    return input_list, input_mapper, output_list, param_list, mapper_list, other_list
+
+    # Return artifacts: no pandas objects, just a wrapper and NumPy arrays
+    output_list = [reshape_fns.to_2d(o) for o in output_list]
+    new_ndim = input_list[0].ndim if output_list[0].shape[1] == 1 else output_list[0].ndim
+    wrapper = ArrayWrapper(input_list[0].index, new_columns, new_ndim, **wrapper_kwargs)
+    input_list = [reshape_fns.to_2d(i, raw=True) for i in input_list]
+    return wrapper, input_list, input_mapper, output_list, param_list, mapper_list, other_list
 
 
-def perform_init_checks(input_list, input_mapper, output_list, param_list, mapper_list, short_name):
+def perform_init_checks(wrapper, input_list, input_mapper, output_list, param_list,
+                        mapper_list, short_name, level_names):
     """Perform checks on objects created by running or slicing an indicator."""
-    checks.assert_type(input_list[0], (pd.Series, pd.DataFrame))
-    checks.assert_type(output_list[0], (pd.Series, pd.DataFrame))
     if input_mapper is not None:
-        checks.assert_same_index(reshape_fns.to_2d(output_list[0]).iloc[0, :], input_mapper)
+        checks.assert_equal(input_mapper.shape[0], wrapper.shape_2d[1])
+    for ts in input_list:
+        checks.assert_equal(ts.shape[0], wrapper.shape_2d[0])
     for ts in output_list:
-        checks.assert_same_meta(output_list[0], ts)
+        checks.assert_equal(ts.shape, wrapper.shape_2d)
     for params in param_list:
-        checks.assert_same_shape(param_list[0], params)
+        checks.assert_shape_equal(param_list[0], params)
     for mapper in mapper_list:
-        checks.assert_type(mapper, pd.Series)
-        checks.assert_same_index(reshape_fns.to_2d(output_list[0]).iloc[0, :], mapper)
+        checks.assert_equal(len(mapper), wrapper.shape_2d[1])
     checks.assert_type(short_name, str)
+    checks.assert_len_equal(level_names, param_list)
 
 
 def compare(obj, other, compare_func, multiple=False, level_name=None, keys=None, **kwargs):
@@ -659,10 +648,10 @@ class IndicatorFactory():
                  short_name='custom',
                  input_names=['ts'],
                  param_names=['param'],
-                 param_defaults={},
+                 param_defaults=None,
                  output_names=['output'],
-                 output_flags={},
-                 custom_output_funcs={}):
+                 output_flags=None,
+                 custom_output_funcs=None):
         """A factory for creating new indicators.
 
         Args:
@@ -691,6 +680,8 @@ class IndicatorFactory():
         self.short_name = short_name
         self.input_names = input_names
         self.param_names = param_names
+        if param_defaults is None:
+            param_defaults = {}
         if len(param_defaults) > 0:
             for param_name in param_defaults:
                 if param_name not in param_names:
@@ -699,27 +690,34 @@ class IndicatorFactory():
                 raise ValueError("Params with defaults should be on the right in param_names")
         self.param_defaults = param_defaults
         self.output_names = output_names
+        if output_flags is None:
+            output_flags = {}
         if len(output_flags) > 0:
             for output_name in output_flags:
                 if output_name not in output_names:
                     raise ValueError(f"Output {output_name} not in output_names")
         self.output_flags = output_flags
+        if custom_output_funcs is None:
+            custom_output_funcs = {}
         self.custom_output_funcs = custom_output_funcs
 
     def from_custom_func(self, custom_func, **pipeline_kwargs):
         """Build indicator class around a custom calculation function.
 
         !!! note
-            Time series passed to `apply_func` will be 2-dimensional NumPy arrays.
-
             In contrast to `IndicatorFactory.from_apply_func`, it's up to you to handle caching
             and concatenate columns for each parameter (for example, by using 
             `vectorbt.base.combine_fns.apply_and_concat_one`). Also, you must ensure that each output
             array has an appropriate number of columns, which is the number of columns in input time 
-            series multiplied by the number of parameter values.
+            series multiplied by the number of parameter combinations.
+
+        !!! note
+            Time series passed to `apply_func` will be 2-dimensional NumPy arrays.
+
+            For each parameter value, input and output time series should have the same shape.
 
         Args:
-            custom_func (function): A function that takes broadcasted time series corresponding 
+            custom_func (callable): A function that takes broadcasted time series corresponding 
                 to `input_names`, broadcasted parameter arrays corresponding to `param_names`, and other
                 arguments and keyword arguments, and returns outputs corresponding to `output_names`
                 and other objects that are then returned with the indicator class instance.
@@ -747,7 +745,7 @@ class IndicatorFactory():
             ...     output_names=['o1', 'o2']
             ... ).from_custom_func(custom_func)
 
-            >>> myInd = MyInd.run(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
+            >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
             >>> myInd.o1
             custom_p1              1             2
             custom_p2              3             4
@@ -778,58 +776,76 @@ class IndicatorFactory():
 
         # Add indexing methods
         def indexing_func(obj, pd_indexing_func):
+            new_wrapper, idx_idxs, _, col_idxs = indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func)
+            idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
+            col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
+            if np.array_equal(idx_idxs_arr, np.arange(obj.wrapper.shape_2d[0])):
+                idx_idxs_arr = slice(None, None, None)
+            if np.array_equal(col_idxs_arr, np.arange(obj.wrapper.shape_2d[1])):
+                col_idxs_arr = slice(None, None, None)
+
             input_mapper = getattr(obj, '_input_mapper', None)
             if input_mapper is not None:
-                input_mapper = indexing_on_mapper(
-                    getattr(obj, '_input_mapper'),
-                    getattr(obj, output_names[0]),
-                    pd_indexing_func
-                )
-            output_list = []
-            for output_name in output_names:
-                output_list.append(pd_indexing_func(getattr(obj, output_name)))
+                input_mapper = input_mapper[col_idxs_arr]
             input_list = []
             for input_name in input_names:
-                input = getattr(obj, f'_{input_name}')
-                if not pd.Index.equals(output_list[0].index, input.index):
-                    input = input.loc[output_list[0].index]
-                input_list.append(input)
+                input_list.append(getattr(obj, f'_{input_name}')[idx_idxs_arr])
+            output_list = []
+            for output_name in output_names:
+                output_list.append(getattr(obj, f'_{output_name}')[idx_idxs_arr, :][:, col_idxs_arr])
             param_list = []
             for param_name in param_names:
-                # TODO: adapt params array according to the indexing operation
                 param_list.append(getattr(obj, f'_{param_name}_array'))
             mapper_list = []
             for param_name in param_names:
-                mapper_list.append(indexing_on_mapper(
-                    getattr(obj, f'_{param_name}_mapper'),
-                    getattr(obj, output_names[0]),
-                    pd_indexing_func
-                ))
-            if len(param_names) > 1:
-                mapper_list.append(indexing_on_mapper(
-                    obj._tuple_mapper,
-                    getattr(obj, output_names[0]),
-                    pd_indexing_func
-                ))
+                # Tuple mapper is a list because of its complex data type
+                mapper_list.append(getattr(obj, f'_{param_name}_mapper')[col_idxs_arr])
 
             return obj.__class__(
+                new_wrapper,
                 input_list,
                 input_mapper,
                 output_list,
                 param_list,
                 mapper_list,
-                obj.short_name
+                obj.short_name,
+                obj.level_names
             )
 
         ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
-        CustomIndicator = type(self.class_name, (PandasIndexer, ParamIndexer), {})
+        CustomIndicator = type(self.class_name, (PandasIndexer, ParamIndexer, Configured), {})
         CustomIndicator.__module__ = self.module_name
         CustomIndicator.__doc__ = self.class_docstring
 
-        # For short_name and each input and output, create read-only properties
+        # Create read-only properties
         prop = property(lambda self: self._short_name)
-        prop.__doc__ = f"""Short name of the indicator (read-only)."""
+        prop.__doc__ = "Name of the indicator (read-only)."
         setattr(CustomIndicator, 'short_name', prop)
+
+        prop = property(lambda self: self._level_names)
+        prop.__doc__ = "Column level names corresponding to each parameter (read-only)."
+        setattr(CustomIndicator, 'level_names', prop)
+
+        prop = classproperty(lambda self: input_names)
+        prop.__doc__ = "Names of the input time series (read-only)."
+        setattr(CustomIndicator, 'input_names', prop)
+
+        prop = classproperty(lambda self: param_names)
+        prop.__doc__ = "Names of the parameters (read-only)."
+        setattr(CustomIndicator, 'param_names', prop)
+
+        prop = classproperty(lambda self: output_names)
+        prop.__doc__ = "Names of the output time series (read-only)."
+        setattr(CustomIndicator, 'output_names', prop)
+
+        prop = classproperty(lambda self: output_flags)
+        prop.__doc__ = "Dictionary of output flags (read-only)."
+        setattr(CustomIndicator, 'output_flags', prop)
+
+        for param_name in param_names:
+            prop = property(lambda self, param_name=param_name: getattr(self, f'_{param_name}_array'))
+            prop.__doc__ = f"Array of `{param_name}` combinations (read-only)."
+            setattr(CustomIndicator, f'{param_name}_array', prop)
 
         for input_name in input_names:
             def input_prop(self, input_name=input_name):
@@ -839,8 +855,8 @@ class IndicatorFactory():
                 old_input = reshape_fns.to_2d(getattr(self, '_' + input_name), raw=True)
                 input_mapper = getattr(self, '_input_mapper')
                 if input_mapper is None:
-                    return old_input
-                return self.wrapper.wrap(old_input[:, input_mapper.values])
+                    return self.wrapper.wrap(old_input)
+                return self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
             setattr(CustomIndicator, input_name, cached_property(input_prop))
@@ -848,7 +864,7 @@ class IndicatorFactory():
         for output_name in output_names:
             def output_prop(self, output_name=output_name):
                 """Output time series (read-only)."""
-                return getattr(self, '_' + output_name)
+                return self.wrapper.wrap(getattr(self, '_' + output_name))
 
             output_prop.__name__ = output_name
             if output_name in output_flags:
@@ -859,16 +875,31 @@ class IndicatorFactory():
             setattr(CustomIndicator, output_name, property(output_prop))
 
         # Add __init__ method
-        def __init__(self, input_list, input_mapper, output_list, param_list, mapper_list, short_name):
+        def __init__(self, wrapper, input_list, input_mapper, output_list, param_list,
+                     mapper_list, short_name, level_names):
             perform_init_checks(
+                wrapper,
                 input_list,
                 input_mapper,
                 output_list,
                 param_list,
                 mapper_list,
-                short_name
+                short_name,
+                level_names
+            )
+            Configured.__init__(
+                self,
+                wrapper=wrapper,
+                input_list=input_list,
+                input_mapper=input_mapper,
+                output_list=output_list,
+                param_list=param_list,
+                mapper_list=mapper_list,
+                short_name=short_name,
+                level_names=level_names
             )
 
+            self.wrapper = wrapper
             for i, ts_name in enumerate(input_names):
                 setattr(self, f'_{ts_name}', input_list[i])
             setattr(self, '_input_mapper', input_mapper)
@@ -878,15 +909,24 @@ class IndicatorFactory():
                 setattr(self, f'_{param_name}_array', param_list[i])
                 setattr(self, f'_{param_name}_mapper', mapper_list[i])
             if len(param_names) > 1:
-                setattr(self, '_tuple_mapper', mapper_list[-1])
+                tuple_mapper = list(zip(*list(mapper_list)))
+                setattr(self, '_tuple_mapper', tuple_mapper)
+            else:
+                tuple_mapper = None
             setattr(self, '_short_name', short_name)
-
-            # Initialize wrapper
-            self.wrapper = ArrayWrapper.from_obj(output_list[0])
+            setattr(self, '_level_names', level_names)
 
             # Initialize indexers
             PandasIndexer.__init__(self, indexing_func)
-            ParamIndexer.__init__(self, mapper_list, indexing_func)
+            mapper_sr_list = []
+            for i, m in enumerate(mapper_list):
+                mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
+            if tuple_mapper is not None:
+                mapper_sr_list.append(pd.Series(tuple_mapper, index=wrapper.columns))
+            ParamIndexer.__init__(
+                self, mapper_sr_list, indexing_func,
+                level_names=[*level_names, tuple(level_names)]
+            )
 
         setattr(CustomIndicator, '__init__', __init__)
 
@@ -933,14 +973,16 @@ class IndicatorFactory():
             )
             if kwargs.get('return_raw', False) or kwargs.get('return_cache', False):
                 return results
-            new_input_list, input_mapper, output_list, new_param_list, mapper_list, other_list = results
+            wrapper, new_input_list, input_mapper, output_list, new_param_list, mapper_list, other_list = results
             obj = cls(
+                wrapper,
                 new_input_list,
                 input_mapper,
                 output_list,
                 new_param_list,
                 mapper_list,
-                short_name
+                short_name,
+                level_names
             )
             if len(other_list) > 0:
                 return (obj, *tuple(other_list))
@@ -1029,7 +1071,7 @@ class IndicatorFactory():
                 if param_product:
                     param_list = create_param_product(param_list)
                 else:
-                    param_list = reshape_fns.broadcast(*param_list, writeable=True)
+                    param_list = reshape_fns.broadcast(*param_list, require_kwargs=dict(requirements='W'))
                 if not isinstance(param_list, (tuple, list)):
                     param_list = [param_list]
                 custom_func_args = args[len(input_names) + len(param_names):]
@@ -1102,10 +1144,10 @@ class IndicatorFactory():
                             level_name = f'{self.short_name}_{func_name}'
                         else:
                             level_name = f'{self.short_name}_{attr}_{func_name}'
-                    result = compare(getattr(self, attr), other, compare_func, level_name=level_name, **kwargs)
+                    out = compare(getattr(self, attr), other, compare_func, level_name=level_name, **kwargs)
                     if crossed:
-                        return result.vbt.signals.nst(wait + 1, after_false=after_false)
-                    return result
+                        return out.vbt.signals.nst(wait + 1, after_false=after_false)
+                    return out
 
                 comparison_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
                 comparison_method.__doc__ = f"""Return `True` for each element where `{attr}` is {func_name} `other`. 
@@ -1145,11 +1187,11 @@ class IndicatorFactory():
             * Your outputs must be arrays of the same shape, data type and data order
 
         Args:
-            apply_func (function): A function that takes broadcasted time series arrays corresponding 
+            apply_func (callable): A function that takes broadcasted time series arrays corresponding 
                 to `input_names`, single parameter selection corresponding to `param_names`, and other
                 arguments and keyword arguments, and returns outputs corresponding to `output_names`.
                 Can be Numba-compiled.
-            caching_func (function): A caching function to preprocess data beforehand.
+            caching_func (callable): A caching function to preprocess data beforehand.
                 All returned objects will be passed as additional arguments to `apply_func`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
         Returns:
@@ -1166,7 +1208,7 @@ class IndicatorFactory():
             ...     output_names=['o1', 'o2']
             ... ).from_apply_func(apply_func_nb)
 
-            >>> myInd = MyInd.run(price_sm, price_sm * 2, [1, 2], [3, 4], 100)
+            >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
             >>> myInd.o1
             custom_p1              1             2
             custom_p2              3             4
@@ -1281,7 +1323,7 @@ class IndicatorFactory():
             ```python-repl
             >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
 
-            >>> sma = SMA.run(price_sm, timeperiod=[2, 3])
+            >>> sma = SMA.run(price, timeperiod=[2, 3])
             >>> sma.real
             sma_timeperiod         2         3
                               a    b    a    b

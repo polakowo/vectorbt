@@ -16,23 +16,72 @@ for wrapping NumPy arrays to match the stored metadata as closest as possible.
 >>> import vectorbt as vbt
 >>> from vectorbt.base.array_wrapper import ArrayWrapper
 
->>> aw = ArrayWrapper(index=['a', 'b', 'c'], columns=['name'], ndim=1)
->>> aw.wrap([1, 2, 3])
-a    1
-b    2
-c    3
-Name: name, dtype: int64
+>>> aw = ArrayWrapper(index=['x', 'y', 'z'], columns=['a', 'b', 'c'], ndim=2)
+>>> aw._config
+{
+    'index': ['x', 'y', 'z'],
+    'columns': ['a', 'b', 'c'],
+    'ndim': 2,
+    'freq': None,
+    'column_only_select': None,
+    'group_select': None,
+    'grouped_ndim': None
+}
+
+>>> np.random.seed(42)
+>>> a = np.random.uniform(size=(3, 3))
+>>> aw.wrap(a)
+          a         b         c
+x  0.374540  0.950714  0.731994
+y  0.598658  0.156019  0.155995
+z  0.058084  0.866176  0.601115
+
+>>> aw.wrap_reduced(np.sum(a, axis=0))
+a    1.031282
+b    1.972909
+c    1.489103
+dtype: float64
 ```
+
+It can also be indexed as a regular pandas object and integrates `vectorbt.base.column_grouper.ColumnGrouper`:
+
+```python-repl
+>>> aw.loc['x':'y', 'a']._config
+{
+    'index': Index(['x', 'y'], dtype='object'),
+    'columns': Index(['a'], dtype='object'),
+    'ndim': 1,
+    'freq': None,
+    'column_only_select': None,
+    'group_select': None,
+    'grouped_ndim': None,
+    'group_by': None
+}
+
+>>> aw.regroup(np.array([0, 0, 1]))._config
+{
+    'index': ['x', 'y', 'z'],
+    'columns': ['a', 'b', 'c'],
+    'ndim': 2,
+    'freq': None,
+    'column_only_select': None,
+    'group_select': None,
+    'grouped_ndim': None,
+    'group_by': array([0, 0, 1])
+}
+```
+
+## Column grouper
+
+`vectorbt.base.column_grouper.ColumnGrouper` stores metadata related to grouping columns.
+It can return, for example, the number of groups, the start indices of groups, and other
+information useful for reducing operations that utilize grouping. It also allows to dynamically
+enable/disable/modify groups and checks whether a certain operation is permitted.
 
 ## Index functions
 
 Index functions perform operations on index objects, such as stacking, combining,
 and cleansing MultiIndex levels. "Index" in pandas context is referred to both index and columns.
-
-## Index grouper
-
-Index grouper groups index either by its levels or by some array, and exposes methods for working
-with groups. It's mainly used for grouping columns in records and portfolio.
 
 ## Reshape functions
 

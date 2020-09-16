@@ -4,6 +4,8 @@
     The underlying Series/DataFrame must already be a signal series.
 
     Input arrays must be `np.bool`.
+
+    Accessors do not utilize caching.
     
 ```python-repl
 >>> import vectorbt as vbt
@@ -41,7 +43,6 @@ from vectorbt.root_accessors import register_dataframe_accessor, register_series
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.decorators import cached_property
 from vectorbt.base import reshape_fns, index_fns
 from vectorbt.base.common import add_nb_methods
 from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
@@ -433,7 +434,8 @@ class Signals_Accessor(Generic_Accessor):
         entries = self._obj
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
 
-        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs, writeable=True)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs)
         stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
 
         # Build column hierarchy
@@ -488,7 +490,8 @@ class Signals_Accessor(Generic_Accessor):
         entries = self._obj
         checks.assert_type(ts, (pd.Series, pd.DataFrame))
 
-        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs, writeable=True)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs)
         stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
 
         # Build column hierarchy
@@ -551,7 +554,7 @@ class Signals_Accessor(Generic_Accessor):
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
-            checks.assert_dtype(other, np.bool_)
+            checks.assert_dtype(other, np.bool)
             result = nb.map_reduce_between_two_nb(
                 self.to_2d_array(), other.vbt.to_2d_array(), map_func_nb, reduce_func_nb, *args)
             return self.wrap_reduced(result)
@@ -581,25 +584,20 @@ class Signals_Accessor(Generic_Accessor):
         result = nb.map_reduce_partitions_nb(self.to_2d_array(), map_func_nb, reduce_func_nb, *args)
         return self.wrap_reduced(result)
 
-    @cached_property
     def num_signals(self):
         """Sum up `True` values."""
         return self.sum()
 
-    @cached_property
-    def avg_distance(self):
-        """Calculate the average distance between `True` values in `self`.
+    def avg_distance(self, to=None, **kwargs):
+        """Calculate the average distance between `True` values in `self` and optionally `to`.
 
         See `Signals_Accessor.map_reduce_between`."""
         return self.map_reduce_between(
-            other=None, map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb)
-
-    def avg_distance_to(self, other, **kwargs):
-        """Calculate the average distance between `True` values in `self` and `other`.
-
-        See `Signals_Accessor.map_reduce_between`."""
-        return self.map_reduce_between(
-            other=other, map_func_nb=nb.distance_map_nb, reduce_func_nb=nb.mean_reduce_nb, **kwargs)
+            other=to,
+            map_func_nb=nb.distance_map_nb,
+            reduce_func_nb=nb.mean_reduce_nb,
+            **kwargs
+        )
 
     # ############# Ranking ############# #
 
@@ -815,7 +813,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
             ![](/vectorbt/docs/img/signals_plot_as_markers.png)"""
         checks.assert_type(ts, pd.Series)
-        checks.assert_same_index(self._obj, ts)
+        checks.assert_index_equal(self._obj.index, ts.index)
 
         if fig is None:
             fig = CustomFigureWidget()

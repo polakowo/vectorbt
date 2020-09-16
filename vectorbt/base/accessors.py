@@ -1,4 +1,7 @@
-"""Custom pandas accessors."""
+"""Custom pandas accessors.
+
+!!! note
+    Accessors do not utilize caching."""
 
 import numpy as np
 import pandas as pd
@@ -6,6 +9,7 @@ from collections.abc import Iterable
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
+from vectorbt.utils.config import merge_kwargs
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.common import (
@@ -72,7 +76,7 @@ class Base_Accessor(ArrayWrapper):
 
         Set `axis` to 1 for columns and 0 for index.
         If `inplace` is `True`, modifies the pandas object. Otherwise, returns a copy."""
-        checks.assert_value_in(axis, (0, 1))
+        checks.assert_in(axis, (0, 1))
 
         if axis == 1:
             obj_index = self.columns
@@ -180,10 +184,10 @@ class Base_Accessor(ArrayWrapper):
         if keys is not None:
             if axis == 1:
                 new_columns = index_fns.combine_indexes(keys, self.columns)
-                return self.wrap(tiled.values, columns=new_columns)
+                return tiled.vbt.wrap(tiled.values, columns=new_columns)
             else:
                 new_index = index_fns.combine_indexes(keys, self.index)
-                return self.wrap(tiled.values, index=new_index)
+                return tiled.vbt.wrap(tiled.values, index=new_index)
         return tiled
 
     def repeat(self, n, keys=None, axis=1):
@@ -195,10 +199,10 @@ class Base_Accessor(ArrayWrapper):
         if keys is not None:
             if axis == 1:
                 new_columns = index_fns.combine_indexes(self.columns, keys)
-                return self.wrap(repeated.values, columns=new_columns)
+                return repeated.vbt.wrap(repeated.values, columns=new_columns)
             else:
                 new_index = index_fns.combine_indexes(self.index, keys)
-                return self.wrap(repeated.values, index=new_index)
+                return repeated.vbt.wrap(repeated.values, index=new_index)
         return repeated
 
     def align_to(self, other):
@@ -399,7 +403,7 @@ class Base_Accessor(ArrayWrapper):
         checks.assert_not_none(combine_func)
         if checks.is_numba_func(combine_func):
             # Numba requires writable arrays
-            broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+            broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         new_obj, new_other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
         # Optionally cast to 2d array
         if pass_2d:
@@ -428,10 +432,9 @@ class Base_Accessor(ArrayWrapper):
         Use `keys` as the outermost level.
 
         !!! note
-            If `combine_func` is Numba-compiled, will broadcast using `writeable=True` and
-            copy using `order='C'` flags, which can lead to an expensive computation overhead if
-            passed objects are large and have different shape/memory order. You also must ensure 
-            that all objects have the same data type.
+            If `combine_func` is Numba-compiled, will broadcast using `WRITEABLE` and `C_CONTIGUOUS`
+            flags, which can lead to an expensive computation overhead if passed objects are large and
+            have different shape/memory order. You also must ensure that all objects have the same data type.
 
             Also remember to bring each in `*args` to a Numba-compatible format.
 
@@ -460,10 +463,9 @@ class Base_Accessor(ArrayWrapper):
         checks.assert_type(others, Iterable)
         # Broadcast arguments
         if checks.is_numba_func(combine_func):
-            # Numba requires writable arrays
-            broadcast_kwargs = {**dict(writeable=True), **broadcast_kwargs}
+            # Numba requires writeable arrays
             # Plus all of our arrays must be in the same order
-            broadcast_kwargs['copy_kwargs'] = {**dict(order='C'), **broadcast_kwargs.get('copy_kwargs', {})}
+            broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements=['W', 'C'])), broadcast_kwargs)
         new_obj, *new_others = reshape_fns.broadcast(self._obj, *others, **broadcast_kwargs)
         # Optionally cast to 2d array
         if pass_2d:
@@ -474,7 +476,7 @@ class Base_Accessor(ArrayWrapper):
             # Concat the results horizontally
             if checks.is_numba_func(combine_func):
                 for i in range(1, len(bc_arrays)):
-                    checks.assert_same_meta(bc_arrays[i - 1], bc_arrays[i])
+                    checks.assert_meta_equal(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_and_concat_nb(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
@@ -489,7 +491,7 @@ class Base_Accessor(ArrayWrapper):
             # Combine arguments pairwise into one object
             if checks.is_numba_func(combine_func):
                 for i in range(1, len(bc_arrays)):
-                    checks.assert_same_dtype(bc_arrays[i - 1], bc_arrays[i])
+                    checks.assert_dtype_equal(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)

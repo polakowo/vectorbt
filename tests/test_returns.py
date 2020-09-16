@@ -151,9 +151,9 @@ class TestAccessors:
         res_a = empyrical.annual_return(ret['a'])
         res_b = empyrical.annual_return(ret['b'])
         res_c = empyrical.annual_return(ret['c'])
-        assert isclose(ret['a'].vbt.returns.annualized_return(), res_a)
+        assert isclose(ret['a'].vbt.returns.annualized(), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.annualized_return(),
+            ret.vbt.returns.annualized(),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
@@ -214,6 +214,12 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             ret.vbt.returns.sharpe_ratio(risk_free=test_risk_free),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
+        )
+
+    def test_deflated_sharpe_ratio(self):
+        pd.testing.assert_series_equal(
+            ret.vbt.returns.deflated_sharpe_ratio(risk_free=[0.01, 0.02, 0.03]),
+            pd.Series([np.nan, np.nan, 0.0037486334476184353], index=ret.columns)
         )
 
     @pytest.mark.parametrize(
@@ -389,12 +395,12 @@ class TestAccessors:
         )
 
     def test_drawdowns(self):
-        assert type(ret['a'].vbt.returns.drawdowns) is Drawdowns
-        assert ret['a'].vbt.returns.drawdowns.wrapper.freq == ret['a'].vbt.returns.freq
-        assert ret['a'].vbt.returns.drawdowns.wrapper.ndim == ret['a'].ndim
-        assert ret.vbt.returns.drawdowns.wrapper.ndim == ret.ndim
-        assert isclose(ret['a'].vbt.returns.drawdowns.max_drawdown(), ret['a'].vbt.returns.max_drawdown())
+        assert type(ret['a'].vbt.returns.drawdowns()) is Drawdowns
+        assert ret['a'].vbt.returns.drawdowns().wrapper.freq == ret['a'].vbt.returns.freq
+        assert ret['a'].vbt.returns.drawdowns().wrapper.ndim == ret['a'].ndim
+        assert ret.vbt.returns.drawdowns().wrapper.ndim == ret.ndim
+        assert isclose(ret['a'].vbt.returns.drawdowns().max_drawdown(), ret['a'].vbt.returns.max_drawdown())
         pd.testing.assert_series_equal(
-            ret.vbt.returns.drawdowns.max_drawdown(),
+            ret.vbt.returns.drawdowns().max_drawdown(),
             ret.vbt.returns.max_drawdown()
         )

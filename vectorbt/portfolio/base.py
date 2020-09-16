@@ -1,921 +1,1546 @@
 """Base class for modeling portfolio and measuring its performance.
 
 The job of the `Portfolio` class is to create a series of positions allocated 
-    against a cash component, produce an equity curve, incorporate basic transaction costs 
-    and produce a set of statistics about its performance. In particular it outputs 
-    position/profit metrics and drawdown information.
+against a cash component, produce an equity curve, incorporate basic transaction costs
+and produce a set of statistics about its performance. In particular it outputs
+position/profit metrics and drawdown information.
 
 ## Workflow
 
-`Portfolio` class can be instantiated using main price of the asset, initial capital, 
-records of filled orders, and cash and shares balances (as a result of filling orders).
-It also accepts many other parameters such as annualization factor.
+The workflow of `Portfolio` is simple:
 
-* Order records are used to track trades and positions, and to measure their performance.
-* Main price, initial capital, and balances are used to compute risk and performance metrics.
+1. Receives a set of inputs, such as entry and exit signals
+2. Uses them to generate and fill orders in form of records (simulation part)
+3. Calculates a broad range of risk & performance metrics based on these records (analysis part)
 
-To simplify creation of order records and keeping track of balances, it exposes several convenience methods
-with prefix `from_`. For example, you can use `Portfolio.from_signals` method to create and fill orders 
-based on entry and exit signals. Alternatively, you can use `Portfolio.from_order_func` to define 
-a custom order function. The results are then automatically passed to the constructor method of 
-`Portfolio` and you will receive a portfolio instance ready to be used for performance measurements.
+It basically builds upon the `vectorbt.records.orders.Orders` class. To simplify creation of order
+records and keep track of balances, it exposes several convenience methods with prefix `from_`.
+For example, you can use `Portfolio.from_signals` method to generate orders from entry and exit signals.
+Alternatively, you can use `Portfolio.from_order_func` to run a custom order function on each tick.
+The results are then automatically passed to the constructor method of `Portfolio` and you will
+receive a portfolio instance ready to be used for performance analysis.
 
-## Properties
+This way, one can simulate and analyze his/her strategy in a couple of lines.
 
-The `Portfolio` class offers numerous properties for measuring the performance of a strategy. 
-They can be categorized as follows:
+### Example
 
-* Time series indexed by time, such as `Portfolio.returns`.
-* Metrics indexed by columns, such as `Portfolio.total_profit`.
-* Group objects with own time series and metrics, such as `Portfolio.positions`.
-
-### Caching
-
-Each property is cached, thus properties can effectively build upon each other, without side effects.
-
-!!! note
-    Due to caching, `Portfolio` class is meant to be atomic and immutable, thus each public attribute
-    is marked as read-only. To change any parameter, you need to create a new `Portfolio` instance.
-
-## Indexing
-
-In addition, you can use pandas indexing on the `Portfolio` class itself, which forwards
-indexing operation to each `__init__` argument with pandas type:
+The following example does something crazy: it checks candlestick data of 6 major cryptocurrencies
+in 2019 against every single pattern found in TA-Lib, and translates them into orders:
 
 ```python-repl
->>> import vectorbt as vbt
 >>> import numpy as np
 >>> import pandas as pd
->>> from numba import njit
 >>> from datetime import datetime
+>>> import yfinance as yf
+>>> import talib
+>>> import vectorbt as vbt
+>>> from vectorbt.portfolio.enums import InitCashMode
 
->>> price = pd.Series([1, 2, 3, 2, 1], index=pd.Index([
-...     datetime(2020, 1, 1),
-...     datetime(2020, 1, 2),
-...     datetime(2020, 1, 3),
-...     datetime(2020, 1, 4),
-...     datetime(2020, 1, 5)
-... ]), name='a')
->>> orders = pd.DataFrame({
-...     'a': [np.inf, 0, 0, 0, 0],
-...     'b': [1, 1, 1, 1, -np.inf],
-...     'c': [np.inf, -np.inf, np.inf, -np.inf, np.inf]
-... }, index=index)
->>> portfolio = vbt.Portfolio.from_orders(price, orders, init_capital=100)
+>>> # Fetch price history
+>>> pairs = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
+>>> start = datetime(2020, 1, 1)
+>>> end = datetime(2020, 9, 1)
+>>> pair_history = {p: yf.Ticker(p).history(start=start, end=end) for p in pairs}
 
->>> portfolio.equity
-                a      b           c
-2020-01-01  100.0  100.0  100.000000
-2020-01-02  200.0  101.0  200.000000
-2020-01-03  300.0  103.0  200.000000
-2020-01-04  200.0  100.0  133.333333
-2020-01-05  100.0   96.0  133.333333
+>>> # Put assets into a single dataframe by price type
+>>> price = {}
+>>> for pt in ['Open', 'High', 'Low', 'Close']:
+...     price[pt] = pd.DataFrame({p: df[pt] for p, df in pair_history.items()})
 
->>> portfolio['a'].equity
-2020-01-01    100.0
-2020-01-02    200.0
-2020-01-03    300.0
-2020-01-04    200.0
-2020-01-05    100.0
-Name: a, dtype: float64
+>>> price['Open'].head()
+            BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
+Date
+2019-12-31  7294.44   132.61   0.1945    13.95   209.30    42.77
+2020-01-01  7194.89   129.63   0.1929    13.73   204.67    41.33
+2020-01-02  7202.55   130.82   0.1927    13.70   204.35    42.02
+2020-01-03  6984.43   127.41   0.1879    13.04   196.01    39.86
+2020-01-04  7345.38   134.17   0.1935    13.67   222.54    42.38
+
+>>> # Run every single pattern recognition indicator and combine results
+>>> result = pd.DataFrame.vbt.empty_like(price['Open'], fill_value=0.)
+>>> for pattern in talib.get_function_groups()['Pattern Recognition']:
+...     PRecognizer = vbt.IndicatorFactory.from_talib(pattern)
+...     pr = PRecognizer.run(price['Open'], price['High'], price['Low'], price['Close'])
+...     result = result + pr.integer
+
+>>> # Don't look into future
+>>> result = result.vbt.fshift(1)
+
+>>> # Treat each number as order value in USD
+>>> order_size = result / price['Open']
+
+>>> # Simulate portfolio
+>>> portfolio = vbt.Portfolio.from_orders(
+...     price['Close'], order_size, order_price=price['Open'],
+...     init_cash=InitCashMode.AutoAlign, fees=0.001, slippage=0.001
+... )
+
+>>> # Visualize portfolio value
+>>> portfolio.value().vbt.plot()
+```
+
+![](/vectorbt/docs/img/portfolio_value.png)
+
+## Features
+
+### Broadcasting
+
+`Portfolio` is very flexible towards inputs:
+
+* Accepts both Series and DataFrames as inputs
+* Broadcasts inputs to the same shape using vectorbt's own broadcasting rules
+* Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
+* Implements flexible broadcasting wherever possible to save memory
+
+### Grouping
+
+One of the key features of `Portfolio` is the ability to group columns. Groups can be specified by
+`group_by`, which can be anything from positions or names of column levels, to a NumPy array with
+actual groups. Groups can be formed to share capital between columns or to compute metrics
+for a combined portfolio of multiple independent columns.
+
+For example, let's divide our portfolio into two groups sharing the same cash:
+
+```python-repl
+>>> # Simulate combined portfolio
+>>> group_by = pd.Index([
+...     'first', 'first', 'first',
+...     'second', 'second', 'second'
+... ], name='group')
+>>> comb_portfolio = vbt.Portfolio.from_orders(
+...     price['Close'], order_size, order_price=price['Open'],
+...     init_cash=InitCashMode.AutoAlign, fees=0.001, slippage=0.001,
+...     group_by=group_by, cash_sharing=True
+... )
+
+>>> # Get total profit per group
+>>> comb_portfolio.total_profit()
+group
+first     21793.882832
+second     8333.660493
+dtype: float64
+```
+
+Not only can you analyze each group, but also each column in the group:
+
+```python-repl
+>>> # Get total profit per column
+>>> comb_portfolio.total_profit(group_by=False)
+BTC-USD     5166.373585
+ETH-USD    13098.913381
+XRP-USD     3528.595867
+BNB-USD     5345.521391
+BCH-USD     -235.128582
+LTC-USD     3223.267684
+dtype: float64
+```
+
+In the same way, you can introduce new grouping to the method itself:
+
+```python-repl
+>>> # Get total profit per group
+>>> portfolio.total_profit(group_by=group_by)
+group
+first     21793.882832
+second     8333.660493
+dtype: float64
 ```
 
 !!! note
-    Changing index (time axis) is not supported."""
+    If cash sharing is enabled, grouping can be disabled but cannot be modified.
+
+### Indexing
+
+In addition, you can use pandas indexing on the `Portfolio` class itself, which forwards
+indexing operation to each argument with index:
+
+```python-repl
+>>> portfolio['BTC-USD']
+<vectorbt.portfolio.base.Portfolio at 0x7fac7517ac88>
+
+>>> portfolio['BTC-USD'].total_profit()
+5166.373584618163
+```
+
+Combined portfolio is indexed by group:
+
+```python-repl
+>>> comb_portfolio['first']
+<vectorbt.portfolio.base.Portfolio at 0x7fac5756b828>
+
+>>> comb_portfolio['first'].total_profit()
+21793.882832230272
+```
+
+!!! note
+    Changing index (time axis) is not supported. The object should be treated as a Series
+    rather than a DataFrame; for example, use `portfolio.iloc[0]` instead of `portfolio.iloc[:, 0]`.
+
+    Indexing behavior depends solely upon `vectorbt.base.array_wrapper.ArrayWrapper`.
+    For example, if `group_select` is enabled indexing will be performed on groups,
+    otherwise on single columns. You can pass wrapper arguments with `wrapper_kwargs`.
+
+### Caching
+
+This class supports caching. If a method or a property requires heavy computation, it's wrapped
+with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property` respectively.
+Caching can be disabled globally via `vectorbt.defaults` or locally via the method/property.
+There is currently no way to disable caching for an entire class.
+
+!!! note
+    Because of caching, this class is meant to be immutable and all properties are read-only.
+    To change any attribute, use the `copy` method and pass the attribute as keyword argument.
+
+!!! warning
+    Make sure to disable caching when working with large arrays. Note that methods in `Portfolio`
+    heavily depend upon each other, and a single call may trigger a chain of caching operations.
+    For example, calling `Portfolio.total_return` caches 7 different time series of the same shape
+    as the reference price.
+
+    If caching is disabled, make sure to store most important time series manually. For example,
+    if you're interested in Sharpe ratio or other metrics based on returns, run and save
+    `Portfolio.returns` and then use the `vectorbt.returns.accessors.Returns_Accessor` to analyze them.
+    Do not use methods akin to `Portfolio.sharpe_ratio` because they will re-calculate returns each time."""
 
 import numpy as np
 import pandas as pd
+from inspect import signature
 
 from vectorbt import defaults
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_property
-from vectorbt.base import reshape_fns
+from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.config import Configured, merge_kwargs
+from vectorbt.utils.random import set_seed
+from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio import nb
-from vectorbt.portfolio.enums import SizeType, AccumulateExitMode, ConflictMode
+from vectorbt.portfolio.enums import (
+    SizeType,
+    AccumulateExitMode,
+    ConflictMode,
+    CallSeqType,
+    InitCashMode
+)
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
+from vectorbt.records.orders import indexing_on_orders_meta
 
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Portfolio`."""
-    if obj.wrapper.ndim == 1:
-        raise TypeError("Indexing on Series is not supported")
+    new_orders, group_idxs, col_idxs = indexing_on_orders_meta(obj.orders, pd_indexing_func)
+    if obj.wrapper.grouper.group_by is None:
+        # Grouping disabled
+        new_init_cash = obj.init_cash.values[col_idxs]
+    else:
+        # Grouping enabled
+        new_init_cash = obj.init_cash.values[group_idxs if obj.cash_sharing else col_idxs]
+    new_call_seq = obj.call_seq.values[:, col_idxs]
 
-    n_rows = len(obj.wrapper.index)
-    n_cols = len(obj.wrapper.columns)
-    col_mapper = obj.wrapper.wrap(np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)))
-    col_mapper = pd_indexing_func(col_mapper)
-    if not pd.Index.equals(col_mapper.index, obj.wrapper.index):
-        raise NotImplementedError("Changing index (time axis) is not supported")
-    new_cols = col_mapper.values[0]
-
-    # Array-like params
-    def index_arraylike_param(param):
-        if np.asarray(param).ndim > 0:
-            param = reshape_fns.broadcast_to_axis_of(param, obj.main_price, 1)
-            param = param[new_cols]
-        return param
-
-    factor_returns = obj.factor_returns
-    if factor_returns is not None:
-        if checks.is_frame(factor_returns):
-            factor_returns = reshape_fns.broadcast_to(factor_returns, obj.main_price)
-            factor_returns = pd_indexing_func(factor_returns)
-
-    # Create new Portfolio instance
-    return obj.__class__(
-        pd_indexing_func(obj.main_price),
-        obj.init_capital.iloc[new_cols],
-        pd_indexing_func(obj.orders),  # Orders class supports indexing
-        pd_indexing_func(obj.cash),
-        pd_indexing_func(obj.shares),
-        freq=obj.freq,
-        year_freq=obj.year_freq,
-        levy_alpha=index_arraylike_param(obj.levy_alpha),
-        risk_free=index_arraylike_param(obj.risk_free),
-        required_return=index_arraylike_param(obj.required_return),
-        cutoff=index_arraylike_param(obj.cutoff),
-        factor_returns=factor_returns,
-        incl_unrealized_stats=obj.incl_unrealized_stats
+    return obj.copy(
+        orders=new_orders,
+        init_cash=new_init_cash,
+        call_seq=new_call_seq
     )
 
 
-class Portfolio(PandasIndexer):
+def add_returns_methods(func_names):
+    """Class decorator to add `vectorbt.returns.accessors.Returns_Accessor` methods to `Portfolio`."""
+
+    def wrapper(cls):
+        for func_name in func_names:
+            if isinstance(func_name, tuple):
+                ret_func_name = func_name[0]
+            else:
+                ret_func_name = func_name
+
+            def returns_method(
+                    self,
+                    *args,
+                    group_by=None,
+                    year_freq=None,
+                    ret_func_name=ret_func_name,
+                    active_returns=False,
+                    reuse_returns=None,
+                    **kwargs):
+                if reuse_returns is not None:
+                    returns = reuse_returns
+                else:
+                    if active_returns:
+                        returns = self.active_returns(group_by=group_by)
+                    else:
+                        returns = self.returns(group_by=group_by)
+                returns_acc = returns.vbt.returns(freq=self.wrapper.freq, year_freq=year_freq)
+                # Select only those arguments in kwargs that are also in the method's signature
+                # This is done for Portfolio.stats which passes the same kwargs to multiple methods
+                method = getattr(returns_acc, ret_func_name)
+                sig = signature(method)
+                arg_names = [p.name for p in sig.parameters.values() if p.kind == p.POSITIONAL_OR_KEYWORD]
+                new_kwargs = {}
+                for arg_name in arg_names:
+                    if arg_name in kwargs:
+                        new_kwargs[arg_name] = kwargs[arg_name]
+                return method(*args, **new_kwargs)
+
+            if isinstance(func_name, tuple):
+                func_name = func_name[1]
+            returns_method.__name__ = func_name
+            returns_method.__qualname__ = f"Portfolio.{func_name}"
+            returns_method.__doc__ = f"See `vectorbt.returns.accessors.Returns_Accessor.{func_name}`."
+            setattr(cls, func_name, cached_method(returns_method))
+        return cls
+
+    return wrapper
+
+
+@add_returns_methods([
+    ('daily', 'daily_returns'),
+    ('annual', 'annual_returns'),
+    ('cumulative', 'cumulative_returns'),
+    ('annualized', 'annualized_return'),
+    'annualized_volatility',
+    'calmar_ratio',
+    'omega_ratio',
+    'sharpe_ratio',
+    'deflated_sharpe_ratio',
+    'downside_risk',
+    'sortino_ratio',
+    'information_ratio',
+    'beta',
+    'alpha',
+    'tail_ratio',
+    'value_at_risk',
+    'conditional_value_at_risk',
+    'capture',
+    'up_capture',
+    'down_capture',
+    'drawdown',
+    'max_drawdown'
+])
+class Portfolio(Configured, PandasIndexer):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
-        main_price (pandas_like): Main price of the asset.
-        init_capital (float or pd.Series): The initial capital.
-
-            Each element must correspond to a column in `main_price`.
-        orders (vectorbt.records.orders.Orders): Order records.
-        cash (pandas_like): Cash held at each time step.
-
-            Must have the same metadata as `main_price`.
-        shares (pandas_like): Shares held at each time step.
-
-            Must have the same metadata as `main_price`.
-        freq (any): Index frequency in case `main_price.index` is not datetime-like.
-        year_freq (any): Year frequency for working with returns.
-        levy_alpha (float or array_like): Scaling relation (Levy stability exponent).
-
-            Single value or value per column.
-        risk_free (float or array_like): Constant risk-free return throughout the period.
-
-            Single value or value per column.
-        required_return (float or array_like): Minimum acceptance return of the investor.
-
-            Single value or value per column.
-        cutoff (float or array_like): Decimal representing the percentage cutoff for the
-            bottom percentile of returns.
-
-            Single value or value per column.
-        factor_returns (array_like): Benchmark return to compare returns against. Will broadcast.
-
-            By default it's `None`, but it's required by some return-based metrics.
-        incl_unrealized_stats (bool): Whether to include unrealized metrics in `Portfolio.stats`.
+        orders (Orders): Order records.
+        init_cash (float or array_like): Initial capital.
+        cash_sharing (bool): Whether to share cash within the same group.
+        call_seq (array_like of int): Sequence of calls per row and group.
+        init_cash_mode (InitCashMode or None): Initial cash mode.
+        incl_unrealized (bool): Whether to include unrealized P&L in statistics.
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
         The `__init__` method is reserved for indexing purposes.
 
-        All array objects must have the same metadata as `main_price`."""
+    !!! note
+        This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
-    def __init__(self, main_price, init_capital, orders, cash, shares, freq=None,
-                 year_freq=None, levy_alpha=None, risk_free=None, required_return=None,
-                 cutoff=None, factor_returns=None, incl_unrealized_stats=False):
+    def __init__(self, orders, init_cash, cash_sharing, call_seq, init_cash_mode=None, incl_unrealized=None):
+        Configured.__init__(
+            self,
+            orders=orders,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=call_seq,
+            init_cash_mode=init_cash_mode,
+            incl_unrealized=incl_unrealized
+        )
+        # Get defaults
+        if incl_unrealized is None:
+            incl_unrealized = defaults.portfolio['incl_unrealized']
+
         # Perform checks
-        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
-        if checks.is_frame(main_price):
-            checks.assert_type(init_capital, pd.Series)
-            checks.assert_same(main_price.columns, init_capital.index)
-        else:
-            checks.assert_ndim(init_capital, 0)
-        checks.assert_same_meta(main_price, cash)
-        checks.assert_same_meta(main_price, shares)
+        checks.assert_type(orders, Orders)
 
         # Store passed arguments
-        self._main_price = main_price
-        self._init_capital = init_capital
+        self._ref_price = orders.close
         self._orders = orders
-        self._cash = cash
-        self._shares = shares
-        self._incl_unrealized_stats = incl_unrealized_stats
-
-        freq = main_price.vbt(freq=freq).freq
-        if freq is None:
-            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
-        self._freq = freq
-
-        year_freq = main_price.vbt.returns(year_freq=year_freq).year_freq
-        if freq is None:
-            raise ValueError("You must set `year_freq`.")
-        self._year_freq = year_freq
-
-        # Parameters
-        self._levy_alpha = defaults.portfolio['levy_alpha'] if levy_alpha is None else levy_alpha
-        self._risk_free = defaults.portfolio['risk_free'] if risk_free is None else risk_free
-        self._required_return = defaults.portfolio['required_return'] if required_return is None else required_return
-        self._cutoff = defaults.portfolio['cutoff'] if cutoff is None else cutoff
-        self._factor_returns = defaults.portfolio['factor_returns'] if factor_returns is None else factor_returns
+        self._init_cash = init_cash
+        self._cash_sharing = cash_sharing
+        self._call_seq = call_seq
+        self._init_cash_mode = init_cash_mode
+        self._incl_unrealized = incl_unrealized
 
         # Supercharge
         PandasIndexer.__init__(self, _indexing_func)
-        self.wrapper = ArrayWrapper.from_obj(main_price, freq=freq)
 
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, main_price, entries, exits, size=np.inf, size_type=SizeType.Shares,
-                     entry_price=None, exit_price=None, init_capital=None, fees=None, fixed_fees=None,
-                     slippage=None, accumulate=None, accumulate_exit_mode=None, conflict_mode=None,
-                     broadcast_kwargs={}, freq=None, **kwargs):
-        """Build portfolio from entry and exit signals.
+    def from_signals(cls, close, entries, exits, size=None, entry_price=None, exit_price=None,
+                     fees=None, fixed_fees=None, slippage=None, reject_prob=None, min_size=None,
+                     init_cash=None, cash_sharing=None, call_seq=None, accumulate=None,
+                     accumulate_exit_mode=None, conflict_mode=None, seed=None, freq=None, group_by=None,
+                     broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
+        """Simulate portfolio from entry and exit signals.
 
-        For each signal in `entries`, buys `size` of shares for `entry_price` to enter
-        the position. For each signal in `exits`, sells everything for `exit_price`
-        to exit the position. Accumulation of orders is disabled by default.
-
-        For more details, see `vectorbt.portfolio.nb.simulate_from_signals_nb`.
+        Starting with initial cash `init_cash`, for each signal in `entries`, enters a position
+        by buying `size` of shares for `entry_price`. For each signal in `exits`, closes the position
+        by selling all shares for `exit_price`. When accumulation is enabled, each entry signal will
+        increase the position, and optionally each exit signal will decrease the position. When both
+        entry and exit signals are present, ignores them by default. When grouping is enabled with
+        `group_by`, will compute performance for the entire group. When, additionally, `cash_sharing`
+        is enabled, will share the cash among all columns in the group.
 
         Args:
-            main_price (pandas_like): Main price of the asset, such as close. Will broadcast.
-            entries (array_like): Boolean array of entry signals. Will broadcast.
-            exits (array_like): Boolean array of exit signals. Will broadcast.
-            size (float or array_like): The amount of shares to order. Will broadcast.
+            close (pandas_like): Reference price, such as close. Will broadcast.
 
-                To buy/sell everything, set the size to `np.inf`.
-            size_type (int or array_like): See `vectorbt.portfolio.enums.SizeType`.
+                Will be used for calculating unrealized P&L and portfolio value.
+            entries (array_like of bool): Boolean array of entry signals. Will broadcast.
+            exits (array_like of bool): Boolean array of exit signals. Will broadcast.
+            size (float or array_like): Size to order. Will broadcast.
 
-                Only `SizeType.Shares` and `SizeType.Cash` are supported.
-            entry_price (array_like): Entry price. Defaults to `main_price`. Will broadcast.
-            exit_price (array_like): Exit price. Defaults to `main_price`. Will broadcast.
-            init_capital (float or array_like): The initial capital. Will broadcast.
+                * Set to positive/negative to buy/sell.
+                * Set to `np.inf`/`-np.inf` to buy/sell everything.
+                * Set to `np.nan` or zero to skip.
+            entry_price (array_like of float): Entry price. Defaults to `close`. Will broadcast.
 
-                Allowed is either a single value or value per column.
+                !!! note
+                    Setting order price to close is risky.
+            exit_price (array_like of float): Exit price. Defaults to `close`. Will broadcast.
+
+                !!! note
+                    Setting order price to close is risky.
             fees (float or array_like): Fees in percentage of the order value. Will broadcast.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
             slippage (float or array_like): Slippage in percentage of price. Will broadcast.
+            reject_prob (float or array_like): Order rejection probability. Will broadcast.
+            min_size (float or array_like): Minimum size for an order to be accepted.
+
+                Will broadcast to the number of columns.
+            init_cash (InitCashMode, float or array_like of float): Initial capital.
+
+                By default, will broadcast to the number of columns.
+                If cash sharing is enabled, will broadcast to the number of groups.
+                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
+
+                !!! note
+                    Make sure that `init_cash` is a floating number if not using `InitCashMode`.
+            cash_sharing (bool): Whether to share cash within the same group.
+
+                !!! warning
+                    Order execution cannot be considered parallel anymore.
+
+                    This method presumes that in a group of assets that share the same capital all
+                    orders will be executed within the same tick and retain their price regardless
+                    of their position in the queue, even though they depend upon each other and thus
+                    cannot be executed in parallel. This behavior is risky.
+            call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
+
+                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
+                * Set to array to specify custom sequence. Will not broadcast.
             accumulate (bool): If `accumulate` is `True`, entering the market when already
-                in the market will be allowed to increase a position.
-            accumulate_exit_mode: See `vectorbt.portfolio.enums.AccumulateExitMode`.
-            conflict_mode: See `vectorbt.portfolio.enums.ConflictMode`.
-            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-            freq (any): Index frequency in case `main_price.index` is not datetime-like.
+                in the market will be allowed to increase the position.
+            accumulate_exit_mode (AccumulateExitMode): See `vectorbt.portfolio.enums.AccumulateExitMode`.
+            conflict_mode (ConflictMode): See `vectorbt.portfolio.enums.ConflictMode`.
+            seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
+            freq (any): Index frequency in case `close.index` is not datetime-like.
+            group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
+            wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
             **kwargs: Keyword arguments passed to the `__init__` method.
+
+        All time series will be broadcast together using `vectorbt.base.reshape_fns.broadcast`.
+        At the end, they will have the same metadata.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
-        At the end, they will have the same metadata.
+        !!! note
+            Only `SizeType.Shares` is supported. Other modes such as target percentage are not
+            compatible with signals since their logic may contradict the direction the user has
+            specified for the order.
+
+            With cash sharing enabled, at each timestamp, processing of the assets in a group
+            goes strictly in order defined in `call_seq`. This order can't be changed dynamically.
+
+        !!! hint
+            If you generated signals using close price, don't forget to shift your signals by one tick
+            forward, for example, with `signals.vbt.fshift(1)`. In general, make sure to use a price
+            that comes after the signal.
 
         Example:
-            Portfolio from various signal sequences:
-            ```python-repl
-            >>> entries = pd.DataFrame({
-            ...     'a': [True, False, False, False, False],
-            ...     'b': [True, False, True, False, True],
-            ...     'c': [True, True, True, True, True]
-            ... }, index=index)
-            >>> exits = pd.DataFrame({
-            ...     'a': [False, False, False, False, False],
-            ...     'b': [False, True, False, True, False],
-            ...     'c': [True, True, True, True, True]
-            ... }, index=index)
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=10, init_capital=100,
-            ...     fees=0.0025, fixed_fees=1., slippage=0.001)
+            Different ways of how signals are interpreted:
 
-            >>> portfolio.orders.records
-               col  idx  size  price      fees  side
-            0    0    0  10.0  1.001  1.025025     0
-            1    1    0  10.0  1.001  1.025025     0
-            2    1    1  10.0  1.998  1.049950     1
-            3    1    2  10.0  3.003  1.075075     0
-            4    1    3  10.0  1.998  1.049950     1
-            5    1    4  10.0  1.001  1.025025     0
-            6    2    0  10.0  1.001  1.025025     0
-            >>> portfolio.equity
-                                 a           b           c
-            2020-01-01   98.964975   98.964975   98.964975
-            2020-01-02  108.964975  107.895025  108.964975
-            2020-01-03  118.964975  106.789950  118.964975
-            2020-01-04  108.964975   95.720000  108.964975
-            2020-01-05   98.964975   94.684975   98.964975
+            ```python-repl
+            >>> import numpy as np
+            >>> import pandas as pd
+            >>> from datetime import datetime
+            >>> import vectorbt as vbt
+            >>> from vectorbt.portfolio.enums import AccumulateExitMode, ConflictMode
+
+            >>> price = pd.Series([1., 2., 3., 4., 5.], index=pd.Index([
+            ...     datetime(2020, 1, 1),
+            ...     datetime(2020, 1, 2),
+            ...     datetime(2020, 1, 3),
+            ...     datetime(2020, 1, 4),
+            ...     datetime(2020, 1, 5)
+            ... ]))
+            >>> entries = pd.Series([True, True, True, False, False])
+            >>> exits = pd.Series([False, False, True, True, True])
+
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, size=1.)
+            >>> portfolio.share_flow()
+            2020-01-01    1.0
+            2020-01-02    0.0
+            2020-01-03    0.0
+            2020-01-04   -1.0
+            2020-01-05    0.0
+            dtype: float64
+
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, size=1.,
+            ...     conflict_mode=ConflictMode.Exit)
+            >>> portfolio.share_flow()
+            2020-01-01    1.0
+            2020-01-02    0.0
+            2020-01-03   -1.0
+            2020-01-04    0.0
+            2020-01-05    0.0
+            dtype: float64
+
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, size=1.,
+            ...     accumulate=True)
+            >>> portfolio.share_flow()
+            2020-01-01    1.0
+            2020-01-02    1.0
+            2020-01-03    0.0
+            2020-01-04   -2.0
+            2020-01-05    0.0
+            dtype: float64
+
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, size=1.,
+            ...     accumulate=True,
+            ...     accumulate_exit_mode=AccumulateExitMode.Reduce)
+            >>> portfolio.share_flow()  # same as using from_orders
+            2020-01-01    1.0
+            2020-01-02    1.0
+            2020-01-03    0.0
+            2020-01-04   -1.0
+            2020-01-05   -1.0
+            dtype: float64
             ```
         """
         # Get defaults
-        if entry_price is None:
-            entry_price = main_price
-        if exit_price is None:
-            exit_price = main_price
-        if init_capital is None:
-            init_capital = defaults.portfolio['init_capital']
         if size is None:
             size = defaults.portfolio['size']
-        if size_type is None:
-            size_type = defaults.portfolio['size_type']
-            if isinstance(size_type, str):
-                size_type = getattr(SizeType, size_type)
+        if entry_price is None:
+            entry_price = close
+        if exit_price is None:
+            exit_price = close
         if fees is None:
             fees = defaults.portfolio['fees']
         if fixed_fees is None:
             fixed_fees = defaults.portfolio['fixed_fees']
         if slippage is None:
             slippage = defaults.portfolio['slippage']
+        if reject_prob is None:
+            reject_prob = defaults.portfolio['reject_prob']
+        if min_size is None:
+            min_size = defaults.portfolio['min_size']
+        if init_cash is None:
+            init_cash = defaults.portfolio['init_cash']
+            if isinstance(init_cash, str):
+                init_cash = getattr(InitCashMode, init_cash)
+        if isinstance(init_cash, int):
+            checks.assert_in(init_cash, InitCashMode)
+            init_cash_mode = init_cash
+            init_cash = np.inf
+        else:
+            init_cash_mode = None
+        if cash_sharing is None:
+            cash_sharing = defaults.portfolio['cash_sharing']
+        if call_seq is None:
+            call_seq = defaults.portfolio['call_seq']
+            if isinstance(call_seq, str):
+                call_seq = getattr(CallSeqType, call_seq)
+        if isinstance(call_seq, int):
+            checks.assert_in(call_seq, CallSeqType)
+            if call_seq == CallSeqType.Auto:
+                raise ValueError("This method doesn't support CallSeqType.Auto")
         if accumulate is None:
             accumulate = defaults.portfolio['accumulate']
         if accumulate_exit_mode is None:
             accumulate_exit_mode = defaults.portfolio['accumulate_exit_mode']
             if isinstance(accumulate_exit_mode, str):
                 accumulate_exit_mode = getattr(AccumulateExitMode, accumulate_exit_mode)
+        checks.assert_in(accumulate_exit_mode, AccumulateExitMode)
         if conflict_mode is None:
             conflict_mode = defaults.portfolio['conflict_mode']
             if isinstance(conflict_mode, str):
                 conflict_mode = getattr(ConflictMode, conflict_mode)
+        checks.assert_in(conflict_mode, ConflictMode)
+        if seed is None:
+            seed = defaults.portfolio['seed']
+        if seed is not None:
+            set_seed(seed)
+        if freq is None:
+            freq = defaults.portfolio['freq']
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+            raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
-        checks.assert_dtype(entries, np.bool_)
-        checks.assert_dtype(exits, np.bool_)
+        checks.assert_type(close, (pd.Series, pd.DataFrame))
+        checks.assert_subdtype(close, np.floating)
+        checks.assert_dtype(entries, np.bool)
+        checks.assert_dtype(exits, np.bool)
+        checks.assert_subdtype(size, np.floating)
+        checks.assert_subdtype(entry_price, np.floating)
+        checks.assert_subdtype(exit_price, np.floating)
+        checks.assert_subdtype(fees, np.floating)
+        checks.assert_subdtype(fixed_fees, np.floating)
+        checks.assert_subdtype(slippage, np.floating)
+        checks.assert_subdtype(reject_prob, np.floating)
+        checks.assert_subdtype(min_size, np.floating)
+        checks.assert_subdtype(init_cash, np.floating)
+        checks.assert_subdtype(call_seq, np.integer)
 
         # Broadcast inputs
-        # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
+        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         keep_raw = (False, True, True, True, True, True, True, True, True, True, True)
-        main_price, entries, exits, size, size_type, entry_price, \
-            exit_price, fees, fixed_fees, slippage, init_capital = \
-            reshape_fns.broadcast(
-                main_price, entries, exits, size, size_type, entry_price, exit_price, fees,
-                fixed_fees, slippage, init_capital, **broadcast_kwargs,
-                writeable=True, keep_raw=keep_raw)
-        target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        close, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, reject_prob = \
+            broadcast(close, entries, exits, size, entry_price, exit_price, fees, fixed_fees,
+                slippage, reject_prob, **broadcast_kwargs, keep_raw=keep_raw)
+        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
+        wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
+        cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
+        init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
+        group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
+        if checks.is_array(call_seq):
+            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+        else:
+            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
 
         # Perform calculation
-        order_records, cash, shares = nb.simulate_from_signals_nb(
-            target_shape,
-            init_capital,
+        order_records = nb.simulate_from_signals_nb(
+            target_shape_2d,
+            cs_group_counts,  # group only if cash sharing is enabled to speed up
+            init_cash,
+            call_seq,
             entries,
             exits,
             size,
-            size_type,
             entry_price,
             exit_price,
             fees,
             fixed_fees,
             slippage,
+            reject_prob,
+            min_size,
             accumulate,
             accumulate_exit_mode,
             conflict_mode,
-            is_2d=main_price.ndim == 2
+            close.ndim == 2
         )
 
-        # Bring to the same meta
-        cash = main_price.vbt.wrap(cash)
-        shares = main_price.vbt.wrap(shares)
-        orders = Orders(order_records, main_price, freq=freq)
-        if checks.is_series(main_price):
-            init_capital = init_capital.item(0)
-        else:
-            init_capital = np.broadcast_to(init_capital, (target_shape[1],))
-            init_capital = main_price.vbt.wrap_reduced(init_capital)
-
-        return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
+        # Create an instance
+        orders = Orders(wrapper, order_records, close)
+        return cls(
+            orders,
+            init_cash,
+            cash_sharing,
+            call_seq,
+            init_cash_mode=init_cash_mode,
+            **kwargs
+        )
 
     @classmethod
-    def from_orders(cls, main_price, order_size, size_type=None, order_price=None,
-                    init_capital=None, fees=None, fixed_fees=None, slippage=None,
-                    broadcast_kwargs={}, freq=None, **kwargs):
-        """Build portfolio from orders.
+    def from_orders(cls, close, order_size, size_type=None, order_price=None, fees=None, fixed_fees=None,
+                    slippage=None, reject_prob=None, min_size=None, init_cash=None, cash_sharing=None,
+                    call_seq=None, val_price=None, freq=None, seed=None, group_by=None, broadcast_kwargs=None,
+                    wrapper_kwargs=None, **kwargs):
+        """Simulate portfolio from orders.
 
-        Starting with initial capital `init_capital`, at each time step, orders the number
-        of shares specified in `order_size` for `order_price`.
-
-        For more details, see `vectorbt.portfolio.nb.simulate_from_orders_nb`.
+        Starting with initial cash `init_cash`, orders the number of shares specified in `order_size`
+        for `order_price`.
 
         Args:
-            main_price (pandas_like): Main price of the asset, such as close. Will broadcast.
-            order_size (float or array_like): The amount of shares to order. Will broadcast.
+            close (pandas_like): Reference price, such as close. Will broadcast.
 
-                If the size is positive, this is the number of shares to buy.
-                If the size is negative, this is the number of shares to sell.
-                To buy/sell everything, set the size to `np.inf`.
-            size_type (int or array_like): See `vectorbt.portfolio.enums.SizeType`.
-            order_price (array_like): Order price. Defaults to `main_price`. Will broadcast.
-            init_capital (float or array_like): The initial capital. Will broadcast.
+                Will be used for calculating unrealized P&L and portfolio value.
+            order_size (float or array_like): Size to order. Will broadcast.
 
-                Allowed is either a single value or value per column.
+                For any size type:
+
+                * Set to `np.nan` to skip.
+                * Set to `np.inf`/`-np.inf` to buy/sell everything.
+
+                For `SizeType.Shares`:
+
+                * Set to positive/negative to buy/sell.
+                * Set to zero to skip.
+
+                For target size, the final size will depend upon current holdings.
+            size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
+            order_price (array_like of float): Order price. Defaults to `close`. Will broadcast.
+
+                !!! note
+                    Setting order price to close is risky.
             fees (float or array_like): Fees in percentage of the order value. Will broadcast.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
             slippage (float or array_like): Slippage in percentage of price. Will broadcast.
-            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-            freq (any): Index frequency in case `main_price.index` is not datetime-like.
-            **kwargs: Keyword arguments passed to the `__init__` method.
+            reject_prob (float or array_like): Order rejection probability. Will broadcast.
+            min_size (float or array_like): Minimum size for an order to be accepted.
+
+                Will broadcast to the number of columns.
+            init_cash (InitCashMode, float or array_like of float): Initial capital.
+
+                By default, will broadcast to the number of columns.
+                If cash sharing is enabled, will broadcast to the number of groups.
+                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
+
+                !!! note
+                    Make sure that `init_cash` is a floating number if not using `InitCashMode`.
+            cash_sharing (bool): Whether to share cash within the same group.
+
+                !!! warning
+                    Order execution cannot be considered parallel anymore.
+
+                    This method presumes that in a group of assets that share the same capital all
+                    orders will be executed within the same tick and retain their price regardless
+                    of their position in the queue, even though they depend upon each other and thus
+                    cannot be executed in parallel. This behavior is risky.
+            call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
+
+                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
+                * Set to array to specify custom sequence. Will not broadcast.
+
+                If `CallSeqType.Auto` selected, rearranges calls dynamically based on order value.
+                Calculates value of all orders per row and group, and sorts them by this value.
+                Sell orders will be executed first to release funds for buy orders.
+
+                !!! warning
+                    `CallSeqType.Auto` should be used with caution:
+
+                    * It not only presumes that order prices are known beforehand, but also that
+                        orders can be executed in arbitrary order and still retain their price.
+                        In reality, this is hardly the case: after processing one asset, some time
+                        has passed and the price for other assets might have already changed.
+                    * Even if you're able to specify a slippage large enough to compensate for
+                        this behavior, slippage itself should depend upon execution order.
+                        This method doesn't let you do that.
+                    * If one order is rejected, it still will execute next orders and possibly
+                        leave them without funds that could have been released by the first order.
+
+                    For more control, use `Portfolio.from_order_func`.
+            val_price (array_like of float): Size valuation price. Defaults to previous `close`.
+                Will broadcast.
+
+                Used to calculate `SizeType.TargetPercent` and `SizeType.TargetValue`.
+
+                !!! note
+                    Make sure to use timestamp for `val_price` that comes before timestamps of all orders
+                    in the group with cash sharing, otherwise you're cheating yourself.
+            seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
+            freq (any): Index frequency in case `close.index` is not datetime-like.
+            group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
+            wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
+
+        All time series will be broadcast together using `vectorbt.base.reshape_fns.broadcast`.
+        At the end, they will have the same metadata.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
-        At the end, they will have the same metadata.
+        !!! note
+            When `call_seq` is not `CallSeqType.Auto`, at each timestamp, processing of the assets in
+            a group goes strictly in order defined in `call_seq`. This order can't be changed dynamically.
+
+            This has one big implication for this particular method: the last asset in the call stack
+            cannot be processed until other assets are processed. This is the reason why rebalancing
+            cannot work properly in this setting: one has to specify percentages for all assets beforehand
+            and then tweak the processing order to sell to-be-sold assets first in order to release funds
+            for to-be-bought assets. This can be automatically done by using `CallSeqType.Auto`.
 
         Example:
-            Portfolio from various order sequences:
-            ```python-repl
-            >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-            ...     init_capital=100, fees=0.0025, fixed_fees=1., slippage=0.001)
+            The same equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb`.
+            It's more compact but has no control over how order of execution impacts order price.
 
-            >>> portfolio.orders.records
-                col  idx        size  price      fees  side
-            0     0    0   98.654463  1.001  1.246883     0
-            1     1    0    1.000000  1.001  1.002502     0
-            2     1    1    1.000000  2.002  1.005005     0
-            3     1    2    1.000000  3.003  1.007507     0
-            4     1    3    1.000000  2.002  1.005005     0
-            5     1    4    4.000000  0.999  1.009990     1
-            6     2    0   98.654463  1.001  1.246883     0
-            7     2    1   98.654463  1.998  1.492779     1
-            8     2    2   64.646521  3.003  1.485334     0
-            9     2    3   64.646521  1.998  1.322909     1
-            10    2    4  126.398131  1.001  1.316311     0
-            >>> portfolio.equity
-                                 a          b           c
-            2020-01-01   98.654463  98.996498   98.654463
-            2020-01-02  197.308925  98.989493  195.618838
-            2020-01-03  295.963388  99.978985  193.939564
-            2020-01-04  197.308925  95.971980  127.840840
-            2020-01-05   98.654463  90.957990  126.398131
+            ```python-repl
+            >>> import numpy as np
+            >>> import pandas as pd
+            >>> import vectorbt as vbt
+            >>> from vectorbt.portfolio.enums import SizeType, CallSeqType
+
+            >>> np.random.seed(42)
+            >>> price = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
+            >>> orders = pd.DataFrame(np.full((5, 3), 1.) / 3)  # each column 33.3%
+            >>> orders[1::2] = np.nan  # skip every second tick
+
+            >>> portfolio = vbt.Portfolio.from_orders(
+            ...     price,  # reference price for portfolio value
+            ...     orders,
+            ...     order_price=price,  # order price
+            ...     size_type=SizeType.TargetPercent,
+            ...     val_price=price,  # order price known beforehand (don't do it)
+            ...     call_seq=CallSeqType.Auto,  # first sell then buy
+            ...     group_by=np.array([0, 0, 0]),
+            ...     cash_sharing=True,
+            ...     fees=0.001, fixed_fees=1., slippage=0.001
+            ... )
+
+            >>> portfolio.holding_value(group_by=False)
+                       0          1          2
+            0  33.333333  33.333333  30.139624
+            1  48.716002   8.385865   9.548589
+            2  19.546625  22.584433  22.584433
+            3  94.638155   3.043394  34.278783
+            4  41.923304  38.661499  41.923304
             ```
         """
         # Get defaults
-        if order_price is None:
-            order_price = main_price
+        if order_size is None:
+            order_size = defaults.portfolio['order_size']
         if size_type is None:
             size_type = defaults.portfolio['size_type']
             if isinstance(size_type, str):
                 size_type = getattr(SizeType, size_type)
-        if init_capital is None:
-            init_capital = defaults.portfolio['init_capital']
+        if order_price is None:
+            order_price = close
         if fees is None:
             fees = defaults.portfolio['fees']
         if fixed_fees is None:
             fixed_fees = defaults.portfolio['fixed_fees']
         if slippage is None:
             slippage = defaults.portfolio['slippage']
+        if reject_prob is None:
+            reject_prob = defaults.portfolio['reject_prob']
+        if min_size is None:
+            min_size = defaults.portfolio['min_size']
+        if init_cash is None:
+            init_cash = defaults.portfolio['init_cash']
+            if isinstance(init_cash, str):
+                init_cash = getattr(InitCashMode, init_cash)
+        if isinstance(init_cash, int):
+            checks.assert_in(init_cash, InitCashMode)
+            init_cash_mode = init_cash
+            init_cash = np.inf
+        else:
+            init_cash_mode = None
+        if cash_sharing is None:
+            cash_sharing = defaults.portfolio['cash_sharing']
+        if call_seq is None:
+            call_seq = defaults.portfolio['call_seq']
+            if isinstance(call_seq, str):
+                call_seq = getattr(CallSeqType, call_seq)
+        auto_call_seq = False
+        if isinstance(call_seq, int):
+            checks.assert_in(call_seq, CallSeqType)
+            if call_seq == CallSeqType.Auto:
+                call_seq = CallSeqType.Default
+                auto_call_seq = True
+        if val_price is None:
+            val_price = close.vbt.fshift(1)
+        if seed is None:
+            seed = defaults.portfolio['seed']
+        if seed is not None:
+            set_seed(seed)
+        if freq is None:
+            freq = defaults.portfolio['freq']
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+            raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
+        checks.assert_type(close, (pd.Series, pd.DataFrame))
+        checks.assert_subdtype(close, np.floating)
+        checks.assert_subdtype(order_size, np.floating)
+        checks.assert_subdtype(size_type, np.integer)
+        checks.assert_subdtype(order_price, np.floating)
+        checks.assert_subdtype(fees, np.floating)
+        checks.assert_subdtype(fixed_fees, np.floating)
+        checks.assert_subdtype(slippage, np.floating)
+        checks.assert_subdtype(reject_prob, np.floating)
+        checks.assert_subdtype(min_size, np.floating)
+        checks.assert_subdtype(init_cash, np.floating)
+        checks.assert_subdtype(call_seq, np.integer)
+        checks.assert_subdtype(val_price, np.floating)
 
         # Broadcast inputs
-        # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
-        keep_raw = (False, True, True, True, True, True, True, True)
-        main_price, order_size, size_type, order_price, fees, fixed_fees, slippage, init_capital = \
-            reshape_fns.broadcast(
-                main_price, order_size, size_type, order_price, fees, fixed_fees, slippage, init_capital,
-                **broadcast_kwargs, writeable=True, keep_raw=keep_raw)
-        target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
+        # Only close is broadcast, others can remain unchanged thanks to flexible indexing
+        keep_raw = (False, True, True, True, True, True, True, True, True, True)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        close, order_size, size_type, order_price, fees, fixed_fees, slippage, reject_prob, val_price = \
+            broadcast(close, order_size, size_type, order_price, fees, fixed_fees, slippage,
+                      reject_prob, val_price, **broadcast_kwargs, keep_raw=keep_raw)
+        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
+        wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
+        cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
+        init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
+        group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
+        if checks.is_array(call_seq):
+            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+        else:
+            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
 
         # Perform calculation
-        order_records, cash, shares = nb.simulate_from_orders_nb(
-            target_shape, init_capital, order_size, size_type, order_price,
-            fees, fixed_fees, slippage, is_2d=main_price.ndim == 2)
+        order_records = nb.simulate_from_orders_nb(
+            target_shape_2d,
+            cs_group_counts,  # group only if cash sharing is enabled to speed up
+            init_cash,
+            call_seq,
+            order_size,
+            size_type,
+            order_price,
+            fees,
+            fixed_fees,
+            slippage,
+            reject_prob,
+            min_size,
+            val_price,
+            auto_call_seq,
+            close.ndim == 2
+        )
 
-        # Bring to the same meta
-        cash = main_price.vbt.wrap(cash)
-        shares = main_price.vbt.wrap(shares)
-        orders = Orders(order_records, main_price, freq=freq)
-        if checks.is_series(main_price):
-            init_capital = init_capital.item(0)
-        else:
-            init_capital = np.broadcast_to(init_capital, (target_shape[1],))
-            init_capital = main_price.vbt.wrap_reduced(init_capital)
-
-        return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
+        # Create an instance
+        orders = Orders(wrapper, order_records, close)
+        return cls(
+            orders,
+            init_cash,
+            cash_sharing,
+            call_seq,
+            init_cash_mode=init_cash_mode,
+            **kwargs
+        )
 
     @classmethod
-    def from_order_func(cls, main_price, order_func_nb, *args, init_capital=None, row_wise=False,
-                        row_prep_func_nb=None, broadcast_kwargs={}, freq=None, **kwargs):
+    def from_order_func(cls, close, order_func_nb, *order_args, target_shape=None, keys=None,
+                        init_cash=None, cash_sharing=None, call_seq=None, active_mask=None, min_size=None,
+                        prep_func_nb=None, prep_args=None, group_prep_func_nb=None, group_prep_args=None,
+                        row_prep_func_nb=None, row_prep_args=None, segment_prep_func_nb=None,
+                        segment_prep_args=None, row_wise=None, seed=None, freq=None, group_by=None,
+                        broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
         """Build portfolio from a custom order function.
 
-        Starting with initial capital `init_capital`, iterates over shape `main_price.shape`, and for
-        each data point, generates an order using `order_func_nb`. This way, you can specify order
-        size, price and transaction costs dynamically (for example, based on the current balance).
+        For details, see `vectorbt.portfolio.nb.simulate_nb`.
 
-        if `row_wise` is `True`, see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
-        Otherwise, see `vectorbt.portfolio.nb.simulate_nb`.
+        if `row_wise` is `True`, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
 
         Args:
-            main_price (pandas_like): Main price of the asset, such as close. Will broadcast.
-            order_func_nb (function): Function that returns an order.
+            close (pandas_like): Reference price, such as close. Will broadcast to `target_shape`.
 
-                See `vectorbt.portfolio.enums.Order`.
-            *args: Arguments passed to `order_func_nb`.
-            init_capital (float or array_like): The initial capital. Will broadcast.
+                Will be used for calculating unrealized P&L and portfolio value.
 
-                Allowed is either a single value or value per column.
-            row_wise (bool): If `True`, iterates over rows, otherwise over columns.
+                Previous `close` will also be used for valuating assets/groups during the simulation.
+            order_func_nb (callable): Order generation function.
+            *order_args: Arguments passed to `order_func_nb`.
+            target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
+            keys (sequence): Outermost column level.
 
-                Set to `True` if columns depend upon each other.
-            row_prep_func_nb (function): Function to call before iterating over the next row.
+                Each element should correspond to one iteration over columns in `close`.
+                Should be set only if `target_shape` is bigger than `close.shape`.
+            init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                Can be used to do preprocessing, such as to calculate past returns.
-            broadcast_kwargs: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-            freq (any): Index frequency in case `main_price.index` is not datetime-like.
+                By default, will broadcast to the number of columns.
+                If cash sharing is enabled, will broadcast to the number of groups.
+                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
+
+                !!! note
+                    Make sure that `init_cash` is a floating number if not using `InitCashMode`.
+            cash_sharing (bool): Whether to share cash within the same group.
+
+                !!! warning
+                    Order execution cannot be considered parallel anymore.
+            call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
+
+                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
+                * Set to array to specify custom sequence. Will not broadcast.
+            active_mask (bool or array_like): Mask of whether a particular segment should be executed.
+
+                By default, will broadcast to the number of rows and groups.
+            min_size (float or array_like): Minimum size for an order to be accepted.
+
+                Will broadcast to the number of columns.
+            prep_func_nb (callable): Simulation preparation function.
+            prep_args (tuple): Packed arguments passed to `prep_func_nb`.
+
+                Defaults to `()`.
+            group_prep_func_nb (callable): Group preparation function.
+
+                Called only if `row_wise` is `False`.
+            group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
+
+                Defaults to `()`.
+            row_prep_func_nb (callable): Row preparation function.
+
+                Called only if `row_wise` is `True`.
+            row_prep_args (tuple): Packed arguments passed to `row_prep_func_nb`.
+
+                Defaults to `()`.
+            segment_prep_func_nb (callable): Segment preparation function.
+            segment_prep_args (tuple): Packed arguments passed to `segment_prep_func_nb`.
+
+                Defaults to `()`.
+            row_wise (bool): Whether to iterate over rows rather than columns/groups.
+
+                See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+            seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
+            freq (any): Index frequency in case `close.index` is not datetime-like.
+            group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
+            wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
-        All time series will be broadcasted together using `vectorbt.base.reshape_fns.broadcast`.
-        At the end, they will have the same metadata.
-
         !!! note
-            `order_func_nb` must be Numba-compiled.
+            All passed functions should be Numba-compiled.
 
-        Example:
-            Placing a buy order each day:
-            ```python-repl
-            >>> from vectorbt.portfolio import Order, SizeType
+            Objects passed as arguments to both functions will not broadcast to `target_shape`
+            as their purpose is unknown. You should broadcast manually or use flexible indexing.
 
-            >>> @njit
-            ... def order_func_nb(oc, price):
-            ...     return Order(10, SizeType.Shares, price[oc.i],
-            ...         fees=0.01, fixed_fees=1., slippage=0.01)
-
-            >>> portfolio = vbt.Portfolio.from_order_func(
-            ...     price, order_func_nb, price.values, init_capital=100)
-
-            >>> portfolio.orders.records
-               col  idx  size  price   fees  side
-            0    0    0  10.0   1.01  1.101     0
-            1    0    1  10.0   2.02  1.202     0
-            2    0    2  10.0   3.03  1.303     0
-            3    0    3  10.0   2.02  1.202     0
-            4    0    4  10.0   1.01  1.101     0
-            >>> portfolio.equity
-            2020-01-01     98.799
-            2020-01-02    107.397
-            2020-01-03    125.794
-            2020-01-04     94.392
-            2020-01-05     53.191
-            Name: a, dtype: float64
-            ```
+            Also see notes on `Portfolio.from_orders`.
         """
         # Get defaults
-        if init_capital is None:
-            init_capital = defaults.portfolio['init_capital']
+        if target_shape is None:
+            target_shape = close.shape
+        if init_cash is None:
+            init_cash = defaults.portfolio['init_cash']
+            if isinstance(init_cash, str):
+                init_cash = getattr(InitCashMode, init_cash)
+        if isinstance(init_cash, int):
+            checks.assert_in(init_cash, InitCashMode)
+            init_cash_mode = init_cash
+            init_cash = np.inf
+        else:
+            init_cash_mode = None
+        if cash_sharing is None:
+            cash_sharing = defaults.portfolio['cash_sharing']
+        if call_seq is None:
+            call_seq = defaults.portfolio['call_seq']
+            if isinstance(call_seq, str):
+                call_seq = getattr(CallSeqType, call_seq)
+        if isinstance(call_seq, int):
+            checks.assert_in(call_seq, CallSeqType)
+            if call_seq == CallSeqType.Auto:
+                raise ValueError("CallSeqType.Auto should be implemented manually."
+                                 "Use auto_call_seq_ctx_nb in segment_prep_func_nb.")
+        if active_mask is None:
+            active_mask = True
+        if min_size is None:
+            min_size = defaults.portfolio['min_size']
+        if row_wise is None:
+            row_wise = defaults.portfolio['row_wise']
+        if seed is None:
+            seed = defaults.portfolio['seed']
+        if seed is not None:
+            set_seed(seed)
+        if freq is None:
+            freq = defaults.portfolio['freq']
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        require_kwargs = dict(require_kwargs=dict(requirements='W'))
+        broadcast_kwargs = merge_kwargs(require_kwargs, broadcast_kwargs)
+        if wrapper_kwargs is None:
+            wrapper_kwargs = {}
+        if not wrapper_kwargs.get('group_select', True) and cash_sharing:
+            raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(main_price, (pd.Series, pd.DataFrame))
-        checks.assert_numba_func(order_func_nb)
+        checks.assert_type(close, (pd.Series, pd.DataFrame))
+        checks.assert_subdtype(close, np.floating)
+        checks.assert_subdtype(init_cash, np.floating)
+        checks.assert_subdtype(call_seq, np.integer)
 
         # Broadcast inputs
-        # Only main_price is broadcasted, others can remain unchanged thanks to flexible indexing
-        keep_raw = (False, True)
-        main_price, init_capital = reshape_fns.broadcast(
-                main_price, init_capital, **broadcast_kwargs,
-                writeable=True, keep_raw=keep_raw)
-        target_shape = (main_price.shape[0], main_price.shape[1] if main_price.ndim > 1 else 1)
+        target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
+        if close.shape != target_shape:
+            if len(close.vbt.columns) <= target_shape_2d[1]:
+                if target_shape_2d[1] % len(close.vbt.columns) != 0:
+                    raise ValueError("Cannot broadcast close to target_shape")
+                if keys is None:
+                    keys = pd.Index(np.arange(target_shape_2d[1]), name='iteration_idx')
+                tile_times = target_shape_2d[1] // len(close.vbt.columns)
+                close = close.vbt.tile(tile_times, keys=keys)
+        close = broadcast(close, to_shape=target_shape, **broadcast_kwargs)
+        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
+        wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
+        cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
+        init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
+        group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
+        active_mask = broadcast(
+            active_mask,
+            to_shape=(target_shape_2d[0], len(group_counts)),
+            to_pd=False,
+            **require_kwargs
+        )
+        if checks.is_array(call_seq):
+            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
+        else:
+            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
+
+        # Prepare arguments
+        if prep_func_nb is None:
+            prep_func_nb = nb.empty_prep_nb
+        if prep_args is None:
+            prep_args = ()
+        if group_prep_func_nb is None:
+            group_prep_func_nb = nb.empty_prep_nb
+        if group_prep_args is None:
+            group_prep_args = ()
+        if row_prep_func_nb is None:
+            row_prep_func_nb = nb.empty_prep_nb
+        if row_prep_args is None:
+            row_prep_args = ()
+        if segment_prep_func_nb is None:
+            segment_prep_func_nb = nb.empty_prep_nb
+        if segment_prep_args is None:
+            segment_prep_args = ()
+
+        prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in prep_args])
+        group_prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in group_prep_args])
+        row_prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in row_prep_args])
+        segment_prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in segment_prep_args])
+        order_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in order_args])
 
         # Perform calculation
         if row_wise:
-            if row_prep_func_nb is None:
-                row_prep_func_nb = nb.none_row_prep_func_nb
-            order_records, cash, shares = nb.simulate_row_wise_nb(
-                target_shape, init_capital, row_prep_func_nb, order_func_nb, *args)
+            order_records = nb.simulate_row_wise_nb(
+                target_shape_2d,
+                to_2d(close, raw=True),
+                group_counts,
+                init_cash,
+                cash_sharing,
+                call_seq,
+                active_mask,
+                min_size,
+                prep_func_nb,
+                prep_args,
+                row_prep_func_nb,
+                row_prep_args,
+                segment_prep_func_nb,
+                segment_prep_args,
+                order_func_nb,
+                order_args
+            )
         else:
-            if row_prep_func_nb is not None:
-                raise ValueError("Function row_prep_func_nb can be only called when row_wise=True")
-            order_records, cash, shares = nb.simulate_nb(
-                target_shape, init_capital, order_func_nb, *args)
+            order_records = nb.simulate_nb(
+                target_shape_2d,
+                to_2d(close, raw=True),
+                group_counts,
+                init_cash,
+                cash_sharing,
+                call_seq,
+                active_mask,
+                min_size,
+                prep_func_nb,
+                prep_args,
+                group_prep_func_nb,
+                group_prep_args,
+                segment_prep_func_nb,
+                segment_prep_args,
+                order_func_nb,
+                order_args
+            )
 
-        # Bring to the same meta
-        cash = main_price.vbt.wrap(cash)
-        shares = main_price.vbt.wrap(shares)
-        orders = Orders(order_records, main_price, freq=freq)
-        if checks.is_series(main_price):
-            init_capital = init_capital.item(0)
-        else:
-            init_capital = np.broadcast_to(init_capital, (target_shape[1],))
-            init_capital = main_price.vbt.wrap_reduced(init_capital)
+        # Create an instance
+        orders = Orders(wrapper, order_records, close)
+        return cls(
+            orders,
+            init_cash,
+            cash_sharing,
+            call_seq,
+            init_cash_mode=init_cash_mode,
+            **kwargs
+        )
 
-        return cls(main_price, init_capital, orders, cash, shares, freq=freq, **kwargs)
-
-    # ############# Passed arguments ############# #
+    # ############# Properties ############# #
 
     @property
-    def init_capital(self):
-        """Initial capital."""
-        return self._init_capital
+    def wrapper(self):
+        """Array wrapper."""
+        # Wrapper in orders and here can be different
+        wrapper = self.orders.wrapper
+        if self.cash_sharing and wrapper.grouper.allow_modify:
+            # Cannot change groups if columns within them are dependent
+            return wrapper.copy(allow_modify=False)
+        return wrapper.copy()
 
     @property
-    def main_price(self):
+    def cash_sharing(self):
+        """Whether to share cash within the same group."""
+        return self._cash_sharing
+
+    @property
+    def call_seq(self):
+        """Sequence of calls per row and group."""
+        return self.wrapper.wrap(self._call_seq, group_by=False)
+
+    @property
+    def init_cash_mode(self):
+        """Initial cash mode."""
+        return self._init_cash_mode
+
+    @property
+    def incl_unrealized(self):
+        """Whether to include unrealized trade P&L in statistics."""
+        return self._incl_unrealized
+
+    # ############# Regrouping ############# #
+
+    def regroup(self, group_by):
+        """Regroup this object."""
+        if self.cash_sharing:
+            raise ValueError("Cannot change grouping globally when cash sharing is enabled")
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            return self.copy(orders=self.orders.regroup(group_by=group_by))
+        return self
+
+    # ############# Reference price ############# #
+
+    @property
+    def close(self):
         """Price per share series."""
-        return self._main_price
+        return self._ref_price
+
+    @cached_method
+    def fill_close(self, ffill=True, bfill=True):
+        """Fill NaN values of `Portfolio.close`.
+
+        Use `ffill` and `bfill` to fill forwards and backwards respectively."""
+        close = to_2d(self.close, raw=True)
+        if ffill and np.any(np.isnan(close[-1, :])):
+            close = generic_nb.ffill_nb(close)
+        if bfill and np.any(np.isnan(close[0, :])):
+            close = generic_nb.ffill_nb(close[::-1, :])[::-1, :]
+        return self.wrapper.wrap(close, group_by=False)
+
+    # ############# Cash ############# #
 
     @property
-    def cash(self):
-        """Cash series."""
-        return self._cash
+    def init_cash(self):
+        """Initial amount of cash per column/group.
 
-    @property
+        Returns value per group if `cash_sharing` is `True`."""
+        if self.init_cash_mode is None:
+            init_cash = self._init_cash
+        else:
+            cash_flow = to_2d(self.cash_flow(group_by=self.cash_sharing), raw=True)
+            init_cash = -np.min(np.cumsum(cash_flow, axis=0), axis=0)
+            if self.init_cash_mode == InitCashMode.AutoAlign:
+                init_cash = np.full(init_cash.shape, np.max(init_cash))
+        return self.wrapper.wrap_reduced(init_cash, group_by=self.cash_sharing)
+
+    @cached_method
+    def init_cash_regrouped(self, group_by=None):
+        """Get cash flow series per column/group."""
+        init_cash = to_1d(self.init_cash, raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            init_cash_regrouped = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
+        else:
+            group_counts = self.wrapper.grouper.get_group_counts()
+            init_cash_regrouped = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
+        return self.wrapper.wrap_reduced(init_cash_regrouped, group_by=group_by)
+
+    @cached_method
+    def cash_flow(self, group_by=None):
+        """Get cash flow series per column/group."""
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            cash_flow_ungrouped = to_2d(self.cash_flow(group_by=False), raw=True)
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            cash_flow = nb.cash_flow_grouped_nb(cash_flow_ungrouped, group_counts)
+        else:
+            cash_flow = nb.cash_flow_ungrouped_nb(self.wrapper.shape_2d, self.orders.records_arr)
+        return self.wrapper.wrap(cash_flow, group_by=group_by)
+
+    @cached_method
+    def cash(self, group_by=None, in_sim_order=False):
+        """Get cash series per column/group."""
+        if in_sim_order and not self.cash_sharing:
+            raise ValueError("in_sim_order requires enabled cash sharing")
+
+        cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            init_cash_grouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            cash = nb.cash_grouped_nb(
+                self.wrapper.shape_2d,
+                cash_flow,
+                group_counts,
+                init_cash_grouped
+            )
+        else:
+            init_cash = to_1d(self.init_cash, raw=True)
+            group_counts = self.wrapper.grouper.get_group_counts()
+            call_seq = to_2d(self.call_seq, raw=True)
+            cash = nb.cash_ungrouped_nb(
+                cash_flow,
+                group_counts,
+                init_cash,
+                self.cash_sharing,
+                call_seq,
+                in_sim_order
+            )
+        return self.wrapper.wrap(cash, group_by=group_by)
+
+    # ############# Shares ############# #
+
+    @cached_method
+    def share_flow(self):
+        """Get share flow series per column."""
+        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self.orders.records_arr)
+        return self.wrapper.wrap(share_flow, group_by=False)
+
+    @cached_method
     def shares(self):
-        """Shares series."""
-        return self._shares
-
-    @property
-    def incl_unrealized_stats(self):
-        """Whether to include unrealized metrics in `Portfolio.stats`."""
-        return self._incl_unrealized_stats
-
-    @property
-    def freq(self):
-        """Index frequency."""
-        return self._freq
-
-    @property
-    def year_freq(self):
-        """Year frequency."""
-        return self._year_freq
-
-    @property
-    def levy_alpha(self):
-        """Scaling relation (Levy stability exponent)."""
-        return self._levy_alpha
-
-    @property
-    def risk_free(self):
-        """Constant risk-free return throughout the period."""
-        return self._risk_free
-
-    @property
-    def required_return(self):
-        """Minimum acceptance return of the investor."""
-        return self._required_return
-
-    @property
-    def cutoff(self):
-        """Decimal representing the percentage cutoff for the bottom percentile of returns."""
-        return self._cutoff
-
-    @property
-    def factor_returns(self):
-        """Benchmark return to compare returns against."""
-        return self._factor_returns
+        """Get share series per column."""
+        share_flow = to_2d(self.share_flow(), raw=True)
+        shares = nb.shares_nb(share_flow)
+        return self.wrapper.wrap(shares, group_by=False)
 
     # ############# Records ############# #
 
-    @cached_property
+    @property
     def orders(self):
         """Order records.
 
         See `vectorbt.records.orders.Orders`."""
         return self._orders
 
-    @cached_property
-    def trades(self):
-        """Trade records.
+    @cached_method
+    def orders_regrouped(self, group_by=None):
+        """Regroup order records.
+
+        See `vectorbt.records.orders.Orders`."""
+        return self._orders.regroup(group_by=group_by)
+
+    @cached_method
+    def trades(self, group_by=None, incl_unrealized=None):
+        """Get trade records from orders.
 
         See `vectorbt.records.events.Trades`."""
-        return Trades.from_orders(self.orders)
+        trades = Trades.from_orders(self.orders_regrouped(group_by=group_by))
+        if incl_unrealized is None:
+            incl_unrealized = self.incl_unrealized
+        if incl_unrealized:
+            return trades
+        return trades.closed
 
-    @cached_property
-    def positions(self):
-        """Position records.
+    @cached_method
+    def positions(self, group_by=None, incl_unrealized=None):
+        """Get position records from orders.
 
         See `vectorbt.records.events.Positions`."""
-        return Positions.from_orders(self.orders)
+        positions = Positions.from_orders(self.orders_regrouped(group_by=group_by))
+        if incl_unrealized is None:
+            incl_unrealized = self.incl_unrealized
+        if incl_unrealized:
+            return positions
+        return positions.closed
 
-    @cached_property
-    def drawdowns(self):
-        """Drawdown records.
+    @cached_method
+    def drawdowns(self, **kwargs):
+        """Get drawdown records from `Portfolio.value`.
 
         See `vectorbt.records.drawdowns.Drawdowns`."""
-        return Drawdowns.from_ts(self.equity, freq=self.freq)
+        return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
-    # ############# Equity ############# #
+    # ############# Performance ############# #
 
-    @cached_property
-    def equity(self):
-        """Portfolio equity series."""
-        cash = self.cash.vbt.to_2d_array()
-        shares = self.shares.vbt.to_2d_array()
-        main_price = self.main_price.vbt.to_2d_array()
-        equity = cash + shares * main_price
-        zero_shares_mask = shares == 0.  # helps with initial NaNs
-        equity[zero_shares_mask] = cash[zero_shares_mask]
-        return self.wrapper.wrap(equity)
+    @cached_method
+    def holding_value(self, group_by=None):
+        """Get holding value series per column/group."""
+        close = to_2d(self.close, raw=True).copy()
+        shares = to_2d(self.shares(), raw=True)
+        close[shares == 0.] = 0.  # for price being NaN
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            holding_value = nb.holding_value_grouped_nb(close, shares, group_counts)
+        else:
+            holding_value = nb.holding_value_ungrouped_nb(close, shares)
+        return self.wrapper.wrap(holding_value, group_by=group_by)
 
-    @cached_property
-    def final_equity(self):
-        """Final equity."""
-        final_equity = generic_nb.ffill_nb(self.equity.vbt.to_2d_array())[-1, :]
-        return self.wrapper.wrap_reduced(final_equity)
+    @cached_method
+    def value(self, group_by=None, in_sim_order=False):
+        """Get portfolio value series per column/group.
 
-    @cached_property
-    def total_profit(self):
-        """Total profit."""
-        final_equity = reshape_fns.to_1d(self.final_equity, raw=True)
-        init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
-        return self.wrapper.wrap_reduced(final_equity - init_capital)
+        By default, will generate portfolio value for each asset based on cash flows and thus
+        independent from other assets, with initial cash and shares being that of the entire group.
+        Useful for generating returns and comparing assets within the same group.
 
-    # ############# Drawdown ############# #
+        When `group_by` is `False` and `in_sim_order` is `True`, returns value generated in
+        simulation order (see [row-major order](https://en.wikipedia.org/wiki/Row-_and_column-major_order).
+        This value cannot be used for generating returns as-is. Useful to analyze how value
+        evolved throughout simulation."""
+        cash = to_2d(self.cash(group_by=group_by, in_sim_order=in_sim_order), raw=True)
+        holding_value = to_2d(self.holding_value(group_by=group_by), raw=True)
+        if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
+            group_counts = self.wrapper.grouper.get_group_counts()
+            call_seq = to_2d(self.call_seq, raw=True)
+            value = nb.value_in_sim_order_nb(cash, holding_value, group_counts, call_seq)
+            # price of NaN is already addressed by ungrouped_value_nb
+        else:
+            value = nb.value_nb(cash, holding_value)
+        return self.wrapper.wrap(value, group_by=group_by)
 
-    @cached_property
-    def drawdown(self):
-        """Drawdown series."""
-        equity = self.equity.vbt.to_2d_array()
-        return self.wrapper.wrap(equity / generic_nb.expanding_max_nb(equity) - 1)
+    @cached_method
+    def final_value(self, group_by=None):
+        """Get final portfolio value per column/group.
 
-    @cached_property
-    def max_drawdown(self):
-        """Max drawdown."""
-        return self.drawdown.vbt.min()
+        Calculated directly from order records. Very fast."""
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            final_value_ungrouped = to_1d(self.final_value(group_by=False), raw=True)
+            init_cash = to_1d(self.init_cash, raw=True)
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            final_value = nb.final_value_grouped_nb(
+                final_value_ungrouped,
+                init_cash,
+                group_counts,
+                self.cash_sharing
+            )
+        else:
+            close = to_2d(self.fill_close(), raw=True)
+            init_cash_ungrouped = to_1d(self.init_cash_regrouped(group_by=False), raw=True)
+            final_value = nb.final_value_ungrouped_nb(
+                self.wrapper.shape_2d,
+                close,
+                self.orders.records_arr,
+                init_cash_ungrouped
+            )
+        return self.wrapper.wrap_reduced(final_value, group_by=group_by)
 
-    # ############# Returns ############# #
+    @cached_method
+    def total_profit(self, group_by=None):
+        """Get total profit per column/group."""
+        init_cash_regrouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
+        final_value = to_1d(self.final_value(group_by=group_by), raw=True)
+        total_profit = nb.total_profit_nb(init_cash_regrouped, final_value)
+        return self.wrapper.wrap_reduced(total_profit, group_by=group_by)
 
-    @cached_property
-    def buy_and_hold_return(self):
-        """Total return of buying and holding.
+    @cached_method
+    def total_return(self, group_by=None):
+        """Get total profit per column/group."""
+        init_cash_regrouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
+        final_value = to_1d(self.final_value(group_by=group_by), raw=True)
+        total_return = nb.total_return_nb(init_cash_regrouped, final_value)
+        return self.wrapper.wrap_reduced(total_return, group_by=group_by)
 
-        !!! note:
+    @cached_method
+    def buy_and_hold_return(self, group_by=None):
+        """Get total return of buy-and-hold.
+
+        If grouped, invests same amount of cash into each asset and returns the total
+        return of the entire group.
+
+        !!! note
             Does not take into account fees and slippage. For this, create a separate portfolio."""
-        returns = generic_nb.pct_change_nb(self.main_price.vbt.to_2d_array())
-        return self.wrapper.wrap(returns).vbt.returns.total()
+        ref_price_filled = to_2d(self.fill_close(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            total_return = nb.buy_and_hold_return_grouped_nb(ref_price_filled, group_counts)
+        else:
+            total_return = nb.buy_and_hold_return_ungrouped_nb(ref_price_filled)
+        return self.wrapper.wrap_reduced(total_return, group_by=group_by)
 
-    @cached_property
-    def returns(self):
-        """Portfolio return series."""
-        equity = self.equity.vbt.to_2d_array()
-        returns = generic_nb.pct_change_nb(equity)
-        init_capital = reshape_fns.to_1d(self.init_capital, raw=True)
-        returns[0, :] = (equity[0, :] - init_capital) / init_capital  # initial capital is one tick before
-        returns[np.isnan(returns)] = 0.  # can happen if later price is unknown
-        return self.wrapper.wrap(returns)
+    @cached_method
+    def active_returns(self, group_by=None):
+        """Get active return series per column/group.
 
-    @cached_property
-    def daily_returns(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.daily`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .daily()
+        This type of returns is based solely on cash flows and holding value rather than portfolio value.
+        It ignores passive cash and thus it will return the same numbers irrespective of the amount of
+        cash currently available, even `np.inf`. The scale of returns is comparable to that of going
+        all in and keeping available cash at zero."""
+        cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
+        holding_value = to_2d(self.holding_value(group_by=group_by), raw=True)
+        active_returns = nb.active_returns_nb(cash_flow, holding_value)
+        return self.wrapper.wrap(active_returns, group_by=group_by)
 
-    @cached_property
-    def annual_returns(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.annual`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .annual()
+    @cached_method
+    def returns(self, group_by=None, in_sim_order=False):
+        """Get return series per column/group based on portfolio value."""
+        value = to_2d(self.value(group_by=group_by, in_sim_order=in_sim_order), raw=True)
+        if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
+            group_counts = self.wrapper.grouper.get_group_counts()
+            init_cash = to_1d(self.init_cash, raw=True)
+            call_seq = to_2d(self.call_seq, raw=True)
+            returns = nb.returns_in_sim_order_nb(value, group_counts, init_cash, call_seq)
+        else:
+            init_cash_regrouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
+            returns = nb.returns_nb(value, init_cash_regrouped)
+        return self.wrapper.wrap(returns, group_by=group_by)
 
-    @cached_property
-    def cumulative_returns(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.cumulative`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .cumulative()
+    @cached_method
+    def stats(self, column=None, group_by=None, incl_unrealized=None, active_returns=False,
+              agg_func=np.mean, **kwargs):
+        """Compute various statistics on this portfolio.
 
-    @cached_property
-    def total_return(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.total`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .total()
+        `kwargs` will be passed to each `vectorbt.returns.accessors.Returns_Accessor` method.
 
-    @cached_property
-    def annualized_return(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.annualized_return`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .annualized_return()
+        Can either return aggregated statistics by reducing metrics of all columns with
+        `agg_func` (mean by default) or return statistics for a single column if `column`
+        was specified or portfolio contains only one column of data. To display rich data types
+        such as durations correctly, use an aggregation function that can be applied on `pd.Series`.
 
-    @cached_property
-    def annualized_volatility(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.annualized_volatility`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .annualized_volatility(levy_alpha=self.levy_alpha)
+        !!! note
+            Use `column` only if caching is enabled, otherwise it may re-compute the same
+            objects multiple times."""
+        def _reduce(obj):
+            if checks.is_series(obj):
+                if column is not None:
+                    return obj[column]
+                return agg_func(obj)
+            return obj
 
-    @cached_property
-    def calmar_ratio(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.calmar_ratio`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .calmar_ratio()
+        # Pre-calculate
+        positions = self.positions(group_by=group_by, incl_unrealized=incl_unrealized)
+        trades = self.trades(group_by=group_by, incl_unrealized=incl_unrealized)
+        drawdowns = self.drawdowns(group_by=group_by)
+        if active_returns:
+            returns = self.active_returns(group_by=group_by)
+        else:
+            returns = self.returns(group_by=group_by)
 
-    @cached_property
-    def omega_ratio(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.omega_ratio`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .omega_ratio(risk_free=self.risk_free, required_return=self.required_return)
-
-    @cached_property
-    def sharpe_ratio(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.sharpe_ratio`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .sharpe_ratio(risk_free=self.risk_free)
-
-    @cached_property
-    def downside_risk(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.downside_risk`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .downside_risk(required_return=self.required_return)
-
-    @cached_property
-    def sortino_ratio(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.sortino_ratio`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .sortino_ratio(required_return=self.required_return)
-
-    @cached_property
-    def information_ratio(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.information_ratio`."""
-        if self.factor_returns is None:
-            raise ValueError("This property requires factor_returns to be set")
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .information_ratio(self.factor_returns)
-
-    @cached_property
-    def beta(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.beta`."""
-        if self.factor_returns is None:
-            raise ValueError("This property requires factor_returns to be set")
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .beta(self.factor_returns)
-
-    @cached_property
-    def alpha(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.alpha`."""
-        if self.factor_returns is None:
-            raise ValueError("This property requires factor_returns to be set")
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .alpha(self.factor_returns, risk_free=self.risk_free)
-
-    @cached_property
-    def tail_ratio(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.tail_ratio`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .tail_ratio()
-
-    @cached_property
-    def value_at_risk(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.value_at_risk`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .value_at_risk(cutoff=self.cutoff)
-
-    @cached_property
-    def conditional_value_at_risk(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.conditional_value_at_risk`."""
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .conditional_value_at_risk(cutoff=self.cutoff)
-
-    @cached_property
-    def capture(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.capture`."""
-        if self.factor_returns is None:
-            raise ValueError("This property requires factor_returns to be set")
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .capture(self.factor_returns)
-
-    @cached_property
-    def up_capture(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.up_capture`."""
-        if self.factor_returns is None:
-            raise ValueError("This property requires factor_returns to be set")
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .up_capture(self.factor_returns)
-
-    @cached_property
-    def down_capture(self):
-        """See `vectorbt.returns.accessors.Returns_Accessor.down_capture`."""
-        if self.factor_returns is None:
-            raise ValueError("This property requires factor_returns to be set")
-        return self.returns.vbt.returns(freq=self.freq, year_freq=self.year_freq) \
-            .down_capture(self.factor_returns)
-
-    # ############# Stats ############# #
-
-    @cached_property
-    def stats(self):
-        """Compute various interesting statistics on this portfolio."""
-        if self.wrapper.ndim > 1:
-            raise TypeError("You must select a column first")
-
-        trades = self.trades
-        if not self.incl_unrealized_stats:
-            trades = trades.closed
+        name = column
+        if name is None:
+            if self.wrapper.grouper.is_grouped(group_by=group_by):
+                if self.wrapper.grouped_ndim == 1:
+                    name = self.wrapper.grouper.get_columns(group_by=group_by)[0]
+                else:
+                    name = agg_func.__name__
+            else:
+                if self.wrapper.ndim == 1:
+                    name = self.wrapper.name
+                else:
+                    name = agg_func.__name__
         return pd.Series({
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
-            'Duration': self.wrapper.shape[0] * self.freq,
-            'Holding Duration [%]': self.positions.coverage() * 100,
-            'Total Profit': self.total_profit,
-            'Total Return [%]': self.total_return * 100,
-            'Buy & Hold Return [%]': self.buy_and_hold_return * 100,
-            'Max. Drawdown [%]': -self.max_drawdown * 100,
-            'Avg. Drawdown [%]': -self.drawdowns.avg_drawdown() * 100,
-            'Max. Drawdown Duration': self.drawdowns.max_duration(),
-            'Avg. Drawdown Duration': self.drawdowns.avg_duration(),
-            'Num. Trades': trades.count(),
-            'Win Rate [%]': trades.win_rate() * 100,
-            'Best Trade [%]': trades.returns.max() * 100,
-            'Worst Trade [%]': trades.returns.min() * 100,
-            'Avg. Trade [%]': trades.returns.mean() * 100,
-            'Max. Trade Duration': trades.duration.max(time_units=True),
-            'Avg. Trade Duration': trades.duration.mean(time_units=True),
-            'Expectancy': trades.expectancy(),
-            'SQN': trades.sqn(),
-            'Sharpe Ratio': self.sharpe_ratio,
-            'Sortino Ratio': self.sortino_ratio,
-            'Calmar Ratio': self.calmar_ratio
-        }, name=self.wrapper.name)
+            'Duration': self.wrapper.shape[0] * self.wrapper.freq,
+            'Holding Duration [%]': _reduce(positions.coverage() * 100),
+            'Total Profit': _reduce(self.total_profit(group_by=group_by)),
+            'Total Return [%]': _reduce(self.total_return(group_by=group_by) * 100),
+            'Buy & Hold Return [%]': _reduce(self.buy_and_hold_return(group_by=group_by) * 100),
+            'Max. Drawdown [%]': _reduce(-drawdowns.max_drawdown() * 100),
+            'Avg. Drawdown [%]': _reduce(-drawdowns.avg_drawdown() * 100),
+            'Max. Drawdown Duration': _reduce(drawdowns.max_duration()),
+            'Avg. Drawdown Duration': _reduce(drawdowns.avg_duration()),
+            'Num. Trades': _reduce(trades.count()),
+            'Win Rate [%]': _reduce(trades.win_rate() * 100),
+            'Best Trade [%]': _reduce(trades.returns.max() * 100),
+            'Worst Trade [%]': _reduce(trades.returns.min() * 100),
+            'Avg. Trade [%]': _reduce(trades.returns.mean() * 100),
+            'Max. Trade Duration': _reduce(trades.duration.max(time_units=True)),
+            'Avg. Trade Duration': _reduce(trades.duration.mean(time_units=True)),
+            'Expectancy': _reduce(trades.expectancy()),
+            'SQN': _reduce(trades.sqn()),
+            'Sharpe Ratio': _reduce(self.sharpe_ratio(reuse_returns=returns, **kwargs)),
+            'Sortino Ratio': _reduce(self.sortino_ratio(reuse_returns=returns, **kwargs)),
+            'Calmar Ratio': _reduce(self.calmar_ratio(reuse_returns=returns, **kwargs))
+        }, name=name)
+
+

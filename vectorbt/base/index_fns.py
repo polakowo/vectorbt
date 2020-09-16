@@ -11,7 +11,7 @@ from vectorbt.utils import checks
 def get_index(arg, axis):
     """Get index of `arg` by `axis`."""
     checks.assert_type(arg, (pd.Series, pd.DataFrame))
-    checks.assert_value_in(axis, (0, 1))
+    checks.assert_in(axis, (0, 1))
 
     if axis == 0:
         return arg.index
@@ -162,12 +162,10 @@ def drop_redundant_levels(index):
     """Drop levels in `index` that either have a single unnamed value or a range from 0 to n."""
     if not isinstance(index, pd.MultiIndex):
         return index
-    if len(index) == 1:
-        return index
 
     levels_to_drop = []
     for i in range(index.nlevels):
-        if len(index.levels[i]) == 1 and index.levels[i].name is None:
+        if len(index) > 1 and len(index.levels[i]) == 1 and index.levels[i].name is None:
             levels_to_drop.append(i)
         elif checks.is_default_index(index.get_level_values(i)):
             levels_to_drop.append(i)
