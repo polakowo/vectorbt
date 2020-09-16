@@ -45,7 +45,7 @@ fast_ma, slow_ma = vbt.MA.run_combs(
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
-# Model performance
+# Run simulation
 portfolio = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq='1D')
 
 # Get total return, reshape to symmetric matrix, and plot the whole thing
@@ -57,7 +57,7 @@ portfolio.total_return().vbt.heatmap(
 
 ![dmac_heatmap.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.png)
 
-Digging into each individual strategy instance is as simple as indexing with pandas:
+Digging into each strategy configuration is as simple as indexing with pandas:
 
 ```python-repl
 >>> portfolio[(13, 21)].stats()
@@ -206,15 +206,16 @@ dtype: bool
 ```
     
 - Functions for working with returns
-    - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
+    - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical) and more
 
 ```python-repl
 >>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
 5.515130702591433
 ```
     
-- Class for modeling portfolio performance
+- Class for modeling portfolios
     - Accepts signals, orders, and custom order function
+    - Supports individual and multi-asset mixed portfolios
     - Provides metrics and tools for analyzing returns, orders, trades and positions
     
 ```python-repl
@@ -228,9 +229,9 @@ dtype: bool
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)
     
 - Technical indicators with full Numba support
-    - Moving average, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more.
-    - Each offering methods for generating signals and plotting
-    - Each allowing arbitrary parameter combinations, from arrays to Cartesian products
+    - Moving average, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more
+    - Each offers methods for generating signals and plotting
+    - Each allows arbitrary parameter combinations, from arrays to Cartesian products
     
 ```python-repl
 >>> vbt.MA.run(pd.Series([1, 2, 3]), window=[2, 3], ewm=[False, True]).ma

@@ -216,6 +216,12 @@ class TestAccessors:
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
+    def test_deflated_sharpe_ratio(self):
+        pd.testing.assert_series_equal(
+            ret.vbt.returns.deflated_sharpe_ratio(risk_free=[0.01, 0.02, 0.03]),
+            pd.Series([np.nan, np.nan, 0.0037486334476184353], index=ret.columns)
+        )
+
     @pytest.mark.parametrize(
         "test_required_return",
         [0.01, 0.02, 0.03],

@@ -1,5 +1,9 @@
 """Utilities for configuration."""
 
+import numpy as np
+import pandas as pd
+
+from vectorbt.utils import checks
 
 class Config(dict):
     """A simple dict with (optionally) frozen keys."""
@@ -48,6 +52,11 @@ class Configured:
     def __init__(self, **config):
         self._config = Config(config, read_only=True)
 
+    @property
+    def config(self):
+        """Initialization config."""
+        return self._config
+
     def copy(self, **new_config):
         """Create a new instance based on the config.
 
@@ -55,4 +64,39 @@ class Configured:
             This "copy" operation won't return a copy of the instance but a new instance
             initialized with the same config. If the instance has writable attributes,
             their values won't be copied over."""
-        return self.__class__(**merge_kwargs(self._config, new_config))
+        return self.__class__(**merge_kwargs(self.config, new_config))
+
+    def __eq__(self, other):
+        """Objects are equals if their configs are equal."""
+        if type(self) != type(other):
+            return False
+        my_config = self.config
+        other_config = other.config
+        if my_config.keys() != other_config.keys():
+            return False
+        for k, v in my_config.items():
+            other_v = other_config[k]
+            if isinstance(v, pd.Series) or isinstance(other_v, pd.Series):
+                try:
+                    pd.testing.assert_series_equal(v, other_v)
+                except:
+                    return False
+            elif isinstance(v, pd.DataFrame) or isinstance(other_v, pd.DataFrame):
+                try:
+                    pd.testing.assert_frame_equal(v, other_v)
+                except:
+                    return False
+            elif isinstance(v, pd.Index) or isinstance(other_v, pd.Index):
+                try:
+                    pd.testing.assert_index_equal(v, other_v)
+                except:
+                    return False
+            elif isinstance(v, np.ndarray) or isinstance(other_v, np.ndarray):
+                try:
+                    np.testing.assert_array_equal(v, other_v)
+                except:
+                    return False
+            else:
+                if v != other_v:
+                    return False
+        return True

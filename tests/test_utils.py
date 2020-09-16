@@ -41,11 +41,21 @@ class TestConfig:
                 super().__init__(a=a, b=b, **kwargs)
 
             def return_config(self):
-                return self._config
+                return self.config
 
         assert H(1).return_config() == {'a': 1, 'b': 2}
         assert H(1).copy(b=3).return_config() == {'a': 1, 'b': 3}
         assert H(1).copy(c=4).return_config() == {'a': 1, 'b': 2, 'c': 4}
+        assert H(pd.Series([1, 2, 3])) == H(pd.Series([1, 2, 3]))
+        assert H(pd.Series([1, 2, 3])) != H(pd.Series([1, 2, 4]))
+        assert H(pd.DataFrame([1, 2, 3])) == H(pd.DataFrame([1, 2, 3]))
+        assert H(pd.DataFrame([1, 2, 3])) != H(pd.DataFrame([1, 2, 4]))
+        assert H(pd.Index([1, 2, 3])) == H(pd.Index([1, 2, 3]))
+        assert H(pd.Index([1, 2, 3])) != H(pd.Index([1, 2, 4]))
+        assert H(np.array([1, 2, 3])) == H(np.array([1, 2, 3]))
+        assert H(np.array([1, 2, 3])) != H(np.array([1, 2, 4]))
+        assert H(None) == H(None)
+        assert H(None) != H(10.)
 
 
 # ############# decorators.py ############# #

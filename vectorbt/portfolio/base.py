@@ -331,7 +331,10 @@ class Portfolio(Configured, PandasIndexer):
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
-        The `__init__` method is reserved for indexing purposes."""
+        The `__init__` method is reserved for indexing purposes.
+
+    !!! note
+        This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
     def __init__(self, orders, init_cash, cash_sharing, call_seq, init_cash_mode=None, incl_unrealized=None):
         Configured.__init__(
@@ -606,20 +609,20 @@ class Portfolio(Configured, PandasIndexer):
         close, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, reject_prob = \
             broadcast(close, entries, exits, size, entry_price, exit_price, fees, fixed_fees,
                 slippage, reject_prob, **broadcast_kwargs, keep_raw=keep_raw)
-        target_shape = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
-        min_size = np.require(np.broadcast_to(min_size, (target_shape[1],)), requirements='W')
+        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
         init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
         group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
         if checks.is_array(call_seq):
-            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape, to_pd=False))
+            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
-            call_seq = nb.build_call_seq(target_shape, group_counts, call_seq_type=call_seq)
+            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
 
         # Perform calculation
         order_records = nb.simulate_from_signals_nb(
-            target_shape,
+            target_shape_2d,
             cs_group_counts,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
@@ -729,10 +732,10 @@ class Portfolio(Configured, PandasIndexer):
                         leave them without funds that could have been released by the first order.
 
                     For more control, use `Portfolio.from_order_func`.
-            val_price (array_like of float): Group valuation price. Defaults to previous `close`.
+            val_price (array_like of float): Size valuation price. Defaults to previous `close`.
                 Will broadcast.
 
-                Used for `SizeType.TargetPercent`.
+                Used to calculate `SizeType.TargetPercent` and `SizeType.TargetValue`.
 
                 !!! note
                     Make sure to use timestamp for `val_price` that comes before timestamps of all orders
@@ -872,20 +875,20 @@ class Portfolio(Configured, PandasIndexer):
         close, order_size, size_type, order_price, fees, fixed_fees, slippage, reject_prob, val_price = \
             broadcast(close, order_size, size_type, order_price, fees, fixed_fees, slippage,
                       reject_prob, val_price, **broadcast_kwargs, keep_raw=keep_raw)
-        target_shape = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
-        min_size = np.require(np.broadcast_to(min_size, (target_shape[1],)), requirements='W')
+        target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
+        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
         init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
         group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
         if checks.is_array(call_seq):
-            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape, to_pd=False))
+            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
-            call_seq = nb.build_call_seq(target_shape, group_counts, call_seq_type=call_seq)
+            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
 
         # Perform calculation
         order_records = nb.simulate_from_orders_nb(
-            target_shape,
+            target_shape_2d,
             cs_group_counts,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
@@ -1053,31 +1056,31 @@ class Portfolio(Configured, PandasIndexer):
         checks.assert_subdtype(call_seq, np.integer)
 
         # Broadcast inputs
-        target_shape = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
+        target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
         if close.shape != target_shape:
-            if len(close.vbt.columns) < target_shape[1]:
-                if target_shape[1] % len(close.vbt.columns) != 0:
+            if len(close.vbt.columns) <= target_shape_2d[1]:
+                if target_shape_2d[1] % len(close.vbt.columns) != 0:
                     raise ValueError("Cannot broadcast close to target_shape")
                 if keys is None:
-                    keys = pd.Index(np.arange(target_shape[1]), name='iteration_idx')
-                tile_times = target_shape[1] // len(close.vbt.columns)
+                    keys = pd.Index(np.arange(target_shape_2d[1]), name='iteration_idx')
+                tile_times = target_shape_2d[1] // len(close.vbt.columns)
                 close = close.vbt.tile(tile_times, keys=keys)
         close = broadcast(close, to_shape=target_shape, **broadcast_kwargs)
-        min_size = np.require(np.broadcast_to(min_size, (target_shape[1],)), requirements='W')
+        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
         init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
         group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
         active_mask = broadcast(
             active_mask,
-            to_shape=(target_shape[0], len(group_counts)),
+            to_shape=(target_shape_2d[0], len(group_counts)),
             to_pd=False,
             **require_kwargs
         )
         if checks.is_array(call_seq):
-            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape, to_pd=False))
+            call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
-            call_seq = nb.build_call_seq(target_shape, group_counts, call_seq_type=call_seq)
+            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
 
         # Prepare arguments
         if prep_func_nb is None:
@@ -1106,8 +1109,8 @@ class Portfolio(Configured, PandasIndexer):
         # Perform calculation
         if row_wise:
             order_records = nb.simulate_row_wise_nb(
-                target_shape,
-                close.values,
+                target_shape_2d,
+                to_2d(close, raw=True),
                 group_counts,
                 init_cash,
                 cash_sharing,
@@ -1125,8 +1128,8 @@ class Portfolio(Configured, PandasIndexer):
             )
         else:
             order_records = nb.simulate_nb(
-                target_shape,
-                close.values,
+                target_shape_2d,
+                to_2d(close, raw=True),
                 group_counts,
                 init_cash,
                 cash_sharing,
@@ -1190,6 +1193,8 @@ class Portfolio(Configured, PandasIndexer):
 
     def regroup(self, group_by):
         """Regroup this object."""
+        if self.cash_sharing:
+            raise ValueError("Cannot change grouping globally when cash sharing is enabled")
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             return self.copy(orders=self.orders.regroup(group_by=group_by))
@@ -1316,7 +1321,7 @@ class Portfolio(Configured, PandasIndexer):
 
     @cached_method
     def trades(self, group_by=None, incl_unrealized=None):
-        """Get trade records.
+        """Get trade records from orders.
 
         See `vectorbt.records.events.Trades`."""
         trades = Trades.from_orders(self.orders_regrouped(group_by=group_by))
@@ -1328,7 +1333,7 @@ class Portfolio(Configured, PandasIndexer):
 
     @cached_method
     def positions(self, group_by=None, incl_unrealized=None):
-        """Get position records.
+        """Get position records from orders.
 
         See `vectorbt.records.events.Positions`."""
         positions = Positions.from_orders(self.orders_regrouped(group_by=group_by))
@@ -1340,11 +1345,9 @@ class Portfolio(Configured, PandasIndexer):
 
     @cached_method
     def drawdowns(self, **kwargs):
-        """Get drawdown records.
+        """Get drawdown records from `Portfolio.value`.
 
-        See `vectorbt.records.drawdowns.Drawdowns`.
-
-        Keyword arguments are passed to `Portfolio.value`."""
+        See `vectorbt.records.drawdowns.Drawdowns`."""
         return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
     # ############# Performance ############# #

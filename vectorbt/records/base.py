@@ -434,7 +434,10 @@ class MappedArray(Configured, PandasIndexer):
             Must be of the same size as `mapped_arr`.
         idx_arr (array_like): A one-dimensional index array. Optional.
 
-            Must be of the same size as `mapped_arr`."""
+            Must be of the same size as `mapped_arr`.
+
+    !!! note
+        This class is meant to be immutable. To change any attribute, use `MappedArray.copy`."""
 
     def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None):
         Configured.__init__(
@@ -785,7 +788,10 @@ class Records(Configured, PandasIndexer):
             Must have the field `col` (column position in a matrix).
         idx_field (str): The name of the field corresponding to the index. Optional.
 
-            Will be derived automatically if records contain field `'idx'`."""
+            Will be derived automatically if records contain field `'idx'`.
+
+    !!! note
+        This class is meant to be immutable. To change any attribute, use `Records.copy`."""
 
     def __init__(self, wrapper, records_arr, idx_field=None):
         Configured.__init__(

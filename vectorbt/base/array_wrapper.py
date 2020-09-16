@@ -178,10 +178,13 @@ def _indexing_func(obj, pd_indexing_func, **kwargs):
 class ArrayWrapper(Configured, PandasIndexer):
     """Class that stores index, columns and shape metadata for wrapping NumPy arrays.
 
-    If the underlying object is a Series, pass `[sr.name]` as `columns`."""
+    If the underlying object is a Series, pass `[sr.name]` as `columns`.
 
-    def __init__(self, index, columns, ndim, freq=None, column_only_select=None,
-                 group_select=None, grouped_ndim=None, **kwargs):
+    !!! note
+        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.copy`."""
+
+    def __init__(self, index, columns, ndim, freq=None, column_only_select=None, group_select=None,
+                 grouped_ndim=None, group_by=None, allow_enable=True, allow_disable=True, allow_modify=True):
         Configured.__init__(
             self,
             index=index,
@@ -191,7 +194,10 @@ class ArrayWrapper(Configured, PandasIndexer):
             column_only_select=column_only_select,
             group_select=group_select,
             grouped_ndim=grouped_ndim,
-            **kwargs
+            group_by=group_by,
+            allow_enable=allow_enable,
+            allow_disable=allow_disable,
+            allow_modify=allow_modify
         )
 
         checks.assert_not_none(index)
@@ -208,7 +214,13 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._freq = freq
         self._column_only_select = column_only_select
         self._group_select = group_select
-        self._grouper = ColumnGrouper(columns, **kwargs)
+        self._grouper = ColumnGrouper(
+            columns,
+            group_by=group_by,
+            allow_enable=allow_enable,
+            allow_disable=allow_disable,
+            allow_modify=allow_modify
+        )
         self._grouped_ndim = grouped_ndim
 
         PandasIndexer.__init__(
@@ -398,24 +410,3 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.Series(a[:, 0], index=index, name=name)
         # Array per column in a DataFrame
         return pd.DataFrame(a, index=index, columns=columns)
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        if not checks.is_equal(self.index, other.index, pd.Index.equals):
-            return False
-        if not checks.is_equal(self.columns, other.columns, pd.Index.equals):
-            return False
-        if self.ndim != other.ndim:
-            return False
-        if self.freq != other.freq:
-            return False
-        if self.column_only_select != other.column_only_select:
-            return False
-        if self.group_select != other.group_select:
-            return False
-        if self.grouped_ndim != other.grouped_ndim:
-            return False
-        if self.grouper != other.grouper:
-            return False
-        return True

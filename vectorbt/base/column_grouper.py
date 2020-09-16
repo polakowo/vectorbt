@@ -87,7 +87,10 @@ class ColumnGrouper(Configured):
     All properties are read-only to enable caching.
 
     !!! note
-        Columns must build groups that are coherent and sorted."""
+        Columns must build groups that are coherent and sorted.
+
+    !!! note
+        This class is meant to be immutable. To change any attribute, use `ColumnGrouper.copy`."""
 
     def __init__(self, columns, group_by=None, allow_enable=True, allow_disable=True, allow_modify=True):
         Configured.__init__(
@@ -228,18 +231,3 @@ class ColumnGrouper(Configured):
         """Get end index of each group as an array."""
         group_counts = self.get_group_counts(**kwargs)
         return np.cumsum(group_counts)
-
-    def __eq__(self, other):
-        if type(self) != type(other):
-            return False
-        if not checks.is_equal(self.columns, other.columns, pd.Index.equals):
-            return False
-        if not checks.is_equal(self.group_by, other.group_by, pd.Index.equals):
-            return False
-        if self.allow_enable != other.allow_enable:
-            return False
-        if self.allow_disable != other.allow_disable:
-            return False
-        if self.allow_modify != other.allow_modify:
-            return False
-        return True

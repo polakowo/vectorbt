@@ -23,7 +23,7 @@ SimulationContext = namedtuple('SimulationContext', [
     'record_mask',
     'last_cash',
     'last_shares',
-    'val_price'
+    'last_val_price'
 ])
 
 __pdoc__['SimulationContext'] = "A named tuple representing context of the current simulation."
@@ -86,7 +86,7 @@ __pdoc__['SimulationContext.last_shares'] = """Last shares per column.
 
 Has shape `(target_shape[1],)`.
 """
-__pdoc__['SimulationContext.val_price'] = """Price for valuing the column/group.
+__pdoc__['SimulationContext.last_val_price'] = """Last size valuation price.
 
 Used to calculate `value_now`. Can be changed in-place before group valuation.
 
@@ -177,6 +177,7 @@ OrderContext = namedtuple('OrderContext', [
     'call_idx',
     'cash_now',
     'shares_now',
+    'val_price_now',
     'value_now'
 ])
 __pdoc__['OrderContext'] = "A named tuple representing context of the current order."
@@ -190,19 +191,23 @@ __pdoc__['OrderContext.call_idx'] = """Index of the current call in `call_seq_no
 
 Has range `[0, group_len)`.
 """
-__pdoc__['OrderContext.cash_now'] = """Current cash available for the column/group.
+__pdoc__['OrderContext.cash_now'] = """Current cash available.
 
 Scalar value. Per group if cash sharing is enabled, otherwise per column.
 """
-__pdoc__['OrderContext.shares_now'] = """Current shares available for the column.
+__pdoc__['OrderContext.shares_now'] = """Current shares available.
 
 Scalar value. Always per column.
 """
-__pdoc__['OrderContext.value_now'] = """Current value of the column/group.
+__pdoc__['OrderContext.val_price_now'] = """Current size valuation price.
+
+Scalar value. Always per column.
+"""
+__pdoc__['OrderContext.value_now'] = """Current value.
 
 Scalar value. Per group if cash sharing is enabled, otherwise per column.
 
-Current value is calculated using `val_price`.
+Current value is calculated using `last_val_price`.
 """
 
 # ############# InitCashMode ############# #

@@ -846,9 +846,9 @@ class TestAccessors:
             [False, True, False],
             [True, False, True]
         ], index=index, columns=columns)
-        assert sig['a'].vbt.signals.avg_distance(other=other_sig['a']) == 1.5
+        assert sig['a'].vbt.signals.avg_distance(to=other_sig['a']) == 1.5
         pd.testing.assert_series_equal(
-            sig.vbt.signals.avg_distance(other=other_sig),
+            sig.vbt.signals.avg_distance(to=other_sig),
             pd.Series([1.5, 2., 2.], index=sig.columns)
         )
 

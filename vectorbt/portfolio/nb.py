@@ -302,14 +302,14 @@ def empty_prep_nb(*args):
 
 
 @njit(cache=True)
-def get_group_value_nb(from_col, to_col, cash_now, last_shares, val_price):
+def get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price):
     """Get group value."""
     group_value = cash_now
     group_len = to_col - from_col
     for k in range(group_len):
         col = from_col + k
         if last_shares[col] > 0.:
-            holding_value = last_shares[col] * val_price[col]
+            holding_value = last_shares[col] * last_val_price[col]
             group_value += holding_value
     return group_value
 
@@ -321,7 +321,7 @@ def get_group_value_ctx_nb(sc_oc):
     Accepts `vectorbt.portfolio.enums.SegmentContext` and `vectorbt.portfolio.enums.OrderContext`.
 
     Best called once from `segment_prep_func_nb`.
-    To set the valuation price, change `val_price` of the context in-place.
+    To set the valuation price, change `last_val_price` of the context in-place.
 
     !!! note
         Cash sharing must be enabled."""
@@ -332,7 +332,7 @@ def get_group_value_ctx_nb(sc_oc):
         sc_oc.to_col,
         sc_oc.last_cash[sc_oc.group],
         sc_oc.last_shares,
-        sc_oc.val_price
+        sc_oc.last_val_price
     )
 
 
@@ -377,7 +377,7 @@ def auto_call_seq_ctx_nb(sc, order_size, order_size_type, temp_float_arr):
             order_size[k],
             order_size_type[k],
             sc.last_shares[col],
-            sc.val_price[col],
+            sc.last_val_price[col],
             group_value_now
         )
     # Sort by order value
@@ -427,6 +427,9 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
             A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
             Should have shape `(target_shape[0], group_counts.shape[0])`.
+        min_size (np.ndarray): Minimum size for an order to be accepted.
+
+            Should have shape `(target_shape[1],)`.
         prep_func_nb (callable): Simulation preparation function.
 
             Can be used for creation of global arrays and setting the seed, and is executed at the
@@ -453,11 +456,11 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                 negatively impact performance. Assigning `SegmentContext.call_seq_now` is not allowed.
 
             !!! note
-                Use `val_price` to manipulate group valuation. By default, `val_price`
+                Use `last_val_price` to manipulate group valuation. By default, `last_val_price`
                 contains the last `close` for a column. You can change it in-place.
                 The column/group is then valuated after `segment_prep_func_nb`, and the value is
                 passed as `value_now` to `order_func_nb` and internally used for converting
-                `SizeType.TargetPercent` to `SizeType.TargetValue`.
+                `SizeType.TargetPercent` and `SizeType.TargetValue` to `SizeType.TargetShares`.
         segment_prep_args (tuple): Packed arguments passed to `segment_prep_func_nb`.
         order_func_nb (callable): Order generation function.
 
@@ -541,7 +544,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
         ...         order_size[k] = 1 / sc.group_len
         ...         order_size_type[k] = SizeType.TargetPercent
         ...         # In this example last seen price is now, just for illustration
-        ...         sc.val_price[col] = price[sc.i, col]
+        ...         sc.last_val_price[col] = price[sc.i, col]
         ...     # Reorder call sequence such that selling orders come first and buying last
         ...     auto_call_seq_ctx_nb(sc, order_size, order_size_type, temp_float_arr)
         ...     return order_size, order_size_type
@@ -624,7 +627,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
     j = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
-    val_price = np.full_like(last_shares, np.nan, dtype=np.float_)
+    last_val_price = np.full_like(last_shares, np.nan, dtype=np.float_)
 
     # Run a function to prepare the simulation
     simc = SimulationContext(
@@ -640,7 +643,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
         record_mask,
         last_cash,
         last_shares,
-        val_price
+        last_val_price
     )
     prep_out = prep_func_nb(simc, *prep_args)
 
@@ -665,7 +668,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                 record_mask,
                 last_cash,
                 last_shares,
-                val_price,
+                last_val_price,
                 group,
                 group_len,
                 from_col,
@@ -680,7 +683,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                     # Update valuation price
                     if i > 0:
                         for col in range(from_col, to_col):
-                            val_price[col] = close[i - 1, col]
+                            last_val_price[col] = close[i - 1, col]
 
                     # Run a function to preprocess this group within this row
                     call_seq_now = call_seq[i, from_col:to_col]
@@ -697,7 +700,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                         record_mask,
                         last_cash,
                         last_shares,
-                        val_price,
+                        last_val_price,
                         i,
                         group,
                         group_len,
@@ -711,7 +714,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                     # Get running values per group
                     if cash_sharing:
                         cash_now = last_cash[group]
-                        value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, val_price)
+                        value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price)
 
                     for k in range(group_len):
                         col_i = call_seq_now[k]
@@ -721,11 +724,12 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
 
                         # Get running values per column
                         shares_now = last_shares[col]
+                        val_price_now = last_val_price[col]
                         if not cash_sharing:
                             cash_now = last_cash[col]
                             value_now = cash_now
                             if shares_now > 0.:
-                                value_now += shares_now * val_price[col]
+                                value_now += shares_now * val_price_now
 
                         # Generate the next order
                         oc = OrderContext(
@@ -741,7 +745,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                             record_mask,
                             last_cash,
                             last_shares,
-                            val_price,
+                            last_val_price,
                             i,
                             group,
                             group_len,
@@ -753,25 +757,39 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                             k,
                             cash_now,
                             shares_now,
+                            val_price_now,
                             value_now
                         )
                         order = order_func_nb(oc, *segment_prep_out, *order_args)
 
-                        # Process the order
+                        # Convert target value or percent into target shares
+                        _size = order.size
+                        _size_type = order.size_type
                         if order.size_type == SizeType.TargetPercent:
                             if not np.isnan(order.size):
+                                if np.isnan(val_price_now):
+                                    raise ValueError("Valuation price is NaN")
                                 if np.isnan(value_now):
                                     raise ValueError("Value of the group is NaN")
-                                order_size = order.size * value_now
-                                order = Order(
-                                    order_size,
-                                    SizeType.TargetValue,
-                                    order.price,
-                                    order.fees,
-                                    order.fixed_fees,
-                                    order.slippage,
-                                    order.reject_prob
-                                )
+                            _size = order.size * value_now / val_price_now
+                            _size_type = SizeType.TargetShares
+                        elif order.size_type == SizeType.TargetValue:
+                            if not np.isnan(order.size):
+                                if np.isnan(val_price_now):
+                                    raise ValueError("Valuation price is NaN")
+                            _size = order.size / val_price_now
+                            _size_type = SizeType.TargetShares
+                        order = Order(
+                            _size,
+                            _size_type,
+                            order.price,
+                            order.fees,
+                            order.fixed_fees,
+                            order.slippage,
+                            order.reject_prob
+                        )
+
+                        # Process the order
                         cash_now, shares_now, order_result = process_order_nb(
                             cash_now, shares_now, order, min_size[col])
 
@@ -854,7 +872,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
     j = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
-    val_price = np.full_like(last_shares, np.nan, dtype=np.float_)
+    last_val_price = np.full_like(last_shares, np.nan, dtype=np.float_)
 
     # Run a function to prepare the simulation
     simc = SimulationContext(
@@ -870,7 +888,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
         record_mask,
         last_cash,
         last_shares,
-        val_price
+        last_val_price
     )
     prep_out = prep_func_nb(simc, *prep_args)
 
@@ -880,7 +898,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
             # Update valuation price
             if i > 0:
                 for col in range(target_shape[1]):
-                    val_price[col] = close[i - 1, col]
+                    last_val_price[col] = close[i - 1, col]
 
             # Run a function to preprocess this entire row
             rc = RowContext(
@@ -896,7 +914,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                 record_mask,
                 last_cash,
                 last_shares,
-                val_price,
+                last_val_price,
                 i,
                 j
             )
@@ -924,7 +942,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                         record_mask,
                         last_cash,
                         last_shares,
-                        val_price,
+                        last_val_price,
                         i,
                         group,
                         group_len,
@@ -938,7 +956,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                     # Get running values per group
                     if cash_sharing:
                         cash_now = last_cash[group]
-                        value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, val_price)
+                        value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price)
 
                     for k in range(group_len):
                         col_i = call_seq_now[k]
@@ -948,11 +966,12 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
 
                         # Get running values per column
                         shares_now = last_shares[col]
+                        val_price_now = last_val_price[col]
                         if not cash_sharing:
                             cash_now = last_cash[col]
                             value_now = cash_now
                             if shares_now > 0.:
-                                value_now += shares_now * val_price[col]
+                                value_now += shares_now * val_price_now
 
                         # Generate the next order
                         oc = OrderContext(
@@ -968,7 +987,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                             record_mask,
                             last_cash,
                             last_shares,
-                            val_price,
+                            last_val_price,
                             i,
                             group,
                             group_len,
@@ -980,25 +999,39 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                             k,
                             cash_now,
                             shares_now,
+                            val_price_now,
                             value_now
                         )
                         order = order_func_nb(oc, *segment_prep_out, *order_args)
 
-                        # Process the order
+                        # Convert target value or percent into target shares
+                        _size = order.size
+                        _size_type = order.size_type
                         if order.size_type == SizeType.TargetPercent:
                             if not np.isnan(order.size):
+                                if np.isnan(val_price_now):
+                                    raise ValueError("Valuation price is NaN")
                                 if np.isnan(value_now):
                                     raise ValueError("Value of the group is NaN")
-                                order_size = order.size * value_now
-                                order = Order(
-                                    order_size,
-                                    SizeType.TargetValue,
-                                    order.price,
-                                    order.fees,
-                                    order.fixed_fees,
-                                    order.slippage,
-                                    order.reject_prob
-                                )
+                            _size = order.size * value_now / val_price_now
+                            _size_type = SizeType.TargetShares
+                        elif order.size_type == SizeType.TargetValue:
+                            if not np.isnan(order.size):
+                                if np.isnan(val_price_now):
+                                    raise ValueError("Valuation price is NaN")
+                            _size = order.size / val_price_now
+                            _size_type = SizeType.TargetShares
+                        order = Order(
+                            _size,
+                            _size_type,
+                            order.price,
+                            order.fees,
+                            order.fixed_fees,
+                            order.slippage,
+                            order.reject_prob
+                        )
+
+                        # Process the order
                         cash_now, shares_now, order_result = process_order_nb(
                             cash_now, shares_now, order, min_size[col])
 
@@ -1020,7 +1053,6 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                         else:
                             last_cash[col] = cash_now
                         last_shares[col] = shares_now
-                        val_price[col] = order_result.price
 
                     from_col = to_col
 
@@ -1287,39 +1319,41 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
 
                 # Get running values per column
                 shares_now = last_shares[col]
+                _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, is_2d)
                 if not cash_sharing:
                     cash_now = last_cash[col]
                     value_now = cash_now
                     if shares_now > 0.:
-                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, is_2d)
                         value_now += shares_now * _val_price
 
-                # Generate the next order
+                # Convert target value or percent into target shares
                 _size = flex_select_nb(i, col, size, flex_i1, flex_col1, is_2d)
                 _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, is_2d)
                 if _size_type == SizeType.TargetPercent:
-                    if not np.isnan(_size) and np.isnan(value_now):
-                        raise ValueError("Value of the group is NaN")
+                    if not np.isnan(_size):
+                        if np.isnan(_val_price):
+                            raise ValueError("Valuation price is NaN")
+                        if np.isnan(value_now):
+                            raise ValueError("Value of the group is NaN")
+                    _size = _size * value_now / _val_price
+                    _size_type = SizeType.TargetShares
+                elif _size_type == SizeType.TargetValue:
+                    if not np.isnan(_size):
+                        if np.isnan(_val_price):
+                            raise ValueError("Valuation price is NaN")
+                    _size = _size / _val_price
+                    _size_type = SizeType.TargetShares
 
-                    order = Order(
-                        _size * value_now,
-                        SizeType.TargetValue,
-                        flex_select_nb(i, col, price, flex_i3, flex_col3, is_2d),
-                        flex_select_nb(i, col, fees, flex_i4, flex_col4, is_2d),
-                        flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, is_2d),
-                        flex_select_nb(i, col, slippage, flex_i6, flex_col6, is_2d),
-                        flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, is_2d)
-                    )
-                else:
-                    order = Order(
-                        _size,
-                        _size_type,
-                        flex_select_nb(i, col, price, flex_i3, flex_col3, is_2d),
-                        flex_select_nb(i, col, fees, flex_i4, flex_col4, is_2d),
-                        flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, is_2d),
-                        flex_select_nb(i, col, slippage, flex_i6, flex_col6, is_2d),
-                        flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, is_2d)
-                    )
+                # Generate the next order
+                order = Order(
+                    _size,
+                    _size_type,
+                    flex_select_nb(i, col, price, flex_i3, flex_col3, is_2d),
+                    flex_select_nb(i, col, fees, flex_i4, flex_col4, is_2d),
+                    flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, is_2d),
+                    flex_select_nb(i, col, slippage, flex_i6, flex_col6, is_2d),
+                    flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, is_2d)
+                )
 
                 # Process the order
                 cash_now, shares_now, order_result = process_order_nb(

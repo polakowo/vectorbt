@@ -60,7 +60,6 @@ mapped_array_grouped = records_grouped.map_field('some_field1')
 
 class TestMappedArray:
     def test_regroup(self):
-        assert mapped_array.regroup() is mapped_array
         pd.testing.assert_index_equal(
             mapped_array.regroup(group_by=group_by).wrapper.grouper.group_by,
             mapped_array_grouped.wrapper.grouper.group_by
@@ -738,7 +737,6 @@ class TestMappedArray:
 
 class TestRecords:
     def test_regroup(self):
-        assert records.regroup() is records
         pd.testing.assert_index_equal(
             records.regroup(group_by=group_by).wrapper.grouper.group_by,
             records_grouped.wrapper.grouper.group_by
