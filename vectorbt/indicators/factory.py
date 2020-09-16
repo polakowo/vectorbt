@@ -111,14 +111,13 @@ The `IndicatorFactory` class is used to construct indicator classes from UDFs. F
 all the necessary information to build the facade of the indicator, such as input, parameter and
 output names, and the actual calculation function. The factory then generates a self-contained
 indicator class capable of running arbitrary configurations of inputs and parameters. To run any
-configuration, you can either use the `IndicatorFactory.run` method (as we did above) or
-the `IndicatorFactory.run_combs` method.
+configuration, you can either use the `run` method (as we did above) or the `run_combs` method.
 
 ### run method
 
-The main method to run an indicator is `IndicatorFactory.run` that accepts 1) input time
-series, 2) parameters (either positional arguments or keyword arguments if you specified
-`param_defaults`), and 3) other arguments that are accepted by the calculation function.
+The main method to run an indicator is `run` that accepts 1) input time series, 2) parameters
+(either positional arguments or keyword arguments if you specified `param_defaults`), and 3)
+other arguments that are accepted by the calculation function.
 
 Input time series can have any shape as long as they are Series or DataFrames. Passing multiple time
 series with different shapes will broadcast them to a single shape.
@@ -176,14 +175,14 @@ array([1, 1, 2, 2])
 array([3, 4, 3, 4])
 ```
 
-The output of the `IndicatorFactory.run` method will be the instance of the indicator.
+The output of the `run` method will be the instance of the indicator.
 All outputs can be then accessed as variables of the instance.
 
 ### run_combs method
 
-The `IndicatorFactory.run_combs` method takes the same inputs as the method above, but computes
-all combinations of passed parameters and returns multiple instances that can be compared with
-each other. For example, this is useful to generate crossover signals of multiple moving averages.
+The `run_combs` method takes the same inputs as the method above, but computes all combinations
+of passed parameters and returns multiple instances that can be compared with each other.
+For example, this is useful to generate crossover signals of multiple moving averages.
 
 ```python-repl
 >>> myma1, myma2 = MyMA.run_combs(price, [2, 3, 4])

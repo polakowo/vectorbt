@@ -25,7 +25,7 @@ This way, one can simulate and analyze his/her strategy in a couple of lines.
 ### Example
 
 The following example does something crazy: it checks candlestick data of 6 major cryptocurrencies
-in 2019 against every single pattern found in TA-Lib, and translates them into orders:
+in 2020 against every single pattern found in TA-Lib, and translates them into orders:
 
 ```python-repl
 >>> import numpy as np
@@ -287,7 +287,7 @@ def add_returns_methods(func_names):
                 func_name = func_name[1]
             returns_method.__name__ = func_name
             returns_method.__qualname__ = f"Portfolio.{func_name}"
-            returns_method.__doc__ = f"See `vectorbt.returns.accessors.Returns_Accessor.{func_name}`."
+            returns_method.__doc__ = f"See `vectorbt.returns.accessors.Returns_Accessor.{ret_func_name}`."
             setattr(cls, func_name, cached_method(returns_method))
         return cls
 

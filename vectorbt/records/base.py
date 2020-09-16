@@ -427,7 +427,7 @@ class MappedArray(Configured, PandasIndexer):
     Args:
         wrapper (ArrayWrapper): Array wrapper.
 
-            See `vectorbt.base.array_wrapper.GroupedWrapper`.
+            See `vectorbt.base.array_wrapper.ArrayWrapper`.
         mapped_arr (array_like): A one-dimensional array of mapped record values.
         col_arr (array_like): A one-dimensional column array.
 
@@ -782,7 +782,7 @@ class Records(Configured, PandasIndexer):
     Args:
         wrapper (ArrayWrapper): Array wrapper.
 
-            See `vectorbt.base.array_wrapper.GroupedWrapper`.
+            See `vectorbt.base.array_wrapper.ArrayWrapper`.
         records_arr (array_like): A structured NumPy array of records.
 
             Must have the field `col` (column position in a matrix).
