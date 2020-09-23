@@ -1303,6 +1303,24 @@ class Portfolio(Configured, PandasIndexer):
         shares = nb.shares_nb(share_flow)
         return self.wrapper.wrap(shares, group_by=False)
 
+    @cached_method
+    def holding_mask(self, group_by=None):
+        """Get holding mask per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            holding_mask = nb.holding_mask_grouped_nb(shares, group_counts)
+        else:
+            holding_mask = shares > 0
+        return self.wrapper.wrap(holding_mask, group_by=group_by)
+
+    @cached_method
+    def holding_duration(self, group_by=None):
+        """Get holding duration per column/group."""
+        holding_mask = to_2d(self.holding_mask(group_by=group_by))
+        holding_duration = np.mean(holding_mask, axis=0)
+        return self.wrapper.wrap_reduced(holding_duration, group_by=group_by)
+
     # ############# Records ############# #
 
     @property
@@ -1490,7 +1508,6 @@ class Portfolio(Configured, PandasIndexer):
             Use `column` only if caching is enabled, otherwise it may re-compute the same
             objects multiple times."""
         # Pre-calculate
-        holding_duration = np.sum(self.shares().values > 0, axis=0) / self.wrapper.shape[0]
         trades = self.trades(group_by=group_by, incl_unrealized=incl_unrealized)
         drawdowns = self.drawdowns(group_by=group_by)
         if active_returns:
@@ -1503,7 +1520,7 @@ class Portfolio(Configured, PandasIndexer):
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.wrapper.freq,
-            'Holding Duration [%]': holding_duration * 100,
+            'Holding Duration [%]': self.holding_duration(group_by=group_by) * 100,
             'Total Profit': self.total_profit(group_by=group_by),
             'Total Return [%]': self.total_return(group_by=group_by) * 100,
             'Buy & Hold Return [%]': self.buy_and_hold_return(group_by=group_by) * 100,

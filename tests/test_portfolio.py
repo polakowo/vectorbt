@@ -2466,7 +2466,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 26.666666666666668,
+                    pd.Timedelta('5 days 00:00:00'), 66.66666666666667,
                     1.688383333333339, 1.688383333333339, 283.3333333333333,
                     0.1061052323180044, 0.1061052323180044,
                     pd.Timedelta('3 days 00:00:00'), pd.Timedelta('3 days 00:00:00'),
@@ -2484,14 +2484,14 @@ class TestPortfolio:
                     'Avg. Trade [%]', 'Max. Trade Duration', 'Avg. Trade Duration',
                     'Expectancy', 'SQN', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
                 ], dtype='object'),
-                name='mean')
+                name='<lambda>')
         )
         pd.testing.assert_series_equal(
             portfolio['a'].stats(),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 20.0, -0.3104900000000015,
+                    pd.Timedelta('5 days 00:00:00'), 40.0, -0.3104900000000015,
                     -0.3104900000000015, 150.0, 0.3104900000000015, 0.3104900000000015,
                     pd.Timedelta('4 days 00:00:00'), pd.Timedelta('4 days 00:00:00'), 1, 0.0,
                     -36.17854088546808, -36.17854088546808, -36.17854088546808,
@@ -2514,7 +2514,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 20.0, -0.3104900000000015,
+                    pd.Timedelta('5 days 00:00:00'), 40.0, -0.3104900000000015,
                     -0.3104900000000015, 150.0, 0.3104900000000015, 0.3104900000000015,
                     pd.Timedelta('4 days 00:00:00'), pd.Timedelta('4 days 00:00:00'), 1, 0.0,
                     -36.17854088546808, -36.17854088546808, -36.17854088546808,
@@ -2537,7 +2537,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 20.0, -0.3104900000000015,
+                    pd.Timedelta('5 days 00:00:00'), 40.0, -0.3104900000000015,
                     -0.3104900000000015, 150.0, 0.3104900000000015, 0.3104900000000015,
                     pd.Timedelta('4 days 00:00:00'), pd.Timedelta('4 days 00:00:00'), 1, 0.0,
                     -36.17854088546808, -36.17854088546808, -36.17854088546808,
@@ -2560,7 +2560,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 20.0, -0.3104900000000015,
+                    pd.Timedelta('5 days 00:00:00'), 40.0, -0.3104900000000015,
                     -0.3104900000000015, 150.0, 0.3104900000000015, 0.3104900000000015,
                     pd.Timedelta('4 days 00:00:00'), pd.Timedelta('4 days 00:00:00'), 2, 0.0,
                     -3.8553985193731357, -36.17854088546808, -20.01696970242061,

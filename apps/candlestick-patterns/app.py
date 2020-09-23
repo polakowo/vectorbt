@@ -31,6 +31,7 @@ from vectorbt.portfolio.enums import InitCashMode, AccumulateExitMode
 
 app = dash.Dash(
     __name__,
+    meta_tags=[{"name": "viewport", "content": "width=device-width"}],
     external_stylesheets=[dbc.themes.GRID]
 )
 CACHE_CONFIG = {
