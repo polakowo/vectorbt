@@ -1303,6 +1303,24 @@ class Portfolio(Configured, PandasIndexer):
         shares = nb.shares_nb(share_flow)
         return self.wrapper.wrap(shares, group_by=False)
 
+    @cached_method
+    def holding_mask(self, group_by=None):
+        """Get holding mask per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            holding_mask = nb.holding_mask_grouped_nb(shares, group_counts)
+        else:
+            holding_mask = shares > 0
+        return self.wrapper.wrap(holding_mask, group_by=group_by)
+
+    @cached_method
+    def holding_duration(self, group_by=None):
+        """Get holding duration per column/group."""
+        holding_mask = to_2d(self.holding_mask(group_by=group_by))
+        holding_duration = np.mean(holding_mask, axis=0)
+        return self.wrapper.wrap_reduced(holding_duration, group_by=group_by)
+
     # ############# Records ############# #
 
     @property
@@ -1476,7 +1494,7 @@ class Portfolio(Configured, PandasIndexer):
 
     @cached_method
     def stats(self, column=None, group_by=None, incl_unrealized=None, active_returns=False,
-              agg_func=np.mean, **kwargs):
+              agg_func=lambda x: x.mean(axis=0), **kwargs):
         """Compute various statistics on this portfolio.
 
         `kwargs` will be passed to each `vectorbt.returns.accessors.Returns_Accessor` method.
@@ -1489,15 +1507,7 @@ class Portfolio(Configured, PandasIndexer):
         !!! note
             Use `column` only if caching is enabled, otherwise it may re-compute the same
             objects multiple times."""
-        def _reduce(obj):
-            if checks.is_series(obj):
-                if column is not None:
-                    return obj[column]
-                return agg_func(obj)
-            return obj
-
         # Pre-calculate
-        positions = self.positions(group_by=group_by, incl_unrealized=incl_unrealized)
         trades = self.trades(group_by=group_by, incl_unrealized=incl_unrealized)
         drawdowns = self.drawdowns(group_by=group_by)
         if active_returns:
@@ -1505,42 +1515,42 @@ class Portfolio(Configured, PandasIndexer):
         else:
             returns = self.returns(group_by=group_by)
 
-        name = column
-        if name is None:
-            if self.wrapper.grouper.is_grouped(group_by=group_by):
-                if self.wrapper.grouped_ndim == 1:
-                    name = self.wrapper.grouper.get_columns(group_by=group_by)[0]
-                else:
-                    name = agg_func.__name__
-            else:
-                if self.wrapper.ndim == 1:
-                    name = self.wrapper.name
-                else:
-                    name = agg_func.__name__
-        return pd.Series({
+        # Run stats
+        stats_df = pd.DataFrame({
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.wrapper.freq,
-            'Holding Duration [%]': _reduce(positions.coverage() * 100),
-            'Total Profit': _reduce(self.total_profit(group_by=group_by)),
-            'Total Return [%]': _reduce(self.total_return(group_by=group_by) * 100),
-            'Buy & Hold Return [%]': _reduce(self.buy_and_hold_return(group_by=group_by) * 100),
-            'Max. Drawdown [%]': _reduce(-drawdowns.max_drawdown() * 100),
-            'Avg. Drawdown [%]': _reduce(-drawdowns.avg_drawdown() * 100),
-            'Max. Drawdown Duration': _reduce(drawdowns.max_duration()),
-            'Avg. Drawdown Duration': _reduce(drawdowns.avg_duration()),
-            'Num. Trades': _reduce(trades.count()),
-            'Win Rate [%]': _reduce(trades.win_rate() * 100),
-            'Best Trade [%]': _reduce(trades.returns.max() * 100),
-            'Worst Trade [%]': _reduce(trades.returns.min() * 100),
-            'Avg. Trade [%]': _reduce(trades.returns.mean() * 100),
-            'Max. Trade Duration': _reduce(trades.duration.max(time_units=True)),
-            'Avg. Trade Duration': _reduce(trades.duration.mean(time_units=True)),
-            'Expectancy': _reduce(trades.expectancy()),
-            'SQN': _reduce(trades.sqn()),
-            'Sharpe Ratio': _reduce(self.sharpe_ratio(reuse_returns=returns, **kwargs)),
-            'Sortino Ratio': _reduce(self.sortino_ratio(reuse_returns=returns, **kwargs)),
-            'Calmar Ratio': _reduce(self.calmar_ratio(reuse_returns=returns, **kwargs))
-        }, name=name)
+            'Holding Duration [%]': self.holding_duration(group_by=group_by) * 100,
+            'Total Profit': self.total_profit(group_by=group_by),
+            'Total Return [%]': self.total_return(group_by=group_by) * 100,
+            'Buy & Hold Return [%]': self.buy_and_hold_return(group_by=group_by) * 100,
+            'Max. Drawdown [%]': -drawdowns.max_drawdown() * 100,
+            'Avg. Drawdown [%]': -drawdowns.avg_drawdown() * 100,
+            'Max. Drawdown Duration': drawdowns.max_duration(),
+            'Avg. Drawdown Duration': drawdowns.avg_duration(),
+            'Num. Trades': trades.count(),
+            'Win Rate [%]': trades.win_rate() * 100,
+            'Best Trade [%]': trades.returns.max() * 100,
+            'Worst Trade [%]': trades.returns.min() * 100,
+            'Avg. Trade [%]': trades.returns.mean() * 100,
+            'Max. Trade Duration': trades.duration.max(time_units=True),
+            'Avg. Trade Duration': trades.duration.mean(time_units=True),
+            'Expectancy': trades.expectancy(),
+            'SQN': trades.sqn(),
+            'Sharpe Ratio': self.sharpe_ratio(reuse_returns=returns, **kwargs),
+            'Sortino Ratio': self.sortino_ratio(reuse_returns=returns, **kwargs),
+            'Calmar Ratio': self.calmar_ratio(reuse_returns=returns, **kwargs)
+        }, index=self.wrapper.grouper.get_columns(group_by=group_by))
 
+        # Select columns or reduce
+        if stats_df.shape[0] == 1:
+            return self.wrapper.wrap_reduced(stats_df.iloc[0], index=stats_df.columns)
+        if column is not None:
+            return stats_df.loc[column]
+        if agg_func is not None:
+            agg_stats_sr = pd.Series(index=stats_df.columns, name=agg_func.__name__)
+            agg_stats_sr.iloc[:3] = stats_df.iloc[0, :3]
+            agg_stats_sr.iloc[3:] = agg_func(stats_df.iloc[:, 3:])
+            return agg_stats_sr
+        return stats_df
 

@@ -1,0 +1,193 @@
+.container.scalable {
+    width: 100%;
+    max-width: none;
+}
+
+/* Remove Undo
+–––––––––––––––––––––––––––––––––––––––––––––––––– */
+._dash-undo-redo {
+    display: none;
+}
+
+body {
+    background-color: #171b26;
+    color: #9fa6b7;
+    overflow-x: hidden;
+    padding: 15px 30px;
+    margin: 0px;
+}
+
+button, .button {
+    background-color: #171b26 !important;
+    color: #7b7d8d !important;
+    border: 1px solid dimgrey !important;
+}
+
+button:hover, .button:hover {
+    color: #88ccee !important;
+    border: 1px solid #88ccee !important;
+}
+
+.banner {
+    height: 5rem;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: row nowrap;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.banner h6 {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 2rem;
+    font-weight: 600;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.control-row {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.half-width {
+    width: 45%;
+}
+
+.full-width {
+    width: 100%;
+}
+
+*.Select-control,
+Select--single,
+.Select-multi-value-wrapper,
+.Select-value,
+.Select-value-label,
+.Select-placeholder,
+.Select-multi-value-wrapper,
+.Select-input input,
+.input-control {
+    background-color: #171b26 !important;
+    color: #7b7d8d !important;
+}
+
+.Select-control,
+.input-control {
+    border: 1px solid dimgrey !important;
+}
+
+.Select.is-focused .Select-input input {
+    color: #88ccee !important;
+}
+
+.Select.is-focused .Select-value .Select-value-label {
+    color: #88ccee !important;
+}
+
+.Select-menu-outer,
+.Select.is-focused .Select-control,
+.input-control:focus {
+    color: #88ccee !important;
+    border: 1px solid #88ccee !important;
+}
+
+.input-control {
+    width: 100%;
+    height: 36px;
+}
+
+span.Select-clear-zone {
+    display: none !important;
+}
+
+.Select-menu-outer,
+.Select-menu-outer div,
+.Select--multi {
+    background-color: #171b26 !important;
+    color: #7b7d8d !important;
+}
+
+.Select-menu-outer div:hover {
+    color: #88ccee !important;
+    cursor: pointer;
+}
+
+label {
+    color: #7b7d8d;
+}
+
+.control-outer {
+    display: inline-block;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: bold;
+    display: block;
+    margin-top: 20px;
+    margin-bottom: 5px;
+    cursor: pointer;
+}
+.section-title:focus {
+    outline: none;
+}
+
+.app__left__section {
+    min-height: 100vh;
+    max-height: 100vh;
+}
+
+.app__right__section {
+    min-height: 100vh;
+    max-height: 100vh;
+}
+
+.pretty-container {
+    margin: 15px 0px;
+    padding: 25px;
+    background-color: #1f2536;
+    border-radius: 5px;
+    box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
+}
+
+#yfinance-checklist {
+    color: #7b7d8d;
+}
+
+.rc-slider {
+    margin-top: 10px;
+}
+
+.rc-slider-rail {
+    background-color: #171b26 !important
+}
+
+.rc-slider-track {
+    background-color: #387c9e !important
+}
+
+.rc-slider-dot-active, .rc-slider-handle {
+    border-color: #88ccee !important;
+    background-color: #88ccee;
+}
+
+.rc-slider-handle {
+    border: none !important;
+}
+
+.column-1 {
+    padding-right: 15px !important;
+}
+
+.dash-cell.column-2 .input-active,
+.dash-cell.column-3 .input-active {
+    color: #88ccee !important;
+}
+
+.dash-spreadsheet-inner .row {
+    margin: 0px;
+}
+
+

@@ -1421,6 +1421,20 @@ def shares_nb(share_flow):
     return out
 
 
+@njit(cache=True)
+def holding_mask_grouped_nb(shares, group_counts):
+    """Get holding mask per group."""
+    check_group_counts(group_counts, shares.shape[1])
+
+    out = np.empty((shares.shape[0], len(group_counts)), dtype=np.bool_)
+    from_col = 0
+    for group in range(len(group_counts)):
+        to_col = from_col + group_counts[group]
+        out[:, group] = np.sum(shares[:, from_col:to_col], axis=1) > 0
+        from_col = to_col
+    return out
+
+
 # ############# Cash ############# #
 
 @njit(cache=True)
