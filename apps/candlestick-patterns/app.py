@@ -31,7 +31,12 @@ from vectorbt.portfolio.enums import InitCashMode, AccumulateExitMode
 
 app = dash.Dash(
     __name__,
-    meta_tags=[{"name": "viewport", "content": "width=device-width"}],
+    meta_tags=[
+        {
+            "name": "viewport",
+            "content": "width=device-width, initial-scale=1, maximum-scale=1.0, user-scalable=no",
+        }
+    ],
     external_stylesheets=[dbc.themes.GRID]
 )
 CACHE_CONFIG = {
@@ -52,9 +57,10 @@ GITHUB_LINK = os.environ.get(
 periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
 intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1d', '5d', '1wk', '1mo', '3mo']
 patterns = talib.get_function_groups()['Pattern Recognition']
-stats_table_columns = ["Metric", "Random (Median)", "Strategy", "Z-Score"]
+stats_table_columns = ["Metric", "Holding", "Random (Median)", "Strategy", "Z-Score"]
 
 data_path = 'data/data.h5'
+default_metric = 'Total Return [%]'
 default_symbol = 'BTC-USD'
 default_period = '1y'
 default_interval = '1d'
@@ -163,7 +169,7 @@ app.layout = html.Div(
         dbc.Row(
             children=[
                 dbc.Col(
-                    width=8,
+                    lg=8, sm=12,
                     children=[
                         html.Div(
                             className="pretty-container",
@@ -252,11 +258,15 @@ app.layout = html.Div(
                                                             style_data_conditional=[{
                                                                 "if": {"column_id": stats_table_columns[1]},
                                                                 "fontWeight": "bold",
+                                                                "borderLeft": "1px solid dimgrey"
                                                             }, {
                                                                 "if": {"column_id": stats_table_columns[2]},
                                                                 "fontWeight": "bold",
                                                             }, {
                                                                 "if": {"column_id": stats_table_columns[3]},
+                                                                "fontWeight": "bold",
+                                                            }, {
+                                                                "if": {"column_id": stats_table_columns[4]},
                                                                 "fontWeight": "bold",
                                                             }, {
                                                                 "if": {"state": "selected"},
@@ -278,7 +288,11 @@ app.layout = html.Div(
                                                             style_data={
                                                                 "border": "none",
                                                                 "backgroundColor": "#1f2536",
-                                                                "color": "#7b7d8d"
+                                                                "color": "#7b7d8d",
+                                                                "paddingRight": "10px"
+                                                            },
+                                                            style_table={
+                                                                'overflowX': 'scroll',
                                                             },
                                                             style_as_list_view=False,
                                                             editable=False,
@@ -313,7 +327,7 @@ app.layout = html.Div(
                                                         dbc.Row(
                                                             children=[
                                                                 dbc.Col(
-                                                                    width=4,
+                                                                    lg=4, sm=12,
                                                                     children=[
                                                                         dcc.Dropdown(
                                                                             id="metric-dropdown"
@@ -321,7 +335,7 @@ app.layout = html.Div(
                                                                     ]
                                                                 ),
                                                                 dbc.Col(
-                                                                    width=8,
+                                                                    lg=8, sm=12,
                                                                     children=[
                                                                         dcc.Graph(
                                                                             id="metric-graph",
@@ -345,7 +359,7 @@ app.layout = html.Div(
                     ]
                 ),
                 dbc.Col(
-                    width=4,
+                    lg=4, sm=12,
                     children=[
                         html.Div(
                             className="pretty-container",
@@ -589,6 +603,9 @@ app.layout = html.Div(
                                                 "backgroundColor": "#1f2536",
                                                 "color": "#7b7d8d"
                                             },
+                                            style_table={
+                                                'overflowX': 'scroll',
+                                            },
                                             style_as_list_view=False,
                                             editable=True,
                                         ),
@@ -716,8 +733,7 @@ app.layout = html.Div(
         ),
         html.Div(id='data-signal', style={'display': 'none'}),
         html.Div(id='candle-settings-signal', style={'display': 'none'}),
-        html.Div(id='stats-signal', style={'display': 'none'}),
-        html.Div(id='rand-stats-signal', style={'display': 'none'}),
+        html.Div(id='stats-signal', style={'display': 'none'})
     ],
 )
 
@@ -899,9 +915,9 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
     # Color volume
     close_open_diff = df['Close'].values - df['Open'].values
     volume_color = np.empty(df['Volume'].shape, dtype=np.object)
-    volume_color[close_open_diff > 0] = '#0f8554'
+    volume_color[close_open_diff > 0] = '#0b623e'
     volume_color[close_open_diff == 0] = 'gray'
-    volume_color[close_open_diff < 0] = '#e17c05'
+    volume_color[close_open_diff < 0] = '#bb6704'
 
     # Build graph
     return dict(
@@ -948,7 +964,6 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
                 x=pd.to_datetime(df.index),
                 y=df['Volume'],
                 marker_color=volume_color,
-                marker_opacity=0.5,
                 marker_line_width=0,
                 name='Volume',
                 yaxis="y",
@@ -958,7 +973,7 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
         layout=merge_kwargs(
             default_layout,
             dict(
-                height=350,
+                height=400,
                 margin=dict(r=40),
                 hovermode="closest",
                 xaxis=dict(
@@ -1008,7 +1023,8 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
     exit_i = [all_patterns.index(p) for p in exit_patterns]
     signals = np.empty((len(df.index), len(all_patterns)), dtype=np.float_)
     for i, pattern in enumerate(all_patterns):
-        signals[:, i] = abstract.Function(pattern)(talib_inputs)
+        # TA-Lib functions have output in increments of 100
+        signals[:, i] = abstract.Function(pattern)(talib_inputs) / 100
 
     # Generate size for main
     def _generate_size(signals):
@@ -1020,6 +1036,10 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
     main_size = np.empty((len(df.index),), dtype=np.float_)
     main_size[0] = 0  # avoid looking into future
     main_size[1:] = _generate_size(signals)[:-1]
+
+    # Generate size for holding
+    hold_size = np.full_like(main_size, 0.)
+    hold_size[0] = np.inf
 
     # Generate size for random
     def _shuffle_along_axis(a, axis):
@@ -1033,40 +1053,47 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
         rand_size[1:, i] = _generate_size(rand_signals)[:-1]
 
     # Simulate portfolio
-    def _simulate_portfolio(size):
-        entries = size > 0
-        exits = size < 0
+    def _simulate_portfolio(size, init_cash):
         accumulate = 'allow_inc_position' in sim_options
         accumulate_exit_mode = AccumulateExitMode.Reduce \
             if 'allow_dec_position' in sim_options else AccumulateExitMode.Close
-        if not accumulate:
-            size = 1.
-        else:
-            size = np.abs(size) / 100  # TA-Lib functions have output in increments of 100
         return vbt.Portfolio.from_signals(
-            df['Close'],
-            entries,
-            exits,
+            close=df['Close'],
+            entries=size > 0,
+            exits=size < 0,
             entry_price=df['Open'],
             exit_price=df['Open'],
-            size=size,
+            size=np.abs(size),
             accumulate=accumulate,
             accumulate_exit_mode=accumulate_exit_mode,
-            init_cash=InitCashMode.AutoAlign,
+            init_cash=init_cash,
             fees=float(fees) / 100,
             fixed_fees=float(fixed_fees),
             slippage=(float(slippage) / 100) * (df['High'] / df['Open'] - 1),
             freq=inputs[2]
         )
 
-    return _simulate_portfolio(main_size), _simulate_portfolio(rand_size)
+    # Align initial cash across main and random strategies
+    aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)), InitCashMode.AutoAlign)
+    # Fixate initial cash for indexing
+    aligned_portfolio = aligned_portfolio.copy(
+        init_cash=aligned_portfolio.init_cash,
+        init_cash_mode=None
+    )
+    # Separate portfolios
+    main_portfolio = aligned_portfolio.iloc[0]
+    rand_portfolio = aligned_portfolio.iloc[1:]
+
+    # Simulate holding portfolio
+    hold_portfolio = _simulate_portfolio(hold_size, main_portfolio.init_cash)
+
+    return main_portfolio, hold_portfolio, rand_portfolio
 
 
 @app.callback(
     [Output(component_id='value-graph', component_property='figure'),
      Output(component_id='stats-table', component_property='data'),
      Output(component_id='stats-signal', component_property='children'),
-     Output(component_id='rand-stats-signal', component_property='children'),
      Output(component_id='metric-dropdown', component_property='options'),
      Output(component_id='metric-dropdown', component_property='value')],
     [Input(component_id='data-signal', component_property='children'),
@@ -1079,18 +1106,19 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
      Input(component_id='slippage-input', component_property='value'),
      Input(component_id='sim-checklist', component_property='value'),
      Input(component_id='n-random-strat-input', component_property='value'),
-     Input(component_id='stats-checklist', component_property='value')],
+     Input(component_id='stats-checklist', component_property='value'),
+     Input(component_id="reset-button", component_property="n_clicks")],
     [State(component_id='metric-dropdown', component_property='value')]
 )
-def update_stats(inputs, date_range, entry_patterns, exit_patterns, _, fees, fixed_fees,
-                 slippage, sim_options, n_random_strat, stats_options, curr_metric):
+def update_stats(inputs, date_range, entry_patterns, exit_patterns, _1, fees, fixed_fees,
+                 slippage, sim_options, n_random_strat, stats_options, _2, curr_metric):
     # Simulate portfolio
-    portfolio, rand_portfolio = simulate_portfolio(
+    main_portfolio, hold_portfolio, rand_portfolio = simulate_portfolio(
         inputs, date_range, entry_patterns, exit_patterns,
         fees, fixed_fees, slippage, sim_options, n_random_strat)
 
     # Get orders
-    buy_trace, sell_trace = portfolio.orders.plot().data[1:]
+    buy_trace, sell_trace = main_portfolio.orders.plot().data[1:]
     buy_trace.update(dict(
         x=pd.to_datetime(buy_trace.x),
         marker_line=None,
@@ -1110,33 +1138,33 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _, fees, fix
 
     # Get returns
     incl_unrealized = 'incl_unrealized' in stats_options
-    returns = portfolio.trades(incl_unrealized=incl_unrealized).returns
+    returns = main_portfolio.trades(incl_unrealized=incl_unrealized).returns
     profit_mask = returns.mapped_arr > 0
     loss_mask = returns.mapped_arr < 0
 
     figure = dict(
         data=[
             go.Scatter(
-                x=pd.to_datetime(portfolio.wrapper.index),
-                y=portfolio.shares(),
+                x=pd.to_datetime(main_portfolio.wrapper.index),
+                y=main_portfolio.shares(),
                 name="Holdings",
                 yaxis="y2",
                 line_color='#1f77b4'
             ),
             go.Scatter(
-                x=pd.to_datetime(portfolio.wrapper.index),
-                y=portfolio.value(),
+                x=pd.to_datetime(main_portfolio.wrapper.index),
+                y=main_portfolio.value(),
                 name="Value",
                 line_color='#2ca02c'
             ),
             go.Scatter(
-                x=pd.to_datetime(portfolio.wrapper.index),
-                y=portfolio.close / portfolio.close.iloc[0] * portfolio.init_cash,
-                name=f"Value ({inputs[0]})",
+                x=pd.to_datetime(hold_portfolio.wrapper.index),
+                y=hold_portfolio.value(),
+                name=f"Value (Holding)",
                 line_color='#ff7f0e'
             ),
             go.Scatter(
-                x=pd.to_datetime(portfolio.wrapper.index[returns.idx_arr[profit_mask]]),
+                x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[profit_mask]]),
                 y=returns.mapped_arr[profit_mask],
                 marker_color='#2ca02c',
                 marker_size=8,
@@ -1145,7 +1173,7 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _, fees, fix
                 yaxis="y3",
             ),
             go.Scatter(
-                x=pd.to_datetime(portfolio.wrapper.index[returns.idx_arr[loss_mask]]),
+                x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[loss_mask]]),
                 y=returns.mapped_arr[loss_mask],
                 marker_color='#d62728',
                 marker_size=8,
@@ -1201,15 +1229,13 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _, fees, fix
             return str(_chop_microseconds(x))
         return str(x)
 
-    stats = portfolio.stats(incl_unrealized=incl_unrealized)
-    stats.name = None
-    # NOTE: Portfolio.stats utilizes caching
+    main_stats = main_portfolio.stats(incl_unrealized=incl_unrealized)
+    hold_stats = hold_portfolio.stats(incl_unrealized=True)
     rand_stats = rand_portfolio.stats(incl_unrealized=incl_unrealized, agg_func=None)
-    rand_stats.index = np.arange(len(rand_stats.index))
     rand_stats_median = rand_stats.iloc[:, 3:].median(axis=0)
     rand_stats_mean = rand_stats.iloc[:, 3:].mean(axis=0)
     rand_stats_std = rand_stats.iloc[:, 3:].std(axis=0, ddof=0)
-    stats_mean_diff = stats.iloc[3:] - rand_stats_mean
+    stats_mean_diff = main_stats.iloc[3:] - rand_stats_mean
 
     def _to_float(x):
         if pd.isnull(x):
@@ -1224,61 +1250,86 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _, fees, fix
     z = stats_mean_diff.apply(_to_float) / rand_stats_std.apply(_to_float)
 
     table_data = pd.DataFrame(columns=stats_table_columns)
-    table_data.iloc[:, 0] = stats.index
-    table_data.iloc[:, 2] = stats.apply(_metric_to_str).values
-    table_data.iloc[:3, 1] = table_data.iloc[:3, 2]
-    table_data.iloc[3:, 1] = rand_stats_median.apply(_metric_to_str).values
-    table_data.iloc[3:, 3] = z.apply(_metric_to_str).values
+    table_data.iloc[:, 0] = main_stats.index
+    table_data.iloc[:, 1] = hold_stats.apply(_metric_to_str).values
+    table_data.iloc[:3, 2] = table_data.iloc[:3, 1]
+    table_data.iloc[3:, 2] = rand_stats_median.apply(_metric_to_str).values
+    table_data.iloc[:, 3] = main_stats.apply(_metric_to_str).values
+    table_data.iloc[3:, 4] = z.apply(_metric_to_str).values
 
     metric = curr_metric
-    if curr_metric is None:
-        metric = 'Total Return [%]'
+    ctx = dash.callback_context
+    if ctx.triggered:
+        control_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        if control_id == 'reset-button':
+            metric = default_metric
+    if metric is None:
+        metric = default_metric
     return figure, \
            table_data.to_dict("records"), \
-           json.dumps({m: [_to_float(stats[m])] for m in stats.index[3:]}), \
-           json.dumps({m: rand_stats[m].apply(_to_float).values.tolist() for m in stats.index[3:]}), \
-           [{"label": i, "value": i} for i in stats.index[3:]], \
+           json.dumps({
+               'main': {m: [_to_float(main_stats[m])] for m in main_stats.index[3:]},
+               'hold': {m: [_to_float(hold_stats[m])] for m in main_stats.index[3:]},
+               'rand': {m: rand_stats[m].apply(_to_float).values.tolist() for m in main_stats.index[3:]}
+           }), \
+           [{"label": i, "value": i} for i in main_stats.index[3:]], \
            metric
 
 
 @app.callback(
     Output(component_id='metric-graph', component_property='figure'),
     [Input(component_id='stats-signal', component_property='children'),
-     Input(component_id='rand-stats-signal', component_property='children'),
      Input(component_id='metric-dropdown', component_property='value')]
 )
-def update_metric_stats(stats_json, rand_stats_json, metric):
+def update_metric_stats(stats_json, metric):
     stats_dict = json.loads(stats_json)
-    rand_stats_dict = json.loads(rand_stats_json)
     return dict(
         data=[
             go.Box(
-                x=rand_stats_dict[metric],
+                x=stats_dict['rand'][metric],
                 quartilemethod="linear",
                 jitter=0.3,
                 pointpos=1.8,
                 boxpoints='all',
                 boxmean='sd',
                 hoveron="points",
-                name='Random',
+                hovertemplate='%{x}<br>Random',
+                name='',
                 marker=dict(
-                    color="#17becf",
+                    color="#1f77b4",
                     opacity=0.5,
                     size=8,
                 ),
             ),
             go.Box(
-                x=stats_dict[metric],
+                x=stats_dict['hold'][metric],
                 quartilemethod="linear",
                 boxpoints="all",
                 jitter=0,
-                pointpos=0.,
+                pointpos=1.8,
                 hoveron="points",
+                hovertemplate='%{x}<br>Holding',
                 fillcolor="rgba(0,0,0,0)",
                 line=dict(color="rgba(0,0,0,0)"),
-                name='Strategy',
+                name='',
                 marker=dict(
                     color="#ff7f0e",
+                    size=8,
+                ),
+            ),
+            go.Box(
+                x=stats_dict['main'][metric],
+                quartilemethod="linear",
+                boxpoints="all",
+                jitter=0,
+                pointpos=1.8,
+                hoveron="points",
+                hovertemplate='%{x}<br>Strategy',
+                fillcolor="rgba(0,0,0,0)",
+                line=dict(color="rgba(0,0,0,0)"),
+                name='',
+                marker=dict(
+                    color="#2ca02c",
                     size=8,
                 ),
             ),

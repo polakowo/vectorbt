@@ -416,7 +416,13 @@ class Portfolio(Configured, PandasIndexer):
                 See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
 
                 !!! note
+                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
+                    to set the same initial cash for all columns/groups. Changing grouping
+                    will change the initial cash, so be aware when indexing.
+
                     Make sure that `init_cash` is a floating number if not using `InitCashMode`.
+
+
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
@@ -699,6 +705,10 @@ class Portfolio(Configured, PandasIndexer):
                 See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
 
                 !!! note
+                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
+                    to set the same initial cash for all columns/groups. Changing grouping
+                    will change the initial cash, so be aware when indexing.
+
                     Make sure that `init_cash` is a floating number if not using `InitCashMode`.
             cash_sharing (bool): Whether to share cash within the same group.
 
@@ -949,6 +959,10 @@ class Portfolio(Configured, PandasIndexer):
                 See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
 
                 !!! note
+                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
+                    to set the same initial cash for all columns/groups. Changing grouping
+                    will change the initial cash, so be aware when indexing.
+
                     Make sure that `init_cash` is a floating number if not using `InitCashMode`.
             cash_sharing (bool): Whether to share cash within the same group.
 
@@ -1226,25 +1240,24 @@ class Portfolio(Configured, PandasIndexer):
         """Initial amount of cash per column/group.
 
         Returns value per group if `cash_sharing` is `True`."""
-        if self.init_cash_mode is None:
-            init_cash = self._init_cash
-        else:
-            cash_flow = to_2d(self.cash_flow(group_by=self.cash_sharing), raw=True)
-            init_cash = -np.min(np.cumsum(cash_flow, axis=0), axis=0)
-            if self.init_cash_mode == InitCashMode.AutoAlign:
-                init_cash = np.full(init_cash.shape, np.max(init_cash))
-        return self.wrapper.wrap_reduced(init_cash, group_by=self.cash_sharing)
+        return self.init_cash_regrouped(group_by=self.cash_sharing)
 
     @cached_method
     def init_cash_regrouped(self, group_by=None):
         """Get cash flow series per column/group."""
-        init_cash = to_1d(self.init_cash, raw=True)
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            init_cash_regrouped = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
+        if self.init_cash_mode is None:
+            init_cash = to_1d(self._init_cash, raw=True)
+            if self.wrapper.grouper.is_grouped(group_by=group_by):
+                group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+                init_cash_regrouped = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
+            else:
+                group_counts = self.wrapper.grouper.get_group_counts()
+                init_cash_regrouped = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
         else:
-            group_counts = self.wrapper.grouper.get_group_counts()
-            init_cash_regrouped = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
+            cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
+            init_cash_regrouped = -np.min(np.cumsum(cash_flow, axis=0), axis=0)
+            if self.init_cash_mode == InitCashMode.AutoAlign:
+                init_cash_regrouped = np.full(init_cash_regrouped.shape, np.max(init_cash_regrouped))
         return self.wrapper.wrap_reduced(init_cash_regrouped, group_by=group_by)
 
     @cached_method
