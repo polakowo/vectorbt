@@ -12,8 +12,10 @@ from dash.dependencies import State, Input, Output
 from flask_caching import Cache
 import plotly.graph_objects as go
 
+import os
 import numpy as np
 import pandas as pd
+import json
 import random
 import yfinance as yf
 import talib
@@ -40,12 +42,31 @@ CACHE_CONFIG = {
 cache = Cache()
 cache.init_app(app.server, config=CACHE_CONFIG)
 
+GITHUB_LINK = os.environ.get(
+    "GITHUB_LINK",
+    "https://github.com/polakowo/vectorbt/tree/master/apps/candlestick-patterns",
+)
+
 # Settings
 periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
 intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1d', '5d', '1wk', '1mo', '3mo']
 patterns = talib.get_function_groups()['Pattern Recognition']
 stats_table_columns = ["Metric", "Random (Median)", "Strategy", "Z-Score"]
-candle_settings = pd.DataFrame({
+
+data_path = 'data/data.h5'
+default_symbol = 'BTC-USD'
+default_period = '1y'
+default_interval = '1d'
+default_date_range = [0, 1]
+default_fees = 0.1
+default_fixed_fees = 0.
+default_slippage = 5.
+default_yf_options = ['auto_adjust']
+default_exit_n_random = default_entry_n_random = 5
+default_entry_patterns = random.sample(patterns, default_entry_n_random)
+default_exit_options = []
+default_exit_patterns = random.sample(patterns, default_exit_n_random)
+default_candle_settings = pd.DataFrame({
     'SettingType': [
         'BodyLong',
         'BodyVeryLong',
@@ -99,18 +120,6 @@ candle_settings = pd.DataFrame({
         0.05
     ]
 })
-
-data_path = 'data/data.h5'
-default_asset = 'BTC-USD'
-default_period = '1y'
-default_interval = '1d'
-default_date_range = [0, 1]
-default_fees = 0.1
-default_fixed_fees = 0.
-default_slippage = 5.
-default_yf_options = ['auto_adjust']
-default_exit_n_random = default_entry_n_random = 5
-default_exit_options = ['same_as_entry']
 default_sim_options = ['allow_inc_position', 'allow_dec_position']
 default_n_random_strat = 50
 default_stats_options = ['incl_unrealized']
@@ -120,10 +129,10 @@ default_layout = dict(
     automargin=True,
     margin=dict(b=40, t=20),
     font=dict(
-        color="#a5a5a5"
+        color="#9fa6b7"
     ),
-    plot_bgcolor="#22252b",
-    paper_bgcolor="#22252b",
+    plot_bgcolor="#1f2536",
+    paper_bgcolor="#1f2536",
     legend=dict(
         font=dict(size=10),
         orientation="h",
@@ -136,6 +145,20 @@ default_layout = dict(
 
 app.layout = html.Div(
     children=[
+        html.Div(
+            className="banner",
+            children=[
+                html.H6("Candlestick patterns"),
+                html.Div(
+                    html.A(
+                        "View on GitHub",
+                        href=GITHUB_LINK,
+                        target="_blank",
+                        className="button",
+                    )
+                ),
+            ],
+        ),
         dbc.Row(
             children=[
                 dbc.Col(
@@ -147,13 +170,13 @@ app.layout = html.Div(
                                 html.Div(
                                     className="banner",
                                     children=[
-                                        html.H6("Price, signals and volume")
+                                        html.H6("OHLCV and indicators")
                                     ],
                                 ),
                                 dcc.Loading(
                                     id="ohlcv-loading",
                                     type="default",
-                                    color="#F0F3F4",
+                                    color="#387c9e",
                                     children=[
                                         dcc.Graph(
                                             id="ohlcv-graph",
@@ -181,7 +204,7 @@ app.layout = html.Div(
                                                 dcc.Loading(
                                                     id="value-loading",
                                                     type="default",
-                                                    color="#F0F3F4",
+                                                    color="#387c9e",
                                                     children=[
                                                         dcc.Graph(
                                                             id="value-graph",
@@ -214,7 +237,7 @@ app.layout = html.Div(
                                                 dcc.Loading(
                                                     id="stats-loading",
                                                     type="default",
-                                                    color="#F0F3F4",
+                                                    color="#387c9e",
                                                     children=[
                                                         dash_table.DataTable(
                                                             id="stats-table",
@@ -232,26 +255,29 @@ app.layout = html.Div(
                                                                 "if": {"column_id": stats_table_columns[2]},
                                                                 "fontWeight": "bold",
                                                             }, {
+                                                                "if": {"column_id": stats_table_columns[3]},
+                                                                "fontWeight": "bold",
+                                                            }, {
                                                                 "if": {"state": "selected"},
-                                                                "backgroundColor": "#1a1c23",
-                                                                "color": "#F0F3F4",
-                                                                "border": "1px solid #F0F3F4",
+                                                                "backgroundColor": "#171b26",
+                                                                "color": "#88ccee",
+                                                                "border": "1px solid #88ccee",
                                                             }, {
                                                                 "if": {"state": "active"},
-                                                                "backgroundColor": "#1a1c23",
-                                                                "color": "#F0F3F4",
-                                                                "border": "1px solid #F0F3F4",
+                                                                "backgroundColor": "#171b26",
+                                                                "color": "#88ccee",
+                                                                "border": "1px solid #88ccee",
                                                             }],
                                                             style_header={
                                                                 "border": "none",
-                                                                "backgroundColor": "#22252b",
+                                                                "backgroundColor": "#1f2536",
                                                                 "fontWeight": "bold",
                                                                 "padding": "0px 5px"
                                                             },
                                                             style_data={
                                                                 "border": "none",
-                                                                "backgroundColor": "#22252b",
-                                                                "color": "#7b7d7d"
+                                                                "backgroundColor": "#1f2536",
+                                                                "color": "#7b7d8d"
                                                             },
                                                             style_as_list_view=False,
                                                             editable=False,
@@ -263,7 +289,58 @@ app.layout = html.Div(
                                     ]
                                 )
                             ]
-                        )
+                        ),
+                        dbc.Row(
+                            children=[
+                                dbc.Col(
+                                    children=[
+                                        html.Div(
+                                            className="pretty-container",
+                                            children=[
+                                                html.Div(
+                                                    className="banner",
+                                                    children=[
+                                                        html.H6("Metric stats")
+                                                    ],
+                                                ),
+                                                dcc.Loading(
+                                                    id="metric-stats-loading",
+                                                    type="default",
+                                                    color="#387c9e",
+                                                    children=[
+                                                        html.Label("Metric:"),
+                                                        dbc.Row(
+                                                            children=[
+                                                                dbc.Col(
+                                                                    width=4,
+                                                                    children=[
+                                                                        dcc.Dropdown(
+                                                                            id="metric-dropdown"
+                                                                        ),
+                                                                    ]
+                                                                ),
+                                                                dbc.Col(
+                                                                    width=8,
+                                                                    children=[
+                                                                        dcc.Graph(
+                                                                            id="metric-graph",
+                                                                            figure={
+                                                                                "layout": default_layout
+                                                                            }
+                                                                        )
+                                                                    ]
+                                                                )
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
+                                    ]
+                                )
+                            ]
+                        ),
+
                     ]
                 ),
                 dbc.Col(
@@ -294,7 +371,7 @@ app.layout = html.Div(
                                             id="symbol-input",
                                             className="input-control",
                                             type="text",
-                                            value=default_asset,
+                                            value=default_symbol,
                                             placeholder="Enter symbol...",
                                             debounce=True
                                         ),
@@ -304,7 +381,7 @@ app.layout = html.Div(
                                                     children=[
                                                         html.Label("Period:"),
                                                         dcc.Dropdown(
-                                                            id="period-select",
+                                                            id="period-dropdown",
                                                             options=[{"label": i, "value": i} for i in periods],
                                                             value=default_period,
                                                         ),
@@ -314,7 +391,7 @@ app.layout = html.Div(
                                                     children=[
                                                         html.Label("Interval:"),
                                                         dcc.Dropdown(
-                                                            id="interval-select",
+                                                            id="interval-dropdown",
                                                             options=[{"label": i, "value": i} for i in intervals],
                                                             value=default_interval,
                                                         ),
@@ -334,15 +411,15 @@ app.layout = html.Div(
                                         dcc.Checklist(
                                             id="yf-checklist",
                                             options=[{
-                                                "label": "Adjust all OHLC automatically?",
+                                                "label": "Adjust all OHLC automatically",
                                                 "value": "auto_adjust"
                                             }, {
-                                                "label": "Use back-adjusted data to mimic true historical prices?",
+                                                "label": "Use back-adjusted data to mimic true historical prices",
                                                 "value": "back_adjust"
                                             }],
                                             value=default_yf_options,
                                             style={
-                                                "color": "#7b7d7d"
+                                                "color": "#7b7d8d"
                                             }
                                         ),
                                     ],
@@ -394,7 +471,7 @@ app.layout = html.Div(
                                                     id="entry-pattern-dropdown",
                                                     options=[{"label": i, "value": i} for i in patterns],
                                                     multi=True,
-                                                    value=[],
+                                                    value=default_entry_patterns,
                                                 ),
 
                                             ],
@@ -411,17 +488,17 @@ app.layout = html.Div(
                                         dcc.Checklist(
                                             id="exit-checklist",
                                             options=[{
-                                                "label": "Same as entry patterns?",
+                                                "label": "Same as entry patterns",
                                                 "value": "same_as_entry"
                                             }],
                                             value=default_exit_options,
                                             style={
-                                                "color": "#7b7d7d"
+                                                "color": "#7b7d8d"
                                             }
                                         ),
                                         html.Div(
                                             id='exit-settings',
-                                            hidden=True,
+                                            hidden="same_as_entry" in default_exit_options,
                                             children=[
                                                 html.Button(
                                                     "All",
@@ -460,7 +537,7 @@ app.layout = html.Div(
                                                     id="exit-pattern-dropdown",
                                                     options=[{"label": i, "value": i} for i in patterns],
                                                     multi=True,
-                                                    value=[],
+                                                    value=default_exit_patterns,
                                                 ),
 
                                             ],
@@ -480,40 +557,36 @@ app.layout = html.Div(
                                                     "name": c,
                                                     "id": c,
                                                     "editable": i in (2, 3),
-                                                    "type": "numeric" if i in (2, 3) else "any",
-                                                    "on_change": {
-                                                        "action": "validate",
-                                                        "failure": "default"
-                                                    },
+                                                    "type": "numeric" if i in (2, 3) else "any"
                                                 }
-                                                for i, c in enumerate(candle_settings.columns)
+                                                for i, c in enumerate(default_candle_settings.columns)
                                             ],
-                                            data=candle_settings.to_dict("records"),
+                                            data=default_candle_settings.to_dict("records"),
                                             style_data_conditional=[{
                                                 "if": {"column_editable": True},
-                                                "backgroundColor": "#1a1c23",
+                                                "backgroundColor": "#171b26",
                                                 "border": "1px solid dimgrey"
                                             }, {
                                                 "if": {"state": "selected"},
-                                                "backgroundColor": "#1a1c23",
-                                                "color": "#F0F3F4",
-                                                "border": "1px solid #F0F3F4",
+                                                "backgroundColor": "#171b26",
+                                                "color": "#88ccee",
+                                                "border": "1px solid #88ccee",
                                             }, {
                                                 "if": {"state": "active"},
-                                                "backgroundColor": "#1a1c23",
-                                                "color": "#F0F3F4",
-                                                "border": "1px solid #F0F3F4",
+                                                "backgroundColor": "#171b26",
+                                                "color": "#88ccee",
+                                                "border": "1px solid #88ccee",
                                             }],
                                             style_header={
                                                 "border": "none",
-                                                "backgroundColor": "#22252b",
+                                                "backgroundColor": "#1f2536",
                                                 "fontWeight": "bold",
                                                 "padding": "0px 5px"
                                             },
                                             style_data={
                                                 "border": "none",
-                                                "backgroundColor": "#22252b",
-                                                "color": "#7b7d7d"
+                                                "backgroundColor": "#1f2536",
+                                                "color": "#7b7d8d"
                                             },
                                             style_as_list_view=False,
                                             editable=True,
@@ -591,18 +664,18 @@ app.layout = html.Div(
                                         dcc.Checklist(
                                             id="sim-checklist",
                                             options=[{
-                                                "label": "Allow increasing position?",
+                                                "label": "Allow increasing position",
                                                 "value": "allow_inc_position"
                                             }, {
-                                                "label": "Allow decreasing position?",
+                                                "label": "Allow decreasing position",
                                                 "value": "allow_dec_position"
                                             }],
                                             value=default_sim_options,
                                             style={
-                                                "color": "#7b7d7d"
+                                                "color": "#7b7d8d"
                                             }
                                         ),
-                                        html.Label("Number of random strategies to compare main to:"),
+                                        html.Label("Number of random strategies to test against:"),
                                         dbc.Row(
                                             children=[
                                                 dbc.Col(
@@ -624,12 +697,12 @@ app.layout = html.Div(
                                         dcc.Checklist(
                                             id="stats-checklist",
                                             options=[{
-                                                "label": "Include unrealized P&L in stats?",
+                                                "label": "Include unrealized P&L in stats",
                                                 "value": "incl_unrealized"
                                             }],
                                             value=default_stats_options,
                                             style={
-                                                "color": "#7b7d7d"
+                                                "color": "#7b7d8d"
                                             }
                                         ),
                                     ],
@@ -640,8 +713,10 @@ app.layout = html.Div(
                 )
             ]
         ),
-        html.Div(id='update-data-signal', style={'display': 'none'}),
-        html.Div(id='set-candle-settings-signal', style={'display': 'none'}),
+        html.Div(id='data-signal', style={'display': 'none'}),
+        html.Div(id='candle-settings-signal', style={'display': 'none'}),
+        html.Div(id='stats-signal', style={'display': 'none'}),
+        html.Div(id='rand-stats-signal', style={'display': 'none'}),
     ],
 )
 
@@ -663,10 +738,10 @@ def global_data_store(symbol, period, interval, auto_adjust, back_adjust):
 
 
 @app.callback(
-    Output(component_id='update-data-signal', component_property='children'),
+    Output(component_id='data-signal', component_property='children'),
     [Input(component_id='symbol-input', component_property='value'),
-     Input(component_id='period-select', component_property='value'),
-     Input(component_id='interval-select', component_property='value'),
+     Input(component_id='period-dropdown', component_property='value'),
+     Input(component_id='interval-dropdown', component_property='value'),
      Input(component_id="yf-checklist", component_property="value")]
 )
 def update_data(symbol, period, interval, yf_options):
@@ -678,16 +753,20 @@ def update_data(symbol, period, interval, yf_options):
 
 
 @app.callback(
-    Output(component_id='set-candle-settings-signal', component_property='children'),
+    Output(component_id='candle-settings-signal', component_property='children'),
     [Input(component_id='candle-settings-table', component_property='data')]
 )
 def set_candle_settings(data):
     for d in data:
+        AvgPeriod = d["AvgPeriod"]
+        if isinstance(AvgPeriod, float) and float.is_integer(AvgPeriod):
+            AvgPeriod = int(AvgPeriod)
+        Factor = float(d["Factor"])
         _ta_set_candle_settings(
             getattr(CandleSettingType, d["SettingType"]),
             getattr(RangeType, d["RangeType"]),
-            d["AvgPeriod"],
-            d["Factor"]
+            AvgPeriod,
+            Factor
         )
 
 
@@ -695,7 +774,7 @@ def set_candle_settings(data):
     [Output(component_id='date-slider', component_property='min'),
      Output(component_id='date-slider', component_property='max'),
      Output(component_id='date-slider', component_property='value')],
-    [Input(component_id='update-data-signal', component_property='children')]
+    [Input(component_id='data-signal', component_property='children')]
 )
 def update_date_range(inputs):
     df = global_data_store(*inputs)
@@ -706,10 +785,11 @@ def update_date_range(inputs):
     Output(component_id='entry-pattern-dropdown', component_property='value'),
     [Input(component_id="entry-all-button", component_property="n_clicks"),
      Input(component_id="entry-random-button", component_property="n_clicks"),
-     Input(component_id="entry-clear-button", component_property="n_clicks")],
+     Input(component_id="entry-clear-button", component_property="n_clicks"),
+     Input(component_id="reset-button", component_property="n_clicks")],
     [State(component_id="entry-n-random-input", component_property="value")]
 )
-def select_all_entry_patterns(_1, _2, _3, n_random):
+def select_all_entry_patterns(_1, _2, _3, _4, n_random):
     ctx = dash.callback_context
     if ctx.triggered:
         button_id = ctx.triggered[0]['prop_id'].split('.')[0]
@@ -719,6 +799,8 @@ def select_all_entry_patterns(_1, _2, _3, n_random):
             return random.sample(patterns, n_random)
         elif button_id == 'entry-clear-button':
             return []
+        elif button_id == 'reset-button':
+            return default_entry_patterns
     return dash.no_update
 
 
@@ -730,11 +812,12 @@ def select_all_entry_patterns(_1, _2, _3, n_random):
      Input(component_id="exit-all-button", component_property="n_clicks"),
      Input(component_id="exit-random-button", component_property="n_clicks"),
      Input(component_id="exit-clear-button", component_property="n_clicks"),
+     Input(component_id="reset-button", component_property="n_clicks"),
      Input(component_id="entry-n-random-input", component_property="value"),
      Input(component_id='entry-pattern-dropdown', component_property='value')],
     [State(component_id="exit-n-random-input", component_property="value")]
 )
-def select_all_exit_patterns(exit_options, _1, _2, _3, entry_n_random, entry_patterns, exit_n_random):
+def select_all_exit_patterns(exit_options, _1, _2, _3, _4, entry_n_random, entry_patterns, exit_n_random):
     ctx = dash.callback_context
     same_as_entry = 'same_as_entry' in exit_options
     if ctx.triggered:
@@ -747,6 +830,9 @@ def select_all_exit_patterns(exit_options, _1, _2, _3, entry_n_random, entry_pat
             return same_as_entry, exit_n_random, random.sample(patterns, exit_n_random)
         elif control_id == 'exit-clear-button':
             return same_as_entry, exit_n_random, []
+        elif control_id == 'reset-button':
+            default_same_as_entry = 'same_as_entry' in default_exit_options
+            return default_same_as_entry, default_exit_n_random, default_exit_patterns
         elif control_id in ('entry-n-random-input', 'entry-pattern-dropdown'):
             if same_as_entry:
                 return same_as_entry, entry_n_random, entry_patterns
@@ -755,13 +841,13 @@ def select_all_exit_patterns(exit_options, _1, _2, _3, entry_n_random, entry_pat
 
 @app.callback(
     Output(component_id='ohlcv-graph', component_property='figure'),
-    [Input(component_id='update-data-signal', component_property='children'),
+    [Input(component_id='data-signal', component_property='children'),
      Input(component_id='date-slider', component_property='value'),
      Input(component_id='entry-pattern-dropdown', component_property='value'),
      Input(component_id='exit-pattern-dropdown', component_property='value'),
-     Input(component_id='set-candle-settings-signal', component_property='children')]
+     Input(component_id='candle-settings-signal', component_property='children')]
 )
-def update_figure(inputs, date_range, entry_patterns, exit_patterns, _):
+def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
     # Get data
     df = global_data_store(*inputs)
 
@@ -977,21 +1063,26 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
 
 @app.callback(
     [Output(component_id='value-graph', component_property='figure'),
-     Output(component_id='stats-table', component_property='data')],
-    [Input(component_id='update-data-signal', component_property='children'),
+     Output(component_id='stats-table', component_property='data'),
+     Output(component_id='stats-signal', component_property='children'),
+     Output(component_id='rand-stats-signal', component_property='children'),
+     Output(component_id='metric-dropdown', component_property='options'),
+     Output(component_id='metric-dropdown', component_property='value')],
+    [Input(component_id='data-signal', component_property='children'),
      Input(component_id='date-slider', component_property='value'),
      Input(component_id='entry-pattern-dropdown', component_property='value'),
      Input(component_id='exit-pattern-dropdown', component_property='value'),
-     Input(component_id='set-candle-settings-signal', component_property='children'),
+     Input(component_id='candle-settings-signal', component_property='children'),
      Input(component_id='fees-input', component_property='value'),
      Input(component_id='fixed-fees-input', component_property='value'),
      Input(component_id='slippage-input', component_property='value'),
      Input(component_id='sim-checklist', component_property='value'),
      Input(component_id='n-random-strat-input', component_property='value'),
-     Input(component_id='stats-checklist', component_property='value')]
+     Input(component_id='stats-checklist', component_property='value')],
+    [State(component_id='metric-dropdown', component_property='value')]
 )
-def update_figure(inputs, date_range, entry_patterns, exit_patterns, _, fees, fixed_fees,
-                  slippage, sim_options, n_random_strat, stats_options):
+def update_stats(inputs, date_range, entry_patterns, exit_patterns, _, fees, fixed_fees,
+                 slippage, sim_options, n_random_strat, stats_options, curr_metric):
     # Simulate portfolio
     portfolio, rand_portfolio = simulate_portfolio(
         inputs, date_range, entry_patterns, exit_patterns,
@@ -1110,8 +1201,10 @@ def update_figure(inputs, date_range, entry_patterns, exit_patterns, _, fees, fi
         return str(x)
 
     stats = portfolio.stats(incl_unrealized=incl_unrealized)
+    stats.name = None
     # NOTE: Portfolio.stats utilizes caching
     rand_stats = rand_portfolio.stats(incl_unrealized=incl_unrealized, agg_func=None)
+    rand_stats.index = np.arange(len(rand_stats.index))
     rand_stats_median = rand_stats.iloc[:, 3:].median(axis=0)
     rand_stats_mean = rand_stats.iloc[:, 3:].mean(axis=0)
     rand_stats_std = rand_stats.iloc[:, 3:].std(axis=0, ddof=0)
@@ -1124,7 +1217,7 @@ def update_figure(inputs, date_range, entry_patterns, exit_patterns, _, fees, fi
             if np.allclose(x, 0):
                 return 0.
         if isinstance(x, pd.Timedelta):
-            return float(x.value)
+            return float(x.total_seconds())
         return float(x)
 
     z = stats_mean_diff.apply(_to_float) / rand_stats_std.apply(_to_float)
@@ -1136,7 +1229,110 @@ def update_figure(inputs, date_range, entry_patterns, exit_patterns, _, fees, fi
     table_data.iloc[3:, 1] = rand_stats_median.apply(_metric_to_str).values
     table_data.iloc[3:, 3] = z.apply(_metric_to_str).values
 
-    return figure, table_data.to_dict("records")
+    metric = curr_metric
+    if curr_metric is None:
+        metric = 'Total Return [%]'
+    return figure, \
+           table_data.to_dict("records"), \
+           json.dumps({m: [_to_float(stats[m])] for m in stats.index[3:]}), \
+           json.dumps({m: rand_stats[m].apply(_to_float).values.tolist() for m in stats.index[3:]}), \
+           [{"label": i, "value": i} for i in stats.index[3:]], \
+           metric
+
+
+@app.callback(
+    Output(component_id='metric-graph', component_property='figure'),
+    [Input(component_id='stats-signal', component_property='children'),
+     Input(component_id='rand-stats-signal', component_property='children'),
+     Input(component_id='metric-dropdown', component_property='value')]
+)
+def update_metric_stats(stats_json, rand_stats_json, metric):
+    stats_dict = json.loads(stats_json)
+    rand_stats_dict = json.loads(rand_stats_json)
+    return dict(
+        data=[
+            go.Box(
+                x=rand_stats_dict[metric],
+                quartilemethod="linear",
+                jitter=0.3,
+                pointpos=1.8,
+                boxpoints='all',
+                boxmean='sd',
+                hoveron="points",
+                name='Random',
+                marker=dict(
+                    color="#17becf",
+                    opacity=0.5,
+                    size=8,
+                ),
+            ),
+            go.Box(
+                x=stats_dict[metric],
+                quartilemethod="linear",
+                boxpoints="all",
+                jitter=0,
+                pointpos=0.,
+                hoveron="points",
+                fillcolor="rgba(0,0,0,0)",
+                line=dict(color="rgba(0,0,0,0)"),
+                name='Strategy',
+                marker=dict(
+                    color="#ff7f0e",
+                    size=8,
+                ),
+            ),
+        ],
+        layout=merge_kwargs(
+            default_layout,
+            dict(
+                showlegend=False,
+                height=300,
+                margin=dict(l=60, r=20, t=40, b=20),
+                hovermode="closest",
+                xaxis=dict(
+                    gridcolor='#323b56',
+                    title=metric,
+                    side='top'
+                ),
+                yaxis=dict(
+                    gridcolor='#323b56'
+                ),
+            )
+        )
+    )
+
+
+@app.callback(
+    [Output(component_id='symbol-input', component_property='value'),
+     Output(component_id='period-dropdown', component_property='value'),
+     Output(component_id='interval-dropdown', component_property='value'),
+     Output(component_id="yf-checklist", component_property="value"),
+     Output(component_id="entry-n-random-input", component_property="value"),
+     Output(component_id="exit-checklist", component_property="value"),
+     Output(component_id='candle-settings-table', component_property='data'),
+     Output(component_id='fees-input', component_property='value'),
+     Output(component_id='fixed-fees-input', component_property='value'),
+     Output(component_id='slippage-input', component_property='value'),
+     Output(component_id='sim-checklist', component_property='value'),
+     Output(component_id='n-random-strat-input', component_property='value'),
+     Output(component_id='stats-checklist', component_property='value')],
+    [Input(component_id="reset-button", component_property="n_clicks")],
+    prevent_initial_call=True
+)
+def reset_settings(_):
+    return default_symbol, \
+           default_period, \
+           default_interval, \
+           default_yf_options, \
+           default_entry_n_random, \
+           default_exit_options, \
+           default_candle_settings.to_dict("records"), \
+           default_fees, \
+           default_fixed_fees, \
+           default_slippage, \
+           default_sim_options, \
+           default_n_random_strat, \
+           default_stats_options
 
 
 if __name__ == '__main__':

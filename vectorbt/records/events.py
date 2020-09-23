@@ -177,7 +177,7 @@ class BaseEvents(Records):
             ),
             name='Entry',
             customdata=entry_customdata,
-            hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.2f}"
+            hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.4f}"
         )
         entry_scatter.update(**entry_trace_kwargs)
         fig.add_trace(entry_scatter)
@@ -208,8 +208,8 @@ class BaseEvents(Records):
                 customdata=customdata,
                 hovertemplate="%{x}<br>Price: %{y}" +
                               "<br>Size: %{customdata[0]:.4f}" +
-                              "<br>Fees: %{customdata[1]:.2f}" +
-                              "<br>PnL: %{customdata[2]:.2f}" +
+                              "<br>Fees: %{customdata[1]:.4f}" +
+                              "<br>PnL: %{customdata[2]:.4f}" +
                               "<br>Return: %{customdata[3]:.2%}" +
                               "<br>Duration: %{customdata[4]}"
             )

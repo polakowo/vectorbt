@@ -137,7 +137,7 @@ class BaseOrders(Records):
             ),
             name='Buy',
             customdata=buy_customdata,
-            hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]}<br>Fees: %{customdata[1]}"
+            hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.4f}"
         )
         buy_scatter.update(**buy_trace_kwargs)
         fig.add_trace(buy_scatter)
@@ -160,7 +160,7 @@ class BaseOrders(Records):
             ),
             name='Sell',
             customdata=sell_customdata,
-            hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]}<br>Fees: %{customdata[1]}"
+            hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.4f}"
         )
         sell_scatter.update(**sell_trace_kwargs)
         fig.add_trace(sell_scatter)
