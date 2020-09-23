@@ -15,29 +15,29 @@ This app creates a dashboard to visualize and backtest candlestick patterns.
 To get started, first clone this repo:
 
 ```
-git clone https://github.com/polakowo/vectorbt.git
-cd vectorbt/apps/candlestick-patterns
+$ git clone https://github.com/polakowo/vectorbt.git
+$ cd vectorbt/apps/candlestick-patterns
 ```
 
 Create and activate a conda env:
 
 ```
-conda create -n candlestick-patterns python=3.7.6
-conda activate candlestick-patterns
+$ conda create -n candlestick-patterns python=3.7.6
+$ conda activate candlestick-patterns
 ```
 
 Or a venv (make sure your Python is 3.6+):
 
 ```
-python3 -m venv venv
-source venv/bin/activate  # Unix
-venv\Scripts\activate  # Windows
+$ python3 -m venv venv
+$ source venv/bin/activate  # Unix
+$ venv\Scripts\activate  # Windows
 ```
 
 Install the requirements:
 
 ```
-pip install -r requirements.txt
+$ pip install -r requirements.txt
 ```
 
 In case of errors related to TA-Lib, see [Troubleshooting](https://github.com/mrjbq7/ta-lib#troubleshooting).
@@ -45,7 +45,7 @@ In case of errors related to TA-Lib, see [Troubleshooting](https://github.com/mr
 Run the app:
 
 ```
-python app.py
+$ python app.py
 ```
 
 Visit [http://127.0.0.1:8050/](http://127.0.0.1:8050/)
