@@ -29,6 +29,27 @@ import vectorbt as vbt
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.portfolio.enums import InitCashMode, AccumulateExitMode
 
+USE_CACHING = os.environ.get(
+    "USE_CACHING",
+    "True",
+) == "True"
+HOST = os.environ.get(
+    "HOST",
+    "127.0.0.1",
+)
+PORT = int(os.environ.get(
+    "PORT",
+    8050,
+))
+DEBUG = os.environ.get(
+    "DEBUG",
+    "True",
+) == "True"
+GITHUB_LINK = os.environ.get(
+    "GITHUB_LINK",
+    "https://github.com/polakowo/vectorbt/tree/master/apps/candlestick-patterns",
+)
+
 app = dash.Dash(
     __name__,
     meta_tags=[
@@ -40,18 +61,13 @@ app = dash.Dash(
     external_stylesheets=[dbc.themes.GRID]
 )
 CACHE_CONFIG = {
-    'CACHE_TYPE': 'filesystem',
+    'CACHE_TYPE': 'filesystem' if USE_CACHING else 'null',
     'CACHE_DIR': 'data',
     'CACHE_DEFAULT_TIMEOUT': 0,
     'CACHE_THRESHOLD': 50
 }
 cache = Cache()
 cache.init_app(app.server, config=CACHE_CONFIG)
-
-GITHUB_LINK = os.environ.get(
-    "GITHUB_LINK",
-    "https://github.com/polakowo/vectorbt/tree/master/apps/candlestick-patterns",
-)
 
 # Settings
 periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
@@ -70,9 +86,21 @@ default_fixed_fees = 0.
 default_slippage = 5.
 default_yf_options = ['auto_adjust']
 default_exit_n_random = default_entry_n_random = 5
-default_entry_patterns = random.sample(patterns, default_entry_n_random)
+default_entry_patterns = [
+    'CDLHAMMER',
+    'CDLINVERTEDHAMMER',
+    'CDLPIERCING',
+    'CDLMORNINGSTAR',
+    'CDL3WHITESOLDIERS'
+]
 default_exit_options = []
-default_exit_patterns = random.sample(patterns, default_exit_n_random)
+default_exit_patterns = [
+    'CDLHANGINGMAN',
+    'CDLSHOOTINGSTAR',
+    'CDLEVENINGSTAR',
+    'CDL3BLACKCROWS',
+    'CDLDARKCLOUDCOVER'
+]
 default_candle_settings = pd.DataFrame({
     'SettingType': [
         'BodyLong',
@@ -645,10 +673,11 @@ app.layout = html.Div(
                                                         dcc.Input(
                                                             id="fees-input",
                                                             className="input-control",
-                                                            type="text",
+                                                            type="number",
                                                             value=default_fees,
                                                             placeholder="Enter fees...",
-                                                            debounce=True
+                                                            debounce=True,
+                                                            min=0, max=100
                                                         ),
                                                     ]
                                                 ),
@@ -657,10 +686,11 @@ app.layout = html.Div(
                                                         dcc.Input(
                                                             id="fixed-fees-input",
                                                             className="input-control",
-                                                            type="text",
+                                                            type="number",
                                                             value=default_fixed_fees,
                                                             placeholder="Enter fixed fees...",
-                                                            debounce=True
+                                                            debounce=True,
+                                                            min=0
                                                         ),
                                                     ]
                                                 ),
@@ -669,10 +699,11 @@ app.layout = html.Div(
                                                         dcc.Input(
                                                             id="slippage-input",
                                                             className="input-control",
-                                                            type="text",
+                                                            type="number",
                                                             value=default_slippage,
                                                             placeholder="Enter slippage...",
-                                                            debounce=True
+                                                            debounce=True,
+                                                            min=0, max=100
                                                         ),
                                                     ]
 
@@ -704,7 +735,8 @@ app.layout = html.Div(
                                                             value=default_n_random_strat,
                                                             placeholder="Enter number...",
                                                             debounce=True,
-                                                            type="number"
+                                                            type="number",
+                                                            min=10, max=1000, step=1
                                                         ),
                                                     ]
                                                 ),
@@ -1388,4 +1420,4 @@ def reset_settings(_):
 
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(host=HOST, port=PORT, debug=DEBUG)

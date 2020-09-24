@@ -12,6 +12,21 @@ This app creates a dashboard to visualize and backtest candlestick patterns.
 
 ## How to run the app
 
+### Using Docker
+
+Build the Docker image and run the container:
+
+```
+$ docker build -t candlestick-patterns . 
+$ docker run -p 8050:8050 -e HOST='0.0.0.0' candlestick-patterns
+```
+
+Visit [http://127.0.0.1:8050/](http://127.0.0.1:8050/)
+
+Note: Compiling for the first time may take a while.
+
+### Using virtual environment
+
 To get started, first clone this repo:
 
 ```
@@ -49,8 +64,6 @@ $ python app.py
 ```
 
 Visit [http://127.0.0.1:8050/](http://127.0.0.1:8050/)
-
-Note: Compiling for the first time may take a while.
 
 ## Screenshot
 
