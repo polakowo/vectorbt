@@ -114,7 +114,7 @@ span.Select-clear-zone {
     cursor: pointer;
 }
 
-label {
+label, small {
     color: #7b7d8d;
 }
 
@@ -152,7 +152,7 @@ label {
     box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
 }
 
-#yfinance-checklist {
+#yfinance_checklist {
     color: #7b7d8d;
 }
 
@@ -188,5 +188,20 @@ label {
 
 .dash-spreadsheet-inner .row {
     margin: 0px;
+}
+
+#ohlcv_graph .svg-container {
+    min-height: 400px !important;
+    height: calc(9/21 * 2/3 * 100vw) !important;
+}
+
+#value_graph .svg-container {
+    min-height: 500px !important;
+    height: calc(9/21 * 2/3 * 100vw) !important;
+}
+
+#metric_graph .svg-container {
+    min-height: 300px !important;
+    height: calc(9/21 * 2/3 * 2/3 * 100vw) !important;
 }
 

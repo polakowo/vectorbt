@@ -73,7 +73,7 @@ cache.init_app(app.server, config=CACHE_CONFIG)
 periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max']
 intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1d', '5d', '1wk', '1mo', '3mo']
 patterns = talib.get_function_groups()['Pattern Recognition']
-stats_table_columns = ["Metric", "Holding", "Random (Median)", "Strategy", "Z-Score"]
+stats_table_columns = ["Metric", "Buy & Hold", "Random (Median)", "Strategy", "Z-Score"]
 
 data_path = 'data/data.h5'
 default_metric = 'Total Return [%]'
@@ -86,6 +86,9 @@ default_fixed_fees = 0.
 default_slippage = 5.
 default_yf_options = ['auto_adjust']
 default_exit_n_random = default_entry_n_random = 5
+default_prob_options = ['mimic_strategy']
+default_entry_prob = 0.1
+default_exit_prob = 0.1
 default_entry_patterns = [
     'CDLHAMMER',
     'CDLINVERTEDHAMMER',
@@ -155,11 +158,12 @@ default_candle_settings = pd.DataFrame({
         0.05
     ]
 })
+default_entry_dates = []
+default_exit_dates = []
 default_sim_options = ['allow_inc_position', 'allow_dec_position']
 default_n_random_strat = 50
 default_stats_options = ['incl_unrealized']
 default_layout = dict(
-    height=200,
     autosize=True,
     automargin=True,
     margin=dict(b=40, t=20),
@@ -183,7 +187,7 @@ app.layout = html.Div(
         html.Div(
             className="banner",
             children=[
-                html.H6("Candlestick patterns"),
+                html.H6("Candlestick patterns @ VBT"),
                 html.Div(
                     html.A(
                         "View on GitHub",
@@ -205,22 +209,23 @@ app.layout = html.Div(
                                 html.Div(
                                     className="banner",
                                     children=[
-                                        html.H6("OHLCV and indicators")
+                                        html.H6("OHLCV and signals")
                                     ],
                                 ),
                                 dcc.Loading(
-                                    id="ohlcv-loading",
+                                    id="ohlcv_loading",
                                     type="default",
                                     color="#387c9e",
                                     children=[
                                         dcc.Graph(
-                                            id="ohlcv-graph",
+                                            id="ohlcv_graph",
                                             figure={
                                                 "layout": default_layout
                                             }
                                         )
                                     ],
                                 ),
+                                html.Small("Hint: Use Box and Lasso Select to filter signals"),
                             ],
                         ),
                         dbc.Row(
@@ -237,12 +242,12 @@ app.layout = html.Div(
                                                     ],
                                                 ),
                                                 dcc.Loading(
-                                                    id="value-loading",
+                                                    id="value_loading",
                                                     type="default",
                                                     color="#387c9e",
                                                     children=[
                                                         dcc.Graph(
-                                                            id="value-graph",
+                                                            id="value_graph",
                                                             figure={
                                                                 "layout": default_layout
                                                             }
@@ -270,12 +275,12 @@ app.layout = html.Div(
                                                     ],
                                                 ),
                                                 dcc.Loading(
-                                                    id="stats-loading",
+                                                    id="stats_loading",
                                                     type="default",
                                                     color="#387c9e",
                                                     children=[
                                                         dash_table.DataTable(
-                                                            id="stats-table",
+                                                            id="stats_table",
                                                             columns=[
                                                                 {
                                                                     "name": c,
@@ -347,7 +352,7 @@ app.layout = html.Div(
                                                     ],
                                                 ),
                                                 dcc.Loading(
-                                                    id="metric-stats-loading",
+                                                    id="metric_stats_loading",
                                                     type="default",
                                                     color="#387c9e",
                                                     children=[
@@ -358,7 +363,7 @@ app.layout = html.Div(
                                                                     lg=4, sm=12,
                                                                     children=[
                                                                         dcc.Dropdown(
-                                                                            id="metric-dropdown"
+                                                                            id="metric_dropdown"
                                                                         ),
                                                                     ]
                                                                 ),
@@ -366,7 +371,7 @@ app.layout = html.Div(
                                                                     lg=8, sm=12,
                                                                     children=[
                                                                         dcc.Graph(
-                                                                            id="metric-graph",
+                                                                            id="metric_graph",
                                                                             figure={
                                                                                 "layout": default_layout
                                                                             }
@@ -400,7 +405,7 @@ app.layout = html.Div(
                                 ),
                                 html.Button(
                                     "Reset",
-                                    id="reset-button"
+                                    id="reset_button"
                                 ),
                                 html.Details(
                                     open=True,
@@ -409,14 +414,23 @@ app.layout = html.Div(
                                             className="section-title",
                                             children="Data",
                                         ),
-                                        html.Label("Yahoo! Finance symbol:"),
-                                        dcc.Input(
-                                            id="symbol-input",
-                                            className="input-control",
-                                            type="text",
-                                            value=default_symbol,
-                                            placeholder="Enter symbol...",
-                                            debounce=True
+                                        dbc.Row(
+                                            children=[
+                                                dbc.Col(
+                                                    children=[
+                                                        html.Label("Yahoo! Finance symbol:"),
+                                                        dcc.Input(
+                                                            id="symbol_input",
+                                                            className="input-control",
+                                                            type="text",
+                                                            value=default_symbol,
+                                                            placeholder="Enter symbol...",
+                                                            debounce=True
+                                                        ),
+                                                    ]
+                                                ),
+                                                dbc.Col()
+                                            ],
                                         ),
                                         dbc.Row(
                                             children=[
@@ -424,7 +438,7 @@ app.layout = html.Div(
                                                     children=[
                                                         html.Label("Period:"),
                                                         dcc.Dropdown(
-                                                            id="period-dropdown",
+                                                            id="period_dropdown",
                                                             options=[{"label": i, "value": i} for i in periods],
                                                             value=default_period,
                                                         ),
@@ -434,25 +448,27 @@ app.layout = html.Div(
                                                     children=[
                                                         html.Label("Interval:"),
                                                         dcc.Dropdown(
-                                                            id="interval-dropdown",
+                                                            id="interval_dropdown",
                                                             options=[{"label": i, "value": i} for i in intervals],
                                                             value=default_interval,
                                                         ),
                                                     ]
-                                                ),
-                                                dbc.Col()
+                                                )
                                             ],
                                         ),
-                                        html.Label("Filter by date (or select range in chart):"),
+                                        html.Label("Filter period:"),
                                         dcc.RangeSlider(
-                                            id="date-slider",
+                                            id="date_slider",
                                             min=0.,
                                             max=1.,
                                             value=default_date_range,
-                                            allowCross=False
+                                            allowCross=False,
+                                            tooltip={
+                                                'placement': 'bottom'
+                                            }
                                         ),
                                         dcc.Checklist(
-                                            id="yf-checklist",
+                                            id="yf_checklist",
                                             options=[{
                                                 "label": "Adjust all OHLC automatically",
                                                 "value": "auto_adjust"
@@ -475,19 +491,19 @@ app.layout = html.Div(
                                             children="Entry patterns",
                                         ),
                                         html.Div(
-                                            id='entry-settings',
+                                            id='entry_settings',
                                             children=[
                                                 html.Button(
                                                     "All",
-                                                    id="entry-all-button"
+                                                    id="entry_all_button"
                                                 ),
                                                 html.Button(
                                                     "Random",
-                                                    id="entry-random-button"
+                                                    id="entry_random_button"
                                                 ),
                                                 html.Button(
                                                     "Clear",
-                                                    id="entry-clear-button"
+                                                    id="entry_clear_button"
                                                 ),
                                                 html.Label("Number of random patterns:"),
                                                 dbc.Row(
@@ -495,7 +511,7 @@ app.layout = html.Div(
                                                         dbc.Col(
                                                             children=[
                                                                 dcc.Input(
-                                                                    id="entry-n-random-input",
+                                                                    id="entry_n_random_input",
                                                                     className="input-control",
                                                                     value=default_entry_n_random,
                                                                     placeholder="Enter number...",
@@ -505,13 +521,12 @@ app.layout = html.Div(
                                                                 ),
                                                             ]
                                                         ),
-                                                        dbc.Col(),
                                                         dbc.Col()
                                                     ],
                                                 ),
                                                 html.Label("Select patterns:"),
                                                 dcc.Dropdown(
-                                                    id="entry-pattern-dropdown",
+                                                    id="entry_pattern_dropdown",
                                                     options=[{"label": i, "value": i} for i in patterns],
                                                     multi=True,
                                                     value=default_entry_patterns,
@@ -529,7 +544,7 @@ app.layout = html.Div(
                                             children="Exit patterns",
                                         ),
                                         dcc.Checklist(
-                                            id="exit-checklist",
+                                            id="exit_checklist",
                                             options=[{
                                                 "label": "Same as entry patterns",
                                                 "value": "same_as_entry"
@@ -540,20 +555,20 @@ app.layout = html.Div(
                                             }
                                         ),
                                         html.Div(
-                                            id='exit-settings',
+                                            id='exit_settings',
                                             hidden="same_as_entry" in default_exit_options,
                                             children=[
                                                 html.Button(
                                                     "All",
-                                                    id="exit-all-button"
+                                                    id="exit_all_button"
                                                 ),
                                                 html.Button(
                                                     "Random",
-                                                    id="exit-random-button"
+                                                    id="exit_random_button"
                                                 ),
                                                 html.Button(
                                                     "Clear",
-                                                    id="exit-clear-button"
+                                                    id="exit_clear_button"
                                                 ),
                                                 html.Label("Number of random patterns:"),
                                                 dbc.Row(
@@ -561,7 +576,7 @@ app.layout = html.Div(
                                                         dbc.Col(
                                                             children=[
                                                                 dcc.Input(
-                                                                    id="exit-n-random-input",
+                                                                    id="exit_n_random_input",
                                                                     className="input-control",
                                                                     value=default_exit_n_random,
                                                                     placeholder="Enter number...",
@@ -571,13 +586,12 @@ app.layout = html.Div(
                                                                 ),
                                                             ]
                                                         ),
-                                                        dbc.Col(),
                                                         dbc.Col()
                                                     ],
                                                 ),
                                                 html.Label("Select patterns:"),
                                                 dcc.Dropdown(
-                                                    id="exit-pattern-dropdown",
+                                                    id="exit_pattern_dropdown",
                                                     options=[{"label": i, "value": i} for i in patterns],
                                                     multi=True,
                                                     value=default_exit_patterns,
@@ -594,7 +608,7 @@ app.layout = html.Div(
                                             children="Candle settings",
                                         ),
                                         dash_table.DataTable(
-                                            id="candle-settings-table",
+                                            id="candle_settings_table",
                                             columns=[
                                                 {
                                                     "name": c,
@@ -640,6 +654,34 @@ app.layout = html.Div(
                                     ],
                                 ),
                                 html.Details(
+                                    open=False,
+                                    children=[
+                                        html.Summary(
+                                            className="section-title",
+                                            children="Custom pattern",
+                                        ),
+                                        html.Div(
+                                            id='custom_settings',
+                                            children=[
+                                                html.Label("Select entry dates:"),
+                                                dcc.Dropdown(
+                                                    id="custom_entry_dropdown",
+                                                    options=[],
+                                                    multi=True,
+                                                    value=default_entry_dates,
+                                                ),
+                                                html.Label("Select exit dates:"),
+                                                dcc.Dropdown(
+                                                    id="custom_exit_dropdown",
+                                                    options=[],
+                                                    multi=True,
+                                                    value=default_exit_dates,
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                ),
+                                html.Details(
                                     open=True,
                                     children=[
                                         html.Summary(
@@ -651,27 +693,8 @@ app.layout = html.Div(
                                                 dbc.Col(
                                                     children=[
                                                         html.Label("Fees (in %):"),
-                                                    ]
-                                                ),
-                                                dbc.Col(
-                                                    children=[
-                                                        html.Label("Fixed fees:"),
-                                                    ]
-                                                ),
-                                                dbc.Col(
-                                                    children=[
-                                                        html.Label("Slippage (in % of H-O):"),
-                                                    ]
-
-                                                )
-                                            ],
-                                        ),
-                                        dbc.Row(
-                                            children=[
-                                                dbc.Col(
-                                                    children=[
                                                         dcc.Input(
-                                                            id="fees-input",
+                                                            id="fees_input",
                                                             className="input-control",
                                                             type="number",
                                                             value=default_fees,
@@ -683,8 +706,9 @@ app.layout = html.Div(
                                                 ),
                                                 dbc.Col(
                                                     children=[
+                                                        html.Label("Fixed fees:"),
                                                         dcc.Input(
-                                                            id="fixed-fees-input",
+                                                            id="fixed_fees_input",
                                                             className="input-control",
                                                             type="number",
                                                             value=default_fixed_fees,
@@ -694,10 +718,15 @@ app.layout = html.Div(
                                                         ),
                                                     ]
                                                 ),
+                                            ]
+                                        ),
+                                        dbc.Row(
+                                            children=[
                                                 dbc.Col(
                                                     children=[
+                                                        html.Label("Slippage (in % of H-O):"),
                                                         dcc.Input(
-                                                            id="slippage-input",
+                                                            id="slippage_input",
                                                             className="input-control",
                                                             type="number",
                                                             value=default_slippage,
@@ -706,12 +735,12 @@ app.layout = html.Div(
                                                             min=0, max=100
                                                         ),
                                                     ]
-
-                                                )
+                                                ),
+                                                dbc.Col()
                                             ],
                                         ),
                                         dcc.Checklist(
-                                            id="sim-checklist",
+                                            id="sim_checklist",
                                             options=[{
                                                 "label": "Allow increasing position",
                                                 "value": "allow_inc_position"
@@ -730,7 +759,7 @@ app.layout = html.Div(
                                                 dbc.Col(
                                                     children=[
                                                         dcc.Input(
-                                                            id="n-random-strat-input",
+                                                            id="n_random_strat_input",
                                                             className="input-control",
                                                             value=default_n_random_strat,
                                                             placeholder="Enter number...",
@@ -740,12 +769,60 @@ app.layout = html.Div(
                                                         ),
                                                     ]
                                                 ),
-                                                dbc.Col(),
                                                 dbc.Col()
                                             ],
                                         ),
                                         dcc.Checklist(
-                                            id="stats-checklist",
+                                            id="prob_checklist",
+                                            options=[{
+                                                "label": "Mimic strategy by shuffling",
+                                                "value": "mimic_strategy"
+                                            }],
+                                            value=default_prob_options,
+                                            style={
+                                                "color": "#7b7d8d"
+                                            }
+                                        ),
+                                        html.Div(
+                                            id='prob_settings',
+                                            hidden="mimic_strategy" in default_prob_options,
+                                            children=[
+                                                dbc.Row(
+                                                    children=[
+                                                        dbc.Col(
+                                                            children=[
+                                                                html.Label("Entry probability (in %):"),
+                                                                dcc.Input(
+                                                                    id="entry_prob_input",
+                                                                    className="input-control",
+                                                                    value=default_entry_prob,
+                                                                    placeholder="Enter number...",
+                                                                    debounce=True,
+                                                                    type="number",
+                                                                    min=0, max=100
+                                                                ),
+                                                            ]
+                                                        ),
+                                                        dbc.Col(
+                                                            children=[
+                                                                html.Label("Exit probability (in %):"),
+                                                                dcc.Input(
+                                                                    id="exit_prob_input",
+                                                                    className="input-control",
+                                                                    value=default_exit_prob,
+                                                                    placeholder="Enter number...",
+                                                                    debounce=True,
+                                                                    type="number",
+                                                                    min=0, max=100
+                                                                ),
+                                                            ]
+                                                        ),
+                                                    ],
+                                                ),
+                                            ]
+                                        ),
+                                        dcc.Checklist(
+                                            id="stats_checklist",
                                             options=[{
                                                 "label": "Include unrealized P&L in stats",
                                                 "value": "incl_unrealized"
@@ -763,20 +840,17 @@ app.layout = html.Div(
                 )
             ]
         ),
-        html.Div(id='data-signal', style={'display': 'none'}),
-        html.Div(id='candle-settings-signal', style={'display': 'none'}),
-        html.Div(id='stats-signal', style={'display': 'none'})
+        html.Div(id='data_signal', style={'display': 'none'}),
+        html.Div(id='index_signal', style={'display': 'none'}),
+        html.Div(id='candle_settings_signal', style={'display': 'none'}),
+        html.Div(id='stats_signal', style={'display': 'none'})
     ],
 )
 
 
 @cache.memoize()
-def global_data_store(symbol, period, interval, auto_adjust, back_adjust):
-    # perform expensive computations in this "global store"
-    # these computations are cached in a globally available
-    # redis memory store which is available across processes
-    # and for all time.
-
+def fetch_data(symbol, period, interval, auto_adjust, back_adjust):
+    """Fetch OHLCV data from Yahoo! Finance."""
     return yf.Ticker(symbol).history(
         period=period,
         interval=interval,
@@ -787,25 +861,113 @@ def global_data_store(symbol, period, interval, auto_adjust, back_adjust):
 
 
 @app.callback(
-    Output(component_id='data-signal', component_property='children'),
-    [Input(component_id='symbol-input', component_property='value'),
-     Input(component_id='period-dropdown', component_property='value'),
-     Input(component_id='interval-dropdown', component_property='value'),
-     Input(component_id="yf-checklist", component_property="value")]
+    [Output('data_signal', 'children'),
+     Output('index_signal', 'children')],
+    [Input('symbol_input', 'value'),
+     Input('period_dropdown', 'value'),
+     Input('interval_dropdown', 'value'),
+     Input("yf_checklist", "value")]
 )
 def update_data(symbol, period, interval, yf_options):
-    # compute value and send a signal when done
+    """Store data into a hidden DIV to avoid repeatedly calling Yahoo's API."""
     auto_adjust = 'auto_adjust' in yf_options
     back_adjust = 'back_adjust' in yf_options
-    global_data_store(symbol, period, interval, auto_adjust, back_adjust)
-    return symbol, period, interval, auto_adjust, back_adjust
+    df = fetch_data(symbol, period, interval, auto_adjust, back_adjust)
+    return df.to_json(date_format='iso', orient='split'), df.index.tolist()
 
 
 @app.callback(
-    Output(component_id='candle-settings-signal', component_property='children'),
-    [Input(component_id='candle-settings-table', component_property='data')]
+    [Output('date_slider', 'min'),
+     Output('date_slider', 'max'),
+     Output('date_slider', 'value')],
+    [Input('index_signal', 'children')]
+)
+def update_date_slider(date_list):
+    """Once index (dates) has changed, reset the date slider."""
+    return 0, len(date_list) - 1, [0, len(date_list) - 1]
+
+
+@app.callback(
+    [Output('custom_entry_dropdown', 'options'),
+     Output('custom_exit_dropdown', 'options')],
+    [Input('index_signal', 'children'),
+     Input('date_slider', 'value')]
+)
+def update_custom_options(date_list, date_range):
+    """Once dates have changed, update entry/exit dates in custom pattern section.
+
+    If selected dates cannot be found in new dates, they will be automatically removed."""
+    filtered_dates = np.asarray(date_list)[date_range[0]:date_range[1] + 1].tolist()
+    custom_options = [{"label": i, "value": i} for i in filtered_dates]
+    return custom_options, custom_options
+
+
+@app.callback(
+    Output('entry_pattern_dropdown', 'value'),
+    [Input("entry_all_button", "n_clicks"),
+     Input("entry_random_button", "n_clicks"),
+     Input("entry_clear_button", "n_clicks"),
+     Input("reset_button", "n_clicks")],
+    [State("entry_n_random_input", "value")]
+)
+def select_entry_patterns(_1, _2, _3, _4, n_random):
+    """Select all/random entry patterns or clear."""
+    ctx = dash.callback_context
+    if ctx.triggered:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        if button_id == 'entry_all_button':
+            return patterns
+        elif button_id == 'entry_random_button':
+            return random.sample(patterns, n_random)
+        elif button_id == 'entry_clear_button':
+            return []
+        elif button_id == 'reset_button':
+            return default_entry_patterns
+    return dash.no_update
+
+
+@app.callback(
+    [Output("exit_settings", "hidden"),
+     Output("exit_n_random_input", "value"),
+     Output('exit_pattern_dropdown', 'value')],
+    [Input("exit_checklist", "value"),
+     Input("exit_all_button", "n_clicks"),
+     Input("exit_random_button", "n_clicks"),
+     Input("exit_clear_button", "n_clicks"),
+     Input("reset_button", "n_clicks"),
+     Input("entry_n_random_input", "value"),
+     Input('entry_pattern_dropdown', 'value')],
+    [State("exit_n_random_input", "value")]
+)
+def select_exit_patterns(exit_options, _1, _2, _3, _4, entry_n_random, entry_patterns, exit_n_random):
+    """Select all/random exit patterns, clear, or configure the same way as entry patterns."""
+    ctx = dash.callback_context
+    same_as_entry = 'same_as_entry' in exit_options
+    if ctx.triggered:
+        control_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        if control_id == 'exit_checklist':
+            return same_as_entry, entry_n_random, entry_patterns
+        elif control_id == 'exit_all_button':
+            return same_as_entry, exit_n_random, patterns
+        elif control_id == 'exit_random_button':
+            return same_as_entry, exit_n_random, random.sample(patterns, exit_n_random)
+        elif control_id == 'exit_clear_button':
+            return same_as_entry, exit_n_random, []
+        elif control_id == 'reset_button':
+            default_same_as_entry = 'same_as_entry' in default_exit_options
+            return default_same_as_entry, default_exit_n_random, default_exit_patterns
+        elif control_id in ('entry_n_random_input', 'entry_pattern_dropdown'):
+            if same_as_entry:
+                return same_as_entry, entry_n_random, entry_patterns
+    return dash.no_update
+
+
+@app.callback(
+    Output('candle_settings_signal', 'children'),
+    [Input('candle_settings_table', 'data')]
 )
 def set_candle_settings(data):
+    """Update candle settings in TA-Lib."""
     for d in data:
         AvgPeriod = d["AvgPeriod"]
         if isinstance(AvgPeriod, float) and float.is_integer(AvgPeriod):
@@ -820,88 +982,31 @@ def set_candle_settings(data):
 
 
 @app.callback(
-    [Output(component_id='date-slider', component_property='min'),
-     Output(component_id='date-slider', component_property='max'),
-     Output(component_id='date-slider', component_property='value')],
-    [Input(component_id='data-signal', component_property='children')]
+    [Output('ohlcv_graph', 'figure'),
+     Output("prob_settings", "hidden"),
+     Output("entry_prob_input", "value"),
+     Output("exit_prob_input", "value")],
+    [Input('data_signal', 'children'),
+     Input('date_slider', 'value'),
+     Input('entry_pattern_dropdown', 'value'),
+     Input('exit_pattern_dropdown', 'value'),
+     Input('candle_settings_signal', 'children'),
+     Input('custom_entry_dropdown', 'value'),
+     Input('custom_exit_dropdown', 'value'),
+     Input('prob_checklist', 'value'),
+     Input("reset_button", "n_clicks")],
+    [State("entry_prob_input", "value"),
+     State("exit_prob_input", "value")]
 )
-def update_date_range(inputs):
-    df = global_data_store(*inputs)
-    return 0, len(df.index), [0, len(df.index)]
+def update_ohlcv(df_json, date_range, entry_patterns, exit_patterns, _1,
+                 entry_dates, exit_dates, prob_options, _2, entry_prob, exit_prob):
+    """Update OHLCV graph.
 
-
-@app.callback(
-    Output(component_id='entry-pattern-dropdown', component_property='value'),
-    [Input(component_id="entry-all-button", component_property="n_clicks"),
-     Input(component_id="entry-random-button", component_property="n_clicks"),
-     Input(component_id="entry-clear-button", component_property="n_clicks"),
-     Input(component_id="reset-button", component_property="n_clicks")],
-    [State(component_id="entry-n-random-input", component_property="value")]
-)
-def select_all_entry_patterns(_1, _2, _3, _4, n_random):
-    ctx = dash.callback_context
-    if ctx.triggered:
-        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if button_id == 'entry-all-button':
-            return patterns
-        elif button_id == 'entry-random-button':
-            return random.sample(patterns, n_random)
-        elif button_id == 'entry-clear-button':
-            return []
-        elif button_id == 'reset-button':
-            return default_entry_patterns
-    return dash.no_update
-
-
-@app.callback(
-    [Output(component_id="exit-settings", component_property="hidden"),
-     Output(component_id="exit-n-random-input", component_property="value"),
-     Output(component_id='exit-pattern-dropdown', component_property='value')],
-    [Input(component_id="exit-checklist", component_property="value"),
-     Input(component_id="exit-all-button", component_property="n_clicks"),
-     Input(component_id="exit-random-button", component_property="n_clicks"),
-     Input(component_id="exit-clear-button", component_property="n_clicks"),
-     Input(component_id="reset-button", component_property="n_clicks"),
-     Input(component_id="entry-n-random-input", component_property="value"),
-     Input(component_id='entry-pattern-dropdown', component_property='value')],
-    [State(component_id="exit-n-random-input", component_property="value")]
-)
-def select_all_exit_patterns(exit_options, _1, _2, _3, _4, entry_n_random, entry_patterns, exit_n_random):
-    ctx = dash.callback_context
-    same_as_entry = 'same_as_entry' in exit_options
-    if ctx.triggered:
-        control_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if control_id == 'exit-checklist':
-            return same_as_entry, entry_n_random, entry_patterns
-        elif control_id == 'exit-all-button':
-            return same_as_entry, exit_n_random, patterns
-        elif control_id == 'exit-random-button':
-            return same_as_entry, exit_n_random, random.sample(patterns, exit_n_random)
-        elif control_id == 'exit-clear-button':
-            return same_as_entry, exit_n_random, []
-        elif control_id == 'reset-button':
-            default_same_as_entry = 'same_as_entry' in default_exit_options
-            return default_same_as_entry, default_exit_n_random, default_exit_patterns
-        elif control_id in ('entry-n-random-input', 'entry-pattern-dropdown'):
-            if same_as_entry:
-                return same_as_entry, entry_n_random, entry_patterns
-    return dash.no_update
-
-
-@app.callback(
-    Output(component_id='ohlcv-graph', component_property='figure'),
-    [Input(component_id='data-signal', component_property='children'),
-     Input(component_id='date-slider', component_property='value'),
-     Input(component_id='entry-pattern-dropdown', component_property='value'),
-     Input(component_id='exit-pattern-dropdown', component_property='value'),
-     Input(component_id='candle-settings-signal', component_property='children')]
-)
-def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
-    # Get data
-    df = global_data_store(*inputs)
+    Also update probability settings, as they also depend upon conversion of patterns into signals."""
+    df = pd.read_json(df_json, orient='split')
 
     # Filter by date
-    df = df.iloc[date_range[0]:date_range[1]]
+    df = df.iloc[date_range[0]:date_range[1] + 1]
 
     # Run pattern recognition indicators and combine results
     talib_inputs = {
@@ -911,7 +1016,9 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
         'close': df['Close'].values,
         'volume': df['Volume'].values
     }
-    all_patterns = set(entry_patterns + exit_patterns)
+    entry_patterns += ['CUSTOM']
+    exit_patterns += ['CUSTOM']
+    all_patterns = list(set(entry_patterns + exit_patterns))
     signal_df = pd.DataFrame.vbt.empty(
         (len(df.index), len(all_patterns)),
         fill_value=0.,
@@ -919,7 +1026,10 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
         columns=all_patterns
     )
     for pattern in all_patterns:
-        signal_df[pattern] = abstract.Function(pattern)(talib_inputs)
+        if pattern != 'CUSTOM':
+            signal_df[pattern] = abstract.Function(pattern)(talib_inputs)
+    signal_df['CUSTOM'].loc[entry_dates] += 100.
+    signal_df['CUSTOM'].loc[exit_dates] += -100.
     entry_signal_df = signal_df[entry_patterns]
     exit_signal_df = signal_df[exit_patterns]
 
@@ -952,7 +1062,7 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
     volume_color[close_open_diff < 0] = '#bb6704'
 
     # Build graph
-    return dict(
+    figure = dict(
         data=[
             go.Ohlc(
                 x=pd.to_datetime(df.index),
@@ -1005,7 +1115,6 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
         layout=merge_kwargs(
             default_layout,
             dict(
-                height=400,
                 margin=dict(r=40),
                 hovermode="closest",
                 xaxis=dict(
@@ -1032,15 +1141,26 @@ def update_ohlcv(inputs, date_range, entry_patterns, exit_patterns, _):
             )
         )
     )
+    mimic_strategy = 'mimic_strategy' in prob_options
+    ctx = dash.callback_context
+    if ctx.triggered:
+        control_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        if control_id == 'reset_button':
+            mimic_strategy = 'mimic_strategy' in default_prob_options
+            entry_prob = default_entry_prob
+            exit_prob = default_exit_prob
+    if mimic_strategy:
+        entry_prob = np.round(len(entry_df.index) / len(df.index) * 100, 4)
+        exit_prob = np.round(len(exit_df.index) / len(df.index) * 100, 4)
+    return figure, mimic_strategy, entry_prob, exit_prob
 
 
-def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
-                       fixed_fees, slippage, sim_options, n_random_strat):
-    # Get data
-    df = global_data_store(*inputs)
-
+def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, exit_patterns,
+                       entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options,
+                       n_random_strat, prob_options, entry_prob, exit_prob):
+    """Simulate portfolio of the main strategy, buy & hold strategy, and a bunch of random strategies."""
     # Filter by date
-    df = df.iloc[date_range[0]:date_range[1]]
+    df = df.iloc[date_range[0]:date_range[1] + 1]
 
     # Run pattern recognition indicators and combine results
     talib_inputs = {
@@ -1050,13 +1170,30 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
         'close': df['Close'].values,
         'volume': df['Volume'].values
     }
+    entry_patterns += ['CUSTOM']
+    exit_patterns += ['CUSTOM']
     all_patterns = list(set(entry_patterns + exit_patterns))
     entry_i = [all_patterns.index(p) for p in entry_patterns]
     exit_i = [all_patterns.index(p) for p in exit_patterns]
-    signals = np.empty((len(df.index), len(all_patterns)), dtype=np.float_)
+    signals = np.full((len(df.index), len(all_patterns)), 0., dtype=np.float_)
     for i, pattern in enumerate(all_patterns):
-        # TA-Lib functions have output in increments of 100
-        signals[:, i] = abstract.Function(pattern)(talib_inputs) / 100
+        if pattern != 'CUSTOM':
+            signals[:, i] = abstract.Function(pattern)(talib_inputs)
+    signals[np.flatnonzero(df.index.isin(entry_dates)), all_patterns.index('CUSTOM')] += 100.
+    signals[np.flatnonzero(df.index.isin(exit_dates)), all_patterns.index('CUSTOM')] += -100.
+    signals /= 100.  # TA-Lib functions have output in increments of 100
+
+    # Filter signals
+    if selected_data is not None:
+        new_signals = np.full_like(signals, 0.)
+        for point in selected_data['points']:
+            if 'customdata' in point:
+                point_patterns = point['customdata'][0].split('<br>')
+                pi = df.index.get_loc(point['x'])
+                for p in point_patterns:
+                    pc = all_patterns.index(p)
+                    new_signals[pi, pc] = signals[pi, pc]
+        signals = new_signals
 
     # Generate size for main
     def _generate_size(signals):
@@ -1069,7 +1206,7 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
     main_size[0] = 0  # avoid looking into future
     main_size[1:] = _generate_size(signals)[:-1]
 
-    # Generate size for holding
+    # Generate size for buy & hold
     hold_size = np.full_like(main_size, 0.)
     hold_size[0] = np.inf
 
@@ -1080,9 +1217,16 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
 
     rand_size = np.empty((len(df.index), n_random_strat), dtype=np.float_)
     rand_size[0] = 0  # avoid looking into future
-    for i in range(n_random_strat):
-        rand_signals = _shuffle_along_axis(signals, 0)
-        rand_size[1:, i] = _generate_size(rand_signals)[:-1]
+    if 'mimic_strategy' in prob_options:
+        for i in range(n_random_strat):
+            rand_signals = _shuffle_along_axis(signals, 0)
+            rand_size[1:, i] = _generate_size(rand_signals)[:-1]
+    else:
+        entry_signals = pd.DataFrame.vbt.signals.generate_random(
+            (rand_size.shape[0] - 1, rand_size.shape[1]), prob=entry_prob / 100).values
+        exit_signals = pd.DataFrame.vbt.signals.generate_random(
+            (rand_size.shape[0] - 1, rand_size.shape[1]), prob=exit_prob / 100).values
+        rand_size[1:, :] = np.where(entry_signals, 1., 0.) - np.where(exit_signals, 1., 0.)
 
     # Simulate portfolio
     def _simulate_portfolio(size, init_cash):
@@ -1102,7 +1246,7 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
             fees=float(fees) / 100,
             fixed_fees=float(fixed_fees),
             slippage=(float(slippage) / 100) * (df['High'] / df['Open'] - 1),
-            freq=inputs[2]
+            freq=interval
         )
 
     # Align initial cash across main and random strategies
@@ -1116,38 +1260,50 @@ def simulate_portfolio(inputs, date_range, entry_patterns, exit_patterns, fees,
     main_portfolio = aligned_portfolio.iloc[0]
     rand_portfolio = aligned_portfolio.iloc[1:]
 
-    # Simulate holding portfolio
+    # Simulate buy & hold portfolio
     hold_portfolio = _simulate_portfolio(hold_size, main_portfolio.init_cash)
 
     return main_portfolio, hold_portfolio, rand_portfolio
 
 
 @app.callback(
-    [Output(component_id='value-graph', component_property='figure'),
-     Output(component_id='stats-table', component_property='data'),
-     Output(component_id='stats-signal', component_property='children'),
-     Output(component_id='metric-dropdown', component_property='options'),
-     Output(component_id='metric-dropdown', component_property='value')],
-    [Input(component_id='data-signal', component_property='children'),
-     Input(component_id='date-slider', component_property='value'),
-     Input(component_id='entry-pattern-dropdown', component_property='value'),
-     Input(component_id='exit-pattern-dropdown', component_property='value'),
-     Input(component_id='candle-settings-signal', component_property='children'),
-     Input(component_id='fees-input', component_property='value'),
-     Input(component_id='fixed-fees-input', component_property='value'),
-     Input(component_id='slippage-input', component_property='value'),
-     Input(component_id='sim-checklist', component_property='value'),
-     Input(component_id='n-random-strat-input', component_property='value'),
-     Input(component_id='stats-checklist', component_property='value'),
-     Input(component_id="reset-button", component_property="n_clicks")],
-    [State(component_id='metric-dropdown', component_property='value')]
+    [Output('value_graph', 'figure'),
+     Output('stats_table', 'data'),
+     Output('stats_signal', 'children'),
+     Output('metric_dropdown', 'options'),
+     Output('metric_dropdown', 'value')],
+    [Input('data_signal', 'children'),
+     Input('interval_dropdown', 'value'),
+     Input('date_slider', 'value'),
+     Input('ohlcv_graph', 'selectedData'),
+     Input('entry_pattern_dropdown', 'value'),
+     Input('exit_pattern_dropdown', 'value'),
+     Input('candle_settings_signal', 'children'),
+     Input('custom_entry_dropdown', 'value'),
+     Input('custom_exit_dropdown', 'value'),
+     Input('fees_input', 'value'),
+     Input('fixed_fees_input', 'value'),
+     Input('slippage_input', 'value'),
+     Input('sim_checklist', 'value'),
+     Input('n_random_strat_input', 'value'),
+     Input('prob_checklist', 'value'),
+     Input("entry_prob_input", "value"),
+     Input("exit_prob_input", "value"),
+     Input('stats_checklist', 'value'),
+     Input("reset_button", "n_clicks")],
+    [State('metric_dropdown', 'value')]
 )
-def update_stats(inputs, date_range, entry_patterns, exit_patterns, _1, fees, fixed_fees,
-                 slippage, sim_options, n_random_strat, stats_options, _2, curr_metric):
+def update_stats(df_json, interval, date_range, selected_data, entry_patterns, exit_patterns,
+                 _1, entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options, n_random_strat,
+                 prob_options, entry_prob, exit_prob, stats_options, _2, curr_metric):
+    """Final stage where we calculate key performance metrics and compare strategies."""
+    df = pd.read_json(df_json, orient='split')
+
     # Simulate portfolio
     main_portfolio, hold_portfolio, rand_portfolio = simulate_portfolio(
-        inputs, date_range, entry_patterns, exit_patterns,
-        fees, fixed_fees, slippage, sim_options, n_random_strat)
+        df, interval, date_range, selected_data, entry_patterns, exit_patterns,
+        entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options,
+        n_random_strat, prob_options, entry_prob, exit_prob)
 
     # Get orders
     buy_trace, sell_trace = main_portfolio.orders.plot().data[1:]
@@ -1192,7 +1348,7 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _1, fees, fi
             go.Scatter(
                 x=pd.to_datetime(hold_portfolio.wrapper.index),
                 y=hold_portfolio.value(),
-                name=f"Value (Holding)",
+                name=f"Value (Buy & Hold)",
                 line_color='#ff7f0e'
             ),
             go.Scatter(
@@ -1219,7 +1375,6 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _1, fees, fi
         layout=merge_kwargs(
             default_layout,
             dict(
-                height=500,
                 hovermode="closest",
                 xaxis=dict(
                     gridcolor='#323b56',
@@ -1293,7 +1448,7 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _1, fees, fi
     ctx = dash.callback_context
     if ctx.triggered:
         control_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if control_id == 'reset-button':
+        if control_id == 'reset_button':
             metric = default_metric
     if metric is None:
         metric = default_metric
@@ -1309,11 +1464,12 @@ def update_stats(inputs, date_range, entry_patterns, exit_patterns, _1, fees, fi
 
 
 @app.callback(
-    Output(component_id='metric-graph', component_property='figure'),
-    [Input(component_id='stats-signal', component_property='children'),
-     Input(component_id='metric-dropdown', component_property='value')]
+    Output('metric_graph', 'figure'),
+    [Input('stats_signal', 'children'),
+     Input('metric_dropdown', 'value')]
 )
 def update_metric_stats(stats_json, metric):
+    """Once a new metric has been selected, plot its distribution."""
     stats_dict = json.loads(stats_json)
     return dict(
         data=[
@@ -1340,7 +1496,7 @@ def update_metric_stats(stats_json, metric):
                 jitter=0,
                 pointpos=1.8,
                 hoveron="points",
-                hovertemplate='%{x}<br>Holding',
+                hovertemplate='%{x}<br>Buy & Hold',
                 fillcolor="rgba(0,0,0,0)",
                 line=dict(color="rgba(0,0,0,0)"),
                 name='',
@@ -1370,7 +1526,6 @@ def update_metric_stats(stats_json, metric):
             default_layout,
             dict(
                 showlegend=False,
-                height=300,
                 margin=dict(l=60, r=20, t=40, b=20),
                 hovermode="closest",
                 xaxis=dict(
@@ -1387,23 +1542,27 @@ def update_metric_stats(stats_json, metric):
 
 
 @app.callback(
-    [Output(component_id='symbol-input', component_property='value'),
-     Output(component_id='period-dropdown', component_property='value'),
-     Output(component_id='interval-dropdown', component_property='value'),
-     Output(component_id="yf-checklist", component_property="value"),
-     Output(component_id="entry-n-random-input", component_property="value"),
-     Output(component_id="exit-checklist", component_property="value"),
-     Output(component_id='candle-settings-table', component_property='data'),
-     Output(component_id='fees-input', component_property='value'),
-     Output(component_id='fixed-fees-input', component_property='value'),
-     Output(component_id='slippage-input', component_property='value'),
-     Output(component_id='sim-checklist', component_property='value'),
-     Output(component_id='n-random-strat-input', component_property='value'),
-     Output(component_id='stats-checklist', component_property='value')],
-    [Input(component_id="reset-button", component_property="n_clicks")],
+    [Output('symbol_input', 'value'),
+     Output('period_dropdown', 'value'),
+     Output('interval_dropdown', 'value'),
+     Output("yf_checklist", "value"),
+     Output("entry_n_random_input", "value"),
+     Output("exit_checklist", "value"),
+     Output('candle_settings_table', 'data'),
+     Output('custom_entry_dropdown', 'value'),
+     Output('custom_exit_dropdown', 'value'),
+     Output('fees_input', 'value'),
+     Output('fixed_fees_input', 'value'),
+     Output('slippage_input', 'value'),
+     Output('sim_checklist', 'value'),
+     Output('n_random_strat_input', 'value'),
+     Output("prob_checklist", "value"),
+     Output('stats_checklist', 'value')],
+    [Input("reset_button", "n_clicks")],
     prevent_initial_call=True
 )
 def reset_settings(_):
+    """Reset most settings. Other settings are reset in their callbacks."""
     return default_symbol, \
            default_period, \
            default_interval, \
@@ -1411,11 +1570,14 @@ def reset_settings(_):
            default_entry_n_random, \
            default_exit_options, \
            default_candle_settings.to_dict("records"), \
+           default_entry_dates, \
+           default_exit_dates, \
            default_fees, \
            default_fixed_fees, \
            default_slippage, \
            default_sim_options, \
            default_n_random_strat, \
+           default_prob_options, \
            default_stats_options
 
 

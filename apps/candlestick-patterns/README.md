@@ -1,14 +1,16 @@
 # candlestick-patterns
 
-This app creates a dashboard to visualize and backtest candlestick patterns. 
+This app creates a dashboard using [Dash](https://github.com/plotly/dash) to visualize and backtest candlestick patterns. 
 
-* Supports Yahoo! Finance tickers
-* Supports TA-Lib candlestick patterns
-* Can choose entry and exit patterns, and override candle settings
-* Builds signals from selected patterns and runs backtesting
-* Visualizes OHLCV, signals, orders, trade returns and portfolio value
-* Displays key performance metrics
-* Compares strategy to holding and trading randomly
+* Supports [Yahoo! Finance](https://github.com/ranaroussi/yfinance) tickers
+* Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) candlestick patterns
+* Allows to choose entry and exit patterns, and override candle settings
+* Allows to specify signals manually
+* Performs backtesting on selected signals using [vectorbt](https://github.com/polakowo/vectorbt)
+* Visualizes OHLCV, signals, orders, trades and portfolio value using [Plotly](https://github.com/plotly/plotly.py)
+* Displays key performance metrics such as Sharpe ratio
+* Compares main strategy to holding and trading randomly
+* Responsive design using [Dash Bootstrap Components](https://github.com/facultyai/dash-bootstrap-components)
 
 ## How to run the app
 
