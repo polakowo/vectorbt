@@ -1494,25 +1494,24 @@ def cash_flow_grouped_nb(cash_flow_ungrouped, group_counts):
 
 
 @njit(cache=True)
-def cash_ungrouped_nb(cash_flow_ungrouped, group_counts, init_cash, cash_sharing, call_seq, in_sim_order):
-    """Get cash series per column."""
+def cash_ungrouped_nb(cash_flow_ungrouped, group_counts, init_cash, call_seq, in_sim_order):
+    """Get cash series per column.
+
+    `init_cash` should be grouped if `in_sim_order` is `True`, and ungrouped otherwise."""
     check_group_counts(group_counts, cash_flow_ungrouped.shape[1])
-    check_group_init_cash(group_counts, cash_flow_ungrouped.shape[1], init_cash, cash_sharing)
 
     out = np.empty_like(cash_flow_ungrouped)
     from_col = 0
     for group in range(len(group_counts)):
         to_col = from_col + group_counts[group]
         group_len = to_col - from_col
-        if cash_sharing and in_sim_order:
+        if in_sim_order:
             cash_now = init_cash[group]
         for i in range(cash_flow_ungrouped.shape[0]):
             for k in range(group_len):
                 col = from_col + call_seq[i, from_col + k]
-                if not cash_sharing:
+                if not in_sim_order:
                     cash_now = init_cash[col] if i == 0 else out[i - 1, col]
-                elif not in_sim_order:
-                    cash_now = init_cash[group] if i == 0 else out[i - 1, col]
                 flow_value = cash_flow_ungrouped[i, col]
                 if flow_value < 0 and is_close_or_less_nb(cash_now, -flow_value):
                     cash_now = 0.  # numerical stability
@@ -1610,8 +1609,8 @@ def value_nb(cash, holding_value):
 
 
 @njit
-def final_value_ungrouped_nb(target_shape, close, order_records, init_cash_ungrouped):
-    """Get final portfolio value per column.
+def total_profit_ungrouped_nb(target_shape, close, order_records, init_cash_ungrouped):
+    """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
     shares = np.full(target_shape[1], 0., dtype=np.float_)
@@ -1648,36 +1647,33 @@ def final_value_ungrouped_nb(target_shape, close, order_records, init_cash_ungro
         else:
             cash[col] += record['size'] * record['price'] - record['fees']
 
-    return cash + shares * close[-1, :]
+    return cash + shares * close[-1, :] - init_cash_ungrouped
 
 
 @njit
-def final_value_grouped_nb(final_value_ungrouped, init_cash, group_counts, cash_sharing):
-    """Get final portfolio value per group."""
-    check_group_counts(group_counts, final_value_ungrouped.shape[0])
-    check_group_init_cash(group_counts, final_value_ungrouped.shape[0], init_cash, cash_sharing)
+def total_profit_grouped_nb(total_profit_ungrouped, group_counts):
+    """Get total profit per group."""
+    check_group_counts(group_counts, total_profit_ungrouped.shape[0])
 
     out = np.empty((len(group_counts),), dtype=np.float_)
     from_col = 0
     for group in range(len(group_counts)):
         to_col = from_col + group_counts[group]
-        out[group] = np.sum(final_value_ungrouped[from_col:to_col])
-        if cash_sharing:
-            out[group] = out[group] - init_cash[group] * (group_counts[group] - 1)
+        out[group] = np.sum(total_profit_ungrouped[from_col:to_col])
         from_col = to_col
     return out
 
 
 @njit(cache=True)
-def total_profit_nb(init_cash_regrouped, final_value):
+def final_value_nb(total_profit, init_cash_regrouped):
     """Get total profit per column/group."""
-    return final_value - init_cash_regrouped
+    return total_profit + init_cash_regrouped
 
 
 @njit(cache=True)
-def total_return_nb(init_cash_regrouped, final_value):
+def total_return_nb(total_profit, init_cash_regrouped):
     """Get total return per column/group."""
-    return (final_value - init_cash_regrouped) / init_cash_regrouped
+    return total_profit / init_cash_regrouped
 
 
 @njit(cache=True)
@@ -1709,7 +1705,7 @@ def returns_nb(value, init_cash_regrouped):
 
 
 @njit(cache=True)
-def returns_in_sim_order_nb(value_iso, group_counts, init_cash, call_seq):
+def returns_in_sim_order_nb(value_iso, group_counts, init_cash_grouped, call_seq):
     """Get portfolio return series in simulation order."""
     check_group_counts(group_counts, value_iso.shape[1])
 
@@ -1718,7 +1714,7 @@ def returns_in_sim_order_nb(value_iso, group_counts, init_cash, call_seq):
     for group in range(len(group_counts)):
         to_col = from_col + group_counts[group]
         group_len = to_col - from_col
-        input_value = init_cash[group]
+        input_value = init_cash_grouped[group]
         for j in range(value_iso.shape[0] * group_len):
             i = j // group_len
             col = from_col + call_seq[i, from_col + j % group_len]

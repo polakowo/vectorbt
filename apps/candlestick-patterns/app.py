@@ -1253,15 +1253,14 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)), InitCashMode.AutoAlign)
     # Fixate initial cash for indexing
     aligned_portfolio = aligned_portfolio.copy(
-        init_cash=aligned_portfolio.init_cash,
-        init_cash_mode=None
+        init_cash=aligned_portfolio.init_cash()
     )
     # Separate portfolios
     main_portfolio = aligned_portfolio.iloc[0]
     rand_portfolio = aligned_portfolio.iloc[1:]
 
     # Simulate buy & hold portfolio
-    hold_portfolio = _simulate_portfolio(hold_size, main_portfolio.init_cash)
+    hold_portfolio = _simulate_portfolio(hold_size, main_portfolio.init_cash())
 
     return main_portfolio, hold_portfolio, rand_portfolio
 
@@ -1306,7 +1305,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
         n_random_strat, prob_options, entry_prob, exit_prob)
 
     # Get orders
-    buy_trace, sell_trace = main_portfolio.orders.plot().data[1:]
+    buy_trace, sell_trace = main_portfolio.orders().plot().data[1:]
     buy_trace.update(dict(
         x=pd.to_datetime(buy_trace.x),
         marker_line=None,

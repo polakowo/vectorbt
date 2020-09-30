@@ -43,9 +43,9 @@ class BaseOrders(Records):
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_cash=100., freq='1D')
 
-        >>> portfolio.orders.buy.count()
+        >>> portfolio.orders().buy.count()
         4
-        >>> portfolio.orders.sell.count()
+        >>> portfolio.orders().sell.count()
         1
         ```"""
 
@@ -88,7 +88,7 @@ class BaseOrders(Records):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            portfolio.orders.plot()
+            portfolio.orders().plot()
             ```
 
             ![](/vectorbt/docs/img/orders.png)"""

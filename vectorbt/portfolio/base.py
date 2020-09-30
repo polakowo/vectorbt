@@ -229,13 +229,11 @@ from vectorbt.records.orders import indexing_on_orders_meta
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Portfolio`."""
-    new_orders, group_idxs, col_idxs = indexing_on_orders_meta(obj.orders, pd_indexing_func)
-    if obj.wrapper.grouper.group_by is None:
-        # Grouping disabled
-        new_init_cash = obj.init_cash.values[col_idxs]
+    new_orders, group_idxs, col_idxs = indexing_on_orders_meta(obj._orders, pd_indexing_func)
+    if isinstance(obj._init_cash, int):
+        new_init_cash = obj._init_cash
     else:
-        # Grouping enabled
-        new_init_cash = obj.init_cash.values[group_idxs if obj.cash_sharing else col_idxs]
+        new_init_cash = to_1d(obj._init_cash, raw=True)[group_idxs if obj.cash_sharing else col_idxs]
     new_call_seq = obj.call_seq.values[:, col_idxs]
 
     return obj.copy(
@@ -262,6 +260,7 @@ def add_returns_methods(func_names):
                     year_freq=None,
                     ret_func_name=ret_func_name,
                     active_returns=False,
+                    in_sim_order=False,
                     reuse_returns=None,
                     **kwargs):
                 if reuse_returns is not None:
@@ -270,7 +269,7 @@ def add_returns_methods(func_names):
                     if active_returns:
                         returns = self.active_returns(group_by=group_by)
                     else:
-                        returns = self.returns(group_by=group_by)
+                        returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
                 returns_acc = returns.vbt.returns(freq=self.wrapper.freq, year_freq=year_freq)
                 # Select only those arguments in kwargs that are also in the method's signature
                 # This is done for Portfolio.stats which passes the same kwargs to multiple methods
@@ -323,10 +322,9 @@ class Portfolio(Configured, PandasIndexer):
 
     Args:
         orders (Orders): Order records.
-        init_cash (float or array_like): Initial capital.
+        init_cash (InitCashMode, float or array_like of float): Initial capital.
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (array_like of int): Sequence of calls per row and group.
-        init_cash_mode (InitCashMode or None): Initial cash mode.
         incl_unrealized (bool): Whether to include unrealized P&L in statistics.
 
     !!! note
@@ -336,14 +334,13 @@ class Portfolio(Configured, PandasIndexer):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
-    def __init__(self, orders, init_cash, cash_sharing, call_seq, init_cash_mode=None, incl_unrealized=None):
+    def __init__(self, orders, init_cash, cash_sharing, call_seq, incl_unrealized=None):
         Configured.__init__(
             self,
             orders=orders,
             init_cash=init_cash,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            init_cash_mode=init_cash_mode,
             incl_unrealized=incl_unrealized
         )
         # Get defaults
@@ -359,7 +356,6 @@ class Portfolio(Configured, PandasIndexer):
         self._init_cash = init_cash
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
-        self._init_cash_mode = init_cash_mode
         self._incl_unrealized = incl_unrealized
 
         # Supercharge
@@ -652,10 +648,9 @@ class Portfolio(Configured, PandasIndexer):
         orders = Orders(wrapper, order_records, close)
         return cls(
             orders,
-            init_cash,
+            init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
-            init_cash_mode=init_cash_mode,
             **kwargs
         )
 
@@ -919,10 +914,9 @@ class Portfolio(Configured, PandasIndexer):
         orders = Orders(wrapper, order_records, close)
         return cls(
             orders,
-            init_cash,
+            init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
-            init_cash_mode=init_cash_mode,
             **kwargs
         )
 
@@ -1164,10 +1158,9 @@ class Portfolio(Configured, PandasIndexer):
         orders = Orders(wrapper, order_records, close)
         return cls(
             orders,
-            init_cash,
+            init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
-            init_cash_mode=init_cash_mode,
             **kwargs
         )
 
@@ -1177,7 +1170,7 @@ class Portfolio(Configured, PandasIndexer):
     def wrapper(self):
         """Array wrapper."""
         # Wrapper in orders and here can be different
-        wrapper = self.orders.wrapper
+        wrapper = self._orders.wrapper
         if self.cash_sharing and wrapper.grouper.allow_modify:
             # Cannot change groups if columns within them are dependent
             return wrapper.copy(allow_modify=False)
@@ -1194,11 +1187,6 @@ class Portfolio(Configured, PandasIndexer):
         return self.wrapper.wrap(self._call_seq, group_by=False)
 
     @property
-    def init_cash_mode(self):
-        """Initial cash mode."""
-        return self._init_cash_mode
-
-    @property
     def incl_unrealized(self):
         """Whether to include unrealized trade P&L in statistics."""
         return self._incl_unrealized
@@ -1211,7 +1199,7 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("Cannot change grouping globally when cash sharing is enabled")
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(orders=self.orders.regroup(group_by=group_by))
+            return self.copy(orders=self._orders.regroup(group_by=group_by))
         return self
 
     # ############# Reference price ############# #
@@ -1235,30 +1223,23 @@ class Portfolio(Configured, PandasIndexer):
 
     # ############# Cash ############# #
 
-    @property
-    def init_cash(self):
-        """Initial amount of cash per column/group.
-
-        Returns value per group if `cash_sharing` is `True`."""
-        return self.init_cash_regrouped(group_by=self.cash_sharing)
-
     @cached_method
-    def init_cash_regrouped(self, group_by=None):
-        """Get cash flow series per column/group."""
-        if self.init_cash_mode is None:
+    def init_cash(self, group_by=None):
+        """Get initial amount of cash per column/group."""
+        if isinstance(self._init_cash, int):
+            cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
+            init_cash = -np.min(np.cumsum(cash_flow, axis=0), axis=0)
+            if self._init_cash == InitCashMode.AutoAlign:
+                init_cash = np.full(init_cash.shape, np.max(init_cash))
+        else:
             init_cash = to_1d(self._init_cash, raw=True)
             if self.wrapper.grouper.is_grouped(group_by=group_by):
                 group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-                init_cash_regrouped = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
+                init_cash = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
             else:
                 group_counts = self.wrapper.grouper.get_group_counts()
-                init_cash_regrouped = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
-        else:
-            cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
-            init_cash_regrouped = -np.min(np.cumsum(cash_flow, axis=0), axis=0)
-            if self.init_cash_mode == InitCashMode.AutoAlign:
-                init_cash_regrouped = np.full(init_cash_regrouped.shape, np.max(init_cash_regrouped))
-        return self.wrapper.wrap_reduced(init_cash_regrouped, group_by=group_by)
+                init_cash = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
+        return self.wrapper.wrap_reduced(init_cash, group_by=group_by)
 
     @cached_method
     def cash_flow(self, group_by=None):
@@ -1268,34 +1249,33 @@ class Portfolio(Configured, PandasIndexer):
             group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
             cash_flow = nb.cash_flow_grouped_nb(cash_flow_ungrouped, group_counts)
         else:
-            cash_flow = nb.cash_flow_ungrouped_nb(self.wrapper.shape_2d, self.orders.records_arr)
+            cash_flow = nb.cash_flow_ungrouped_nb(self.wrapper.shape_2d, self._orders.records_arr)
         return self.wrapper.wrap(cash_flow, group_by=group_by)
 
     @cached_method
     def cash(self, group_by=None, in_sim_order=False):
         """Get cash series per column/group."""
         if in_sim_order and not self.cash_sharing:
-            raise ValueError("in_sim_order requires enabled cash sharing")
+            raise ValueError("Cash sharing must be enabled for in_sim_order=True")
 
         cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            init_cash_grouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
             group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
             cash = nb.cash_grouped_nb(
                 self.wrapper.shape_2d,
                 cash_flow,
                 group_counts,
-                init_cash_grouped
+                init_cash
             )
         else:
-            init_cash = to_1d(self.init_cash, raw=True)
             group_counts = self.wrapper.grouper.get_group_counts()
+            init_cash = to_1d(self.init_cash(group_by=in_sim_order), raw=True)
             call_seq = to_2d(self.call_seq, raw=True)
             cash = nb.cash_ungrouped_nb(
                 cash_flow,
                 group_counts,
                 init_cash,
-                self.cash_sharing,
                 call_seq,
                 in_sim_order
             )
@@ -1306,7 +1286,7 @@ class Portfolio(Configured, PandasIndexer):
     @cached_method
     def share_flow(self):
         """Get share flow series per column."""
-        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self.orders.records_arr)
+        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self._orders.records_arr)
         return self.wrapper.wrap(share_flow, group_by=False)
 
     @cached_method
@@ -1336,16 +1316,9 @@ class Portfolio(Configured, PandasIndexer):
 
     # ############# Records ############# #
 
-    @property
-    def orders(self):
-        """Order records.
-
-        See `vectorbt.records.orders.Orders`."""
-        return self._orders
-
     @cached_method
-    def orders_regrouped(self, group_by=None):
-        """Regroup order records.
+    def orders(self, group_by=None):
+        """Order records.
 
         See `vectorbt.records.orders.Orders`."""
         return self._orders.regroup(group_by=group_by)
@@ -1355,7 +1328,7 @@ class Portfolio(Configured, PandasIndexer):
         """Get trade records from orders.
 
         See `vectorbt.records.events.Trades`."""
-        trades = Trades.from_orders(self.orders_regrouped(group_by=group_by))
+        trades = Trades.from_orders(self.orders(group_by=group_by))
         if incl_unrealized is None:
             incl_unrealized = self.incl_unrealized
         if incl_unrealized:
@@ -1367,7 +1340,7 @@ class Portfolio(Configured, PandasIndexer):
         """Get position records from orders.
 
         See `vectorbt.records.events.Positions`."""
-        positions = Positions.from_orders(self.orders_regrouped(group_by=group_by))
+        positions = Positions.from_orders(self.orders(group_by=group_by))
         if incl_unrealized is None:
             incl_unrealized = self.incl_unrealized
         if incl_unrealized:
@@ -1420,45 +1393,42 @@ class Portfolio(Configured, PandasIndexer):
         return self.wrapper.wrap(value, group_by=group_by)
 
     @cached_method
-    def final_value(self, group_by=None):
-        """Get final portfolio value per column/group.
+    def total_profit(self, group_by=None):
+        """Get total profit per column/group.
 
         Calculated directly from order records. Very fast."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            final_value_ungrouped = to_1d(self.final_value(group_by=False), raw=True)
-            init_cash = to_1d(self.init_cash, raw=True)
+            total_profit_ungrouped = to_1d(self.total_profit(group_by=False), raw=True)
             group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            final_value = nb.final_value_grouped_nb(
-                final_value_ungrouped,
-                init_cash,
-                group_counts,
-                self.cash_sharing
+            total_profit = nb.total_profit_grouped_nb(
+                total_profit_ungrouped,
+                group_counts
             )
         else:
             close = to_2d(self.fill_close(), raw=True)
-            init_cash_ungrouped = to_1d(self.init_cash_regrouped(group_by=False), raw=True)
-            final_value = nb.final_value_ungrouped_nb(
+            init_cash_ungrouped = to_1d(self.init_cash(group_by=False), raw=True)
+            total_profit = nb.total_profit_ungrouped_nb(
                 self.wrapper.shape_2d,
                 close,
-                self.orders.records_arr,
+                self._orders.records_arr,
                 init_cash_ungrouped
             )
-        return self.wrapper.wrap_reduced(final_value, group_by=group_by)
+        return self.wrapper.wrap_reduced(total_profit, group_by=group_by)
 
     @cached_method
-    def total_profit(self, group_by=None):
+    def final_value(self, group_by=None):
         """Get total profit per column/group."""
-        init_cash_regrouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
-        final_value = to_1d(self.final_value(group_by=group_by), raw=True)
-        total_profit = nb.total_profit_nb(init_cash_regrouped, final_value)
-        return self.wrapper.wrap_reduced(total_profit, group_by=group_by)
+        init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
+        total_profit = to_1d(self.total_profit(group_by=group_by), raw=True)
+        final_value = nb.final_value_nb(total_profit, init_cash)
+        return self.wrapper.wrap_reduced(final_value, group_by=group_by)
 
     @cached_method
     def total_return(self, group_by=None):
         """Get total profit per column/group."""
-        init_cash_regrouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
-        final_value = to_1d(self.final_value(group_by=group_by), raw=True)
-        total_return = nb.total_return_nb(init_cash_regrouped, final_value)
+        init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
+        total_profit = to_1d(self.total_profit(group_by=group_by), raw=True)
+        total_return = nb.total_return_nb(total_profit, init_cash)
         return self.wrapper.wrap_reduced(total_return, group_by=group_by)
 
     @cached_method
@@ -1497,17 +1467,17 @@ class Portfolio(Configured, PandasIndexer):
         value = to_2d(self.value(group_by=group_by, in_sim_order=in_sim_order), raw=True)
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             group_counts = self.wrapper.grouper.get_group_counts()
-            init_cash = to_1d(self.init_cash, raw=True)
+            init_cash_grouped = to_1d(self.init_cash(), raw=True)
             call_seq = to_2d(self.call_seq, raw=True)
-            returns = nb.returns_in_sim_order_nb(value, group_counts, init_cash, call_seq)
+            returns = nb.returns_in_sim_order_nb(value, group_counts, init_cash_grouped, call_seq)
         else:
-            init_cash_regrouped = to_1d(self.init_cash_regrouped(group_by=group_by), raw=True)
-            returns = nb.returns_nb(value, init_cash_regrouped)
+            init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
+            returns = nb.returns_nb(value, init_cash)
         return self.wrapper.wrap(returns, group_by=group_by)
 
     @cached_method
     def stats(self, column=None, group_by=None, incl_unrealized=None, active_returns=False,
-              agg_func=lambda x: x.mean(axis=0), **kwargs):
+              in_sim_order=False, agg_func=lambda x: x.mean(axis=0), **kwargs):
         """Compute various statistics on this portfolio.
 
         `kwargs` will be passed to each `vectorbt.returns.accessors.Returns_Accessor` method.
@@ -1526,7 +1496,7 @@ class Portfolio(Configured, PandasIndexer):
         if active_returns:
             returns = self.active_returns(group_by=group_by)
         else:
-            returns = self.returns(group_by=group_by)
+            returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
 
         # Run stats
         stats_df = pd.DataFrame({

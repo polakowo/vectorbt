@@ -488,7 +488,7 @@ class Trades(Events):
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_cash=100., freq='1D')
 
-        >>> trades = vbt.Trades.from_orders(portfolio.orders)
+        >>> trades = vbt.Trades.from_orders(portfolio.orders())
         >>> trades.count()
         6
         >>> trades.pnl.sum()
@@ -592,7 +592,7 @@ class Positions(Events):
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_cash=100., freq='1D')
 
-        >>> positions = vbt.Positions.from_orders(portfolio.orders)
+        >>> positions = vbt.Positions.from_orders(portfolio.orders())
         >>> positions.count()
         3
         >>> positions.pnl.sum()
