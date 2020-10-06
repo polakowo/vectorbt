@@ -30,10 +30,10 @@ def mstd_nb(a, window, ewm):
 
 
 @njit(cache=True)
-def ma_caching_nb(ts, windows, ewms):
+def ma_cache_nb(ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.MA`."""
     cache_dict = dict()
-    for i in range(windows.shape[0]):
+    for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             cache_dict[h] = ma_nb(ts, windows[i], ewms[i])
@@ -48,10 +48,10 @@ def ma_apply_nb(ts, window, ewm, cache_dict):
 
 
 @njit(cache=True)
-def mstd_caching_nb(ts, windows, ewms):
+def mstd_cache_nb(ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.MSTD`."""
     cache_dict = dict()
-    for i in range(windows.shape[0]):
+    for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             cache_dict[h] = mstd_nb(ts, windows[i], ewms[i])
@@ -66,10 +66,10 @@ def mstd_apply_nb(ts, window, ewm, cache_dict):
 
 
 @njit(cache=True)
-def bb_caching_nb(ts, windows, ewms, alphas):
+def bb_cache_nb(ts, windows, ewms, alphas):
     """Caching function for `vectorbt.indicators.basic.BollingerBands`."""
-    ma_cache_dict = ma_caching_nb(ts, windows, ewms)
-    mstd_cache_dict = mstd_caching_nb(ts, windows, ewms)
+    ma_cache_dict = ma_cache_nb(ts, windows, ewms)
+    mstd_cache_dict = mstd_cache_nb(ts, windows, ewms)
     return ma_cache_dict, mstd_cache_dict
 
 
@@ -85,7 +85,7 @@ def bb_apply_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
 
 
 @njit(cache=True)
-def rsi_caching_nb(ts, windows, ewms):
+def rsi_cache_nb(ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.RSI`."""
     delta = generic_nb.diff_nb(ts)  # otherwise ewma will be all NaN
     up, down = delta.copy(), delta.copy()
@@ -93,7 +93,7 @@ def rsi_caching_nb(ts, windows, ewms):
     down = np.abs(generic_nb.set_by_mask_nb(down, down > 0, 0))
     # Cache
     cache_dict = dict()
-    for i in range(windows.shape[0]):
+    for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             roll_up = ma_nb(up, windows[i], ewms[i])
@@ -112,10 +112,10 @@ def rsi_apply_nb(ts, window, ewm, cache_dict):
 
 
 @njit(cache=True)
-def stoch_caching_nb(high_ts, low_ts, close_ts, k_windows, d_windows, d_ewms):
+def stoch_cache_nb(high_ts, low_ts, close_ts, k_windows, d_windows, d_ewms):
     """Caching function for `vectorbt.indicators.basic.Stochastic`."""
     cache_dict = dict()
-    for i in range(k_windows.shape[0]):
+    for i in range(len(k_windows)):
         h = hash(k_windows[i])
         if h not in cache_dict:
             roll_min = generic_nb.rolling_min_nb(low_ts, k_windows[i])
@@ -135,9 +135,9 @@ def stoch_apply_nb(high_ts, low_ts, close_ts, k_window, d_window, d_ewm, cache_d
 
 
 @njit(cache=True)
-def macd_caching_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
+def macd_cache_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
     """Caching function for `vectorbt.indicators.basic.MACD`."""
-    return ma_caching_nb(ts, np.concatenate((fast_windows, slow_windows)), np.concatenate((macd_ewms, macd_ewms)))
+    return ma_cache_nb(ts, fast_windows + slow_windows, macd_ewms + macd_ewms)
 
 
 @njit(cache=True)
@@ -174,13 +174,13 @@ def true_range(high_ts, low_ts, close_ts):
 
 
 @njit(cache=True)
-def atr_caching_nb(high_ts, low_ts, close_ts, windows, ewms):
+def atr_cache_nb(high_ts, low_ts, close_ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_nb
     tr = true_range(high_ts, low_ts, close_ts)
 
     cache_dict = dict()
-    for i in range(windows.shape[0]):
+    for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
         if h not in cache_dict:
             cache_dict[h] = ma_nb(tr, windows[i], ewms[i])

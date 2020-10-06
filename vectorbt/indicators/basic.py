@@ -50,7 +50,7 @@ MA = IndicatorFactory(
     param_names=['window', 'ewm'],
     param_defaults={'ewm': False},
     output_names=['ma']
-).from_apply_func(nb.ma_apply_nb, caching_func=nb.ma_caching_nb)
+).from_apply_func(nb.ma_apply_nb, cache_func=nb.ma_cache_nb)
 
 
 class MA(MA):
@@ -108,7 +108,7 @@ MSTD = IndicatorFactory(
     param_names=['window', 'ewm'],
     param_defaults={'ewm': False},
     output_names=['mstd']
-).from_apply_func(nb.mstd_apply_nb, caching_func=nb.mstd_caching_nb)
+).from_apply_func(nb.mstd_apply_nb, cache_func=nb.mstd_cache_nb)
 
 
 class MSTD(MSTD):
@@ -164,7 +164,7 @@ BollingerBands = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap(
             (self.upper.values - self.lower.values) / self.middle.values)
     )
-).from_apply_func(nb.bb_apply_nb, caching_func=nb.bb_caching_nb)
+).from_apply_func(nb.bb_apply_nb, cache_func=nb.bb_cache_nb)
 
 
 class BollingerBands(BollingerBands):
@@ -242,7 +242,7 @@ RSI = IndicatorFactory(
     param_names=['window', 'ewm'],
     param_defaults={'window': 14, 'ewm': False},
     output_names=['rsi']
-).from_apply_func(nb.rsi_apply_nb, caching_func=nb.rsi_caching_nb)
+).from_apply_func(nb.rsi_apply_nb, cache_func=nb.rsi_cache_nb)
 
 
 class RSI(RSI):
@@ -313,7 +313,7 @@ Stochastic = IndicatorFactory(
     param_names=['k_window', 'd_window', 'd_ewm'],
     param_defaults={'k_window': 14, 'd_window': 3, 'd_ewm': False},
     output_names=['percent_k', 'percent_d']
-).from_apply_func(nb.stoch_apply_nb, caching_func=nb.stoch_caching_nb)
+).from_apply_func(nb.stoch_apply_nb, cache_func=nb.stoch_cache_nb)
 
 
 class Stochastic(Stochastic):
@@ -396,7 +396,7 @@ MACD = IndicatorFactory(
     custom_output_funcs=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
-).from_apply_func(nb.macd_apply_nb, caching_func=nb.macd_caching_nb)
+).from_apply_func(nb.macd_apply_nb, cache_func=nb.macd_cache_nb)
 
 
 class MACD(MACD):
@@ -479,7 +479,7 @@ ATR = IndicatorFactory(
     param_names=['window', 'ewm'],
     param_defaults={'ewm': True},
     output_names=['tr', 'atr']
-).from_apply_func(nb.atr_apply_nb, caching_func=nb.atr_caching_nb)
+).from_apply_func(nb.atr_apply_nb, cache_func=nb.atr_cache_nb)
 
 
 class ATR(ATR):

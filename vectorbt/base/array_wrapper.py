@@ -20,12 +20,12 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
 
     Takes into account column grouping.
 
-    Set `column_only_select` to `True` to index the array wrapper as a Series of columns.
-    This way, selection of index (axis 0) can be avoided. Set `group_select` to `True`
+    Set `column_only_select` to True to index the array wrapper as a Series of columns.
+    This way, selection of index (axis 0) can be avoided. Set `group_select` to True
     to select groups rather than columns. Takes effect only if grouping is enabled.
 
     !!! note
-        If `column_only_select` is `True`, make sure to index the array wrapper
+        If `column_only_select` is True, make sure to index the array wrapper
         as a Series of columns rather than a DataFrame. For example, the operation
         `.iloc[:, :2]` should become `.iloc[:2]`. Operations are not allowed if the
         object is already a Series and thus has only one column/group."""

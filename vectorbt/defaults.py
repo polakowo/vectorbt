@@ -131,7 +131,7 @@ __pdoc__['broadcasting'] = f"""Broadcasting rules for index and columns.
 
 # Cache
 caching = True
-"""If `True`, will cache properties and methods decorated accordingly.
+"""If True, will cache properties and methods decorated accordingly.
 
 Disable for performance tests."""
 

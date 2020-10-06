@@ -413,7 +413,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
             Even if columns are not grouped, `group_counts` should contain ones - one column per group.
         init_cash (np.ndarray): Initial capital per column, or per group if cash sharing is enabled.
 
-            If `cash_sharing` is `True`, should have shape `(target_shape[0], group_counts.shape[0])`.
+            If `cash_sharing` is True, should have shape `(target_shape[0], group_counts.shape[0])`.
             Otherwise, should have shape `target_shape`.
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (np.ndarray): Default sequence of calls per row and group.
@@ -1243,7 +1243,7 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
     !!! note
         Should be only grouped if cash sharing is enabled.
 
-        If `auto_call_seq` is `True`, make sure that `call_seq` follows `CallSeqType.Default`."""
+        If `auto_call_seq` is True, make sure that `call_seq` follows `CallSeqType.Default`."""
     check_group_counts(group_counts, target_shape[1])
     cash_sharing = is_grouped_nb(group_counts)
     check_group_init_cash(group_counts, target_shape[1], init_cash, cash_sharing)
@@ -1497,7 +1497,7 @@ def cash_flow_grouped_nb(cash_flow_ungrouped, group_counts):
 def cash_ungrouped_nb(cash_flow_ungrouped, group_counts, init_cash, call_seq, in_sim_order):
     """Get cash series per column.
 
-    `init_cash` should be grouped if `in_sim_order` is `True`, and ungrouped otherwise."""
+    `init_cash` should be grouped if `in_sim_order` is True, and ungrouped otherwise."""
     check_group_counts(group_counts, cash_flow_ungrouped.shape[1])
 
     out = np.empty_like(cash_flow_ungrouped)

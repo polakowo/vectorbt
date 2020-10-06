@@ -74,8 +74,8 @@ class cached_property(custom_property):
     
     Disables caching if 
     
-    * `vectorbt.defaults.caching` is `False`, or
-    * `disabled` attribute is to `True`."""
+    * `vectorbt.defaults.caching` is False, or
+    * `disabled` attribute is to True."""
 
     def __init__(self, func, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
@@ -152,8 +152,8 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
 
     Disables caching if
 
-    * `vectorbt.defaults.caching` is `False`,
-    * `disabled` attribute is to `True`, or
+    * `vectorbt.defaults.caching` is False,
+    * `disabled` attribute is to True, or
     * a non-hashable object was passed as positional or keyword argument.
 
     Cache can be cleared by calling `clear_cache` with instance as argument.

@@ -49,10 +49,11 @@ exits = fast_ma.ma_below(slow_ma, crossed=True)
 portfolio = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq='1D')
 
 # Get total return, reshape to symmetric matrix, and plot the whole thing
-portfolio.total_return().vbt.heatmap(
+fig = portfolio.total_return().vbt.heatmap(
     x_level='fast_window', y_level='slow_window', symmetric=True,
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%'))
 )
+fig.show()
 ```
 
 ![dmac_heatmap.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.png)

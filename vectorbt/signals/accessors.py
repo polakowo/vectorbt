@@ -43,11 +43,12 @@ from vectorbt.root_accessors import register_dataframe_accessor, register_series
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.base import reshape_fns, index_fns
+from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.base import reshape_fns
 from vectorbt.base.common import add_nb_methods
 from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
 from vectorbt.signals import nb
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.signals.enums import StopPosition
 
 
 @add_nb_methods([
@@ -144,6 +145,7 @@ class Signals_Accessor(Generic_Accessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
+        args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in args])
         result = nb.generate_nb(shape, choice_func_nb, *args)
 
         if cls.is_series():
@@ -154,7 +156,7 @@ class Signals_Accessor(Generic_Accessor):
 
     @classmethod
     def generate_both(cls, shape, entry_choice_func_nb, exit_choice_func_nb,
-                      entry_args, exit_args, **kwargs):
+                      entry_args=None, exit_args=None, **kwargs):
         """See `vectorbt.signals.nb.generate_enex_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -176,7 +178,8 @@ class Signals_Accessor(Generic_Accessor):
             ...     return np.empty(0, dtype=np.int_)
 
             >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
-            ...     (5, 3), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,),
+            ...     (5, 3), entry_choice_func_nb, exit_choice_func_nb,
+            ...     entry_args=(0,), exit_args=(1,),
             ...     index=sig.index, columns=sig.columns)
             >>> en
                             a      b      c
@@ -201,12 +204,12 @@ class Signals_Accessor(Generic_Accessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
+        entry_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in entry_args])
+        exit_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in exit_args])
         result1, result2 = nb.generate_enex_nb(
             shape,
-            entry_choice_func_nb,
-            exit_choice_func_nb,
-            entry_args,
-            exit_args
+            entry_choice_func_nb, entry_args,
+            exit_choice_func_nb, exit_args
         )
         if cls.is_series():
             if shape[1] > 1:
@@ -234,6 +237,7 @@ class Signals_Accessor(Generic_Accessor):
             ```"""
         checks.assert_numba_func(exit_choice_func_nb)
 
+        args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in args])
         return self.wrap(nb.generate_ex_nb(self.to_2d_array(), exit_choice_func_nb, *args))
 
     # ############# Random ############# #
@@ -367,7 +371,7 @@ class Signals_Accessor(Generic_Accessor):
     def generate_random_exits(self, prob=None, seed=None):
         """Generate exit signals randomly.
 
-        If `prob` is `None`, see `vectorbt.signals.nb.generate_rand_ex_nb`.
+        If `prob` is None, see `vectorbt.signals.nb.generate_rand_ex_nb`.
         Otherwise, see `vectorbt.signals.nb.generate_rand_ex_by_prob_nb`.
 
         Example:
@@ -398,133 +402,94 @@ class Signals_Accessor(Generic_Accessor):
             return obj.vbt.wrap(nb.generate_rand_ex_by_prob_nb(self.to_2d_array(), prob, seed=seed))
         return self.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), seed=seed))
 
-    def generate_stop_loss_exits(self, ts, stops, trailing=False, first=True, iteratively=False,
-                                 keys=None, broadcast_kwargs={}):
-        """Generate (trailing) stop loss exits.
+    def generate_stop_exits(self, ts, stop, stop_pos=StopPosition.Entry, first=True,
+                            iteratively=False, broadcast_kwargs=None):
+        """Generate exits based on stop values.
 
-        If `iteratively` is `True`, see `vectorbt.signals.nb.generate_sl_ex_iter_nb`.
+        If `iteratively` is True, see `vectorbt.signals.nb.generate_sl_ex_iter_nb`.
         Otherwise, see `vectorbt.signals.nb.generate_sl_ex_nb`.
 
-        Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
-        with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of
-        numbers, or a 3D array, where each matrix corresponds to a single configuration.
-        Use `keys` as the outermost level.
+        Arguments `entries`, `ts` and `stop` will be broadcasted using
+        `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`."""
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        entries = self._obj
+        checks.assert_type(ts, (pd.Series, pd.DataFrame))
+
+        keep_raw = (False, True, True)
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        entries, ts, stop = reshape_fns.broadcast(entries, ts, stop, **broadcast_kwargs, keep_raw=keep_raw)
+
+        # Perform generation
+        if iteratively:
+            new_entries, exits = nb.generate_stop_ex_iter_nb(
+                entries.vbt.to_2d_array(), ts, stop, stop_pos, entries.ndim == 2)
+            return entries.vbt.wrap(new_entries), entries.vbt.wrap(exits)
+        else:
+            exits = nb.generate_stop_ex_nb(
+                entries.vbt.to_2d_array(), ts, stop, stop_pos, first, entries.ndim == 2)
+            return entries.vbt.wrap(exits)
+
+    def generate_stop_loss_exits(self, ts, stop, trailing=False, **kwargs):
+        """Generate (trailing) stop loss exits.
+
+        For more details, see `Signals_Accessor.generate_stop_exits`.
 
         Example:
             For each entry in `sig`, set stop loss for 10% and 20% below the entry price:
             ```python-repl
             >>> ts = pd.Series([1, 2, 3, 2, 1])
-            >>> sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.5])
-            stop_loss                   0.1                  0.5
-                            a      b      c      a      b      c
-            2020-01-01  False  False  False  False  False  False
-            2020-01-02  False  False  False  False  False  False
-            2020-01-03  False  False  False  False  False  False
-            2020-01-04  False   True   True  False  False  False
-            2020-01-05  False  False  False  False  False   True
-            >>> sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.5], trailing=True)
-            trail_stop                  0.1                  0.5
-                            a      b      c      a      b      c
-            2020-01-01  False  False  False  False  False  False
-            2020-01-02  False  False  False  False  False  False
-            2020-01-03  False  False  False  False  False  False
-            2020-01-04   True   True   True  False  False  False
-            2020-01-05  False  False  False   True  False   True
+            >>> sig.vbt.signals.generate_stop_loss_exits(ts, 0.1)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
+            >>> sig.vbt.signals.generate_stop_loss_exits(ts, 0.1, trailing=True)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
             ```"""
-        entries = self._obj
-        checks.assert_type(ts, (pd.Series, pd.DataFrame))
-
-        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs)
-        stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
-
-        # Build column hierarchy
-        if keys is not None:
-            param_columns = keys
+        if trailing:
+            stop_pos = StopPosition.ExpMax
         else:
-            name = 'trail_stop' if trailing else 'stop_loss'
-            param_columns = index_fns.index_from_values(stops, name=name)
-        columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
+            stop_pos = StopPosition.Entry
+        return self.generate_stop_exits(ts, -np.abs(stop), stop_pos=stop_pos, **kwargs)
 
-        # Perform generation
-        if iteratively:
-            new_entries, exits = nb.generate_sl_ex_iter_nb(
-                entries.vbt.to_2d_array(),
-                ts.vbt.to_2d_array(),
-                stops,
-                trailing=trailing)
-            return entries.vbt.wrap(new_entries, columns=columns), entries.vbt.wrap(exits, columns=columns)
-        else:
-            exits = nb.generate_sl_ex_nb(
-                entries.vbt.to_2d_array(),
-                ts.vbt.to_2d_array(),
-                stops,
-                trailing=trailing,
-                first=first)
-            return entries.vbt.wrap(exits, columns=columns)
+    def generate_take_profit_exits(self, ts, stop, **kwargs):
+        """Generate (trailing) stop loss exits.
 
-    def generate_take_profit_exits(self, ts, stops, first=True, iteratively=False, keys=None, broadcast_kwargs={}):
-        """Generate take profit exits.
-
-        See `vectorbt.signals.nb.generate_tp_ex_iter_nb` if `iteratively` is `True`, otherwise see
-        `vectorbt.signals.nb.generate_tp_ex_nb`.
-
-        Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
-        with `broadcast_kwargs`. Argument `stops` can be either a single number, an array of
-        numbers, or a 3D array, where each matrix corresponds to a single configuration.
-        Use `keys` as the outermost level.
+        For more details, see `Signals_Accessor.generate_stop_exits`.
 
         Example:
             For each entry in `sig`, set take profit for 10% and 20% above the entry price:
             ```python-repl
             >>> ts = pd.Series([1, 2, 3, 4, 5])
-            >>> sig.vbt.signals.generate_take_profit_exits(ts, [0.1, 0.5])
-            take_profit                  0.1                  0.5
-                             a      b      c      a      b      c
-            2020-01-01   False  False  False  False  False  False
-            2020-01-02    True   True  False   True   True  False
-            2020-01-03   False  False  False  False  False  False
-            2020-01-04   False   True   True  False  False  False
-            2020-01-05   False  False  False  False  False   True
+            >>> sig.vbt.signals.generate_take_profit_exits(ts, 0.1)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02   True   True  False
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
             ```"""
-        entries = self._obj
-        checks.assert_type(ts, (pd.Series, pd.DataFrame))
-
-        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, ts = reshape_fns.broadcast(entries, ts, **broadcast_kwargs)
-        stops = reshape_fns.broadcast_to_array_of(stops, entries.vbt.to_2d_array())
-
-        # Build column hierarchy
-        if keys is not None:
-            param_columns = keys
-        else:
-            param_columns = index_fns.index_from_values(stops, name='take_profit')
-        columns = index_fns.combine_indexes(param_columns, entries.vbt.columns)
-
-        # Perform generation
-        if iteratively:
-            new_entries, exits = nb.generate_tp_ex_iter_nb(
-                entries.vbt.to_2d_array(),
-                ts.vbt.to_2d_array(),
-                stops)
-            return entries.vbt.wrap(new_entries, columns=columns), entries.vbt.wrap(exits, columns=columns)
-        else:
-            exits = nb.generate_tp_ex_nb(
-                entries.vbt.to_2d_array(),
-                ts.vbt.to_2d_array(),
-                stops,
-                first=first)
-            return entries.vbt.wrap(exits, columns=columns)
+        return self.generate_stop_exits(ts, np.abs(stop), stop_pos=StopPosition.Entry, **kwargs)
 
     # ############# Map and reduce ############# #
 
-    def map_reduce_between(self, *args, other=None, map_func_nb=None, reduce_func_nb=None, broadcast_kwargs={}):
+    def map_reduce_between(self, other=None, map_func_nb=None, map_args=None,
+                           reduce_func_nb=None, reduce_args=None, broadcast_kwargs=None):
         """See `vectorbt.signals.nb.map_reduce_between_nb`.
 
         If `other` specified, see `vectorbt.signals.nb.map_reduce_between_two_nb`.
-
-        Arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        Both will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
+
+        Note that `map_args` and `reduce_args` won't be broadcasted.
 
         Example:
             Get average distance between signals in `sig`:
@@ -540,14 +505,26 @@ class Signals_Accessor(Generic_Accessor):
             c    1.0
             dtype: float64
             ```"""
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
         checks.assert_not_none(map_func_nb)
         checks.assert_not_none(reduce_func_nb)
         checks.assert_numba_func(map_func_nb)
         checks.assert_numba_func(reduce_func_nb)
+        if map_args is None:
+            map_args = ()
+        if reduce_args is None:
+            reduce_args = ()
+        map_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in map_args])
+        reduce_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in reduce_args])
 
         if other is None:
             # One input array
-            result = nb.map_reduce_between_nb(self.to_2d_array(), map_func_nb, reduce_func_nb, *args)
+            result = nb.map_reduce_between_nb(
+                self.to_2d_array(),
+                map_func_nb, map_args,
+                reduce_func_nb, reduce_args
+            )
             if isinstance(self._obj, pd.Series):
                 return result[0]
             return pd.Series(result, index=self.columns)
@@ -556,10 +533,15 @@ class Signals_Accessor(Generic_Accessor):
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
             checks.assert_dtype(other, np.bool)
             result = nb.map_reduce_between_two_nb(
-                self.to_2d_array(), other.vbt.to_2d_array(), map_func_nb, reduce_func_nb, *args)
+                self.to_2d_array(),
+                other.vbt.to_2d_array(),
+                map_func_nb, map_args,
+                reduce_func_nb, reduce_args
+            )
             return self.wrap_reduced(result)
 
-    def map_reduce_partitions(self, *args, map_func_nb=None, reduce_func_nb=None):
+    def map_reduce_partitions(self, map_func_nb=None, map_args=None,
+                              reduce_func_nb=None, reduce_args=None):
         """See `vectorbt.signals.nb.map_reduce_partitions_nb`.
 
         Example:
@@ -580,16 +562,26 @@ class Signals_Accessor(Generic_Accessor):
         checks.assert_not_none(reduce_func_nb)
         checks.assert_numba_func(map_func_nb)
         checks.assert_numba_func(reduce_func_nb)
+        if map_args is None:
+            map_args = ()
+        if reduce_args is None:
+            reduce_args = ()
+        map_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in map_args])
+        reduce_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in reduce_args])
 
-        result = nb.map_reduce_partitions_nb(self.to_2d_array(), map_func_nb, reduce_func_nb, *args)
+        result = nb.map_reduce_partitions_nb(
+            self.to_2d_array(),
+            map_func_nb, map_args,
+            reduce_func_nb, reduce_args
+        )
         return self.wrap_reduced(result)
 
     def num_signals(self):
-        """Sum up `True` values."""
+        """Sum up True values."""
         return self.sum()
 
     def avg_distance(self, to=None, **kwargs):
-        """Calculate the average distance between `True` values in `self` and optionally `to`.
+        """Calculate the average distance between True values in `self` and optionally `to`.
 
         See `Signals_Accessor.map_reduce_between`."""
         return self.map_reduce_between(
@@ -601,11 +593,11 @@ class Signals_Accessor(Generic_Accessor):
 
     # ############# Ranking ############# #
 
-    def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs={}):
+    def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs=None):
         """See `vectorbt.signals.nb.rank_nb`.
 
         Example:
-            Rank each `True` value in each partition in `sig`:
+            Rank each True value in each partition in `sig`:
             ```python-repl
             >>> sig.vbt.signals.rank()
                         a  b  c
@@ -636,6 +628,8 @@ class Signals_Accessor(Generic_Accessor):
             2020-01-04  0  0  0
             2020-01-05  0  1  0
             ```"""
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
         if reset_by is not None:
             obj, reset_by = reshape_fns.broadcast(self._obj, reset_by, **broadcast_kwargs)
             reset_by = reset_by.vbt.to_2d_array()
@@ -648,11 +642,11 @@ class Signals_Accessor(Generic_Accessor):
             allow_gaps=allow_gaps)
         return obj.vbt.wrap(ranked)
 
-    def rank_partitions(self, reset_by=None, after_false=False, broadcast_kwargs={}):
+    def rank_partitions(self, reset_by=None, after_false=False, broadcast_kwargs=None):
         """See `vectorbt.signals.nb.rank_partitions_nb`.
 
         Example:
-            Rank each partition of `True` values in `sig`:
+            Rank each partition of True values in `sig`:
             ```python-repl
             >>> sig.vbt.signals.rank_partitions()
                         a  b  c
@@ -676,6 +670,8 @@ class Signals_Accessor(Generic_Accessor):
             2020-01-04  0  0  0
             2020-01-05  0  1  0
             ```"""
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
         if reset_by is not None:
             obj, reset_by = reshape_fns.broadcast(self._obj, reset_by, **broadcast_kwargs)
             reset_by = reset_by.vbt.to_2d_array()
@@ -749,7 +745,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         Generic_SRAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
@@ -759,10 +755,12 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```python-repl
-            >>> signals['a'].vbt.signals.plot()
+            >>> sig['a'].vbt.signals.plot()
             ```
 
             ![](/vectorbt/docs/img/signals_sr_plot.png)"""
+        if trace_kwargs is None:
+            trace_kwargs = {}
         # Set up figure
         if fig is None:
             fig = CustomFigureWidget()
@@ -789,7 +787,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         return fig
 
-    def plot_as_markers(self, ts, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot_as_markers(self, ts, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as markers.
 
         Args:
@@ -812,6 +810,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             ```
 
             ![](/vectorbt/docs/img/signals_plot_as_markers.png)"""
+        if trace_kwargs is None:
+            trace_kwargs = {}
         checks.assert_type(ts, pd.Series)
         checks.assert_index_equal(self._obj.index, ts.index)
 
@@ -842,15 +842,17 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         fig.add_trace(scatter)
         return fig
 
-    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs={}, **kwargs):  # pragma: no cover
+    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as entry markers.
         
         See `Signals_SRAccessor.plot_as_markers`."""
+        if trace_kwargs is None:
+            trace_kwargs = {}
         trace_kwargs = merge_kwargs(dict(
             marker=dict(
-                symbol='circle',
+                symbol='triangle-up',
                 color=contrast_color_schema['green'],
-                size=7,
+                size=8,
                 line=dict(
                     width=1,
                     color=adjust_lightness(contrast_color_schema['green'])
@@ -859,18 +861,20 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         ), trace_kwargs)
         return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
 
-    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs={}, **kwargs):  # pragma: no cover
+    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as exit markers.
         
         See `Signals_SRAccessor.plot_as_markers`."""
+        if trace_kwargs is None:
+            trace_kwargs = {}
         trace_kwargs = merge_kwargs(dict(
             marker=dict(
-                symbol='circle',
-                color=contrast_color_schema['orange'],
-                size=7,
+                symbol='triangle-down',
+                color=contrast_color_schema['red'],
+                size=8,
                 line=dict(
                     width=1,
-                    color=adjust_lightness(contrast_color_schema['orange'])
+                    color=adjust_lightness(contrast_color_schema['red'])
                 )
             )
         ), trace_kwargs)
@@ -890,7 +894,7 @@ class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
         Generic_DFAccessor.__init__(self, obj, freq=freq)
         Signals_Accessor.__init__(self, obj, freq=freq)
 
-    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:
@@ -900,10 +904,12 @@ class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
 
         Example:
             ```python-repl
-            >>> signals[['a', 'c']].vbt.signals.plot()
+            >>> sig[['a', 'c']].vbt.signals.plot()
             ```
 
             ![](/vectorbt/docs/img/signals_signals_plot.png)"""
+        if trace_kwargs is None:
+            trace_kwargs = {}
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.signals.plot(
                 trace_kwargs=trace_kwargs,

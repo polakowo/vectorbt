@@ -12,8 +12,8 @@
 from numba import njit
 import numpy as np
 
-from vectorbt.base import combine_fns
-from vectorbt.generic import nb as generic_nb
+from vectorbt.base.reshape_fns import flex_choose_i_and_col_nb, flex_select_nb
+from vectorbt.signals.enums import StopPosition
 
 
 # ############# Signal generation ############# #
@@ -81,7 +81,7 @@ def generate_ex_nb(entries, exit_choice_func_nb, *args):
 
 
 @njit
-def generate_enex_nb(shape, entry_choice_func_nb, exit_choice_func_nb, entry_args, exit_args):
+def generate_enex_nb(shape, entry_choice_func_nb, entry_args, exit_choice_func_nb, exit_args):
     """Pick entry signals using `entry_choice_func_nb` and exit signals using 
     `exit_choice_func_nb` iteratively.
 
@@ -188,7 +188,7 @@ def generate_rand_by_prob_nb(shape, probs, seed=None):
     return generate_nb(shape, rand_by_prob_choice_nb, probs, False)
 
 
-# ############# Exits ############# #
+# ############# Random exits ############# #
 
 @njit
 def generate_rand_ex_nb(entries, seed=None):
@@ -238,159 +238,141 @@ def generate_rand_enex_by_prob_nb(shape, entry_probs, exit_probs, seed=None):
         np.random.seed(seed)
     return generate_enex_nb(
         shape,
-        rand_by_prob_choice_nb,
-        rand_by_prob_choice_nb,
-        (entry_probs, True),
-        (exit_probs, True)
+        rand_by_prob_choice_nb, (entry_probs, True),
+        rand_by_prob_choice_nb, (exit_probs, True)
     )
 
 
-@njit(cache=True)
-def true_choice_nb(col, from_i, to_i, a):
-    """`choice_func_nb` that returns the indices of signals in `a`."""
-    return from_i + np.flatnonzero(a[from_i:to_i, col])
+# ############# Stop exits ############# #
 
 
 @njit(cache=True)
-def sl_choice_nb(col, from_i, to_i, ts, stop, trailing, first):
-    """`choice_func_nb` that returns the first index of `ts` being below the stop defined at `from_i-1`."""
-    ts = ts[from_i - 1:to_i, col]
-    stop = stop[from_i - 1:to_i, col]
-    if trailing:
-        # Propagate the maximum value from the entry using expanding max
-        stop = (1 - stop) * generic_nb.expanding_max_1d_nb(ts)
-        # Get the absolute index of the first ts being below that stop
-        exits = from_i + np.flatnonzero(ts[1:] <= stop[1:])
-    else:
-        exits = from_i + np.flatnonzero(ts[1:] <= (1 - stop[0]) * ts[0])
-    if first:
-        return exits[:1]
-    return exits
+def first_choice_nb(col, from_i, to_i, a):
+    """`choice_func_nb` that returns the index of the first signal in `a`."""
+    out = np.empty((1,), dtype=np.int_)
+    for i in range(from_i, to_i):
+        if a[i, col]:
+            out[0] = i
+            return out
+    return out[:0]  # empty
 
 
 @njit(cache=True)
-def tp_choice_nb(col, from_i, to_i, ts, stop, first):
-    """`choice_func_nb` that returns the first index of `ts` being above the stop defined at `from_i-1`."""
-    ts = ts[from_i - 1:to_i, col]
-    stop = stop[from_i - 1:to_i, col]
-    exits = from_i + np.flatnonzero(ts[1:] >= (1 + stop[0]) * ts[0])
-    if first:
-        return exits[:1]
-    return exits
+def stop_choice_nb(col, from_i, to_i, ts, _stop, stop_pos, first, temp_int, is_2d):
+    """`choice_func_nb` that returns the indices of `ts` that hit the stop."""
+    stop = np.asarray(_stop)
+    flex_i1, flex_col1 = flex_choose_i_and_col_nb(ts, is_2d)
+    flex_i2, flex_col2 = flex_choose_i_and_col_nb(stop, is_2d)
+    j = 0
+    min_i = max_i = from_i - 1
+    min_val = max_val = flex_select_nb(from_i - 1, col, ts, flex_i1, flex_col1, is_2d)
+
+    for i in range(from_i, to_i):
+        _ts = flex_select_nb(i, col, ts, flex_i1, flex_col1, is_2d)
+        if _ts < min_val:  # keep track of min
+            min_i = i
+            min_val = _ts
+        elif _ts > max_val:  # keep track of max
+            max_i = i
+            max_val = _ts
+        if stop_pos == StopPosition.ExpMin:  # defined at min
+            ts_val = flex_select_nb(min_i, col, ts, flex_i1, flex_col1, is_2d)
+            stop_val = flex_select_nb(min_i, col, stop, flex_i2, flex_col2, is_2d)
+        elif stop_pos == StopPosition.ExpMax:  # defined at max
+            ts_val = flex_select_nb(max_i, col, ts, flex_i1, flex_col1, is_2d)
+            stop_val = flex_select_nb(max_i, col, stop, flex_i2, flex_col2, is_2d)
+        elif stop_pos == StopPosition.Entry:  # defined at entry
+            ts_val = flex_select_nb(from_i - 1, col, ts, flex_i1, flex_col1, is_2d)
+            stop_val = flex_select_nb(from_i - 1, col, stop, flex_i2, flex_col2, is_2d)
+        else:
+            raise ValueError("Comparison value not supported")
+
+        # Is this exit signal?
+        if stop_val > 0:
+            exit_signal = _ts >= (1 + stop_val) * ts_val
+        else:
+            exit_signal = _ts <= (1 + stop_val) * ts_val
+        if exit_signal:
+            temp_int[j] = i
+            j += 1
+            if first:
+                return temp_int[:1]
+    return temp_int[:j]
 
 
 @njit
-def sl_apply_nb(i, entries, ts, stops, trailing, first):
-    """`apply_func_nb` for stop loss used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_ex_nb(entries, sl_choice_nb, ts, stops[i, :, :], trailing, first)
-
-
-@njit
-def sl_iter_apply_nb(i, entries, ts, stops, trailing, first):
-    """`apply_func_nb` for iterative stop loss used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_enex_nb(
-        entries.shape,
-        true_choice_nb,
-        sl_choice_nb,
-        (entries,), (ts, stops[i, :, :], trailing, first))
-
-
-@njit
-def tp_apply_nb(i, entries, ts, stops, first):
-    """`apply_func_nb` for take profit used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_ex_nb(entries, tp_choice_nb, ts, stops[i, :, :], first)
-
-
-@njit
-def tp_iter_apply_nb(i, entries, ts, stops, first):
-    """`apply_func_nb` for iterative take profit used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_enex_nb(
-        entries.shape,
-        true_choice_nb,
-        tp_choice_nb,
-        (entries,), (ts, stops[i, :, :], first))
-
-
-@njit
-def generate_sl_ex_nb(entries, ts, stops, trailing=False, first=True):
-    """Generate (trailing) stop loss exits using `generate_ex_nb`.
-
-    For each signal in `entries`, find the first value in `ts` that is below the (trailing) stop.
+def generate_stop_ex_nb(entries, ts, stop, stop_pos, first, is_2d):
+    """Generate stop exits using `generate_ex_nb`.
 
     Args:
         entries (array_like): 2-dim boolean array of entry signals.
         ts (array_like): 2-dim time series array such as price.
-        stops (array_like): 3-dim array of stop values.
+        stop (float or array_like): One or more stop values (per row/column/element).
+        stop_pos (StopPosition): See `vectorbt.signals.enums.StopPosition`.
+        first (bool): If True, selects the first signal, otherwise returns the whole sequence.
+        is_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
 
-            !!! note
-                `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape.
-                Each of these arrays will correspond to a different stop configuration.
-        trailing (bool): If `True`, uses trailing stop, otherwise constant stop.
-        first (bool): If `True`, selects the first signal, otherwise returns the whole sequence.
+    !!! note
+        `ts` and `stop` use flexible broadcasting.
 
     Example:
+        Generate trailing stop loss and take profit signals for 10%.
         ```python-repl
         >>> import numpy as np
-        >>> from vectorbt.signals.nb import generate_sl_ex_nb
-        >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
+        >>> from vectorbt.signals.nb import generate_stop_ex_nb
+        >>> from vectorbt.signals.enums import StopPosition
 
         >>> entries = np.asarray([False, True, False, False, False])[:, None]
         >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
-        >>> stops = broadcast_to_array_of([0.1, 0.5], ts)
 
-        >>> generate_sl_ex_nb(entries, ts, stops, trailing=True, first=True)
-        [[False False]
-         [False False]
-         [False False]
-         [ True False]
-         [False  True]]
+        >>> generate_stop_ex_nb(entries, ts, np.asarray(-0.1),
+        ...     StopPosition.ExpMax, True, True)
+        array([[False],
+               [False],
+               [False],
+               [ True],
+               [False]])
+
+        >>> generate_stop_ex_nb(entries, ts, np.asarray(0.1),
+        ...     StopPosition.Entry, True, True)
+        array([[False],
+               [False],
+               [ True],
+               [False],
+               [False]])
         ```"""
-    return combine_fns.apply_and_concat_one_nb(
-        len(stops), sl_apply_nb, entries, ts, stops, trailing, first)
+    temp_int = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_ex_nb(entries, stop_choice_nb, ts, stop, stop_pos, first, temp_int, is_2d)
 
 
 @njit
-def generate_sl_ex_iter_nb(entries, ts, stops, trailing=False):
-    """Generate (trailing) stop loss exits iteratively using `generate_enex_nb`.
+def generate_stop_ex_iter_nb(entries, ts, stop, stop_pos, is_2d):
+    """Generate stop loss exits iteratively using `generate_enex_nb`.
 
     Returns two arrays: new entries and exits.
 
     For arguments, see `generate_sl_ex_nb`."""
-    return combine_fns.apply_and_concat_multiple_nb(
-        len(stops), sl_iter_apply_nb, entries, ts, stops, trailing, True)
-
-
-@njit
-def generate_tp_ex_nb(entries, ts, stops, first=True):
-    """Generate take profit exits using `generate_ex_nb`.
-
-    For arguments, see `generate_sl_ex_nb`."""
-    return combine_fns.apply_and_concat_one_nb(
-        len(stops), tp_apply_nb, entries, ts, stops, first)
-
-
-@njit
-def generate_tp_ex_iter_nb(entries, ts, stops):
-    """Generate take profit exits iteratively using `generate_enex_nb`.
-
-    For arguments, see `generate_sl_ex_nb`."""
-    return combine_fns.apply_and_concat_multiple_nb(
-        len(stops), tp_iter_apply_nb, entries, ts, stops, True)
+    temp_int = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_enex_nb(
+        entries.shape,
+        first_choice_nb, (entries,),
+        stop_choice_nb, (ts, stop, stop_pos, True, temp_int, is_2d)
+    )
 
 
 # ############# Map and reduce ############# #
 
 
 @njit
-def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
+def map_reduce_between_nb(a, map_func_nb, map_args, reduce_func_nb, reduce_args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive
     pair of signals in `a`.
 
     Applies `map_func_nb` on each range `[from_i, to_i)`. Must accept index of the current column,
-    index of the start of the range `from_i`, index of the end of the range `to_i`, and `*args`.
+    index of the start of the range `from_i`, index of the end of the range `to_i`, and `*map_args`.
 
     Applies `reduce_func_nb` on all mapper results in a column. Must accept index of the
-    current column, the array of results from `map_func_nb` for that column, and `*args`.
+    current column, the array of results from `map_func_nb` for that column, and `*reduce_args`.
 
     Example:
         ```python-repl
@@ -406,8 +388,8 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
         ...     return np.nanmean(map_res)
         >>> a = np.asarray([False, True, True, False, True])[:, None]
 
-        >>> map_reduce_between_nb(a, map_func_nb, reduce_func_nb)
-        [1.5]
+        >>> map_reduce_between_nb(a, map_func_nb, (), reduce_func_nb, ())
+        array([1.5])
         ```"""
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
@@ -419,15 +401,15 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
             for j in range(1, a_idxs.shape[0]):
                 from_i = a_idxs[j - 1]
                 to_i = a_idxs[j]
-                map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                 k += 1
             if k > 0:
-                out[col] = reduce_func_nb(col, map_res[:k], *args)
+                out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
     return out
 
 
 @njit
-def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
+def map_reduce_between_two_nb(a, b, map_func_nb, map_args, reduce_func_nb, reduce_args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive
     pair of signals between `a` and `b`.
 
@@ -447,15 +429,15 @@ def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
                     valid_a_idxs = a_idxs[a_idxs < to_i]
                     if len(valid_a_idxs) > 0:
                         from_i = valid_a_idxs[-1]  # preceding in a
-                        map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                        map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                         k += 1
                 if k > 0:
-                    out[col] = reduce_func_nb(col, map_res[:k], *args)
+                    out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
     return out
 
 
 @njit
-def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
+def map_reduce_partitions_nb(a, map_func_nb, map_args, reduce_func_nb, reduce_args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each partition of signals in `a`.
 
     `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
@@ -473,16 +455,16 @@ def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
                 is_partition = True
             elif is_partition:
                 to_i = i
-                map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                 k += 1
                 is_partition = False
             if i == a.shape[0] - 1:
                 if is_partition:
                     to_i = a.shape[0]
-                    map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                    map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                     k += 1
         if k > 0:
-            out[col] = reduce_func_nb(col, map_res[:k], *args)
+            out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
     return out
 
 
@@ -506,8 +488,8 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
     """Rank signals in each partition.
 
     Partition is some number of signals in a row. You can reset partitions by signals from
-    `reset_by` (must have the same shape). If `after_false` is `True`, the first partition must
-    come after at least one `False` value. If `allow_gaps` is `True`, ignores gaps between partitions.
+    `reset_by` (must have the same shape). If `after_false` is True, the first partition must
+    come after at least one False value. If `allow_gaps` is True, ignores gaps between partitions.
 
     Example:
         ```python-repl

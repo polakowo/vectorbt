@@ -28,7 +28,7 @@ from vectorbt.records.enums import (
 )
 
 
-def indexing_on_orders_meta(obj, pd_indexing_func):
+def indexing_on_events_meta(obj, pd_indexing_func):
     """Perform indexing on `BaseEvents` and also return metadata."""
     new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
     new_ref_price = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
@@ -41,7 +41,10 @@ def indexing_on_orders_meta(obj, pd_indexing_func):
 
 def _indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseEvents`."""
-    return indexing_on_orders_meta(obj, pd_indexing_func)[0]
+    return indexing_on_events_meta(obj, pd_indexing_func)[0]
+
+
+# ############# Events ############# #
 
 
 class BaseEvents(Records):
@@ -67,6 +70,27 @@ class BaseEvents(Records):
             raise ValueError("Records array must have all fields defined in event_dt")
 
         PandasIndexer.__init__(self, _indexing_func)
+
+    @property  # no need for cached
+    def records_readable(self):
+        """Records in readable format."""
+        records_df = self.records
+        out = pd.DataFrame(columns=[
+            'Column', 'Size', 'Entry Date', 'Entry Price', 'Entry Fees', 'Exit Date',
+            'Exit Price', 'Exit Fees', 'P&L', 'Return', 'Status'
+        ])
+        out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
+        out['Size'] = records_df['size']
+        out['Entry Date'] = records_df['entry_idx'].map(lambda x: self.wrapper.index[x])
+        out['Entry Price'] = records_df['entry_price']
+        out['Entry Fees'] = records_df['entry_fees']
+        out['Exit Date'] = records_df['exit_idx'].map(lambda x: self.wrapper.index[x])
+        out['Exit Price'] = records_df['exit_price']
+        out['Exit Fees'] = records_df['exit_fees']
+        out['P&L'] = records_df['pnl']
+        out['Return'] = records_df['return']
+        out['Status'] = records_df['status'].map(lambda x: EventStatus._fields[x])
+        return out
 
     def plot(self,
              column=None,
@@ -95,15 +119,15 @@ class BaseEvents(Records):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            import vectorbt as vbt
-            import pandas as pd
+            ```python-repl
+            >>> import vectorbt as vbt
+            >>> import pandas as pd
 
-            price = pd.Series([1, 2, 3, 2, 1])
-            orders = pd.Series([1, -1, 1, -1, 0])
-            portfolio = vbt.Portfolio.from_orders(price, orders, freq='1D')
+            >>> price = pd.Series([1, 2, 3, 2, 1])
+            >>> orders = pd.Series([1, -1, 1, -1, 0])
+            >>> portfolio = vbt.Portfolio.from_orders(price, orders, freq='1D')
 
-            portfolio.trades.plot()
+            >>> portfolio.trades.plot()
             ```
 
             ![](/vectorbt/docs/img/events.png)"""
@@ -309,12 +333,13 @@ class BaseEvents(Records):
 
 class BaseEventsByResult(BaseEvents):
     """Extends `BaseEvents` by further dividing events into winning and losing events."""
+    BaseEvents = BaseEvents
 
     @cached_property
     def winning(self):
         """Winning events of type `BaseEvents`."""
         filter_mask = self.records_arr['pnl'] > 0.
-        return BaseEvents(
+        return self.BaseEvents(
             self.wrapper,
             self.records_arr[filter_mask],
             self.close,
@@ -325,7 +350,7 @@ class BaseEventsByResult(BaseEvents):
     def losing(self):
         """Losing events of type `BaseEvents`."""
         filter_mask = self.records_arr['pnl'] < 0.
-        return BaseEvents(
+        return self.BaseEvents(
             self.wrapper,
             self.records_arr[filter_mask],
             self.close,
@@ -380,6 +405,7 @@ class BaseEventsByResult(BaseEvents):
 
 class Events(BaseEventsByResult):
     """Extends `BaseEventsByResult` by further dividing events by status."""
+    BaseEventsByResult = BaseEventsByResult
 
     @cached_property
     def status(self):
@@ -397,7 +423,7 @@ class Events(BaseEventsByResult):
     def open(self):
         """Open events of type `BaseEventsByResult`."""
         filter_mask = self.records_arr['status'] == EventStatus.Open
-        return BaseEventsByResult(
+        return self.BaseEventsByResult(
             self.wrapper,
             self.records_arr[filter_mask],
             self.close,
@@ -408,7 +434,7 @@ class Events(BaseEventsByResult):
     def closed(self):
         """Closed events of type `BaseEventsByResult`."""
         filter_mask = self.records_arr['status'] == EventStatus.Closed
-        return BaseEventsByResult(
+        return self.BaseEventsByResult(
             self.wrapper,
             self.records_arr[filter_mask],
             self.close,
@@ -416,7 +442,26 @@ class Events(BaseEventsByResult):
         )
 
 
-class Trades(Events):
+# ############# Trades ############# #
+
+
+class BaseTrades(BaseEvents):
+    """`BaseEvents` adapted for trades."""
+    @property  # no need for cached
+    def records_readable(self):
+        """Records in readable format."""
+        records_df = self.records
+        out = super().records_readable.copy()
+        out['Position'] = records_df['position_idx']
+        return out
+
+
+class BaseTradesByResult(BaseEventsByResult, BaseTrades):
+    """`BaseEventsByResult` adapted for trades."""
+    BaseEvents = BaseTrades
+
+
+class Trades(Events, BaseTradesByResult):
     """Extends `Events` for working with trade records.
 
     Such records can be created by using `vectorbt.records.nb.trade_records_nb`.
@@ -508,6 +553,7 @@ class Trades(Events):
         >>> trades_filtered.pnl.sum()
         -3.0
         ```"""
+    BaseEventsByResult = BaseTradesByResult
 
     def __init__(self, wrapper, records_arr, *args, **kwargs):
         Events.__init__(self, wrapper, records_arr, *args, **kwargs)
@@ -527,7 +573,20 @@ class Trades(Events):
         return self.map_field('position_idx')
 
 
-class Positions(Events):
+# ############# Positions ############# #
+
+
+class BasePositions(BaseEvents):
+    """`BaseEvents` adapted for positions."""
+    pass
+
+
+class BasePositionsByResult(BaseEventsByResult, BasePositions):
+    """`BaseEventsByResult` adapted for positions."""
+    BaseEvents = BasePositions
+
+
+class Positions(Events, BasePositionsByResult):
     """Extends `Events` for working with position records.
 
     Such records can be created by using `vectorbt.records.nb.position_records_nb`.
@@ -612,6 +671,7 @@ class Positions(Events):
         >>> positions_filtered.pnl.sum()
         -2.0
         ```"""
+    BaseEventsByResult = BasePositionsByResult
 
     def __init__(self, wrapper, records_arr, *args, **kwargs):
         Events.__init__(self, wrapper, records_arr, *args, **kwargs)

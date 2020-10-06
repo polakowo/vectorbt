@@ -80,9 +80,9 @@ class ColumnGrouper(Configured):
     `group_by` can be integer (level by position), string (level by name), tuple or list
     (multiple levels), index or series (named index with groups), or NumPy array (raw groups).
 
-    Set `allow_enable` to `False` to prohibit grouping if `ColumnGrouper.group_by` is `None`.
-    Set `allow_disable` to `False` to prohibit disabling of grouping if `ColumnGrouper.group_by` is not `None`.
-    Set `allow_modify` to `False` to prohibit changing groups (you can still change their labels).
+    Set `allow_enable` to False to prohibit grouping if `ColumnGrouper.group_by` is None.
+    Set `allow_disable` to False to prohibit disabling of grouping if `ColumnGrouper.group_by` is not None.
+    Set `allow_modify` to False to prohibit changing groups (you can still change their labels).
 
     All properties are read-only to enable caching.
 

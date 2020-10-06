@@ -24,6 +24,10 @@ dtype: int64
 
 The accessors extend `vectorbt.generic.accessors`.
 
+## Enums
+
+`vectorbt.signals.enums` defines schemas for working with signals.
+
 ## Numba-compiled functions
 
 `vectorbt.signals.nb` provides an arsenal of Numba-compiled functions that are used by accessors
@@ -36,3 +40,5 @@ These only accept NumPy arrays and other Numba-compatible types.
 array([0, 1, 2, 3, 0])
 ```
 """
+
+from vectorbt.signals.enums import StopPosition

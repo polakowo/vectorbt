@@ -41,21 +41,21 @@ class TestFactory:
     def test_create_param_combs(self):
         assert vbt.indicators.create_param_combs(
             (combinations, [0, 1, 2, 3], 2)) == [
-                   [0, 0, 0, 1, 1, 2],
-                   [1, 2, 3, 2, 3, 3]
+                   (0, 0, 0, 1, 1, 2),
+                   (1, 2, 3, 2, 3, 3)
                ]
         assert vbt.indicators.create_param_combs(
             (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
-                   [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
-                   [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
+                   (0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2),
+                   (1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3),
+                   (4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5)
                ]
         assert vbt.indicators.create_param_combs(
             (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1],
-                   [1, 1, 1, 2, 2, 2, 2, 2, 2],
-                   [3, 3, 4, 3, 3, 4, 3, 3, 4],
-                   [4, 5, 5, 4, 5, 5, 4, 5, 5]
+                   (0, 0, 0, 0, 0, 0, 1, 1, 1),
+                   (1, 1, 1, 2, 2, 2, 2, 2, 2),
+                   (3, 3, 4, 3, 3, 4, 3, 3, 4),
+                   (4, 5, 5, 4, 5, 5, 4, 5, 5)
                ]
 
     def test_from_custom_func(self):
@@ -371,7 +371,6 @@ class TestFactory:
         )
 
     def test_outputs(self):
-
         def apply_func(ts, p):
             return (ts * p, ts * p ** 2)
 
@@ -434,13 +433,12 @@ class TestFactory:
         )
 
     def test_cache(self):
-
-        def caching_func(ts, params):
+        def cache_func(ts, params):
             np.random.seed(seed)
             return np.random.uniform(0, 1)
 
         @njit
-        def caching_func_nb(ts, params):
+        def cache_func_nb(ts, params):
             np.random.seed(seed)
             return np.random.uniform(0, 1)
 
@@ -472,27 +470,27 @@ class TestFactory:
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_apply_func(
                 apply_func,
-                caching_func=caching_func
+                cache_func=cache_func
             ).run(ts, [0, 1]).output,
             target
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_apply_func(
                 apply_func_nb,
-                caching_func=caching_func_nb
+                cache_func=cache_func_nb
             ).run(ts, [0, 1]).output,
             target
         )
         # return_cache
         cache = vbt.IndicatorFactory().from_apply_func(
             apply_func,
-            caching_func=caching_func,
+            cache_func=cache_func,
             return_cache=True
         ).run(ts, [0, 1])
         assert cache == 0.3745401188473625
         cache = vbt.IndicatorFactory().from_apply_func(
             apply_func_nb,
-            caching_func=caching_func_nb,
+            cache_func=cache_func_nb,
             return_cache=True
         ).run(ts, [0, 1])
         assert cache == 0.3745401188473625
@@ -513,7 +511,6 @@ class TestFactory:
         )
 
     def test_return_raw(self):
-
         def apply_func(ts, p, a, b=10):
             return ts * p + a + b
 
@@ -552,7 +549,6 @@ class TestFactory:
         )
 
     def test_use_raw(self):
-
         def apply_func(ts, p, a, b=10):
             return ts * p + a + b
 
@@ -575,7 +571,6 @@ class TestFactory:
         )
 
     def test_no_params(self):
-
         def custom_func(ts, a, b=10):
             return ts + a + b
 
@@ -604,7 +599,6 @@ class TestFactory:
         )
 
     def test_pass_1d(self):
-
         def custom_func(ts, a, b=10):
             return ts + a + b
 
@@ -627,25 +621,25 @@ class TestFactory:
         pd.testing.assert_series_equal(
             vbt.IndicatorFactory(param_names=[]).from_custom_func(
                 custom_func,
-                pass_2d=False
+                to_2d=False
             ).run(ts['a'], 10, b=ts['a'].values).output,
             target
         )
         pd.testing.assert_series_equal(
             vbt.IndicatorFactory(param_names=[]).from_custom_func(
                 custom_func_nb,
-                pass_2d=False
+                to_2d=False
             ).run(ts['a'], 10, ts['a'].values).output,
             target
         )
 
     def test_pass_lists(self):
-
         def custom_func(ts_list, param_list):
-            return ts_list[0] * param_list[0]
+            return ts_list[0] * param_list[0][0]
 
-        def custom_func2(ts_list, param_list):
-            return njit(lambda x, y: x * y)(ts_list[0], param_list[0])
+        @njit
+        def custom_func_nb(ts_list, param_list):
+            return ts_list[0] * param_list[0][0]
 
         target = pd.DataFrame(
             ts.values * 2,
@@ -665,20 +659,19 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             vbt.IndicatorFactory().from_custom_func(
-                custom_func2,
+                custom_func_nb,
                 pass_lists=True
             ).run(ts, 2).output,
             target
         )
 
     def test_other(self):
-
         def apply_func(ts1, ts2, p1, p2):
-            return (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+            return ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2
 
         @njit
         def apply_func_nb(ts1, ts2, p1, p2):
-            return (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+            return ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2
 
         obj, other = vbt.IndicatorFactory(
             input_names=['ts1', 'ts2'],

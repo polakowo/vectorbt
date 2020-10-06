@@ -255,5 +255,5 @@ def assert_level_not_exists(arg, level_name):
 def assert_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` are different."""
     if arg1 != arg2:
-        raise AssertionError(f"{len(arg1)} and {len(arg2)} do not match")
+        raise AssertionError(f"{arg1} and {arg2} do not match")
 

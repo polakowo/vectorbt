@@ -119,8 +119,8 @@ class Generic_Accessor(Base_Accessor):
         `start_idxs` and `end_idxs`.
 
         At least one of `range_len`, `n`, or `start_idxs` and `end_idxs` must be set.
-        If `range_len` is `None`, will split evenly into `n` ranges.
-        If `n` is `None`, will return the maximum number of ranges of length `range_len`.
+        If `range_len` is None, will split evenly into `n` ranges.
+        If `n` is None, will return the maximum number of ranges of length `range_len`.
         If `start_idxs` and `end_idxs`, will split into ranges between both arrays.
         Both index arrays must be either NumPy arrays with positions (last exclusive)
         or pandas indexes with labels (last inclusive).

@@ -432,7 +432,7 @@ class Portfolio(Configured, PandasIndexer):
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
-            accumulate (bool): If `accumulate` is `True`, entering the market when already
+            accumulate (bool): If `accumulate` is True, entering the market when already
                 in the market will be allowed to increase the position.
             accumulate_exit_mode (AccumulateExitMode): See `vectorbt.portfolio.enums.AccumulateExitMode`.
             conflict_mode (ConflictMode): See `vectorbt.portfolio.enums.ConflictMode`.
@@ -931,7 +931,7 @@ class Portfolio(Configured, PandasIndexer):
 
         For details, see `vectorbt.portfolio.nb.simulate_nb`.
 
-        if `row_wise` is `True`, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+        if `row_wise` is True, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
 
         Args:
             close (pandas_like): Reference price, such as close. Will broadcast to `target_shape`.
@@ -978,13 +978,13 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `()`.
             group_prep_func_nb (callable): Group preparation function.
 
-                Called only if `row_wise` is `False`.
+                Called only if `row_wise` is False.
             group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
 
                 Defaults to `()`.
             row_prep_func_nb (callable): Row preparation function.
 
-                Called only if `row_wise` is `True`.
+                Called only if `row_wise` is True.
             row_prep_args (tuple): Packed arguments passed to `row_prep_func_nb`.
 
                 Defaults to `()`.
@@ -1377,7 +1377,7 @@ class Portfolio(Configured, PandasIndexer):
         independent from other assets, with initial cash and shares being that of the entire group.
         Useful for generating returns and comparing assets within the same group.
 
-        When `group_by` is `False` and `in_sim_order` is `True`, returns value generated in
+        When `group_by` is False and `in_sim_order` is True, returns value generated in
         simulation order (see [row-major order](https://en.wikipedia.org/wiki/Row-_and_column-major_order).
         This value cannot be used for generating returns as-is. Useful to analyze how value
         evolved throughout simulation."""

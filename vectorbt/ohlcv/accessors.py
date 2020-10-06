@@ -35,7 +35,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
         """Plot OHLCV data.
 
         Args:
-            display_volume (bool): If `True`, displays volume as bar chart.
+            display_volume (bool): If True, displays volume as bar chart.
             candlestick_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Candlestick`.
             bar_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.

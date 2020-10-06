@@ -1586,12 +1586,16 @@ class TestReshapeFns:
                 )
             )
 
-    def test_broadcast_to_pd(self):
+    @pytest.mark.parametrize(
+        "test_to_pd",
+        [False, [False, False, False, False, False, False]],
+    )
+    def test_broadcast_to_pd(self, test_to_pd):
         to_broadcast = 0, a1, a2, sr_none, sr1, sr2
         broadcasted_arrs = list(np.broadcast_arrays(*to_broadcast))
         broadcasted = reshape_fns.broadcast(
             *to_broadcast,
-            to_pd=False,  # to NumPy
+            to_pd=test_to_pd,  # to NumPy
             index_from='stack',
             columns_from='stack',
             drop_duplicates=True,
@@ -1604,42 +1608,55 @@ class TestReshapeFns:
             )
 
     def test_broadcast_require_kwargs(self):
-        a, _ = reshape_fns.broadcast(np.empty((1,)), a5)  # readonly
+        a, b = reshape_fns.broadcast(np.empty((1,)), np.empty((1,)))  # readonly
         assert not a.flags.writeable
-        a, _ = reshape_fns.broadcast(
-            np.empty((1,)), a5, require_kwargs={'requirements': 'W'})  # writeable
+        assert not b.flags.writeable
+        a, b = reshape_fns.broadcast(
+            np.empty((1,)), np.empty((1,)),
+            require_kwargs=[{'requirements': 'W'}, {}])  # writeable
         assert a.flags.writeable
-        a, _ = reshape_fns.broadcast(
-            np.empty((1,)), a5, require_kwargs={'requirements': ('W', 'C')})  # writeable, C order
+        assert not b.flags.writeable
+        a, b = reshape_fns.broadcast(
+            np.empty((1,)), np.empty((1,)),
+            require_kwargs=[{'requirements': ('W', 'C')}, {}])  # writeable, C order
         assert a.flags.writeable  # writeable since it was copied to make C order
+        assert not b.flags.writeable
         assert not np.isfortran(a)
+        assert not np.isfortran(b)
 
-    def test_broadcast_keep_raw(self):
+    def test_broadcast_meta(self):
         _0, _a2, _sr2, _df2 = reshape_fns.broadcast(0, a2, sr2, df2, keep_raw=True)
         assert _0 == 0
         np.testing.assert_array_equal(_a2, a2)
         np.testing.assert_array_equal(_sr2, sr2.values[:, None])
         np.testing.assert_array_equal(_df2, df2.values)
         _0, _a2, _sr2, _df2 = reshape_fns.broadcast(0, a2, sr2, df2, keep_raw=[False, True, True, True])
+        test_shape = (3, 3)
+        test_index = pd.MultiIndex.from_tuples([
+            ('x2', 'x4'),
+            ('y2', 'y4'),
+            ('z2', 'z4')
+        ], names=['i2', 'i4'])
+        test_columns = pd.MultiIndex.from_tuples([
+            ('a2', 'a4'),
+            ('a2', 'a4'),
+            ('a2', 'a4')
+        ], names=[None, 'c4'])
         pd.testing.assert_frame_equal(
             _0,
             pd.DataFrame(
-                np.zeros((3, 3), dtype=int),
-                index=pd.MultiIndex.from_tuples([
-                    ('x2', 'x4'),
-                    ('y2', 'y4'),
-                    ('z2', 'z4')
-                ], names=['i2', 'i4']),
-                columns=pd.MultiIndex.from_tuples([
-                    ('a2', 'a4'),
-                    ('a2', 'a4'),
-                    ('a2', 'a4')
-                ], names=[None, 'c4'])
+                np.zeros(test_shape, dtype=int),
+                index=test_index,
+                columns=test_columns
             )
         )
         np.testing.assert_array_equal(_a2, a2)
         np.testing.assert_array_equal(_sr2, sr2.values[:, None])
         np.testing.assert_array_equal(_df2, df2.values)
+        _, new_shape, new_index, new_columns = reshape_fns.broadcast(0, a2, sr2, df2, return_meta=True)
+        assert new_shape == test_shape
+        pd.testing.assert_index_equal(new_index, test_index)
+        pd.testing.assert_index_equal(new_columns, test_columns)
 
     def test_broadcast_to(self):
         np.testing.assert_array_equal(reshape_fns.broadcast_to(0, a5), np.broadcast_to(0, a5.shape))
@@ -2633,7 +2650,7 @@ class TestAccessors:
 
     def test_apply(self):
         pd.testing.assert_series_equal(sr2.vbt.apply(apply_func=lambda x: x ** 2), sr2 ** 2)
-        pd.testing.assert_series_equal(sr2.vbt.apply(apply_func=lambda x: x ** 2, pass_2d=True), sr2 ** 2)
+        pd.testing.assert_series_equal(sr2.vbt.apply(apply_func=lambda x: x ** 2, to_2d=True), sr2 ** 2)
         pd.testing.assert_frame_equal(df4.vbt.apply(apply_func=lambda x: x ** 2), df4 ** 2)
 
     def test_concat(self):
@@ -2718,7 +2735,7 @@ class TestAccessors:
             sr2.vbt.apply_and_concat(
                 3, np.array([[1], [2], [3]]), 10, apply_func=apply_func2, d=100,
                 keys=['a', 'b', 'c'],
-                pass_2d=True  # otherwise (3, 1) + (1, 3) = (3, 3) != (3, 1) -> error
+                to_2d=True  # otherwise (3, 1) + (1, 3) = (3, 3) != (3, 1) -> error
             ),
             pd.DataFrame(
                 np.array([
@@ -2788,7 +2805,7 @@ class TestAccessors:
             return x + y + np.array([[1], [2], [3]])
 
         pd.testing.assert_series_equal(
-            sr2.vbt.combine_with(10, combine_func=combine_func2_nb, pass_2d=True),
+            sr2.vbt.combine_with(10, combine_func=combine_func2_nb, to_2d=True),
             pd.Series(
                 np.array([12, 14, 16]),
                 index=pd.Index(['x2', 'y2', 'z2'], dtype='object', name='i2'),

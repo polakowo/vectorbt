@@ -69,6 +69,18 @@ class BaseDrawdowns(Records):
         """Original time series that records are built from."""
         return self._ts
 
+    @property  # no need for cached
+    def records_readable(self):
+        """Records in readable format."""
+        records_df = self.records
+        out = pd.DataFrame(columns=['Column', 'Start Date', 'Valley Date', 'End Date', 'Status'])
+        out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
+        out['Start Date'] = records_df['start_idx'].map(lambda x: self.wrapper.index[x])
+        out['Valley Date'] = records_df['valley_idx'].map(lambda x: self.wrapper.index[x])
+        out['End Date'] = records_df['end_idx'].map(lambda x: self.wrapper.index[x])
+        out['Status'] = records_df['status'].map(lambda x: DrawdownStatus._fields[x])
+        return out
+
     def plot(self,
              column=None,
              ts_trace_kwargs=None,
@@ -96,12 +108,12 @@ class BaseDrawdowns(Records):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            import vectorbt as vbt
-            import pandas as pd
+            ```python-repl
+            >>> import vectorbt as vbt
+            >>> import pandas as pd
 
-            ts = pd.Series([1, 2, 1, 2, 3, 2, 1, 2])
-            vbt.records.Drawdowns.from_ts(ts, freq='1 days').plot()
+            >>> ts = pd.Series([1, 2, 1, 2, 3, 2, 1, 2])
+            >>> vbt.records.Drawdowns.from_ts(ts, freq='1 days').plot()
             ```
 
             ![](/vectorbt/docs/img/drawdowns.png)"""
