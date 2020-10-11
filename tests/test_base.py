@@ -1891,7 +1891,7 @@ class TestReshapeFns:
             raw_arg = raw_args[r]
             bc_arg = np.array(bc_args[r])
             bc_arg_2d = reshape_fns.to_2d(bc_arg)
-            def_i, def_col = reshape_fns.flex_choose_i_and_col_nb(raw_arg, is_2d=bc_arg.ndim == 2)
+            def_i, def_col = reshape_fns.flex_choose_i_and_col_nb(raw_arg, flex_2d=bc_arg.ndim == 2)
             for col in range(bc_arg_2d.shape[1]):
                 for i in range(bc_arg_2d.shape[0]):
                     assert bc_arg_2d[i, col] == reshape_fns.flex_select_nb(

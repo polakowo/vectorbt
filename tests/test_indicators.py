@@ -1297,7 +1297,7 @@ class TestBasic:
             )
         )
 
-    def test_BollingerBands(self):
+    def test_BBANDS(self):
         columns = pd.MultiIndex.from_tuples([
             (2, False, 2.0),
             (2, False, 3.0),
@@ -1309,7 +1309,7 @@ class TestBasic:
             (3, True, 3.0)
         ], names=['bb_window', 'bb_ewm', 'bb_alpha'])
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1338,7 +1338,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1367,7 +1367,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1396,7 +1396,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1425,7 +1425,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1477,7 +1477,7 @@ class TestBasic:
             )
         )
 
-    def test_Stochastic(self):
+    def test_STOCH(self):
         columns = pd.MultiIndex.from_tuples([
             (2, 2, False),
             (2, 2, True),
@@ -1489,7 +1489,7 @@ class TestBasic:
             (3, 3, True)
         ], names=['stoch_k_window', 'stoch_d_window', 'stoch_d_ewm'])
         pd.testing.assert_frame_equal(
-            vbt.Stochastic.run(
+            vbt.STOCH.run(
                 high_ts,
                 low_ts,
                 close_ts,
@@ -1520,7 +1520,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.Stochastic.run(
+            vbt.STOCH.run(
                 high_ts,
                 low_ts,
                 close_ts,

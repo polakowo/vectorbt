@@ -12,8 +12,8 @@ def is_sorted(a):
 @njit(cache=True)
 def is_sorted_nb(a):
     """Numba-compiled version of `is_sorted`."""
-    for i in range(a.size-1):
-        if a[i+1] < a[i]:
+    for i in range(a.size - 1):
+        if a[i + 1] < a[i]:
             return False
     return True
 
@@ -52,3 +52,36 @@ def get_ranges_arr(starts, ends):
     id_arr[0] = starts[0]
     id_arr[counts_csum[:-1]] = starts[1:] - ends[:-1] + 1
     return id_arr.cumsum()
+
+
+@njit(cache=True)
+def uniform_summing_to_one_nb(n):
+    """Generate random floats summing to one.
+
+    See # https://stackoverflow.com/a/2640067/8141780"""
+    rand_floats = np.empty(n + 1, dtype=np.float_)
+    rand_floats[0] = 0.
+    rand_floats[1] = 1.
+    rand_floats[2:] = np.random.uniform(0, 1, n - 1)
+    rand_floats = np.sort(rand_floats)
+    rand_floats = rand_floats[1:] - rand_floats[:-1]
+    return rand_floats
+
+
+@njit(cache=True)
+def renormalize_nb(n, range1, range2):
+    """Convert from one range to another."""
+    delta1 = range1[1] - range1[0]
+    delta2 = range2[1] - range2[0]
+    return (delta2 * (n - range1[0]) / delta1) + range2[0]
+
+
+@njit(cache=True)
+def rescale_float_to_int_nb(floats, int_range, total):
+    """Rescale a float array into an int array."""
+    ints = np.floor(renormalize_nb(floats, [0., 1.], int_range))
+    leftover = int(total - ints.sum())
+    for i in range(leftover):
+        ints[np.random.choice(len(ints))] += 1
+    return ints
+

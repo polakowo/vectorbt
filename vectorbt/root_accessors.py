@@ -27,8 +27,7 @@ So, for example, the method `pd.Series.vbt.to_2d_array` is also available as
 `pd.Series.vbt.returns.to_2d_array`."""
 
 import pandas as pd
-import warnings
-from pandas.core.accessor import CachedAccessor, DirNamesMixin
+from pandas.core.accessor import _register_accessor, DirNamesMixin
 
 from vectorbt.generic.accessors import Generic_SRAccessor, Generic_DFAccessor
 
@@ -54,23 +53,6 @@ class Vbt_DFAccessor(DirNamesMixin, Generic_DFAccessor):
 
         DirNamesMixin.__init__(self)
         Generic_DFAccessor.__init__(self, obj, freq=freq)
-
-
-def _register_accessor(name, cls):
-    def decorator(accessor):
-        if hasattr(cls, name):
-            warnings.warn(
-                f"registration of accessor {repr(accessor)} under name "
-                f"{repr(name)} for type {repr(cls)} is overriding a preexisting "
-                f"attribute with the same name.",
-                UserWarning,
-                stacklevel=2,
-            )
-        setattr(cls, name, CachedAccessor(name, accessor))
-        cls._accessors.add(name)
-        return accessor
-
-    return decorator
 
 
 def register_dataframe_accessor(name):

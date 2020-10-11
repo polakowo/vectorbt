@@ -5,29 +5,6 @@ import pandas as pd
 
 from vectorbt.utils import checks
 
-class Config(dict):
-    """A simple dict with (optionally) frozen keys."""
-
-    def __init__(self, *args, frozen=True, read_only=False, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.frozen = frozen
-        self.read_only = read_only
-        self.default_config = dict(self)
-        for key, value in dict.items(self):
-            if isinstance(value, dict):
-                dict.__setitem__(self, key, Config(value, frozen=frozen))
-
-    def __setitem__(self, key, val):
-        if self.read_only:
-            raise ValueError("Config is read-only")
-        if self.frozen and key not in self:
-            raise KeyError(f"Key {key} is not a valid parameter")
-        dict.__setitem__(self, key, val)
-
-    def reset(self):
-        """Reset dictionary to the one passed at instantiation."""
-        self.update(self.default_config)
-
 
 def merge_kwargs(x, y):
     """Merge dictionaries `x` and `y`.
@@ -47,14 +24,47 @@ def merge_kwargs(x, y):
     return z
 
 
+class Config(dict):
+    """A simple dict with (optionally) frozen keys."""
+
+    def __init__(self, *args, frozen=True, read_only=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.frozen = frozen
+        self.read_only = read_only
+        self.default_config = dict(self)
+        for key, value in dict.items(self):
+            if isinstance(value, dict):
+                dict.__setitem__(self, key, Config(value, read_only=read_only, frozen=frozen))
+
+    def __setitem__(self, key, val):
+        if self.read_only:
+            raise ValueError("Config is read-only")
+        if self.frozen and key not in self:
+            raise KeyError(f"Key {key} is not a valid parameter")
+        dict.__setitem__(self, key, val)
+
+    def merge_with(self, other):
+        """Update with the elements and properties from the another config.
+
+        Returns a new config."""
+        read_only = other.read_only if isinstance(other, Config) else self.read_only
+        frozen = other.frozen if isinstance(other, Config) else self.frozen
+        return Config(read_only=read_only, frozen=frozen, **merge_kwargs(self, other))
+
+    def reset(self):
+        """Reset dictionary to the one passed at instantiation."""
+        self.update(self.default_config)
+
+
 class Configured:
     """Class with an initialization config."""
+
     def __init__(self, **config):
         self._config = Config(config, read_only=True)
 
     @property
     def config(self):
-        """Initialization config."""
+        """Initialization config (read-only)."""
         return self._config
 
     def copy(self, **new_config):
@@ -64,7 +74,7 @@ class Configured:
             This "copy" operation won't return a copy of the instance but a new instance
             initialized with the same config. If the instance has writable attributes,
             their values won't be copied over."""
-        return self.__class__(**merge_kwargs(self.config, new_config))
+        return self.__class__(**self.config.merge_with(new_config))
 
     def __eq__(self, other):
         """Objects are equals if their configs are equal."""

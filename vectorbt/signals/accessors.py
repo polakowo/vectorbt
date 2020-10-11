@@ -1,9 +1,9 @@
 """Custom pandas accessors.
 
 !!! note
-    The underlying Series/DataFrame must already be a signal series.
+    The underlying Series/DataFrame should already be a signal series.
 
-    Input arrays must be `np.bool`.
+    Input arrays should be `np.bool`.
 
     Accessors do not utilize caching.
     
@@ -48,7 +48,6 @@ from vectorbt.base import reshape_fns
 from vectorbt.base.common import add_nb_methods
 from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
 from vectorbt.signals import nb
-from vectorbt.signals.enums import StopPosition
 
 
 @add_nb_methods([
@@ -156,48 +155,54 @@ class Signals_Accessor(Generic_Accessor):
 
     @classmethod
     def generate_both(cls, shape, entry_choice_func_nb, exit_choice_func_nb,
-                      entry_args=None, exit_args=None, **kwargs):
+                      entry_args=None, exit_args=None, entry_wait=1, exit_wait=1, **kwargs):
         """See `vectorbt.signals.nb.generate_enex_nb`.
 
         `**kwargs` will be passed to pandas constructor.
 
         Example:
-            Generate entry and exit signals one after another:
+            Generate entry and exit signals one after another. Each column increment
+            the number of ticks to wait before placing the exit signal.
             ```python-repl
             >>> @njit
-            ... def entry_choice_func_nb(col, from_i, to_i, wait1):
-            ...     next_pos = col + from_i + wait1
-            ...     if next_pos < to_i:
-            ...          return np.array([next_pos])
-            ...     return np.empty(0, dtype=np.int_)
-            >>> @njit
-            ... def exit_choice_func_nb(col, from_i, to_i, wait2):
-            ...     next_pos = col + from_i + wait2
-            ...     if next_pos < to_i:
-            ...          return np.array([next_pos])
-            ...     return np.empty(0, dtype=np.int_)
+            ... def entry_choice_func_nb(col, from_i, to_i, temp_int):
+            ...     temp_int[0] = from_i
+            ...     return temp_int[:1]  # array with one signal
 
+            >>> @njit
+            ... def exit_choice_func_nb(col, from_i, to_i, temp_int):
+            ...     wait = col
+            ...     temp_int[0] = from_i + wait
+            ...     if temp_int[0] < to_i:
+            ...         return temp_int[:1]  # array with one signal
+            ...     return temp_int[:0]  # empty array
+
+            >>> temp_int = np.empty((1,), dtype=np.int_)  # reuse memory
             >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
             ...     (5, 3), entry_choice_func_nb, exit_choice_func_nb,
-            ...     entry_args=(0,), exit_args=(1,),
+            ...     entry_args=(temp_int,), exit_args=(temp_int,),
             ...     index=sig.index, columns=sig.columns)
             >>> en
                             a      b      c
-            2020-01-01   True  False  False
-            2020-01-02  False   True  False
-            2020-01-03  False  False   True
-            2020-01-04   True  False  False
-            2020-01-05  False  False  False
+            2020-01-01   True   True   True
+            2020-01-02  False  False  False
+            2020-01-03   True  False  False
+            2020-01-04  False   True  False
+            2020-01-05   True  False   True
             >>> ex
                             a      b      c
             2020-01-01  False  False  False
-            2020-01-02  False  False  False
-            2020-01-03   True  False  False
-            2020-01-04  False  False  False
-            2020-01-05  False   True  False
+            2020-01-02   True  False  False
+            2020-01-03  False   True  False
+            2020-01-04   True  False   True
+            2020-01-05  False  False  False
             ```"""
         checks.assert_numba_func(entry_choice_func_nb)
         checks.assert_numba_func(exit_choice_func_nb)
+        if entry_args is None:
+            entry_args = ()
+        if exit_args is None:
+            exit_args = ()
 
         if not isinstance(shape, tuple):
             shape = (shape, 1)
@@ -208,6 +213,7 @@ class Signals_Accessor(Generic_Accessor):
         exit_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in exit_args])
         result1, result2 = nb.generate_enex_nb(
             shape,
+            entry_wait, exit_wait,
             entry_choice_func_nb, entry_args,
             exit_choice_func_nb, exit_args
         )
@@ -217,17 +223,18 @@ class Signals_Accessor(Generic_Accessor):
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
-    def generate_exits(self, exit_choice_func_nb, *args):
+    def generate_exits(self, exit_choice_func_nb, *args, wait=1):
         """See `vectorbt.signals.nb.generate_ex_nb`.
 
         Example:
-            Fill all space between signals in `sig`:
+            Fill all space after signals in `sig`:
             ```python-repl
             >>> @njit
-            ... def exit_choice_func_nb(col, from_i, to_i):
-            ...     return np.arange(from_i, to_i)
+            ... def exit_choice_func_nb(col, from_i, to_i, temp_range):
+            ...     return temp_range[from_i:to_i]
 
-            >>> sig.vbt.signals.generate_exits(exit_choice_func_nb)
+            >>> temp_range = np.arange(sig.shape[0])  # reuse memory
+            >>> sig.vbt.signals.generate_exits(exit_choice_func_nb, temp_range)
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02   True   True  False
@@ -238,7 +245,7 @@ class Signals_Accessor(Generic_Accessor):
         checks.assert_numba_func(exit_choice_func_nb)
 
         args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in args])
-        return self.wrap(nb.generate_ex_nb(self.to_2d_array(), exit_choice_func_nb, *args))
+        return self.wrap(nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args))
 
     # ############# Random ############# #
 
@@ -249,20 +256,21 @@ class Signals_Accessor(Generic_Accessor):
         If `n` is set, see `vectorbt.signals.nb.generate_rand_nb`.
         If `prob` is set, see `vectorbt.signals.nb.generate_rand_by_prob_nb`.
 
-        `prob` must be either a single number or an array that will be broadcast to match `shape`.
+        `n` should be either a scalar or an array that will be broadcast to the number of columns.
+        `prob` should be either a single number or an array that will be broadcast to match `shape`.
         `**kwargs` will be passed to pandas constructor.
 
         Example:
-            For each column, generate two signals randomly:
+            For each column, generate a variable number of signals:
             ```python-repl
-            >>> pd.DataFrame.vbt.signals.generate_random((5, 3), n=2,
+            >>> pd.DataFrame.vbt.signals.generate_random((5, 3), n=[0, 1, 2],
             ...     seed=42, index=sig.index, columns=sig.columns)
                             a      b      c
             2020-01-01  False  False   True
-            2020-01-02   True   True   True
+            2020-01-02  False  False   True
             2020-01-03  False  False  False
             2020-01-04  False   True  False
-            2020-01-05   True  False  False
+            2020-01-05  False  False  False
             ```
 
             For each column and time step, pick a signal with 50% probability:
@@ -276,18 +284,22 @@ class Signals_Accessor(Generic_Accessor):
             2020-01-04  False  False   True
             2020-01-05   True  False   True
             ```"""
+        flex_2d = True
         if not isinstance(shape, tuple):
+            flex_2d = False
             shape = (shape, 1)
         elif isinstance(shape, tuple) and len(shape) == 1:
+            flex_2d = False
             shape = (shape[0], 1)
 
         if n is not None:
+            n = np.broadcast_to(n, shape[1])
             result = nb.generate_rand_nb(shape, n, seed=seed)
         elif prob is not None:
-            probs = np.broadcast_to(prob, shape)
-            result = nb.generate_rand_by_prob_nb(shape, probs, seed=seed)
+            prob = np.broadcast_to(prob, shape)
+            result = nb.generate_rand_by_prob_nb(shape, prob, flex_2d, seed=seed)
         else:
-            raise ValueError("At least n or prob must be set")
+            raise ValueError("At least n or prob should be set")
 
         if cls.is_series():
             if shape[1] > 1:
@@ -298,20 +310,20 @@ class Signals_Accessor(Generic_Accessor):
     # ############# Exits ############# #
 
     @classmethod
-    def generate_random_both(cls, shape, n=None, entry_prob=None, exit_prob=None, seed=None, **kwargs):
+    def generate_random_both(cls, shape, n=None, entry_prob=None, exit_prob=None, seed=None,
+                             entry_wait=1, exit_wait=1, **kwargs):
         """Generate entry and exit signals randomly and iteratively.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_enex_nb`.
-        If `prob` is set, see `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`.
+        If `entry_prob` and `exit_prob` are set, see `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`.
 
-        `entry_prob` and `exit_prob` must be either a single number or an array that will be
-        broadcast to match `shape`. `**kwargs` will be passed to pandas constructor.
+        For arguments, see `Signals_Accessor.generate_random`.
 
         Example:
             For each column, generate two entries and exits randomly:
             ```python-repl
             >>> en, ex = pd.DataFrame.vbt.signals.generate_random_both(
-            ...      (5, 3), n=2, seed=42, index=sig.index, columns=sig.columns)
+            ...     (5, 3), n=2, seed=42, index=sig.index, columns=sig.columns)
             >>> en
                             a      b      c
             2020-01-01   True   True   True
@@ -335,11 +347,11 @@ class Signals_Accessor(Generic_Accessor):
             ...     seed=42, index=sig.index, columns=sig.columns)
             >>> en
                             a      b      c
-            2020-01-01   True   True  False
-            2020-01-02  False  False   True
-            2020-01-03  False   True  False
-            2020-01-04   True  False   True
-            2020-01-05  False  False  False
+            2020-01-01   True   True   True
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04  False  False   True
+            2020-01-05   True  False  False
             >>> ex
                             a      b      c
             2020-01-01  False  False  False
@@ -348,19 +360,24 @@ class Signals_Accessor(Generic_Accessor):
             2020-01-04  False   True  False
             2020-01-05   True  False   True
             ```"""
+        flex_2d = True
         if not isinstance(shape, tuple):
+            flex_2d = False
             shape = (shape, 1)
         elif isinstance(shape, tuple) and len(shape) == 1:
+            flex_2d = False
             shape = (shape[0], 1)
 
         if n is not None:
-            entries, exits = nb.generate_rand_enex_nb(shape, n, seed=seed)
+            n = np.broadcast_to(n, shape[1])
+            entries, exits = nb.generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=seed)
         elif entry_prob is not None and exit_prob is not None:
             entry_prob = np.broadcast_to(entry_prob, shape)
             exit_prob = np.broadcast_to(exit_prob, shape)
-            entries, exits = nb.generate_rand_enex_by_prob_nb(shape, entry_prob, exit_prob, seed=seed)
+            entries, exits = nb.generate_rand_enex_by_prob_nb(
+                shape, entry_prob, exit_prob, entry_wait, exit_wait, flex_2d, seed=seed)
         else:
-            raise ValueError("At least n, or entry_prob and exit_prob must be set")
+            raise ValueError("At least n, or entry_prob and exit_prob should be set")
 
         if cls.is_series():
             if shape[1] > 1:
@@ -368,7 +385,7 @@ class Signals_Accessor(Generic_Accessor):
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_random_exits(self, prob=None, seed=None):
+    def generate_random_exits(self, prob=None, seed=None, wait=1):
         """Generate exit signals randomly.
 
         If `prob` is None, see `vectorbt.signals.nb.generate_rand_ex_nb`.
@@ -397,24 +414,47 @@ class Signals_Accessor(Generic_Accessor):
             2020-01-05  False  False   True
             ```"""
         if prob is not None:
-            obj, prob = reshape_fns.broadcast(self._obj, prob)
-            prob = reshape_fns.to_2d(prob, raw=True)
-            return obj.vbt.wrap(nb.generate_rand_ex_by_prob_nb(self.to_2d_array(), prob, seed=seed))
-        return self.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), seed=seed))
+            obj, prob = reshape_fns.broadcast(self._obj, prob, keep_raw=[False, True])
+            return obj.vbt.wrap(nb.generate_rand_ex_by_prob_nb(
+                self.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed))
+        return self.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed))
 
-    def generate_stop_exits(self, ts, stop, stop_pos=StopPosition.Entry, first=True,
-                            iteratively=False, broadcast_kwargs=None):
-        """Generate exits based on stop values.
+    def generate_stop_exits(self, ts, stop, trailing=False, entry_wait=1, exit_wait=1,
+                            first=True, iteratively=False, broadcast_kwargs=None):
+        """Generate exits based on when `ts` hits the stop.
 
-        If `iteratively` is True, see `vectorbt.signals.nb.generate_sl_ex_iter_nb`.
-        Otherwise, see `vectorbt.signals.nb.generate_sl_ex_nb`.
+        If `iteratively` is True, see `vectorbt.signals.nb.generate_stop_ex_iter_nb`.
+        Otherwise, see `vectorbt.signals.nb.generate_stop_ex_nb`.
 
-        Arguments `entries`, `ts` and `stop` will be broadcasted using
-        `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`."""
+        Arguments `entries`, `ts` and `stop` will be broadcast using
+        `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`.
+
+        For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
+
+        Example:
+            ```python-repl
+            >>> ts = pd.Series([1, 2, 3, 2, 1])
+
+            >>> # stop loss
+            >>> sig.vbt.signals.generate_stop_exits(ts, -0.1)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04  False   True   True
+            2020-01-05  False  False  False
+            >>> # trailing stop loss
+            >>> sig.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True)
+                            a      b      c
+            2020-01-01  False  False  False
+            2020-01-02  False  False  False
+            2020-01-03  False  False  False
+            2020-01-04   True   True   True
+            2020-01-05  False  False  False
+            ```"""
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         entries = self._obj
-        checks.assert_type(ts, (pd.Series, pd.DataFrame))
 
         keep_raw = (False, True, True)
         broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
@@ -423,61 +463,128 @@ class Signals_Accessor(Generic_Accessor):
         # Perform generation
         if iteratively:
             new_entries, exits = nb.generate_stop_ex_iter_nb(
-                entries.vbt.to_2d_array(), ts, stop, stop_pos, entries.ndim == 2)
+                entries.vbt.to_2d_array(), ts, stop, trailing, entry_wait, exit_wait, entries.ndim == 2)
             return entries.vbt.wrap(new_entries), entries.vbt.wrap(exits)
         else:
             exits = nb.generate_stop_ex_nb(
-                entries.vbt.to_2d_array(), ts, stop, stop_pos, first, entries.ndim == 2)
+                entries.vbt.to_2d_array(), ts, stop, trailing, exit_wait, first, entries.ndim == 2)
             return entries.vbt.wrap(exits)
 
-    def generate_stop_loss_exits(self, ts, stop, trailing=False, **kwargs):
-        """Generate (trailing) stop loss exits.
+    def generate_adv_stop_exits(self, open, high=None, low=None, close=None, is_open_safe=True,
+                                out_dict=None, sl_stop=0., ts_stop=0., tp_stop=0., entry_wait=1,
+                                exit_wait=1, first=True, iteratively=False, broadcast_kwargs=None):
+        """Generate exits based on when price hits (trailing) stop loss or take profit.
 
-        For more details, see `Signals_Accessor.generate_stop_exits`.
+        If any of `high`, `low` or `close` is None, it will be set to `open`.
 
-        Example:
-            For each entry in `sig`, set stop loss for 10% and 20% below the entry price:
-            ```python-repl
-            >>> ts = pd.Series([1, 2, 3, 2, 1])
-            >>> sig.vbt.signals.generate_stop_loss_exits(ts, 0.1)
-                            a      b      c
-            2020-01-01  False  False  False
-            2020-01-02  False  False  False
-            2020-01-03  False  False  False
-            2020-01-04  False   True   True
-            2020-01-05  False  False  False
-            >>> sig.vbt.signals.generate_stop_loss_exits(ts, 0.1, trailing=True)
-                            a      b      c
-            2020-01-01  False  False  False
-            2020-01-02  False  False  False
-            2020-01-03  False  False  False
-            2020-01-04   True   True   True
-            2020-01-05  False  False  False
-            ```"""
-        if trailing:
-            stop_pos = StopPosition.ExpMax
-        else:
-            stop_pos = StopPosition.Entry
-        return self.generate_stop_exits(ts, -np.abs(stop), stop_pos=stop_pos, **kwargs)
+        Use `out_dict` as a dict to pass `hit_price` and `stop_type` arrays. You can also
+        set `out_dict` to {} to produce these arrays automatically and still have access to them.
 
-    def generate_take_profit_exits(self, ts, stop, **kwargs):
-        """Generate (trailing) stop loss exits.
+        If `iteratively` is True, see `vectorbt.signals.nb.generate_adv_stop_ex_iter_nb`.
+        Otherwise, see `vectorbt.signals.nb.generate_adv_stop_ex_nb`.
 
-        For more details, see `Signals_Accessor.generate_stop_exits`.
+        All array-like arguments including stops and `out_dict` will be broadcast using
+        `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`.
+
+        For arguments, see `vectorbt.signals.nb.adv_stop_choice_nb`.
 
         Example:
-            For each entry in `sig`, set take profit for 10% and 20% above the entry price:
             ```python-repl
-            >>> ts = pd.Series([1, 2, 3, 4, 5])
-            >>> sig.vbt.signals.generate_take_profit_exits(ts, 0.1)
+            >>> from vectorbt.signals.enums import StopType
+
+            >>> price = pd.DataFrame({
+            ...     'open': [10, 11, 12, 11, 10],
+            ...     'high': [11, 12, 13, 12, 11],
+            ...     'low': [9, 10, 11, 10, 9],
+            ...     'close': [10, 11, 12, 11, 10]
+            ... })
+            >>> out_dict = {}
+            >>> exits = sig.vbt.signals.generate_adv_stop_exits(
+            ...     price['open'], price['high'], price['low'], price['close'],
+            ...     out_dict=out_dict, sl_stop=0.2, ts_stop=0.2,
+            ...     tp_stop=0.2
+            ... )
+            >>> out_dict['hit_price'][~exits] = np.nan
+            >>> out_dict['stop_type'][~exits] = -1
+
+            >>> exits
                             a      b      c
             2020-01-01  False  False  False
             2020-01-02   True   True  False
             2020-01-03  False  False  False
-            2020-01-04  False   True   True
-            2020-01-05  False  False  False
+            2020-01-04  False  False  False
+            2020-01-05  False  False   True
+            >>> out_dict['hit_price']
+                           a     b    c
+            2020-01-01   NaN   NaN  NaN
+            2020-01-02  12.0  12.0  NaN
+            2020-01-03   NaN   NaN  NaN
+            2020-01-04   NaN   NaN  NaN
+            2020-01-05   NaN   NaN  9.6
+            >>> out_dict['stop_type'].applymap(
+            ...     lambda x: StopType._fields[x] if x in StopType else '')
+                                 a           b         c
+            2020-01-01
+            2020-01-02  TakeProfit  TakeProfit
+            2020-01-03
+            2020-01-04
+            2020-01-05                          StopLoss
             ```"""
-        return self.generate_stop_exits(ts, np.abs(stop), stop_pos=StopPosition.Entry, **kwargs)
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        entries = self._obj
+        if high is None:
+            high = open
+        if low is None:
+            low = open
+        if close is None:
+            close = open
+        if out_dict is None:
+            out_dict = {}
+        hit_price_out = out_dict.get('hit_price', None)
+        stop_type_out = out_dict.get('stop_type', None)
+        out_args = ()
+        if hit_price_out is not None:
+            out_args += (hit_price_out,)
+        if stop_type_out is not None:
+            out_args += (stop_type_out,)
+
+        keep_raw = (False, True, True, True, True, True, True, True) + out_args
+        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args = reshape_fns.broadcast(
+            entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args,
+            **broadcast_kwargs, keep_raw=keep_raw)
+        if hit_price_out is None:
+            hit_price_out = np.empty_like(entries, dtype=np.float_)
+        else:
+            hit_price_out = out_args[0]
+            if checks.is_pandas(hit_price_out):
+                hit_price_out = hit_price_out.vbt.to_2d_array()
+            out_args = out_args[1:]
+        if stop_type_out is None:
+            stop_type_out = np.empty_like(entries, dtype=np.int_)
+        else:
+            stop_type_out = out_args[0]
+            if checks.is_pandas(stop_type_out):
+                stop_type_out = stop_type_out.vbt.to_2d_array()
+
+        # Perform generation
+        if iteratively:
+            new_entries, exits = nb.generate_adv_stop_ex_iter_nb(
+                entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
+                stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
+                exit_wait, first, entries.ndim == 2)
+            out_dict['hit_price'] = entries.vbt.wrap(hit_price_out)
+            out_dict['stop_type'] = entries.vbt.wrap(stop_type_out)
+            return entries.vbt.wrap(new_entries), entries.vbt.wrap(exits)
+        else:
+            exits = nb.generate_adv_stop_ex_nb(
+                entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
+                stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait,
+                first, entries.ndim == 2)
+            out_dict['hit_price'] = entries.vbt.wrap(hit_price_out)
+            out_dict['stop_type'] = entries.vbt.wrap(stop_type_out)
+            return entries.vbt.wrap(exits)
 
     # ############# Map and reduce ############# #
 
@@ -486,10 +593,10 @@ class Signals_Accessor(Generic_Accessor):
         """See `vectorbt.signals.nb.map_reduce_between_nb`.
 
         If `other` specified, see `vectorbt.signals.nb.map_reduce_between_two_nb`.
-        Both will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        Both will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
-        Note that `map_args` and `reduce_args` won't be broadcasted.
+        Note that `map_args` and `reduce_args` won't be broadcast.
 
         Example:
             Get average distance between signals in `sig`:
@@ -844,7 +951,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
     def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as entry markers.
-        
+
         See `Signals_SRAccessor.plot_as_markers`."""
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -863,7 +970,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
     def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as exit markers.
-        
+
         See `Signals_SRAccessor.plot_as_markers`."""
         if trace_kwargs is None:
             trace_kwargs = {}

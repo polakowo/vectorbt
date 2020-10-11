@@ -147,11 +147,11 @@ class MSTD(MSTD):
 
 fix_class_for_docs(MSTD)
 
-# ############# BollingerBands ############# #
+# ############# BBANDS ############# #
 
 
-BollingerBands = IndicatorFactory(
-    class_name='BollingerBands',
+BBANDS = IndicatorFactory(
+    class_name='BBANDS',
     module_name=__name__,
     short_name='bb',
     input_names=['close'],
@@ -167,14 +167,14 @@ BollingerBands = IndicatorFactory(
 ).from_apply_func(nb.bb_apply_nb, cache_func=nb.bb_cache_nb)
 
 
-class BollingerBands(BollingerBands):
+class BBANDS(BBANDS):
     """A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard
     deviations (positively and negatively) away from a simple moving average (SMA) of the security's
     price, but can be adjusted to user preferences.
 
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp).
 
-    Use `BollingerBands.run` or `BollingerBands.run_combs` to run the indicator."""
+    Use `BBANDS.run` or `BBANDS.run_combs` to run the indicator."""
 
     def plot(self,
              close_trace_kwargs={},
@@ -183,14 +183,14 @@ class BollingerBands(BollingerBands):
              lower_trace_kwargs={},
              fig=None,
              **layout_kwargs):  # pragma: no cover
-        """Plot `BollingerBands.middle`, `BollingerBands.upper` and `BollingerBands.lower` against
-        `BollingerBands.close`.
+        """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
+        `BBANDS.close`.
 
         Args:
-            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.close`.
-            middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.middle`.
-            upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.upper`.
-            lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.lower`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.close`.
+            middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
+            upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
+            lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.lower`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -198,7 +198,7 @@ class BollingerBands(BollingerBands):
             bb[(10, False, 2)].plot()
             ```
 
-            ![](/vectorbt/docs/img/BollingerBands.png)"""
+            ![](/vectorbt/docs/img/BBANDS.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
@@ -229,7 +229,7 @@ class BollingerBands(BollingerBands):
         return fig
 
 
-fix_class_for_docs(BollingerBands)
+fix_class_for_docs(BBANDS)
 
 # ############# RSI ############# #
 
@@ -302,11 +302,11 @@ class RSI(RSI):
 
 fix_class_for_docs(RSI)
 
-# ############# Stochastic ############# #
+# ############# STOCH ############# #
 
 
-Stochastic = IndicatorFactory(
-    class_name='Stochastic',
+STOCH = IndicatorFactory(
+    class_name='STOCH',
     module_name=__name__,
     short_name='stoch',
     input_names=['high', 'low', 'close'],
@@ -316,14 +316,14 @@ Stochastic = IndicatorFactory(
 ).from_apply_func(nb.stoch_apply_nb, cache_func=nb.stoch_cache_nb)
 
 
-class Stochastic(Stochastic):
+class STOCH(STOCH):
     """A stochastic oscillator is a momentum indicator comparing a particular closing price of a security
     to a range of its prices over a certain period of time. It is used to generate overbought and oversold
     trading signals, utilizing a 0-100 bounded range of values.
 
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
 
-    Use `Stochastic.run` or `Stochastic.run_combs` to run the indicator."""
+    Use `STOCH.run` or `STOCH.run_combs` to run the indicator."""
 
     def plot(self,
              levels=(30, 70),
@@ -332,11 +332,11 @@ class Stochastic(Stochastic):
              shape_kwargs={},
              fig=None,
              **layout_kwargs):  # pragma: no cover
-        """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
+        """Plot `STOCH.percent_k` and `STOCH.percent_d`.
 
         Args:
-            percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Stochastic.percent_k`.
-            percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Stochastic.percent_d`.
+            percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
+            percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
             shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zone between levels.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -345,7 +345,7 @@ class Stochastic(Stochastic):
             stoch[(10, 2, False)].plot(levels=(20, 80))
             ```
 
-            ![](/vectorbt/docs/img/Stochastic.png)"""
+            ![](/vectorbt/docs/img/STOCH.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
@@ -380,7 +380,7 @@ class Stochastic(Stochastic):
         return fig
 
 
-fix_class_for_docs(Stochastic)
+fix_class_for_docs(STOCH)
 
 # ############# MACD ############# #
 
@@ -536,7 +536,7 @@ OBV = IndicatorFactory(
     input_names=['close', 'volume'],
     param_names=[],
     output_names=['obv'],
-).from_custom_func(nb.obv_custom_func_nb)
+).from_custom_func(nb.obv_custom_nb)
 
 
 class OBV(OBV):

@@ -41,4 +41,15 @@ array([0, 1, 2, 3, 0])
 ```
 """
 
-from vectorbt.signals.enums import StopPosition
+from vectorbt.signals.enums import StopType
+from vectorbt.signals.factory import SignalFactory
+from vectorbt.signals.basic import (
+    RAND,
+    RPROB,
+    RPROBEX,
+    IRPROBEX,
+    STEX,
+    ISTEX,
+    ADVSTEX,
+    IADVSTEX
+)

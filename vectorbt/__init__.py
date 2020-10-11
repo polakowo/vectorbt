@@ -477,6 +477,27 @@ import vectorbt.ohlcv.accessors
 
 # Most important classes
 from vectorbt.generic import nb, plotting
+from vectorbt.indicators import (
+    IndicatorFactory,
+    MA,
+    MSTD,
+    BBANDS,
+    RSI,
+    STOCH,
+    MACD,
+    OBV,
+    ATR
+)
+from vectorbt.signals import (
+    RAND,
+    RPROB,
+    RPROBEX,
+    IRPROBEX,
+    STEX,
+    ISTEX,
+    ADVSTEX,
+    IADVSTEX
+)
 from vectorbt.records import (
     MappedArray,
     Records,
@@ -487,17 +508,6 @@ from vectorbt.records import (
     Drawdowns
 )
 from vectorbt.portfolio import Portfolio
-from vectorbt.indicators import (
-    IndicatorFactory,
-    MA,
-    MSTD,
-    BollingerBands,
-    RSI,
-    Stochastic,
-    MACD,
-    OBV,
-    ATR
-)
 
 # silence NumbaExperimentalFeatureWarning
 import warnings

@@ -67,7 +67,7 @@ def mstd_apply_nb(ts, window, ewm, cache_dict):
 
 @njit(cache=True)
 def bb_cache_nb(ts, windows, ewms, alphas):
-    """Caching function for `vectorbt.indicators.basic.BollingerBands`."""
+    """Caching function for `vectorbt.indicators.basic.BBANDS`."""
     ma_cache_dict = ma_cache_nb(ts, windows, ewms)
     mstd_cache_dict = mstd_cache_nb(ts, windows, ewms)
     return ma_cache_dict, mstd_cache_dict
@@ -75,7 +75,7 @@ def bb_cache_nb(ts, windows, ewms, alphas):
 
 @njit(cache=True)
 def bb_apply_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
-    """Apply function for `vectorbt.indicators.basic.BollingerBands`."""
+    """Apply function for `vectorbt.indicators.basic.BBANDS`."""
     # Calculate lower, middle and upper bands
     h = hash((window, ewm))
     ma = np.copy(ma_cache_dict[h])
@@ -113,7 +113,7 @@ def rsi_apply_nb(ts, window, ewm, cache_dict):
 
 @njit(cache=True)
 def stoch_cache_nb(high_ts, low_ts, close_ts, k_windows, d_windows, d_ewms):
-    """Caching function for `vectorbt.indicators.basic.Stochastic`."""
+    """Caching function for `vectorbt.indicators.basic.STOCH`."""
     cache_dict = dict()
     for i in range(len(k_windows)):
         h = hash(k_windows[i])
@@ -126,7 +126,7 @@ def stoch_cache_nb(high_ts, low_ts, close_ts, k_windows, d_windows, d_ewms):
 
 @njit(cache=True)
 def stoch_apply_nb(high_ts, low_ts, close_ts, k_window, d_window, d_ewm, cache_dict):
-    """Apply function for `vectorbt.indicators.basic.Stochastic`."""
+    """Apply function for `vectorbt.indicators.basic.STOCH`."""
     h = hash(k_window)
     roll_min, roll_max = cache_dict[h]
     percent_k = 100 * (close_ts - roll_min) / (roll_max - roll_min)
@@ -195,7 +195,7 @@ def atr_apply_nb(high_ts, low_ts, close_ts, window, ewm, tr, cache_dict):
 
 
 @njit(cache=True)
-def obv_custom_func_nb(close_ts, volume_ts):
+def obv_custom_nb(close_ts, volume_ts):
     """Custom calculation function for `vectorbt.indicators.basic.OBV`."""
     obv = generic_nb.set_by_mask_mult_nb(volume_ts, close_ts < generic_nb.fshift_nb(close_ts, 1), -volume_ts)
     obv = generic_nb.cumsum_nb(obv)

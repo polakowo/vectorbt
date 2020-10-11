@@ -304,7 +304,7 @@ class Base_Accessor(ArrayWrapper):
     def concat(self_or_cls, *others, keys=None, broadcast_kwargs={}):
         """Concatenate with `others` along columns.
 
-        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Use `keys` as the outermost level.
 
         Example:
@@ -341,7 +341,7 @@ class Base_Accessor(ArrayWrapper):
         Use `keys` as the outermost level.
 
         !!! note
-            The resulted arrays to be concatenated must have the same shape as broadcasted input arrays.
+            The resulted arrays to be concatenated must have the same shape as broadcast input arrays.
 
         Example:
             ```python-repl
@@ -377,14 +377,14 @@ class Base_Accessor(ArrayWrapper):
     def combine_with(self, other, *args, combine_func=None, to_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
 
-        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`.
         If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
 
         !!! note
-            The resulted array must have the same shape as broadcasted input arrays.
+            The resulted array must have the same shape as broadcast input arrays.
 
         Example:
             ```python-repl
@@ -419,7 +419,7 @@ class Base_Accessor(ArrayWrapper):
                               concat=False, broadcast_kwargs={}, keys=None, **kwargs):
         """Combine with `others` using `combine_func`.
 
-        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         If `concat` is True, concatenate the results along columns,

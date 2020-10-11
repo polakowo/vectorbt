@@ -1063,7 +1063,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
 @njit(cache=True)
 def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, entries, exits, size,
                              entry_price, exit_price, fees, fixed_fees, slippage, reject_prob, min_size,
-                             accumulate, accumulate_exit_mode, conflict_mode, is_2d):
+                             accumulate, accumulate_exit_mode, conflict_mode, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals.
 
     Utilizes flexible broadcasting.
@@ -1081,15 +1081,15 @@ def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, en
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
 
     # Inputs were not broadcast -> use flexible indexing
-    flex_i1, flex_col1 = flex_choose_i_and_col_nb(entries, is_2d)
-    flex_i2, flex_col2 = flex_choose_i_and_col_nb(exits, is_2d)
-    flex_i3, flex_col3 = flex_choose_i_and_col_nb(size, is_2d)
-    flex_i4, flex_col4 = flex_choose_i_and_col_nb(entry_price, is_2d)
-    flex_i5, flex_col5 = flex_choose_i_and_col_nb(exit_price, is_2d)
-    flex_i6, flex_col6 = flex_choose_i_and_col_nb(fees, is_2d)
-    flex_i7, flex_col7 = flex_choose_i_and_col_nb(fixed_fees, is_2d)
-    flex_i8, flex_col8 = flex_choose_i_and_col_nb(slippage, is_2d)
-    flex_i9, flex_col9 = flex_choose_i_and_col_nb(reject_prob, is_2d)
+    flex_i1, flex_col1 = flex_choose_i_and_col_nb(entries, flex_2d)
+    flex_i2, flex_col2 = flex_choose_i_and_col_nb(exits, flex_2d)
+    flex_i3, flex_col3 = flex_choose_i_and_col_nb(size, flex_2d)
+    flex_i4, flex_col4 = flex_choose_i_and_col_nb(entry_price, flex_2d)
+    flex_i5, flex_col5 = flex_choose_i_and_col_nb(exit_price, flex_2d)
+    flex_i6, flex_col6 = flex_choose_i_and_col_nb(fees, flex_2d)
+    flex_i7, flex_col7 = flex_choose_i_and_col_nb(fixed_fees, flex_2d)
+    flex_i8, flex_col8 = flex_choose_i_and_col_nb(slippage, flex_2d)
+    flex_i9, flex_col9 = flex_choose_i_and_col_nb(reject_prob, flex_2d)
 
     from_col = 0
     for group in range(len(group_counts)):
@@ -1114,21 +1114,21 @@ def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, en
                     cash_now = last_cash[col]
                 shares_now = last_shares[col]
 
-                is_entry = flex_select_nb(i, col, entries, flex_i1, flex_col1, is_2d)
-                is_exit = flex_select_nb(i, col, exits, flex_i2, flex_col2, is_2d)
+                is_entry = flex_select_nb(i, col, entries, flex_i1, flex_col1, flex_2d)
+                is_exit = flex_select_nb(i, col, exits, flex_i2, flex_col2, flex_2d)
                 if is_entry or is_exit:
                     # Generate the next order
                     order = signals_order_func_nb(
                         shares_now,
                         is_entry,
                         is_exit,
-                        flex_select_nb(i, col, size, flex_i3, flex_col3, is_2d),
-                        flex_select_nb(i, col, entry_price, flex_i4, flex_col4, is_2d),
-                        flex_select_nb(i, col, exit_price, flex_i5, flex_col5, is_2d),
-                        flex_select_nb(i, col, fees, flex_i6, flex_col6, is_2d),
-                        flex_select_nb(i, col, fixed_fees, flex_i7, flex_col7, is_2d),
-                        flex_select_nb(i, col, slippage, flex_i8, flex_col8, is_2d),
-                        flex_select_nb(i, col, reject_prob, flex_i9, flex_col9, is_2d),
+                        flex_select_nb(i, col, size, flex_i3, flex_col3, flex_2d),
+                        flex_select_nb(i, col, entry_price, flex_i4, flex_col4, flex_2d),
+                        flex_select_nb(i, col, exit_price, flex_i5, flex_col5, flex_2d),
+                        flex_select_nb(i, col, fees, flex_i6, flex_col6, flex_2d),
+                        flex_select_nb(i, col, fixed_fees, flex_i7, flex_col7, flex_2d),
+                        flex_select_nb(i, col, slippage, flex_i8, flex_col8, flex_2d),
+                        flex_select_nb(i, col, reject_prob, flex_i9, flex_col9, flex_2d),
                         accumulate,
                         accumulate_exit_mode,
                         conflict_mode
@@ -1235,7 +1235,7 @@ def signals_order_func_nb(shares_now, is_entry, is_exit, size, entry_price, exit
 @njit(cache=True)
 def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, size, size_type,
                             price, fees, fixed_fees, slippage, reject_prob, min_size, val_price,
-                            auto_call_seq, is_2d):
+                            auto_call_seq, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on orders.
 
     Utilizes flexible broadcasting.
@@ -1256,14 +1256,14 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
 
     # Inputs were not broadcast -> use flexible indexing
-    flex_i1, flex_col1 = flex_choose_i_and_col_nb(size, is_2d)
-    flex_i2, flex_col2 = flex_choose_i_and_col_nb(size_type, is_2d)
-    flex_i3, flex_col3 = flex_choose_i_and_col_nb(price, is_2d)
-    flex_i4, flex_col4 = flex_choose_i_and_col_nb(fees, is_2d)
-    flex_i5, flex_col5 = flex_choose_i_and_col_nb(fixed_fees, is_2d)
-    flex_i6, flex_col6 = flex_choose_i_and_col_nb(slippage, is_2d)
-    flex_i7, flex_col7 = flex_choose_i_and_col_nb(reject_prob, is_2d)
-    flex_i8, flex_col8 = flex_choose_i_and_col_nb(val_price, is_2d)
+    flex_i1, flex_col1 = flex_choose_i_and_col_nb(size, flex_2d)
+    flex_i2, flex_col2 = flex_choose_i_and_col_nb(size_type, flex_2d)
+    flex_i3, flex_col3 = flex_choose_i_and_col_nb(price, flex_2d)
+    flex_i4, flex_col4 = flex_choose_i_and_col_nb(fees, flex_2d)
+    flex_i5, flex_col5 = flex_choose_i_and_col_nb(fixed_fees, flex_2d)
+    flex_i6, flex_col6 = flex_choose_i_and_col_nb(slippage, flex_2d)
+    flex_i7, flex_col7 = flex_choose_i_and_col_nb(reject_prob, flex_2d)
+    flex_i8, flex_col8 = flex_choose_i_and_col_nb(val_price, flex_2d)
 
     from_col = 0
     for group in range(len(group_counts)):
@@ -1282,7 +1282,7 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                 for k in range(group_len):
                     col = from_col + k
                     if last_shares[col] > 0.:
-                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, is_2d)
+                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
                         holding_value = last_shares[col] * _val_price
                         value_now += holding_value
 
@@ -1291,9 +1291,9 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                     # Same as sort_by_order_value_ctx_nb but with flexible indexing
                     for k in range(group_len):
                         col = from_col + k
-                        _size = flex_select_nb(i, col, size, flex_i1, flex_col1, is_2d)
-                        _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, is_2d)
-                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, is_2d)
+                        _size = flex_select_nb(i, col, size, flex_i1, flex_col1, flex_2d)
+                        _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, flex_2d)
+                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
                         holding_value_now = last_shares[col] * _val_price
 
                         if _size_type == SizeType.Shares:
@@ -1319,7 +1319,7 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
 
                 # Get running values per column
                 shares_now = last_shares[col]
-                _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, is_2d)
+                _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
                 if not cash_sharing:
                     cash_now = last_cash[col]
                     value_now = cash_now
@@ -1327,8 +1327,8 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                         value_now += shares_now * _val_price
 
                 # Convert target value or percent into target shares
-                _size = flex_select_nb(i, col, size, flex_i1, flex_col1, is_2d)
-                _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, is_2d)
+                _size = flex_select_nb(i, col, size, flex_i1, flex_col1, flex_2d)
+                _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, flex_2d)
                 if _size_type == SizeType.TargetPercent:
                     if not np.isnan(_size):
                         if np.isnan(_val_price):
@@ -1348,10 +1348,10 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                 order = Order(
                     _size,
                     _size_type,
-                    flex_select_nb(i, col, price, flex_i3, flex_col3, is_2d),
-                    flex_select_nb(i, col, fees, flex_i4, flex_col4, is_2d),
-                    flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, is_2d),
-                    flex_select_nb(i, col, slippage, flex_i6, flex_col6, is_2d),
+                    flex_select_nb(i, col, price, flex_i3, flex_col3, flex_2d),
+                    flex_select_nb(i, col, fees, flex_i4, flex_col4, flex_2d),
+                    flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, flex_2d),
+                    flex_select_nb(i, col, slippage, flex_i6, flex_col6, flex_2d),
                     flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, is_2d)
                 )
 

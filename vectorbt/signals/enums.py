@@ -5,18 +5,18 @@ import json
 
 __pdoc__ = {}
 
-# ############# StopPosition ############# #
+# ############# StopType ############# #
 
-StopPosition = namedtuple('StopPosition', [
-    'Entry',
-    'ExpMin',
-    'ExpMax'
+StopType = namedtuple('StopType', [
+    'StopLoss',
+    'TrailStop',
+    'TakeProfit'
 ])(*range(3))
 """_"""
 
-__pdoc__['StopPosition'] = f"""Stop position.
+__pdoc__['StopType'] = f"""Stop type.
 
 ```plaintext
-{json.dumps(dict(zip(StopPosition._fields, StopPosition)), indent=2)}
+{json.dumps(dict(zip(StopType._fields, StopType)), indent=2)}
 ```
 """
