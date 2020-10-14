@@ -27,25 +27,27 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
         Generic_DFAccessor.__init__(self, obj, freq=freq)
 
     def plot(self,
+             plot_type=go.Ohlc,
              display_volume=True,
-             candlestick_kwargs={},
-             bar_kwargs={},
+             ohlc_kwargs=None,
+             bar_kwargs=None,
              fig=None,
              **layout_kwargs):
         """Plot OHLCV data.
 
         Args:
+            plot_type: Either `plotly.graph_objects.Ohlc` or `plotly.graph_objects.Candlestick`.
             display_volume (bool): If True, displays volume as bar chart.
-            candlestick_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Candlestick`.
+            ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
             bar_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            import vectorbt as vbt
-            import yfinance as yf
+            ```python-repl
+            >>> import vectorbt as vbt
+            >>> import yfinance as yf
 
-            yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
+            >>> yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
             ```
 
             ![](/vectorbt/docs/img/ohlcv.png)"""
@@ -58,7 +60,19 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
         # Set up figure
         if fig is None:
             fig = CustomFigureWidget()
-        candlestick = go.Candlestick(
+            fig.update_layout(
+                showlegend=True,
+                xaxis_rangeslider_visible=False,
+                xaxis_showgrid=True,
+                yaxis_showgrid=True,
+                bargap=0
+            )
+        fig.update_layout(**layout_kwargs)
+        if ohlc_kwargs is None:
+            ohlc_kwargs = {}
+        if bar_kwargs is None:
+            bar_kwargs = {}
+        ohlc = plot_type(
             x=self.index,
             open=open,
             high=high,
@@ -66,22 +80,25 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             close=close,
             name='OHLC',
             yaxis="y2",
-            xaxis="x"
+            xaxis="x",
+            increasing_line_color='#1b9e76',
+            decreasing_line_color='#d95f02'
         )
-        candlestick.update(**candlestick_kwargs)
-        fig.add_trace(candlestick)
+        ohlc.update(**ohlc_kwargs)
+        fig.add_trace(ohlc)
         if display_volume:
             volume = self._obj[column_names['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=np.object)
-            marker_colors[(close.values - open.values) > 0] = 'green'
+            marker_colors[(close.values - open.values) > 0] = '#1b9e76'
             marker_colors[(close.values - open.values) == 0] = 'lightgrey'
-            marker_colors[(close.values - open.values) < 0] = 'red'
+            marker_colors[(close.values - open.values) < 0] = '#d95f02'
             bar = go.Bar(
                 x=self.index,
                 y=volume,
                 marker_color=marker_colors,
                 marker_line_width=0,
+                marker_opacity=0.7,
                 name='Volume',
                 yaxis="y",
                 xaxis="x"
@@ -96,12 +113,4 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
                     domain=[0, 0.33]
                 )
             )
-        fig.update_layout(
-            showlegend=True,
-            xaxis_rangeslider_visible=False,
-            xaxis_showgrid=True,
-            yaxis_showgrid=True
-        )
-        fig.update_layout(**layout_kwargs)
-
         return fig

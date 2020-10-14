@@ -165,22 +165,22 @@ class Signals_Accessor(Generic_Accessor):
             the number of ticks to wait before placing the exit signal.
             ```python-repl
             >>> @njit
-            ... def entry_choice_func_nb(col, from_i, to_i, temp_int):
-            ...     temp_int[0] = from_i
-            ...     return temp_int[:1]  # array with one signal
+            ... def entry_choice_func_nb(col, from_i, to_i, temp_idx_arr):
+            ...     temp_idx_arr[0] = from_i
+            ...     return temp_idx_arr[:1]  # array with one signal
 
             >>> @njit
-            ... def exit_choice_func_nb(col, from_i, to_i, temp_int):
+            ... def exit_choice_func_nb(col, from_i, to_i, temp_idx_arr):
             ...     wait = col
-            ...     temp_int[0] = from_i + wait
-            ...     if temp_int[0] < to_i:
-            ...         return temp_int[:1]  # array with one signal
-            ...     return temp_int[:0]  # empty array
+            ...     temp_idx_arr[0] = from_i + wait
+            ...     if temp_idx_arr[0] < to_i:
+            ...         return temp_idx_arr[:1]  # array with one signal
+            ...     return temp_idx_arr[:0]  # empty array
 
-            >>> temp_int = np.empty((1,), dtype=np.int_)  # reuse memory
+            >>> temp_idx_arr = np.empty((1,), dtype=np.int_)  # reuse memory
             >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
             ...     (5, 3), entry_choice_func_nb, exit_choice_func_nb,
-            ...     entry_args=(temp_int,), exit_args=(temp_int,),
+            ...     entry_args=(temp_idx_arr,), exit_args=(temp_idx_arr,),
             ...     index=sig.index, columns=sig.columns)
             >>> en
                             a      b      c
@@ -894,14 +894,14 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         return fig
 
-    def plot_as_markers(self, ts, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot_as_markers(self, y=None, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as markers.
 
         Args:
-            ts (pandas.Series): Time series to plot markers on.
+            y (array_like): Y-axis values to plot markers on.
 
                 !!! note
-                    Doesn't plot `ts`.
+                    Doesn't plot `y`.
 
             name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
@@ -912,15 +912,13 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             ```python-repl
             >>> ts = pd.Series([1, 2, 3, 2, 1], index=sig.index)
             >>> fig = ts.vbt.plot()
-            >>> sig['b'].vbt.signals.plot_as_entry_markers(ts, fig=fig)
-            >>> (~sig['b']).vbt.signals.plot_as_exit_markers(ts, fig=fig)
+            >>> sig['b'].vbt.signals.plot_as_entry_markers(y=ts, fig=fig)
+            >>> (~sig['b']).vbt.signals.plot_as_exit_markers(y=ts, fig=fig)
             ```
 
             ![](/vectorbt/docs/img/signals_plot_as_markers.png)"""
         if trace_kwargs is None:
             trace_kwargs = {}
-        checks.assert_type(ts, pd.Series)
-        checks.assert_index_equal(self._obj.index, ts.index)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -930,8 +928,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         # Plot markers
         scatter = go.Scatter(
-            x=ts.index[self._obj],
-            y=ts[self._obj],
+            x=self.index,
+            y=np.where(self._obj, y, np.nan),
             mode='markers',
             marker=dict(
                 symbol='circle',
@@ -949,7 +947,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         fig.add_trace(scatter)
         return fig
 
-    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
+    def plot_as_entry_markers(self, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as entry markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
@@ -966,9 +964,9 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                 )
             )
         ), trace_kwargs)
-        return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
+        return self.plot_as_markers(name=name, trace_kwargs=trace_kwargs, **kwargs)
 
-    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
+    def plot_as_exit_markers(self, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as exit markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
@@ -985,7 +983,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                 )
             )
         ), trace_kwargs)
-        return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
+        return self.plot_as_markers(name=name, trace_kwargs=trace_kwargs, **kwargs)
 
 
 @register_dataframe_accessor('signals')

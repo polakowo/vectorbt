@@ -14,20 +14,36 @@ from vectorbt.signals.nb import generate_ex_nb, generate_enex_nb, first_choice_n
 class SignalFactory(IndicatorFactory):
     """A factory for building signal generators.
 
-    Extends `vectorbt.indicators.factory.IndicatorFactory` with choice functions."""
+    Extends `vectorbt.indicators.factory.IndicatorFactory` with choice functions.
+
+    Generates a fixed number of outputs (see arguments). If you need to generate other outputs,
+    use in-place outputs (via `in_output_names`).
+
+    Args:
+        exit_only (bool): Whether to generate exit signals only.
+
+            If True, uses `entries` as input and `exits` as output.
+            Otherwise, uses `entries` and `exits` as outputs.
+        iteratively (bool): Whether to use entries to iteratively generate new entries and exits.
+
+            If True, uses `entries` as input and `new_entries` and `exits` as outputs.
+        **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.IndicatorFactory`.
+    ```"""
 
     def __init__(self,
                  *args,
                  class_name='CustomSignals',
                  input_names=None,
-                 obj_settings=None,
+                 attr_settings=None,
                  exit_only=False,
                  iteratively=False,
                  **kwargs):
         if input_names is None:
             input_names = []
-        if obj_settings is None:
-            obj_settings = {}
+        if attr_settings is None:
+            attr_settings = {}
+        if iteratively:
+            exit_only = True
         if exit_only:
             if len(input_names) > 0:
                 if input_names[0] != 'entries':
@@ -37,21 +53,77 @@ class SignalFactory(IndicatorFactory):
             output_names = ['exits']
             if iteratively:
                 output_names = ['new_entries'] + output_names
-                obj_settings['new_entries'] = dict(dtype=np.bool)
+                attr_settings['new_entries'] = dict(dtype=np.bool)
         else:
             output_names = ['entries', 'exits']
-        obj_settings['entries'] = dict(dtype=np.bool)
-        obj_settings['exits'] = dict(dtype=np.bool)
+        attr_settings['entries'] = dict(dtype=np.bool)
+        attr_settings['exits'] = dict(dtype=np.bool)
         IndicatorFactory.__init__(
             self, *args,
             class_name=class_name,
             input_names=input_names,
             output_names=output_names,
-            obj_settings=obj_settings,
+            attr_settings=attr_settings,
             **kwargs
         )
         self.exit_only = exit_only
         self.iteratively = iteratively
+
+        def plot(_self,
+                 entry_y=None,
+                 exit_y=None,
+                 entry_types=None,
+                 exit_types=None,
+                 entry_trace_kwargs=None,
+                 exit_trace_kwargs=None,
+                 fig=None,
+                 **layout_kwargs):  # pragma: no cover
+            if _self.wrapper.ndim > 1:
+                raise TypeError("Select a column first. Use indexing.")
+
+            if entry_trace_kwargs is None:
+                entry_trace_kwargs = {}
+            if exit_trace_kwargs is None:
+                exit_trace_kwargs = {}
+            if entry_types is not None:
+                entry_trace_kwargs = merge_kwargs(dict(
+                    customdata=entry_types,
+                    hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
+                ), entry_trace_kwargs)
+            if exit_types is not None:
+                exit_trace_kwargs = merge_kwargs(dict(
+                    customdata=exit_types,
+                    hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
+                ), exit_trace_kwargs)
+            if exit_only and iteratively:
+                entries = _self.new_entries
+            else:
+                entries = _self.entries
+            exits = _self.exits
+            fig = entries.vbt.signals.plot_as_entry_markers(
+                y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **layout_kwargs)
+            fig = exits.vbt.signals.plot_as_exit_markers(
+                y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **layout_kwargs)
+
+            return fig
+
+        plot.__doc__ = """Plot `{0}.{1}` and `{0}.exits`.
+
+        Args:
+            entry_y (array_like): Y-axis values to plot entry markers on.
+            exit_y (array_like): Y-axis values to plot exit markers on.
+            entry_types (array_like): Entry types in string format.
+            exit_types (array_like): Exit types in string format.
+            entry_trace_kwargs (dict): Keyword arguments passed to \
+            `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_entry_markers` for `{0}.{1}`.
+            exit_trace_kwargs (dict): Keyword arguments passed to \
+            `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_exit_markers` for `{0}.exits`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.""".format(
+            class_name, 'new_entries' if exit_only and iteratively else 'entries'
+        )
+
+        setattr(self.CustomIndicator, 'plot', plot)
 
     def from_choice_func(
             self,
@@ -64,21 +136,24 @@ class SignalFactory(IndicatorFactory):
             **kwargs):
         """Build signal generator class around entry and exit choice functions.
 
-        Each choice function takes broadcast time series, broadcast parameter arrays,
-        and other arguments, and returns an array of indices corresponding to signals. 
-        See `vectorbt.signals.nb.generate_nb`.
+        A choice function is simply a function that returns indices of signals.
+        There are two types of it: entry choice function and exit choice function.
+        Each choice function takes broadcast time series, broadcast in-place output time series,
+        broadcast parameter arrays, and other arguments, and returns an array of indices
+        corresponding to chosen signals. See `vectorbt.signals.nb.generate_nb`.
+
+        If `exit_only` is True, calls `vectorbt.signals.nb.generate_ex_nb`.
+        If `exit_only` is False or `iteratively` is True, calls `vectorbt.signals.nb.generate_enex_nb`.
 
         Args:
             entry_choice_func (callable): `choice_func_nb` that returns indices of entries.
 
-                Cannot be used if `exit_only` is True.
+                If `exit_only` is True, automatically set to `vectorbt.signals.nb.first_choice_nb`.
             exit_choice_func (callable): `choice_func_nb` that returns indices of exits.
             cache_func (callable): A caching function to preprocess data beforehand.
 
                 All returned objects will be passed as last arguments to choice functions.
             entry_settings (dict): Settings dict for `entry_choice_func`.
-
-                Cannot be used if `exit_only` is True.
             exit_settings (dict): Settings dict for `exit_choice_func`.
             cache_settings (dict): Settings dict for `cache_func`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
@@ -117,8 +192,10 @@ class SignalFactory(IndicatorFactory):
                     Default is 1.
                 * `first`: Whether to stop as soon as the first exit signal is found.
                     Default is True.
-                * `temp_int`: Empty integer array used to temporarily store indices.
+                * `temp_idx_arr`: Empty integer array used to temporarily store indices.
                     Default is an automatically generated array of shape `input_shape[0]`.
+
+                    You can also pass `temp_idx_arr1`, `temp_idx_arr2`, etc. to generate multiple.
                 * `flex_2d`: See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
                     Default is provided by the pipeline if `forward_flex_2d` is True.
             pass_cache (bool): Whether to pass cache from `cache_func` to the choice function.
@@ -151,32 +228,30 @@ class SignalFactory(IndicatorFactory):
             Test three different `n` values.
 
             ```python-repl
-            >>> import pandas as pd
             >>> from numba import njit
             >>> from vectorbt.signals.factory import SignalFactory
 
             >>> @njit
-            ... def wait_choice_nb(col, from_i, to_i, n, temp_int):
-            ...     temp_int[0] = from_i + n  # index of next exit
-            ...     if temp_int[0] < to_i:
-            ...         return temp_int[:1]
-            ...     return temp_int[:0]  # must return array anyway
+            ... def wait_choice_nb(col, from_i, to_i, n, temp_idx_arr):
+            ...     temp_idx_arr[0] = from_i + n  # index of next exit
+            ...     if temp_idx_arr[0] < to_i:
+            ...         return temp_idx_arr[:1]
+            ...     return temp_idx_arr[:0]  # must return array anyway
 
             >>> # Build signal generator
             >>> MySignals = SignalFactory(
             ...     param_names=['n'],
-            ...     exit_only=True,
             ...     iteratively=True
             ... ).from_choice_func(
             ...     exit_choice_func=wait_choice_nb,
             ...     exit_settings=dict(
             ...         pass_params=['n'],
-            ...         pass_kwargs=['temp_int']  # built-in kwarg
+            ...         pass_kwargs=['temp_idx_arr']  # built-in kwarg
             ...     )
             ... )
 
             >>> # Run signal generator
-            >>> entries = pd.Series([True, True, True, True, True])
+            >>> entries = [True, True, True, True, True]
             >>> my_sig = MySignals.run(entries, [0, 1, 2])
 
             >>> my_sig.entries  # input entries
@@ -201,6 +276,95 @@ class SignalFactory(IndicatorFactory):
             3          True  False   True
             4         False  False  False
             ```
+
+            To combine multiple iterative signals, you would need to create a choice function
+            that does that. Here is an example of combining two random generators using "OR" rule:
+
+            ```python-repl
+            >>> from numba import njit
+            >>> from collections import namedtuple
+            >>> from vectorbt.signals.factory import SignalFactory
+            >>> from vectorbt.signals.nb import rand_by_prob_choice_nb
+            >>> from vectorbt.signals.basic import flex_elem_param_config
+
+            >>> # Enum to distinguish random generators
+            >>> RandType = namedtuple('RandType', ['R1', 'R2'])(0, 1)
+
+            >>> # Define exit choice function
+            >>> @njit
+            ... def rand_exit_choice_nb(col, from_i, to_i, rand_type_out, prob1,
+            ...                         prob2, temp_idx_arr1, temp_idx_arr2, flex_2d):
+            ...     idxs1 = rand_by_prob_choice_nb(
+            ...         col, from_i, to_i, prob1, True, temp_idx_arr1, flex_2d)
+            ...     if len(idxs1) > 0:
+            ...         to_i = idxs1[0]  # no need to go beyond first signal
+            ...     idxs2 = rand_by_prob_choice_nb(
+            ...         col, from_i, to_i, prob2, True, temp_idx_arr2, flex_2d)
+            ...     if len(idxs2) > 0:
+            ...         rand_type_out[idxs2[0], col] = RandType.R2
+            ...         return idxs2
+            ...     if len(idxs1) > 0:
+            ...         rand_type_out[idxs1[0], col] = RandType.R1
+            ...         return idxs1
+            ...     return temp_idx_arr1[:0]
+
+            >>> # Build signal generator
+            >>> MySignals = SignalFactory(
+            ...     in_output_names=['rand_type'],
+            ...     in_output_settings=dict(
+            ...         rand_type=dict(
+            ...             dtype=int,
+            ...             default=-1
+            ...         )
+            ...     ),
+            ...     param_names=['prob1', 'prob2'],
+            ...     param_settings=dict(
+            ...         prob1=flex_elem_param_config,  # param per frame/row/col/element
+            ...         prob2=flex_elem_param_config
+            ...     ),
+            ...     attr_settings=dict(
+            ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
+            ...     ),
+            ...     iteratively=True
+            ... ).from_choice_func(
+            ...     exit_choice_func=rand_exit_choice_nb,
+            ...     exit_settings=dict(
+            ...         pass_in_outputs=['rand_type'],
+            ...         pass_params=['prob1', 'prob2'],
+            ...         pass_kwargs=['temp_idx_arr1', 'temp_idx_arr2', 'flex_2d']
+            ...     ),
+            ...     forward_flex_2d=True
+            ... )
+
+            >>> # Run signal generator
+            >>> entries = [True, True, True, True, True]
+            >>> my_sig = MySignals.run(entries, [0., 1.], [0., 1.], param_product=True)
+
+            >>> my_sig.new_entries
+            custom_prob1           0.0           1.0
+            custom_prob2    0.0    1.0    0.0    1.0
+            0              True   True   True   True
+            1             False  False  False  False
+            2             False   True   True   True
+            3             False  False  False  False
+            4             False   True   True   True
+            >>> my_sig.exits
+            custom_prob1           0.0           1.0
+            custom_prob2    0.0    1.0    0.0    1.0
+            0             False  False  False  False
+            1             False   True   True   True
+            2             False  False  False  False
+            3             False   True   True   True
+            4             False  False  False  False
+            >>> my_sig.rand_type_readable
+            custom_prob1     0.0     1.0
+            custom_prob2 0.0 1.0 0.0 1.0
+            0
+            1                 R2  R1  R1
+            2
+            3                 R2  R1  R1
+            4
+            ```
         """
 
         exit_only = self.exit_only
@@ -212,15 +376,14 @@ class SignalFactory(IndicatorFactory):
         checks.assert_not_none(exit_choice_func)
         checks.assert_numba_func(exit_choice_func)
         if exit_only:
-            if entry_choice_func is not None:
-                raise ValueError("entry_choice_func cannot be set when exit_only=True")
-            if entry_settings is not None:
-                raise ValueError("entry_settings cannot be set when exit_only=True")
             if iteratively:
-                entry_choice_func = first_choice_nb
-                entry_settings = dict(
+                if entry_choice_func is None:
+                    entry_choice_func = first_choice_nb
+                if entry_settings is None:
+                    entry_settings = {}
+                entry_settings = merge_kwargs(dict(
                     pass_inputs=['entries']
-                )
+                ), entry_settings)
         else:
             checks.assert_not_none(entry_choice_func)
             checks.assert_numba_func(entry_choice_func)
@@ -235,11 +398,11 @@ class SignalFactory(IndicatorFactory):
         def _check_settings(func_settings):
             for k in func_settings:
                 if k not in (
-                    'pass_inputs',
-                    'pass_in_outputs',
-                    'pass_params',
-                    'pass_kwargs',
-                    'pass_cache'
+                        'pass_inputs',
+                        'pass_in_outputs',
+                        'pass_params',
+                        'pass_kwargs',
+                        'pass_cache'
                 ):
                     raise ValueError(f"Unrecognized key {k} in function settings")
 
@@ -346,7 +509,6 @@ class SignalFactory(IndicatorFactory):
                 input_shape=input_shape,
                 wait=1,
                 first=True,
-                temp_int=np.empty((input_shape[0],), dtype=np.int_),
                 flex_2d=flex_2d,
             )
             entry_kwargs = merge_kwargs(kwargs_defaults, entry_kwargs)
@@ -407,6 +569,9 @@ class SignalFactory(IndicatorFactory):
                     value = None
                     if isinstance(key, tuple):
                         key, value = key
+                    else:
+                        if key.startswith('temp_idx_arr'):
+                            value = np.empty((input_shape[0],), dtype=np.int_)
                     value = func_kwargs.get(key, value)
                     more_args += (value,)
                 return more_args
@@ -435,7 +600,6 @@ class SignalFactory(IndicatorFactory):
 
             # Apply and concatenate
             if exit_only and not iteratively:
-                print(exit_param_tuples)
                 return combine_fns.apply_and_concat_one_nb(
                     n_params,
                     apply_nb,

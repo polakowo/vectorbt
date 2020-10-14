@@ -398,7 +398,7 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
             )
             if len(new_params) == 1:
                 _new_params = (_new_params,)
-            if bc_to_input is True and to_2d:
+            if to_2d and bc_to_input is True:
                 # If inputs are meant to reshape to 2D, do the same to parameters
                 # But only to those that fully resemble inputs (= not raw)
                 __new_params = list(_new_params)
@@ -445,17 +445,17 @@ def run_pipeline(
         num_ret_outputs,
         custom_func,
         *args,
-        input_list=None,
-        in_output_list=None,
-        param_list=None,
-        level_names=None,
         input_shape=None,
         input_index=None,
         input_columns=None,
+        input_list=None,
+        in_output_list=None,
+        in_output_settings=None,
         broadcast_kwargs=None,
-        param_settings=None,
-        output_settings=None,
+        param_list=None,
         param_product=False,
+        param_settings=None,
+        level_names=None,
         to_2d=True,
         pass_lists=False,
         forward_input_shape=None,
@@ -473,16 +473,6 @@ def run_pipeline(
 
             See `IndicatorFactory.from_custom_func`.
         *args: Arguments passed to the `custom_func`.
-        input_list (list of array_like): A list of time series objects.
-        in_output_list (list of array_like): A list of in-place outputs.
-            
-            If an array should be generated, pass None.
-        param_list (list of array_like): A list of parameters.
-
-            Each element is either an array-like object or a single value of any type.
-        level_names (list of str): A list of column level names corresponding to each parameter.
-
-            Should have the same length as `param_list`.
         input_shape (tuple): Shape to broadcast each input to.
 
             Can be passed to `custom_func`. See `forward_input_shape`.
@@ -492,8 +482,21 @@ def run_pipeline(
         input_columns (any): Sets columns of each input.
 
             Can be used to label columns if no inputs passed.
+        input_list (list of array_like): A list of time series objects.
+        in_output_list (list of array_like): A list of in-place outputs.
+            
+            If an array should be generated, pass None.
+        in_output_settings (dict or list of dict): Settings corresponding to each in-place output.
+
+            Following keys are accepted:
+
+            * `dtype`: Create this array using this data type and `np.empty`. Default is `np.float_`.
         broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`
             to broadcast inputs.
+        param_list (list of array_like): A list of parameters.
+
+            Each element is either an array-like object or a single value of any type.
+        param_product (bool): Whether to build a Cartesian product out of all parameters.
         param_settings (dict or list of dict): Settings corresponding to each parameter.
 
             Following keys are accepted:
@@ -503,15 +506,13 @@ def run_pipeline(
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-        output_settings (dict or list of dict): Settings corresponding to each output.
+        level_names (list of str): A list of column level names corresponding to each parameter.
 
-            Following keys are accepted:
-
-            * `dtype`: Cast this output to a data type. If output is an in-place output,
-                creates an empty array with this data type.
-        param_product (bool): Whether to build a Cartesian product out of all parameters.
+            Should have the same length as `param_list`.
         to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
         pass_lists (bool): Whether to pass inputs and parameters to `custom_func` as lists.
+
+            If `custom_func` is Numba-compiled, passes tuples.
         forward_input_shape (bool): Whether to pass `input_shape` to `custom_func` as keyword argument.
 
             If None and no inputs passed, passes `input_shape` automatically.
@@ -637,8 +638,8 @@ def run_pipeline(
         broadcast_kwargs = {}
     if param_settings is None:
         param_settings = {}
-    if output_settings is None:
-        output_settings = {}
+    if in_output_settings is None:
+        in_output_settings = {}
     if hide_levels is None:
         hide_levels = []
     if wrapper_kwargs is None:
@@ -715,8 +716,10 @@ def run_pipeline(
             in_output = reshape_fns.tile(in_output, n_param_values, axis=1)
             j += 1
         else:
-            dtype = output_settings[num_ret_outputs - 1 + i].get('dtype', np.float_)
-            in_output = np.empty((input_shape_passed[0], input_shape_passed[1] * n_param_values), dtype=dtype)
+            _in_output_settings = in_output_settings if isinstance(in_output_settings, dict) else in_output_settings[i]
+            dtype = _in_output_settings.get('dtype', np.float_)
+            in_output_shape = (input_shape_passed[0], input_shape_passed[1] * n_param_values)
+            in_output = np.empty(in_output_shape, dtype=dtype)
         in_output_list[i] = in_output
         in_output_tuple = ()
         for i in range(n_param_values):
@@ -730,7 +733,7 @@ def run_pipeline(
         idxs = reindex_outputs(list(zip(*param_list)), param_map, n_input_cols)
         output_list = [output[:, idxs] for output in output_list]
     else:
-        # Run custom function
+        # Prepare arguments
         func_kwargs = {}
         if forward_input_shape:
             func_kwargs['input_shape'] = input_shape_passed
@@ -739,12 +742,14 @@ def run_pipeline(
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs['flex_2d'] = len(input_shape) == 2
         func_kwargs = merge_kwargs(func_kwargs, kwargs)
+
+        # Run the function
         if pass_lists:
             if checks.is_numba_func(custom_func):
                 output = custom_func(
-                    List(input_list_passed),
-                    List(in_output_list_passed),
-                    List(param_list),
+                    tuple(input_list_passed),
+                    tuple(in_output_list_passed),
+                    tuple(param_list),
                     *args, **func_kwargs
                 )
             else:
@@ -767,10 +772,10 @@ def run_pipeline(
             return output
 
         # Post-process results
-        if not isinstance(output, (tuple, list, List)):
-            output_list = [output]
-        else:
+        if isinstance(output, (tuple, list, List)):
             output_list = list(output)
+        else:
+            output_list = [output]
         # Other outputs should be returned without post-processing (for example cache_dict)
         if len(output_list) > num_ret_outputs:
             other_list = output_list[num_ret_outputs:]
@@ -783,10 +788,6 @@ def run_pipeline(
         output_list = list(map(reshape_fns.to_2d, output_list))
         # In-place outputs are treated as outputs from here
         output_list += in_output_list
-        for i in range(len(output_list)):
-            dtype = output_settings[i].get('dtype', None)
-            if dtype is not None:
-                output_list[i] = np.require(output_list[i], dtype=dtype)
 
         # Return raw results if needed
         param_map = list(zip(*param_list))
@@ -796,7 +797,10 @@ def run_pipeline(
 
     # Update shape info if no inputs
     if input_shape is None:
-        input_shape = (output_list[0].shape[0], n_input_cols)
+        if n_input_cols == 1:
+            input_shape = (output_list[0].shape[0],)
+        else:
+            input_shape = (output_list[0].shape[0], n_input_cols)
     if input_index is None:
         input_index = pd.RangeIndex(start=0, step=1, stop=input_shape[0])
     if input_columns is None:
@@ -875,15 +879,15 @@ class IndicatorFactory:
                  prepend_name=True,
                  input_names=None,
                  param_names=None,
-                 param_defaults=None,
-                 param_settings=None,
                  in_output_names=None,
                  output_names=None,
-                 output_settings=None,
                  output_flags=None,
                  custom_output_funcs=None,
-                 obj_settings=None):
+                 attr_settings=None):
         """A factory for creating new indicators.
+
+        Initialize `IndicatorFactory` to create a skeleton and then use a class method
+        to finish building the indicator class.
 
         Args:
             class_name (str): Name for the created Python class.
@@ -893,82 +897,99 @@ class IndicatorFactory:
             prepend_name (bool): Whether to prepend `short_name` to each parameter level.
             input_names (list of str): A list of names of input time series objects.
             param_names (list of str): A list of names of parameters.
-            param_defaults (dict): A dictionary of parameter defaults.
-
-                !!! note
-                    Params with defaults should be on the right in `param_names`.
-            param_settings (dict): A dictionary of parameter settings by param name.
-
-                See `run_pipeline` for keys.
             in_output_names (list of str): A list of names of in-place output time series objects.
+
+                An in-place output is an output that is not returned but modified in-place.
+                Some advantages of such outputs include:
+
+                1) they don't need to be returned,
+                2) they can be passed between functions as easily as inputs,
+                3) they can be provided with already allocated data to safe memory,
+                4) if data or default value are not provided, they are created empty to safe memory.
             output_names (list of str): A list of names of output time series objects.
 
                 !!! note
-                    Must have at least one output.
-            output_settings (dict): A dictionary of output settings by output name.
-
-                See `run_pipeline` for keys.
+                    Must have at least one (non-in-place) output.
             output_flags (dict): A dictionary of output flags.
             custom_output_funcs (dict): A dictionary with user-defined functions that will be
                 bound to the indicator class and wrapped with `@cached_property`.
+            attr_settings (dict): A dictionary of settings by attribute name.
+
+                Attributes can be `input_names`, `in_output_names`, `output_names` and `custom_output_funcs`.
+
+                Following keys are accepted:
+
+                * `dtype`: Data type used to determine which methods to generate around this attribute.
+                    Set to None to disable. Default is `np.float_`. Can be set to instance of
+                    `collections.namedtuple` acting as enumerated type; it will then create a property
+                    with suffix `readable` that contains data in a string format.
 
         !!! note
             The `__init__` method is not used for running the indicator, for this use `run`.
             The reason for this is indexing, which requires a clean `__init__` method for creating 
             a new indicator object with newly indexed attributes.
         """
+        # Check and save parameters
         self.class_name = class_name
+        checks.assert_type(class_name, str)
+
         self.class_docstring = class_docstring
+        checks.assert_type(class_docstring, str)
+
         self.module_name = module_name
+        checks.assert_type(module_name, str)
+
         self.short_name = short_name
+        checks.assert_type(short_name, str)
+
         self.prepend_name = prepend_name
+        checks.assert_type(prepend_name, bool)
+
         if input_names is None:
             input_names = []
+        checks.assert_type(input_names, (tuple, list))
         self.input_names = input_names
+
         if param_names is None:
             param_names = []
+        checks.assert_type(param_names, (tuple, list))
         self.param_names = param_names
-        if param_defaults is None:
-            param_defaults = {}
-        if len(param_defaults) > 0:
-            for param_name in param_defaults:
-                if param_name not in param_names:
-                    raise ValueError(f"Param {param_name} not in param_names")
-            if sorted(param_names[-len(param_defaults):]) != sorted(param_defaults.keys()):
-                raise ValueError("Params with defaults should be on the right in param_names")
-        self.param_defaults = param_defaults
-        if param_settings is None:
-            param_settings = {}
-        self.param_settings = param_settings
+
         if in_output_names is None:
             in_output_names = []
+        checks.assert_type(in_output_names, (tuple, list))
         self.in_output_names = in_output_names
+
         if output_names is None:
             output_names = []
+        checks.assert_type(output_names, (tuple, list))
         if len(output_names) == 0:
             raise ValueError("Must have at least one output")
         output_names += in_output_names
         self.output_names = output_names
-        if output_settings is None:
-            output_settings = {}
-        if len(output_settings) > 0:
-            for output_name in output_settings:
-                if output_name not in output_names:
-                    raise ValueError(f"Key {output_name} not in output_names or in_output_names")
-        self.output_settings = output_settings
+
         if output_flags is None:
             output_flags = {}
+        checks.assert_type(output_flags, dict)
         if len(output_flags) > 0:
             for output_name in output_flags:
                 if output_name not in output_names:
-                    raise ValueError(f"Key {output_name} not in output_names or in_output_names")
+                    raise ValueError(f"Can't find key {output_name} in any output names")
         self.output_flags = output_flags
+
         if custom_output_funcs is None:
             custom_output_funcs = {}
+        checks.assert_type(custom_output_funcs, dict)
         self.custom_output_funcs = custom_output_funcs
-        if obj_settings is None:
-            obj_settings = {}
-        self.obj_settings = obj_settings
+
+        if attr_settings is None:
+            attr_settings = {}
+        checks.assert_type(attr_settings, dict)
+        if len(attr_settings) > 0:
+            for attr in attr_settings:
+                if attr not in set(input_names + output_names + list(custom_output_funcs.keys())):
+                    raise ValueError(f"Can't find key {attr} in any names")
+        self.attr_settings = attr_settings
 
         # Add indexing methods
         def indexing_func(obj, pd_indexing_func):
@@ -1138,85 +1159,107 @@ class IndicatorFactory:
             setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
-        all_attrs = set(input_names + output_names + list(custom_output_funcs.keys()))
-        for attr in all_attrs:
-            _obj_settings = obj_settings.get(attr, {})
-            obj_create_methods = _obj_settings.get('create_methods', True)
-            obj_dtype = _obj_settings.get('dtype', np.number)
+        all_attr_names = set(input_names + output_names + list(custom_output_funcs.keys()))
+        for attr_name in all_attr_names:
+            _attr_settings = attr_settings.get(attr_name, {})
+            dtype = _attr_settings.get('dtype', np.float_)
 
-            if obj_create_methods:
-                if np.issubdtype(obj_dtype, np.number):
-                    def assign_numeric_method(func_name, combine_func, attr=attr):
-                        def numeric_method(_self, other, crossed=False, wait=0, after_false=True,
-                                           level_name=None, prepend_name=prepend_name, **kwargs):
-                            if isinstance(other, _self.__class__):
-                                other = getattr(other, attr)
-                            if level_name is None:
-                                if prepend_name:
-                                    if attr == _self.short_name:
-                                        level_name = f'{_self.short_name}_{func_name}'
-                                    else:
-                                        level_name = f'{_self.short_name}_{attr}_{func_name}'
+            def _isinstance_namedtuple(obj) -> bool:
+                return (
+                    isinstance(obj, tuple) and
+                    hasattr(obj, '_asdict') and
+                    hasattr(obj, '_fields')
+                )
+
+            if _isinstance_namedtuple(dtype):
+                def attr_readable(_self, attr_name=attr_name, enum=dtype):
+                    if _self.wrapper.ndim == 1:
+                        return getattr(_self, attr_name).map(lambda x: '' if x == -1 else enum._fields[x])
+                    return getattr(_self, attr_name).applymap(lambda x: '' if x == -1 else enum._fields[x])
+
+                attr_readable.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_readable'
+                attr_readable.__doc__ = f"""{attr_name} in readable format based on enum {dtype}."""
+                setattr(CustomIndicator, f'{attr_name}_readable', property(attr_readable))
+
+            elif np.issubdtype(dtype, np.number):
+                def assign_numeric_method(func_name, combine_func, attr_name=attr_name):
+                    def numeric_method(_self, other, crossed=False, wait=0, after_false=True,
+                                       level_name=None, prepend_name=prepend_name, **kwargs):
+                        if isinstance(other, _self.__class__):
+                            other = getattr(other, attr_name)
+                        if level_name is None:
+                            if prepend_name:
+                                if attr_name == _self.short_name:
+                                    level_name = f'{_self.short_name}_{func_name}'
                                 else:
-                                    level_name = f'{attr}_{func_name}'
-                            out = combine_objs(
-                                getattr(_self, attr),
-                                other,
-                                combine_func,
-                                level_name=level_name,
-                                **kwargs
-                            )
-                            if crossed:
-                                return out.vbt.signals.nst(wait + 1, after_false=after_false)
-                            return out
+                                    level_name = f'{_self.short_name}_{attr_name}_{func_name}'
+                            else:
+                                level_name = f'{attr_name}_{func_name}'
+                        out = combine_objs(
+                            getattr(_self, attr_name),
+                            other,
+                            combine_func,
+                            level_name=level_name,
+                            **kwargs
+                        )
+                        if crossed:
+                            return out.vbt.signals.nst(wait + 1, after_false=after_false)
+                        return out
 
-                        numeric_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
-                        numeric_method.__doc__ = f"""Return True for each element where `{attr}` is {func_name} `other`. 
-        
-                            Set `crossed` to True to return the first True after crossover. Specify `wait` to return 
-                            True only when `{attr}` is {func_name} for a number of time steps in a row after crossover.
+                    numeric_method.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_{func_name}'
+                    numeric_method.__doc__ = f"""Return True for each element where `{attr_name}` is {func_name} `other`. 
     
-                            See `vectorbt.indicators.factory.combine_objs`."""
-                        setattr(CustomIndicator, f'{attr}_{func_name}', numeric_method)
+                    Set `crossed` to True to return the first True after crossover. Specify `wait` to return 
+                    True only when `{attr_name}` is {func_name} for a number of time steps in a row after crossover.
+                
+                    See `vectorbt.indicators.factory.combine_objs`."""
+                    setattr(CustomIndicator, f'{attr_name}_{func_name}', numeric_method)
 
-                    assign_numeric_method('above', np.greater)
-                    assign_numeric_method('below', np.less)
-                    assign_numeric_method('equal', np.equal)
+                assign_numeric_method('above', np.greater)
+                assign_numeric_method('below', np.less)
+                assign_numeric_method('equal', np.equal)
 
-                elif np.issubdtype(obj_dtype, np.bool_):
-                    def assign_bool_method(func_name, combine_func, attr=attr):
-                        def bool_method(_self, other, level_name=None, prepend_name=prepend_name, **kwargs):
-                            if isinstance(other, _self.__class__):
-                                other = getattr(other, attr)
-                            if level_name is None:
-                                if prepend_name:
-                                    if attr == _self.short_name:
-                                        level_name = f'{_self.short_name}_{func_name}'
-                                    else:
-                                        level_name = f'{_self.short_name}_{attr}_{func_name}'
+            elif np.issubdtype(dtype, np.bool_):
+                def assign_bool_method(func_name, combine_func, attr_name=attr_name):
+                    def bool_method(_self, other, level_name=None, prepend_name=prepend_name, **kwargs):
+                        if isinstance(other, _self.__class__):
+                            other = getattr(other, attr_name)
+                        if level_name is None:
+                            if prepend_name:
+                                if attr_name == _self.short_name:
+                                    level_name = f'{_self.short_name}_{func_name}'
                                 else:
-                                    level_name = f'{attr}_{func_name}'
-                            return combine_objs(
-                                getattr(_self, attr),
-                                other,
-                                combine_func,
-                                level_name=level_name,
-                                **kwargs
-                            )
+                                    level_name = f'{_self.short_name}_{attr_name}_{func_name}'
+                            else:
+                                level_name = f'{attr_name}_{func_name}'
+                        return combine_objs(
+                            getattr(_self, attr_name),
+                            other,
+                            combine_func,
+                            level_name=level_name,
+                            **kwargs
+                        )
 
-                        bool_method.__qualname__ = f'{CustomIndicator.__name__}.{attr}_{func_name}'
-                        bool_method.__doc__ = f"""Return `{attr} {func_name.upper()} other`. 
+                    bool_method.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_{func_name}'
+                    bool_method.__doc__ = f"""Return `{attr_name} {func_name.upper()} other`. 
 
-                            See `vectorbt.indicators.factory.combine_objs`."""
-                        setattr(CustomIndicator, f'{attr}_{func_name}', bool_method)
+                        See `vectorbt.indicators.factory.combine_objs`."""
+                    setattr(CustomIndicator, f'{attr_name}_{func_name}', bool_method)
 
-                    assign_bool_method('and', np.logical_and)
-                    assign_bool_method('or', np.logical_or)
-                    assign_bool_method('xor', np.logical_xor)
+                assign_bool_method('and', np.logical_and)
+                assign_bool_method('or', np.logical_or)
+                assign_bool_method('xor', np.logical_xor)
 
             self.CustomIndicator = CustomIndicator
 
-    def from_custom_func(self, custom_func, **pipeline_kwargs):
+    def from_custom_func(self,
+                         custom_func,
+                         param_defaults=None,
+                         param_settings=None,
+                         in_output_settings=None,
+                         hide_params=None,
+                         hide_default=True,
+                         **pipeline_kwargs):
         """Build indicator class around a custom calculation function.
 
         !!! note
@@ -1239,7 +1282,21 @@ class IndicatorFactory:
                 and other objects that are then returned with the indicator class instance.
 
                 Can be Numba-compiled.
-            **pipeline_kwargs: Default keyword arguments passed to `run_pipeline`.
+            param_defaults (dict): A dictionary of parameter defaults.
+
+                !!! note
+                    Params with defaults should be on the right in `param_names`.
+            param_settings (dict): A dictionary of settings by parameter name.
+
+                See `run_pipeline` for keys.
+            in_output_settings (dict): A dictionary of settings by in-place output name.
+
+                See `run_pipeline` for keys.
+            hide_params (list): Parameter names to hide column levels for.
+            hide_default (bool): Whether to hide column levels of parameters with default value.
+            **pipeline_kwargs: Keyword arguments passed to `run_pipeline`.
+
+                Can also be default keyword arguments passed to the `custom_func`.
         Returns:
             `CustomIndicator`, and optionally other objects that are returned by `custom_func`
             and exceed `output_names`.
@@ -1289,60 +1346,82 @@ class IndicatorFactory:
         prepend_name = self.prepend_name
         input_names = self.input_names
         param_names = self.param_names
-        param_defaults = self.param_defaults
-        param_settings = self.param_settings
         output_names = self.output_names
         in_output_names = self.in_output_names
-        output_settings = self.output_settings
+
+        if param_defaults is None:
+            param_defaults = {}
+        checks.assert_type(param_defaults, dict)
+        if len(param_defaults) > 0:
+            for param_name in param_defaults:
+                if param_name not in param_names:
+                    raise ValueError(f"Can't find key {param_name} in param_names")
+            if sorted(param_names[-len(param_defaults):]) != sorted(param_defaults.keys()):
+                raise ValueError("Params with defaults should be on the right in param_names")
+
+        if param_settings is None:
+            param_settings = {}
+        checks.assert_type(param_settings, dict)
+
+        if in_output_settings is None:
+            in_output_settings = {}
+        checks.assert_type(in_output_settings, dict)
+        if len(in_output_settings) > 0:
+            for in_output_name in in_output_settings:
+                if in_output_name not in in_output_names:
+                    raise ValueError(f"Can't find key {in_output_name} in in_output_names")
+
+        if hide_params is None:
+            hide_params = []
 
         # Add private run method
         def_run_kwargs = dict(
             short_name=short_name,
-            hide_params=[],
-            hide_default=True,
-            seed=None
+            hide_params=hide_params,
+            hide_default=hide_default,
+            **merge_kwargs({n: None for n in in_output_names}, pipeline_kwargs)
         )
 
         @classmethod
-        def _run(cls,
-                 *args,
-                 short_name=def_run_kwargs['short_name'],
-                 hide_params=def_run_kwargs['hide_params'],
-                 hide_default=def_run_kwargs['hide_default'],
-                 seed=def_run_kwargs['seed'],
-                 **kwargs):
+        def _run(cls, *args, **kwargs):
+            _short_name = kwargs.pop('short_name')
+            _hide_params = kwargs.pop('hide_params')
+            _hide_default = kwargs.pop('hide_default')
+
             if len(args) < len(input_names) + len(param_names):
                 nmissed = len(input_names) + len(param_names) - len(args)
                 raise ValueError(f"Missing {nmissed} required positional arguments")
-            if seed is not None:
-                set_seed(seed)
             args = list(args)
+
             # Extract inputs
             input_list = args[:len(input_names)]
+
             # Extract params
             param_list = args[len(input_names):len(input_names) + len(param_names)]
+
             # Extract in-place outputs (optional)
             in_output_list = []
             for output_name in in_output_names:
                 in_output_list.append(kwargs.pop(output_name, None))
+
             # Prepare column levels
             level_names = []
             hide_levels = []
             for i, pname in enumerate(param_names):
-                level_name = short_name + '_' + pname if prepend_name else pname
+                level_name = _short_name + '_' + pname if prepend_name else pname
                 level_names.append(level_name)
-                if pname in hide_params:
+                if pname in _hide_params:
                     hide_levels.append(level_name)
-                elif hide_default and pname in param_defaults:
+                elif _hide_default and pname in param_defaults:
                     # Hide parameters with default value
                     if isinstance(param_list[i], Default):
-                        param_list[i] = param_list[i].value
                         hide_levels.append(level_name)
             level_names = list(level_names)
+            param_list = [params.value if isinstance(params, Default) else params for params in param_list]
+
             # Extract positional arguments for the custom function
             custom_func_args = args[len(input_names) + len(param_names):]
-            # Keyword arguments for the pipeline and the custom function
-            kwargs = merge_kwargs(pipeline_kwargs, kwargs)  # overwrite default pipeline kwargs
+
             # Run the pipeline
             results = run_pipeline(
                 len(output_names) - len(in_output_names),  # number of returned outputs
@@ -1354,14 +1433,17 @@ class IndicatorFactory:
                 level_names=level_names,
                 hide_levels=hide_levels,
                 param_settings=[param_settings.get(n, {}) for n in param_names],
-                output_settings=[output_settings.get(n, {}) for n in output_names],
+                in_output_settings=[in_output_settings.get(n, {}) for n in in_output_names],
                 **kwargs
             )
+
             # Return the raw result if any of the flags are set
             if kwargs.get('return_raw', False) or kwargs.get('return_cache', False):
                 return results
+
             # Unpack the result
             wrapper, new_input_list, input_mapper, output_list, new_param_list, mapper_list, other_list = results
+
             # Create a new instance
             obj = cls(
                 wrapper,
@@ -1390,21 +1472,17 @@ class IndicatorFactory:
             param_kwargs_str = ['{}=Default({})'.format(k, v) for k, v in all_param_tuples]
             param_kwarg_names = [param_names[i] for i in range(-len(param_defaults), 0)]
             default_kwargs_str = ['{}={}'.format(k, k) for k, v in default_kwargs.items()]
-            in_output_kwargs_str = ['{}={}'.format(k, None) for k in in_output_names]
-            in_output_kwargs_str2 = ['{}={}'.format(k, k) for k in in_output_names]
             first_arg = input_names + pos_params + param_kwargs_str
             first_arg = ', '.join(first_arg) + ', ' if len(first_arg) > 0 else ''
-            second_arg = default_kwargs_str + in_output_kwargs_str
+            second_arg = default_kwargs_str
             second_arg = ', '.join(second_arg) + ', ' if len(second_arg) > 0 else ''
             fourth_arg = input_names + pos_params + param_kwarg_names
             fourth_arg = ', '.join(fourth_arg) + ', ' if len(fourth_arg) > 0 else ''
-            fifth_arg = default_kwargs_str + in_output_kwargs_str2
-            fifth_arg = ', '.join(fifth_arg) + ', ' if len(fifth_arg) > 0 else ''
             func_str = "@classmethod\n" \
                 "def {0}(cls, {1}*args, {2}**kwargs):\n" \
                 "    \"\"\"{3}\"\"\"\n" \
-                "    return cls._{0}({4}*args, {5}**kwargs)".format(
-                    func_name, first_arg, second_arg, docstring, fourth_arg, fifth_arg
+                "    return cls._{0}({4}*args, {2}**kwargs)".format(
+                    func_name, first_arg, second_arg, docstring, fourth_arg
             )
             scope = {**dict(Default=Default), **default_kwargs}
             filename = inspect.getfile(lambda: None)
@@ -1433,9 +1511,8 @@ class IndicatorFactory:
     
                 Pass a list of parameter names `hide_params` to hide their column levels.
                 Set `hide_default` to False to show column levels of parameters with the default value passed.
-                Keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
                 
-                Specify `seed` to make output deterministic.""".format(
+                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.""".format(
                 class_name,
                 in_ts_str,
                 param_str,
@@ -1457,24 +1534,40 @@ class IndicatorFactory:
             )
 
             @classmethod
-            def _run_combs(cls,
-                           *args,
-                           r=def_run_combs_kwargs['r'],
-                           param_product=def_run_combs_kwargs['param_product'],
-                           comb_func=def_run_combs_kwargs['comb_func'],
-                           speed_up=def_run_combs_kwargs['speed_up'],
-                           short_names=def_run_combs_kwargs['short_names'],
-                           **kwargs):
+            def _run_combs(cls, *args, **kwargs):
+                r = kwargs.pop('r')
+                param_product = kwargs.pop('param_product')
+                comb_func = kwargs.pop('comb_func')
+                speed_up = kwargs.pop('speed_up')
+                short_names = kwargs.pop('short_names')
+
+                # Build list of all parameter combinations
                 if short_names is None:
                     short_names = [f'{short_name}_{str(i + 1)}' for i in range(r)]
                 input_list = args[:len(input_names)]
                 param_list = args[len(input_names):len(input_names) + len(param_names)]
+                param_list = [params.value if isinstance(params, Default) else params for params in param_list]
+                param_settings_list = [param_settings.get(n, {}) for n in param_names]
+                for i in range(len(param_list)):
+                    is_array_like = param_settings_list[i].get('array_like', False)
+                    if is_array_like:
+                        # Array is treated as one value
+                        check_against = (list, tuple, List)
+                    else:
+                        # Array is treated as multiple values
+                        check_against = (list, tuple, List, np.ndarray)
+                    if isinstance(param_list[i], check_against):
+                        param_list[i] = tuple(param_list[i])
+                    else:
+                        param_list[i] = (param_list[i],)
                 if param_product:
                     param_list = create_param_product(param_list)
                 else:
                     param_list = broadcast_params(param_list)
                 if not isinstance(param_list, (tuple, list)):
                     param_list = [param_list]
+
+                # Speed up by pre-calculating raw outputs
                 custom_func_args = args[len(input_names) + len(param_names):]
                 if speed_up:
                     raw_results = cls.run(
@@ -1484,7 +1577,9 @@ class IndicatorFactory:
                         return_raw=True,
                         **kwargs
                     )
-                    kwargs['use_raw'] = raw_results
+                    kwargs['use_raw'] = raw_results  # use them next time
+
+                # Generate indicator instances
                 instances = []
                 if comb_func == itertools.product:
                     param_lists = zip(*comb_func(zip(*param_list), repeat=r))
@@ -1513,7 +1608,8 @@ class IndicatorFactory:
                     Pass `r` to specify how many indicators to run. Pass `short_names` to specify the
                     short name for each indicator. Set `speed_up` to True to first compute raw outputs 
                     for all parameters, and then use them to build each indicator (faster).
-                    Keyword arguments are passed to `{0}.run`.""".format(
+                    
+                    Other keyword arguments are passed to `{0}.run`.""".format(
                     class_name,
                     in_ts_str,
                     param_str,
@@ -1658,7 +1754,15 @@ class IndicatorFactory:
             # Caching
             cache = use_cache
             if cache is None and cache_func is not None:
-                cache = cache_func(*args_before, *input_list, *param_list, *args, *more_args, **_kwargs)
+                cache = cache_func(
+                    *args_before,
+                    *input_list,
+                    *in_output_list,
+                    *param_list,
+                    *args,
+                    *more_args,
+                    **_kwargs
+                )
             if return_cache:
                 return cache
             if cache is None:
@@ -1757,8 +1861,11 @@ class IndicatorFactory:
             short_name=info['name'].lower(),
             input_names=input_names,
             param_names=list(info['parameters'].keys()),
-            param_defaults=info['parameters'],
             output_names=info['output_names'],
             output_flags=info['output_flags']
-        ).from_custom_func(custom_func, **kwargs)
+        ).from_custom_func(
+            custom_func,
+            param_defaults=info['parameters'],
+            **kwargs
+        )
         return TALibIndicator

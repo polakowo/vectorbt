@@ -184,7 +184,7 @@ def generate_rand_nb(shape, n, seed=None):
 
 
 @njit(cache=True)
-def rand_by_prob_choice_nb(col, from_i, to_i, prob, first, temp_int, flex_2d):
+def rand_by_prob_choice_nb(col, from_i, to_i, prob, first, temp_idx_arr, flex_2d):
     """`choice_func_nb` to randomly pick values from range `[from_i, to_i)` with probability `prob`.
 
     `prob` uses flexible indexing."""
@@ -192,11 +192,11 @@ def rand_by_prob_choice_nb(col, from_i, to_i, prob, first, temp_int, flex_2d):
     j = 0
     for i in range(from_i, to_i):
         if np.random.uniform(0, 1) < flex_select_auto_nb(i, col, probs, flex_2d):  # [0, 1)
-            temp_int[j] = i
+            temp_idx_arr[j] = i
             j += 1
             if first:
                 break
-    return temp_int[:j]
+    return temp_idx_arr[:j]
 
 
 @njit
@@ -209,8 +209,8 @@ def generate_rand_by_prob_nb(shape, prob, flex_2d, seed=None):
     See `rand_by_prob_choice_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    temp_int = np.empty(shape[0], dtype=np.int_)
-    return generate_nb(shape, rand_by_prob_choice_nb, prob, False, temp_int, flex_2d)
+    temp_idx_arr = np.empty(shape[0], dtype=np.int_)
+    return generate_nb(shape, rand_by_prob_choice_nb, prob, False, temp_idx_arr, flex_2d)
 
 
 # ############# Random exits ############# #
@@ -233,8 +233,8 @@ def generate_rand_ex_by_prob_nb(entries, prob, wait, flex_2d, seed=None):
     Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    temp_int = np.empty(entries.shape[0], dtype=np.int_)
-    return generate_ex_nb(entries, wait, rand_by_prob_choice_nb, prob, True, temp_int, flex_2d)
+    temp_idx_arr = np.empty(entries.shape[0], dtype=np.int_)
+    return generate_ex_nb(entries, wait, rand_by_prob_choice_nb, prob, True, temp_idx_arr, flex_2d)
 
 
 @njit
@@ -346,12 +346,12 @@ def generate_rand_enex_by_prob_nb(shape, entry_prob, exit_prob, entry_wait, exit
     Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    temp_int = np.empty(shape[0], dtype=np.int_)
+    temp_idx_arr = np.empty(shape[0], dtype=np.int_)
     return generate_enex_nb(
         shape,
         entry_wait, exit_wait,
-        rand_by_prob_choice_nb, (entry_prob, True, temp_int, flex_2d),
-        rand_by_prob_choice_nb, (exit_prob, True, temp_int, flex_2d)
+        rand_by_prob_choice_nb, (entry_prob, True, temp_idx_arr, flex_2d),
+        rand_by_prob_choice_nb, (exit_prob, True, temp_idx_arr, flex_2d)
     )
 
 
@@ -370,7 +370,7 @@ def first_choice_nb(col, from_i, to_i, a):
 
 
 @njit(cache=True)
-def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_int, flex_2d):
+def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_idx_arr, flex_2d):
     """`choice_func_nb` that returns the indices of the stop being reached.
 
     Args:
@@ -388,7 +388,7 @@ def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_int,
 
             Setting False or 0 may result in two signals at one tick.
         first (bool): Whether to stop as soon as the first exit signal is found.
-        temp_int (int): Empty integer array used to temporarily store indices.
+        temp_idx_arr (int): Empty integer array used to temporarily store indices.
         flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`."""
     stops = np.asarray(stop)
     trailings = np.asarray(trailing)
@@ -424,10 +424,10 @@ def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_int,
         else:
             exit_signal = curr_ts <= curr_stop_price
         if exit_signal:
-            temp_int[j] = i
+            temp_idx_arr[j] = i
             j += 1
             if first:
-                return temp_int[:1]
+                return temp_idx_arr[:1]
 
         # Keep track of lowest low and highest high if trailing
         if init_trailing:
@@ -437,7 +437,7 @@ def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_int,
             elif curr_ts > max_high:
                 max_i = i
                 max_high = curr_ts
-    return temp_int[:j]
+    return temp_idx_arr[:j]
 
 
 @njit
@@ -467,8 +467,8 @@ def generate_stop_ex_nb(entries, ts, stop, trailing, wait, first, flex_2d):
                [False],
                [False]])
         ```"""
-    temp_int = np.empty((entries.shape[0],), dtype=np.int_)
-    return generate_ex_nb(entries, wait, stop_choice_nb, ts, stop, trailing, wait, first, temp_int, flex_2d)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_ex_nb(entries, wait, stop_choice_nb, ts, stop, trailing, wait, first, temp_idx_arr, flex_2d)
 
 
 @njit
@@ -476,18 +476,18 @@ def generate_stop_ex_iter_nb(entries, ts, stop, trailing, entry_wait, exit_wait,
     """Generate iteratively using `generate_enex_nb` and `stop_choice_nb`.
 
     Returns two arrays: new entries and exits."""
-    temp_int = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_enex_nb(
         entries.shape,
         entry_wait, exit_wait,
         first_choice_nb, (entries,),
-        stop_choice_nb, (ts, stop, trailing, exit_wait, True, temp_int, flex_2d)
+        stop_choice_nb, (ts, stop, trailing, exit_wait, True, temp_idx_arr, flex_2d)
     )
 
 
 @njit(cache=True)
 def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out, stop_type_out,
-                       sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_int, flex_2d):
+                       sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d):
     """`choice_func_nb` that returns the indices of the stop price being reached.
 
     Compared to `stop_choice_nb`, takes into account the whole bar, can check for both
@@ -527,7 +527,7 @@ def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out,
 
             Setting False or 0 may result in two signals at one tick.
         first (bool): Whether to stop as soon as the first exit signal is found.
-        temp_int (array_like of int): Empty integer array used to temporarily store indices.
+        temp_idx_arr (array_like of int): Empty integer array used to temporarily store indices.
         flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
     """
     sl_stops = np.asarray(sl_stop)
@@ -581,10 +581,10 @@ def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out,
                 hit_price_out[i, col] = curr_tp_stop_price
                 stop_type_out[i, col] = StopType.TakeProfit
         if exit_signal:
-            temp_int[j] = i
+            temp_idx_arr[j] = i
             j += 1
             if first:
-                return temp_int[:1]
+                return temp_idx_arr[:1]
 
         # Keep track of highest high if trailing
         if abs(init_ts_stop) > 0:
@@ -592,7 +592,7 @@ def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out,
                 max_i = i
                 max_p = curr_high
 
-    return temp_int[:j]
+    return temp_idx_arr[:j]
 
 
 @njit
@@ -644,11 +644,11 @@ def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop
                [11],
                [10]])
         ```"""
-    temp_int = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_ex_nb(
         entries, wait, adv_stop_choice_nb,
         open, high, low, close, hit_price_out, stop_type_out,
-        sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_int, flex_2d
+        sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d
     )
 
 
@@ -659,14 +659,14 @@ def generate_adv_stop_ex_iter_nb(entries, open, high, low, close, hit_price_out,
     """Generate iteratively using `generate_enex_nb` and `adv_stop_choice_nb`.
 
     Returns two arrays: new entries and exits."""
-    temp_int = np.empty((entries.shape[0],), dtype=np.int_)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_enex_nb(
         entries.shape,
         entry_wait, exit_wait,
         first_choice_nb, (entries,),
         adv_stop_choice_nb, (
             open, high, low, close, hit_price_out, stop_type_out,
-            sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait, first, temp_int, flex_2d
+            sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait, first, temp_idx_arr, flex_2d
         )
     )
 

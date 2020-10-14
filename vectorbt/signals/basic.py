@@ -1,9 +1,11 @@
 """Signal generators built with `vectorbt.signals.factory.SignalFactory`."""
 
 import numpy as np
+import plotly.graph_objects as go
 
 from vectorbt.utils.config import Config
 from vectorbt.utils.docs import fix_class_for_docs
+from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.nb import (
@@ -13,19 +15,19 @@ from vectorbt.signals.nb import (
     adv_stop_choice_nb
 )
 
-elem_param_config = Config(
+flex_elem_param_config = Config(
     frozen=False,
     **dict(
         array_like=True,  # passing a NumPy array means passing one value, for multiple use list
         bc_to_input=True,  # broadcast to input
         broadcast_kwargs=dict(
-            keep_raw=True  # don't materialize, keep shape for flexible indexing
+            keep_raw=True  # keep original shape for flexible indexing to save memory
         )
     )
 )
 """Config for element-wise parameters."""
 
-col_param_config = Config(
+flex_col_param_config = Config(
     frozen=False,
     **dict(
         array_like=True,
@@ -44,16 +46,17 @@ RAND = SignalFactory(
     class_name='RAND',
     module_name=__name__,
     short_name='rand',
-    param_names=['n'],
-    param_settings=dict(
-        n=col_param_config
-    )
+    param_names=['n']
 ).from_apply_func(  # apply_func since function is (almost) vectorized
     rand_enex_apply_nb,
+    param_settings=dict(
+        n=flex_col_param_config
+    ),
     pass_kwargs=[
         ('entry_wait', 1),
         ('exit_wait', 1)
-    ]
+    ],
+    seed=None
 )
 
 
@@ -62,7 +65,7 @@ class RAND(RAND):
 
     Generates `entries` and `exits` based on `vectorbt.signals.nb.rand_enex_apply_nb`.
 
-    !!! note
+    !!! hint
         Parameter `n` can be either a single value (per frame) or a NumPy array (per column).
         To generate multiple combinations, pass it as a list.
 
@@ -132,23 +135,24 @@ RPROB = SignalFactory(
     class_name='RPROB',
     module_name=__name__,
     short_name='rprob',
-    param_names=['entry_prob', 'exit_prob'],
-    param_settings=dict(
-        entry_prob=elem_param_config,
-        exit_prob=elem_param_config
-    )
+    param_names=['entry_prob', 'exit_prob']
 ).from_choice_func(
     entry_choice_func=rand_by_prob_choice_nb,
     entry_settings=dict(
         pass_params=['entry_prob'],
-        pass_kwargs=['first', 'temp_int', 'flex_2d']
+        pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
     ),
     exit_choice_func=rand_by_prob_choice_nb,
     exit_settings=dict(
         pass_params=['exit_prob'],
-        pass_kwargs=['first', 'temp_int', 'flex_2d']
+        pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
     ),
-    forward_flex_2d=True
+    forward_flex_2d=True,
+    param_settings=dict(
+        entry_prob=flex_elem_param_config,
+        exit_prob=flex_elem_param_config
+    ),
+    seed=None
 )
 
 
@@ -157,7 +161,7 @@ class RPROB(RPROB):
 
     Generates `entries` and `exits` based on `vectorbt.signals.nb.rand_by_prob_choice_nb`.
 
-    !!! note
+    !!! hint
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists.
 
@@ -229,9 +233,6 @@ rprobex_config = Config(
         module_name=__name__,
         short_name='rprobex',
         param_names=['prob'],
-        param_settings=dict(
-            prob=elem_param_config
-        ),
         exit_only=True,
         iteratively=False
     )
@@ -244,9 +245,13 @@ rprobex_func_config = Config(
         exit_choice_func=rand_by_prob_choice_nb,
         exit_settings=dict(
             pass_params=['prob'],
-            pass_kwargs=['first', 'temp_int', 'flex_2d']
+            pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
         ),
-        forward_flex_2d=True
+        forward_flex_2d=True,
+        param_settings=dict(
+            prob=flex_elem_param_config
+        ),
+        seed=None
     )
 )
 """Exit function config for `RPROBEX`."""
@@ -304,10 +309,6 @@ stex_config = Config(
         short_name='stex',
         input_names=['ts'],
         param_names=['stop', 'trailing'],
-        param_settings=dict(
-            stop=elem_param_config,
-            trailing=elem_param_config
-        ),
         exit_only=True,
         iteratively=False
     )
@@ -321,9 +322,13 @@ stex_func_config = Config(
         exit_settings=dict(
             pass_inputs=['ts'],
             pass_params=['stop', 'trailing'],
-            pass_kwargs=['wait', 'first', 'temp_int', 'flex_2d']
+            pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
         ),
-        forward_flex_2d=True
+        forward_flex_2d=True,
+        param_settings=dict(
+            stop=flex_elem_param_config,
+            trailing=flex_elem_param_config
+        ),
     )
 )
 """Exit function config for `STEX`."""
@@ -340,7 +345,7 @@ class STEX(STEX):
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.stop_choice_nb`.
 
-    !!! note
+    !!! hint
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists."""
     pass
@@ -376,29 +381,6 @@ fix_class_for_docs(ISTEX)
 
 # ############# Advanced stop signals ############# #
 
-@property
-def _hit_price_filled(self):
-    """Hit price with empty values replaced by NaN."""
-    hit_price = self.hit_price.copy()
-    hit_price[~self.exits] = np.nan
-    return hit_price
-
-
-@property
-def _stop_type_filled(self):
-    """Stop type with empty values replaced by -1."""
-    stop_type = self.stop_type.copy()
-    stop_type[~self.exits] = -1
-    return stop_type
-
-
-@property
-def _stop_type_readable(self):
-    """Stop type in readable (string) format."""
-    return self.stop_type_filled.applymap(
-        lambda x: StopType._fields[x] if x in StopType else '')
-
-
 advstex_config = Config(
     frozen=False,
     **dict(
@@ -407,23 +389,9 @@ advstex_config = Config(
         short_name='advstex',
         input_names=['open', 'high', 'low', 'close'],
         in_output_names=['hit_price', 'stop_type'],
-        output_settings=dict(
-            stop_type=dict(
-                dtype=np.int_
-            )
-        ),
         param_names=['sl_stop', 'ts_stop', 'tp_stop'],
-        param_settings=dict(stop=elem_param_config),
-        custom_output_funcs={
-            'hit_price_filled': _hit_price_filled,
-            'stop_type_filled': _stop_type_filled,
-            'stop_type_readable': _stop_type_readable
-        },
-        obj_settings=dict(
-            hit_price=dict(create_methods=False),
-            stop_type=dict(create_methods=False),
-            stop_type_filled=dict(create_methods=False),
-            stop_type_readable=dict(create_methods=False)
+        attr_settings=dict(
+            stop_type=dict(dtype=StopType)  # creates rand_type_readable
         ),
         exit_only=True,
         iteratively=False
@@ -439,9 +407,20 @@ advstex_func_config = Config(
             pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
             pass_in_outputs=['hit_price', 'stop_type'],
             pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
-            pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_int', 'flex_2d'],
+            pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
         ),
-        forward_flex_2d=True
+        forward_flex_2d=True,
+        in_output_settings=dict(
+            hit_price=dict(
+                dtype=np.float_
+            ),
+            stop_type=dict(
+                dtype=np.int_
+            )
+        ),
+        param_settings=dict(stop=flex_elem_param_config),  # param per frame/row/col/element
+        hit_price=np.nan,
+        stop_type=-1
     )
 )
 """Exit function config for `ADVSTEX`."""
@@ -453,12 +432,85 @@ ADVSTEX = SignalFactory(
 )
 
 
+def _generate_advstex_plot(base_cls, entries_attr):
+    def plot(self,
+             plot_type=go.Ohlc,
+             ohlc_kwargs=None,
+             entry_trace_kwargs=None,
+             exit_trace_kwargs=None,
+             fig=None,
+             **layout_kwargs):
+        if self.wrapper.ndim > 1:
+            raise TypeError("Select a column first. Use indexing.")
+
+        if fig is None:
+            fig = CustomFigureWidget()
+            fig.update_layout(
+                showlegend=True,
+                xaxis_rangeslider_visible=False,
+                xaxis_showgrid=True,
+                yaxis_showgrid=True
+            )
+        fig.update_layout(**layout_kwargs)
+        if ohlc_kwargs is None:
+            ohlc_kwargs = {}
+
+        # Plot OHLC
+        ohlc = plot_type(
+            x=self.wrapper.index,
+            open=self.open,
+            high=self.high,
+            low=self.low,
+            close=self.close,
+            name='OHLC',
+            increasing_line_color='#1b9e76',
+            decreasing_line_color='#d95f02',
+            opacity=0.7
+        )
+        ohlc.update(**ohlc_kwargs)
+        fig.add_trace(ohlc)
+
+        # Plot entry and exit markers
+        base_cls.plot(
+            self,
+            entry_y=self.open,
+            exit_y=self.hit_price,
+            exit_types=self.stop_type_readable,
+            entry_trace_kwargs=entry_trace_kwargs,
+            exit_trace_kwargs=exit_trace_kwargs,
+            fig=fig
+        )
+        return fig
+
+    plot.__doc__ = """Plot OHLC, `{0}.{1}` and `{0}.exits`.
+    
+    Args:
+        plot_type: Either `plotly.graph_objects.Ohlc` or `plotly.graph_objects.Candlestick`.
+        ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
+        entry_trace_kwargs (dict): Keyword arguments passed to \
+        `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_entry_markers` for `{0}.{1}`.
+        exit_trace_kwargs (dict): Keyword arguments passed to \
+        `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_exit_markers` for `{0}.exits`.
+        fig (plotly.graph_objects.Figure): Figure to add traces to.
+        **layout_kwargs: Keyword arguments for layout.""".format(base_cls.__name__, entries_attr)
+
+    if entries_attr == 'entries':
+        plot.__doc__ += """
+    Example:
+        ```python-repl
+        >>> advstex.iloc[:, 0].plot()
+        ```
+        
+        ![](/vectorbt/docs/img/advstex.png)"""
+    return plot
+
+
 class ADVSTEX(ADVSTEX):
     """Advanced exit signal generator based on stop values.
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.adv_stop_choice_nb`.
 
-    !!! note
+    !!! hint
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists.
 
@@ -517,7 +569,8 @@ class ADVSTEX(ADVSTEX):
         3                          TrailStop
         4                StopLoss
         ```"""
-    pass
+
+    plot = _generate_advstex_plot(ADVSTEX, 'entries')
 
 
 fix_class_for_docs(ADVSTEX)
@@ -542,7 +595,8 @@ class IADVSTEX(IADVSTEX):
     `vectorbt.signals.nb.adv_stop_choice_nb`.
 
     See `ADVSTEX` for notes on parameters."""
-    pass
+
+    plot = _generate_advstex_plot(IADVSTEX, 'new_entries')
 
 
 fix_class_for_docs(IADVSTEX)

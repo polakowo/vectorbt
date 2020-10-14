@@ -10,6 +10,7 @@
 import numpy as np
 from numba import njit
 
+from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
 
 # ############# Financial risk and performance metrics ############# #
@@ -37,13 +38,13 @@ def cum_returns_1d_nb(returns, start_value=0.):
 
 
 @njit(cache=True)
-def cum_returns_nb(returns, start_value_arr):
-    """2-dim version of `cum_returns_1d_nb`.
-
-    `start_value_arr` should be an array of shape `returns.shape[1]`."""
+def cum_returns_nb(returns, start_value):
+    """2-dim version of `cum_returns_1d_nb`."""
+    start_value_arr = np.asarray(start_value)
     out = np.empty_like(returns, dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[:, col] = cum_returns_1d_nb(returns[:, col], start_value=start_value_arr[col])
+        _start_value = flex_select_auto_nb(0, col, start_value_arr, True)
+        out[:, col] = cum_returns_1d_nb(returns[:, col], start_value=_start_value)
     return out
 
 
@@ -57,13 +58,15 @@ def cum_returns_final_1d_nb(returns, start_value=0.):
 
 
 @njit(cache=True)
-def cum_returns_final_nb(returns, start_value_arr):
+def cum_returns_final_nb(returns, start_value):
     """2-dim version of `cum_returns_final_1d_nb`.
 
     `start_value_arr` should be an array of shape `returns.shape[1]`."""
+    start_value_arr = np.asarray(start_value)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = cum_returns_final_1d_nb(returns[:, col], start_value=start_value_arr[col])
+        _start_value = flex_select_auto_nb(0, col, start_value_arr, True)
+        out[col] = cum_returns_final_1d_nb(returns[:, col], start_value=_start_value)
     return out
 
 
@@ -93,13 +96,15 @@ def annualized_volatility_1d_nb(returns, ann_factor, levy_alpha=2.0):
 
 
 @njit(cache=True)
-def annualized_volatility_nb(returns, ann_factor, levy_alpha_arr):
+def annualized_volatility_nb(returns, ann_factor, levy_alpha):
     """2-dim version of `annualized_volatility_1d_nb`.
 
     `levy_alpha_arr` should be an array of shape `returns.shape[1]`."""
+    levy_alpha_arr = np.asarray(levy_alpha)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = annualized_volatility_1d_nb(returns[:, col], ann_factor, levy_alpha=levy_alpha_arr[col])
+        _levy_alpha = flex_select_auto_nb(0, col, levy_alpha_arr, True)
+        out[col] = annualized_volatility_1d_nb(returns[:, col], ann_factor, levy_alpha=_levy_alpha)
     return out
 
 
@@ -172,14 +177,18 @@ def omega_ratio_1d_nb(returns, ann_factor, risk_free=0., required_return=0.):
 
 
 @njit(cache=True)
-def omega_ratio_nb(returns, ann_factor, risk_free_arr, required_return_arr):
+def omega_ratio_nb(returns, ann_factor, risk_free, required_return):
     """2-dim version of `omega_ratio_1d_nb`.
 
     `risk_free_arr` and `required_return_arr` should be arrays of shape `returns.shape[1]`."""
+    risk_free_arr = np.asarray(risk_free)
+    required_return_arr = np.asarray(required_return)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
+        _risk_free = flex_select_auto_nb(0, col, risk_free_arr, True)
+        _required_return = flex_select_auto_nb(0, col, required_return_arr, True)
         out[col] = omega_ratio_1d_nb(
-            returns[:, col], ann_factor, risk_free=risk_free_arr[col], required_return=required_return_arr[col])
+            returns[:, col], ann_factor, risk_free=_risk_free, required_return=_required_return)
     return out
 
 
@@ -198,13 +207,15 @@ def sharpe_ratio_1d_nb(returns, ann_factor, risk_free=0.):
 
 
 @njit(cache=True)
-def sharpe_ratio_nb(returns, ann_factor, risk_free_arr):
+def sharpe_ratio_nb(returns, ann_factor, risk_free):
     """2-dim version of `sharpe_ratio_1d_nb`.
 
     `risk_free_arr` should be an array of shape `returns.shape[1]`."""
+    risk_free_arr = np.asarray(risk_free)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = sharpe_ratio_1d_nb(returns[:, col], ann_factor, risk_free=risk_free_arr[col])
+        _risk_free = flex_select_auto_nb(0, col, risk_free_arr, True)
+        out[col] = sharpe_ratio_1d_nb(returns[:, col], ann_factor, risk_free=_risk_free)
     return out
 
 
@@ -217,13 +228,15 @@ def downside_risk_1d_nb(returns, ann_factor, required_return=0.):
 
 
 @njit(cache=True)
-def downside_risk_nb(returns, ann_factor, required_return_arr):
+def downside_risk_nb(returns, ann_factor, required_return):
     """2-dim version of `downside_risk_1d_nb`.
 
     `required_return_arr` should be an array of shape `returns.shape[1]`."""
+    required_return_arr = np.asarray(required_return)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = downside_risk_1d_nb(returns[:, col], ann_factor, required_return=required_return_arr[col])
+        _required_return = flex_select_auto_nb(0, col, required_return_arr, True)
+        out[col] = downside_risk_1d_nb(returns[:, col], ann_factor, required_return=_required_return)
     return out
 
 
@@ -242,13 +255,15 @@ def sortino_ratio_1d_nb(returns, ann_factor, required_return=0.):
 
 
 @njit(cache=True)
-def sortino_ratio_nb(returns, ann_factor, required_return_arr):
+def sortino_ratio_nb(returns, ann_factor, required_return):
     """2-dim version of `sortino_ratio_1d_nb`.
 
     `required_return_arr` should be an array of shape `returns.shape[1]`."""
+    required_return_arr = np.asarray(required_return)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = sortino_ratio_1d_nb(returns[:, col], ann_factor, required_return=required_return_arr[col])
+        _required_return = flex_select_auto_nb(0, col, required_return_arr, True)
+        out[col] = sortino_ratio_1d_nb(returns[:, col], ann_factor, required_return=_required_return)
     return out
 
 
@@ -316,13 +331,15 @@ def alpha_1d_nb(returns, factor_returns, ann_factor, risk_free=0.):
 
 
 @njit(cache=True)
-def alpha_nb(returns, factor_returns, ann_factor, risk_free_arr):
+def alpha_nb(returns, factor_returns, ann_factor, risk_free):
     """2-dim version of `alpha_1d_nb`.
 
     `risk_free_arr` should be an array of shape `returns.shape[1]`."""
+    risk_free_arr = np.asarray(risk_free)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = alpha_1d_nb(returns[:, col], factor_returns[:, col], ann_factor, risk_free=risk_free_arr[col])
+        _risk_free = flex_select_auto_nb(0, col, risk_free_arr, True)
+        out[col] = alpha_1d_nb(returns[:, col], factor_returns[:, col], ann_factor, risk_free=_risk_free)
     return out
 
 
@@ -358,13 +375,15 @@ def value_at_risk_1d_nb(returns, cutoff=0.05):
 
 
 @njit(cache=True)
-def value_at_risk_nb(returns, cutoff_arr):
+def value_at_risk_nb(returns, cutoff):
     """2-dim version of `value_at_risk_1d_nb`.
 
     `cutoff_arr` should be an array of shape `returns.shape[1]`."""
+    cutoff_arr = np.asarray(cutoff)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = value_at_risk_1d_nb(returns[:, col], cutoff=cutoff_arr[col])
+        _cutoff = flex_select_auto_nb(0, col, cutoff_arr, True)
+        out[col] = value_at_risk_1d_nb(returns[:, col], cutoff=_cutoff)
     return out
 
 
@@ -376,13 +395,15 @@ def conditional_value_at_risk_1d_nb(returns, cutoff=0.05):
 
 
 @njit(cache=True)
-def conditional_value_at_risk_nb(returns, cutoff_arr):
+def conditional_value_at_risk_nb(returns, cutoff):
     """2-dim version of `conditional_value_at_risk_1d_nb`.
 
     `cutoff_arr` should be an array of shape `returns.shape[1]`."""
+    cutoff_arr = np.asarray(cutoff)
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = conditional_value_at_risk_1d_nb(returns[:, col], cutoff=cutoff_arr[col])
+        _cutoff = flex_select_auto_nb(0, col, cutoff_arr, True)
+        out[col] = conditional_value_at_risk_1d_nb(returns[:, col], cutoff=_cutoff)
     return out
 
 
