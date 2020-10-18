@@ -222,9 +222,9 @@ dtype: bool
     - Provides metrics and tools for analyzing returns, orders, trades and positions
     
 ```python-repl
->>> price = pd.Series([1., 2., 3., 2., 1.])
->>> entries = pd.Series([True, False, True, False, False])
->>> exits = pd.Series([False, True, False, True, False])
+>>> price = [1., 2., 3., 2., 1.]
+>>> entries = [True, False, True, False, False]
+>>> exits = [False, True, False, True, False]
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
 >>> portfolio.trades().plot()
 ```
@@ -237,7 +237,7 @@ dtype: bool
     - Each allows arbitrary parameter combinations, from arrays to Cartesian products
     
 ```python-repl
->>> vbt.MA.run(pd.Series([1, 2, 3]), window=[2, 3], ewm=[False, True]).ma
+>>> vbt.MA.run([1, 2, 3], window=[2, 3], ewm=[False, True]).ma
 ma_window     2         3
 ma_ewm    False      True 
 0           NaN       NaN
@@ -250,7 +250,7 @@ ma_ewm    False      True
     
 ```python-repl
 >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
->>> SMA.run(pd.Series([1., 2., 3.]), timeperiod=[2, 3]).real
+>>> SMA.run([1., 2., 3.], timeperiod=[2, 3]).real
 sma_timeperiod    2    3
 0               NaN  NaN
 1               1.5  NaN

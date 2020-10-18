@@ -380,7 +380,7 @@ class Portfolio(Configured, PandasIndexer):
         is enabled, will share the cash among all columns in the group.
 
         Args:
-            close (pandas_like): Reference price, such as close. Will broadcast.
+            close (array_like): Reference price, such as close. Will broadcast.
 
                 Will be used for calculating unrealized P&L and portfolio value.
             entries (array_like of bool): Boolean array of entry signals. Will broadcast.
@@ -589,7 +589,6 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(close, (pd.Series, pd.DataFrame))
         checks.assert_subdtype(close, np.floating)
         checks.assert_dtype(entries, np.bool)
         checks.assert_dtype(exits, np.bool)
@@ -611,6 +610,8 @@ class Portfolio(Configured, PandasIndexer):
         close, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, reject_prob = \
             broadcast(close, entries, exits, size, entry_price, exit_price, fees, fixed_fees,
                 slippage, reject_prob, **broadcast_kwargs, keep_raw=keep_raw)
+        if not checks.is_pandas(close):
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -665,7 +666,7 @@ class Portfolio(Configured, PandasIndexer):
         for `order_price`.
 
         Args:
-            close (pandas_like): Reference price, such as close. Will broadcast.
+            close (array_like): Reference price, such as close. Will broadcast.
 
                 Will be used for calculating unrealized P&L and portfolio value.
             order_size (float or array_like): Size to order. Will broadcast.
@@ -859,7 +860,6 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(close, (pd.Series, pd.DataFrame))
         checks.assert_subdtype(close, np.floating)
         checks.assert_subdtype(order_size, np.floating)
         checks.assert_subdtype(size_type, np.integer)
@@ -880,6 +880,8 @@ class Portfolio(Configured, PandasIndexer):
         close, order_size, size_type, order_price, fees, fixed_fees, slippage, reject_prob, val_price = \
             broadcast(close, order_size, size_type, order_price, fees, fixed_fees, slippage,
                       reject_prob, val_price, **broadcast_kwargs, keep_raw=keep_raw)
+        if not checks.is_pandas(close):
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -934,7 +936,7 @@ class Portfolio(Configured, PandasIndexer):
         if `row_wise` is True, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
 
         Args:
-            close (pandas_like): Reference price, such as close. Will broadcast to `target_shape`.
+            close (array_like): Reference price, such as close. Will broadcast to `target_shape`.
 
                 Will be used for calculating unrealized P&L and portfolio value.
 
@@ -1058,12 +1060,15 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(close, (pd.Series, pd.DataFrame))
         checks.assert_subdtype(close, np.floating)
         checks.assert_subdtype(init_cash, np.floating)
         checks.assert_subdtype(call_seq, np.integer)
 
         # Broadcast inputs
+        if not checks.is_pandas(close):
+            if not checks.is_array(close):
+                close = np.asarray(close)
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
         if close.shape != target_shape:
             if len(close.vbt.columns) <= target_shape_2d[1]:
