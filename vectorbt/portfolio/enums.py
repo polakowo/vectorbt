@@ -379,6 +379,6 @@ __pdoc__['OrderResult.size'] = "Filled size in shares."
 __pdoc__['OrderResult.price'] = "Filled price per share, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `vectorbt.records.enums.OrderSide`."
-__pdoc__['OrderResult.status'] = "See `vectorbt.records.enums.OrderStatus`."
+__pdoc__['OrderResult.status'] = "See `OrderStatus`."
 
 RejectedOrder = OrderResult(np.nan, np.nan, np.nan, -1, OrderStatus.Rejected)

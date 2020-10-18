@@ -427,6 +427,14 @@ class TestChecks:
         with pytest.raises(Exception) as e_info:
             checks.assert_equal(0, 1)
 
+    def test_assert_dict_valid(self):
+        checks.assert_dict_valid(dict(a=2, b=3), [['a', 'b', 'c']])
+        with pytest.raises(Exception) as e_info:
+            checks.assert_dict_valid(dict(a=2, b=3, d=4), [['a', 'b', 'c']])
+        checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, e=5)), [['a', 'b', 'c'], ['d', 'e']])
+        with pytest.raises(Exception) as e_info:
+            checks.assert_dict_valid(dict(a=2, b=3, c=dict(d=4, f=5)), [['a', 'b', 'c'], ['d', 'e']])
+
 
 # ############# math.py ############# #
 

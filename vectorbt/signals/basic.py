@@ -25,7 +25,7 @@ flex_elem_param_config = Config(
         )
     )
 )
-"""Config for element-wise parameters."""
+"""Config for flexible element-wise parameters."""
 
 flex_col_param_config = Config(
     frozen=False,
@@ -37,7 +37,7 @@ flex_col_param_config = Config(
         )
     )
 )
-"""Config for column-wise parameters."""
+"""Config for flexible column-wise parameters."""
 
 # ############# Random signals ############# #
 
@@ -329,6 +329,7 @@ stex_func_config = Config(
             stop=flex_elem_param_config,
             trailing=flex_elem_param_config
         ),
+        trailing=False
     )
 )
 """Exit function config for `STEX`."""
@@ -419,6 +420,9 @@ advstex_func_config = Config(
             )
         ),
         param_settings=dict(stop=flex_elem_param_config),  # param per frame/row/col/element
+        sl_stop=0.,
+        ts_stop=0.,
+        tp_stop=0.,
         hit_price=np.nan,
         stop_type=-1
     )

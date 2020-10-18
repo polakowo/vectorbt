@@ -48,7 +48,7 @@ MA = IndicatorFactory(
 ).from_apply_func(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
-    param_defaults={'ewm': False}
+    ewm=False
 )
 
 
@@ -109,7 +109,7 @@ MSTD = IndicatorFactory(
 ).from_apply_func(
     nb.mstd_apply_nb,
     cache_func=nb.mstd_cache_nb,
-    param_defaults={'ewm': False}
+    ewm=False
 )
 
 
@@ -168,7 +168,9 @@ BBANDS = IndicatorFactory(
 ).from_apply_func(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
-    param_defaults={'window': 20, 'ewm': False, 'alpha': 2}
+    window=20,
+    ewm=False,
+    alpha=2
 )
 
 
@@ -257,7 +259,8 @@ RSI = IndicatorFactory(
 ).from_apply_func(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
-    param_defaults={'window': 14, 'ewm': False}
+    window=14,
+    ewm=False
 )
 
 
@@ -332,7 +335,9 @@ STOCH = IndicatorFactory(
 ).from_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
-    param_defaults={'k_window': 14, 'd_window': 3, 'd_ewm': False}
+    k_window=14,
+    d_window=3,
+    d_ewm=False
 )
 
 
@@ -421,7 +426,11 @@ MACD = IndicatorFactory(
 ).from_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
-    param_defaults={'fast_window': 26, 'slow_window': 12, 'signal_window': 9, 'macd_ewm': True, 'signal_ewm': True},
+    fast_window=26,
+    slow_window=12,
+    signal_window=9,
+    macd_ewm=False,
+    signal_ewm=False
 )
 
 
@@ -506,7 +515,7 @@ ATR = IndicatorFactory(
 ).from_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
-    param_defaults={'ewm': True}
+    ewm=False
 )
 
 

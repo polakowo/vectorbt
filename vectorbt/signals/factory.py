@@ -206,8 +206,6 @@ class SignalFactory(IndicatorFactory):
 
         Args:
             *args: Should be used instead of `exit_args` when `exit_only` is True.
-            input_shape (tuple): Input shape if no input time series passed.
-            flex_2d (bool): Whether arguments used in flexible indexing should be treated as 2D.
             entry_args (tuple): Arguments passed to the entry choice function.
             exit_args (tuple): Arguments passed to the exit choice function.
             cache_args (tuple): Arguments passed to the cache function.
@@ -404,7 +402,7 @@ class SignalFactory(IndicatorFactory):
                         'pass_kwargs',
                         'pass_cache'
                 ):
-                    raise ValueError(f"Unrecognized key {k} in function settings")
+                    raise ValueError(f"Can't find key {k} in function settings")
 
         _check_settings(entry_settings)
         _check_settings(exit_settings)

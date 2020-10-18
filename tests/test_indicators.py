@@ -548,11 +548,11 @@ class TestFactory:
             ], names=['custom_p1', 'custom_p2', None])
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, param_defaults={'p2': 2}, hide_default=False).run(ts, [0, 1]).out,
+            F.from_apply_func(apply_func, p2=2, hide_default=False).run(ts, [0, 1]).out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, param_defaults={'p2': 2}, hide_default=False).run(ts, [0, 1]).out,
+            F.from_apply_func(apply_func_nb, p2=2, hide_default=False).run(ts, [0, 1]).out,
             target
         )
 
@@ -569,10 +569,10 @@ class TestFactory:
     def test_hide_default(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
 
-        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, param_defaults={'p2': 2}, hide_default=False) \
+        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, p2=2, hide_default=False) \
                    .run(ts, [0, 1]) \
                    .out.columns.names == ['custom_p1', 'custom_p2', None]
-        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, param_defaults={'p2': 2}, hide_default=True) \
+        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, p2=2, hide_default=True) \
                    .run(ts, [0, 1]) \
                    .out.columns.names == ['custom_p1', None]
 

@@ -115,9 +115,8 @@ configuration, you can either use the `run` method (as we did above) or the `run
 
 ### run method
 
-The main method to run an indicator is `run` that accepts 1) input time series, 2) parameters
-(either positional arguments or keyword arguments if you specified `param_defaults`), and 3)
-other arguments that are accepted by the calculation function.
+The main method to run an indicator is `run` that accepts 1) input time series, 2) parameters,
+and 3) other arguments that are accepted by the calculation function.
 
 Input time series can have any shape as long as they are Series or DataFrames. Passing multiple time
 series with different shapes will broadcast them to a single shape.
@@ -364,6 +363,7 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
     new_param_list = []
     for i, params in enumerate(param_list):
         _param_settings = param_settings if isinstance(param_settings, dict) else param_settings[i]
+        checks.assert_dict_valid(_param_settings, [['array_like', 'bc_to_input', 'broadcast_kwargs']])
         is_array_like = _param_settings.get('array_like', False)
         bc_to_input = _param_settings.get('bc_to_input', False)
         broadcast_kwargs = _param_settings.get('broadcast_kwargs', dict(require_kwargs=dict(requirements='W')))
@@ -464,6 +464,7 @@ def run_pipeline(
         return_raw=False,
         use_raw=None,
         wrapper_kwargs=None,
+        seed=None,
         **kwargs):
     """A pipeline for calculating an indicator, used by `IndicatorFactory`.
 
@@ -490,7 +491,7 @@ def run_pipeline(
 
             Following keys are accepted:
 
-            * `dtype`: Create this array using this data type and `np.empty`. Default is `np.float_`.
+            * `dtype`: Create this array using this data type and `np.empty`. Default is None.
         broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`
             to broadcast inputs.
         param_list (list of array_like): A list of parameters.
@@ -521,6 +522,7 @@ def run_pipeline(
         return_raw (bool): Whether to return raw output without post-processing and hashed parameter tuples.
         use_raw (bool): Takes the raw results and uses them instead of running `custom_func`.
         wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
+        seed (int): Set seed to make output deterministic.
         **kwargs: Keyword arguments passed to the `custom_func`.
 
             Some common arguments include `return_cache` to return cache and `use_cache` to use cache.
@@ -717,7 +719,8 @@ def run_pipeline(
             j += 1
         else:
             _in_output_settings = in_output_settings if isinstance(in_output_settings, dict) else in_output_settings[i]
-            dtype = _in_output_settings.get('dtype', np.float_)
+            checks.assert_dict_valid(_in_output_settings, [['dtype']])
+            dtype = _in_output_settings.get('dtype', None)
             in_output_shape = (input_shape_passed[0], input_shape_passed[1] * n_param_values)
             in_output = np.empty(in_output_shape, dtype=dtype)
         in_output_list[i] = in_output
@@ -742,6 +745,10 @@ def run_pipeline(
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs['flex_2d'] = len(input_shape) == 2
         func_kwargs = merge_kwargs(func_kwargs, kwargs)
+
+        # Set seed
+        if seed is not None:
+            set_seed(seed)
 
         # Run the function
         if pass_lists:
@@ -972,9 +979,7 @@ class IndicatorFactory:
             output_flags = {}
         checks.assert_type(output_flags, dict)
         if len(output_flags) > 0:
-            for output_name in output_flags:
-                if output_name not in output_names:
-                    raise ValueError(f"Can't find key {output_name} in any output names")
+            checks.assert_dict_valid(output_flags, [output_names])
         self.output_flags = output_flags
 
         if custom_output_funcs is None:
@@ -985,10 +990,9 @@ class IndicatorFactory:
         if attr_settings is None:
             attr_settings = {}
         checks.assert_type(attr_settings, dict)
+        all_attr_names = input_names + output_names + list(custom_output_funcs.keys())
         if len(attr_settings) > 0:
-            for attr in attr_settings:
-                if attr not in set(input_names + output_names + list(custom_output_funcs.keys())):
-                    raise ValueError(f"Can't find key {attr} in any names")
+            checks.assert_dict_valid(attr_settings, [all_attr_names])
         self.attr_settings = attr_settings
 
         # Add indexing methods
@@ -1159,9 +1163,9 @@ class IndicatorFactory:
             setattr(CustomIndicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
-        all_attr_names = set(input_names + output_names + list(custom_output_funcs.keys()))
         for attr_name in all_attr_names:
             _attr_settings = attr_settings.get(attr_name, {})
+            checks.assert_dict_valid(_attr_settings, [['dtype']])
             dtype = _attr_settings.get('dtype', np.float_)
 
             def _isinstance_namedtuple(obj) -> bool:
@@ -1254,7 +1258,6 @@ class IndicatorFactory:
 
     def from_custom_func(self,
                          custom_func,
-                         param_defaults=None,
                          param_settings=None,
                          in_output_settings=None,
                          hide_params=None,
@@ -1282,10 +1285,6 @@ class IndicatorFactory:
                 and other objects that are then returned with the indicator class instance.
 
                 Can be Numba-compiled.
-            param_defaults (dict): A dictionary of parameter defaults.
-
-                !!! note
-                    Params with defaults should be on the right in `param_names`.
             param_settings (dict): A dictionary of settings by parameter name.
 
                 See `run_pipeline` for keys.
@@ -1296,7 +1295,11 @@ class IndicatorFactory:
             hide_default (bool): Whether to hide column levels of parameters with default value.
             **pipeline_kwargs: Keyword arguments passed to `run_pipeline`.
 
-                Can also be default keyword arguments passed to the `custom_func`.
+                Can be default values for `param_names` and `in_output_names`, but also custom keyword
+                arguments passed to the `custom_func`.
+
+                !!! note
+                    Default parameters should be on the right in `param_names`.
         Returns:
             `CustomIndicator`, and optionally other objects that are returned by `custom_func`
             and exceed `output_names`.
@@ -1349,16 +1352,6 @@ class IndicatorFactory:
         output_names = self.output_names
         in_output_names = self.in_output_names
 
-        if param_defaults is None:
-            param_defaults = {}
-        checks.assert_type(param_defaults, dict)
-        if len(param_defaults) > 0:
-            for param_name in param_defaults:
-                if param_name not in param_names:
-                    raise ValueError(f"Can't find key {param_name} in param_names")
-            if sorted(param_names[-len(param_defaults):]) != sorted(param_defaults.keys()):
-                raise ValueError("Params with defaults should be on the right in param_names")
-
         if param_settings is None:
             param_settings = {}
         checks.assert_type(param_settings, dict)
@@ -1367,42 +1360,45 @@ class IndicatorFactory:
             in_output_settings = {}
         checks.assert_type(in_output_settings, dict)
         if len(in_output_settings) > 0:
-            for in_output_name in in_output_settings:
-                if in_output_name not in in_output_names:
-                    raise ValueError(f"Can't find key {in_output_name} in in_output_names")
+            checks.assert_dict_valid(in_output_settings, [in_output_names])
 
         if hide_params is None:
             hide_params = []
+        for k, v in pipeline_kwargs.items():
+            if k in param_names and not isinstance(v, Default):
+                pipeline_kwargs[k] = Default(v)  # track default params
+        pipeline_kwargs = merge_kwargs({k: None for k in in_output_names}, pipeline_kwargs)
 
         # Add private run method
         def_run_kwargs = dict(
             short_name=short_name,
             hide_params=hide_params,
             hide_default=hide_default,
-            **merge_kwargs({n: None for n in in_output_names}, pipeline_kwargs)
+            **pipeline_kwargs
         )
 
         @classmethod
         def _run(cls, *args, **kwargs):
-            _short_name = kwargs.pop('short_name')
-            _hide_params = kwargs.pop('hide_params')
-            _hide_default = kwargs.pop('hide_default')
+            _short_name = kwargs.pop('short_name', def_run_kwargs['short_name'])
+            _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
+            _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
 
-            if len(args) < len(input_names) + len(param_names):
-                nmissed = len(input_names) + len(param_names) - len(args)
-                raise ValueError(f"Missing {nmissed} required positional arguments")
             args = list(args)
 
             # Extract inputs
             input_list = args[:len(input_names)]
+            checks.assert_len_equal(input_list, input_names)
+            args = args[len(input_names):]
 
             # Extract params
-            param_list = args[len(input_names):len(input_names) + len(param_names)]
+            param_list = args[:len(param_names)]
+            checks.assert_len_equal(param_list, param_names)
+            args = args[len(param_names):]
 
-            # Extract in-place outputs (optional)
-            in_output_list = []
-            for output_name in in_output_names:
-                in_output_list.append(kwargs.pop(output_name, None))
+            # Extract in-place outputs
+            in_output_list = args[:len(in_output_names)]
+            checks.assert_len_equal(in_output_list, in_output_names)
+            args = args[len(in_output_names):]
 
             # Prepare column levels
             level_names = []
@@ -1410,23 +1406,16 @@ class IndicatorFactory:
             for i, pname in enumerate(param_names):
                 level_name = _short_name + '_' + pname if prepend_name else pname
                 level_names.append(level_name)
-                if pname in _hide_params:
+                if pname in _hide_params or (_hide_default and isinstance(param_list[i], Default)):
                     hide_levels.append(level_name)
-                elif _hide_default and pname in param_defaults:
-                    # Hide parameters with default value
-                    if isinstance(param_list[i], Default):
-                        hide_levels.append(level_name)
             level_names = list(level_names)
             param_list = [params.value if isinstance(params, Default) else params for params in param_list]
-
-            # Extract positional arguments for the custom function
-            custom_func_args = args[len(input_names) + len(param_names):]
 
             # Run the pipeline
             results = run_pipeline(
                 len(output_names) - len(in_output_names),  # number of returned outputs
                 custom_func,
-                *custom_func_args,
+                *args,
                 input_list=input_list,
                 in_output_list=in_output_list,
                 param_list=param_list,
@@ -1464,25 +1453,32 @@ class IndicatorFactory:
         # Add public run method
         # Create function dynamically to provide user with a proper signature
         def compile_run_function(func_name, docstring, default_kwargs):
-            pos_params = param_names[:len(param_names) - len(param_defaults)]
-            all_param_tuples = [
-                (param_names[i], param_defaults[param_names[i]])
-                for i in range(-len(param_defaults), 0)
-            ]
-            param_kwargs_str = ['{}=Default({})'.format(k, v) for k, v in all_param_tuples]
-            param_kwarg_names = [param_names[i] for i in range(-len(param_defaults), 0)]
-            default_kwargs_str = ['{}={}'.format(k, k) for k, v in default_kwargs.items()]
-            first_arg = input_names + pos_params + param_kwargs_str
+            pos_names = []
+            main_kw_names = []
+            other_kw_names = []
+            for k in input_names + param_names:
+                if k in default_kwargs:
+                    main_kw_names.append(k)
+                else:
+                    pos_names.append(k)
+            main_kw_names.extend(in_output_names)  # in_output_names are keyword-only
+            for k, v in default_kwargs.items():
+                if k not in pos_names and k not in main_kw_names:
+                    other_kw_names.append(k)
+
+            first_arg = pos_names
             first_arg = ', '.join(first_arg) + ', ' if len(first_arg) > 0 else ''
-            second_arg = default_kwargs_str
+            second_arg = ['{}={}'.format(k, k) for k in main_kw_names + other_kw_names]
             second_arg = ', '.join(second_arg) + ', ' if len(second_arg) > 0 else ''
-            fourth_arg = input_names + pos_params + param_kwarg_names
+            fourth_arg = input_names + param_names + in_output_names
             fourth_arg = ', '.join(fourth_arg) + ', ' if len(fourth_arg) > 0 else ''
+            fifth_arg = ['{}={}'.format(k, k) for k in other_kw_names]
+            fifth_arg = ', '.join(fifth_arg) + ', ' if len(fifth_arg) > 0 else ''
             func_str = "@classmethod\n" \
                 "def {0}(cls, {1}*args, {2}**kwargs):\n" \
                 "    \"\"\"{3}\"\"\"\n" \
-                "    return cls._{0}({4}*args, {2}**kwargs)".format(
-                    func_name, first_arg, second_arg, docstring, fourth_arg
+                "    return cls._{0}({4}*args, {5}**kwargs)".format(
+                    func_name, first_arg, second_arg, docstring, fourth_arg, fifth_arg
             )
             scope = {**dict(Default=Default), **default_kwargs}
             filename = inspect.getfile(lambda: None)
@@ -1530,23 +1526,33 @@ class IndicatorFactory:
                 param_product=False,
                 comb_func=itertools.combinations,
                 speed_up=True,
-                short_names=None
+                short_names=None,
+                **pipeline_kwargs
             )
 
             @classmethod
             def _run_combs(cls, *args, **kwargs):
-                r = kwargs.pop('r')
-                param_product = kwargs.pop('param_product')
-                comb_func = kwargs.pop('comb_func')
-                speed_up = kwargs.pop('speed_up')
-                short_names = kwargs.pop('short_names')
+                r = kwargs.pop('r', def_run_combs_kwargs['r'])
+                param_product = kwargs.pop('param_product', def_run_combs_kwargs['param_product'])
+                comb_func = kwargs.pop('comb_func', def_run_combs_kwargs['comb_func'])
+                speed_up = kwargs.pop('speed_up', def_run_combs_kwargs['speed_up'])
+                short_names = kwargs.pop('short_names', def_run_combs_kwargs['short_names'])
 
-                # Build list of all parameter combinations
                 if short_names is None:
                     short_names = [f'{short_name}_{str(i + 1)}' for i in range(r)]
+
+                # Extract inputs
                 input_list = args[:len(input_names)]
-                param_list = args[len(input_names):len(input_names) + len(param_names)]
+                checks.assert_len_equal(input_list, input_names)
+                args = args[len(input_names):]
+
+                # Extract params
+                param_list = args[:len(param_names)]
                 param_list = [params.value if isinstance(params, Default) else params for params in param_list]
+                checks.assert_len_equal(param_list, param_names)
+                args = args[len(param_names):]
+
+                # Prepare params
                 param_settings_list = [param_settings.get(n, {}) for n in param_names]
                 for i in range(len(param_list)):
                     is_array_like = param_settings_list[i].get('array_like', False)
@@ -1568,12 +1574,11 @@ class IndicatorFactory:
                     param_list = [param_list]
 
                 # Speed up by pre-calculating raw outputs
-                custom_func_args = args[len(input_names) + len(param_names):]
                 if speed_up:
-                    raw_results = cls.run(
+                    raw_results = cls._run(
                         *input_list,
                         *param_list,
-                        *custom_func_args,
+                        *args,
                         return_raw=True,
                         **kwargs
                     )
@@ -1586,10 +1591,10 @@ class IndicatorFactory:
                 else:
                     param_lists = zip(*comb_func(zip(*param_list), r))
                 for i, param_list in enumerate(param_lists):
-                    instances.append(cls.run(
+                    instances.append(cls._run(
                         *input_list,
                         *zip(*param_list),
-                        *custom_func_args,
+                        *args,
                         short_name=short_names[i],
                         **kwargs
                     ))
@@ -1865,7 +1870,7 @@ class IndicatorFactory:
             output_flags=info['output_flags']
         ).from_custom_func(
             custom_func,
-            param_defaults=info['parameters'],
+            **info['parameters'],
             **kwargs
         )
         return TALibIndicator

@@ -6,14 +6,16 @@
 
 ![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/logo.png)
 
-vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy, and is accelerated 
-by [Numba](https://github.com/numba/numba) to analyze trading strategies at speed and scale :fire:
+vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
+accelerated by [Numba](https://github.com/numba/numba) to analyze trading strategies at speed and scale :fire:
 
-It follows a unique approach to backtesting that builds upon vectorized matrix calculations and fast iterative 
-processing with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) 
-and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin to 
-Tableau right in the Jupyter notebook. Due to its high processing performance, vectorbt is able to process data 
-on the fly and thus enable the user to interact with data-hungry widgets without significant delays.
+In contrast to conventional libraries, vectorbt tries to represent trading data as nd-arrays.
+This enables superfast computation using vectorized operations with NumPy and non-vectorized but compiled 
+operations with Numba, for example, for hyperparameter optimization. It also integrates 
+[plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) 
+to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to its high 
+performance, vectorbt is able to process large amounts of data without GPU or parallelization (both are work 
+in progress), and enable the user to interact with data-hungry widgets without significant delays.
 
 With vectorbt you can
 * Analyze and engineer features for any time series data
@@ -98,11 +100,11 @@ instruments in little time, to explore where your strategy performs best and to 
 
 Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Moving_average_crossover) strategy 
 for example. By calculating the performance of each reasonable window combination and plotting the whole thing 
-as a heatmap (as we do above), you can easily identify how performance depends on window size. If you additionally 
-compute the same heatmap over multiple time periods, you will spot how performance varies with downtrends and 
-uptrends. Finally, by running the same pipeline on other strategies such as holding and trading randomly, 
+as a heatmap (as we do above), you can analyze how performance depends upon window size. If you additionally 
+compute the same heatmap over multiple time periods, you may figure out how performance varies with downtrends 
+and uptrends. Finally, by running the same pipeline over other strategies such as holding and trading randomly, 
 you can compare them and decide whether your strategy is worth executing. With vectorbt, this analysis can 
-be done in minutes, and will effectively save you nights of getting the same insights using other libraries.
+be done in minutes and save you time and cost of getting the same insights elsewhere.
 
 ## How it works?
 
@@ -129,9 +131,9 @@ This way, it is often much faster than pandas alone:
 In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
 (think of an array for price, an array for signals, etc.), vectorbt is optimized for working with 
 2-dimensional data: it treats index of a DataFrame as time axis and columns as distinct features
-that should be backtested, and performs calculations on the entire matrix at once. This way, user can 
+that should be backtest, and performs any calculation on the entire matrix at once. This way, user can 
 construct huge matrices with thousands of columns and calculate the performance for each one with a single 
-matrix operation, without any Pythonic loops.
+matrix operation, without any "Pythonic" loops.
 
 To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
@@ -156,7 +158,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 ```
     
 - Helper functions for combining, transforming, and indexing NumPy and pandas objects
-    - NumPy-like broadcasting for pandas, among other features
+- NumPy-like broadcasting for pandas, among other features
     
 ```python-repl
 # pandas
@@ -195,7 +197,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 
 - Functions for working with signals
     - Entry, exit and random signal generation, ranking and distance functions
-    - Stop loss, trailing stop and take profit signal generation
+    - Signal factory for building iterative signal generators with ease
     
 ```python-repl
 >>> pd.Series([False, True, True, True]).vbt.signals.first()
@@ -243,7 +245,7 @@ ma_ewm    False      True
 2           2.5  2.428571
 ``` 
 
-- Indicator factory for building complex technical indicators in a simplified way
+- Indicator factory for building complex technical indicators with ease
     - Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
     
 ```python-repl
@@ -278,9 +280,9 @@ for Plotly figures.
 
 ## Example notebooks
 
-- [Comparing DMAC to holding and trading randomly on Bitcoin](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Bitcoin-DMAC.ipynb)
-- [Comparing effectiveness of stop loss and trailing stop loss](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopLoss-vs-TrailingStop.ipynb)
-- [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Trading-Sessions.ipynb)
+- [Assessing performance of DMAC on Bitcoin](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/BitcoinDMAC.ipynb)
+- [Comparing effectiveness of stop signals](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopSignals.ipynb)
+- [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TradingSessions.ipynb)
 
 Note: you will need to run the notebook to play with widgets.
 

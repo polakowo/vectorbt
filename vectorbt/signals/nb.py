@@ -112,7 +112,10 @@ def generate_enex_nb(shape, entry_wait, exit_wait, entry_choice_func_nb,
             to_i = shape[0]
             # Cannot assign two functions to a var in numba
             if i % 2 == 0:
-                from_i = max(0, prev_i + entry_wait)
+                if i == 0:
+                    from_i = 0
+                else:
+                    from_i = prev_i + entry_wait
                 if from_i >= to_i:
                     break
                 idxs = entry_choice_func_nb(col, from_i, to_i, *entry_args)
@@ -405,23 +408,20 @@ def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_idx_
             if init_stop > 0:
                 # Trailing stop buy
                 last_stop = flex_select_auto_nb(min_i, col, stops, flex_2d)
-                if last_stop < 0:
-                    raise ValueError("Sign of stop changed")
-                curr_stop_price = min_low * (1 + last_stop)
-            else:
+                curr_stop_price = min_low * (1 + abs(last_stop))
+            elif init_stop < 0:
                 # Trailing stop sell
                 last_stop = flex_select_auto_nb(max_i, col, stops, flex_2d)
-                if last_stop > 0:
-                    raise ValueError("Sign of stop changed")
-                curr_stop_price = max_high * (1 + last_stop)
+                curr_stop_price = max_high * (1 - abs(last_stop))
         else:
             curr_stop_price = init_ts * (1 + init_stop)
 
         # Check if stop price is within bar
         curr_ts = flex_select_auto_nb(i, col, ts, flex_2d)
+        exit_signal = False
         if init_stop > 0:
             exit_signal = curr_ts >= curr_stop_price
-        else:
+        elif init_stop < 0:
             exit_signal = curr_ts <= curr_stop_price
         if exit_signal:
             temp_idx_arr[j] = i
@@ -536,22 +536,22 @@ def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out,
 
     init_i = from_i - wait
     init_open = flex_select_auto_nb(init_i, col, open, flex_2d)
-    init_sl_stop = flex_select_auto_nb(init_i, col, sl_stops, flex_2d)
-    init_ts_stop = flex_select_auto_nb(init_i, col, ts_stops, flex_2d)
-    init_tp_stop = flex_select_auto_nb(init_i, col, tp_stops, flex_2d)
+    init_sl_stop = abs(flex_select_auto_nb(init_i, col, sl_stops, flex_2d))
+    init_ts_stop = abs(flex_select_auto_nb(init_i, col, ts_stops, flex_2d))
+    init_tp_stop = abs(flex_select_auto_nb(init_i, col, tp_stops, flex_2d))
     max_i = init_i
     max_p = init_open
     j = 0
 
     for i in range(from_i, to_i):
         # Calculate stop price
-        if abs(init_sl_stop) > 0:
-            curr_sl_stop_price = init_open * (1 - abs(init_sl_stop))
-        if abs(init_ts_stop) > 0:
-            max_ts_stop = flex_select_auto_nb(max_i, col, ts_stops, flex_2d)
-            curr_ts_stop_price = max_p * (1 - abs(max_ts_stop))
-        if abs(init_tp_stop) > 0:
-            curr_tp_stop_price = init_open * (1 + abs(init_tp_stop))
+        if init_sl_stop > 0:
+            curr_sl_stop_price = init_open * (1 - init_sl_stop)
+        if init_ts_stop > 0:
+            max_ts_stop = abs(flex_select_auto_nb(max_i, col, ts_stops, flex_2d))
+            curr_ts_stop_price = max_p * (1 - max_ts_stop)
+        if init_tp_stop > 0:
+            curr_tp_stop_price = init_open * (1 + init_tp_stop)
 
         # Check if stop price is within bar
         if i > init_i or is_open_safe:
@@ -565,17 +565,17 @@ def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out,
             curr_high = curr_low = curr_close
 
         exit_signal = False
-        if abs(init_sl_stop) > 0:
+        if init_sl_stop > 0:
             if curr_low <= curr_sl_stop_price:
                 exit_signal = True
                 hit_price_out[i, col] = curr_sl_stop_price
                 stop_type_out[i, col] = StopType.StopLoss
-        if not exit_signal and abs(init_ts_stop) > 0:
+        if not exit_signal and init_ts_stop > 0:
             if curr_low <= curr_ts_stop_price:
                 exit_signal = True
                 hit_price_out[i, col] = curr_ts_stop_price
                 stop_type_out[i, col] = StopType.TrailStop
-        if not exit_signal and abs(init_tp_stop) > 0:
+        if not exit_signal and init_tp_stop > 0:
             if curr_high >= curr_tp_stop_price:
                 exit_signal = True
                 hit_price_out[i, col] = curr_tp_stop_price
@@ -587,7 +587,7 @@ def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out,
                 return temp_idx_arr[:1]
 
         # Keep track of highest high if trailing
-        if abs(init_ts_stop) > 0:
+        if init_ts_stop > 0:
             if curr_high > max_p:
                 max_i = i
                 max_p = curr_high

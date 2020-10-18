@@ -1352,7 +1352,7 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                     flex_select_nb(i, col, fees, flex_i4, flex_col4, flex_2d),
                     flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, flex_2d),
                     flex_select_nb(i, col, slippage, flex_i6, flex_col6, flex_2d),
-                    flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, is_2d)
+                    flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, flex_2d)
                 )
 
                 # Process the order

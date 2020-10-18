@@ -549,7 +549,7 @@ class Signals_Accessor(Generic_Accessor):
         if stop_type_out is not None:
             out_args += (stop_type_out,)
 
-        keep_raw = (False, True, True, True, True, True, True, True) + out_args
+        keep_raw = (False, True, True, True, True, True, True, True) + (False,) * len(out_args)
         broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args = reshape_fns.broadcast(
             entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args,
@@ -927,9 +927,10 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             name = self._obj.name
 
         # Plot markers
+        _y = 1 if y is None else y
         scatter = go.Scatter(
             x=self.index,
-            y=np.where(self._obj, y, np.nan),
+            y=np.where(self._obj, _y, np.nan),
             mode='markers',
             marker=dict(
                 symbol='circle',
@@ -947,7 +948,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         fig.add_trace(scatter)
         return fig
 
-    def plot_as_entry_markers(self, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
+    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as entry markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
@@ -964,9 +965,9 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                 )
             )
         ), trace_kwargs)
-        return self.plot_as_markers(name=name, trace_kwargs=trace_kwargs, **kwargs)
+        return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
 
-    def plot_as_exit_markers(self, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
+    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as exit markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
@@ -983,7 +984,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                 )
             )
         ), trace_kwargs)
-        return self.plot_as_markers(name=name, trace_kwargs=trace_kwargs, **kwargs)
+        return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
 
 
 @register_dataframe_accessor('signals')

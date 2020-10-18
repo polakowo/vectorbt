@@ -6,11 +6,10 @@ import pandas as pd
 from vectorbt.utils import checks
 
 
-def merge_kwargs(x, y):
-    """Merge dictionaries `x` and `y`.
-
-    By conflicts, `y` wins."""
+def merge_kwargs(*dicts):
+    """Merge dictionaries `dicts`."""
     z = {}
+    x, y = dicts[0], dicts[1]
     overlapping_keys = x.keys() & y.keys()
     for key in overlapping_keys:
         if isinstance(x[key], dict) and isinstance(y[key], dict):
@@ -21,6 +20,8 @@ def merge_kwargs(x, y):
         z[key] = x[key]
     for key in y.keys() - overlapping_keys:
         z[key] = y[key]
+    if len(dicts) > 2:
+        return merge_kwargs(z, *dicts[2:])
     return z
 
 
