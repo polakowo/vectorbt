@@ -2,11 +2,7 @@
 
 ```python-repl
 >>> import vectorbt as vbt
->>> import numpy as np
->>> import pandas as pd
->>> from datetime import datetime, timedelta
->>> import itertools
->>> from numba import njit
+>>> from datetime import datetime
 >>> import yfinance as yf
 
 >>> ticker = yf.Ticker("BTC-USD")
@@ -48,9 +44,12 @@ MA = IndicatorFactory(
     short_name='ma',
     input_names=['close'],
     param_names=['window', 'ewm'],
-    param_defaults={'ewm': False},
     output_names=['ma']
-).from_apply_func(nb.ma_apply_nb, caching_func=nb.ma_caching_nb)
+).from_apply_func(
+    nb.ma_apply_nb,
+    cache_func=nb.ma_cache_nb,
+    ewm=False
+)
 
 
 class MA(MA):
@@ -62,8 +61,8 @@ class MA(MA):
     Use `MA.run` or `MA.run_combs` to run the indicator."""
 
     def plot(self,
-             close_trace_kwargs={},
-             ma_trace_kwargs={},
+             close_trace_kwargs=None,
+             ma_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MA.ma` against `MA.close`.
@@ -74,20 +73,20 @@ class MA(MA):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            ma[(10, False)].plot()
+            ```python-repl
+            >>> vbt.MA.run(price['Close'], 10).plot()
             ```
 
             ![](/vectorbt/docs/img/MA.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        close_trace_kwargs = merge_kwargs(dict(
-            name=f'Close ({self.short_name})'
-        ), close_trace_kwargs)
-        ma_trace_kwargs = merge_kwargs(dict(
-            name=f'MA ({self.short_name})'
-        ), ma_trace_kwargs)
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if ma_trace_kwargs is None:
+            ma_trace_kwargs = {}
+        close_trace_kwargs = merge_kwargs(dict(name='Close'), close_trace_kwargs)
+        ma_trace_kwargs = merge_kwargs(dict(name='MA'), ma_trace_kwargs)
 
         fig = self.close.vbt.plot(trace_kwargs=close_trace_kwargs, fig=fig, **layout_kwargs)
         fig = self.ma.vbt.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
@@ -106,9 +105,12 @@ MSTD = IndicatorFactory(
     short_name='mstd',
     input_names=['close'],
     param_names=['window', 'ewm'],
-    param_defaults={'ewm': False},
     output_names=['mstd']
-).from_apply_func(nb.mstd_apply_nb, caching_func=nb.mstd_caching_nb)
+).from_apply_func(
+    nb.mstd_apply_nb,
+    cache_func=nb.mstd_cache_nb,
+    ewm=False
+)
 
 
 class MSTD(MSTD):
@@ -118,7 +120,7 @@ class MSTD(MSTD):
     Use `MSTD.run` or `MSTD.run_combs` to run the indicator."""
 
     def plot(self,
-             mstd_trace_kwargs={},
+             mstd_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MSTD.mstd`.
@@ -128,17 +130,17 @@ class MSTD(MSTD):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            mstd[(10, False)].plot()
+            ```python-repl
+            >>> vbt.MSTD.run(price['Close'], 10).plot()
             ```
 
             ![](/vectorbt/docs/img/MSTD.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        mstd_trace_kwargs = merge_kwargs(dict(
-            name=f'MSTD ({self.short_name})'
-        ), mstd_trace_kwargs)
+        if mstd_trace_kwargs is None:
+            mstd_trace_kwargs = {}
+        mstd_trace_kwargs = merge_kwargs(dict(name='MSTD'), mstd_trace_kwargs)
 
         fig = self.mstd.vbt.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
 
@@ -147,16 +149,15 @@ class MSTD(MSTD):
 
 fix_class_for_docs(MSTD)
 
-# ############# BollingerBands ############# #
+# ############# BBANDS ############# #
 
 
-BollingerBands = IndicatorFactory(
-    class_name='BollingerBands',
+BBANDS = IndicatorFactory(
+    class_name='BBANDS',
     module_name=__name__,
     short_name='bb',
     input_names=['close'],
     param_names=['window', 'ewm', 'alpha'],
-    param_defaults={'window': 20, 'ewm': False, 'alpha': 2},
     output_names=['middle', 'upper', 'lower'],
     custom_output_funcs=dict(
         percent_b=lambda self: self.wrapper.wrap(
@@ -164,60 +165,74 @@ BollingerBands = IndicatorFactory(
         bandwidth=lambda self: self.wrapper.wrap(
             (self.upper.values - self.lower.values) / self.middle.values)
     )
-).from_apply_func(nb.bb_apply_nb, caching_func=nb.bb_caching_nb)
+).from_apply_func(
+    nb.bb_apply_nb,
+    cache_func=nb.bb_cache_nb,
+    window=20,
+    ewm=False,
+    alpha=2
+)
 
 
-class BollingerBands(BollingerBands):
+class BBANDS(BBANDS):
     """A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard
     deviations (positively and negatively) away from a simple moving average (SMA) of the security's
     price, but can be adjusted to user preferences.
 
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp).
 
-    Use `BollingerBands.run` or `BollingerBands.run_combs` to run the indicator."""
+    Use `BBANDS.run` or `BBANDS.run_combs` to run the indicator."""
 
     def plot(self,
-             close_trace_kwargs={},
-             middle_trace_kwargs={},
-             upper_trace_kwargs={},
-             lower_trace_kwargs={},
+             close_trace_kwargs=None,
+             middle_trace_kwargs=None,
+             upper_trace_kwargs=None,
+             lower_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
-        """Plot `BollingerBands.middle`, `BollingerBands.upper` and `BollingerBands.lower` against
-        `BollingerBands.close`.
+        """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
+        `BBANDS.close`.
 
         Args:
-            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.close`.
-            middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.middle`.
-            upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.upper`.
-            lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BollingerBands.lower`.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.close`.
+            middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
+            upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
+            lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.lower`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            bb[(10, False, 2)].plot()
+            ```python-repl
+            >>> vbt.BBANDS.run(price['Close']).plot()
             ```
 
-            ![](/vectorbt/docs/img/BollingerBands.png)"""
+            ![](/vectorbt/docs/img/BBANDS.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
+        if middle_trace_kwargs is None:
+            middle_trace_kwargs = {}
+        if upper_trace_kwargs is None:
+            upper_trace_kwargs = {}
+        if lower_trace_kwargs is None:
+            lower_trace_kwargs = {}
         lower_trace_kwargs = merge_kwargs(dict(
-            name=f'Lower Band ({self.short_name})',
+            name='Lower Band',
             line=dict(color='silver')
         ), lower_trace_kwargs)
         upper_trace_kwargs = merge_kwargs(dict(
-            name=f'Upper Band ({self.short_name})',
+            name='Upper Band',
             line=dict(color='silver'),
             fill='tonexty',
             fillcolor='rgba(128, 128, 128, 0.25)'
         ), upper_trace_kwargs)  # default kwargs
         middle_trace_kwargs = merge_kwargs(dict(
-            name=f'Middle Band ({self.short_name})',
+            name='Middle Band',
             line=dict(color=defaults.layout['colorway'][1])
         ), middle_trace_kwargs)
         close_trace_kwargs = merge_kwargs(dict(
-            name=f'Close ({self.short_name})',
+            name='Close',
             line=dict(color=defaults.layout['colorway'][0])
         ), close_trace_kwargs)
 
@@ -229,7 +244,7 @@ class BollingerBands(BollingerBands):
         return fig
 
 
-fix_class_for_docs(BollingerBands)
+fix_class_for_docs(BBANDS)
 
 # ############# RSI ############# #
 
@@ -240,9 +255,13 @@ RSI = IndicatorFactory(
     short_name='rsi',
     input_names=['close'],
     param_names=['window', 'ewm'],
-    param_defaults={'window': 14, 'ewm': False},
     output_names=['rsi']
-).from_apply_func(nb.rsi_apply_nb, caching_func=nb.rsi_caching_nb)
+).from_apply_func(
+    nb.rsi_apply_nb,
+    cache_func=nb.rsi_cache_nb,
+    window=14,
+    ewm=False
+)
 
 
 class RSI(RSI):
@@ -257,27 +276,28 @@ class RSI(RSI):
 
     def plot(self,
              levels=(30, 70),
-             rsi_trace_kwargs={},
+             rsi_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
-            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `RSI.rsi`.
+            levels (tuple): Two extremes: bottom and top.
+            rsi_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `RSI.rsi`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            rsi[(10, False)].plot()
+            ```python-repl
+            >>> vbt.RSI.run(price['Close']).plot()
             ```
 
             ![](/vectorbt/docs/img/RSI.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        rsi_trace_kwargs = merge_kwargs(dict(
-            name=f'RSI ({self.short_name})'
-        ), rsi_trace_kwargs)
+        if rsi_trace_kwargs is None:
+            rsi_trace_kwargs = {}
+        rsi_trace_kwargs = merge_kwargs(dict(name='RSI'), rsi_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
         fig = self.rsi.vbt.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
@@ -302,59 +322,67 @@ class RSI(RSI):
 
 fix_class_for_docs(RSI)
 
-# ############# Stochastic ############# #
+# ############# STOCH ############# #
 
 
-Stochastic = IndicatorFactory(
-    class_name='Stochastic',
+STOCH = IndicatorFactory(
+    class_name='STOCH',
     module_name=__name__,
     short_name='stoch',
     input_names=['high', 'low', 'close'],
     param_names=['k_window', 'd_window', 'd_ewm'],
-    param_defaults={'k_window': 14, 'd_window': 3, 'd_ewm': False},
     output_names=['percent_k', 'percent_d']
-).from_apply_func(nb.stoch_apply_nb, caching_func=nb.stoch_caching_nb)
+).from_apply_func(
+    nb.stoch_apply_nb,
+    cache_func=nb.stoch_cache_nb,
+    k_window=14,
+    d_window=3,
+    d_ewm=False
+)
 
 
-class Stochastic(Stochastic):
+class STOCH(STOCH):
     """A stochastic oscillator is a momentum indicator comparing a particular closing price of a security
     to a range of its prices over a certain period of time. It is used to generate overbought and oversold
     trading signals, utilizing a 0-100 bounded range of values.
 
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
 
-    Use `Stochastic.run` or `Stochastic.run_combs` to run the indicator."""
+    Use `STOCH.run` or `STOCH.run_combs` to run the indicator."""
 
     def plot(self,
              levels=(30, 70),
-             percent_k_trace_kwargs={},
-             percent_d_trace_kwargs={},
-             shape_kwargs={},
+             percent_k_trace_kwargs=None,
+             percent_d_trace_kwargs=None,
+             shape_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
-        """Plot `Stochastic.percent_k` and `Stochastic.percent_d`.
+        """Plot `STOCH.percent_k` and `STOCH.percent_d`.
 
         Args:
-            percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Stochastic.percent_k`.
-            percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Stochastic.percent_d`.
+            levels (tuple): Two extremes: bottom and top.
+            percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
+            percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
             shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zone between levels.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            stoch[(10, 2, False)].plot(levels=(20, 80))
+            ```python-repl
+            >>> vbt.STOCH.run(price['High'], price['Low'], price['Close']).plot()
             ```
 
-            ![](/vectorbt/docs/img/Stochastic.png)"""
+            ![](/vectorbt/docs/img/STOCH.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        percent_k_trace_kwargs = merge_kwargs(dict(
-            name=f'%K ({self.short_name})'
-        ), percent_k_trace_kwargs)
-        percent_d_trace_kwargs = merge_kwargs(dict(
-            name=f'%D ({self.short_name})'
-        ), percent_d_trace_kwargs)
+        if percent_k_trace_kwargs is None:
+            percent_k_trace_kwargs = {}
+        if percent_d_trace_kwargs is None:
+            percent_d_trace_kwargs = {}
+        if shape_kwargs is None:
+            shape_kwargs = {}
+        percent_k_trace_kwargs = merge_kwargs(dict(name='%K'), percent_k_trace_kwargs)
+        percent_d_trace_kwargs = merge_kwargs(dict(name='%D'), percent_d_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
         fig = self.percent_k.vbt.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
@@ -380,7 +408,7 @@ class Stochastic(Stochastic):
         return fig
 
 
-fix_class_for_docs(Stochastic)
+fix_class_for_docs(STOCH)
 
 # ############# MACD ############# #
 
@@ -391,12 +419,19 @@ MACD = IndicatorFactory(
     short_name='macd',
     input_names=['close'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
-    param_defaults={'fast_window': 26, 'slow_window': 12, 'signal_window': 9, 'macd_ewm': True, 'signal_ewm': True},
     output_names=['macd', 'signal'],
     custom_output_funcs=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
-).from_apply_func(nb.macd_apply_nb, caching_func=nb.macd_caching_nb)
+).from_apply_func(
+    nb.macd_apply_nb,
+    cache_func=nb.macd_cache_nb,
+    fast_window=26,
+    slow_window=12,
+    signal_window=9,
+    macd_ewm=False,
+    signal_ewm=False
+)
 
 
 class MACD(MACD):
@@ -408,9 +443,9 @@ class MACD(MACD):
     Use `MACD.run` or `MACD.run_combs` to run the indicator."""
 
     def plot(self,
-             macd_trace_kwargs={},
-             signal_trace_kwargs={},
-             hist_trace_kwargs={},
+             macd_trace_kwargs=None,
+             signal_trace_kwargs=None,
+             hist_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
@@ -422,24 +457,23 @@ class MACD(MACD):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            macd[(10, 20, 30, False, True)].plot()
+            ```python-repl
+            >>> vbt.MACD.run(price['Close']).plot()
             ```
 
             ![](/vectorbt/docs/img/MACD.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        macd_trace_kwargs = merge_kwargs(dict(
-            name=f'MACD ({self.short_name})'
-        ), macd_trace_kwargs)
-        signal_trace_kwargs = merge_kwargs(dict(
-            name=f'Signal ({self.short_name})'
-        ), signal_trace_kwargs)
-        hist_trace_kwargs = merge_kwargs(dict(
-            name=f'Histogram ({self.short_name})',
-            showlegend=False
-        ), hist_trace_kwargs)
+        if macd_trace_kwargs is None:
+            macd_trace_kwargs = {}
+        if signal_trace_kwargs is None:
+            signal_trace_kwargs = {}
+        if hist_trace_kwargs is None:
+            hist_trace_kwargs = {}
+        macd_trace_kwargs = merge_kwargs(dict(name='MACD'), macd_trace_kwargs)
+        signal_trace_kwargs = merge_kwargs(dict(name='Signal'), signal_trace_kwargs)
+        hist_trace_kwargs = merge_kwargs(dict(name='Histogram'), hist_trace_kwargs)
 
         layout_kwargs = merge_kwargs(dict(bargap=0), layout_kwargs)
         fig = self.macd.vbt.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
@@ -477,9 +511,12 @@ ATR = IndicatorFactory(
     short_name='atr',
     input_names=['high', 'low', 'close'],
     param_names=['window', 'ewm'],
-    param_defaults={'ewm': True},
     output_names=['tr', 'atr']
-).from_apply_func(nb.atr_apply_nb, caching_func=nb.atr_caching_nb)
+).from_apply_func(
+    nb.atr_apply_nb,
+    cache_func=nb.atr_cache_nb,
+    ewm=False
+)
 
 
 class ATR(ATR):
@@ -491,8 +528,8 @@ class ATR(ATR):
     Use `ATR.run` or `ATR.run_combs` to run the indicator."""
 
     def plot(self,
-             tr_trace_kwargs={},
-             atr_trace_kwargs={},
+             tr_trace_kwargs=None,
+             atr_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
@@ -503,20 +540,20 @@ class ATR(ATR):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            atr[(10, False)].plot()
+            ```python-repl
+            >>> vbt.ATR.run(price['High'], price['Low'], price['Close'], 10).plot()
             ```
 
             ![](/vectorbt/docs/img/ATR.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        tr_trace_kwargs = merge_kwargs(dict(
-            name=f'TR ({self.short_name})'
-        ), tr_trace_kwargs)
-        atr_trace_kwargs = merge_kwargs(dict(
-            name=f'ATR ({self.short_name})'
-        ), atr_trace_kwargs)
+        if tr_trace_kwargs is None:
+            tr_trace_kwargs = {}
+        if atr_trace_kwargs is None:
+            atr_trace_kwargs = {}
+        tr_trace_kwargs = merge_kwargs(dict(name='TR'), tr_trace_kwargs)
+        atr_trace_kwargs = merge_kwargs(dict(name='ATR'), atr_trace_kwargs)
 
         fig = self.tr.vbt.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
         fig = self.atr.vbt.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
@@ -536,7 +573,7 @@ OBV = IndicatorFactory(
     input_names=['close', 'volume'],
     param_names=[],
     output_names=['obv'],
-).from_custom_func(nb.obv_custom_func_nb)
+).from_custom_func(nb.obv_custom_nb)
 
 
 class OBV(OBV):
@@ -548,7 +585,7 @@ class OBV(OBV):
     Use `OBV.run` to run the indicator."""
 
     def plot(self,
-             obv_trace_kwargs={},
+             obv_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `OBV.obv`.
@@ -559,16 +596,16 @@ class OBV(OBV):
             **layout_kwargs: Keyword arguments for layout.
         Example:
             ```py
-            obv.plot()
+            >>> vbt.OBV.run(price['Close'], price['Volume']).plot()
             ```
 
             ![](/vectorbt/docs/img/OBV.png)"""
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
-        obv_trace_kwargs = merge_kwargs(dict(
-            name=f'OBV ({self.short_name})'
-        ), obv_trace_kwargs)
+        if obv_trace_kwargs is None:
+            obv_trace_kwargs = {}
+        obv_trace_kwargs = merge_kwargs(dict(name='OBV'), obv_trace_kwargs)
 
         fig = self.obv.vbt.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
 

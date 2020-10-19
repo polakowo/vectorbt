@@ -76,9 +76,9 @@ from vectorbt.indicators.factory import IndicatorFactory, create_param_combs
 from vectorbt.indicators.basic import (
     MA,
     MSTD,
-    BollingerBands,
+    BBANDS,
     RSI,
-    Stochastic,
+    STOCH,
     MACD,
     ATR,
     OBV

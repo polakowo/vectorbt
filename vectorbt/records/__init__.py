@@ -70,8 +70,9 @@ with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vect
 ```python-repl
 >>> entries, exits = pd.Series.vbt.signals.generate_random_both(price.shape, n=10, seed=42)
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, fees=0.01, freq='1D')
+>>> orders = portfolio.orders()
 
->>> portfolio.orders().records.head()
+>>> orders.records.head()
    col  idx      size    price      fees  side
 0    0    0  0.026454  3742.70  0.990099     0
 1    0   15  0.026454  3630.68  0.960465     1
@@ -79,20 +80,20 @@ with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vect
 3    0   39  0.026738  3666.78  0.980408     1
 4    0   55  0.025220  3810.43  0.960994     0
 
->>> portfolio.orders().plot()
+>>> orders.plot()
 ```
 
 ![](/vectorbt/docs/img/orders_plot.png)
 
 
 ```python-repl
->>> portfolio.orders().count()
+>>> orders.count()
 20
 
->>> portfolio.orders().buy.price.mean()
+>>> orders.buy.price.mean()
 6359.48
 
->>> portfolio.orders().sell.price.mean()
+>>> orders.sell.price.mean()
 6815.132
 ```
 

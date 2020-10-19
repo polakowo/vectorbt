@@ -380,7 +380,7 @@ class Portfolio(Configured, PandasIndexer):
         is enabled, will share the cash among all columns in the group.
 
         Args:
-            close (pandas_like): Reference price, such as close. Will broadcast.
+            close (array_like): Reference price, such as close. Will broadcast.
 
                 Will be used for calculating unrealized P&L and portfolio value.
             entries (array_like of bool): Boolean array of entry signals. Will broadcast.
@@ -432,7 +432,7 @@ class Portfolio(Configured, PandasIndexer):
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
-            accumulate (bool): If `accumulate` is `True`, entering the market when already
+            accumulate (bool): If `accumulate` is True, entering the market when already
                 in the market will be allowed to increase the position.
             accumulate_exit_mode (AccumulateExitMode): See `vectorbt.portfolio.enums.AccumulateExitMode`.
             conflict_mode (ConflictMode): See `vectorbt.portfolio.enums.ConflictMode`.
@@ -589,7 +589,6 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(close, (pd.Series, pd.DataFrame))
         checks.assert_subdtype(close, np.floating)
         checks.assert_dtype(entries, np.bool)
         checks.assert_dtype(exits, np.bool)
@@ -611,6 +610,8 @@ class Portfolio(Configured, PandasIndexer):
         close, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, reject_prob = \
             broadcast(close, entries, exits, size, entry_price, exit_price, fees, fixed_fees,
                 slippage, reject_prob, **broadcast_kwargs, keep_raw=keep_raw)
+        if not checks.is_pandas(close):
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -665,7 +666,7 @@ class Portfolio(Configured, PandasIndexer):
         for `order_price`.
 
         Args:
-            close (pandas_like): Reference price, such as close. Will broadcast.
+            close (array_like): Reference price, such as close. Will broadcast.
 
                 Will be used for calculating unrealized P&L and portfolio value.
             order_size (float or array_like): Size to order. Will broadcast.
@@ -844,7 +845,11 @@ class Portfolio(Configured, PandasIndexer):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if val_price is None:
-            val_price = close.vbt.fshift(1)
+            if checks.is_pandas(close):
+                val_price = close.vbt.fshift(1)
+            else:
+                val_price = np.roll(np.asarray(close), 1, axis=0)
+                val_price[0] = np.nan
         if seed is None:
             seed = defaults.portfolio['seed']
         if seed is not None:
@@ -859,7 +864,6 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(close, (pd.Series, pd.DataFrame))
         checks.assert_subdtype(close, np.floating)
         checks.assert_subdtype(order_size, np.floating)
         checks.assert_subdtype(size_type, np.integer)
@@ -880,6 +884,8 @@ class Portfolio(Configured, PandasIndexer):
         close, order_size, size_type, order_price, fees, fixed_fees, slippage, reject_prob, val_price = \
             broadcast(close, order_size, size_type, order_price, fees, fixed_fees, slippage,
                       reject_prob, val_price, **broadcast_kwargs, keep_raw=keep_raw)
+        if not checks.is_pandas(close):
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -931,10 +937,10 @@ class Portfolio(Configured, PandasIndexer):
 
         For details, see `vectorbt.portfolio.nb.simulate_nb`.
 
-        if `row_wise` is `True`, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+        if `row_wise` is True, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
 
         Args:
-            close (pandas_like): Reference price, such as close. Will broadcast to `target_shape`.
+            close (array_like): Reference price, such as close. Will broadcast to `target_shape`.
 
                 Will be used for calculating unrealized P&L and portfolio value.
 
@@ -978,13 +984,13 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `()`.
             group_prep_func_nb (callable): Group preparation function.
 
-                Called only if `row_wise` is `False`.
+                Called only if `row_wise` is False.
             group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
 
                 Defaults to `()`.
             row_prep_func_nb (callable): Row preparation function.
 
-                Called only if `row_wise` is `True`.
+                Called only if `row_wise` is True.
             row_prep_args (tuple): Packed arguments passed to `row_prep_func_nb`.
 
                 Defaults to `()`.
@@ -1013,6 +1019,10 @@ class Portfolio(Configured, PandasIndexer):
             Also see notes on `Portfolio.from_orders`.
         """
         # Get defaults
+        if not checks.is_pandas(close):
+            if not checks.is_array(close):
+                close = np.asarray(close)
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         if target_shape is None:
             target_shape = close.shape
         if init_cash is None:
@@ -1058,7 +1068,6 @@ class Portfolio(Configured, PandasIndexer):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Perform checks
-        checks.assert_type(close, (pd.Series, pd.DataFrame))
         checks.assert_subdtype(close, np.floating)
         checks.assert_subdtype(init_cash, np.floating)
         checks.assert_subdtype(call_seq, np.integer)
@@ -1377,7 +1386,7 @@ class Portfolio(Configured, PandasIndexer):
         independent from other assets, with initial cash and shares being that of the entire group.
         Useful for generating returns and comparing assets within the same group.
 
-        When `group_by` is `False` and `in_sim_order` is `True`, returns value generated in
+        When `group_by` is False and `in_sim_order` is True, returns value generated in
         simulation order (see [row-major order](https://en.wikipedia.org/wiki/Row-_and_column-major_order).
         This value cannot be used for generating returns as-is. Useful to analyze how value
         evolved throughout simulation."""

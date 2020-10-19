@@ -41,7 +41,7 @@ Even if columns are not grouped, `group_counts` contains ones - one column per g
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column, or per group if cash sharing is enabled.
 
-If `cash_sharing` is `True`, has shape `(target_shape[0], group_counts.shape[0])`. 
+If `cash_sharing` is True, has shape `(target_shape[0], group_counts.shape[0])`. 
 Otherwise, has shape `target_shape`.
 """
 __pdoc__['SimulationContext.cash_sharing'] = """Whether cash sharing is enabled."""
@@ -379,6 +379,6 @@ __pdoc__['OrderResult.size'] = "Filled size in shares."
 __pdoc__['OrderResult.price'] = "Filled price per share, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `vectorbt.records.enums.OrderSide`."
-__pdoc__['OrderResult.status'] = "See `vectorbt.records.enums.OrderStatus`."
+__pdoc__['OrderResult.status'] = "See `OrderStatus`."
 
 RejectedOrder = OrderResult(np.nan, np.nan, np.nan, -1, OrderStatus.Rejected)

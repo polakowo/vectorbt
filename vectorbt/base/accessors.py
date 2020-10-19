@@ -75,7 +75,7 @@ class Base_Accessor(ArrayWrapper):
         """Apply function `apply_func` on index of the pandas object.
 
         Set `axis` to 1 for columns and 0 for index.
-        If `inplace` is `True`, modifies the pandas object. Otherwise, returns a copy."""
+        If `inplace` is True, modifies the pandas object. Otherwise, returns a copy."""
         checks.assert_in(axis, (0, 1))
 
         if axis == 1:
@@ -100,7 +100,7 @@ class Base_Accessor(ArrayWrapper):
     def stack_index(self, index, on_top=True, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.stack_indexes`.
 
-        Set `on_top` to `False` to stack at bottom.
+        Set `on_top` to False to stack at bottom.
 
         See `Base_Accessor.apply_on_index` for other keyword arguments."""
 
@@ -269,11 +269,11 @@ class Base_Accessor(ArrayWrapper):
 
     # ############# Combining ############# #
 
-    def apply(self, *args, apply_func=None, pass_2d=False, **kwargs):
+    def apply(self, *args, apply_func=None, to_2d=False, **kwargs):
         """Apply a function `apply_func`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
-        If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
+        If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
 
         !!! note
             The resulted array must have the same shape as the original array.
@@ -293,7 +293,7 @@ class Base_Accessor(ArrayWrapper):
             ```"""
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
-        if pass_2d:
+        if to_2d:
             obj = reshape_fns.to_2d(self._obj, raw=True)
         else:
             obj = np.asarray(self._obj)
@@ -304,7 +304,7 @@ class Base_Accessor(ArrayWrapper):
     def concat(self_or_cls, *others, keys=None, broadcast_kwargs={}):
         """Concatenate with `others` along columns.
 
-        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Use `keys` as the outermost level.
 
         Example:
@@ -332,16 +332,16 @@ class Base_Accessor(ArrayWrapper):
             concatenated.columns = index_fns.combine_indexes(keys, broadcasted[0].columns)
         return concatenated
 
-    def apply_and_concat(self, ntimes, *args, apply_func=None, pass_2d=False, keys=None, **kwargs):
+    def apply_and_concat(self, ntimes, *args, apply_func=None, to_2d=False, keys=None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
         See `vectorbt.base.combine_fns.apply_and_concat_one`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
-        If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
+        If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
         Use `keys` as the outermost level.
 
         !!! note
-            The resulted arrays to be concatenated must have the same shape as broadcasted input arrays.
+            The resulted arrays to be concatenated must have the same shape as broadcast input arrays.
 
         Example:
             ```python-repl
@@ -358,7 +358,7 @@ class Base_Accessor(ArrayWrapper):
             ```"""
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
-        if pass_2d:
+        if to_2d:
             obj_arr = reshape_fns.to_2d(self._obj, raw=True)
         else:
             obj_arr = np.asarray(self._obj)
@@ -374,17 +374,17 @@ class Base_Accessor(ArrayWrapper):
             new_columns = index_fns.combine_indexes(top_columns, self.columns)
         return self.wrap(result, columns=new_columns)
 
-    def combine_with(self, other, *args, combine_func=None, pass_2d=False, broadcast_kwargs={}, **kwargs):
+    def combine_with(self, other, *args, combine_func=None, to_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
 
-        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`.
-        If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
+        If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
 
         !!! note
-            The resulted array must have the same shape as broadcasted input arrays.
+            The resulted array must have the same shape as broadcast input arrays.
 
         Example:
             ```python-repl
@@ -406,7 +406,7 @@ class Base_Accessor(ArrayWrapper):
             broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         new_obj, new_other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
         # Optionally cast to 2d array
-        if pass_2d:
+        if to_2d:
             new_obj_arr = reshape_fns.to_2d(new_obj, raw=True)
             new_other_arr = reshape_fns.to_2d(new_other, raw=True)
         else:
@@ -415,20 +415,20 @@ class Base_Accessor(ArrayWrapper):
         result = combine_func(new_obj_arr, new_other_arr, *args, **kwargs)
         return new_obj.vbt.wrap(result)
 
-    def combine_with_multiple(self, others, *args, combine_func=None, pass_2d=False,
+    def combine_with_multiple(self, others, *args, combine_func=None, to_2d=False,
                               concat=False, broadcast_kwargs={}, keys=None, **kwargs):
         """Combine with `others` using `combine_func`.
 
-        All arguments will be broadcasted using `vectorbt.base.reshape_fns.broadcast`
+        All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
-        If `concat` is `True`, concatenate the results along columns, 
+        If `concat` is True, concatenate the results along columns,
         see `vectorbt.base.combine_fns.combine_and_concat`.
         Otherwise, pairwise combine into a Series/DataFrame of the same shape, 
         see `vectorbt.base.combine_fns.combine_multiple`.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`. 
-        If `pass_2d` is `True`, 2-dimensional NumPy arrays will be passed, otherwise as is.
+        If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
         Use `keys` as the outermost level.
 
         !!! note
@@ -468,7 +468,7 @@ class Base_Accessor(ArrayWrapper):
             broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements=['W', 'C'])), broadcast_kwargs)
         new_obj, *new_others = reshape_fns.broadcast(self._obj, *others, **broadcast_kwargs)
         # Optionally cast to 2d array
-        if pass_2d:
+        if to_2d:
             bc_arrays = tuple(map(lambda x: reshape_fns.to_2d(x, raw=True), (new_obj, *new_others)))
         else:
             bc_arrays = tuple(map(lambda x: np.asarray(x), (new_obj, *new_others)))

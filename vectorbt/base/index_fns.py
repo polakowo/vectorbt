@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+from numba import njit
 from collections.abc import Iterable
 
 from vectorbt import defaults
@@ -199,39 +200,93 @@ def drop_duplicate_levels(index, keep=None):
     return index.droplevel(levels_to_drop)
 
 
+@njit
+def _align_index_to_nb(a, b):
+    """Return indices required to align `a` to `b`."""
+    idxs = np.empty(b.shape[0], dtype=np.int_)
+    g = 0
+    for i in range(b.shape[0]):
+        for j in range(a.shape[0]):
+            if b[i] == a[j]:
+                idxs[g] = j
+                g += 1
+                break
+    return idxs
+
+
 def align_index_to(index1, index2):
-    """Align `index1` to have the same shape as `index2`.
+    """Align `index1` to have the same shape as `index2` if they have any levels in common.
 
-    Returns index slice for the aligning.
-
-    The second one must contain all levels from the first (and can have some more). In all these levels, 
-    both must share the same elements."""
+    Returns index slice for the aligning."""
     if not isinstance(index1, pd.MultiIndex):
         index1 = pd.MultiIndex.from_arrays([index1])
     if not isinstance(index2, pd.MultiIndex):
         index2 = pd.MultiIndex.from_arrays([index2])
-    if index1.duplicated().any():
-        raise ValueError("Duplicates index values are not allowed for the first index")
-
     if pd.Index.equals(index1, index2):
         return pd.IndexSlice[:]
-    if len(index1) <= len(index2):
-        if len(index1) == 1:
-            return pd.IndexSlice[np.tile([0])]
-        js = []
-        for i in range(index1.nlevels):
-            for j in range(index2.nlevels):
-                if index1.names[i] == index2.names[j]:
-                    if np.array_equal(index1.levels[i], index2.levels[j]):
-                        js.append(j)
-                        break
-        if index1.nlevels == len(js):
-            new_index = pd.MultiIndex.from_arrays([index2.get_level_values(j) for j in js])
-            xsorted = np.argsort(index1)
-            ypos = np.searchsorted(index1[xsorted], new_index)
-            return pd.IndexSlice[xsorted[ypos]]
 
-    raise ValueError("Indexes could not be aligned together")
+    # Build map between levels in first and second index
+    mapper = {}
+    for i in range(index1.nlevels):
+        for j in range(index2.nlevels):
+            name1 = index1.names[i]
+            name2 = index2.names[j]
+            if name1 == name2:
+                if set(index2.levels[j]).issubset(set(index1.levels[i])):
+                    mapper[i] = j
+                    break
+                if name1 is not None:
+                    raise ValueError(f"Level {name1} in second index contains values not in first index")
+    if len(mapper) == 0:
+        raise ValueError("Can't find common levels to align both indexes")
+
+    # Factorize first to be accepted by Numba
+    factorized = []
+    for k, v in mapper.items():
+        factorized.append(pd.factorize(pd.concat((
+            index1.get_level_values(k).to_series(),
+            index2.get_level_values(v).to_series()
+        )))[0])
+    stacked = np.transpose(np.stack(factorized))
+    indices1 = stacked[:len(index1)]
+    indices2 = stacked[len(index1):]
+    if len(np.unique(indices1, axis=0)) != len(indices1):
+        raise ValueError("Duplicated values in first index are not allowed")
+
+    # Try to tile
+    if len(index2) % len(index1) == 0:
+        tile_times = len(index2) // len(index1)
+        index1_tiled = np.tile(indices1, (tile_times, 1))
+        if np.array_equal(index1_tiled, indices2):
+            return pd.IndexSlice[np.tile(np.arange(len(index1)), tile_times)]
+
+    # Do element-wise comparison
+    unique_indices = np.unique(stacked, axis=0, return_inverse=True)[1]
+    unique1 = unique_indices[:len(index1)]
+    unique2 = unique_indices[len(index1):]
+    return pd.IndexSlice[_align_index_to_nb(unique1, unique2)]
+
+
+def align_indexes(*indexes):
+    """Align multiple indexes to each other."""
+    max_len = max(map(len, indexes))
+    indices = []
+    for i in range(len(indexes)):
+        index_i = indexes[i]
+        if len(index_i) == max_len:
+            indices.append(pd.IndexSlice[:])
+        else:
+            for j in range(len(indexes)):
+                index_j = indexes[j]
+                if len(index_j) == max_len:
+                    try:
+                        indices.append(align_index_to(index_i, index_j))
+                        break
+                    except ValueError:
+                        pass
+            if len(indices) < i + 1:
+                raise ValueError(f"Index at position {i} could not be aligned")
+    return indices
 
 
 def pick_levels(index, required_levels=[], optional_levels=[]):

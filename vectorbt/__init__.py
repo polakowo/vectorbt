@@ -455,9 +455,9 @@ modeling portfolio performance and visualizing results.
 
 ## Example notebooks
 
-- [Comparing DMAC to holding and trading randomly on Bitcoin](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Bitcoin-DMAC.ipynb)
-- [Comparing effectiveness of stop loss and trailing stop loss](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopLoss-vs-TrailingStop.ipynb)
-- [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/Trading-Sessions.ipynb)
+- [Assessing performance of DMAC on Bitcoin](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/BitcoinDMAC.ipynb)
+- [Comparing effectiveness of stop signals](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopSignals.ipynb)
+- [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TradingSessions.ipynb)
 - There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/master/tests/notebooks) for testing purposes.
 
 Note: you will need to run the notebook to play with widgets.
@@ -477,6 +477,28 @@ import vectorbt.ohlcv.accessors
 
 # Most important classes
 from vectorbt.generic import nb, plotting
+from vectorbt.indicators import (
+    IndicatorFactory,
+    MA,
+    MSTD,
+    BBANDS,
+    RSI,
+    STOCH,
+    MACD,
+    OBV,
+    ATR
+)
+from vectorbt.signals import (
+    SignalFactory,
+    RAND,
+    RPROB,
+    RPROBEX,
+    IRPROBEX,
+    STEX,
+    ISTEX,
+    ADVSTEX,
+    IADVSTEX
+)
 from vectorbt.records import (
     MappedArray,
     Records,
@@ -487,17 +509,6 @@ from vectorbt.records import (
     Drawdowns
 )
 from vectorbt.portfolio import Portfolio
-from vectorbt.indicators import (
-    IndicatorFactory,
-    MA,
-    MSTD,
-    BollingerBands,
-    RSI,
-    Stochastic,
-    MACD,
-    OBV,
-    ATR
-)
 
 # silence NumbaExperimentalFeatureWarning
 import warnings

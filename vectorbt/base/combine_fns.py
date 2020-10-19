@@ -44,7 +44,7 @@ def apply_and_concat_one_nb(n, apply_func_nb, *args):  # numba doesn't accepts *
             outputs_i = output_0
         else:
             outputs_i = to_2d_one_nb(apply_func_nb(i, *args))
-        output[:, i*outputs_i.shape[1]:(i+1)*outputs_i.shape[1]] = outputs_i
+        output[:, i * outputs_i.shape[1]:(i + 1) * outputs_i.shape[1]] = outputs_i
     return output
 
 
@@ -89,7 +89,7 @@ def apply_and_concat_multiple_nb(n, apply_func_nb, *args):
         else:
             outputs_i = to_2d_multiple_nb(apply_func_nb(i, *args))
         for j in range(len(outputs_i)):
-            outputs[j][:, i*outputs_i[j].shape[1]:(i+1)*outputs_i[j].shape[1]] = outputs_i[j]
+            outputs[j][:, i * outputs_i[j].shape[1]:(i + 1) * outputs_i[j].shape[1]] = outputs_i[j]
     return outputs
 
 
@@ -127,7 +127,7 @@ def combine_multiple(objs, combine_func, *args, **kwargs):
     result = None
     for i in range(1, len(objs)):
         if result is None:
-            result = combine_func(objs[i-1], objs[i], *args, **kwargs)
+            result = combine_func(objs[i - 1], objs[i], *args, **kwargs)
         else:
             result = combine_func(result, objs[i], *args, **kwargs)
     return result
@@ -146,7 +146,7 @@ def combine_multiple_nb(objs, combine_func_nb, *args):
     result = None
     for i in range(1, len(objs)):
         if result is None:
-            result = combine_func_nb(objs[i-1], objs[i], *args)
+            result = combine_func_nb(objs[i - 1], objs[i], *args)
         else:
             result = combine_func_nb(result, objs[i], *args)
     return result

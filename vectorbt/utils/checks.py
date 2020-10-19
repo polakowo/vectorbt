@@ -255,5 +255,20 @@ def assert_level_not_exists(arg, level_name):
 def assert_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` are different."""
     if arg1 != arg2:
-        raise AssertionError(f"{len(arg1)} and {len(arg2)} do not match")
+        raise AssertionError(f"{arg1} and {arg2} do not match")
+
+
+def assert_dict_valid(arg, lvl_keys):
+    """Raise exception if dict `arg` has keys that are not in `lvl_keys`.
+
+    `lvl_keys` should be a list of lists, each corresponding to a level in the dict."""
+    if len(lvl_keys) == 0 or not isinstance(lvl_keys[0], (tuple, list)):
+        return
+    set1 = set(arg.keys())
+    set2 = set(lvl_keys[0])
+    if not set1.issubset(set2):
+        raise AssertionError(f"Not all keys from {set1} are in {set2}")
+    for k, v in arg.items():
+        if isinstance(v, dict):
+            assert_dict_valid(v, lvl_keys[1:])
 

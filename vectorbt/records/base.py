@@ -535,15 +535,15 @@ class MappedArray(Configured, PandasIndexer):
                idx_labeled=True, default_val=np.nan, cast=None, group_by=None, **kwargs):
         """Reduce mapped array by column.
 
-        If `to_array` is `False` and `to_idx` is `False`, see `vectorbt.records.nb.reduce_mapped_nb`.
-        If `to_array` is `False` and `to_idx` is `True`, see `vectorbt.records.nb.reduce_mapped_to_idx_nb`.
-        If `to_array` is `True` and `to_idx` is `False`, see `vectorbt.records.nb.reduce_mapped_to_array_nb`.
-        If `to_array` is `True` and `to_idx` is `True`, see `vectorbt.records.nb.reduce_mapped_to_idx_array_nb`.
+        If `to_array` is False and `to_idx` is False, see `vectorbt.records.nb.reduce_mapped_nb`.
+        If `to_array` is False and `to_idx` is True, see `vectorbt.records.nb.reduce_mapped_to_idx_nb`.
+        If `to_array` is True and `to_idx` is False, see `vectorbt.records.nb.reduce_mapped_to_array_nb`.
+        If `to_array` is True and `to_idx` is True, see `vectorbt.records.nb.reduce_mapped_to_idx_array_nb`.
 
-        If `to_array` is `True`, must pass `n_rows` indicating the number of elements in the array.
-        If `to_idx` is `True`, must pass `idx_arr`. Set `idx_labeled` to `False` to return raw positions
+        If `to_array` is True, must pass `n_rows` indicating the number of elements in the array.
+        If `to_idx` is True, must pass `idx_arr`. Set `idx_labeled` to False to return raw positions
         instead of labels. Use `default_val` to set the default value and `cast` to perform casting
-        on the resulting pandas object. Set `group_by` to `False` to disable grouping.
+        on the resulting pandas object. Set `group_by` to False to disable grouping.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
         # Perform checks
@@ -730,7 +730,7 @@ class MappedArray(Configured, PandasIndexer):
         Function `pd_plot_func` should receive Series or DataFrame and plot it.
         Should only be used by plotting methods that disregard X axis labels.
 
-        Set `group_by` to `False` to disable grouping."""
+        Set `group_by` to False to disable grouping."""
         # We can't simply do to_matrix since there can be multiple records for one position in matrix
         if self.wrapper.ndim == 1:
             name = None if self.wrapper.columns[0] == 0 else self.wrapper.columns[0]

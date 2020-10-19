@@ -24,6 +24,10 @@ dtype: int64
 
 The accessors extend `vectorbt.generic.accessors`.
 
+## Enums
+
+`vectorbt.signals.enums` defines schemas for working with signals.
+
 ## Numba-compiled functions
 
 `vectorbt.signals.nb` provides an arsenal of Numba-compiled functions that are used by accessors
@@ -35,4 +39,30 @@ These only accept NumPy arrays and other Numba-compatible types.
 >>> vbt.signals.nb.rank_1d_nb(np.array([False, True, True, True, False]))
 array([0, 1, 2, 3, 0])
 ```
+
+## Signal factory
+
+The signal factory class `vectorbt.signals.factory.SignalFactory` extends
+`vectorbt.indicators.factory.IndicatorFactory` to offer a convenient way to create signal generators
+of any complexity. By providing it with information such as entry and exit functions and the names
+of your inputs, parameters, and outputs, it will create a stand-alone class capable of generating
+signals for an arbitrary combination of your inputs and parameters.
+
+## Basic
+
+`vectorbt.signals.basic` provides a collection of basic signal generators, such as
+random signal generator, all built with `vectorbt.signals.factory.SignalFactory`.
 """
+
+from vectorbt.signals.enums import StopType
+from vectorbt.signals.factory import SignalFactory
+from vectorbt.signals.basic import (
+    RAND,
+    RPROB,
+    RPROBEX,
+    IRPROBEX,
+    STEX,
+    ISTEX,
+    ADVSTEX,
+    IADVSTEX
+)

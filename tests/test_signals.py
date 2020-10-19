@@ -27,6 +27,16 @@ sig = pd.DataFrame([
     [False, True, False]
 ], index=index, columns=columns)
 
+ts = pd.Series([1., 2., 3., 2., 1.], index=index)
+
+price = pd.DataFrame({
+    'open': [10, 11, 12, 11, 10],
+    'high': [11, 12, 13, 12, 11],
+    'low': [9, 10, 11, 10, 9],
+    'close': [10, 11, 12, 11, 10]
+})
+
+
 # ############# accessors.py ############# #
 
 
@@ -106,18 +116,10 @@ class TestAccessors:
             elif col == 1:
                 return np.full(1, from_i)
             else:
-                return np.full(1, to_i-n)
+                return np.full(1, to_i - n)
 
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate(5, choice_func_nb, 1, index=sig['a'].index, name=sig['a'].name),
-            pd.Series(
-                np.array([True, True, True, True, True]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate((5,), choice_func_nb, 1, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([True, True, True, True, True]),
                 index=sig['a'].index,
@@ -141,114 +143,146 @@ class TestAccessors:
             )
         )
 
-    def test_generate_exits(self):
+    def test_generate_both(self):
         @njit
-        def choice_func_nb(col, from_i, to_i, n):
-            if col == 0:
-                return np.arange(from_i, to_i)
-            elif col == 1:
-                return np.full(1, from_i)
-            else:
-                return np.full(1, to_i - n)
+        def entry_func_nb(col, from_i, to_i, temp_int):
+            temp_int[0] = from_i
+            return temp_int[:1]
 
+        @njit
+        def exit_func_nb(col, from_i, to_i, temp_int):
+            temp_int[0] = from_i
+            return temp_int[:1]
+
+        temp_int = np.empty((sig.shape[0],), dtype=np.int_)
+
+        en, ex = pd.Series.vbt.signals.generate_both(
+            5, entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            index=sig['a'].index, name=sig['a'].name)
         pd.testing.assert_series_equal(
-            sig['a'].vbt.signals.generate_exits(choice_func_nb, 1),
+            en,
             pd.Series(
-                np.array([False, True, True, False, True]),
+                np.array([True, False, True, False, True]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
         )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(
+                np.array([False, True, False, True, False]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_both(
+            (5, 3), entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_exits(choice_func_nb, 1),
+            en,
             pd.DataFrame(
                 np.array([
+                    [True, True, True],
                     [False, False, False],
-                    [True, False, False],
-                    [True, True, False],
+                    [True, True, True],
                     [False, False, False],
-                    [True, False, True]
+                    [True, True, True]
                 ]),
                 index=sig.index,
                 columns=sig.columns
             )
         )
-
-    def test_generate_both(self):
-        @njit
-        def entry_choice_func_nb(col, from_i, to_i, wait1):
-            next_pos = col + from_i + wait1
-            if next_pos < to_i:
-                return np.array([next_pos])
-            return np.empty(0, dtype=np.int_)
-
-        @njit
-        def exit_choice_func_nb(col, from_i, to_i, wait2):
-            next_pos = col + from_i + wait2
-            if next_pos < to_i:
-                return np.array([next_pos])
-            return np.empty(0, dtype=np.int_)
-
-        a, b = pd.Series.vbt.signals.generate_both(
-            5, entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
-        pd.testing.assert_series_equal(
-            a,
-            pd.Series(
-                np.array([True, False, False, True, False]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        pd.testing.assert_series_equal(
-            b,
-            pd.Series(
-                np.array([False, False, True, False, False]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        a, b = pd.Series.vbt.signals.generate_both(
-            (5,), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig['a'].index, name=sig['a'].name)
-        pd.testing.assert_series_equal(
-            a,
-            pd.Series(
-                np.array([True, False, False, True, False]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        pd.testing.assert_series_equal(
-            b,
-            pd.Series(
-                np.array([False, False, True, False, False]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        a, b = pd.DataFrame.vbt.signals.generate_both(
-            (5, 3), entry_choice_func_nb, exit_choice_func_nb, (0,), (1,), index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
-            a,
+            ex,
             pd.DataFrame(
                 np.array([
-                    [True, False, False],
-                    [False, True, False],
-                    [False, False, True],
-                    [True, False, False],
+                    [False, False, False],
+                    [True, True, True],
+                    [False, False, False],
+                    [True, True, True],
                     [False, False, False]
                 ]),
                 index=sig.index,
                 columns=sig.columns
             )
         )
+        en, ex = pd.Series.vbt.signals.generate_both(
+            (5,), entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            index=sig['a'].index, name=sig['a'].name, entry_wait=1, exit_wait=0)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(
+                np.array([True, True, True, True, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(
+                np.array([True, True, True, True, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        en, ex = pd.Series.vbt.signals.generate_both(
+            (5,), entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            index=sig['a'].index, name=sig['a'].name, entry_wait=0, exit_wait=1)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(
+                np.array([True, True, True, True, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(
+                np.array([False, True, True, True, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+
+    def test_generate_exits(self):
+        @njit
+        def choice_func_nb(col, from_i, to_i, temp_int):
+            temp_int[0] = from_i
+            return temp_int[:1]
+
+        temp_int = np.empty((sig.shape[0],), dtype=np.int_)
+
+        pd.testing.assert_series_equal(
+            sig['a'].vbt.signals.generate_exits(choice_func_nb, temp_int),
+            pd.Series(
+                np.array([False, True, False, False, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
         pd.testing.assert_frame_equal(
-            b,
+            sig.vbt.signals.generate_exits(choice_func_nb, temp_int),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
-                    [False, False, False],
                     [True, False, False],
-                    [False, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [True, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_exits(choice_func_nb, temp_int, wait=0),
+            pd.DataFrame(
+                np.array([
+                    [True, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [True, False, False],
                     [False, True, False]
                 ]),
                 index=sig.index,
@@ -258,15 +292,8 @@ class TestAccessors:
 
     def test_generate_random(self):
         pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random(5, n=3, seed=seed, index=sig['a'].index, name=sig['a'].name),
-            pd.Series(
-                np.array([False, True, True, False, True]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random((5,), n=3, seed=seed, index=sig['a'].index, name=sig['a'].name),
+            pd.Series.vbt.signals.generate_random(
+                5, n=3, seed=seed, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([False, True, True, False, True]),
                 index=sig['a'].index,
@@ -276,7 +303,8 @@ class TestAccessors:
         with pytest.raises(Exception) as e_info:
             _ = pd.Series.vbt.signals.generate_random((5, 2), n=3)
         pd.testing.assert_frame_equal(
-            pd.DataFrame.vbt.signals.generate_random((5, 3), n=3, seed=seed, index=sig.index, columns=sig.columns),
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), n=3, seed=seed, index=sig.index, columns=sig.columns),
             pd.DataFrame(
                 np.array([
                     [False, False, True],
@@ -289,18 +317,24 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
-        pd.testing.assert_series_equal(
-            pd.Series.vbt.signals.generate_random(
-                5, prob=0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
-            pd.Series(
-                np.array([True, False, False, False, True]),
-                index=sig['a'].index,
-                name=sig['a'].name
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.generate_random(
+                (5, 3), n=[0, 1, 2], seed=seed, index=sig.index, columns=sig.columns),
+            pd.DataFrame(
+                np.array([
+                    [False, False, True],
+                    [False, False, True],
+                    [False, False, False],
+                    [False, True, False],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
             )
         )
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(
-                (5,), prob=0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
+                5, prob=0.5, seed=seed, index=sig['a'].index, name=sig['a'].name),
             pd.Series(
                 np.array([True, False, False, False, True]),
                 index=sig['a'].index,
@@ -346,7 +380,7 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             sig['a'].vbt.signals.generate_random_exits(seed=seed),
             pd.Series(
-                np.array([False, False,  True, False,  True]),
+                np.array([False, False, True, False, True]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
@@ -365,100 +399,255 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_random_exits(seed=seed, wait=0),
+            pd.DataFrame(
+                np.array([
+                    [True, False, False],
+                    [False, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [True, True, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
         pd.testing.assert_series_equal(
-            sig['a'].vbt.signals.generate_random_exits(prob=0.5, seed=seed),
+            sig['a'].vbt.signals.generate_random_exits(prob=1., seed=seed),
             pd.Series(
-                np.array([False, True, False, False, False]),
+                np.array([False, True, False, False, True]),
                 index=sig['a'].index,
                 name=sig['a'].name
             )
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_random_exits(prob=0.5, seed=seed),
+            sig.vbt.signals.generate_random_exits(prob=1., seed=seed),
             pd.DataFrame(
                 np.array([
                     [False, False, False],
                     [True, False, False],
-                    [False, False, False],
-                    [False, False, True],
-                    [False, False, False]
-                ]),
-                index=sig.index,
-                columns=sig.columns
-            )
-        )
-        
-    def test_generate_random_both(self):
-        a, b = pd.Series.vbt.signals.generate_random_both(
-            5, n=1, seed=seed, index=sig['a'].index, name=sig['a'].name)
-        pd.testing.assert_series_equal(
-            a,
-            pd.Series(
-                np.array([False, True, False, False, False]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        pd.testing.assert_series_equal(
-            b,
-            pd.Series(
-                np.array([False, False, False, False, True]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        a, b = pd.Series.vbt.signals.generate_random_both(
-            (5,), n=1, seed=seed, index=sig['a'].index, name=sig['a'].name)
-        pd.testing.assert_series_equal(
-            a,
-            pd.Series(
-                np.array([False, True, False, False, False]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        pd.testing.assert_series_equal(
-            b,
-            pd.Series(
-                np.array([False, False, False, False, True]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        a, b = pd.DataFrame.vbt.signals.generate_random_both(
-            (5, 3), n=1, seed=seed, index=sig.index, columns=sig.columns)
-        pd.testing.assert_frame_equal(
-            a,
-            pd.DataFrame(
-                np.array([
-                    [False, False, True],
-                    [True, True, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False]
-                ]),
-                index=sig.index,
-                columns=sig.columns
-            )
-        )
-        pd.testing.assert_frame_equal(
-            b,
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [False, False, True],
-                    [False, False, False],
                     [False, True, False],
+                    [False, False, True],
                     [True, False, False]
                 ]),
                 index=sig.index,
                 columns=sig.columns
             )
         )
-        a, b = pd.DataFrame.vbt.signals.generate_random_both(
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_random_exits(prob=[0., 0.5, 1.], seed=seed),
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, True, True],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_random_exits(prob=1., wait=0, seed=seed),
+            pd.DataFrame(
+                np.array([
+                    [True, False, False],
+                    [False, True, False],
+                    [False, False, True],
+                    [True, False, False],
+                    [False, True, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+
+    def test_generate_random_both(self):
+        # n
+        en, ex = pd.Series.vbt.signals.generate_random_both(
+            5, n=2, seed=seed, index=sig['a'].index, name=sig['a'].name)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(
+                np.array([True, False, True, False, False]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(
+                np.array([False, True, False, False, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both(
+            (5, 3), n=2, seed=seed, index=sig.index, columns=sig.columns)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [False, False, False],
+                    [True, True, False],
+                    [False, False, True],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, True, True],
+                    [False, False, False],
+                    [False, True, False],
+                    [True, False, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both(
+            (5, 3), n=[0, 1, 2], seed=seed, index=sig.index, columns=sig.columns)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [False, False, True],
+                    [False, True, False],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, False, True],
+                    [False, False, False],
+                    [False, True, False],
+                    [False, False, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both((2, 3), n=2, seed=seed, entry_wait=1, exit_wait=0)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [True, True, True],
+                ])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [True, True, True]
+                ])
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both((3, 3), n=2, seed=seed, entry_wait=0, exit_wait=1)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [True, True, True],
+                    [False, False, False]
+                ])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, True, True],
+                    [True, True, True],
+                ])
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both((7, 3), n=2, seed=seed, entry_wait=2, exit_wait=2)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [True, True, True],
+                    [False, False, False],
+                    [False, False, False]
+                ])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, False, False],
+                    [True, True, True],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [True, True, True]
+                ])
+            )
+        )
+        n = 10
+        a = np.full(n * 2, 0.)
+        for i in range(10000):
+            en, ex = pd.Series.vbt.signals.generate_random_both(1000, n, entry_wait=2, exit_wait=2)
+            _a = np.empty((n * 2,), dtype=np.int_)
+            _a[0::2] = np.flatnonzero(en)
+            _a[1::2] = np.flatnonzero(ex)
+            a += _a
+        greater = a > 10000000 / (2 * n + 1) * np.arange(0, 2 * n)
+        less = a < 10000000 / (2 * n + 1) * np.arange(2, 2 * n + 2)
+        assert np.all(greater & less)
+
+        # probs
+        en, ex = pd.Series.vbt.signals.generate_random_both(
+            5, entry_prob=0.5, exit_prob=1., seed=seed, index=sig['a'].index, name=sig['a'].name)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(
+                np.array([True, False, False, False, True]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(
+                np.array([False, True, False, False, False]),
+                index=sig['a'].index,
+                name=sig['a'].name
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both(
             (5, 3), entry_prob=0.5, exit_prob=1., seed=seed, index=sig.index, columns=sig.columns)
         pd.testing.assert_frame_equal(
-            a,
+            en,
             pd.DataFrame(
                 np.array([
                     [True, True, True],
@@ -472,7 +661,7 @@ class TestAccessors:
             )
         )
         pd.testing.assert_frame_equal(
-            b,
+            ex,
             pd.DataFrame(
                 np.array([
                     [False, False, False],
@@ -485,282 +674,446 @@ class TestAccessors:
                 columns=sig.columns
             )
         )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both(
+            (5, 3), entry_prob=[0., 0.5, 1.], exit_prob=[0., 0.5, 1.],
+            seed=seed, index=sig.index, columns=sig.columns)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [False, True, True],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, False, False],
+                    [False, False, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, True, True],
+                    [False, False, False],
+                    [False, False, True],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        en, ex = pd.DataFrame.vbt.signals.generate_random_both(
+            (5, 3), entry_prob=1., exit_prob=1., exit_wait=0,
+            seed=seed, index=sig.index, columns=sig.columns)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [True, True, True],
+                    [True, True, True],
+                    [True, True, True],
+                    [True, True, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(
+                np.array([
+                    [True, True, True],
+                    [True, True, True],
+                    [True, True, True],
+                    [True, True, True],
+                    [True, True, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        # none
         with pytest.raises(Exception) as e_info:
             pd.DataFrame.vbt.signals.generate_random((5, 3))
 
-    def test_generate_stop_loss_exits(self):
-        ts = pd.Series([1, 2, 3, 2, 1], index=index, name=sig['a'].name)
+    def test_generate_stop_exits(self):
+        e = pd.Series([True, False, False, False, False, False])
+        t = pd.Series([2, 3, 4, 3, 2, 1]).astype(np.float64)
 
+        # stop loss
         pd.testing.assert_series_equal(
-            sig['a'].vbt.signals.generate_stop_loss_exits(ts, 0.1),
-            pd.Series(
-                np.array([False, False, False, False, True]),
-                index=sig['a'].index,
-                name=(0.1, sig['a'].name)
-            )
+            e.vbt.signals.generate_stop_exits(t, -0.1),
+            pd.Series(np.array([False, False, False, False, False, True]))
         )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(ts, 0.1),
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, True],
-                    [True, False, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['stop_loss', None])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(ts, 0.1, first=False),
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, True],
-                    [True, False, True]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['stop_loss', None])
-            )
-        )
-        target = pd.DataFrame(
-            np.array([
-                [False, False, False, False, False, False],
-                [False, False, False, False, False, False],
-                [False, False, False, False, False, False],
-                [False, False, True, False, False, True],
-                [True, False, False, True, False, False]
-            ]),
-            index=sig.index,
-            columns=pd.MultiIndex.from_tuples([
-                (0.1, 'a'),
-                (0.1, 'b'),
-                (0.1, 'c'),
-                (0.2, 'a'),
-                (0.2, 'b'),
-                (0.2, 'c')
-            ], names=['stop_loss', None])
-        )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.2]),
-            target
-        )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(
-                ts, np.concatenate((np.full((1, 5, 3), 0.1), np.full((1, 5, 3), 0.2)))),
-            target
-        )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.2], keys=['sl1', 'sl2']),
-            pd.DataFrame(
-                target.values,
-                index=target.index,
-                columns=pd.MultiIndex.from_tuples([
-                    ('sl1', 'a'),
-                    ('sl1', 'b'),
-                    ('sl1', 'c'),
-                    ('sl2', 'a'),
-                    ('sl2', 'b'),
-                    ('sl2', 'c')
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_stop_loss_exits(ts, [0.1, 0.2], trailing=True),
-            pd.DataFrame(
-                np.array([
-                    [False, False, False, False, False, False],
-                    [False, False, False, False, False, False],
-                    [False, False, False, False, False, False],
-                    [False, True, True, False, True, True],
-                    [True, False, False, True, False, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c'),
-                    (0.2, 'a'),
-                    (0.2, 'b'),
-                    (0.2, 'c')
-                ], names=['trail_stop', None])
-            )
-        )
-        new_entries, new_exits = sig.vbt.signals.generate_stop_loss_exits(ts, 0.1, iteratively=True)
-        pd.testing.assert_frame_equal(
-            new_entries,
-            pd.DataFrame(
-                np.array([
-                    [True, False, False],
-                    [False, True, False],
-                    [False, False, True],
-                    [False, False, False],
-                    [False, False, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['stop_loss', None])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            new_exits,
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, False],
-                    [False, False, True],
-                    [False, True, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['stop_loss', None])
-            )
-        )
-
-    def test_generate_take_profit_exits(self):
-        ts = pd.Series([1, 2, 3, 2, 1], index=index, name=sig['a'].name)
-
         pd.testing.assert_series_equal(
-            sig['a'].vbt.signals.generate_take_profit_exits(ts, 0.1),
-            pd.Series(
-                np.array([False, True, False, False, False]),
-                index=sig['a'].index,
-                name=(0.1, sig['a'].name)
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True),
+            pd.Series(np.array([False, False, False, True, False, False]))
+        )
+        pd.testing.assert_series_equal(
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, first=False),
+            pd.Series(np.array([False, False, False, True, True, True]))
+        )
+        pd.testing.assert_frame_equal(
+            e.vbt.signals.generate_stop_exits(t.vbt.tile(3), [-0., -0.5, -1.], trailing=True, first=False),
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, True, False],
+                [False, True, False]
+            ]))
+        )
+        pd.testing.assert_series_equal(
+            e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=3),
+            pd.Series(np.array([False, False, False, False, True, False]))
+        )
+        # take profit
+        pd.testing.assert_series_equal(
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1),
+            pd.Series(np.array([False, False, False, False, False, True]))
+        )
+        pd.testing.assert_series_equal(
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True),
+            pd.Series(np.array([False, False, False, True, False, False]))
+        )
+        pd.testing.assert_series_equal(
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, first=False),
+            pd.Series(np.array([False, False, False, True, True, True]))
+        )
+        pd.testing.assert_frame_equal(
+            e.vbt.signals.generate_stop_exits((4 - t).vbt.tile(3), [0., 0.5, 1.], trailing=True, first=False),
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, True, True],
+                [False, True, True],
+                [False, True, True]
+            ]))
+        )
+        pd.testing.assert_series_equal(
+            e.vbt.signals.generate_stop_exits(4 - t, 0.1, trailing=True, exit_wait=3),
+            pd.Series(np.array([False, False, False, False, True, False]))
+        )
+        # iteratively
+        e = pd.Series([True, True, True, True, True, True])
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, iteratively=True)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(np.array([True, False, False, False, True, False]))
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(np.array([False, False, False, True, False, True]))
+        )
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, entry_wait=2, iteratively=True)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(np.array([True, False, False, False, False, True]))
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(np.array([False, False, False, True, False, False]))
+        )
+        en, ex = e.vbt.signals.generate_stop_exits(t, -0.1, trailing=True, exit_wait=2, iteratively=True)
+        pd.testing.assert_series_equal(
+            en,
+            pd.Series(np.array([True, False, False, False, True, False]))
+        )
+        pd.testing.assert_series_equal(
+            ex,
+            pd.Series(np.array([False, False, False, True, False, False]))
+        )
+
+    def test_generate_adv_stop_exits(self):
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_stop_exits(ts, -0.1),
+            sig.vbt.signals.generate_adv_stop_exits(ts, sl_stop=0.1)
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True),
+            sig.vbt.signals.generate_adv_stop_exits(ts, ts_stop=0.1)
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_stop_exits(ts, 0.1),
+            sig.vbt.signals.generate_adv_stop_exits(ts, tp_stop=0.1)
+        )
+
+        def _test_adv_stop_exits(**kwargs):
+            out_dict = {'hit_price': np.nan, 'stop_type': -1}
+            result = sig.vbt.signals.generate_adv_stop_exits(
+                price['open'], price['high'], price['low'], price['close'],
+                out_dict=out_dict, **kwargs
             )
+            if isinstance(result, tuple):
+                _, ex = result
+            else:
+                ex = result
+            return result, out_dict['hit_price'], out_dict['stop_type']
+
+        ex, hit_price, stop_type = _test_adv_stop_exits()
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, False, False]
+            ]), index=sig.index, columns=sig.columns)
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_take_profit_exits(ts, 0.1),
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [True, False, False],
-                    [False, True, False],
-                    [False, False, False],
-                    [False, False, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['take_profit', None])
-            )
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan]
+            ]), index=sig.index, columns=sig.columns)
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_take_profit_exits(ts, 0.1, first=False),
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [True, False, False],
-                    [True, True, False],
-                    [False, False, False],
-                    [False, False, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['take_profit', None])
-            )
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, -1]
+            ]), index=sig.index, columns=sig.columns)
         )
-        target = pd.DataFrame(
-            np.array([
-                [False, False, False, False, False, False],
-                [True, False, False, True, False, False],
-                [False, True, False, False, True, False],
-                [False, False, False, False, False, False],
-                [False, False, False, False, False, False]
-            ]),
-            index=sig.index,
-            columns=pd.MultiIndex.from_tuples([
-                (0.1, 'a'),
-                (0.1, 'b'),
-                (0.1, 'c'),
-                (0.2, 'a'),
-                (0.2, 'b'),
-                (0.2, 'c')
-            ], names=['take_profit', None])
+        ex, hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1)
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, False, True],
+                [True, False, False]
+            ]), index=sig.index, columns=sig.columns)
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_take_profit_exits(ts, [0.1, 0.2]),
-            target
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, 10.8],
+                [9.9, np.nan, np.nan]
+            ]), index=sig.index, columns=sig.columns)
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_take_profit_exits(
-                ts, np.concatenate((np.full((1, 5, 3), 0.1), np.full((1, 5, 3), 0.2)))),
-            target
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, 0],
+                [0, -1, -1]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        ex, hit_price, stop_type = _test_adv_stop_exits(ts_stop=0.1)
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, True, True],
+                [True, False, False]
+            ]), index=sig.index, columns=sig.columns)
         )
         pd.testing.assert_frame_equal(
-            sig.vbt.signals.generate_take_profit_exits(ts, [0.1, 0.2], keys=['tp1', 'tp2']),
-            pd.DataFrame(
-                target.values,
-                index=target.index,
-                columns=pd.MultiIndex.from_tuples([
-                    ('tp1', 'a'),
-                    ('tp1', 'b'),
-                    ('tp1', 'c'),
-                    ('tp2', 'a'),
-                    ('tp2', 'b'),
-                    ('tp2', 'c')
-                ])
-            )
-        )
-        new_entries, new_exits = sig.vbt.signals.generate_take_profit_exits(ts, 0.1, iteratively=True)
-        pd.testing.assert_frame_equal(
-            new_entries,
-            pd.DataFrame(
-                np.array([
-                    [True, False, False],
-                    [False, True, False],
-                    [False, False, True],
-                    [True, False, False],
-                    [False, True, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['take_profit', None])
-            )
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, 11.7, 10.8],
+                [9.9, np.nan, np.nan]
+            ]), index=sig.index, columns=sig.columns)
         )
         pd.testing.assert_frame_equal(
-            new_exits,
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [True, False, False],
-                    [False, True, False],
-                    [False, False, False],
-                    [False, False, False]
-                ]),
-                index=sig.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (0.1, 'a'),
-                    (0.1, 'b'),
-                    (0.1, 'c')
-                ], names=['take_profit', None])
-            )
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, 1, 1],
+                [1, -1, -1]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        ex, hit_price, stop_type = _test_adv_stop_exits(tp_stop=0.1)
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [True, False, False],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [11.0, np.nan, np.nan],
+                [np.nan, 12.1, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [2, -1, -1],
+                [-1, 2, -1],
+                [-1, -1, -1],
+                [-1, -1, -1]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        ex, hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1)
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [True, False, False],
+                [False, True, False],
+                [False, False, True],
+                [True, False, False]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [11.0, np.nan, np.nan],
+                [np.nan, 12.1, np.nan],
+                [np.nan, np.nan, 10.8],
+                [9.9, np.nan, np.nan]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [2, -1, -1],
+                [-1, 2, -1],
+                [-1, -1, 0],
+                [0, -1, -1]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        ex, hit_price, stop_type = _test_adv_stop_exits(
+            sl_stop=[0., 0.1, 0.2], ts_stop=[0., 0.1, 0.2], tp_stop=[0., 0.1, 0.2])
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, True, False],
+                [False, False, False],
+                [False, False, True]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, 12.1, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, 9.6]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, 2, -1],
+                [-1, -1, -1],
+                [-1, -1, 0]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        ex, hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1, exit_wait=0)
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [True, False, False],
+                [False, False, False],
+                [False, True, False],
+                [False, False, True],
+                [True, True, False]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            hit_price,
+            pd.DataFrame(np.array([
+                [9.0, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, 12.1, np.nan],
+                [np.nan, np.nan, 10.8],
+                [9.9, 9.0, np.nan]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            stop_type,
+            pd.DataFrame(np.array([
+                [0, -1, -1],
+                [-1, -1, -1],
+                [-1, 2, -1],
+                [-1, -1, 0],
+                [0, 0, -1]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        (en, ex), hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1, iteratively=True)
+        pd.testing.assert_frame_equal(
+            en,
+            pd.DataFrame(np.array([
+                [True, False, False],
+                [False, True, False],
+                [False, False, True],
+                [True, False, False],
+                [False, True, False]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            ex,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [True, False, False],
+                [False, True, False],
+                [False, False, True],
+                [True, False, False]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [11.0, np.nan, np.nan],
+                [np.nan, 12.1, np.nan],
+                [np.nan, np.nan, 10.8],
+                [9.9, np.nan, np.nan]
+            ]), index=sig.index, columns=sig.columns)
+        )
+        pd.testing.assert_frame_equal(
+            stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [2, -1, -1],
+                [-1, 2, -1],
+                [-1, -1, 0],
+                [0, -1, -1]
+            ]), index=sig.index, columns=sig.columns)
         )
 
     def test_map_reduce_between(self):
@@ -1064,5 +1417,904 @@ class TestAccessors:
                 test_func_pd(sig, True),
                 test_func_pd(sig, np.broadcast_to([[True], [False], [False], [False], [False]], (5, 3)))
             ), axis=1, keys=[0, 1], names=['combine_idx'])
+        )
+
+
+# ############# factory.py ############# #
+
+
+class TestFactory:
+    def test_both(self):
+        @njit
+        def cache_nb(ts1, ts2, in_out1, in_out2, n1, n2, arg0, temp_idx_arr0, kw0):
+            return arg0
+
+        @njit
+        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw, cache):
+            in_out[from_i, col] = ts[from_i, col] * n + arg + kw + cache
+            temp_idx_arr[0] = from_i
+            return temp_idx_arr[:1]
+
+        MySignals = vbt.SignalFactory(
+            input_names=['ts1', 'ts2'],
+            in_output_names=['in_out1', 'in_out2'],
+            param_names=['n1', 'n2']
+        ).from_choice_func(
+            cache_func=cache_nb,
+            cache_settings=dict(
+                pass_inputs=['ts1', 'ts2'],
+                pass_in_outputs=['in_out1', 'in_out2'],
+                pass_params=['n1', 'n2'],
+                pass_kwargs=['temp_idx_arr0', ('kw0', 1000)]
+            ),
+            entry_choice_func=choice_nb,
+            entry_settings=dict(
+                pass_inputs=['ts1'],
+                pass_in_outputs=['in_out1'],
+                pass_params=['n1'],
+                pass_kwargs=['temp_idx_arr1', ('kw1', 1000)],
+                pass_cache=True
+            ),
+            exit_choice_func=choice_nb,
+            exit_settings=dict(
+                pass_inputs=['ts2'],
+                pass_in_outputs=['in_out2'],
+                pass_params=['n2'],
+                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)],
+                pass_cache=True
+            ),
+            in_output_settings=dict(
+                in_out1=dict(
+                    dtype=np.float_
+                ),
+                in_out2=dict(
+                    dtype=np.float_
+                )
+            ),
+            in_out1=np.nan,
+            in_out2=np.nan
+        )
+        my_sig = MySignals.run(
+            np.arange(5), np.arange(5), [0, 1], [1, 0],
+            cache_args=(0,), entry_args=(100,), exit_args=(100,)
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, True]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, True],
+                [False, False],
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out1,
+            pd.DataFrame(np.array([
+                [1100.0, 1100.0],
+                [np.nan, np.nan],
+                [1100.0, 1102.0],
+                [np.nan, np.nan],
+                [1100.0, 1104.0]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out2,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan],
+                [1101.0, 1100.0],
+                [np.nan, np.nan],
+                [1103.0, 1100.0],
+                [np.nan, np.nan],
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        my_sig = MySignals.run(
+            np.arange(7), np.arange(7), [0, 1], [1, 0],
+            cache_args=(0,), entry_args=(100,), exit_args=(100,),
+            entry_kwargs=dict(wait=2), exit_kwargs=dict(wait=2)
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [False, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False],
+                [False, False],
+                [True, True]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out1,
+            pd.DataFrame(np.array([
+                [1100.0, 1100.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1100.0, 1104.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out2,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1102.0, 1100.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1106.0, 1100.0]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0, 1), (1, 0)],
+                names=['custom_n1', 'custom_n2'])
+            )
+        )
+
+    def test_exit_only(self):
+        @njit
+        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
+            in_out[from_i, col] = ts[from_i, col] * n + arg + kw
+            temp_idx_arr[0] = from_i
+            return temp_idx_arr[:1]
+
+        MySignals = vbt.SignalFactory(
+            input_names=['ts2'],
+            in_output_names=['in_out2'],
+            param_names=['n2'],
+            exit_only=True
+        ).from_choice_func(
+            exit_choice_func=choice_nb,
+            exit_settings=dict(
+                pass_inputs=['ts2'],
+                pass_in_outputs=['in_out2'],
+                pass_params=['n2'],
+                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)],
+                pass_cache=True
+            ),
+            in_output_settings=dict(
+                in_out2=dict(
+                    dtype=np.float_
+                )
+            ),
+            in_out2=np.nan
+        )
+        e = np.array([True, False, True, False, True])
+        my_sig = MySignals.run(e, np.arange(5), [1, 0], 100)
+        pd.testing.assert_frame_equal(
+            my_sig.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, True]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, True],
+                [False, False]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out2,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan],
+                [1101.0, 1100.0],
+                [np.nan, np.nan],
+                [1103.0, 1100.0],
+                [np.nan, np.nan],
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        e = np.array([True, False, False, True, False, False])
+        my_sig = MySignals.run(e, np.arange(6), [1, 0], 100, wait=2)
+        pd.testing.assert_frame_equal(
+            my_sig.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False],
+                [True, True]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out2,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1102.0, 1100.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1105.0, 1100.0]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+
+    def test_iteratively(self):
+        @njit
+        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
+            in_out[from_i, col] = ts[from_i, col] * n + arg + kw
+            temp_idx_arr[0] = from_i
+            return temp_idx_arr[:1]
+
+        MySignals = vbt.SignalFactory(
+            input_names=['ts2'],
+            in_output_names=['in_out2'],
+            param_names=['n2'],
+            iteratively=True
+        ).from_choice_func(
+            exit_choice_func=choice_nb,
+            exit_settings=dict(
+                pass_inputs=['ts2'],
+                pass_in_outputs=['in_out2'],
+                pass_params=['n2'],
+                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)],
+                pass_cache=True
+            ),
+            in_output_settings=dict(
+                in_out2=dict(
+                    dtype=np.float_
+                )
+            ),
+            in_out2=np.nan
+        )
+        e = np.array([True, True, True, True, True])
+        my_sig = MySignals.run(e, np.arange(5), [1, 0], 100)
+        pd.testing.assert_frame_equal(
+            my_sig.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [True, True],
+                [True, True],
+                [True, True],
+                [True, True]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.new_entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, True]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [True, True],
+                [False, False],
+                [True, True],
+                [False, False]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out2,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan],
+                [1101.0, 1100.0],
+                [np.nan, np.nan],
+                [1103.0, 1100.0],
+                [np.nan, np.nan],
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        e = np.array([True, True, True, True, True, True])
+        my_sig = MySignals.run(e, np.arange(6), [1, 0], 100, wait=2)
+        pd.testing.assert_frame_equal(
+            my_sig.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [True, True],
+                [True, True],
+                [True, True],
+                [True, True],
+                [True, True]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.new_entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False],
+                [True, True]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            my_sig.in_out2,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1102.0, 1100.0],
+                [np.nan, np.nan],
+                [np.nan, np.nan],
+                [1105.0, 1100.0]
+            ]), columns=pd.Int64Index([1, 0], dtype='int64', name='custom_n2')
+            )
+        )
+
+
+# ############# basic.py ############# #
+
+class TestBasic:
+    def test_RAND(self):
+        rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed)
+        pd.testing.assert_series_equal(
+            rand.entries,
+            pd.Series(np.array([True, False, False, False, False, False]), name=1)
+        )
+        pd.testing.assert_series_equal(
+            rand.exits,
+            pd.Series(np.array([False, True, False, False, False, False]), name=1)
+        )
+        rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=seed)
+        pd.testing.assert_frame_equal(
+            rand.entries,
+            pd.DataFrame(np.array([
+                [True, True, True],
+                [False, False, False],
+                [False, True, True],
+                [False, False, False],
+                [False, False, True],
+                [False, False, False]
+            ]), columns=pd.Int64Index([1, 2, 3], dtype='int64', name='rand_n')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            rand.exits,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [True, True, True],
+                [False, False, False],
+                [False, True, True],
+                [False, False, False],
+                [False, False, True]
+            ]), columns=pd.Int64Index([1, 2, 3], dtype='int64', name='rand_n')
+            )
+        )
+        rand = vbt.RAND.run(n=[np.array([1, 2]), np.array([3, 4])], input_shape=(8, 2), seed=seed)
+        pd.testing.assert_frame_equal(
+            rand.entries,
+            pd.DataFrame(np.array([
+                [False, True, True, True],
+                [True, False, False, False],
+                [False, False, False, True],
+                [False, False, True, False],
+                [False, True, False, True],
+                [False, False, True, False],
+                [False, False, False, True],
+                [False, False, False, False]
+            ]), columns=pd.MultiIndex.from_tuples([
+                ('mix_0', 0),
+                ('mix_0', 1),
+                ('mix_1', 0),
+                ('mix_1', 1)
+            ], names=['rand_n', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            rand.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False],
+                [False, False, True, True],
+                [False, False, False, False],
+                [False, True, False, True],
+                [False, False, True, False],
+                [True, False, False, True],
+                [False, False, True, False],
+                [False, True, False, True]
+            ]), columns=pd.MultiIndex.from_tuples([
+                ('mix_0', 0),
+                ('mix_0', 1),
+                ('mix_1', 0),
+                ('mix_1', 1)
+            ], names=['rand_n', None])
+            )
+        )
+
+    def test_RPROB(self):
+        rprob = vbt.RPROB.run(entry_prob=1., exit_prob=1., input_shape=(5,), seed=seed)
+        pd.testing.assert_series_equal(
+            rprob.entries,
+            pd.Series(np.array([True, False, True, False, True]), name=(1.0, 1.0))
+        )
+        pd.testing.assert_series_equal(
+            rprob.exits,
+            pd.Series(np.array([False, True, False, True, False]), name=(1.0, 1.0))
+        )
+        rprob = vbt.RPROB.run(
+            entry_prob=np.asarray([1., 0., 1., 0., 1.]),
+            exit_prob=np.asarray([0., 1., 0., 1., 0.]),
+            input_shape=(5,), seed=seed)
+        pd.testing.assert_series_equal(
+            rprob.entries,
+            pd.Series(np.array([True, False, True, False, True]), name=('mix_0', 'mix_0'))
+        )
+        pd.testing.assert_series_equal(
+            rprob.exits,
+            pd.Series(np.array([False, True, False, True, False]), name=('mix_0', 'mix_0'))
+        )
+        rprob = vbt.RPROB.run(entry_prob=[0.5, 1.], exit_prob=[1., 0.5], input_shape=(5,), seed=seed)
+        pd.testing.assert_frame_equal(
+            rprob.entries,
+            pd.DataFrame(np.array([
+                [True, True],
+                [False, False],
+                [False, True],
+                [False, False],
+                [True, False]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0.5, 1.0), (1.0, 0.5)],
+                names=['rprob_entry_prob', 'rprob_exit_prob'])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            rprob.exits,
+            pd.DataFrame(np.array([
+                [False, False],
+                [True, True],
+                [False, False],
+                [False, False],
+                [False, False]
+            ]), columns=pd.MultiIndex.from_tuples(
+                [(0.5, 1.0), (1.0, 0.5)],
+                names=['rprob_entry_prob', 'rprob_exit_prob'])
+            )
+        )
+
+    def test_RPROBEX(self):
+        rprobex = vbt.RPROBEX.run(sig, prob=[0., 0.5, 1.], seed=seed)
+        pd.testing.assert_frame_equal(
+            rprobex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, True, False, False],
+                [False, False, False, False, True, False, False, True, False],
+                [False, False, False, False, False, False, False, False, True],
+                [False, False, False, False, False, False, True, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.0, 'a'),
+                (0.0, 'b'),
+                (0.0, 'c'),
+                (0.5, 'a'),
+                (0.5, 'b'),
+                (0.5, 'c'),
+                (1.0, 'a'),
+                (1.0, 'b'),
+                (1.0, 'c')
+            ], names=['rprobex_prob', None])
+            )
+        )
+
+    def test_IRPROBEX(self):
+        irprobex = vbt.IRPROBEX.run(sig, prob=[0., 0.5, 1.], seed=seed)
+        pd.testing.assert_frame_equal(
+            irprobex.new_entries,
+            pd.DataFrame(np.array([
+                [True, False, False, True, False, False, True, False, False],
+                [False, True, False, False, True, False, False, True, False],
+                [False, False, True, False, False, True, False, False, True],
+                [False, False, False, True, False, False, True, False, False],
+                [False, False, False, False, True, False, False, True, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.0, 'a'),
+                (0.0, 'b'),
+                (0.0, 'c'),
+                (0.5, 'a'),
+                (0.5, 'b'),
+                (0.5, 'c'),
+                (1.0, 'a'),
+                (1.0, 'b'),
+                (1.0, 'c')
+            ], names=['irprobex_prob', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            irprobex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, True, False, False],
+                [False, False, False, True, False, False, False, True, False],
+                [False, False, False, False, True, True, False, False, True],
+                [False, False, False, False, False, False, True, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.0, 'a'),
+                (0.0, 'b'),
+                (0.0, 'c'),
+                (0.5, 'a'),
+                (0.5, 'b'),
+                (0.5, 'c'),
+                (1.0, 'a'),
+                (1.0, 'b'),
+                (1.0, 'c')
+            ], names=['irprobex_prob', None])
+            )
+        )
+
+    def test_STEX(self):
+        stex = vbt.STEX.run(sig, ts, 0.1)
+        pd.testing.assert_frame_equal(
+            stex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [True, False, False],
+                [False, True, False],
+                [False, False, False],
+                [False, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 'a'),
+                (0.1, 'b'),
+                (0.1, 'c')
+            ], names=['stex_stop', None])
+            )
+        )
+        stex = vbt.STEX.run(sig, ts, np.asarray([0.1, 0.1, -0.1, -0.1, -0.1])[:, None])
+        pd.testing.assert_frame_equal(
+            stex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [True, False, False],
+                [False, True, False],
+                [False, False, True],
+                [True, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                ('mix_0', 'a'),
+                ('mix_0', 'b'),
+                ('mix_0', 'c')
+            ], names=['stex_stop', None])
+            )
+        )
+        stex = vbt.STEX.run(sig, ts, [0.1, 0.1, -0.1, -0.1], trailing=[False, True, False, True])
+        pd.testing.assert_frame_equal(
+            stex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False, False, False, False, False, False, False, False, False],
+                [True, False, False, True, False, False, False, False, False, False, False, False],
+                [False, True, False, False, True, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, False, False, True, False, True, True],
+                [False, False, False, False, False, False, True, False, False, True, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, False, 'a'),
+                (0.1, False, 'b'),
+                (0.1, False, 'c'),
+                (0.1, True, 'a'),
+                (0.1, True, 'b'),
+                (0.1, True, 'c'),
+                (-0.1, False, 'a'),
+                (-0.1, False, 'b'),
+                (-0.1, False, 'c'),
+                (-0.1, True, 'a'),
+                (-0.1, True, 'b'),
+                (-0.1, True, 'c')
+            ], names=['stex_stop', 'stex_trailing', None])
+            )
+        )
+
+    def test_ISTEX(self):
+        istex = vbt.ISTEX.run(sig, ts, [0.1, 0.1, -0.1, -0.1], trailing=[False, True, False, True])
+        pd.testing.assert_frame_equal(
+            istex.new_entries,
+            pd.DataFrame(np.array([
+                [True, False, False, True, False, False, True, False, False, True, False, False],
+                [False, True, False, False, True, False, False, True, False, False, True, False],
+                [False, False, True, False, False, True, False, False, True, False, False, True],
+                [True, False, False, True, False, False, False, False, False, False, False, False],
+                [False, True, False, False, True, False, False, False, False, False, True, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, False, 'a'),
+                (0.1, False, 'b'),
+                (0.1, False, 'c'),
+                (0.1, True, 'a'),
+                (0.1, True, 'b'),
+                (0.1, True, 'c'),
+                (-0.1, False, 'a'),
+                (-0.1, False, 'b'),
+                (-0.1, False, 'c'),
+                (-0.1, True, 'a'),
+                (-0.1, True, 'b'),
+                (-0.1, True, 'c')
+            ], names=['istex_stop', 'istex_trailing', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            istex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False, False, False, False, False, False, False, False, False],
+                [True, False, False, True, False, False, False, False, False, False, False, False],
+                [False, True, False, False, True, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, False, False, True, True, True, True],
+                [False, False, False, False, False, False, False, True, False, False, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, False, 'a'),
+                (0.1, False, 'b'),
+                (0.1, False, 'c'),
+                (0.1, True, 'a'),
+                (0.1, True, 'b'),
+                (0.1, True, 'c'),
+                (-0.1, False, 'a'),
+                (-0.1, False, 'b'),
+                (-0.1, False, 'c'),
+                (-0.1, True, 'a'),
+                (-0.1, True, 'b'),
+                (-0.1, True, 'c')
+            ], names=['istex_stop', 'istex_trailing', None])
+            )
+        )
+
+    def test_ADVSTEX(self):
+        advstex = vbt.ADVSTEX.run(
+            sig, price['open'], price['high'], price['low'], price['close'],
+            sl_stop=0.1
+        )
+        pd.testing.assert_frame_equal(
+            advstex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False],
+                [False, False, False],
+                [False, False, False],
+                [False, False, True],
+                [True, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 'a'),
+                (0.1, 'b'),
+                (0.1, 'c')
+            ], names=['advstex_sl_stop', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            advstex.hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan],
+                [np.nan, np.nan, 10.8],
+                [9.9, np.nan, np.nan]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 'a'),
+                (0.1, 'b'),
+                (0.1, 'c')
+            ], names=['advstex_sl_stop', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            advstex.stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, -1],
+                [-1, -1, 0],
+                [0, -1, -1]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 'a'),
+                (0.1, 'b'),
+                (0.1, 'c')
+            ], names=['advstex_sl_stop', None])
+            )
+        )
+        advstex = vbt.ADVSTEX.run(
+            sig, price['open'], price['high'], price['low'], price['close'],
+            sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
+        )
+        pd.testing.assert_frame_equal(
+            advstex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, True, False, False],
+                [False, False, False, False, False, False, False, True, False],
+                [False, False, True, False, True, True, False, False, False],
+                [True, False, False, True, False, False, False, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 0., 0., 'a'),
+                (0.1, 0., 0., 'b'),
+                (0.1, 0., 0., 'c'),
+                (0., 0.1, 0., 'a'),
+                (0., 0.1, 0., 'b'),
+                (0., 0.1, 0., 'c'),
+                (0., 0., 0.1, 'a'),
+                (0., 0., 0.1, 'b'),
+                (0., 0., 0.1, 'c')
+            ], names=['advstex_sl_stop', 'advstex_ts_stop', 'advstex_tp_stop', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            advstex.hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11., np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 12.1, np.nan],
+                [np.nan, np.nan, 10.8, np.nan, 11.7, 10.8, np.nan, np.nan, np.nan],
+                [9.9, np.nan, np.nan, 9.9, np.nan, np.nan, np.nan, np.nan, np.nan]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 0., 0., 'a'),
+                (0.1, 0., 0., 'b'),
+                (0.1, 0., 0., 'c'),
+                (0., 0.1, 0., 'a'),
+                (0., 0.1, 0., 'b'),
+                (0., 0.1, 0., 'c'),
+                (0., 0., 0.1, 'a'),
+                (0., 0., 0.1, 'b'),
+                (0., 0., 0.1, 'c')
+            ], names=['advstex_sl_stop', 'advstex_ts_stop', 'advstex_tp_stop', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            advstex.stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, 2, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, 2, -1],
+                [-1, -1, 0, -1, 1, 1, -1, -1, -1],
+                [0, -1, -1, 1, -1, -1, -1, -1, -1]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 0., 0., 'a'),
+                (0.1, 0., 0., 'b'),
+                (0.1, 0., 0., 'c'),
+                (0., 0.1, 0., 'a'),
+                (0., 0.1, 0., 'b'),
+                (0., 0.1, 0., 'c'),
+                (0., 0., 0.1, 'a'),
+                (0., 0., 0.1, 'b'),
+                (0., 0., 0.1, 'c')
+            ], names=['advstex_sl_stop', 'advstex_ts_stop', 'advstex_tp_stop', None])
+            )
+        )
+
+    def test_IADVSTEX(self):
+        iadvstex = vbt.IADVSTEX.run(
+            sig, price['open'], price['high'], price['low'], price['close'],
+            sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
+        )
+        pd.testing.assert_frame_equal(
+            iadvstex.exits,
+            pd.DataFrame(np.array([
+                [False, False, False, False, False, False, False, False, False],
+                [False, False, False, False, False, False, True, False, False],
+                [False, False, False, False, False, False, False, True, False],
+                [False, False, True, True, True, True, False, False, False],
+                [True, True, False, False, False, False, False, False, False]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 0., 0., 'a'),
+                (0.1, 0., 0., 'b'),
+                (0.1, 0., 0., 'c'),
+                (0., 0.1, 0., 'a'),
+                (0., 0.1, 0., 'b'),
+                (0., 0.1, 0., 'c'),
+                (0., 0., 0.1, 'a'),
+                (0., 0., 0.1, 'b'),
+                (0., 0., 0.1, 'c')
+            ], names=['iadvstex_sl_stop', 'iadvstex_ts_stop', 'iadvstex_tp_stop', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            iadvstex.hit_price,
+            pd.DataFrame(np.array([
+                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11., np.nan, np.nan],
+                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 12.1, np.nan],
+                [np.nan, np.nan, 10.8, 11.7, 11.7, 10.8, np.nan, np.nan, np.nan],
+                [9., 9.9, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 0., 0., 'a'),
+                (0.1, 0., 0., 'b'),
+                (0.1, 0., 0., 'c'),
+                (0., 0.1, 0., 'a'),
+                (0., 0.1, 0., 'b'),
+                (0., 0.1, 0., 'c'),
+                (0., 0., 0.1, 'a'),
+                (0., 0., 0.1, 'b'),
+                (0., 0., 0.1, 'c')
+            ], names=['iadvstex_sl_stop', 'iadvstex_ts_stop', 'iadvstex_tp_stop', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            iadvstex.stop_type,
+            pd.DataFrame(np.array([
+                [-1, -1, -1, -1, -1, -1, -1, -1, -1],
+                [-1, -1, -1, -1, -1, -1, 2, -1, -1],
+                [-1, -1, -1, -1, -1, -1, -1, 2, -1],
+                [-1, -1, 0, 1, 1, 1, -1, -1, -1],
+                [0, 0, -1, -1, -1, -1, -1, -1, -1]
+            ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
+                (0.1, 0., 0., 'a'),
+                (0.1, 0., 0., 'b'),
+                (0.1, 0., 0., 'c'),
+                (0., 0.1, 0., 'a'),
+                (0., 0.1, 0., 'b'),
+                (0., 0.1, 0., 'c'),
+                (0., 0., 0.1, 'a'),
+                (0., 0., 0.1, 'b'),
+                (0., 0., 0.1, 'c')
+            ], names=['iadvstex_sl_stop', 'iadvstex_ts_stop', 'iadvstex_tp_stop', None])
+            )
         )
 

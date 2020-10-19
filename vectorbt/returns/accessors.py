@@ -127,8 +127,8 @@ class Returns_Accessor(Generic_Accessor):
 
         Expresses the chance that the advertized strategy has a positive Sharpe ratio.
 
-        If `var_sharpe` is `None`, is calculated based on all columns.
-        If `nb_trials` is `None`, is set to the number of columns."""
+        If `var_sharpe` is None, is calculated based on all columns.
+        If `nb_trials` is None, is set to the number of columns."""
         sharpe_ratio = reshape_fns.to_1d(self.sharpe_ratio(risk_free=risk_free), raw=True)
         if var_sharpe is None:
             var_sharpe = np.var(sharpe_ratio, ddof=ddof)

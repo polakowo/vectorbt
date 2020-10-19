@@ -7,6 +7,7 @@ import pytest
 
 import vectorbt as vbt
 from vectorbt import defaults
+from vectorbt.utils.random import set_seed
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.portfolio.enums import (
     SizeType,
@@ -17,7 +18,7 @@ from vectorbt.portfolio.enums import (
     NoOrder,
     InitCashMode
 )
-from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
+from vectorbt.portfolio.nb import auto_call_seq_ctx_nb, build_call_seq_nb, build_call_seq
 from vectorbt.records import order_dt, trade_dt, position_dt
 
 from tests.utils import record_arrays_close
@@ -40,6 +41,26 @@ big_price = pd.DataFrame(np.random.uniform(size=(1000,)))
 big_price.index = [datetime(2018, 1, 1) + timedelta(days=i) for i in range(1000)]
 big_price_wide = big_price.vbt.tile(1000)
 
+
+# ############# nb ############# #
+
+def test_build_call_seq_nb():
+    group_counts = np.array([1, 2, 3, 4])
+    np.testing.assert_array_equal(
+        build_call_seq_nb((10, 10), group_counts, CallSeqType.Default),
+        build_call_seq((10, 10), group_counts, CallSeqType.Default)
+    )
+    np.testing.assert_array_equal(
+        build_call_seq_nb((10, 10), group_counts, CallSeqType.Reversed),
+        build_call_seq((10, 10), group_counts, CallSeqType.Reversed)
+    )
+    set_seed(seed)
+    out1 = build_call_seq_nb((10, 10), group_counts, CallSeqType.Random)
+    set_seed(seed)
+    out2 = build_call_seq((10, 10), group_counts, CallSeqType.Random)
+    np.testing.assert_array_equal(out1, out2)
+
+
 # ############# from_signals ############# #
 
 entries = pd.Series([True, True, True, False, False], index=price.index)
@@ -51,6 +72,13 @@ exits_wide = exits.vbt.tile(3, keys=['a', 'b', 'c'])
 
 class TestFromSignals:
     def test_one_column(self):
+        portfolio = vbt.Portfolio.from_signals(price.tolist(), entries.tolist(), exits.tolist())
+        record_arrays_close(
+            portfolio.orders().records_arr,
+            np.array([
+                (0, 0, 100., 1., 0., 0), (0, 3, 100., 4., 0., 1)
+            ], dtype=order_dt)
+        )
         portfolio = vbt.Portfolio.from_signals(price, entries, exits)
         record_arrays_close(
             portfolio.orders().records_arr,
@@ -369,6 +397,14 @@ order_size_one = pd.Series([1, -1, np.nan, 1, -1], index=price.index)
 
 class TestFromOrders:
     def test_one_column(self):
+        portfolio = vbt.Portfolio.from_orders(price.tolist(), order_size.tolist())
+        record_arrays_close(
+            portfolio.orders().records_arr,
+            np.array([
+                (0, 0, 100., 1., 0., 0), (0, 1, 100., 2., 0., 1),
+                (0, 3, 50., 4., 0., 0), (0, 4, 50., 5., 0., 1)
+            ], dtype=order_dt)
+        )
         portfolio = vbt.Portfolio.from_orders(price, order_size)
         record_arrays_close(
             portfolio.orders().records_arr,
@@ -844,6 +880,15 @@ class TestFromOrderFunc:
         [False, True],
     )
     def test_one_column(self, test_row_wise):
+        portfolio = vbt.Portfolio.from_order_func(price.tolist(), order_func_nb, np.inf, row_wise=test_row_wise)
+        record_arrays_close(
+            portfolio.orders().records_arr,
+            np.array([
+                (0, 0, 100., 1., 0., 0), (0, 1, 100., 2., 0., 1),
+                (0, 2, 66.66666667, 3., 0., 0), (0, 3, 66.66666667, 4., 0., 1),
+                (0, 4, 53.33333333, 5., 0., 0)
+            ], dtype=order_dt)
+        )
         portfolio = vbt.Portfolio.from_order_func(price, order_func_nb, np.inf, row_wise=test_row_wise)
         record_arrays_close(
             portfolio.orders().records_arr,

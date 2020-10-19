@@ -7,13 +7,14 @@
     
     All functions passed as argument should be Numba-compiled.
 
-    Returned indices must be absolute."""
+    Returned indices should be absolute."""
 
 from numba import njit
 import numpy as np
 
-from vectorbt.base import combine_fns
-from vectorbt.generic import nb as generic_nb
+from vectorbt.base.reshape_fns import flex_select_auto_nb
+from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb
+from vectorbt.signals.enums import StopType
 
 
 # ############# Signal generation ############# #
@@ -23,9 +24,9 @@ from vectorbt.generic import nb as generic_nb
 def generate_nb(shape, choice_func_nb, *args):
     """Create a boolean matrix of `shape` and pick signals using `choice_func_nb`.
 
-    `choice_func_nb` must accept index of the current column `col`, index of the start
+    `choice_func_nb` should accept index of the current column `col`, index of the start
     of the range `from_i`, index of the end of the range `to_i`, and `*args`.
-    It must return an array of indices from `[from_i, to_i)` (can be empty).
+    It should return an array of indices from `[from_i, to_i)` (can be empty).
 
     Example:
         ```python-repl
@@ -53,8 +54,13 @@ def generate_nb(shape, choice_func_nb, *args):
 
 
 @njit
-def generate_ex_nb(entries, exit_choice_func_nb, *args):
+def generate_ex_nb(entries, wait, exit_choice_func_nb, *args):
     """Pick exit signals using `exit_choice_func_nb` after each signal in `entries`.
+
+    Set `wait` to a number of ticks to wait before placing exits.
+
+    !!! note
+        Setting `wait` to 0 or False may result in two signals at one tick.
 
     `exit_choice_func_nb` is same as for `generate_nb`."""
     exits = np.full_like(entries, False)
@@ -63,56 +69,73 @@ def generate_ex_nb(entries, exit_choice_func_nb, *args):
         entry_idxs = np.flatnonzero(entries[:, col])
         for i in range(entry_idxs.shape[0]):
             # Calculate the range to choose from
-            prev_idx = entry_idxs[i]
+            from_i = entry_idxs[i] + wait
             if i < entry_idxs.shape[0] - 1:
-                next_idx = entry_idxs[i + 1]
+                to_i = entry_idxs[i + 1]
             else:
-                next_idx = entries.shape[0]
-            if prev_idx < entries.shape[0] - 1:
-                if next_idx - prev_idx > 1:
-                    # Run the UDF
-                    from_i = prev_idx + 1
-                    to_i = next_idx
-                    idxs = exit_choice_func_nb(col, from_i, to_i, *args)
-                    if np.any(idxs < from_i) or np.any(idxs >= to_i):
-                        raise ValueError("Returned indices are out of bounds")
-                    exits[idxs, col] = True
+                to_i = entries.shape[0]
+            if to_i > from_i:
+                # Run the UDF
+                idxs = exit_choice_func_nb(col, from_i, to_i, *args)
+                if np.any(idxs < from_i) or np.any(idxs >= to_i):
+                    raise ValueError("Returned indices are out of bounds")
+                exits[idxs, col] = True
     return exits
 
 
 @njit
-def generate_enex_nb(shape, entry_choice_func_nb, exit_choice_func_nb, entry_args, exit_args):
+def generate_enex_nb(shape, entry_wait, exit_wait, entry_choice_func_nb,
+                     entry_args, exit_choice_func_nb, exit_args):
     """Pick entry signals using `entry_choice_func_nb` and exit signals using 
     `exit_choice_func_nb` iteratively.
 
+    Set `entry_wait`/`exit_wait` to a number of ticks to wait before placing entries/exits.
+
+    !!! note
+        Setting `entry_wait` or `exit_wait` to 0 or False may result in two signals at one tick.
+
     `entry_choice_func_nb` and `exit_choice_func_nb` are same as for `generate_nb`.
-    `entry_args` and `exit_args` must be tuples that will be unpacked and passed to
+    `entry_args` and `exit_args` should be tuples that will be unpacked and passed to
     each function respectively.
 
     If any function returns multiple values, only the first value will be picked."""
     entries = np.full(shape, False)
     exits = np.full(shape, False)
+    if entry_wait == 0 and exit_wait == 0:
+        raise ValueError("entry_wait and exit_wait cannot be both 0")
 
     for col in range(shape[1]):
-        prev_idx = -1
+        prev_prev_i = -2
+        prev_i = -1
         i = 0
-        while prev_idx < shape[0] - 1:
-            from_i = prev_idx + 1
+        while True:
             to_i = shape[0]
+            # Cannot assign two functions to a var in numba
             if i % 2 == 0:
-                # Cannot assign two functions to a var in numba
+                if i == 0:
+                    from_i = 0
+                else:
+                    from_i = prev_i + entry_wait
+                if from_i >= to_i:
+                    break
                 idxs = entry_choice_func_nb(col, from_i, to_i, *entry_args)
                 a = entries
             else:
+                from_i = prev_i + exit_wait
+                if from_i >= to_i:
+                    break
                 idxs = exit_choice_func_nb(col, from_i, to_i, *exit_args)
                 a = exits
             if len(idxs) == 0:
                 break
-            next_idx = idxs[0]
-            if next_idx < from_i or next_idx >= to_i:
+            found_i = idxs[0]
+            if found_i == prev_i == prev_prev_i:
+                raise ValueError("Infinite loop detected")
+            if found_i < from_i or found_i >= to_i:
                 raise ValueError("Returned index is out of bounds")
-            a[next_idx, col] = True
-            prev_idx = next_idx
+            a[found_i, col] = True
+            prev_prev_i = prev_i
+            prev_i = found_i
             i += 1
     return entries, exits
 
@@ -124,7 +147,7 @@ def generate_enex_nb(shape, entry_choice_func_nb, exit_choice_func_nb, entry_arg
 def shuffle_1d_nb(a, seed=None):
     """Shuffle each column in `a`.
 
-    Specify seed to make output deterministic."""
+    Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
     return np.random.permutation(a)
@@ -144,15 +167,19 @@ def shuffle_nb(a, seed=None):
 
 @njit(cache=True)
 def rand_choice_nb(col, from_i, to_i, n):
-    """`choice_func_nb` to randomly pick `n` values from range `[from_i, to_i)`."""
-    return np.random.choice(np.arange(from_i, to_i), size=n, replace=False)
+    """`choice_func_nb` to randomly pick `n` values from range `[from_i, to_i)`.
+
+    `n` uses flexible indexing."""
+    ns = np.asarray(n)
+    return from_i + np.random.choice(to_i - from_i, size=flex_select_auto_nb(0, col, ns, True), replace=False)
 
 
 @njit
 def generate_rand_nb(shape, n, seed=None):
-    """Create a boolean matrix of `shape` and pick `n` signals randomly.
+    """Create a boolean matrix of `shape` and pick a number of signals randomly.
 
-    Specify seed to make output deterministic.
+    Specify `seed` to make output deterministic.
+
     See `rand_choice_nb`."""
     if seed is not None:
         np.random.seed(seed)
@@ -160,237 +187,503 @@ def generate_rand_nb(shape, n, seed=None):
 
 
 @njit(cache=True)
-def rand_by_prob_choice_nb(col, from_i, to_i, probs, return_first):
-    """`choice_func_nb` to randomly pick values from range `[from_i, to_i)` with probabilities `probs`.
+def rand_by_prob_choice_nb(col, from_i, to_i, prob, first, temp_idx_arr, flex_2d):
+    """`choice_func_nb` to randomly pick values from range `[from_i, to_i)` with probability `prob`.
 
-    `probs` must be a 1-dim array."""
-    out = np.empty(to_i - from_i, dtype=np.int_)
+    `prob` uses flexible indexing."""
+    probs = np.asarray(prob)
     j = 0
-    for i in np.arange(from_i, to_i):
-        if np.random.uniform(0, 1) <= probs[i, col]:
-            out[j] = i
+    for i in range(from_i, to_i):
+        if np.random.uniform(0, 1) < flex_select_auto_nb(i, col, probs, flex_2d):  # [0, 1)
+            temp_idx_arr[j] = i
             j += 1
-            if return_first:
+            if first:
                 break
-    return out[:j]
+    return temp_idx_arr[:j]
 
 
 @njit
-def generate_rand_by_prob_nb(shape, probs, seed=None):
-    """Create a boolean matrix of `shape` and pick signals randomly by probabilities `probs`.
+def generate_rand_by_prob_nb(shape, prob, flex_2d, seed=None):
+    """Create a boolean matrix of `shape` and pick signals randomly by probability `prob`.
 
-    `probs` must be a 2-dim array of shape `shape`.
-    Specify seed to make output deterministic.
+    `prob` should be a 2-dim array of shape `shape`.
+    Specify `seed` to make output deterministic.
 
     See `rand_by_prob_choice_nb`."""
     if seed is not None:
         np.random.seed(seed)
-    return generate_nb(shape, rand_by_prob_choice_nb, probs, False)
+    temp_idx_arr = np.empty(shape[0], dtype=np.int_)
+    return generate_nb(shape, rand_by_prob_choice_nb, prob, False, temp_idx_arr, flex_2d)
 
 
-# ############# Exits ############# #
+# ############# Random exits ############# #
 
 @njit
-def generate_rand_ex_nb(entries, seed=None):
+def generate_rand_ex_nb(entries, wait, seed=None):
     """Pick an exit after each entry in `entries`.
 
-    Specify seed to make output deterministic."""
+    Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    return generate_ex_nb(entries, rand_choice_nb, 1)
+    return generate_ex_nb(entries, wait, rand_choice_nb, np.full(entries.shape[1], 1))
 
 
 @njit
-def generate_rand_ex_by_prob_nb(entries, probs, seed=None):
-    """Pick an exit after each entry in `entries` by probabilities `probs`.
+def generate_rand_ex_by_prob_nb(entries, prob, wait, flex_2d, seed=None):
+    """Pick an exit after each entry in `entries` by probability `prob`.
 
-    `probs` must be a 2-dim array of shape `shape`.
-    Specify seed to make output deterministic."""
+    `prob` should be a 2-dim array of shape `shape`.
+    Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
-    return generate_ex_nb(entries, rand_by_prob_choice_nb, probs, True)
+    temp_idx_arr = np.empty(entries.shape[0], dtype=np.int_)
+    return generate_ex_nb(entries, wait, rand_by_prob_choice_nb, prob, True, temp_idx_arr, flex_2d)
 
 
 @njit
-def generate_rand_enex_nb(shape, n, seed=None):
-    """Pick `n` entries and the same number of exits one after another.
+def generate_rand_enex_nb(shape, n, entry_wait, exit_wait, seed=None):
+    """Pick a number of entries and the same number of exits one after another.
 
-    Specify seed to make output deterministic."""
+    Respects `entry_wait` and `exit_wait` constraints through a number of tricks.
+    Tries to mimic a uniform distribution as much as possible.
+
+    The idea is the following: with constraints, there is some fixed amount of total
+    space required between first entry and last exit. Upscale this space in a way that
+    distribution of entries and exit is similar to a uniform distribution. This means
+    randomizing the position of first entry, last exit, and all signals between them.
+
+    `n` uses flexible indexing.
+    Specify `seed` to make output deterministic."""
+    if seed is not None:
+        np.random.seed(seed)
     entries = np.full(shape, False)
     exits = np.full(shape, False)
-    both = generate_rand_nb(shape, n * 2, seed=seed)
+    if entry_wait == 0 and exit_wait == 0:
+        raise ValueError("entry_wait and exit_wait cannot be both 0")
 
-    for col in range(both.shape[1]):
-        both_idxs = np.flatnonzero(both[:, col])
-        entries[both_idxs[0::2], col] = True
-        exits[both_idxs[1::2], col] = True
+    if entry_wait == 1 and exit_wait == 1:
+        # Basic case
+        both = generate_rand_nb(shape, n * 2, seed=None)
+        for col in range(both.shape[1]):
+            both_idxs = np.flatnonzero(both[:, col])
+            entries[both_idxs[0::2], col] = True
+            exits[both_idxs[1::2], col] = True
+    else:
+        ns = np.asarray(n)
+        for col in range(shape[1]):
+            _n = flex_select_auto_nb(0, col, ns, True)
+            if _n == 1:
+                entry_idx = np.random.randint(0, shape[0] - exit_wait)
+                entries[entry_idx, col] = True
+            else:
+                # Minimum range between two entries
+                min_range = entry_wait + exit_wait
 
+                # Minimum total range between first and last entry
+                min_total_range = min_range * (_n - 1)
+                if shape[0] < min_total_range + exit_wait + 1:
+                    raise ValueError("Cannot take a larger sample than population")
+
+                # We should decide how much space should be allocate before first and after last entry
+                # Maximum space outside of min_total_range
+                max_free_space = shape[0] - min_total_range - 1
+
+                # If min_total_range is tiny compared to max_free_space, limit it
+                # otherwise we would have huge space before first and after last entry
+                # Limit it such as distribution of entries mimics uniform
+                free_space = min(max_free_space, 3 * shape[0] // (_n + 1))
+
+                # What about last exit? it requires exit_wait space
+                free_space -= exit_wait
+
+                # Now we need to distribute free space among three ranges:
+                # 1) before first, 2) between first and last added to min_total_range, 3) after last
+                # We do 2) such that min_total_range can freely expand to maximum
+                # We allocate twice as much for 3) as for 1) because an exit is missing
+                rand_floats = uniform_summing_to_one_nb(6)
+                chosen_spaces = rescale_float_to_int_nb(rand_floats, (0, free_space), free_space)
+                first_idx = chosen_spaces[0]
+                last_idx = shape[0] - np.sum(chosen_spaces[-2:]) - exit_wait - 1
+
+                # Selected range between first and last entry
+                total_range = last_idx - first_idx
+
+                # Maximum range between two entries within total_range
+                max_range = total_range - (_n - 2) * min_range
+
+                # Select random ranges within total_range
+                rand_floats = uniform_summing_to_one_nb(_n - 1)
+                chosen_ranges = rescale_float_to_int_nb(rand_floats, (min_range, max_range), total_range)
+
+                # Translate them into entries
+                entry_idxs = np.empty(_n, dtype=np.int_)
+                entry_idxs[0] = first_idx
+                entry_idxs[1:] = chosen_ranges
+                entry_idxs = np.cumsum(entry_idxs)
+                entries[entry_idxs, col] = True
+
+        # Generate exits
+        for col in range(shape[1]):
+            entry_idxs = np.flatnonzero(entries[:, col])
+            for j in range(len(entry_idxs)):
+                entry_i = entry_idxs[j] + exit_wait
+                if j < len(entry_idxs) - 1:
+                    exit_i = entry_idxs[j + 1] - entry_wait
+                else:
+                    exit_i = entries.shape[0] - 1
+                i = np.random.randint(exit_i - entry_i + 1)
+                exits[entry_i + i, col] = True
     return entries, exits
 
 
-@njit
-def generate_rand_enex_by_prob_nb(shape, entry_probs, exit_probs, seed=None):
-    """Pick entries by probabilities `entry_probs` and exits by probabilities `exit_probs` one after another.
+def rand_enex_apply_nb(input_shape, n, entry_wait, exit_wait):
+    """`apply_func_nb` that calls `generate_rand_enex_nb`."""
+    return generate_rand_enex_nb(input_shape, n, entry_wait, exit_wait)
 
-    `entry_probs` and `exit_probs` must be 2-dim arrays of shape `shape`.
-    Specify seed to make output deterministic."""
+
+@njit
+def generate_rand_enex_by_prob_nb(shape, entry_prob, exit_prob, entry_wait, exit_wait, flex_2d, seed=None):
+    """Pick entries by probability `entry_prob` and exits by probability `exit_prob` one after another.
+
+    `entry_prob` and `exit_prob` should be 2-dim arrays of shape `shape`.
+    Specify `seed` to make output deterministic."""
     if seed is not None:
         np.random.seed(seed)
+    temp_idx_arr = np.empty(shape[0], dtype=np.int_)
     return generate_enex_nb(
         shape,
-        rand_by_prob_choice_nb,
-        rand_by_prob_choice_nb,
-        (entry_probs, True),
-        (exit_probs, True)
+        entry_wait, exit_wait,
+        rand_by_prob_choice_nb, (entry_prob, True, temp_idx_arr, flex_2d),
+        rand_by_prob_choice_nb, (exit_prob, True, temp_idx_arr, flex_2d)
+    )
+
+
+# ############# Stop exits ############# #
+
+
+@njit(cache=True)
+def first_choice_nb(col, from_i, to_i, a):
+    """`choice_func_nb` that returns the index of the first signal in `a`."""
+    out = np.empty((1,), dtype=np.int_)
+    for i in range(from_i, to_i):
+        if a[i, col]:
+            out[0] = i
+            return out
+    return out[:0]  # empty
+
+
+@njit(cache=True)
+def stop_choice_nb(col, from_i, to_i, ts, stop, trailing, wait, first, temp_idx_arr, flex_2d):
+    """`choice_func_nb` that returns the indices of the stop being reached.
+
+    Args:
+        col (int): Current column.
+        from_i (int): Index to start generation from (inclusive).
+        to_i (int): Index to run generation to (exclusive).
+        ts (array_like): 2-dim time series array such as price.
+        stop (float or array_like): Stop value for stop loss.
+
+            Can be per frame, column, row, or element-wise. Set to 0. to disable.
+        trailing (bool or array_like): Whether to use trailing stop.
+
+            Can be per frame, column, row, or element-wise.
+        wait (bool or int): Number of ticks to wait before placing exits.
+
+            Setting False or 0 may result in two signals at one tick.
+        first (bool): Whether to stop as soon as the first exit signal is found.
+        temp_idx_arr (int): Empty integer array used to temporarily store indices.
+        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`."""
+    stops = np.asarray(stop)
+    trailings = np.asarray(trailing)
+
+    j = 0
+    min_i = max_i = init_i = from_i - wait
+    init_ts = flex_select_auto_nb(init_i, col, ts, flex_2d)
+    init_stop = flex_select_auto_nb(init_i, col, stops, flex_2d)
+    init_trailing = flex_select_auto_nb(init_i, col, trailings, flex_2d)
+    max_high = min_low = init_ts
+
+    for i in range(from_i, to_i):
+        if init_trailing:
+            if init_stop > 0:
+                # Trailing stop buy
+                last_stop = flex_select_auto_nb(min_i, col, stops, flex_2d)
+                curr_stop_price = min_low * (1 + abs(last_stop))
+            elif init_stop < 0:
+                # Trailing stop sell
+                last_stop = flex_select_auto_nb(max_i, col, stops, flex_2d)
+                curr_stop_price = max_high * (1 - abs(last_stop))
+        else:
+            curr_stop_price = init_ts * (1 + init_stop)
+
+        # Check if stop price is within bar
+        curr_ts = flex_select_auto_nb(i, col, ts, flex_2d)
+        exit_signal = False
+        if init_stop > 0:
+            exit_signal = curr_ts >= curr_stop_price
+        elif init_stop < 0:
+            exit_signal = curr_ts <= curr_stop_price
+        if exit_signal:
+            temp_idx_arr[j] = i
+            j += 1
+            if first:
+                return temp_idx_arr[:1]
+
+        # Keep track of lowest low and highest high if trailing
+        if init_trailing:
+            if curr_ts < min_low:
+                min_i = i
+                min_low = curr_ts
+            elif curr_ts > max_high:
+                max_i = i
+                max_high = curr_ts
+    return temp_idx_arr[:j]
+
+
+@njit
+def generate_stop_ex_nb(entries, ts, stop, trailing, wait, first, flex_2d):
+    """Generate using `generate_ex_nb` and `stop_choice_nb`.
+
+    Example:
+        Generate trailing stop loss and take profit signals for 10%.
+        ```python-repl
+        >>> import numpy as np
+        >>> from vectorbt.signals.nb import generate_stop_ex_nb
+
+        >>> entries = np.asarray([False, True, False, False, False])[:, None]
+        >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
+
+        >>> generate_stop_ex_nb(entries, ts, -0.1, True, 1, True, True)
+        array([[False],
+               [False],
+               [False],
+               [ True],
+               [False]])
+
+        >>> generate_stop_ex_nb(entries, ts, 0.1, False, 1, True, True)
+        array([[False],
+               [False],
+               [ True],
+               [False],
+               [False]])
+        ```"""
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_ex_nb(entries, wait, stop_choice_nb, ts, stop, trailing, wait, first, temp_idx_arr, flex_2d)
+
+
+@njit
+def generate_stop_ex_iter_nb(entries, ts, stop, trailing, entry_wait, exit_wait, flex_2d):
+    """Generate iteratively using `generate_enex_nb` and `stop_choice_nb`.
+
+    Returns two arrays: new entries and exits."""
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_enex_nb(
+        entries.shape,
+        entry_wait, exit_wait,
+        first_choice_nb, (entries,),
+        stop_choice_nb, (ts, stop, trailing, exit_wait, True, temp_idx_arr, flex_2d)
     )
 
 
 @njit(cache=True)
-def true_choice_nb(col, from_i, to_i, a):
-    """`choice_func_nb` that returns the indices of signals in `a`."""
-    return from_i + np.flatnonzero(a[from_i:to_i, col])
+def adv_stop_choice_nb(col, from_i, to_i, open, high, low, close, hit_price_out, stop_type_out,
+                       sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d):
+    """`choice_func_nb` that returns the indices of the stop price being reached.
 
+    Compared to `stop_choice_nb`, takes into account the whole bar, can check for both
+    (trailing) stop loss and take profit simultaneously, and tracks hit price and stop type.
 
-@njit(cache=True)
-def sl_choice_nb(col, from_i, to_i, ts, stop, trailing, first):
-    """`choice_func_nb` that returns the first index of `ts` being below the stop defined at `from_i-1`."""
-    ts = ts[from_i - 1:to_i, col]
-    stop = stop[from_i - 1:to_i, col]
-    if trailing:
-        # Propagate the maximum value from the entry using expanding max
-        stop = (1 - stop) * generic_nb.expanding_max_1d_nb(ts)
-        # Get the absolute index of the first ts being below that stop
-        exits = from_i + np.flatnonzero(ts[1:] <= stop[1:])
-    else:
-        exits = from_i + np.flatnonzero(ts[1:] <= (1 - stop[0]) * ts[0])
-    if first:
-        return exits[:1]
-    return exits
-
-
-@njit(cache=True)
-def tp_choice_nb(col, from_i, to_i, ts, stop, first):
-    """`choice_func_nb` that returns the first index of `ts` being above the stop defined at `from_i-1`."""
-    ts = ts[from_i - 1:to_i, col]
-    stop = stop[from_i - 1:to_i, col]
-    exits = from_i + np.flatnonzero(ts[1:] >= (1 + stop[0]) * ts[0])
-    if first:
-        return exits[:1]
-    return exits
-
-
-@njit
-def sl_apply_nb(i, entries, ts, stops, trailing, first):
-    """`apply_func_nb` for stop loss used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_ex_nb(entries, sl_choice_nb, ts, stops[i, :, :], trailing, first)
-
-
-@njit
-def sl_iter_apply_nb(i, entries, ts, stops, trailing, first):
-    """`apply_func_nb` for iterative stop loss used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_enex_nb(
-        entries.shape,
-        true_choice_nb,
-        sl_choice_nb,
-        (entries,), (ts, stops[i, :, :], trailing, first))
-
-
-@njit
-def tp_apply_nb(i, entries, ts, stops, first):
-    """`apply_func_nb` for take profit used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_ex_nb(entries, tp_choice_nb, ts, stops[i, :, :], first)
-
-
-@njit
-def tp_iter_apply_nb(i, entries, ts, stops, first):
-    """`apply_func_nb` for iterative take profit used in `vectorbt.base.combine_fns.apply_and_concat_one_nb`."""
-    return generate_enex_nb(
-        entries.shape,
-        true_choice_nb,
-        tp_choice_nb,
-        (entries,), (ts, stops[i, :, :], first))
-
-
-@njit
-def generate_sl_ex_nb(entries, ts, stops, trailing=False, first=True):
-    """Generate (trailing) stop loss exits using `generate_ex_nb`.
-
-    For each signal in `entries`, find the first value in `ts` that is below the (trailing) stop.
-
+    !!! note
+        We don't have intra-candle data. If there was a huge price fluctuation in both directions,
+        we can't determine whether SL was triggered before TP and vice versa. So some assumptions
+        need to be made: 1) trailing stop can only be based on previous close/high, and
+        2) we pessimistically assume that SL comes before TS and TP.
+    
     Args:
-        entries (array_like): 2-dim boolean array of entry signals.
-        ts (array_like): 2-dim time series array such as price.
-        stops (array_like): 3-dim array of stop values.
+        col (int): Current column.
+        from_i (int): Index to start generation from (inclusive).
+        to_i (int): Index to run generation to (exclusive).
+        open (array_like of float): Entry price such as open or previous close.
+        high (array_like of float): High price.
+        low (array_like of float): Low price.
+        close (array_like of float): Close price.
+        hit_price_out (array_like of float): Array where hit price of each exit will be stored.
+        stop_type_out (array_like of int): Array where stop type of each exit will be stored.
 
-            !!! note
-                `stops` must be a 3D array - an array out of 2-dim arrays each of `ts` shape.
-                Each of these arrays will correspond to a different stop configuration.
-        trailing (bool): If `True`, uses trailing stop, otherwise constant stop.
-        first (bool): If `True`, selects the first signal, otherwise returns the whole sequence.
+            0 for stop loss, 1 for take profit.
+        sl_stop (float or array_like): Percentage value for stop loss.
+
+            Can be per frame, column, row, or element-wise. Set to 0. to disable.
+        ts_stop (bool or array_like): Percentage value for trailing stop.
+
+            Can be per frame, column, row, or element-wise.
+        tp_stop (float or array_like): Percentage value for take profit.
+
+            Can be per frame, column, row, or element-wise. Set to 0. to disable.
+        is_open_safe (bool): Whether entry price comes right at or before open.
+
+            If True and wait is 0, can use high/low at entry tick. Otherwise uses close.
+        wait (bool or int): Number of ticks to wait before placing exits.
+
+            Setting False or 0 may result in two signals at one tick.
+        first (bool): Whether to stop as soon as the first exit signal is found.
+        temp_idx_arr (array_like of int): Empty integer array used to temporarily store indices.
+        flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
+    """
+    sl_stops = np.asarray(sl_stop)
+    ts_stops = np.asarray(ts_stop)
+    tp_stops = np.asarray(tp_stop)
+
+    init_i = from_i - wait
+    init_open = flex_select_auto_nb(init_i, col, open, flex_2d)
+    init_sl_stop = abs(flex_select_auto_nb(init_i, col, sl_stops, flex_2d))
+    init_ts_stop = abs(flex_select_auto_nb(init_i, col, ts_stops, flex_2d))
+    init_tp_stop = abs(flex_select_auto_nb(init_i, col, tp_stops, flex_2d))
+    max_i = init_i
+    max_p = init_open
+    j = 0
+
+    for i in range(from_i, to_i):
+        # Calculate stop price
+        if init_sl_stop > 0:
+            curr_sl_stop_price = init_open * (1 - init_sl_stop)
+        if init_ts_stop > 0:
+            max_ts_stop = abs(flex_select_auto_nb(max_i, col, ts_stops, flex_2d))
+            curr_ts_stop_price = max_p * (1 - max_ts_stop)
+        if init_tp_stop > 0:
+            curr_tp_stop_price = init_open * (1 + init_tp_stop)
+
+        # Check if stop price is within bar
+        if i > init_i or is_open_safe:
+            # is_open_safe means open is either open or any other price before it
+            # so it's safe to use high/low at entry tick
+            curr_high = flex_select_auto_nb(i, col, high, flex_2d)
+            curr_low = flex_select_auto_nb(i, col, low, flex_2d)
+        else:
+            # Otherwise, we can only use close price at entry tick
+            curr_close = flex_select_auto_nb(i, col, close, flex_2d)
+            curr_high = curr_low = curr_close
+
+        exit_signal = False
+        if init_sl_stop > 0:
+            if curr_low <= curr_sl_stop_price:
+                exit_signal = True
+                hit_price_out[i, col] = curr_sl_stop_price
+                stop_type_out[i, col] = StopType.StopLoss
+        if not exit_signal and init_ts_stop > 0:
+            if curr_low <= curr_ts_stop_price:
+                exit_signal = True
+                hit_price_out[i, col] = curr_ts_stop_price
+                stop_type_out[i, col] = StopType.TrailStop
+        if not exit_signal and init_tp_stop > 0:
+            if curr_high >= curr_tp_stop_price:
+                exit_signal = True
+                hit_price_out[i, col] = curr_tp_stop_price
+                stop_type_out[i, col] = StopType.TakeProfit
+        if exit_signal:
+            temp_idx_arr[j] = i
+            j += 1
+            if first:
+                return temp_idx_arr[:1]
+
+        # Keep track of highest high if trailing
+        if init_ts_stop > 0:
+            if curr_high > max_p:
+                max_i = i
+                max_p = curr_high
+
+    return temp_idx_arr[:j]
+
+
+@njit
+def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
+                            sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, flex_2d):
+    """Generate using `generate_ex_nb` and `adv_stop_choice_nb`.
 
     Example:
+        Generate trailing stop loss and take profit signals for 10%.
+        Illustrates how exit signal can be generated within the same tick as entry.
         ```python-repl
         >>> import numpy as np
-        >>> from vectorbt.signals.nb import generate_sl_ex_nb
-        >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
+        >>> from vectorbt.signals.nb import generate_adv_stop_ex_nb
 
-        >>> entries = np.asarray([False, True, False, False, False])[:, None]
-        >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
-        >>> stops = broadcast_to_array_of([0.1, 0.5], ts)
+        >>> entries = np.asarray([True, False, False, False, False])[:, None]
+        >>> open_p = np.asarray([10, 11, 12, 11, 10])[:, None]
+        >>> high_p = open_p + 1
+        >>> low_p = open_p - 1
+        >>> close_p = open_p
+        >>> hit_p_out = np.empty_like(entries, dtype=np.float_)
+        >>> stop_type_out = np.empty_like(entries, dtype=np.int_)
+        >>> sl_stop = 0.1
+        >>> ts_stop = 0.1
+        >>> tp_stop = 0.1
+        >>> is_entry_p_safe = True
+        >>> first = True
+        >>> flex_2d = True
 
-        >>> generate_sl_ex_nb(entries, ts, stops, trailing=True, first=True)
-        [[False False]
-         [False False]
-         [False False]
-         [ True False]
-         [False  True]]
+        >>> generate_adv_stop_ex_nb(
+        ...     entries, open_p, high_p, low_p, close_p,
+        ...     hit_p_out, stop_type_out, sl_stop, tp_stop, tp_stop,
+        ...     is_entry_p_safe, 0, first, flex_2d
+        ... )
+        array([[ True],  <<< exit
+               [False],
+               [False],
+               [False],
+               [False]])
+        >>> hit_p_out
+        array([[9.0e+000],  <<< exit
+               [5.4e-323],
+               [5.9e-323],
+               [5.4e-323],
+               [4.9e-323]])
+        >>> stop_type_out
+        array([[ 0],  <<< exit
+               [11],
+               [12],
+               [11],
+               [10]])
         ```"""
-    return combine_fns.apply_and_concat_one_nb(
-        len(stops), sl_apply_nb, entries, ts, stops, trailing, first)
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_ex_nb(
+        entries, wait, adv_stop_choice_nb,
+        open, high, low, close, hit_price_out, stop_type_out,
+        sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d
+    )
 
 
 @njit
-def generate_sl_ex_iter_nb(entries, ts, stops, trailing=False):
-    """Generate (trailing) stop loss exits iteratively using `generate_enex_nb`.
+def generate_adv_stop_ex_iter_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
+                                 sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
+                                 exit_wait, first, flex_2d):
+    """Generate iteratively using `generate_enex_nb` and `adv_stop_choice_nb`.
 
-    Returns two arrays: new entries and exits.
-
-    For arguments, see `generate_sl_ex_nb`."""
-    return combine_fns.apply_and_concat_multiple_nb(
-        len(stops), sl_iter_apply_nb, entries, ts, stops, trailing, True)
-
-
-@njit
-def generate_tp_ex_nb(entries, ts, stops, first=True):
-    """Generate take profit exits using `generate_ex_nb`.
-
-    For arguments, see `generate_sl_ex_nb`."""
-    return combine_fns.apply_and_concat_one_nb(
-        len(stops), tp_apply_nb, entries, ts, stops, first)
-
-
-@njit
-def generate_tp_ex_iter_nb(entries, ts, stops):
-    """Generate take profit exits iteratively using `generate_enex_nb`.
-
-    For arguments, see `generate_sl_ex_nb`."""
-    return combine_fns.apply_and_concat_multiple_nb(
-        len(stops), tp_iter_apply_nb, entries, ts, stops, True)
+    Returns two arrays: new entries and exits."""
+    temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
+    return generate_enex_nb(
+        entries.shape,
+        entry_wait, exit_wait,
+        first_choice_nb, (entries,),
+        adv_stop_choice_nb, (
+            open, high, low, close, hit_price_out, stop_type_out,
+            sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait, first, temp_idx_arr, flex_2d
+        )
+    )
 
 
 # ############# Map and reduce ############# #
 
 
 @njit
-def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
+def map_reduce_between_nb(a, map_func_nb, map_args, reduce_func_nb, reduce_args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive
     pair of signals in `a`.
 
     Applies `map_func_nb` on each range `[from_i, to_i)`. Must accept index of the current column,
-    index of the start of the range `from_i`, index of the end of the range `to_i`, and `*args`.
+    index of the start of the range `from_i`, index of the end of the range `to_i`, and `*map_args`.
 
     Applies `reduce_func_nb` on all mapper results in a column. Must accept index of the
-    current column, the array of results from `map_func_nb` for that column, and `*args`.
+    current column, the array of results from `map_func_nb` for that column, and `*reduce_args`.
 
     Example:
         ```python-repl
@@ -406,8 +699,8 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
         ...     return np.nanmean(map_res)
         >>> a = np.asarray([False, True, True, False, True])[:, None]
 
-        >>> map_reduce_between_nb(a, map_func_nb, reduce_func_nb)
-        [1.5]
+        >>> map_reduce_between_nb(a, map_func_nb, (), reduce_func_nb, ())
+        array([1.5])
         ```"""
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
@@ -419,15 +712,15 @@ def map_reduce_between_nb(a, map_func_nb, reduce_func_nb, *args):
             for j in range(1, a_idxs.shape[0]):
                 from_i = a_idxs[j - 1]
                 to_i = a_idxs[j]
-                map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                 k += 1
             if k > 0:
-                out[col] = reduce_func_nb(col, map_res[:k], *args)
+                out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
     return out
 
 
 @njit
-def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
+def map_reduce_between_two_nb(a, b, map_func_nb, map_args, reduce_func_nb, reduce_args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive
     pair of signals between `a` and `b`.
 
@@ -447,15 +740,15 @@ def map_reduce_between_two_nb(a, b, map_func_nb, reduce_func_nb, *args):
                     valid_a_idxs = a_idxs[a_idxs < to_i]
                     if len(valid_a_idxs) > 0:
                         from_i = valid_a_idxs[-1]  # preceding in a
-                        map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                        map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                         k += 1
                 if k > 0:
-                    out[col] = reduce_func_nb(col, map_res[:k], *args)
+                    out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
     return out
 
 
 @njit
-def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
+def map_reduce_partitions_nb(a, map_func_nb, map_args, reduce_func_nb, reduce_args):
     """Map using `map_func_nb` and reduce using `reduce_func_nb` each partition of signals in `a`.
 
     `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
@@ -473,16 +766,16 @@ def map_reduce_partitions_nb(a, map_func_nb, reduce_func_nb, *args):
                 is_partition = True
             elif is_partition:
                 to_i = i
-                map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                 k += 1
                 is_partition = False
             if i == a.shape[0] - 1:
                 if is_partition:
                     to_i = a.shape[0]
-                    map_res[k] = map_func_nb(col, from_i, to_i, *args)
+                    map_res[k] = map_func_nb(col, from_i, to_i, *map_args)
                     k += 1
         if k > 0:
-            out[col] = reduce_func_nb(col, map_res[:k], *args)
+            out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
     return out
 
 
@@ -506,8 +799,8 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
     """Rank signals in each partition.
 
     Partition is some number of signals in a row. You can reset partitions by signals from
-    `reset_by` (must have the same shape). If `after_false` is `True`, the first partition must
-    come after at least one `False` value. If `allow_gaps` is `True`, ignores gaps between partitions.
+    `reset_by` (should have the same shape). If `after_false` is True, the first partition should
+    come after at least one False value. If `allow_gaps` is True, ignores gaps between partitions.
 
     Example:
         ```python-repl

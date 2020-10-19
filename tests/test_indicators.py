@@ -5,13 +5,16 @@ from numba import njit
 from datetime import datetime
 import pytest
 from itertools import product, combinations
+from collections import namedtuple
 
 seed = 42
 
+# ############# factory.py ############# #
+
 ts = pd.DataFrame({
-    'a': [1, 2, 3, 4, np.nan],
-    'b': [np.nan, 4, 3, 2, 1],
-    'c': [1, 2, np.nan, 2, 1]
+    'a': [1., 2., 3., 4., 5.],
+    'b': [5., 4., 3., 2., 1.],
+    'c': [1., 2., 3., 2., 1.]
 }, index=pd.DatetimeIndex([
     datetime(2018, 1, 1),
     datetime(2018, 1, 2),
@@ -20,45 +23,31 @@ ts = pd.DataFrame({
     datetime(2018, 1, 5)
 ]))
 
-CustomInd = vbt.IndicatorFactory(
-    input_names=['ts1', 'ts2'],
-    param_names=['p1', 'p2'],
-    param_defaults={'p2': 2},
-    output_names=['o1', 'o2'],
-    custom_output_funcs={
-        'co1': lambda self: self.ts1 + self.ts2,
-        'co2': property(lambda self: self.o1 + self.o2)
-    }
-).from_apply_func(lambda ts1, ts2, p1, p2: (ts1 * p1, ts2 * p2))
-
-custom_ind = CustomInd.run(ts, ts['a'], [1, 2], 3)
-
-
-# ############# factory.py ############# #
-
 
 class TestFactory:
     def test_create_param_combs(self):
         assert vbt.indicators.create_param_combs(
             (combinations, [0, 1, 2, 3], 2)) == [
-                   [0, 0, 0, 1, 1, 2],
-                   [1, 2, 3, 2, 3, 3]
+                   (0, 0, 0, 1, 1, 2),
+                   (1, 2, 3, 2, 3, 3)
                ]
         assert vbt.indicators.create_param_combs(
             (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
-                   [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
-                   [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
+                   (0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2),
+                   (1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3),
+                   (4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5)
                ]
         assert vbt.indicators.create_param_combs(
             (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1],
-                   [1, 1, 1, 2, 2, 2, 2, 2, 2],
-                   [3, 3, 4, 3, 3, 4, 3, 3, 4],
-                   [4, 5, 5, 4, 5, 5, 4, 5, 5]
+                   (0, 0, 0, 0, 0, 0, 1, 1, 1),
+                   (1, 1, 1, 2, 2, 2, 2, 2, 2),
+                   (3, 3, 4, 3, 3, 4, 3, 3, 4),
+                   (4, 5, 5, 4, 5, 5, 4, 5, 5)
                ]
 
     def test_from_custom_func(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
         def apply_func(i, ts, p, a, b=10):
             return ts * p[i] + a + b
 
@@ -66,7 +55,6 @@ class TestFactory:
         def apply_func_nb(i, ts, p, a, b):
             return ts * p[i] + a + b  # numba doesn't support **kwargs
 
-        # Custom function can be anything that takes time series, params and other arguments, and returns outputs
         def custom_func(ts, p, *args, **kwargs):
             return vbt.base.combine_fns.apply_and_concat_one(len(p), apply_func, ts, p, *args, **kwargs)
 
@@ -76,11 +64,11 @@ class TestFactory:
 
         target1 = pd.DataFrame(
             np.array([
-                [110., np.nan, 110., 111., np.nan, 111.],
+                [110., 110., 110., 111., 115., 111.],
                 [110., 110., 110., 112., 114., 112.],
-                [110., 110., np.nan, 113., 113., np.nan],
+                [110., 110., 110., 113., 113., 113.],
                 [110., 110., 110., 114., 112., 112.],
-                [np.nan, 110., 110., np.nan, 111., 111.]
+                [110., 110., 110., 115., 111., 111.]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -90,14 +78,14 @@ class TestFactory:
                 (1, 'a'),
                 (1, 'b'),
                 (1, 'c')
-            ], names=['custom_param', None])
+            ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(custom_func).run(ts, [0, 1], 10, b=100).output,
+            F.from_custom_func(custom_func).run(ts, [0, 1], 10, b=100).out,
             target1
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(custom_func_nb).run(ts, [0, 1], 10, 100).output,
+            F.from_custom_func(custom_func_nb).run(ts, [0, 1], 10, 100).out,
             target1
         )
         target2 = pd.DataFrame(
@@ -106,37 +94,36 @@ class TestFactory:
                 [110., 112.],
                 [110., 113.],
                 [110., 114.],
-                [np.nan, np.nan]
+                [110., 115.]
             ]),
             index=ts.index,
-            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_param')
+            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_p')
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(custom_func).run(ts['a'], [0, 1], 10, b=100).output,
+            F.from_custom_func(custom_func).run(ts['a'], [0, 1], 10, b=100).out,
             target2
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(custom_func_nb).run(ts['a'], [0, 1], 10, 100).output,
+            F.from_custom_func(custom_func_nb).run(ts['a'], [0, 1], 10, 100).out,
             target2
         )
         target3 = pd.Series(
-            np.array([110., 110., 110., 110., np.nan]),
+            np.array([110., 110., 110., 110., 110.]),
             index=ts.index,
             name=(0, 'a')
         )
         pd.testing.assert_series_equal(
-            vbt.IndicatorFactory().from_custom_func(custom_func).run(ts['a'], 0, 10, b=100).output,
+            F.from_custom_func(custom_func).run(ts['a'], 0, 10, b=100).out,
             target3
         )
         pd.testing.assert_series_equal(
-            vbt.IndicatorFactory().from_custom_func(custom_func_nb).run(ts['a'], 0, 10, 100).output,
+            F.from_custom_func(custom_func_nb).run(ts['a'], 0, 10, 100).out,
             target3
         )
 
     def test_from_apply_func(self):
-        # Apply function is performed on each parameter `p` individually, and each output is then stacked for you
-        # Apply functions are less customizable than custom functions, but are simpler to write
-        # Notice there is no longer an `i` argument
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
         def apply_func(ts, p, a, b=10):
             return ts * p + a + b
 
@@ -146,11 +133,11 @@ class TestFactory:
 
         target1 = pd.DataFrame(
             np.array([
-                [110., np.nan, 110., 111., np.nan, 111.],
+                [110., 110., 110., 111., 115., 111.],
                 [110., 110., 110., 112., 114., 112.],
-                [110., 110., np.nan, 113., 113., np.nan],
+                [110., 110., 110., 113., 113., 113.],
                 [110., 110., 110., 114., 112., 112.],
-                [np.nan, 110., 110., np.nan, 111., 111.]
+                [110., 110., 110., 115., 111., 111.]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -160,14 +147,14 @@ class TestFactory:
                 (1, 'a'),
                 (1, 'b'),
                 (1, 'c')
-            ], names=['custom_param', None])
+            ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(apply_func).run(ts, [0, 1], 10, b=100).output,
+            F.from_apply_func(apply_func).run(ts, [0, 1], 10, b=100).out,
             target1
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(apply_func_nb).run(ts, [0, 1], 10, 100).output,
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1], 10, 100).out,
             target1
         )
         target2 = pd.DataFrame(
@@ -176,59 +163,216 @@ class TestFactory:
                 [110., 112.],
                 [110., 113.],
                 [110., 114.],
-                [np.nan, np.nan]
+                [110., 115.]
             ]),
             index=ts.index,
-            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_param')
+            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_p')
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(apply_func).run(ts['a'], [0, 1], 10, b=100).output,
+            F.from_apply_func(apply_func).run(ts['a'], [0, 1], 10, b=100).out,
             target2
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(apply_func_nb).run(ts['a'], [0, 1], 10, 100).output,
+            F.from_apply_func(apply_func_nb).run(ts['a'], [0, 1], 10, 100).out,
             target2
         )
         target3 = pd.Series(
-            np.array([110., 110., 110., 110., np.nan]),
+            np.array([110., 110., 110., 110., 110.]),
             index=ts.index,
             name=(0, 'a')
         )
         pd.testing.assert_series_equal(
-            vbt.IndicatorFactory().from_apply_func(apply_func).run(ts['a'], 0, 10, b=100).output,
+            F.from_apply_func(apply_func).run(ts['a'], 0, 10, b=100).out,
             target3
         )
         pd.testing.assert_series_equal(
-            vbt.IndicatorFactory().from_apply_func(apply_func_nb).run(ts['a'], 0, 10, 100).output,
+            F.from_apply_func(apply_func_nb).run(ts['a'], 0, 10, 100).out,
             target3
         )
 
-    def test_inputs(self):
-        # inputs
-        ts1 = ts
-        ts2 = ts['a'].vbt.broadcast_to(ts)
-        np.testing.assert_array_equal(
-            custom_ind._ts1,
-            ts1.values
-        )
-        np.testing.assert_array_equal(
-            custom_ind._ts2,
-            ts2.values
-        )
-        np.testing.assert_array_equal(
-            custom_ind._input_mapper,
-            np.array([0, 1, 2, 0, 1, 2])
+    def test_no_inputs(self):
+        F = vbt.IndicatorFactory(param_names=['p'], output_names=['out'])
+
+        def apply_func(p):
+            return np.full((3, 3), p)
+
+        @njit
+        def apply_func_nb(p):
+            return np.full((3, 3), p)
+
+        target = pd.DataFrame(
+            np.array([
+                [0, 0, 0, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1]
+            ]),
+            index=pd.RangeIndex(start=0, stop=3, step=1),
+            columns=pd.MultiIndex.from_tuples([
+                (0, 0),
+                (0, 1),
+                (0, 2),
+                (1, 0),
+                (1, 1),
+                (1, 2)
+            ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            custom_ind.ts1,
-            custom_ind.wrapper.wrap(ts1.vbt.tile(2).values)
+            F.from_apply_func(apply_func).run([0, 1]).out,
+            target
         )
         pd.testing.assert_frame_equal(
-            custom_ind.ts2,
-            custom_ind.wrapper.wrap(ts2.vbt.tile(2))
+            F.from_apply_func(apply_func_nb).run([0, 1]).out,
+            target
         )
 
-    def test_params(self):
+    def test_input_shape(self):
+        F = vbt.IndicatorFactory(param_names=['p'], output_names=['out'])
+
+        def apply_func(input_shape, p):
+            return np.full(input_shape, p)
+
+        @njit
+        def apply_func_nb(input_shape, p):
+            return np.full(input_shape, p)
+
+        target1 = pd.Series(
+            np.array([0, 0, 0, 0, 0]),
+            index=pd.RangeIndex(start=0, stop=5, step=1)
+        )
+        pd.testing.assert_series_equal(
+            F.from_apply_func(apply_func).run(0, input_shape=(5,)).out,
+            target1
+        )
+        pd.testing.assert_series_equal(
+            F.from_apply_func(apply_func_nb).run(0, input_shape=(5,)).out,
+            target1
+        )
+        target2 = pd.DataFrame(
+            np.array([
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [0, 1],
+                [0, 1]
+            ]),
+            index=pd.RangeIndex(start=0, stop=5, step=1),
+            columns=pd.Int64Index([0, 1], dtype='int64', name='custom_p')
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run([0, 1], input_shape=(5,)).out,
+            target2
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run([0, 1], input_shape=(5,)).out,
+            target2
+        )
+        target3 = pd.DataFrame(
+            np.array([
+                [0, 0, 0, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1],
+                [0, 0, 0, 1, 1, 1]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (0, 'a'),
+                (0, 'b'),
+                (0, 'c'),
+                (1, 'a'),
+                (1, 'b'),
+                (1, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run(
+                [0, 1], input_shape=(5, 3), input_index=ts.index, input_columns=ts.columns).out,
+            target3
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run(
+                [0, 1], input_shape=(5, 3), input_index=ts.index, input_columns=ts.columns).out,
+            target3
+        )
+
+    def test_multiple_inputs(self):
+        F = vbt.IndicatorFactory(input_names=['ts1', 'ts2'], param_names=['p'], output_names=['out'])
+
+        def apply_func(ts1, ts2, p):
+            return ts1 * ts2 * p
+
+        @njit
+        def apply_func_nb(ts1, ts2, p):
+            return ts1 * ts2 * p
+
+        target = pd.DataFrame(
+            np.array([
+                [0., 0., 0., 1., 25., 1.],
+                [0., 0., 0., 4., 16., 4.],
+                [0., 0., 0., 9., 9., 9.],
+                [0., 0., 0., 16., 4., 4.],
+                [0., 0., 0., 25., 1., 1.]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (0, 'a'),
+                (0, 'b'),
+                (0, 'c'),
+                (1, 'a'),
+                (1, 'b'),
+                (1, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run(ts, ts, [0, 1]).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run(ts, ts, [0, 1]).out,
+            target
+        )
+
+    def test_no_params(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], output_names=['out'])
+
+        def apply_func(ts):
+            return ts * 2
+
+        @njit
+        def apply_func_nb(ts):
+            return ts * 2
+
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run(ts).out,
+            ts * 2
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run(ts).out,
+            ts * 2
+        )
+
+    def test_no_inputs_and_params(self):
+        F = vbt.IndicatorFactory(output_names=['out'])
+
+        def apply_func():
+            return np.full((3, 3), 1)
+
+        @njit
+        def apply_func_nb():
+            return np.full((3, 3), 1)
+
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run().out,
+            pd.DataFrame(np.full((3, 3), 1))
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run().out,
+            pd.DataFrame(np.full((3, 3), 1))
+        )
+
+    def test_multiple_params(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
         def apply_func(ts, p1, p2):
             return ts * (p1 + p2)
 
@@ -238,100 +382,117 @@ class TestFactory:
 
         target = pd.DataFrame(
             np.array([
-                [2., np.nan, 2.],
-                [4., 8., 4.],
-                [6., 6., np.nan],
-                [8., 4., 4.],
-                [np.nan, 2., 2.]
+                [2., 10., 2., 3., 15., 3.],
+                [4., 8., 4., 6., 12., 6.],
+                [6., 6., 6., 9., 9., 9.],
+                [8., 4., 4., 12., 6., 6.],
+                [10., 2., 2., 15., 3., 3.]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
                 (0, 2, 'a'),
                 (0, 2, 'b'),
-                (0, 2, 'c')],
-                names=['custom_p1', 'custom_p2', None])
+                (0, 2, 'c'),
+                (1, 2, 'a'),
+                (1, 2, 'b'),
+                (1, 2, 'c')
+            ], names=['custom_p1', 'custom_p2', None])
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func) \
-                .run(ts, 0, 2).output,
+            F.from_apply_func(apply_func).run(ts, np.asarray([0, 1]), 2).out,
             target
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func_nb) \
-                .run(ts, 0, 2).output,
+            F.from_apply_func(apply_func_nb).run(ts, np.asarray([0, 1]), 2).out,
             target
         )
+
+    def test_param_settings(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
+        def apply_func(ts, p):
+            return ts * p
+
+        @njit
+        def apply_func_nb(ts, p):
+            return ts * p
+
+        target1 = pd.DataFrame(
+            np.array([
+                [0., 5., 2.],
+                [0., 4., 4.],
+                [0., 3., 6.],
+                [0., 2., 4.],
+                [0., 1., 2.]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                ('mix_0', 'a'),
+                ('mix_0', 'b'),
+                ('mix_0', 'c'),
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func, param_settings={'p': {'array_like': True}})
+                .run(ts, np.asarray([0, 1, 2])).out,
+            target1
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb, param_settings={'p': {'array_like': True}})
+                .run(ts, np.asarray([0, 1, 2])).out,
+            target1
+        )
+
+        def apply_func2(ts, p):
+            return ts * np.expand_dims(p, 1)
+
+        @njit
+        def apply_func2_nb(ts, p):
+            return ts * np.expand_dims(p, 1)
+
         target2 = pd.DataFrame(
             np.array([
-                [2., np.nan, 2., 3., np.nan, 3.],
-                [4., 8., 4., 6., 12., 6.],
-                [6., 6., np.nan, 9., 9., np.nan],
-                [8., 4., 4., 12., 6., 6.],
-                [np.nan, 2., 2., np.nan, 3., 3.]
+                [0., 0., 0.],
+                [2., 4., 2.],
+                [6., 6., 6.],
+                [12., 6., 6.],
+                [20., 4., 4.]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
-                (0, 2, 'a'),
-                (0, 2, 'b'),
-                (0, 2, 'c'),
-                (0, 3, 'a'),
-                (0, 3, 'b'),
-                (0, 3, 'c')
-            ], names=['custom_p1', 'custom_p2', None])
+                ('mix_0', 'a'),
+                ('mix_0', 'b'),
+                ('mix_0', 'c'),
+            ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func) \
-                .run(ts, 0, [2, 3]).output,
+            F.from_apply_func(apply_func2, param_settings={'p': {'array_like': True, 'bc_to_input': 0}})
+                .run(ts, np.asarray([0, 1, 2, 3, 4])).out,
             target2
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func_nb) \
-                .run(ts, 0, [2, 3]).output,
+            F.from_apply_func(apply_func2_nb, param_settings={'p': {'array_like': True, 'bc_to_input': 0}})
+                .run(ts, np.asarray([0, 1, 2, 3, 4])).out,
             target2
-        )
-        target3 = pd.DataFrame(
-            np.array([
-                [2., np.nan, 2., 4., np.nan, 4.],
-                [4., 8., 4., 8., 16., 8.],
-                [6., 6., np.nan, 12., 12., np.nan],
-                [8., 4., 4., 16., 8., 8.],
-                [np.nan, 2., 2., np.nan, 4., 4.]
-            ]),
-            index=ts.index,
-            columns=pd.MultiIndex.from_tuples([
-                (0, 2, 'a'),
-                (0, 2, 'b'),
-                (0, 2, 'c'),
-                (1, 3, 'a'),
-                (1, 3, 'b'),
-                (1, 3, 'c')
-            ], names=['custom_p1', 'custom_p2', None])
-        )
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func) \
-                .run(ts, [0, 1], [2, 3]).output,
-            target3
-        )
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func_nb) \
-                .run(ts, [0, 1], [2, 3]).output,
-            target3
         )
 
     def test_param_product(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
+        def apply_func(ts, p1, p2):
+            return ts * (p1 + p2)
+
+        @njit
+        def apply_func_nb(ts, p1, p2):
+            return ts * (p1 + p2)
+
         target = pd.DataFrame(
             np.array([
-                [2., np.nan, 2., 3., np.nan, 3., 3., np.nan, 3., 4., np.nan, 4.],
+                [2., 10., 2., 3., 15., 3., 3., 15., 3., 4., 20., 4.],
                 [4., 8., 4., 6., 12., 6., 6., 12., 6., 8., 16., 8.],
-                [6., 6., np.nan, 9., 9., np.nan, 9., 9., np.nan, 12., 12., np.nan],
+                [6., 6., 6., 9., 9., 9., 9., 9., 9., 12., 12., 12.],
                 [8., 4., 4., 12., 6., 6., 12., 6., 6., 16., 8., 8.],
-                [np.nan, 2., 2., np.nan, 3., 3., np.nan, 3., 3., np.nan, 4., 4.]
+                [10., 2., 2., 15., 3., 3., 15., 3., 3., 20., 4., 4.]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -349,6 +510,17 @@ class TestFactory:
                 (1, 3, 'c')
             ], names=['custom_p1', 'custom_p2', None])
         )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run(ts, [0, 1], [2, 3], param_product=True).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1], [2, 3], param_product=True).out,
+            target
+        )
+
+    def test_default_params(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
 
         def apply_func(ts, p1, p2):
             return ts * (p1 + p2)
@@ -357,35 +529,70 @@ class TestFactory:
         def apply_func_nb(ts, p1, p2):
             return ts * (p1 + p2)
 
+        target = pd.DataFrame(
+            np.array([
+                [2., 10., 2., 3., 15., 3.],
+                [4., 8., 4., 6., 12., 6.],
+                [6., 6., 6., 9., 9., 9.],
+                [8., 4., 4., 12., 6., 6.],
+                [10., 2., 2., 15., 3., 3.]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (0, 2, 'a'),
+                (0, 2, 'b'),
+                (0, 2, 'c'),
+                (1, 2, 'a'),
+                (1, 2, 'b'),
+                (1, 2, 'c')
+            ], names=['custom_p1', 'custom_p2', None])
+        )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func) \
-                .run(ts, [0, 1], [2, 3], param_product=True).output,
+            F.from_apply_func(apply_func, p2=2, hide_default=False).run(ts, [0, 1]).out,
             target
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                .from_apply_func(apply_func_nb) \
-                .run(ts, [0, 1], [2, 3], param_product=True).output,
+            F.from_apply_func(apply_func_nb, p2=2, hide_default=False).run(ts, [0, 1]).out,
             target
         )
 
-    def test_outputs(self):
+    def test_hide_params(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
+        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, hide_params=[]) \
+                   .run(ts, [0, 1], 2) \
+                   .out.columns.names == ['custom_p1', 'custom_p2', None]
+        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, hide_params=['p2']) \
+                   .run(ts, [0, 1], 2) \
+                   .out.columns.names == ['custom_p1', None]
+
+    def test_hide_default(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
+        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, p2=2, hide_default=False) \
+                   .run(ts, [0, 1]) \
+                   .out.columns.names == ['custom_p1', 'custom_p2', None]
+        assert F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2, p2=2, hide_default=True) \
+                   .run(ts, [0, 1]) \
+                   .out.columns.names == ['custom_p1', None]
+
+    def test_multiple_outputs(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['o1', 'o2'])
 
         def apply_func(ts, p):
-            return (ts * p, ts * p ** 2)
+            return (ts * p, (ts * p) ** 2)
 
         @njit
         def apply_func_nb(ts, p):
-            return (ts * p, ts * p ** 2)
+            return (ts * p, (ts * p) ** 2)
 
         target1 = pd.DataFrame(
             np.array([
-                [0., np.nan, 0., 1., np.nan, 1.],
+                [0., 0., 0., 1., 5., 1.],
                 [0., 0., 0., 2., 4., 2.],
-                [0., 0., np.nan, 3., 3., np.nan],
+                [0., 0., 0., 3., 3., 3.],
                 [0., 0., 0., 4., 2., 2.],
-                [np.nan, 0., 0., np.nan, 1., 1.]
+                [0., 0., 0., 5., 1., 1.]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -395,69 +602,58 @@ class TestFactory:
                 (1, 'a'),
                 (1, 'b'),
                 (1, 'c')
-            ], names=['custom_param', None])
+            ], names=['custom_p', None])
         )
         target2 = pd.DataFrame(
             np.array([
-                [0., np.nan, 0., 1., np.nan, 1.],
-                [0., 0., 0., 2., 4., 2.],
-                [0., 0., np.nan, 3., 3., np.nan],
-                [0., 0., 0., 4., 2., 2.],
-                [np.nan, 0., 0., np.nan, 1., 1.]
+                [0., 0., 0., 1., 25., 1.],
+                [0., 0., 0., 4., 16., 4.],
+                [0., 0., 0., 9., 9., 9.],
+                [0., 0., 0., 16., 4., 4.],
+                [0., 0., 0., 25., 1., 1.]
             ]),
             index=target1.index,
             columns=target1.columns
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(apply_func) \
-                .run(ts, [0, 1]).o1,
+            F.from_apply_func(apply_func).run(ts, [0, 1]).o1,
             target1
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(apply_func_nb) \
-                .run(ts, [0, 1]).o1,
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1]).o1,
             target1
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(apply_func) \
-                .run(ts, [0, 1]).o2,
+            F.from_apply_func(apply_func).run(ts, [0, 1]).o2,
             target2
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(output_names=['o1', 'o2']) \
-                .from_apply_func(apply_func_nb) \
-                .run(ts, [0, 1]).o2,
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1]).o2,
             target2
         )
 
-    def test_cache(self):
+    def test_in_outputs(self):
+        F = vbt.IndicatorFactory(
+            input_names=['ts'], param_names=['p'],
+            output_names=['out'], in_output_names=['ts_out']
+        )
 
-        def caching_func(ts, params):
-            np.random.seed(seed)
-            return np.random.uniform(0, 1)
-
-        @njit
-        def caching_func_nb(ts, params):
-            np.random.seed(seed)
-            return np.random.uniform(0, 1)
-
-        def apply_func(ts, param, c):
-            return ts * param + c
+        def apply_func(ts, ts_out, p):
+            ts_out[:, 0] = p
+            return ts * p
 
         @njit
-        def apply_func_nb(ts, param, c):
-            return ts * param + c
+        def apply_func_nb(ts, ts_out, p):
+            ts_out[:, 0] = p
+            return ts * p
 
         target = pd.DataFrame(
             np.array([
-                [0.37454012, np.nan, 0.37454012, 1.37454012, np.nan, 1.37454012],
-                [0.37454012, 0.37454012, 0.37454012, 2.37454012, 4.37454012, 2.37454012],
-                [0.37454012, 0.37454012, np.nan, 3.37454012, 3.37454012, np.nan],
-                [0.37454012, 0.37454012, 0.37454012, 4.37454012, 2.37454012, 2.37454012],
-                [np.nan, 0.37454012, 0.37454012, np.nan, 1.37454012, 1.37454012]
+                [0, -1, -1, 1, -1, -1],
+                [0, -1, -1, 1, -1, -1],
+                [0, -1, -1, 1, -1, -1],
+                [0, -1, -1, 1, -1, -1],
+                [0, -1, -1, 1, -1, -1]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
@@ -467,52 +663,129 @@ class TestFactory:
                 (1, 'a'),
                 (1, 'b'),
                 (1, 'c')
-            ], names=['custom_param', None])
+            ], names=['custom_p', None])
         )
+        assert F.from_apply_func(apply_func).run(ts, [0, 1])._ts_out.dtype == np.float_
+        assert F.from_apply_func(apply_func, in_output_settings={'ts_out': {'dtype': np.int_}}) \
+                   .run(ts, [0, 1])._ts_out.dtype == np.int_
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(
-                apply_func,
-                caching_func=caching_func
-            ).run(ts, [0, 1]).output,
+            F.from_apply_func(apply_func, ts_out=-1).run(ts, [0, 1]).ts_out,
             target
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(apply_func_nb, ts_out=-1).run(ts, [0, 1]).ts_out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func).run(ts, [0, 1], ts_out=-1).ts_out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1], ts_out=-1).ts_out,
+            target
+        )
+
+    def test_pass_kwargs(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], output_names=['out'])
+
+        def apply_func(ts, kw):
+            return ts * kw
+
+        @njit
+        def apply_func_nb(ts, kw):
+            return ts * kw
+
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func, pass_kwargs=['kw']).run(ts, kw=2).out,
+            ts * 2
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func_nb, pass_kwargs=['kw']).run(ts, kw=2).out,
+            ts * 2
+        )
+
+    def test_cache(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
+        def cache_func(ts, ps):
+            np.random.seed(seed)
+            return np.random.uniform(0, 1)
+
+        @njit
+        def cache_func_nb(ts, ps):
+            np.random.seed(seed)
+            return np.random.uniform(0, 1)
+
+        def apply_func(ts, p, c):
+            return ts * p + c
+
+        @njit
+        def apply_func_nb(ts, p, c):
+            return ts * p + c
+
+        target = pd.DataFrame(
+            np.array([
+                [0.37454012, 0.37454012, 0.37454012, 1.37454012, 5.37454012, 1.37454012],
+                [0.37454012, 0.37454012, 0.37454012, 2.37454012, 4.37454012, 2.37454012],
+                [0.37454012, 0.37454012, 0.37454012, 3.37454012, 3.37454012, 3.37454012],
+                [0.37454012, 0.37454012, 0.37454012, 4.37454012, 2.37454012, 2.37454012],
+                [0.37454012, 0.37454012, 0.37454012, 5.37454012, 1.37454012, 1.37454012]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (0, 'a'),
+                (0, 'b'),
+                (0, 'c'),
+                (1, 'a'),
+                (1, 'b'),
+                (1, 'c')
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(
+                apply_func,
+                cache_func=cache_func
+            ).run(ts, [0, 1]).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(
                 apply_func_nb,
-                caching_func=caching_func_nb
-            ).run(ts, [0, 1]).output,
+                cache_func=cache_func_nb
+            ).run(ts, [0, 1]).out,
             target
         )
         # return_cache
-        cache = vbt.IndicatorFactory().from_apply_func(
+        cache = F.from_apply_func(
             apply_func,
-            caching_func=caching_func,
+            cache_func=cache_func,
             return_cache=True
         ).run(ts, [0, 1])
         assert cache == 0.3745401188473625
-        cache = vbt.IndicatorFactory().from_apply_func(
+        cache = F.from_apply_func(
             apply_func_nb,
-            caching_func=caching_func_nb,
+            cache_func=cache_func_nb,
             return_cache=True
         ).run(ts, [0, 1])
         assert cache == 0.3745401188473625
         # pass cache
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(
                 apply_func,
                 use_cache=cache
-            ).run(ts, [0, 1]).output,
+            ).run(ts, [0, 1]).out,
             target
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(
                 apply_func_nb,
                 use_cache=cache
-            ).run(ts, [0, 1]).output,
+            ).run(ts, [0, 1]).out,
             target
         )
 
     def test_return_raw(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
         def apply_func(ts, p, a, b=10):
             return ts * p + a + b
@@ -522,36 +795,48 @@ class TestFactory:
             return ts * p + a + b
 
         target = np.array([
-            [110., np.nan, 110., 111., np.nan, 111.],
+            [110., 110., 110., 111., 115., 111.],
             [110., 110., 110., 112., 114., 112.],
-            [110., 110., np.nan, 113., 113., np.nan],
+            [110., 110., 110., 113., 113., 113.],
             [110., 110., 110., 114., 112., 112.],
-            [np.nan, 110., 110., np.nan, 111., 111.]
+            [110., 110., 110., 115., 111., 111.]
         ])
         target_map = [(0,), (1,)]
         np.testing.assert_array_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(
                 apply_func,
                 return_raw=True
-            ).run(ts, [0, 1], 10, b=100)[0],
+            ).run(ts, [0, 1], 10, b=100)[0][0],
             target
         )
         np.testing.assert_array_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(
+                apply_func_nb,
+                return_raw=True
+            ).run(ts, [0, 1], 10, 100)[0][0],
+            target
+        )
+        np.testing.assert_array_equal(
+            F.from_apply_func(
                 apply_func,
                 return_raw=True
             ).run(ts, [0, 1], 10, b=100)[1],
             target_map
         )
         np.testing.assert_array_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(
                 apply_func_nb,
                 return_raw=True
             ).run(ts, [0, 1], 10, 100)[1],
             target_map
         )
+        assert F.from_apply_func(apply_func, return_raw=True).run(ts, [0, 1], 10, b=100)[2] == 3
+        assert F.from_apply_func(apply_func_nb, return_raw=True).run(ts, [0, 1], 10, 100)[2] == 3
+        assert F.from_apply_func(apply_func, return_raw=True).run(ts, [0, 1], 10, b=100)[3] == []
+        assert F.from_apply_func(apply_func_nb, return_raw=True).run(ts, [0, 1], 10, 100)[3] == []
 
     def test_use_raw(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
         def apply_func(ts, p, a, b=10):
             return ts * p + a + b
@@ -560,50 +845,22 @@ class TestFactory:
         def apply_func_nb(ts, p, a, b):
             return ts * p + a + b
 
-        raw_results = vbt.IndicatorFactory().from_apply_func(
+        raw_results = F.from_apply_func(
             apply_func,
             return_raw=True
-        ).run(ts, [0, 1], 10, b=100)
+        ).run(ts, [0, 1, 2], 10, b=100)
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_apply_func(
+            F.from_apply_func(
                 apply_func,
                 use_raw=raw_results
-            ).run(ts, [0, 1], 10, b=100).output,
-            vbt.IndicatorFactory().from_apply_func(
-                apply_func
-            ).run(ts, [0, 1], 10, b=100).output
-        )
-
-    def test_no_params(self):
-
-        def custom_func(ts, a, b=10):
-            return ts + a + b
-
-        @njit
-        def custom_func_nb(ts, a, b):
-            return ts + a + b
-
-        target = pd.DataFrame(
-            np.array([
-                [111., np.nan, 111.],
-                [112., 114., 112.],
-                [113., 113., np.nan],
-                [114., 112., 112.],
-                [np.nan, 111., 111.]
-            ]),
-            index=ts.index,
-            columns=ts.columns
-        )
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=[]).from_custom_func(custom_func).run(ts, 10, b=100).output,
-            target
-        )
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory(param_names=[]).from_custom_func(custom_func_nb).run(ts, 10, 100).output,
-            target
+            ).run(ts, [0, 1], 10, b=100).out,
+            F.from_apply_func(
+                apply_func_nb
+            ).run(ts, [0, 1], 10, 100).out
         )
 
     def test_pass_1d(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], output_names=['out'])
 
         def custom_func(ts, a, b=10):
             return ts + a + b
@@ -613,39 +870,33 @@ class TestFactory:
             return ts + a + b
 
         target = pd.Series(
-            np.array([12., 14., 16., 18., np.nan]),
+            np.array([12., 14., 16., 18., 20.]),
             index=ts['a'].index,
             name=ts['a'].name
         )
         with pytest.raises(Exception) as e_info:
             pd.testing.assert_series_equal(
-                vbt.IndicatorFactory(param_names=[]).from_custom_func(
-                    custom_func
-                ).run(ts['a'], 10, b=ts['a'].values).output,
+                F.from_custom_func(custom_func).run(ts['a'], 10, b=ts['a'].values).out,
                 target
             )
         pd.testing.assert_series_equal(
-            vbt.IndicatorFactory(param_names=[]).from_custom_func(
-                custom_func,
-                pass_2d=False
-            ).run(ts['a'], 10, b=ts['a'].values).output,
+            F.from_custom_func(custom_func, to_2d=False).run(ts['a'], 10, b=ts['a'].values).out,
             target
         )
         pd.testing.assert_series_equal(
-            vbt.IndicatorFactory(param_names=[]).from_custom_func(
-                custom_func_nb,
-                pass_2d=False
-            ).run(ts['a'], 10, ts['a'].values).output,
+            F.from_custom_func(custom_func_nb, to_2d=False).run(ts['a'], 10, ts['a'].values).out,
             target
         )
 
     def test_pass_lists(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
-        def custom_func(ts_list, param_list):
-            return ts_list[0] * param_list[0]
+        def custom_func(input_list, in_output_list, param_list):
+            return input_list[0] * param_list[0][0]
 
-        def custom_func2(ts_list, param_list):
-            return njit(lambda x, y: x * y)(ts_list[0], param_list[0])
+        @njit
+        def custom_func_nb(input_list, in_output_list, param_list):
+            return input_list[0] * param_list[0][0]
 
         target = pd.DataFrame(
             ts.values * 2,
@@ -654,62 +905,205 @@ class TestFactory:
                 (2, 'a'),
                 (2, 'b'),
                 (2, 'c')
-            ], names=['custom_param', None])
+            ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(
-                custom_func,
-                pass_lists=True
-            ).run(ts, 2).output,
+            F.from_custom_func(custom_func, pass_lists=True).run(ts, 2).out,
             target
         )
         pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory().from_custom_func(
-                custom_func2,
-                pass_lists=True
-            ).run(ts, 2).output,
+            F.from_custom_func(custom_func_nb, pass_lists=True).run(ts, 2).out,
             target
         )
 
     def test_other(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], output_names=['o1', 'o2'])
 
-        def apply_func(ts1, ts2, p1, p2):
-            return (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+        def custom_func(ts):
+            return ts, ts + 1, ts + 2
 
         @njit
-        def apply_func_nb(ts1, ts2, p1, p2):
-            return (ts1 * p1, ts2 * p2, ts1 * p1 + ts2 * p2)
+        def custom_func_nb(ts):
+            return ts, ts + 1, ts + 2
 
-        obj, other = vbt.IndicatorFactory(
-            input_names=['ts1', 'ts2'],
-            param_names=['p1', 'p2'],
-            output_names=['o1', 'o2']
-        ).from_apply_func(
-            apply_func
-        ).run(ts, ts + 1, [0, 1], [1, 2])
-        np.testing.assert_array_equal(
-            other,
-            np.array([
-                [2., np.nan, 2., 5., np.nan, 5.],
-                [3., 5., 3., 8., 14., 8.],
-                [4., 4., np.nan, 11., 11., np.nan],
-                [5., 3., 3., 14., 8., 8.],
-                [np.nan, 2., 2., np.nan, 5., 5.]
-            ])
+        obj, other = F.from_custom_func(custom_func).run(ts)
+        np.testing.assert_array_equal(other, ts + 2)
+        obj, other = F.from_custom_func(custom_func_nb).run(ts)
+        np.testing.assert_array_equal(other, ts + 2)
+
+    def test_run_combs(self):
+        # itertools.combinations
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
+        ind1 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run(ts, [2, 2, 3], [10, 10, 11], short_name='custom_1')
+        ind2 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run(ts, [3, 4, 4], [11, 12, 12], short_name='custom_2')
+        ind1_1, ind2_1 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, speed_up=False)
+        ind1_2, ind2_2 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, speed_up=True)
+        pd.testing.assert_frame_equal(
+            ind1.out,
+            ind1_1.out
         )
-        obj2, other2 = vbt.IndicatorFactory(
-            input_names=['ts1', 'ts2'],
-            param_names=['p1', 'p2'],
-            output_names=['o1', 'o2']
-        ).from_apply_func(
-            apply_func_nb
-        ).run(ts, ts + 1, [0, 1], [1, 2])
-        np.testing.assert_array_equal(other, other2)
+        pd.testing.assert_frame_equal(
+            ind2.out,
+            ind2_1.out
+        )
+        pd.testing.assert_frame_equal(
+            ind1.out,
+            ind1_2.out
+        )
+        pd.testing.assert_frame_equal(
+            ind2.out,
+            ind2_2.out
+        )
+        # itertools.product
+        ind3 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run(ts, [2, 2, 2, 3, 3, 3, 4, 4, 4], [10, 10, 10, 11, 11, 11, 12, 12, 12], short_name='custom_1')
+        ind4 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run(ts, [2, 3, 4, 2, 3, 4, 2, 3, 4], [10, 11, 12, 10, 11, 12, 10, 11, 12], short_name='custom_2')
+        ind3_1, ind4_1 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speed_up=False)
+        ind3_2, ind4_2 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speed_up=True)
+        pd.testing.assert_frame_equal(
+            ind3.out,
+            ind3_1.out
+        )
+        pd.testing.assert_frame_equal(
+            ind4.out,
+            ind4_1.out
+        )
+        pd.testing.assert_frame_equal(
+            ind3.out,
+            ind3_2.out
+        )
+        pd.testing.assert_frame_equal(
+            ind4.out,
+            ind4_2.out
+        )
+
+    def test_wrapper(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
+        obj = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts['a'], 0, 1)
+        assert obj.wrapper.ndim == 1
+        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 1, 'a')
+            ], names=['custom_p1', 'custom_p2', None])
+        )
+        obj = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts['a'], [0, 1], 2)
+        assert obj.wrapper.ndim == 2
+        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 2),
+                (1, 2),
+            ], names=['custom_p1', 'custom_p2'])
+        )
+        obj = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts, 0, 1)
+        assert obj.wrapper.ndim == 2
+        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 1, 'a'),
+                (0, 1, 'b'),
+                (0, 1, 'c')
+            ], names=['custom_p1', 'custom_p2', None])
+        )
+        obj = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2).run(ts, [1, 2], 3)
+        assert obj.wrapper.ndim == 2
+        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (1, 3, 'a'),
+                (1, 3, 'b'),
+                (1, 3, 'c'),
+                (2, 3, 'a'),
+                (2, 3, 'b'),
+                (2, 3, 'c')
+            ], names=['custom_p1', 'custom_p2', None])
+        )
+
+    @pytest.mark.parametrize(
+        "test_config",
+        [
+            lambda F, shape, *args, **kwargs: F.from_apply_func(
+                lambda input_shape, p1, p2: np.empty(input_shape) * p1 * p2)
+                .run(*args, input_shape=shape, **kwargs),
+            lambda F, shape, *args, **kwargs: F.from_apply_func(
+                lambda p1, p2: np.full(shape, p1 + p2))
+                .run(*args, **kwargs)
+        ]
+    )
+    def test_no_inputs_wrapper(self, test_config):
+        F = vbt.IndicatorFactory(param_names=['p1', 'p2'], output_names=['out'])
+
+        obj = test_config(F, (5,), 0, 1)
+        assert obj.wrapper.ndim == 1
+        pd.testing.assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 1),
+            ], names=['custom_p1', 'custom_p2'])
+        )
+        obj = test_config(F, (5,), [0, 1], 2)
+        assert obj.wrapper.ndim == 2
+        pd.testing.assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 2),
+                (1, 2)
+            ], names=['custom_p1', 'custom_p2'])
+        )
+        obj = test_config(F, (5, 3), [0, 1], 2)
+        assert obj.wrapper.ndim == 2
+        pd.testing.assert_index_equal(obj.wrapper.index, pd.RangeIndex(start=0, stop=5, step=1))
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 2, 0),
+                (0, 2, 1),
+                (0, 2, 2),
+                (1, 2, 0),
+                (1, 2, 1),
+                (1, 2, 2)
+            ], names=['custom_p1', 'custom_p2', None])
+        )
+        obj = test_config(F, ts.shape, [0, 1], 2, input_index=ts.index, input_columns=ts.columns)
+        assert obj.wrapper.ndim == ts.ndim
+        pd.testing.assert_index_equal(obj.wrapper.index, ts.index)
+        pd.testing.assert_index_equal(
+            obj.wrapper.columns,
+            pd.MultiIndex.from_tuples([
+                (0, 2, 'a'),
+                (0, 2, 'b'),
+                (0, 2, 'c'),
+                (1, 2, 'a'),
+                (1, 2, 'b'),
+                (1, 2, 'c')
+            ], names=['custom_p1', 'custom_p2', None])
+        )
 
     def test_mappers(self):
-        obj = vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-            .from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
+
+        obj = F.from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
             .run(ts, 0, 2)
+        np.testing.assert_array_equal(
+            obj._input_mapper,
+            np.array([0, 1, 2])
+        )
         np.testing.assert_array_equal(
             obj._p1_mapper,
             np.array([0, 0, 0])
@@ -719,9 +1113,12 @@ class TestFactory:
             np.array([2, 2, 2])
         )
         assert obj._tuple_mapper == [(0, 2), (0, 2), (0, 2)]
-        obj = vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-            .from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
+        obj = F.from_apply_func(lambda ts, p1, p2: ts * (p1 + p2)) \
             .run(ts, [0, 1], [1, 2])
+        np.testing.assert_array_equal(
+            obj._input_mapper,
+            np.array([0, 1, 2, 0, 1, 2])
+        )
         np.testing.assert_array_equal(
             obj._p1_mapper,
             np.array([0, 0, 0, 1, 1, 1])
@@ -732,391 +1129,229 @@ class TestFactory:
         )
         assert obj._tuple_mapper == [(0, 1), (0, 1), (0, 1), (1, 2), (1, 2), (1, 2)]
 
-    def test_short_name(self):
-        assert vbt.IndicatorFactory(short_name='my_ind') \
-                   .from_apply_func(lambda ts, p: ts * p) \
-                   .run(ts, [0, 1]).short_name == 'my_ind'
-        assert vbt.IndicatorFactory() \
-                   .from_apply_func(lambda ts, p: ts * p) \
-                   .run(ts, [0, 1], short_name='my_ind').short_name == 'my_ind'
-
-    def test_hide_params(self):
-        assert vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                   .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-                   .run(ts, [0, 1], 2, hide_params=[]) \
-                   .output.columns.names == ['custom_p1', 'custom_p2', None]
-        assert vbt.IndicatorFactory(param_names=['p1', 'p2']) \
-                   .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-                   .run(ts, [0, 1], 2, hide_params=['p2']) \
-                   .output.columns.names == ['custom_p1', None]
-
-    def test_hide_default(self):
-        assert vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-                   .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-                   .run(ts, [0, 1], 2, hide_default=False) \
-                   .output.columns.names == ['custom_p1', 'custom_p2', None]
-        assert vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-                   .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-                   .run(ts, [0, 1], 2, hide_default=True) \
-                   .output.columns.names == ['custom_p1', None]
-
-    def test_run_combs(self):
-        # itertools.combinations
-        ind1 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run(ts, [2, 2, 3], [10, 10, 11], short_name='custom_1')
-        ind2 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run(ts, [3, 4, 4], [11, 12, 12], short_name='custom_2')
-        ind1_1, ind2_1 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, speed_up=False)
-        ind1_2, ind2_2 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, speed_up=True)
-        pd.testing.assert_frame_equal(
-            ind1.output,
-            ind1_1.output
-        )
-        pd.testing.assert_frame_equal(
-            ind2.output,
-            ind2_1.output
-        )
-        pd.testing.assert_frame_equal(
-            ind1.output,
-            ind1_2.output
-        )
-        pd.testing.assert_frame_equal(
-            ind2.output,
-            ind2_2.output
-        )
-        # itertools.product
-        ind3 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run(ts, [2, 2, 2, 3, 3, 3, 4, 4, 4], [10, 10, 10, 11, 11, 11, 12, 12, 12], short_name='custom_1')
-        ind4 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run(ts, [2, 3, 4, 2, 3, 4, 2, 3, 4], [10, 11, 12, 10, 11, 12, 10, 11, 12], short_name='custom_2')
-        ind3_1, ind4_1 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speed_up=False)
-        ind3_2, ind4_2 = vbt.IndicatorFactory(param_names=['p1', 'p2'], param_defaults={'p2': 2}) \
-            .from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speed_up=True)
-        pd.testing.assert_frame_equal(
-            ind3.output,
-            ind3_1.output
-        )
-        pd.testing.assert_frame_equal(
-            ind4.output,
-            ind4_1.output
-        )
-        pd.testing.assert_frame_equal(
-            ind3.output,
-            ind3_2.output
-        )
-        pd.testing.assert_frame_equal(
-            ind4.output,
-            ind4_2.output
-        )
-
-    def test_wrapper(self):
-        pd.testing.assert_index_equal(
-            custom_ind.wrapper.index,
-            pd.DatetimeIndex([
-                '2018-01-01',
-                '2018-01-02',
-                '2018-01-03',
-                '2018-01-04',
-                '2018-01-05'
-            ], dtype='datetime64[ns]', freq=None)
-        )
-        pd.testing.assert_index_equal(
-            custom_ind.wrapper.columns,
-            pd.MultiIndex.from_tuples([
-                (1, 3, 'a'),
-                (1, 3, 'b'),
-                (1, 3, 'c'),
-                (2, 3, 'a'),
-                (2, 3, 'b'),
-                (2, 3, 'c')
-            ], names=['custom_p1', 'custom_p2', None])
-        )
-        assert custom_ind.wrapper.ndim == 2
-        assert custom_ind.wrapper.shape == (5, 6)
-        assert custom_ind.wrapper.freq == pd.Timedelta('1 days 00:00:00')
-
     def test_properties(self):
+        F = vbt.IndicatorFactory(
+            input_names=['ts1', 'ts2'],
+            param_names=['p1', 'p2'],
+            output_names=['o1', 'o2'],
+            in_output_names=['ts_o1', 'ts_o2'],
+            output_flags={'o1': 'Hello'}
+        )
+        obj = F.from_apply_func(lambda ts1, ts2, p1, p2, ts_o1, ts_o2: (ts1, ts2)).run(ts, ts, [0, 1], 2)
+
         # Class properties
-        assert CustomInd.input_names == ['ts1', 'ts2']
-        assert CustomInd.param_names == ['p1', 'p2']
-        assert CustomInd.output_names == ['o1', 'o2']
-        assert CustomInd.output_flags == {}
+        assert F.input_names == ['ts1', 'ts2']
+        assert F.param_names == ['p1', 'p2']
+        assert F.output_names == ['o1', 'o2', 'ts_o1', 'ts_o2']
+        assert F.output_flags == {'o1': 'Hello'}
 
         # Instance properties
-        assert custom_ind.input_names == ['ts1', 'ts2']
-        assert custom_ind.param_names == ['p1', 'p2']
-        assert custom_ind.output_names == ['o1', 'o2']
-        assert custom_ind.output_flags == {}
-        assert custom_ind.short_name == 'custom'
-        assert custom_ind.level_names == ['custom_p1', 'custom_p2']
-        np.testing.assert_array_equal(custom_ind.p1_array, np.array([1, 2]))
-        np.testing.assert_array_equal(custom_ind.p2_array, np.array([3, 3]))
+        assert obj.input_names == ['ts1', 'ts2']
+        assert obj.param_names == ['p1', 'p2']
+        assert obj.output_names == ['o1', 'o2', 'ts_o1', 'ts_o2']
+        assert obj.output_flags == {'o1': 'Hello'}
+        assert obj.short_name == 'custom'
+        assert obj.level_names == ['custom_p1', 'custom_p2']
+        np.testing.assert_array_equal(obj.p1_array, np.array([0, 1]))
+        np.testing.assert_array_equal(obj.p2_array, np.array([2, 2]))
 
     @pytest.mark.parametrize(
         "test_attr",
-        ['ts1', 'ts2', 'o1', 'o2', 'co1', 'co2']
+        ['ts1', 'ts2', 'o1', 'o2', 'ts_o1', 'ts_o2', 'co1', 'co2']
     )
-    def test_pandas_indexing(self, test_attr):
+    def test_indexing(self, test_attr):
+        obj = vbt.IndicatorFactory(
+            input_names=['ts1', 'ts2'],
+            param_names=['p1', 'p2'],
+            output_names=['o1', 'o2'],
+            in_output_names=['ts_o1', 'ts_o2'],
+            custom_output_funcs={
+                'co1': lambda self: self.ts1 + self.ts2,
+                'co2': property(lambda self: self.o1 + self.o2)
+            }
+        ).from_apply_func(lambda ts1, ts2, p1, p2, ts_o1, ts_o2: (ts1, ts2)).run(ts, ts + 1, [1, 2], 3)
+
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.iloc[np.arange(3), np.arange(3)], test_attr),
-            getattr(custom_ind, test_attr).iloc[np.arange(3), np.arange(3)]
+            getattr(obj.iloc[np.arange(3), np.arange(3)], test_attr),
+            getattr(obj, test_attr).iloc[np.arange(3), np.arange(3)]
         )
         pd.testing.assert_series_equal(
-            getattr(custom_ind.loc[:, (1, 3, 'a')], test_attr),
-            getattr(custom_ind, test_attr).loc[:, (1, 3, 'a')]
+            getattr(obj.loc[:, (1, 3, 'a')], test_attr),
+            getattr(obj, test_attr).loc[:, (1, 3, 'a')]
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.loc[:, (1, 3)], test_attr),
-            getattr(custom_ind, test_attr).loc[:, (1, 3)]
+            getattr(obj.loc[:, (1, 3)], test_attr),
+            getattr(obj, test_attr).loc[:, (1, 3)]
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind[(1, 3)], test_attr),
-            getattr(custom_ind, test_attr)[(1, 3)]
+            getattr(obj[(1, 3)], test_attr),
+            getattr(obj, test_attr)[(1, 3)]
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.xs(1, axis=1, level=0), test_attr),
-            getattr(custom_ind, test_attr).xs(1, axis=1, level=0)
-        )
-
-    @pytest.mark.parametrize(
-        "test_attr",
-        ['ts1', 'ts2', 'o1', 'o2', 'co1', 'co2']
-    )
-    def test_param_indexing(self, test_attr):
-        pd.testing.assert_frame_equal(
-            getattr(custom_ind.p1_loc[2], test_attr),
-            getattr(custom_ind, test_attr).xs(2, level='custom_p1', axis=1)
+            getattr(obj.xs(1, axis=1, level=0), test_attr),
+            getattr(obj, test_attr).xs(1, axis=1, level=0)
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.p1_loc[1:2], test_attr),
+            getattr(obj.p1_loc[2], test_attr),
+            getattr(obj, test_attr).xs(2, level='custom_p1', axis=1)
+        )
+        pd.testing.assert_frame_equal(
+            getattr(obj.p1_loc[1:2], test_attr),
             pd.concat((
-                getattr(custom_ind, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1),
-                getattr(custom_ind, test_attr).xs(2, level='custom_p1', drop_level=False, axis=1)
+                getattr(obj, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1),
+                getattr(obj, test_attr).xs(2, level='custom_p1', drop_level=False, axis=1)
             ), axis=1)
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.p1_loc[[1, 1, 1]], test_attr),
+            getattr(obj.p1_loc[[1, 1, 1]], test_attr),
             pd.concat((
-                getattr(custom_ind, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1),
-                getattr(custom_ind, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1),
-                getattr(custom_ind, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1)
+                getattr(obj, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1),
+                getattr(obj, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1),
+                getattr(obj, test_attr).xs(1, level='custom_p1', drop_level=False, axis=1)
             ), axis=1)
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.tuple_loc[(1, 3)], test_attr),
-            getattr(custom_ind, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), axis=1)
+            getattr(obj.tuple_loc[(1, 3)], test_attr),
+            getattr(obj, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), axis=1)
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.tuple_loc[(1, 3):(2, 3)], test_attr),
+            getattr(obj.tuple_loc[(1, 3):(2, 3)], test_attr),
             pd.concat((
-                getattr(custom_ind, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1),
-                getattr(custom_ind, test_attr).xs((2, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1)
+                getattr(obj, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1),
+                getattr(obj, test_attr).xs((2, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1)
             ), axis=1)
         )
         pd.testing.assert_frame_equal(
-            getattr(custom_ind.tuple_loc[[(1, 3), (1, 3), (1, 3)]], test_attr),
+            getattr(obj.tuple_loc[[(1, 3), (1, 3), (1, 3)]], test_attr),
             pd.concat((
-                getattr(custom_ind, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1),
-                getattr(custom_ind, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1),
-                getattr(custom_ind, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1)
+                getattr(obj, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1),
+                getattr(obj, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1),
+                getattr(obj, test_attr).xs((1, 3), level=('custom_p1', 'custom_p2'), drop_level=False, axis=1)
             ), axis=1)
         )
 
-    @pytest.mark.parametrize(
-        "test_attr",
-        ['ts1', 'ts2', 'o1', 'o2', 'co1', 'co2']
-    )
-    def test_comparison_methods(self, test_attr):
-        pd.testing.assert_frame_equal(
-            getattr(custom_ind, test_attr + '_above')(2),
-            getattr(custom_ind, test_attr) > 2
-        )
-        pd.testing.assert_frame_equal(
-            getattr(custom_ind, test_attr + '_below')(2),
-            getattr(custom_ind, test_attr) < 2
-        )
-        pd.testing.assert_frame_equal(
-            getattr(custom_ind, test_attr + '_equal')(2),
-            getattr(custom_ind, test_attr) == 2
-        )
+    def test_numeric_method(self):
+        obj = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])\
+            .from_apply_func(lambda ts, p: ts * p).run(ts, 1)
 
-    def test_above(self):
-        pd.testing.assert_frame_equal(custom_ind.o1_above(2), custom_ind.o1 > 2)
+        pd.testing.assert_frame_equal(obj.out_above(2), obj.out > 2)
         target = pd.DataFrame(
             np.array([
-                [False, False, False, False, False, False, False, False, False, False, False, False],
-                [False, True, False, True, True, True, False, True, False, True, True, True],
-                [True, True, False, True, True, False, False, False, False, True, True, False],
-                [True, False, False, True, True, True, True, False, False, True, True, True],
-                [False, False, False, False, False, False, False, False, False, False, False, False]
+                [False, True, False, False, True, False],
+                [False, True, False, False, True, False],
+                [True, True, True, False, False, False],
+                [True, False, False, True, False, False],
+                [True, False, False, True, False, False]
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
-                (2, 1, 3, 'a'),
-                (2, 1, 3, 'b'),
-                (2, 1, 3, 'c'),
-                (2, 2, 3, 'a'),
-                (2, 2, 3, 'b'),
-                (2, 2, 3, 'c'),
-                (3, 1, 3, 'a'),
-                (3, 1, 3, 'b'),
-                (3, 1, 3, 'c'),
-                (3, 2, 3, 'a'),
-                (3, 2, 3, 'b'),
-                (3, 2, 3, 'c')
-            ], names=['custom_o1_above', 'custom_p1', 'custom_p2', None])
+                (2, 1, 'a'),
+                (2, 1, 'b'),
+                (2, 1, 'c'),
+                (3, 1, 'a'),
+                (3, 1, 'b'),
+                (3, 1, 'c'),
+            ], names=['custom_out_above', 'custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            custom_ind.o1_above([2, 3], multiple=True),
+            obj.out_above([2, 3], multiple=True),
             target
         )
-        columns2 = target.columns.rename('my_above', 0)
+        columns = target.columns.rename('my_above', 0)
         pd.testing.assert_frame_equal(
-            custom_ind.o1_above([2, 3], level_name='my_above', multiple=True),
+            obj.out_above([2, 3], level_name='my_above', multiple=True),
             pd.DataFrame(
                 target.values,
                 index=target.index,
-                columns=columns2
+                columns=columns
             )
         )
         pd.testing.assert_frame_equal(
-            custom_ind.o1_above(2, crossed=True),
+            obj.out_above(2, crossed=True),
             pd.DataFrame(
                 np.array([
-                    [False, False, False, False, False, False],
-                    [False, True, False, True, True, True],
-                    [True, False, False, False, False, False],
-                    [False, False, False, False, False, True],
-                    [False, False, False, False, False, False]
+                    [False, False, False],
+                    [False, False, False],
+                    [True, False, True],
+                    [False, False, False],
+                    [False, False, False]
                 ]),
                 index=ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    (1, 3, 'a'),
-                    (1, 3, 'b'),
-                    (1, 3, 'c'),
-                    (2, 3, 'a'),
-                    (2, 3, 'b'),
-                    (2, 3, 'c')
-                ], names=['custom_p1', 'custom_p2', None])
+                    (1, 'a'),
+                    (1, 'b'),
+                    (1, 'c'),
+                ], names=['custom_p', None])
             )
         )
 
-    def test_attr_list(self):
-        attr_list = [
-            '_iloc',
-            '_indexing_func',
-            '_input_mapper',
-            '_loc',
-            '_short_name',
-            '_o1',
-            '_o2',
-            '_p1_array',
-            '_p1_loc',
-            '_p1_mapper',
-            '_p2_array',
-            '_p2_loc',
-            '_p2_mapper',
-            '_ts1',
-            '_ts2',
-            '_tuple_loc',
-            '_tuple_mapper',
-            'run',
-            'iloc',
-            'loc',
-            'short_name',
-            'o1',
-            'o1_above',
-            'o1_below',
-            'o1_equal',
-            'o2',
-            'o2_above',
-            'o2_below',
-            'o2_equal',
-            'p1_loc',
-            'p2_loc',
-            'ts1',
-            'ts1_above',
-            'ts1_below',
-            'ts1_equal',
-            'ts2',
-            'ts2_above',
-            'ts2_below',
-            'ts2_equal',
-            'tuple_loc',
-            'wrapper',
-            'xs'
-        ]
-        assert len(set(attr_list).intersection(dir(custom_ind))) == len(attr_list)
+    def test_bool_method(self):
+        obj = vbt.IndicatorFactory(
+            input_names=['ts'], param_names=['p'], output_names=['out'],
+            attr_settings=dict(out=dict(dtype=np.bool_)))\
+            .from_apply_func(lambda ts, p: ts > p).run(ts, 2)
 
-    def test_from_talib(self):
-        # with params
-        BBANDS = vbt.IndicatorFactory.from_talib('BBANDS')
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).upperband,
-            pd.DataFrame(
-                np.array([
-                    [np.nan, np.nan, np.nan],
-                    [2.5, np.nan, 2.5],
-                    [3.5, 4.5, np.nan],
-                    [4.5, 3.5, np.nan],
-                    [np.nan, 2.5, np.nan]
-                ]),
-                index=ts.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (2, 'a'),
-                    (2, 'b'),
-                    (2, 'c')
-                ], names=['bbands_timeperiod', None])
-            )
+        pd.testing.assert_frame_equal(obj.out_and(True), obj.out)
+        target = pd.DataFrame(
+            np.array([
+                [False, False, False, False, True, False],
+                [False, False, False, False, True, False],
+                [False, False, False, True, True, True],
+                [False, False, False, True, False, False],
+                [False, False, False, True, False, False]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (False, 2, 'a'),
+                (False, 2, 'b'),
+                (False, 2, 'c'),
+                (True, 2, 'a'),
+                (True, 2, 'b'),
+                (True, 2, 'c'),
+            ], names=['custom_out_and', 'custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).middleband,
-            pd.DataFrame(
-                np.array([
-                    [np.nan, np.nan, np.nan],
-                    [1.5, np.nan, 1.5],
-                    [2.5, 3.5, np.nan],
-                    [3.5, 2.5, np.nan],
-                    [np.nan, 1.5, np.nan]
-                ]),
-                index=ts.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (2, 'a'),
-                    (2, 'b'),
-                    (2, 'c')
-                ], names=['bbands_timeperiod', None])
-            )
+            obj.out_and([False, True], multiple=True),
+            target
         )
+        columns = target.columns.rename('my_and', 0)
         pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).lowerband,
+            obj.out_and([False, True], level_name='my_and', multiple=True),
             pd.DataFrame(
-                np.array([
-                    [np.nan, np.nan, np.nan],
-                    [0.5, np.nan, 0.5],
-                    [1.5, 2.5, np.nan],
-                    [2.5, 1.5, np.nan],
-                    [np.nan, 0.5, np.nan]
-                ]),
-                index=ts.index,
-                columns=pd.MultiIndex.from_tuples([
-                    (2, 'a'),
-                    (2, 'b'),
-                    (2, 'c')
-                ], names=['bbands_timeperiod', None])
+                target.values,
+                index=target.index,
+                columns=columns
             )
         )
-        attr_list = [
+
+    def test_readable(self):
+        TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
+        obj = vbt.IndicatorFactory(
+            output_names=['out'],
+            attr_settings=dict(out=dict(dtype=TestEnum)))\
+            .from_apply_func(lambda: np.array([[0, 1], [1, -1]])).run()
+
+        pd.testing.assert_frame_equal(
+            obj.out_readable,
+            pd.DataFrame([
+                ['Hello', 'World'],
+                ['World', '']
+            ])
+        )
+
+    def test_dir(self):
+        TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
+        F = vbt.IndicatorFactory(
+            input_names=['ts'], output_names=['o1', 'o2'], in_output_names=['ts_out'],
+            attr_settings={
+                'ts': {'dtype': None},
+                'o1': {'dtype': np.float_},
+                'o2': {'dtype': np.bool_},
+                'ts_out': {'dtype': TestEnum}
+            }
+        )
+        test_attr_list = dir(F.from_apply_func(lambda ts, ts_out: (ts + ts_out, ts + ts_out)).run(ts))
+        assert test_attr_list == [
             '__class__',
             '__delattr__',
             '__dict__',
@@ -1144,101 +1379,94 @@ class TestFactory:
             '__str__',
             '__subclasshook__',
             '__weakref__',
-            '_run_combs',
+            '_config',
+            '_iloc',
+            '_indexing_func',
+            '_indexing_kwargs',
+            '_input_mapper',
+            '_level_names',
+            '_loc',
+            '_o1',
+            '_o2',
             '_run',
-            'close',
-            'close_above',
-            'close_below',
-            'close_equal',
-            'run_combs',
-            'run',
+            '_short_name',
+            '_ts',
+            '_ts_out',
+            'config',
+            'copy',
             'iloc',
+            'input_names',
+            'level_names',
             'loc',
-            'lowerband',
-            'lowerband_above',
-            'lowerband_below',
-            'lowerband_equal',
-            'matype_loc',
-            'middleband',
-            'middleband_above',
-            'middleband_below',
-            'middleband_equal',
-            'nbdevdn_loc',
-            'nbdevup_loc',
+            'o1',
+            'o1_above',
+            'o1_below',
+            'o1_equal',
+            'o2',
+            'o2_and',
+            'o2_or',
+            'o2_xor',
+            'output_flags',
+            'output_names',
+            'param_names',
+            'run',
             'short_name',
-            'timeperiod_loc',
-            'tuple_loc',
-            'upperband',
-            'upperband_above',
-            'upperband_below',
-            'upperband_equal',
+            'ts',
+            'ts_above',
+            'ts_below',
+            'ts_equal',
+            'ts_out',
+            'ts_out_readable',
+            'wrapper',
             'xs'
         ]
-        assert len(set(attr_list).intersection(dir(BBANDS))) == len(attr_list)
+
+    def test_from_talib(self):
+        # with params
+        target = pd.DataFrame(
+            np.array([
+                [np.nan, np.nan, np.nan],
+                [2.5, 5.5, 2.5],
+                [3.5, 4.5, 3.5],
+                [4.5, 3.5, 3.5],
+                [5.5, 2.5, 2.5]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (2, 2, 2, 'a'),
+                (2, 2, 2, 'b'),
+                (2, 2, 2, 'c')
+            ], names=['bbands_timeperiod', 'bbands_nbdevup', 'bbands_nbdevdn', None])
+        )
+        BBANDS = vbt.IndicatorFactory.from_talib('BBANDS')
+        pd.testing.assert_frame_equal(
+            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).upperband,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).middleband,
+            target - 1
+        )
+        pd.testing.assert_frame_equal(
+            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).lowerband,
+            target - 2
+        )
         # without params
         OBV = vbt.IndicatorFactory.from_talib('OBV')
         pd.testing.assert_frame_equal(
             OBV.run(ts, ts * 2).real,
             pd.DataFrame(
                 np.array([
-                    [2., np.nan, 2.],
-                    [6., 8., 6.],
-                    [12., 2., 6.],
-                    [20., -2., 6.],
-                    [20., -4., 4.]
+                    [2., 10., 2.],
+                    [6., 2., 6.],
+                    [12., -4., 12.],
+                    [20., -8., 8.],
+                    [30., -10., 6.]
                 ]),
                 index=ts.index,
                 columns=ts.columns
             )
         )
-        attr_list = [
-            '__class__',
-            '__delattr__',
-            '__dict__',
-            '__dir__',
-            '__doc__',
-            '__eq__',
-            '__format__',
-            '__ge__',
-            '__getattribute__',
-            '__getitem__',
-            '__gt__',
-            '__hash__',
-            '__init__',
-            '__init_subclass__',
-            '__le__',
-            '__lt__',
-            '__module__',
-            '__ne__',
-            '__new__',
-            '__reduce__',
-            '__reduce_ex__',
-            '__repr__',
-            '__setattr__',
-            '__sizeof__',
-            '__str__',
-            '__subclasshook__',
-            '__weakref__',
-            '_run',
-            'close',
-            'close_above',
-            'close_below',
-            'close_equal',
-            'run',
-            'iloc',
-            'loc',
-            'real',
-            'real_above',
-            'real_below',
-            'real_equal',
-            'short_name',
-            'volume',
-            'volume_above',
-            'volume_below',
-            'volume_equal',
-            'xs'
-        ]
-        assert len(set(attr_list).intersection(dir(OBV))) == len(attr_list)
 
 
 # ############# basic.py ############# #
@@ -1304,7 +1532,7 @@ class TestBasic:
             )
         )
 
-    def test_BollingerBands(self):
+    def test_BBANDS(self):
         columns = pd.MultiIndex.from_tuples([
             (2, False, 2.0),
             (2, False, 3.0),
@@ -1316,7 +1544,7 @@ class TestBasic:
             (3, True, 3.0)
         ], names=['bb_window', 'bb_ewm', 'bb_alpha'])
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1345,7 +1573,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1374,7 +1602,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1403,7 +1631,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1432,7 +1660,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.BollingerBands.run(
+            vbt.BBANDS.run(
                 close_ts,
                 window=(2, 3),
                 alpha=(2., 3.),
@@ -1484,7 +1712,7 @@ class TestBasic:
             )
         )
 
-    def test_Stochastic(self):
+    def test_STOCH(self):
         columns = pd.MultiIndex.from_tuples([
             (2, 2, False),
             (2, 2, True),
@@ -1496,7 +1724,7 @@ class TestBasic:
             (3, 3, True)
         ], names=['stoch_k_window', 'stoch_d_window', 'stoch_d_ewm'])
         pd.testing.assert_frame_equal(
-            vbt.Stochastic.run(
+            vbt.STOCH.run(
                 high_ts,
                 low_ts,
                 close_ts,
@@ -1527,7 +1755,7 @@ class TestBasic:
             )
         )
         pd.testing.assert_frame_equal(
-            vbt.Stochastic.run(
+            vbt.STOCH.run(
                 high_ts,
                 low_ts,
                 close_ts,

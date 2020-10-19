@@ -14,7 +14,14 @@ from vectorbt.records import (
 )
 from vectorbt.records.drawdowns import ActiveDrawdowns, RecoveredDrawdowns
 from vectorbt.records.orders import BaseOrders
-from vectorbt.records.events import BaseEvents, BaseEventsByResult
+from vectorbt.records.events import (
+    BaseEvents,
+    BaseEventsByResult,
+    BaseTrades,
+    BaseTradesByResult,
+    BasePositions,
+    BasePositionsByResult
+)
 
 from tests.utils import record_arrays_close
 
@@ -1051,6 +1058,18 @@ drawdowns_grouped = vbt.Drawdowns.from_ts(ts, freq='1 days', group_by=group_by)
 
 
 class TestDrawdowns:
+    def test_records_readable(self):
+        pd.testing.assert_frame_equal(
+            drawdowns.records_readable,
+            pd.DataFrame({
+                'Column': ['a', 'a', 'a', 'b', 'b', 'c'],
+                'Start Date': [0, 2, 4, 1, 3, 2],
+                'Valley Date': [1, 3, 5, 2, 4, 4],
+                'End Date': [2, 4, 5, 3, 5, 5],
+                'Status': ['Recovered', 'Recovered', 'Active', 'Recovered', 'Recovered', 'Active']
+            })
+        )
+
     def test_from_ts(self):
         record_arrays_close(
             drawdowns_grouped.records_arr,
@@ -1372,6 +1391,24 @@ orders_grouped = vbt.Orders(wrapper2_grouped, order_records_arr, price)
 
 
 class TestOrders:
+    def test_records_readable(self):
+        pd.testing.assert_frame_equal(
+            orders.records_readable,
+            pd.DataFrame({
+                'Column': ['a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'd', 'd', 'd'],
+                'Date': [2, 3, 4, 6, 2, 3, 4, 5, 0, 1, 6, 2, 4, 6],
+                'Size': [33.00330033, 33.00330033, 25.8798157, 25.8798157, 14.14427157,
+                         14.14427157, 16.63702438, 16.63702438, 99.00990099, 99.00990099,
+                         194.09861778, 49.5049505, 49.5049505, 24.26232722],
+                'Price': [3., 4., 5., 7., 7., 6., 5., 4., 1., 2., 1., 2., 2., 4.],
+                'Fees': [0.99009901, 1.32013201, 1.29399079, 1.8115871, 0.99009901, 0.84865629,
+                         0.83185122, 0.66548098, 0.99009901, 1.98019802, 1.94098618, 0.99009901,
+                         0.99009901, 0.97049309],
+                'Side': ['Buy', 'Sell', 'Buy', 'Sell', 'Buy', 'Sell', 'Buy', 'Sell', 'Buy', 'Sell', 'Buy',
+                         'Buy', 'Sell', 'Buy']
+            })
+        )
+
     def test_size(self):
         np.testing.assert_array_equal(
             orders.size.mapped_arr,
@@ -1515,6 +1552,29 @@ events_grouped = vbt.Events(wrapper2_grouped, event_records_arr, price)
 
 
 class TestEvents:
+    def test_records_readable(self):
+        pd.testing.assert_frame_equal(
+            events.records_readable,
+            pd.DataFrame({
+                'Column': ['a', 'a', 'b', 'b', 'c', 'c', 'd', 'd'],
+                'Size': [33.00330033, 25.8798157, 14.14427157, 16.63702438, 99.00990099,
+                         194.09861778, 49.5049505, 24.26232722],
+                'Entry Date': [2, 4, 2, 4, 0, 6, 2, 6],
+                'Entry Price': [3., 5., 7., 5., 1., 1., 2., 4.],
+                'Entry Fees': [0.99009901, 1.29399079, 0.99009901, 0.83185122, 0.99009901, 1.94098618,
+                               0.99009901, 0.97049309],
+                'Exit Date': [3, 6, 3, 5, 1, 6, 4, 6],
+                'Exit Price': [4., 7., 6., 4., 2., 1., 2., 4.],
+                'Exit Fees': [1.32013201, 1.8115871, 0.84865629, 0.66548098, 1.98019802, 0.,
+                              0.99009901, 0.],
+                'P&L': [30.69306931, 48.65405351, -15.98302687, -18.13435658, 96.03960396,
+                        -1.94098618, -1.98019802, -0.97049309],
+                'Return': [0.30693069, 0.37227723, -0.15983027, -0.21584158, 0.96039604, -0.00990099,
+                           -0.01980198, -0.00990099],
+                'Status': ['Closed', 'Closed', 'Closed', 'Closed', 'Closed', 'Open', 'Closed', 'Open']
+            })
+        )
+
     def test_duration(self):
         np.testing.assert_array_almost_equal(
             events.duration.mapped_arr,
@@ -1729,6 +1789,30 @@ trades_grouped = vbt.Trades.from_orders(orders_grouped)
 
 
 class TestTrades:
+    def test_records_readable(self):
+        pd.testing.assert_frame_equal(
+            trades.records_readable,
+            pd.DataFrame({
+                'Column': ['a', 'a', 'b', 'b', 'c', 'c', 'd', 'd'],
+                'Size': [33.00330033, 25.8798157, 14.14427157, 16.63702438, 99.00990099,
+                         194.09861778, 49.5049505, 24.26232722],
+                'Entry Date': [2, 4, 2, 4, 0, 6, 2, 6],
+                'Entry Price': [3., 5., 7., 5., 1., 1., 2., 4.],
+                'Entry Fees': [0.99009901, 1.29399079, 0.99009901, 0.83185122, 0.99009901, 1.94098618,
+                               0.99009901, 0.97049309],
+                'Exit Date': [3, 6, 3, 5, 1, 6, 4, 6],
+                'Exit Price': [4., 7., 6., 4., 2., 1., 2., 4.],
+                'Exit Fees': [1.32013201, 1.8115871, 0.84865629, 0.66548098, 1.98019802, 0.,
+                              0.99009901, 0.],
+                'P&L': [30.69306931, 48.65405351, -15.98302687, -18.13435658, 96.03960396,
+                        -1.94098618, -1.98019802, -0.97049309],
+                'Return': [0.30693069, 0.37227723, -0.15983027, -0.21584158, 0.96039604, -0.00990099,
+                           -0.01980198, -0.00990099],
+                'Status': ['Closed', 'Closed', 'Closed', 'Closed', 'Closed', 'Open', 'Closed', 'Open'],
+                'Position': [0, 1, 2, 3, 4, 5, 6, 7]
+            })
+        )
+
     def test_from_orders(self):
         trades = vbt.Trades.from_orders(orders)
         record_arrays_close(
@@ -1769,6 +1853,10 @@ class TestTrades:
             np.array([0, 1])
         )
 
+    def test_hiearchy(self):
+        assert isinstance(trades.closed, BaseTradesByResult)
+        assert isinstance(trades.closed.winning, BaseTrades)
+
 
 positions = vbt.Positions.from_orders(orders)
 positions_grouped = vbt.Positions.from_orders(orders_grouped)
@@ -1804,3 +1892,8 @@ class TestPositions:
             positions_grouped.wrapper.grouper.group_by,
             group_by
         )
+
+    def test_hiearchy(self):
+        assert isinstance(positions.closed, BasePositionsByResult)
+        assert isinstance(positions.closed.winning, BasePositions)
+

@@ -42,10 +42,11 @@ class BaseOrders(Records):
         >>> orders = pd.Series([1., 1., 1., 1., -1.])
         >>> portfolio = vbt.Portfolio.from_orders(price, orders,
         ...      init_cash=100., freq='1D')
+        >>> orders = portfolio.orders()
 
-        >>> portfolio.orders().buy.count()
+        >>> orders.buy.count()
         4
-        >>> portfolio.orders().sell.count()
+        >>> orders.sell.count()
         1
         ```"""
 
@@ -70,6 +71,19 @@ class BaseOrders(Records):
 
         PandasIndexer.__init__(self, _indexing_func)
 
+    @property  # no need for cached
+    def records_readable(self):
+        """Records in readable format."""
+        records_df = self.records
+        out = pd.DataFrame(columns=['Column', 'Date', 'Size', 'Price', 'Fees', 'Side'])
+        out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
+        out['Date'] = records_df['idx'].map(lambda x: self.wrapper.index[x])
+        out['Size'] = records_df['size']
+        out['Price'] = records_df['price']
+        out['Fees'] = records_df['fees']
+        out['Side'] = records_df['side'].map(lambda x: OrderSide._fields[x])
+        return out
+
     def plot(self,
              column=None,
              ref_price_trace_kwargs=None,
@@ -87,8 +101,8 @@ class BaseOrders(Records):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
-            ```py
-            portfolio.orders().plot()
+            ```python-repl
+            >>> orders.plot()
             ```
 
             ![](/vectorbt/docs/img/orders.png)"""
@@ -127,9 +141,9 @@ class BaseOrders(Records):
             y=price[buy_mask],
             mode='markers',
             marker=dict(
-                symbol='circle',
+                symbol='triangle-up',
                 color=contrast_color_schema['green'],
-                size=7,
+                size=8,
                 line=dict(
                     width=1,
                     color=adjust_lightness(contrast_color_schema['green'])
@@ -150,12 +164,12 @@ class BaseOrders(Records):
             y=price[sell_mask],
             mode='markers',
             marker=dict(
-                symbol='circle',
-                color=contrast_color_schema['orange'],
-                size=7,
+                symbol='triangle-down',
+                color=contrast_color_schema['red'],
+                size=8,
                 line=dict(
                     width=1,
-                    color=adjust_lightness(contrast_color_schema['orange'])
+                    color=adjust_lightness(contrast_color_schema['red'])
                 )
             ),
             name='Sell',
