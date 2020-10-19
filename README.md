@@ -9,12 +9,12 @@
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze trading strategies at speed and scale :fire:
 
-In contrast to conventional libraries, vectorbt tries to represent trading data as nd-arrays.
+In contrast to conventional libraries, vectorbt represents trading data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but compiled 
 operations with Numba, for example, for hyperparameter optimization. It also integrates 
 [plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) 
-to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to its high 
-performance, vectorbt is able to process large amounts of data without GPU or parallelization (both are work 
+to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to high 
+performance, vectorbt is able to process large amounts of data even without GPU and parallelization (both are work 
 in progress), and enable the user to interact with data-hungry widgets without significant delays.
 
 With vectorbt you can
