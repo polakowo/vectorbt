@@ -831,6 +831,19 @@ class TestAccessors:
         )
 
     def test_generate_adv_stop_exits(self):
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_stop_exits(ts, -0.1),
+            sig.vbt.signals.generate_adv_stop_exits(ts, sl_stop=0.1)
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True),
+            sig.vbt.signals.generate_adv_stop_exits(ts, ts_stop=0.1)
+        )
+        pd.testing.assert_frame_equal(
+            sig.vbt.signals.generate_stop_exits(ts, 0.1),
+            sig.vbt.signals.generate_adv_stop_exits(ts, tp_stop=0.1)
+        )
+
         def _test_adv_stop_exits(**kwargs):
             out_dict = {'hit_price': np.nan, 'stop_type': -1}
             result = sig.vbt.signals.generate_adv_stop_exits(
@@ -1413,8 +1426,12 @@ class TestAccessors:
 class TestFactory:
     def test_both(self):
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
-            in_out[from_i, col] = ts[from_i, col] * n + arg + kw
+        def cache_nb(ts1, ts2, in_out1, in_out2, n1, n2, arg0, temp_idx_arr0, kw0):
+            return arg0
+
+        @njit
+        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw, cache):
+            in_out[from_i, col] = ts[from_i, col] * n + arg + kw + cache
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]
 
@@ -1423,19 +1440,28 @@ class TestFactory:
             in_output_names=['in_out1', 'in_out2'],
             param_names=['n1', 'n2']
         ).from_choice_func(
+            cache_func=cache_nb,
+            cache_settings=dict(
+                pass_inputs=['ts1', 'ts2'],
+                pass_in_outputs=['in_out1', 'in_out2'],
+                pass_params=['n1', 'n2'],
+                pass_kwargs=['temp_idx_arr0', ('kw0', 1000)]
+            ),
             entry_choice_func=choice_nb,
             entry_settings=dict(
                 pass_inputs=['ts1'],
                 pass_in_outputs=['in_out1'],
                 pass_params=['n1'],
-                pass_kwargs=['temp_idx_arr1', ('kw1', 1000)]
+                pass_kwargs=['temp_idx_arr1', ('kw1', 1000)],
+                pass_cache=True
             ),
             exit_choice_func=choice_nb,
             exit_settings=dict(
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
                 pass_params=['n2'],
-                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)]
+                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)],
+                pass_cache=True
             ),
             in_output_settings=dict(
                 in_out1=dict(
@@ -1448,7 +1474,10 @@ class TestFactory:
             in_out1=np.nan,
             in_out2=np.nan
         )
-        my_sig = MySignals.run(np.arange(5), np.arange(5), [0, 1], [1, 0], entry_args=(100,), exit_args=(100,))
+        my_sig = MySignals.run(
+            np.arange(5), np.arange(5), [0, 1], [1, 0],
+            cache_args=(0,), entry_args=(100,), exit_args=(100,)
+        )
         pd.testing.assert_frame_equal(
             my_sig.entries,
             pd.DataFrame(np.array([
@@ -1503,7 +1532,7 @@ class TestFactory:
         )
         my_sig = MySignals.run(
             np.arange(7), np.arange(7), [0, 1], [1, 0],
-            entry_args=(100,), exit_args=(100,),
+            cache_args=(0,), entry_args=(100,), exit_args=(100,),
             entry_kwargs=dict(wait=2), exit_kwargs=dict(wait=2)
         )
         pd.testing.assert_frame_equal(
@@ -1585,7 +1614,8 @@ class TestFactory:
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
                 pass_params=['n2'],
-                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)]
+                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)],
+                pass_cache=True
             ),
             in_output_settings=dict(
                 in_out2=dict(
@@ -1686,7 +1716,8 @@ class TestFactory:
                 pass_inputs=['ts2'],
                 pass_in_outputs=['in_out2'],
                 pass_params=['n2'],
-                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)]
+                pass_kwargs=['temp_idx_arr2', ('kw2', 1000)],
+                pass_cache=True
             ),
             in_output_settings=dict(
                 in_out2=dict(

@@ -581,7 +581,13 @@ class SignalFactory(IndicatorFactory):
             # Caching
             cache = use_cache
             if cache is None and cache_func is not None:
-                cache = cache_func(*cache_input_list, *cache_param_list, *cache_args, *cache_more_args)
+                cache = cache_func(
+                    *cache_input_list,
+                    *cache_in_output_list,
+                    *cache_param_list,
+                    *cache_args,
+                    *cache_more_args
+                )
             if return_cache:
                 return cache
             if cache is None:

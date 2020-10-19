@@ -845,7 +845,11 @@ class Portfolio(Configured, PandasIndexer):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if val_price is None:
-            val_price = close.vbt.fshift(1)
+            if checks.is_pandas(close):
+                val_price = close.vbt.fshift(1)
+            else:
+                val_price = np.roll(np.asarray(close), 1, axis=0)
+                val_price[0] = np.nan
         if seed is None:
             seed = defaults.portfolio['seed']
         if seed is not None:
@@ -1015,6 +1019,10 @@ class Portfolio(Configured, PandasIndexer):
             Also see notes on `Portfolio.from_orders`.
         """
         # Get defaults
+        if not checks.is_pandas(close):
+            if not checks.is_array(close):
+                close = np.asarray(close)
+            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         if target_shape is None:
             target_shape = close.shape
         if init_cash is None:
@@ -1065,10 +1073,6 @@ class Portfolio(Configured, PandasIndexer):
         checks.assert_subdtype(call_seq, np.integer)
 
         # Broadcast inputs
-        if not checks.is_pandas(close):
-            if not checks.is_array(close):
-                close = np.asarray(close)
-            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
         if close.shape != target_shape:
             if len(close.vbt.columns) <= target_shape_2d[1]:
