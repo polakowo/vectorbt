@@ -416,7 +416,7 @@ class Signals_Accessor(Generic_Accessor):
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self._obj, prob, keep_raw=[False, True])
             return obj.vbt.wrap(nb.generate_rand_ex_by_prob_nb(
-                self.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed))
+                obj.vbt.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed))
         return self.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed))
 
     def generate_stop_exits(self, ts, stop, trailing=False, entry_wait=1, exit_wait=1,
@@ -640,12 +640,12 @@ class Signals_Accessor(Generic_Accessor):
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
             checks.assert_dtype(other, np.bool)
             result = nb.map_reduce_between_two_nb(
-                self.to_2d_array(),
+                obj.vbt.to_2d_array(),
                 other.vbt.to_2d_array(),
                 map_func_nb, map_args,
                 reduce_func_nb, reduce_args
             )
-            return self.wrap_reduced(result)
+            return obj.vbt.wrap_reduced(result)
 
     def map_reduce_partitions(self, map_func_nb=None, map_args=None,
                               reduce_func_nb=None, reduce_args=None):

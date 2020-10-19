@@ -231,8 +231,9 @@ def wrap_broadcasted(old_arg, new_arg, is_pd=False, new_index=None, new_columns=
     return new_arg
 
 
-def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, index_from='default', columns_from='default',
-              require_kwargs=None, keep_raw=False, return_meta=False, **kwargs):
+def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None, align_columns=None,
+              index_from='default', columns_from='default', require_kwargs=None, keep_raw=False,
+              return_meta=False, **kwargs):
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
 
     See [Broadcasting](https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html).
@@ -242,13 +243,15 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, index_from='defau
     Args:
         *args (array_like): Array-like objects.
         to_shape (tuple): Target shape. If set, will broadcast every element in `args` to `to_shape`.
-        to_pd (bool, tuple or list): If True, converts all output arrays to pandas, otherwise returns
+        to_pd (bool, tuple or list): Whether to convert all output arrays to pandas, otherwise returns
             raw NumPy arrays. If None, converts only if there is at least one pandas object among them.
-        to_frame (bool): If True, converts all Series to DataFrames.
+        to_frame (bool): Whether to convert all Series to DataFrames.
+        align_index (bool): Whether to align index of pandas objects using multi-index.
+        align_columns (bool): Whether to align columns of pandas objects using multi-index.
         index_from (any): Broadcasting rule for index.
         columns_from (any): Broadcasting rule for columns.
         require_kwargs (dict or list of dict): Keyword arguments passed to `np.require`.
-        keep_raw (bool, tuple or list): If True, will keep the unbroadcasted version of the array.
+        keep_raw (bool, tuple or list): Whether to keep the unbroadcasted version of the array.
 
             Only makes sure that the array can be broadcast to the target shape.
         return_meta (bool): If True, will also return new shape, index and columns.
@@ -373,6 +376,10 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, index_from='defau
     args = list(args)
     if require_kwargs is None:
         require_kwargs = {}
+    if align_index is None:
+        align_index = defaults.broadcasting['align_index']
+    if align_columns is None:
+        align_columns = defaults.broadcasting['align_columns']
     if isinstance(index_from, str) and index_from == 'default':
         index_from = defaults.broadcasting['index_from']
     if isinstance(columns_from, str) and columns_from == 'default':
@@ -406,6 +413,32 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, index_from='defau
             is_pd = any(to_pd)
         else:
             is_pd = to_pd
+
+    # Align pandas objects
+    if align_index:
+        index_to_align = []
+        for i in range(len(args)):
+            if checks.is_pandas(args[i]) and len(args[i].index) > 1:
+                index_to_align.append(i)
+        if len(index_to_align) > 1:
+            indexes = [args[i].index for i in index_to_align]
+            if len(set(map(len, indexes))) > 1:
+                index_indices = index_fns.align_indexes(*indexes)
+                for i in range(len(args)):
+                    if i in index_to_align:
+                        args[i] = args[i].iloc[index_indices[index_to_align.index(i)]]
+    if align_columns:
+        cols_to_align = []
+        for i in range(len(args)):
+            if checks.is_frame(args[i]) and len(args[i].columns) > 1:
+                cols_to_align.append(i)
+        if len(cols_to_align) > 1:
+            indexes = [args[i].columns for i in cols_to_align]
+            if len(set(map(len, indexes))) > 1:
+                col_indices = index_fns.align_indexes(*indexes)
+                for i in range(len(args)):
+                    if i in cols_to_align:
+                        args[i] = args[i].iloc[:, col_indices[cols_to_align.index(i)]]
 
     # Convert all pd.Series objects to pd.DataFrame if we work on 2-dim data
     args_2d = [arg.to_frame() if is_2d and checks.is_series(arg) else arg for arg in args]

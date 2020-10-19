@@ -436,14 +436,14 @@ ADVSTEX = SignalFactory(
 )
 
 
-def _generate_advstex_plot(base_cls, entries_attr):
+def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
     def plot(self,
              plot_type=go.Ohlc,
              ohlc_kwargs=None,
              entry_trace_kwargs=None,
              exit_trace_kwargs=None,
              fig=None,
-             **layout_kwargs):
+             **layout_kwargs):  # pragma: no cover
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 

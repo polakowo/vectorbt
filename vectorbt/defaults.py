@@ -114,6 +114,8 @@ __pdoc__['array_wrapper'] = f"""Parameters for array wrapper.
 
 # Broadcasting
 broadcasting = Config(
+    align_index=False,
+    align_columns=True,
     index_from='strict',
     columns_from='stack',
     drop_duplicates=True,

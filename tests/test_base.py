@@ -1098,9 +1098,84 @@ class TestIndexFns:
         )
 
     def test_align_index_to(self):
-        multi_c1 = pd.MultiIndex.from_arrays([['a8', 'b8']], names=['c8'])
-        multi_c2 = pd.MultiIndex.from_arrays([['a7', 'a7', 'c7', 'c7'], ['a8', 'b8', 'a8', 'b8']], names=['c7', 'c8'])
-        np.testing.assert_array_equal(index_fns.align_index_to(multi_c1, multi_c2), np.array([0, 1, 0, 1]))
+        index1 = pd.Index(['c', 'b', 'a'], name='name1')
+        assert index_fns.align_index_to(index1, index1) == pd.IndexSlice[:]
+        index2 = pd.Index(['a', 'b', 'c', 'a', 'b', 'c'], name='name1')
+        np.testing.assert_array_equal(
+            index_fns.align_index_to(index1, index2),
+            np.array([2, 1, 0, 2, 1, 0])
+        )
+        with pytest.raises(Exception) as e_info:
+            index_fns.align_index_to(pd.Index(['a']), pd.Index(['a', 'b', 'c']))
+        index3 = pd.MultiIndex.from_tuples([
+            (0, 'c'),
+            (0, 'b'),
+            (0, 'a'),
+            (1, 'c'),
+            (1, 'b'),
+            (1, 'a')
+        ], names=['name2', 'name1'])
+        np.testing.assert_array_equal(
+            index_fns.align_index_to(index1, index3),
+            np.array([0, 1, 2, 0, 1, 2])
+        )
+        with pytest.raises(Exception) as e_info:
+            index_fns.align_index_to(
+                pd.Index(['b', 'a'], name='name1'),
+                index3
+            )
+        with pytest.raises(Exception) as e_info:
+            index_fns.align_index_to(
+                pd.Index(['c', 'b', 'a', 'a'], name='name1'),
+                index3
+            )
+        index4 = pd.MultiIndex.from_tuples([
+            (0, 'a'),
+            (0, 'b'),
+            (0, 'c'),
+            (1, 'a'),
+            (1, 'b'),
+            (1, 'c')
+        ], names=['name2', 'name1'])
+        np.testing.assert_array_equal(
+            index_fns.align_index_to(index1, index4),
+            np.array([2, 1, 0, 2, 1, 0])
+        )
+
+    def test_align_indexes(self):
+        index1 = pd.Index(['a', 'b', 'c'])
+        index2 = pd.MultiIndex.from_tuples([
+            (0, 'a'),
+            (0, 'b'),
+            (0, 'c'),
+            (1, 'a'),
+            (1, 'b'),
+            (1, 'c')
+        ])
+        index3 = pd.MultiIndex.from_tuples([
+            (2, 0, 'a'),
+            (2, 0, 'b'),
+            (2, 0, 'c'),
+            (2, 1, 'a'),
+            (2, 1, 'b'),
+            (2, 1, 'c'),
+            (3, 0, 'a'),
+            (3, 0, 'b'),
+            (3, 0, 'c'),
+            (3, 1, 'a'),
+            (3, 1, 'b'),
+            (3, 1, 'c')
+        ])
+        indices1, indices2, indices3 = index_fns.align_indexes(index1, index2, index3)
+        np.testing.assert_array_equal(
+            indices1,
+            np.array([0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2])
+        )
+        np.testing.assert_array_equal(
+            indices2,
+            np.array([0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5])
+        )
+        assert indices3 == pd.IndexSlice[:]
 
     def test_pick_levels(self):
         index = index_fns.stack_indexes(multi_i, multi_c)
@@ -1657,6 +1732,76 @@ class TestReshapeFns:
         assert new_shape == test_shape
         pd.testing.assert_index_equal(new_index, test_index)
         pd.testing.assert_index_equal(new_columns, test_columns)
+
+    def test_broadcast_align(self):
+        index1 = pd.Index(['a', 'b', 'c'])
+        index2 = pd.MultiIndex.from_tuples([
+            (0, 'a'),
+            (0, 'b'),
+            (0, 'c'),
+            (1, 'a'),
+            (1, 'b'),
+            (1, 'c')
+        ])
+        index3 = pd.MultiIndex.from_tuples([
+            (2, 0, 'a'),
+            (2, 0, 'b'),
+            (2, 0, 'c'),
+            (2, 1, 'a'),
+            (2, 1, 'b'),
+            (2, 1, 'c'),
+            (3, 0, 'a'),
+            (3, 0, 'b'),
+            (3, 0, 'c'),
+            (3, 1, 'a'),
+            (3, 1, 'b'),
+            (3, 1, 'c')
+        ])
+        sr1 = pd.Series(np.arange(len(index1)), index=index1)
+        df2 = pd.DataFrame(
+            np.reshape(np.arange(len(index2) * len(index2)), (len(index2), len(index2))),
+            index=index2, columns=index2
+        )
+        df3 = pd.DataFrame(
+            np.reshape(np.arange(len(index3) * len(index3)), (len(index3), len(index3))),
+            index=index3, columns=index3
+        )
+        _df1, _df2, _df3 = reshape_fns.broadcast(sr1, df2, df3, align_index=True, align_columns=True)
+        pd.testing.assert_frame_equal(
+            _df1,
+            pd.DataFrame(np.array([
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
+                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2]
+            ]), index=index3, columns=index3)
+        )
+        pd.testing.assert_frame_equal(
+            _df2,
+            pd.DataFrame(np.array([
+                [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
+                [6, 7, 8, 9, 10, 11, 6, 7, 8, 9, 10, 11],
+                [12, 13, 14, 15, 16, 17, 12, 13, 14, 15, 16, 17],
+                [18, 19, 20, 21, 22, 23, 18, 19, 20, 21, 22, 23],
+                [24, 25, 26, 27, 28, 29, 24, 25, 26, 27, 28, 29],
+                [30, 31, 32, 33, 34, 35, 30, 31, 32, 33, 34, 35],
+                [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5],
+                [6, 7, 8, 9, 10, 11, 6, 7, 8, 9, 10, 11],
+                [12, 13, 14, 15, 16, 17, 12, 13, 14, 15, 16, 17],
+                [18, 19, 20, 21, 22, 23, 18, 19, 20, 21, 22, 23],
+                [24, 25, 26, 27, 28, 29, 24, 25, 26, 27, 28, 29],
+                [30, 31, 32, 33, 34, 35, 30, 31, 32, 33, 34, 35]
+            ]), index=index3, columns=index3)
+        )
+        pd.testing.assert_frame_equal(_df3, df3)
 
     def test_broadcast_to(self):
         np.testing.assert_array_equal(reshape_fns.broadcast_to(0, a5), np.broadcast_to(0, a5.shape))
