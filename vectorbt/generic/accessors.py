@@ -92,11 +92,11 @@ class Generic_Accessor(Base_Accessor):
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Base_Accessor.__init__(self, obj, freq=freq)
+        Base_Accessor.__init__(self, obj, **kwargs)
 
     def rolling_std(self, window, minp=1, ddof=1):  # pragma: no cover
         """See `vectorbt.generic.nb.rolling_std_nb`."""
@@ -208,7 +208,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
             >>> df.vbt.rolling_apply(3, mean_nb)
                           a    b         c
             2020-01-01  1.0  5.0  1.000000
@@ -239,7 +239,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
             >>> df.vbt.expanding_apply(mean_nb)
                           a    b    c
             2020-01-01  1.0  5.0  1.0
@@ -272,7 +272,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
             >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb)
                  a    b    c
             1  1.5  4.5  1.5
@@ -305,7 +305,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> mean_nb = njit(lambda col, i, a: np.nanmean(a))
+            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
             >>> df.vbt.resample_apply('2d', mean_nb)
                           a    b    c
             2020-01-01  1.5  4.5  1.5
@@ -339,7 +339,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> multiply_nb = njit(lambda col, i, a: a ** 2)
+            >>> multiply_nb = njit(lambda i, col, a: a ** 2)
             >>> df.vbt.applymap(multiply_nb)
                            a     b    c
             2020-01-01   1.0  25.0  1.0
@@ -358,7 +358,7 @@ class Generic_Accessor(Base_Accessor):
 
         Example:
             ```python-repl
-            >>> greater_nb = njit(lambda col, i, a: a > 2)
+            >>> greater_nb = njit(lambda i, col, a: a > 2)
             >>> df.vbt.filter(greater_nb)
                           a    b    c
             2020-01-01  NaN  5.0  NaN
@@ -372,7 +372,7 @@ class Generic_Accessor(Base_Accessor):
         out = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
         return self.wrap(out)
 
-    def apply_and_reduce(self, apply_func_nb, reduce_func_nb, *args, **kwargs):
+    def apply_and_reduce(self, apply_func_nb, reduce_func_nb, apply_args=None, reduce_args=None, **kwargs):
         """See `vectorbt.generic.nb.apply_and_reduce_nb`.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
@@ -389,8 +389,12 @@ class Generic_Accessor(Base_Accessor):
             ```"""
         checks.assert_numba_func(apply_func_nb)
         checks.assert_numba_func(reduce_func_nb)
+        if apply_args is None:
+            apply_args = ()
+        if reduce_args is None:
+            reduce_args = ()
 
-        out = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, reduce_func_nb, *args)
+        out = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, apply_args, reduce_func_nb, reduce_args)
         return self.wrap_reduced(out, **kwargs)
 
     def reduce(self, reduce_func_nb, *args, **kwargs):
@@ -429,6 +433,44 @@ class Generic_Accessor(Base_Accessor):
 
         out = nb.reduce_to_array_nb(self.to_2d_array(), reduce_func_nb, *args)
         return self.wrap_reduced(out, **kwargs)
+
+    def reduce_grouped(self, reduce_func_nb, *args, group_by=None, row_wise=False, **kwargs):
+        """Reduce group of columns.
+
+        If row_wise is True, see `vectorbt.generic.nb.reduce_grouped_row_wise_nb`.
+        Otherwise, see `vectorbt.generic.nb.reduce_grouped_nb`.
+
+        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
+
+        Example:
+            ```python-repl
+            >>> group_by = np.array([0, 0, 1])
+            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
+            >>> df.vbt.reduce_grouped(mean_nb, group_by=group_by)
+            0    3.0
+            1    1.8
+            dtype: float64
+
+            >>> i_mean_nb = njit(lambda i, col, a: np.nanmean(a))
+            >>> df.vbt.reduce_grouped(i_mean_nb, group_by=group_by, row_wise=True)
+                 0    1
+            0  3.0  1.0
+            1  3.0  2.0
+            2  3.0  3.0
+            3  3.0  2.0
+            4  3.0  1.0
+            ```
+            """
+        if not self.grouper.is_grouped(group_by=group_by):
+            raise ValueError("Grouping required")
+        checks.assert_numba_func(reduce_func_nb)
+
+        group_counts = self.grouper.get_group_counts(group_by=group_by)
+        if row_wise:
+            out = nb.reduce_grouped_row_wise_nb(self.to_2d_array(), group_counts, reduce_func_nb, *args)
+        else:
+            out = nb.reduce_grouped_nb(self.to_2d_array(), group_counts, reduce_func_nb, *args)
+        return self.wrap_reduced(out, group_by=group_by, **kwargs)
 
     def min(self, **kwargs):
         """Return min of non-NaN elements."""
@@ -610,12 +652,12 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
     Accessible through `pd.Series.vbt`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Base_SRAccessor.__init__(self, obj, freq=freq)
-        Generic_Accessor.__init__(self, obj, freq=freq)
+        Base_SRAccessor.__init__(self, obj, **kwargs)
+        Generic_Accessor.__init__(self, obj, **kwargs)
 
     def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
@@ -849,12 +891,12 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
 
     Accessible through `pd.DataFrame.vbt`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Base_DFAccessor.__init__(self, obj, freq=freq)
-        Generic_Accessor.__init__(self, obj, freq=freq)
+        Base_DFAccessor.__init__(self, obj, **kwargs)
+        Generic_Accessor.__init__(self, obj, **kwargs)
 
     def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.

@@ -110,7 +110,7 @@ class TestAccessors:
 
     def test_generate(self):
         @njit
-        def choice_func_nb(col, from_i, to_i, n):
+        def choice_func_nb(from_i, to_i, col, n):
             if col == 0:
                 return np.arange(from_i, to_i)
             elif col == 1:
@@ -145,12 +145,12 @@ class TestAccessors:
 
     def test_generate_both(self):
         @njit
-        def entry_func_nb(col, from_i, to_i, temp_int):
+        def entry_func_nb(from_i, to_i, col, temp_int):
             temp_int[0] = from_i
             return temp_int[:1]
 
         @njit
-        def exit_func_nb(col, from_i, to_i, temp_int):
+        def exit_func_nb(from_i, to_i, col, temp_int):
             temp_int[0] = from_i
             return temp_int[:1]
 
@@ -247,7 +247,7 @@ class TestAccessors:
 
     def test_generate_exits(self):
         @njit
-        def choice_func_nb(col, from_i, to_i, temp_int):
+        def choice_func_nb(from_i, to_i, col, temp_int):
             temp_int[0] = from_i
             return temp_int[:1]
 
@@ -1118,7 +1118,7 @@ class TestAccessors:
 
     def test_map_reduce_between(self):
         @njit
-        def distance_map_nb(col, from_i, to_i):
+        def distance_map_nb(from_i, to_i, col):
             return to_i - from_i
 
         @njit
@@ -1160,7 +1160,7 @@ class TestAccessors:
 
     def test_map_reduce_partitions(self):
         @njit
-        def distance_map_nb(col, from_i, to_i):
+        def distance_map_nb(from_i, to_i, col):
             return to_i - from_i
 
         @njit
@@ -1430,7 +1430,7 @@ class TestFactory:
             return arg0
 
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw, cache):
+        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw, cache):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw + cache
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]
@@ -1598,7 +1598,7 @@ class TestFactory:
 
     def test_exit_only(self):
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
+        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]
@@ -1700,7 +1700,7 @@ class TestFactory:
 
     def test_iteratively(self):
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
+        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]

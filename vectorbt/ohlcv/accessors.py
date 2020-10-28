@@ -19,12 +19,12 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
 
     Accessible through `pd.DataFrame.vbt.ohlcv`."""
 
-    def __init__(self, obj, column_names=None, freq=None):
+    def __init__(self, obj, column_names=None, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._column_names = column_names
 
-        Generic_DFAccessor.__init__(self, obj, freq=freq)
+        Generic_DFAccessor.__init__(self, obj, **kwargs)
 
     def plot(self,
              plot_type=go.Ohlc,

@@ -26,7 +26,7 @@ SimulationContext = namedtuple('SimulationContext', [
     'last_val_price'
 ])
 
-__pdoc__['SimulationContext'] = "A named tuple representing context of the current simulation."
+__pdoc__['SimulationContext'] = "A named tuple representing context of the simulation."
 __pdoc__['SimulationContext.target_shape'] = """Target shape.
 
 A tuple with exactly two elements: the number of rows and columns.
@@ -104,18 +104,18 @@ GroupContext = namedtuple('GroupContext', [
     'num_records'
 ])
 
-__pdoc__['GroupContext'] = "A named tuple representing context of the current group."
+__pdoc__['GroupContext'] = "A named tuple representing context of the group."
 for field in SimulationContext._fields:
     __pdoc__[f'GroupContext.{field}'] = f"See `SimulationContext.{field}`."
-__pdoc__['GroupContext.group'] = """Index of the current group.
+__pdoc__['GroupContext.group'] = """Index of the group.
 
 Has range `[0, group_counts.shape[0])`.
 """
-__pdoc__['GroupContext.group_len'] = """Number of columns in the current group.
+__pdoc__['GroupContext.group_len'] = """Number of columns in the group.
 
 Scalar value. Same as `group_counts[group]`.
 """
-__pdoc__['GroupContext.from_col'] = """Index of the first column in the current group.
+__pdoc__['GroupContext.from_col'] = """Index of the first column in the group.
 
 Has range `[0, target_shape[1])`.
 """
@@ -134,7 +134,7 @@ RowContext = namedtuple('RowContext', [
     'i',
     'num_records'
 ])
-__pdoc__['RowContext'] = "A named tuple representing context of the current row."
+__pdoc__['RowContext'] = "A named tuple representing context of the row."
 for field in SimulationContext._fields:
     __pdoc__[f'RowContext.{field}'] = f"See `SimulationContext.{field}`."
 __pdoc__['RowContext.i'] = """Current row (time axis).
@@ -155,7 +155,7 @@ SegmentContext = namedtuple('SegmentContext', [
     'num_records',
     'call_seq_now'
 ])
-__pdoc__['SegmentContext'] = "A named tuple representing context of the current segment."
+__pdoc__['SegmentContext'] = "A named tuple representing context of the segment."
 for field in SimulationContext._fields:
     __pdoc__[f'SegmentContext.{field}'] = f"See `SimulationContext.{field}`."
 __pdoc__['SegmentContext.i'] = "See `RowContext.i`."
@@ -180,14 +180,14 @@ OrderContext = namedtuple('OrderContext', [
     'val_price_now',
     'value_now'
 ])
-__pdoc__['OrderContext'] = "A named tuple representing context of the current order."
+__pdoc__['OrderContext'] = "A named tuple representing context of the order."
 for field in SegmentContext._fields:
     __pdoc__[f'OrderContext.{field}'] = f"See `SegmentContext.{field}`."
 __pdoc__['OrderContext.col'] = """Current column (feature axis).
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`.
 """
-__pdoc__['OrderContext.call_idx'] = """Index of the current call in `call_seq_now`.
+__pdoc__['OrderContext.call_idx'] = """Index of the call in `call_seq_now`.
 
 Has range `[0, group_len)`.
 """
@@ -275,34 +275,37 @@ Attributes:
     TargetPercent: Percentage of total value to hold after transaction.
 """
 
-# ############# AccumulateExitMode ############# #
+# ############# AccumulationMode ############# #
 
-AccumulateExitMode = namedtuple('AccumulateExitMode', [
-    'Close',
-    'Reduce'
-])(*range(2))
+AccumulationMode = namedtuple('AccumulationMode', [
+    'Disable',
+    'LongShort',
+    'Long',
+    'Short'
+])(*range(4))
 """_"""
 
-__pdoc__['AccumulateExitMode'] = f"""Accumulation exit mode.
+__pdoc__['AccumulationMode'] = f"""Accumulation mode.
 
 ```plaintext
-{json.dumps(dict(zip(AccumulateExitMode._fields, AccumulateExitMode)), indent=2)}
+{json.dumps(dict(zip(AccumulationMode._fields, AccumulationMode)), indent=2)}
 ```
 
-What should happen if exit signal occurs and accumulation is turned on?
-
 Attributes:
-    Close: Close the position by selling all.
-    Reduce: Reduce the position by selling size.
+    Disable: Disable accumulation.
+    LongShort: Allow accumulation of long and short signals.
+    Long: Allow accumulation of long signals only.
+    Short: Allow accumulation of short signals only.
 """
 
 # ############# ConflictMode ############# #
 
 ConflictMode = namedtuple('ConflictMode', [
     'Ignore',
+    'Entry',
     'Exit',
-    'ExitAndEntry'
-])(*range(3))
+    'Opposite'
+])(*range(4))
 """_"""
 
 __pdoc__['ConflictMode'] = f"""Conflict mode.
@@ -315,8 +318,9 @@ What should happen if both entry and exit signals occur simultaneously?
 
 Attributes:
     Ignore: Ignore both signals.
-    Exit: Ignore entry signal.
-    ExitAndEntry: Imitate exit and entry by using entry size as target.
+    Entry: Use entry signal.
+    Exit: Use exit signal.
+    Opposite: Use opposite signal. Prefers long over short if uncertain.
 """
 
 # ############# Order ############# #
@@ -328,7 +332,11 @@ Order = namedtuple('Order', [
     'fees',
     'fixed_fees',
     'slippage',
-    'reject_prob'
+    'min_size',
+    'max_size',
+    'reject_prob',
+    'allow_partial',
+    'raise_by_reject'
 ])
 
 __pdoc__['Order'] = "A named tuple representing an order."
@@ -338,9 +346,13 @@ __pdoc__['Order.price'] = "Price per share. Filled price will depend upon slippa
 __pdoc__['Order.fees'] = "Fees in percentage of the order value."
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
+__pdoc__['Order.min_size'] = "Minimum size. Lower than that will be rejected."
+__pdoc__['Order.max_size'] = "Maximum size. Higher than that will be cut."
 __pdoc__['Order.reject_prob'] = "Probability of rejecting this order."
+__pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
+__pdoc__['Order.raise_by_reject'] = "Whether to raise exception if order has been rejected."
 
-NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan)
+NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False)
 """_"""
 
 __pdoc__['NoOrder'] = "Order that will not be processed."
@@ -349,8 +361,9 @@ __pdoc__['NoOrder'] = "Order that will not be processed."
 
 OrderStatus = namedtuple('OrderStatus', [
     'Filled',
+    'Ignored',
     'Rejected'
-])(*range(2))
+])(*range(3))
 """_"""
 
 __pdoc__['OrderStatus'] = f"""Order status.
@@ -361,6 +374,7 @@ __pdoc__['OrderStatus'] = f"""Order status.
 
 Attributes:
     Filled: Order filled.
+    Ignored: Order ignored.
     Rejected: Order rejected.
 """
 
@@ -381,4 +395,32 @@ __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `vectorbt.records.enums.OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
 
+IgnoredOrder = OrderResult(np.nan, np.nan, np.nan, -1, OrderStatus.Ignored)
 RejectedOrder = OrderResult(np.nan, np.nan, np.nan, -1, OrderStatus.Rejected)
+
+
+class RejectedOrderError(Exception):
+    """Rejected order error."""
+    pass
+
+
+# ############# SignalType ############# #
+
+SignalType = namedtuple('SignalType', [
+    'LongShort',
+    'Long',
+    'Short'
+])(*range(3))
+"""_"""
+
+__pdoc__['SignalType'] = f"""Signal type.
+
+```plaintext
+{json.dumps(dict(zip(SignalType._fields, SignalType)), indent=2)}
+```
+
+Attributes:
+    LongShort: Entry signal to go long, exit signal to go short.
+    Long: Entry signal to go long, exit signal to close the long position.
+    Short: Entry signal to go short, exit signal to close the short position.
+"""

@@ -168,7 +168,7 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
     Faster than `mapped_to_matrix_nb` and `vbt.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
-    `reduce_func_nb` must accept index of the current column, mapped array and `*args`,
+    `reduce_func_nb` must accept index of the column, mapped array and `*args`,
     and return a scalar value."""
     out = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
@@ -440,7 +440,7 @@ def event_duration_map_nb(record):
 
 
 @njit(cache=True)
-def save_trade_nb(record, col, i, order_size, order_price, order_fees, position_start,
+def save_trade_nb(record, i, col, order_size, order_price, order_fees, position_start,
                   buy_size_sum, buy_gross_sum, buy_fees_sum, position_idx, status):
     """Save trade to the record."""
 
@@ -545,8 +545,8 @@ def trade_records_nb(price, order_records):
                 # If trade in previous column hasn't been closed, calculate its unrealized metrics
                 save_trade_nb(
                     out[j],
-                    prev_col,
                     price.shape[0] - 1,
+                    prev_col,
                     buy_size_sum,
                     price[price.shape[0] - 1, prev_col],
                     0.,
@@ -580,8 +580,8 @@ def trade_records_nb(price, order_records):
             # Close the current trade
             save_trade_nb(
                 out[j],
-                col,
                 i,
+                col,
                 order_size,
                 order_price,
                 order_fees,
@@ -609,8 +609,8 @@ def trade_records_nb(price, order_records):
             # If the last trade hasn't been closed, calculate its unrealized metrics
             save_trade_nb(
                 out[j],
-                col,
                 price.shape[0] - 1,
+                col,
                 buy_size_sum,
                 price[price.shape[0] - 1, col],
                 0.,
@@ -629,7 +629,7 @@ def trade_records_nb(price, order_records):
 
 
 @njit(cache=True)
-def save_position_nb(record, col, i, position_start, buy_size_sum, buy_gross_sum, buy_fees_sum,
+def save_position_nb(record, i, col, position_start, buy_size_sum, buy_gross_sum, buy_fees_sum,
                      sell_size_sum, sell_gross_sum, sell_fees_sum, status):
     """Save position to the record."""
 
@@ -734,8 +734,8 @@ def position_records_nb(price, order_records):
                 # NOTE: We have no information about fees here, so we don't add them
                 save_position_nb(
                     out[j],
-                    prev_col,
                     price.shape[0] - 1,
+                    prev_col,
                     position_start,
                     buy_size_sum,
                     buy_gross_sum,
@@ -781,8 +781,8 @@ def position_records_nb(price, order_records):
             # Close the current position
             save_position_nb(
                 out[j],
-                col,
                 i,
+                col,
                 position_start,
                 buy_size_sum,
                 buy_gross_sum,
@@ -809,8 +809,8 @@ def position_records_nb(price, order_records):
             # NOTE: We have no information about fees here, so we don't add them
             save_position_nb(
                 out[j],
-                col,
                 price.shape[0] - 1,
+                col,
                 position_start,
                 buy_size_sum,
                 buy_gross_sum,

@@ -28,11 +28,11 @@ class Returns_Accessor(Generic_Accessor):
 
     Accessible through `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`."""
 
-    def __init__(self, obj, freq=None, year_freq=None):
+    def __init__(self, obj, year_freq=None, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_Accessor.__init__(self, obj, freq=freq)
+        Generic_Accessor.__init__(self, obj, **kwargs)
 
         # Set year frequency
         self._year_freq = year_freq
@@ -270,12 +270,12 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
 
     Accessible through `pd.Series.vbt.returns`."""
 
-    def __init__(self, obj, freq=None, year_freq=None):
+    def __init__(self, obj, year_freq=None, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_SRAccessor.__init__(self, obj, freq=freq)
-        Returns_Accessor.__init__(self, obj, freq=freq, year_freq=year_freq)
+        Generic_SRAccessor.__init__(self, obj, **kwargs)
+        Returns_Accessor.__init__(self, obj, year_freq=year_freq, **kwargs)
 
 
 @register_dataframe_accessor('returns')
@@ -284,9 +284,9 @@ class Returns_DFAccessor(Returns_Accessor, Generic_DFAccessor):
 
     Accessible through `pd.DataFrame.vbt.returns`."""
 
-    def __init__(self, obj, freq=None, year_freq=None):
+    def __init__(self, obj, year_freq=None, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_DFAccessor.__init__(self, obj, freq=freq)
-        Returns_Accessor.__init__(self, obj, freq=freq, year_freq=year_freq)
+        Generic_DFAccessor.__init__(self, obj, **kwargs)
+        Returns_Accessor.__init__(self, obj, year_freq=year_freq, **kwargs)

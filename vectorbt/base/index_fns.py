@@ -232,9 +232,11 @@ def align_index_to(index1, index2):
             name1 = index1.names[i]
             name2 = index2.names[j]
             if name1 == name2:
+                if i in mapper:
+                    raise ValueError(f"There are multiple candidate levels with name {name1} in second index")
                 if set(index2.levels[j]).issubset(set(index1.levels[i])):
                     mapper[i] = j
-                    break
+                    continue
                 if name1 is not None:
                     raise ValueError(f"Level {name1} in second index contains values not in first index")
     if len(mapper) == 0:

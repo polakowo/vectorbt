@@ -39,14 +39,14 @@ class Base_Accessor(ArrayWrapper):
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
     by using `Base_Accessor.wrap`, we will convert the 2-dim output back to a Series."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._obj = obj
 
         # Initialize array wrapper
         wrapper = ArrayWrapper.from_obj(obj)
-        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim, freq=freq)
+        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim, **kwargs)
 
     def __call__(self, *args, **kwargs):
         """Allows passing arguments to the initializer."""
@@ -239,7 +239,7 @@ class Base_Accessor(ArrayWrapper):
         aligned_index = index_fns.align_index_to(obj.index, other.index)
         aligned_columns = index_fns.align_index_to(obj.columns, other.columns)
         obj = obj.iloc[aligned_index, aligned_columns]
-        return self.wrap(obj.values, index=other.index, columns=other.columns)
+        return self.wrap(obj.values, index=other.index, columns=other.columns, group_by=False)
 
     @class_or_instancemethod
     def broadcast(self_or_cls, *others, **kwargs):
@@ -298,7 +298,7 @@ class Base_Accessor(ArrayWrapper):
         else:
             obj = np.asarray(self._obj)
         result = apply_func(obj, *args, **kwargs)
-        return self.wrap(result)
+        return self.wrap(result, group_by=False)
 
     @class_or_instancemethod
     def concat(self_or_cls, *others, keys=None, broadcast_kwargs={}):
@@ -372,7 +372,7 @@ class Base_Accessor(ArrayWrapper):
         else:
             top_columns = pd.Index(np.arange(ntimes), name='apply_idx')
             new_columns = index_fns.combine_indexes(top_columns, self.columns)
-        return self.wrap(result, columns=new_columns)
+        return self.wrap(result, columns=new_columns, group_by=False)
 
     def combine_with(self, other, *args, combine_func=None, to_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
@@ -503,12 +503,12 @@ class Base_SRAccessor(Base_Accessor):
 
     Accessible through `pd.Series.vbt` and all child accessors."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         checks.assert_type(obj, pd.Series)
 
-        Base_Accessor.__init__(self, obj, freq=freq)
+        Base_Accessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -524,12 +524,12 @@ class Base_DFAccessor(Base_Accessor):
 
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         checks.assert_type(obj, pd.DataFrame)
 
-        Base_Accessor.__init__(self, obj, freq=freq)
+        Base_Accessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
     def is_series(self_or_cls):

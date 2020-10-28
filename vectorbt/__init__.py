@@ -114,9 +114,7 @@ the whole backtesting pipeline, from signal generation, to performance modeling.
 
 ### Broadcasting
 
-Moreover, vectobt borrows broadcasting rules from NumPy.
-
-For example, consider the following objects:
+vectobt borrows broadcasting rules from NumPy. For example, consider the following objects:
 
 ```python-repl
 >>> sr = pd.Series([1, 2, 3], index=['x', 'y', 'z'])
@@ -154,11 +152,15 @@ y  6  7  8
 z  7  8  9
 ```
 
-In case index or columns in both objects are different, thy are simply stacked upon each other
-(by default):
+In case index or columns in both objects are different, they are stacked upon each other:
 
 ```python-repl
 >>> df2 = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a2', 'b2', 'c2'])
+>>> df2
+   a2  b2  c2
+x   4   5   6
+y   4   5   6
+z   4   5   6
 
 >>> df + df2  # pandas
     a  a2   b  b2   c  c2
@@ -174,17 +176,53 @@ y  8  10  12
 z  8  10  12
 ```
 
-This way, you can perform operations on objects of arbitrary (but compatible) shapes, and still
-preserve their index information. This is handy for combining complex DataFrames, such as signals
-from different indicators.
+This way, you can perform operations on objects of arbitrary broadcastable shapes, and still
+preserve their index information. This is handy for combining DataFrames with lots of metadata,
+such as indicators or signals with many hyperparameters.
+
+Another feature of vectorbt is that it can broadcast objects with incompatible shapes but common
+multi-index levels - those that have the same name, or are without name but have overlapping values.
+
+For example:
+
+```python-repl
+>>> df3 = pd.DataFrame(
+...     [[7, 8, 9, 10, 11, 12]],
+...     index=['x', 'y', 'z'],
+...     columns=pd.MultiIndex.from_tuples([
+...         (1, 'a'),
+...         (1, 'b'),
+...         (1, 'c'),
+...         (2, 'a'),
+...         (2, 'b'),
+...         (2, 'c'),
+...     ]))
+>>> df3
+   1         2
+   a  b  c   a   b   c
+x  7  8  9  10  11  12
+y  7  8  9  10  11  12
+z  7  8  9  10  11  12
+
+>>> df + df3  # pandas
+ValueError: cannot join with no overlapping index names
+
+>>> df.vbt + df3  # vectorbt
+    1           2
+    a   b   c   a   b   c
+x  11  13  15  14  16  18
+y  11  13  15  14  16  18
+z  11  13  15  14  16  18
+```
 
 ## Example
 
 To better understand how these concepts fit together in vectorbt, consider the following example.
-You have a complex strategy that has lots of parameters. While brute-forcing all parameter combinations
-seems to be a rather unrealistic attempt, vectorbt makes exactly this possible. It doesn't care whether
-you have one strategy instance or millions. As soon as their vectors can be concatenated into a matrix
-and you have enough memory, you can analyze them in one go.
+You have a complex strategy that has lots of (hyper-)parameters that have to be tuned. While brute-
+forcing all combinations seems to be a rather unrealistic attempt, you can still interpolate, and
+vectorbt makes exactly this possible. It doesn't care whether you have one strategy instance or millions.
+As soon as their vectors can be concatenated into a matrix and you have enough memory, you can analyze
+them in one go.
 
 Let's start with fetching the daily price of Bitcoin:
 
@@ -220,7 +258,6 @@ Our first test will be rather simple: buy when the 10-day moving average crosses
 average, and sell when the opposite happens.
 
 ```python-repl
->>> # (10, 20) - 10 day moving average crosses 20 day moving average
 >>> fast_ma = vbt.MA.run(btc_price, 10, short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, 20, short_name='slow')
 
@@ -365,9 +402,7 @@ Date
 
 [366 rows x 4 columns]
 
->>> # Notice that we need to align the price to the shape of signals
->>> portfolio = vbt.Portfolio.from_signals(
-...     comb_price.vbt.tile(2), entries, exits)
+>>> portfolio = vbt.Portfolio.from_signals(comb_price, entries, exits)
 >>> portfolio.total_return()
 fast_window  slow_window  asset
 10           30           BTC      0.865956
@@ -417,8 +452,7 @@ range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
 >>> entries = fast_ma.ma_above(slow_ma, crossed=True)
 >>> exits = fast_ma.ma_below(slow_ma, crossed=True)
 
->>> portfolio = vbt.Portfolio.from_signals(
-...     mult_comb_price.vbt.tile(2), entries, exits, freq='1D')
+>>> portfolio = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
 >>> portfolio.total_return()
 fast_window  slow_window  asset  range_start  range_end
 10           30           BTC    2018-12-31   2019-07-01    1.631617

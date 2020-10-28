@@ -230,7 +230,7 @@ class SignalFactory(IndicatorFactory):
             >>> from vectorbt.signals.factory import SignalFactory
 
             >>> @njit
-            ... def wait_choice_nb(col, from_i, to_i, n, temp_idx_arr):
+            ... def wait_choice_nb(from_i, to_i, col, n, temp_idx_arr):
             ...     temp_idx_arr[0] = from_i + n  # index of next exit
             ...     if temp_idx_arr[0] < to_i:
             ...         return temp_idx_arr[:1]
@@ -290,14 +290,14 @@ class SignalFactory(IndicatorFactory):
 
             >>> # Define exit choice function
             >>> @njit
-            ... def rand_exit_choice_nb(col, from_i, to_i, rand_type_out, prob1,
+            ... def rand_exit_choice_nb(from_i, to_i, col, rand_type_out, prob1,
             ...                         prob2, temp_idx_arr1, temp_idx_arr2, flex_2d):
             ...     idxs1 = rand_by_prob_choice_nb(
-            ...         col, from_i, to_i, prob1, True, temp_idx_arr1, flex_2d)
+            ...         from_i, to_i, col, prob1, True, temp_idx_arr1, flex_2d)
             ...     if len(idxs1) > 0:
             ...         to_i = idxs1[0]  # no need to go beyond first signal
             ...     idxs2 = rand_by_prob_choice_nb(
-            ...         col, from_i, to_i, prob2, True, temp_idx_arr2, flex_2d)
+            ...         from_i, to_i, col, prob2, True, temp_idx_arr2, flex_2d)
             ...     if len(idxs2) > 0:
             ...         rand_type_out[idxs2[0], col] = RandType.R2
             ...         return idxs2

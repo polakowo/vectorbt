@@ -11,7 +11,7 @@ from vectorbt.utils.random import set_seed
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.portfolio.enums import (
     SizeType,
-    AccumulateExitMode,
+    AccumulationMode,
     ConflictMode,
     CallSeqType,
     Order,
@@ -356,7 +356,7 @@ class TestFromSignals:
         )
         portfolio = vbt.Portfolio.from_signals(
             price, entries, exits, size=1.,
-            accumulate=True, conflict_mode=ConflictMode.ExitAndEntry)
+            accumulate=True, conflict_mode=ConflictMode.Target)
         record_arrays_close(
             portfolio.orders().records_arr,
             np.array([

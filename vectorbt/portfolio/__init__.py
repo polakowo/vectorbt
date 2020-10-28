@@ -63,9 +63,10 @@ from vectorbt.portfolio.enums import (
     InitCashMode,
     CallSeqType,
     SizeType,
-    AccumulateExitMode,
+    AccumulationMode,
     ConflictMode,
     Order,
     NoOrder,
+    SignalType
 )
 from vectorbt.portfolio.base import Portfolio

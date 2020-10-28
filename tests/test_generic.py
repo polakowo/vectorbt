@@ -21,17 +21,22 @@ df = pd.DataFrame({
     datetime(2018, 1, 4),
     datetime(2018, 1, 5)
 ]))
+group_by = np.array(['first', 'first', 'second'])
 
 @njit
-def pd_nanmean_nb(x):
+def nanmean_nb(x):
     return np.nanmean(x)
 
 @njit
-def nanmean_nb(col, i, x):
+def i_col_nanmean_nb(i, col, x):
     return np.nanmean(x)
 
 @njit
-def nanmean_matrix_nb(i, x):
+def i_nanmean_nb(i, x):
+    return np.nanmean(x)
+
+@njit
+def col_nanmean_nb(col, x):
     return np.nanmean(x)
 
 
@@ -359,17 +364,15 @@ class TestAccessors:
     )
     def test_rolling_apply(self, test_window):
         pd.testing.assert_series_equal(
-            df['a'].rolling(test_window, min_periods=1).apply(pd_nanmean_nb, raw=True),
-            df['a'].vbt.rolling_apply(test_window, nanmean_nb)
+            df['a'].rolling(test_window, min_periods=1).apply(nanmean_nb, raw=True),
+            df['a'].vbt.rolling_apply(test_window, i_col_nanmean_nb)
         )
         pd.testing.assert_frame_equal(
-            df.rolling(test_window, min_periods=1).apply(pd_nanmean_nb, raw=True),
-            df.vbt.rolling_apply(test_window, nanmean_nb)
+            df.rolling(test_window, min_periods=1).apply(nanmean_nb, raw=True),
+            df.vbt.rolling_apply(test_window, i_col_nanmean_nb)
         )
-
-    def test_rolling_apply_on_matrix(self):
         pd.testing.assert_frame_equal(
-            df.vbt.rolling_apply(3, nanmean_matrix_nb, on_matrix=True),
+            df.vbt.rolling_apply(3, i_nanmean_nb, on_matrix=True),
             pd.DataFrame(
                 np.array([
                     [1., 1., 1.],
@@ -385,17 +388,15 @@ class TestAccessors:
 
     def test_expanding_apply(self):
         pd.testing.assert_series_equal(
-            df['a'].expanding(min_periods=1).apply(pd_nanmean_nb, raw=True),
-            df['a'].vbt.expanding_apply(nanmean_nb)
+            df['a'].expanding(min_periods=1).apply(nanmean_nb, raw=True),
+            df['a'].vbt.expanding_apply(i_col_nanmean_nb)
         )
         pd.testing.assert_frame_equal(
-            df.expanding(min_periods=1).apply(pd_nanmean_nb, raw=True),
-            df.vbt.expanding_apply(nanmean_nb)
+            df.expanding(min_periods=1).apply(nanmean_nb, raw=True),
+            df.vbt.expanding_apply(i_col_nanmean_nb)
         )
-
-    def test_expanding_apply_on_matrix(self):
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_apply(nanmean_matrix_nb, on_matrix=True),
+            df.vbt.expanding_apply(i_nanmean_nb, on_matrix=True),
             pd.DataFrame(
                 np.array([
                     [1., 1., 1.],
@@ -411,21 +412,21 @@ class TestAccessors:
 
     def test_groupby_apply(self):
         pd.testing.assert_series_equal(
-            df['a'].groupby(np.asarray([1, 1, 2, 2, 3])).apply(lambda x: pd_nanmean_nb(x.values)),
-            df['a'].vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), nanmean_nb)
+            df['a'].groupby(np.asarray([1, 1, 2, 2, 3])).apply(lambda x: nanmean_nb(x.values)),
+            df['a'].vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), i_col_nanmean_nb)
         )
         pd.testing.assert_frame_equal(
             df.groupby(np.asarray([1, 1, 2, 2, 3])).agg({
-                'a': lambda x: pd_nanmean_nb(x.values),
-                'b': lambda x: pd_nanmean_nb(x.values),
-                'c': lambda x: pd_nanmean_nb(x.values)
+                'a': lambda x: nanmean_nb(x.values),
+                'b': lambda x: nanmean_nb(x.values),
+                'c': lambda x: nanmean_nb(x.values)
             }),  # any clean way to do column-wise grouping in pandas?
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), nanmean_nb)
+            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), i_col_nanmean_nb)
         )
 
     def test_groupby_apply_on_matrix(self):
         pd.testing.assert_frame_equal(
-            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), nanmean_matrix_nb, on_matrix=True),
+            df.vbt.groupby_apply(np.asarray([1, 1, 2, 2, 3]), i_nanmean_nb, on_matrix=True),
             pd.DataFrame(
                 np.array([
                     [2., 2., 2.],
@@ -443,17 +444,15 @@ class TestAccessors:
     )
     def test_resample_apply(self, test_freq):
         pd.testing.assert_series_equal(
-            df['a'].resample(test_freq).apply(lambda x: pd_nanmean_nb(x.values)),
-            df['a'].vbt.resample_apply(test_freq, nanmean_nb)
+            df['a'].resample(test_freq).apply(lambda x: nanmean_nb(x.values)),
+            df['a'].vbt.resample_apply(test_freq, i_col_nanmean_nb)
         )
         pd.testing.assert_frame_equal(
-            df.resample(test_freq).apply(lambda x: pd_nanmean_nb(x.values)),
-            df.vbt.resample_apply(test_freq, nanmean_nb)
+            df.resample(test_freq).apply(lambda x: nanmean_nb(x.values)),
+            df.vbt.resample_apply(test_freq, i_col_nanmean_nb)
         )
-
-    def test_resample_apply_on_matrix(self):
         pd.testing.assert_frame_equal(
-            df.vbt.resample_apply('3d', nanmean_matrix_nb, on_matrix=True),
+            df.vbt.resample_apply('3d', i_nanmean_nb, on_matrix=True),
             pd.DataFrame(
                 np.array([
                     [2.28571429, 2.28571429, 2.28571429],
@@ -466,7 +465,7 @@ class TestAccessors:
 
     def test_applymap(self):
         @njit
-        def mult_nb(col, i, x):
+        def mult_nb(i, col, x):
             return x * 2
 
         pd.testing.assert_series_equal(
@@ -480,7 +479,7 @@ class TestAccessors:
 
     def test_filter(self):
         @njit
-        def greater_nb(col, i, x):
+        def greater_nb(i, col, x):
             return x > 2
 
         pd.testing.assert_series_equal(
@@ -498,17 +497,20 @@ class TestAccessors:
             return a[::n]
 
         @njit
-        def sum_nb(col, a, n):
-            return np.nansum(a)
+        def sum_nb(col, a, b):
+            return np.nansum(a) + b
 
-        assert df['a'].iloc[::2].sum() == df['a'].vbt.apply_and_reduce(every_nth_nb, sum_nb, 2)
+        assert df['a'].iloc[::2].sum() + 3 == df['a'].vbt.apply_and_reduce(
+            every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,))
         pd.testing.assert_series_equal(
-            df.iloc[::2].sum(),
-            df.vbt.apply_and_reduce(every_nth_nb, sum_nb, 2)
+            df.iloc[::2].sum() + 3,
+            df.vbt.apply_and_reduce(
+                every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,))
         )
         pd.testing.assert_series_equal(
-            df.iloc[::2].sum() * day_dt,
-            df.vbt.apply_and_reduce(every_nth_nb, sum_nb, 2, time_units=True)
+            (df.iloc[::2].sum() + 3) * day_dt,
+            df.vbt.apply_and_reduce(
+                every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,), time_units=True)
         )
 
     def test_reduce(self):
@@ -551,6 +553,22 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             result * day_dt,
             df.vbt.reduce_to_array(min_and_max_nb, index=['min', 'max'], time_units=True)
+        )
+
+    def test_reduce_grouped(self):
+        pd.testing.assert_series_equal(
+            df.vbt.reduce_grouped(col_nanmean_nb, group_by=group_by),
+            pd.Series(np.array([2.5, 1.5]), index=pd.Index(['first', 'second'], dtype='object'))
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.reduce_grouped(i_col_nanmean_nb, group_by=group_by, row_wise=True),
+            pd.DataFrame(np.array([
+                [1.0, 1.0],
+                [3.0, 2.0],
+                [3.0, np.nan],
+                [3.0, 2.0],
+                [1.0, 1.0]
+            ]), columns=pd.Index(['first', 'second'], dtype='object'))
         )
 
     @pytest.mark.parametrize(

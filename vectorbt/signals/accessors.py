@@ -59,13 +59,13 @@ class Signals_Accessor(Generic_Accessor):
 
     Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
         checks.assert_dtype(obj, np.bool)
 
-        Generic_Accessor.__init__(self, obj, freq=freq)
+        Generic_Accessor.__init__(self, obj, **kwargs)
 
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
@@ -125,7 +125,7 @@ class Signals_Accessor(Generic_Accessor):
             Generate random signals manually:
             ```python-repl
             >>> @njit
-            ... def choice_func_nb(col, from_i, to_i):
+            ... def choice_func_nb(from_i, to_i, col):
             ...     return col + from_i
 
             >>> pd.DataFrame.vbt.signals.generate((5, 3),
@@ -144,7 +144,6 @@ class Signals_Accessor(Generic_Accessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in args])
         result = nb.generate_nb(shape, choice_func_nb, *args)
 
         if cls.is_series():
@@ -165,12 +164,12 @@ class Signals_Accessor(Generic_Accessor):
             the number of ticks to wait before placing the exit signal.
             ```python-repl
             >>> @njit
-            ... def entry_choice_func_nb(col, from_i, to_i, temp_idx_arr):
+            ... def entry_choice_func_nb(from_i, to_i, col, temp_idx_arr):
             ...     temp_idx_arr[0] = from_i
             ...     return temp_idx_arr[:1]  # array with one signal
 
             >>> @njit
-            ... def exit_choice_func_nb(col, from_i, to_i, temp_idx_arr):
+            ... def exit_choice_func_nb(from_i, to_i, col, temp_idx_arr):
             ...     wait = col
             ...     temp_idx_arr[0] = from_i + wait
             ...     if temp_idx_arr[0] < to_i:
@@ -209,8 +208,6 @@ class Signals_Accessor(Generic_Accessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        entry_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in entry_args])
-        exit_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in exit_args])
         result1, result2 = nb.generate_enex_nb(
             shape,
             entry_wait, exit_wait,
@@ -230,7 +227,7 @@ class Signals_Accessor(Generic_Accessor):
             Fill all space after signals in `sig`:
             ```python-repl
             >>> @njit
-            ... def exit_choice_func_nb(col, from_i, to_i, temp_range):
+            ... def exit_choice_func_nb(from_i, to_i, col, temp_range):
             ...     return temp_range[from_i:to_i]
 
             >>> temp_range = np.arange(sig.shape[0])  # reuse memory
@@ -244,7 +241,6 @@ class Signals_Accessor(Generic_Accessor):
             ```"""
         checks.assert_numba_func(exit_choice_func_nb)
 
-        args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in args])
         return self.wrap(nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args))
 
     # ############# Random ############# #
@@ -601,7 +597,7 @@ class Signals_Accessor(Generic_Accessor):
         Example:
             Get average distance between signals in `sig`:
             ```python-repl
-            >>> distance_map_nb = njit(lambda col, from_i, to_i: to_i - from_i)
+            >>> distance_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
             >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
 
             >>> sig.vbt.signals.map_reduce_between(
@@ -622,8 +618,6 @@ class Signals_Accessor(Generic_Accessor):
             map_args = ()
         if reduce_args is None:
             reduce_args = ()
-        map_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in map_args])
-        reduce_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in reduce_args])
 
         if other is None:
             # One input array
@@ -654,7 +648,7 @@ class Signals_Accessor(Generic_Accessor):
         Example:
             Get average length of each partition in `sig`:
             ```python-repl
-            >>> distance_map_nb = njit(lambda col, from_i, to_i: to_i - from_i)
+            >>> distance_map_nb = njit(lambda from_i, to_i, col: to_i - from_i)
             >>> mean_reduce_nb = njit(lambda col, a: np.nanmean(a))
 
             >>> sig.vbt.signals.map_reduce_partitions(
@@ -673,8 +667,6 @@ class Signals_Accessor(Generic_Accessor):
             map_args = ()
         if reduce_args is None:
             reduce_args = ()
-        map_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in map_args])
-        reduce_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in reduce_args])
 
         result = nb.map_reduce_partitions_nb(
             self.to_2d_array(),
@@ -845,12 +837,12 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
     Accessible through `pd.Series.vbt.signals`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_SRAccessor.__init__(self, obj, freq=freq)
-        Signals_Accessor.__init__(self, obj, freq=freq)
+        Generic_SRAccessor.__init__(self, obj, **kwargs)
+        Signals_Accessor.__init__(self, obj, **kwargs)
 
     def plot(self, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
@@ -993,12 +985,12 @@ class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
 
     Accessible through `pd.DataFrame.vbt.signals`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_DFAccessor.__init__(self, obj, freq=freq)
-        Signals_Accessor.__init__(self, obj, freq=freq)
+        Generic_DFAccessor.__init__(self, obj, **kwargs)
+        Signals_Accessor.__init__(self, obj, **kwargs)
 
     def plot(self, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.

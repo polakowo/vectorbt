@@ -35,15 +35,19 @@
     times may still introduce a noticable error that cannot be corrected post factum.
 
     To mitigate this issue, avoid repeating lots of micro-transactions of the same sign in favor of
-    one bigger transaction. Also, when closing a position, use `-np.inf` instead of a finite number.
+    one bigger transaction. Also reduce by `np.inf` or `shares_now` to close a long/short position.
 """
 
 import numpy as np
 from numba import njit
 
-from vectorbt.utils.math import is_close_or_less_nb
+from vectorbt.utils.math import (
+    is_close_or_less_nb,
+    is_addition_zero_nb,
+    is_subtraction_zero_nb
+)
 from vectorbt.utils.array import insert_argsort_nb
-from vectorbt.base.reshape_fns import flex_choose_i_and_col_nb, flex_select_nb
+from vectorbt.base.reshape_fns import flex_choose_i_and_col_nb, flex_select_nb, flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio.enums import (
     SimulationContext,
@@ -53,13 +57,16 @@ from vectorbt.portfolio.enums import (
     OrderContext,
     CallSeqType,
     SizeType,
-    AccumulateExitMode,
+    AccumulationMode,
     ConflictMode,
+    SignalType,
     Order,
     NoOrder,
     OrderStatus,
     OrderResult,
-    RejectedOrder
+    IgnoredOrder,
+    RejectedOrder,
+    RejectedOrderError
 )
 from vectorbt.records.enums import (
     OrderSide,
@@ -70,7 +77,8 @@ from vectorbt.records.enums import (
 # ############# Simulation ############# #
 
 @njit(cache=True)
-def buy_shares_nb(cash_now, shares_now, order_price, order_size, order_fees, order_fixed_fees, order_slippage):
+def buy_shares_nb(cash_now, shares_now, order_price, order_size, order_fees,
+                  order_fixed_fees, order_slippage, allow_partial, raise_by_reject):
     """Buy shares."""
 
     # Get price adjusted with slippage
@@ -78,97 +86,166 @@ def buy_shares_nb(cash_now, shares_now, order_price, order_size, order_fees, ord
 
     # Get cash required to complete this order
     req_cash = order_size * adj_price
-    adj_req_cash = req_cash * (1 + order_fees) + order_fixed_fees
+    req_fees = req_cash * order_fees + order_fixed_fees
+    adj_req_cash = req_cash + req_fees
 
     if is_close_or_less_nb(adj_req_cash, cash_now):
         # Sufficient cash
         final_size = order_size
-        fees_paid = adj_req_cash - req_cash
+        fees_paid = req_fees
+        final_cash = adj_req_cash
 
-        # Update current cash and shares
-        cash_now -= order_size * adj_price + fees_paid
-        shares_now += final_size
+        # Update current cash
+        if is_subtraction_zero_nb(cash_now, final_cash):
+            cash_now = 0.  # numerical stability
+        else:
+            cash_now -= final_cash
     else:
         # Insufficient cash, size will be less than requested
+        if not allow_partial:
+            if raise_by_reject:
+                raise RejectedOrderError("Order rejected due to partial fill")
+            return cash_now, shares_now, RejectedOrder
         if is_close_or_less_nb(cash_now, order_fixed_fees):
             # Can't cover
+            if raise_by_reject:
+                raise RejectedOrderError("Order rejected due to insufficient funds")
             return cash_now, shares_now, RejectedOrder
 
         # For fees of 10% and 1$ per transaction, you can buy shares for 90$ (effect_cash)
         # to spend 100$ (adj_req_cash) in total
-        effect_cash = (cash_now - order_fixed_fees) / (1 + order_fees)
+        final_cash = (cash_now - order_fixed_fees) / (1 + order_fees)
 
         # Update size and fees
-        final_size = effect_cash / adj_price
-        fees_paid = cash_now - effect_cash
+        final_size = final_cash / adj_price
+        fees_paid = cash_now - final_cash
 
-        # Update current cash and shares
+        # Update current cash
         cash_now = 0.  # numerical stability
+
+    # Update current shares
+    if is_addition_zero_nb(shares_now, final_size):
+        shares_now = 0.  # numerical stability
+    else:
         shares_now += final_size
 
     # Return filled order
-    return cash_now, shares_now, OrderResult(final_size, adj_price, fees_paid, OrderSide.Buy, OrderStatus.Filled)
+    return cash_now, \
+           shares_now, \
+           OrderResult(
+               final_size,
+               adj_price,
+               fees_paid,
+               OrderSide.Buy,
+               OrderStatus.Filled
+           )
 
 
 @njit(cache=True)
-def sell_shares_nb(cash_now, shares_now, order_price, order_size, order_fees, order_fixed_fees, order_slippage):
+def sell_shares_nb(cash_now, shares_now, order_price, order_size,
+                   order_fees, order_fixed_fees, order_slippage):
     """Sell shares."""
 
     # Get price adjusted with slippage
     adj_price = order_price * (1 - order_slippage)
 
     # Compute acquired cash
-    final_size = min(shares_now, order_size)
-    acq_cash = final_size * adj_price
-
-    # Get final cash by subtracting costs
-    final_cash = acq_cash * (1 - order_fees)
-    if is_close_or_less_nb(cash_now + final_cash, order_fixed_fees):
-        # Can't cover
-        return cash_now, shares_now, RejectedOrder
-    final_cash -= order_fixed_fees
+    acq_cash = order_size * adj_price
 
     # Update fees
-    fees_paid = acq_cash - final_cash
+    fees_paid = acq_cash * order_fees + order_fixed_fees
+
+    # Get final cash by subtracting costs
+    final_cash = acq_cash - fees_paid
 
     # Update current cash and shares
-    cash_now += final_size * adj_price - fees_paid
-    if is_close_or_less_nb(shares_now, order_size):
+    cash_now += final_cash
+    if is_subtraction_zero_nb(shares_now, order_size):
         shares_now = 0.  # numerical stability
     else:
-        shares_now -= final_size
-    return cash_now, shares_now, OrderResult(final_size, adj_price, fees_paid, OrderSide.Sell, OrderStatus.Filled)
+        shares_now -= order_size
+    return cash_now, \
+           shares_now, \
+           OrderResult(
+               order_size,
+               adj_price,
+               fees_paid,
+               OrderSide.Sell,
+               OrderStatus.Filled
+           )
 
 
 @njit(cache=True)
-def process_order_nb(cash_now, shares_now, order, min_size):
-    """Fill an order."""
-    if np.isnan(order.size) or np.isnan(order.price):
-        return cash_now, shares_now, RejectedOrder
+def create_order(size=np.nan,
+                 size_type=SizeType.Shares,
+                 price=np.nan,
+                 fees=0.,
+                 fixed_fees=0.,
+                 slippage=0.,
+                 min_size=0.,
+                 max_size=np.inf,
+                 reject_prob=0.,
+                 allow_partial=True,
+                 raise_by_reject=False):
+    """Create order with some defaults."""
 
-    if not np.isfinite(order.price) or order.price <= 0.:
-        raise ValueError("Price must be finite and greater than 0")
-    if not np.isfinite(order.fees) or order.fees < 0.:
-        raise ValueError("Fees must be finite and 0 or greater")
-    if not np.isfinite(order.fixed_fees) or order.fixed_fees < 0.:
-        raise ValueError("Fixed fees must be finite and 0 or greater")
-    if not np.isfinite(order.slippage) or order.slippage < 0.:
-        raise ValueError("Slippage must be finite and 0 or greater")
-    if not np.isfinite(order.reject_prob) or order.reject_prob < 0. or order.reject_prob > 1.:
-        raise ValueError("Rejection probability must be between 0 and 1")
-    if not np.isfinite(min_size) or min_size < 0.:
-        raise ValueError("Minimum size must be finite and 0 or greater")
+    return Order(
+        float(size),
+        size_type,
+        float(price),
+        float(fees),
+        float(fixed_fees),
+        float(slippage),
+        float(min_size),
+        float(max_size),
+        float(reject_prob),
+        bool(allow_partial),
+        bool(raise_by_reject)
+    )
+
+
+@njit(cache=True)
+def process_order_nb(cash_now, shares_now, order):
+    """Process an order given current cash and share balance.
+
+    Ignores order if size or price are NaN, or size is zero."""
+    if np.isnan(order.size) or np.isnan(order.price):
+        return cash_now, shares_now, IgnoredOrder
+
+    # Check order
+    if cash_now < 0:
+        raise ValueError("cash_now must be greater than 0")
+    if not np.isfinite(order.price) or order.price <= 0:
+        raise ValueError("order.price must be finite and greater than 0")
+    if not np.isfinite(order.fees) or order.fees < 0:
+        raise ValueError("order.fees must be finite and 0 or greater")
+    if not np.isfinite(order.fixed_fees) or order.fixed_fees < 0:
+        raise ValueError("order.fixed_fees must be finite and 0 or greater")
+    if not np.isfinite(order.slippage) or order.slippage < 0:
+        raise ValueError("order.slippage must be finite and 0 or greater")
+    if not np.isfinite(order.min_size) or order.min_size < 0:
+        raise ValueError("order.min_size must be finite and 0 or greater")
+    if order.max_size < 0:
+        raise ValueError("order.max_size must be 0 or greater")
+    if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
+        raise ValueError("order.reject_prob must be between 0 and 1")
+    if order.allow_partial != 0 and order.allow_partial != 1:
+        raise ValueError("order.allow_partial must be boolean")
+    if order.raise_by_reject != 0 and order.raise_by_reject != 1:
+        raise ValueError("order.raise_by_reject must be boolean")
 
     # Convert target size to shares
     size = order.size
     if order.size_type == SizeType.TargetShares:
         # Target amount of shares
         size = order.size - shares_now
+
     elif order.size_type == SizeType.TargetValue:
         # Value in monetary units of the asset
         target_value = order.size
         current_value = shares_now * order.price
         size = (target_value - current_value) / order.price
+
     elif order.size_type == SizeType.TargetPercent:
         # Percentage from current value that can be moved by this asset
         # Not to confuse with group value!
@@ -178,14 +255,30 @@ def process_order_nb(cash_now, shares_now, order, min_size):
         target_value = target_perc * current_total_value
         size = (target_value - current_value) / order.price
 
-    if abs(size) < min_size:
-        return cash_now, shares_now, RejectedOrder
+    if size == 0:
+        return cash_now, shares_now, IgnoredOrder
 
-    if order.reject_prob > 0.:
+    if abs(size) < order.min_size:
+        if order.raise_by_reject:
+            raise RejectedOrderError("Order rejected due to minimum size")
+        return cash_now, shares_now, RejectedOrder
+    if abs(size) > order.max_size:
+        if not order.allow_partial:
+            if order.raise_by_reject:
+                raise RejectedOrderError("Order rejected due to partial fill")
+            return cash_now, shares_now, RejectedOrder
+        if size > 0:
+            size = order.max_size
+        else:
+            size = -order.max_size
+
+    if order.reject_prob > 0:
         if np.random.uniform(0, 1) < order.reject_prob:
+            if order.raise_by_reject:
+                raise RejectedOrderError("Order rejected due to rejection probability")
             return cash_now, shares_now, RejectedOrder
 
-    if size > 0. and cash_now > 0.:
+    if size > 0:
         if np.isinf(size) and np.isinf(cash_now):
             raise ValueError("Size and current cash cannot be both infinite")
 
@@ -196,23 +289,23 @@ def process_order_nb(cash_now, shares_now, order, min_size):
             size,
             order.fees,
             order.fixed_fees,
-            order.slippage
+            order.slippage,
+            order.allow_partial,
+            order.raise_by_reject
         )
-    if size < 0. and shares_now > 0.:
-        if np.isinf(size) and np.isinf(shares_now):
-            raise ValueError("Size and current shares cannot be both infinite")
+    else:
+        if np.isinf(size):
+            raise ValueError("Size cannot be both negative and infinite")
 
         return sell_shares_nb(
             cash_now,
             shares_now,
             order.price,
-            abs(size),
+            -size,
             order.fees,
             order.fixed_fees,
             order.slippage
         )
-
-    return cash_now, shares_now, RejectedOrder
 
 
 @njit(cache=True)
@@ -234,7 +327,7 @@ def check_group_init_cash(group_counts, n_cols, init_cash, cash_sharing):
 
 
 @njit(cache=True)
-def get_record_idx_nb(target_shape, col, i):
+def get_record_idx_nb(target_shape, i, col):
     """Get record index by position of order in the matrix."""
     return col * target_shape[0] + i
 
@@ -308,7 +401,7 @@ def get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price):
     group_len = to_col - from_col
     for k in range(group_len):
         col = from_col + k
-        if last_shares[col] > 0.:
+        if last_shares[col] > 0:
             holding_value = last_shares[col] * last_val_price[col]
             group_value += holding_value
     return group_value
@@ -385,7 +478,7 @@ def auto_call_seq_ctx_nb(sc, order_size, order_size_type, temp_float_arr):
 
 
 @njit
-def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call_seq, active_mask, min_size,
+def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call_seq, active_mask,
                 prep_func_nb, prep_args, group_prep_func_nb, group_prep_args, segment_prep_func_nb,
                 segment_prep_args, order_func_nb, order_args):
     """Simulate a portfolio by generating and filling orders.
@@ -427,9 +520,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
             A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
             Should have shape `(target_shape[0], group_counts.shape[0])`.
-        min_size (np.ndarray): Minimum size for an order to be accepted.
-
-            Should have shape `(target_shape[1],)`.
         prep_func_nb (callable): Simulation preparation function.
 
             Can be used for creation of global arrays and setting the seed, and is executed at the
@@ -516,7 +606,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
         >>> call_seq = build_call_seq(target_shape, group_counts)  # will be overridden
         >>> active_mask = np.array([True, False, True, False, True])[:, None]
         >>> active_mask = np.copy(np.broadcast_to(active_mask, target_shape))
-        >>> min_size = np.copy(np.broadcast_to(1e-4, (target_shape[1],)))
         >>> fees = 0.001
         >>> fixed_fees = 1.
         >>> slippage = 0.001
@@ -568,7 +657,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
         ...     cash_sharing,
         ...     call_seq,
         ...     active_mask,
-        ...     min_size,
         ...     prep_func_nb, (),
         ...     group_prep_func_nb, (),
         ...     segment_prep_func_nb, (),
@@ -638,7 +726,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
         cash_sharing,
         call_seq,
         active_mask,
-        min_size,
         order_records,
         record_mask,
         last_cash,
@@ -663,7 +750,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                 cash_sharing,
                 call_seq,
                 active_mask,
-                min_size,
                 order_records,
                 record_mask,
                 last_cash,
@@ -695,7 +781,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                         cash_sharing,
                         call_seq,
                         active_mask,
-                        min_size,
                         order_records,
                         record_mask,
                         last_cash,
@@ -728,7 +813,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                         if not cash_sharing:
                             cash_now = last_cash[col]
                             value_now = cash_now
-                            if shares_now > 0.:
+                            if shares_now > 0:
                                 value_now += shares_now * val_price_now
 
                         # Generate the next order
@@ -740,7 +825,6 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                             cash_sharing,
                             call_seq,
                             active_mask,
-                            min_size,
                             order_records,
                             record_mask,
                             last_cash,
@@ -790,12 +874,11 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
                         )
 
                         # Process the order
-                        cash_now, shares_now, order_result = process_order_nb(
-                            cash_now, shares_now, order, min_size[col])
+                        cash_now, shares_now, order_result = process_order_nb(cash_now, shares_now, order)
 
                         if order_result.status == OrderStatus.Filled:
                             # Add a new record
-                            r = get_record_idx_nb(target_shape, col, i)
+                            r = get_record_idx_nb(target_shape, i, col)
                             order_records[r]['col'] = col
                             order_records[r]['idx'] = i
                             order_records[r]['size'] = order_result.size
@@ -820,7 +903,7 @@ def simulate_nb(target_shape, close, group_counts, init_cash, cash_sharing, call
 
 @njit
 def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_sharing, call_seq,
-                         active_mask, min_size, prep_func_nb, prep_args, row_prep_func_nb, row_prep_args,
+                         active_mask, prep_func_nb, prep_args, row_prep_func_nb, row_prep_args,
                          segment_prep_func_nb, segment_prep_args, order_func_nb, order_args):
     """Same as `simulate_nb`, but iterates using row-major order, with the rows
     changing fastest, and the columns/groups changing slowest.
@@ -883,7 +966,6 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
         cash_sharing,
         call_seq,
         active_mask,
-        min_size,
         order_records,
         record_mask,
         last_cash,
@@ -909,7 +991,6 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                 cash_sharing,
                 call_seq,
                 active_mask,
-                min_size,
                 order_records,
                 record_mask,
                 last_cash,
@@ -937,7 +1018,6 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                         cash_sharing,
                         call_seq,
                         active_mask,
-                        min_size,
                         order_records,
                         record_mask,
                         last_cash,
@@ -970,7 +1050,7 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                         if not cash_sharing:
                             cash_now = last_cash[col]
                             value_now = cash_now
-                            if shares_now > 0.:
+                            if shares_now > 0:
                                 value_now += shares_now * val_price_now
 
                         # Generate the next order
@@ -982,7 +1062,6 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                             cash_sharing,
                             call_seq,
                             active_mask,
-                            min_size,
                             order_records,
                             record_mask,
                             last_cash,
@@ -1032,12 +1111,11 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
                         )
 
                         # Process the order
-                        cash_now, shares_now, order_result = process_order_nb(
-                            cash_now, shares_now, order, min_size[col])
+                        cash_now, shares_now, order_result = process_order_nb(cash_now, shares_now, order)
 
                         if order_result.status == OrderStatus.Filled:
                             # Add a new record
-                            r = get_record_idx_nb(target_shape, col, i)
+                            r = get_record_idx_nb(target_shape, i, col)
                             order_records[r]['col'] = col
                             order_records[r]['idx'] = i
                             order_records[r]['size'] = order_result.size
@@ -1061,9 +1139,150 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
 
 
 @njit(cache=True)
-def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, entries, exits, size,
-                             entry_price, exit_price, fees, fixed_fees, slippage, reject_prob, min_size,
-                             accumulate, accumulate_exit_mode, conflict_mode, flex_2d):
+def signals_order_func_nb(shares_now,
+                          is_entry, is_exit,
+                          long_size, short_size,
+                          long_price, short_price,
+                          long_fees, short_fees,
+                          long_fixed_fees, short_fixed_fees,
+                          long_slippage, short_slippage,
+                          long_min_size, short_min_size,
+                          long_max_size, short_max_size,
+                          long_reject_prob, short_reject_prob,
+                          long_allow_partial, short_allow_partial,
+                          long_raise_by_reject, short_raise_by_reject,
+                          accumulation_mode, conflict_mode, signal_type):
+    """`order_func_nb` of `simulate_from_signals_nb`."""
+    order_size = 0.
+    abs_shares_now = abs(shares_now)
+    abs_long_size = abs(long_size)
+    abs_short_size = abs(short_size)
+    long_accumulate = accumulation_mode == AccumulationMode.LongShort \
+        or accumulation_mode == AccumulationMode.Long
+    short_accumulate = accumulation_mode == AccumulationMode.LongShort \
+        or accumulation_mode == AccumulationMode.Short
+
+    if is_entry and is_exit:
+        # Conflict
+        if conflict_mode == ConflictMode.Entry:
+            # Ignore exit signal
+            is_exit = False
+        elif conflict_mode == ConflictMode.Exit:
+            # Ignore entry signal
+            is_entry = False
+        elif conflict_mode == ConflictMode.Opposite:
+            # Take opposite signal from the position we are in
+            if signal_type == SignalType.LongShort:
+                if shares_now > 0:
+                    is_entry = False
+                elif shares_now == 0:
+                    is_exit = False  # long is preferred here
+                else:
+                    is_exit = False
+            else:
+                if shares_now != 0:
+                    is_entry = False
+                else:
+                    is_exit = False
+
+    if is_entry and not is_exit:
+        if signal_type == SignalType.LongShort:
+            # Behaves like SignalType.Long
+            if long_accumulate:
+                order_size = abs_long_size
+            else:
+                if shares_now < 0:
+                    # Reverse short position
+                    order_size = abs_shares_now + abs_long_size
+                elif shares_now == 0:
+                    # Open long position
+                    order_size = abs_long_size
+        elif signal_type == SignalType.Long:
+            if shares_now == 0 or long_accumulate:
+                # Open or increase long position
+                order_size = abs_long_size
+        else:
+            if shares_now == 0 or short_accumulate:
+                # Open or increase short position
+                order_size = -abs_short_size
+
+    elif not is_entry and is_exit:
+        if signal_type == SignalType.LongShort:
+            # Behaves like SignalType.Short
+            if short_accumulate:
+                order_size = -abs_short_size
+            else:
+                if shares_now > 0:
+                    # Reverse long position
+                    order_size = -abs_shares_now - abs_short_size
+                elif shares_now == 0:
+                    # Open short position
+                    order_size = -abs_short_size
+        elif signal_type == SignalType.Short:
+            if shares_now < 0:
+                if long_accumulate:
+                    # Reduce short position
+                    order_size = abs_long_size
+                else:
+                    # Close short position
+                    order_size = abs_shares_now
+        else:
+            if shares_now > 0:
+                if short_accumulate:
+                    # Reduce long position
+                    order_size = -abs_short_size
+                else:
+                    # Close long position
+                    order_size = -abs_shares_now
+
+    if order_size == 0:
+        return NoOrder
+    if order_size > 0:
+        # Go long
+        return create_order(
+            size=order_size,
+            size_type=SizeType.Shares,
+            price=long_price,
+            fees=long_fees,
+            fixed_fees=long_fixed_fees,
+            slippage=long_slippage,
+            min_size=long_min_size,
+            max_size=long_max_size,
+            reject_prob=long_reject_prob,
+            allow_partial=long_allow_partial,
+            raise_by_reject=long_raise_by_reject
+        )
+    # Go short
+    return create_order(
+        size=order_size,
+        size_type=SizeType.Shares,
+        price=short_price,
+        fees=short_fees,
+        fixed_fees=short_fixed_fees,
+        slippage=short_slippage,
+        min_size=short_min_size,
+        max_size=short_max_size,
+        reject_prob=short_reject_prob,
+        allow_partial=short_allow_partial,
+        raise_by_reject=short_raise_by_reject
+    )
+
+
+@njit(cache=True)
+def simulate_from_signals_nb(target_shape,
+                             group_counts, init_cash, call_seq,
+                             entries, exits,
+                             long_size, short_size,
+                             long_price, short_price,
+                             long_fees, short_fees,
+                             long_fixed_fees, short_fixed_fees,
+                             long_slippage, short_slippage,
+                             long_min_size, short_min_size,
+                             long_max_size, short_max_size,
+                             long_reject_prob, short_reject_prob,
+                             long_allow_partial, short_allow_partial,
+                             long_raise_by_reject, short_raise_by_reject,
+                             accumulation_mode, conflict_mode, signal_type, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals.
 
     Utilizes flexible broadcasting.
@@ -1079,17 +1298,6 @@ def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, en
     j = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
-
-    # Inputs were not broadcast -> use flexible indexing
-    flex_i1, flex_col1 = flex_choose_i_and_col_nb(entries, flex_2d)
-    flex_i2, flex_col2 = flex_choose_i_and_col_nb(exits, flex_2d)
-    flex_i3, flex_col3 = flex_choose_i_and_col_nb(size, flex_2d)
-    flex_i4, flex_col4 = flex_choose_i_and_col_nb(entry_price, flex_2d)
-    flex_i5, flex_col5 = flex_choose_i_and_col_nb(exit_price, flex_2d)
-    flex_i6, flex_col6 = flex_choose_i_and_col_nb(fees, flex_2d)
-    flex_i7, flex_col7 = flex_choose_i_and_col_nb(fixed_fees, flex_2d)
-    flex_i8, flex_col8 = flex_choose_i_and_col_nb(slippage, flex_2d)
-    flex_i9, flex_col9 = flex_choose_i_and_col_nb(reject_prob, flex_2d)
 
     from_col = 0
     for group in range(len(group_counts)):
@@ -1114,34 +1322,46 @@ def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, en
                     cash_now = last_cash[col]
                 shares_now = last_shares[col]
 
-                is_entry = flex_select_nb(i, col, entries, flex_i1, flex_col1, flex_2d)
-                is_exit = flex_select_nb(i, col, exits, flex_i2, flex_col2, flex_2d)
+                is_entry = flex_select_auto_nb(i, col, entries, flex_2d)
+                is_exit = flex_select_auto_nb(i, col, exits, flex_2d)
                 if is_entry or is_exit:
                     # Generate the next order
                     order = signals_order_func_nb(
                         shares_now,
                         is_entry,
                         is_exit,
-                        flex_select_nb(i, col, size, flex_i3, flex_col3, flex_2d),
-                        flex_select_nb(i, col, entry_price, flex_i4, flex_col4, flex_2d),
-                        flex_select_nb(i, col, exit_price, flex_i5, flex_col5, flex_2d),
-                        flex_select_nb(i, col, fees, flex_i6, flex_col6, flex_2d),
-                        flex_select_nb(i, col, fixed_fees, flex_i7, flex_col7, flex_2d),
-                        flex_select_nb(i, col, slippage, flex_i8, flex_col8, flex_2d),
-                        flex_select_nb(i, col, reject_prob, flex_i9, flex_col9, flex_2d),
-                        accumulate,
-                        accumulate_exit_mode,
-                        conflict_mode
+                        flex_select_auto_nb(i, col, long_size, flex_2d),
+                        flex_select_auto_nb(i, col, short_size, flex_2d),
+                        flex_select_auto_nb(i, col, long_price, flex_2d),
+                        flex_select_auto_nb(i, col, short_price, flex_2d),
+                        flex_select_auto_nb(i, col, long_fees, flex_2d),
+                        flex_select_auto_nb(i, col, short_fees, flex_2d),
+                        flex_select_auto_nb(i, col, long_fixed_fees, flex_2d),
+                        flex_select_auto_nb(i, col, short_fixed_fees, flex_2d),
+                        flex_select_auto_nb(i, col, long_slippage, flex_2d),
+                        flex_select_auto_nb(i, col, short_slippage, flex_2d),
+                        flex_select_auto_nb(i, col, long_min_size, flex_2d),
+                        flex_select_auto_nb(i, col, short_min_size, flex_2d),
+                        flex_select_auto_nb(i, col, long_max_size, flex_2d),
+                        flex_select_auto_nb(i, col, short_max_size, flex_2d),
+                        flex_select_auto_nb(i, col, long_reject_prob, flex_2d),
+                        flex_select_auto_nb(i, col, short_reject_prob, flex_2d),
+                        flex_select_auto_nb(i, col, long_allow_partial, flex_2d),
+                        flex_select_auto_nb(i, col, short_allow_partial, flex_2d),
+                        flex_select_auto_nb(i, col, long_raise_by_reject, flex_2d),
+                        flex_select_auto_nb(i, col, short_raise_by_reject, flex_2d),
+                        flex_select_auto_nb(i, col, accumulation_mode, flex_2d),
+                        flex_select_auto_nb(i, col, conflict_mode, flex_2d),
+                        flex_select_auto_nb(i, col, signal_type, flex_2d)
                     )
 
                     # Process the order
-                    cash_now, shares_now, order_result = process_order_nb(
-                        cash_now, shares_now, order, min_size[col])
+                    cash_now, shares_now, order_result = process_order_nb(cash_now, shares_now, order)
 
                     if order_result.status == OrderStatus.Filled:
                         # Add a new record
                         if cash_sharing:
-                            r = get_record_idx_nb(target_shape, col, i)
+                            r = get_record_idx_nb(target_shape, i, col)
                         else:
                             r = j
                         order_records[r]['col'] = col
@@ -1170,71 +1390,8 @@ def simulate_from_signals_nb(target_shape, group_counts, init_cash, call_seq, en
 
 
 @njit(cache=True)
-def signals_order_func_nb(shares_now, is_entry, is_exit, size, entry_price, exit_price, fees, fixed_fees,
-                          slippage, reject_prob, accumulate, accumulate_exit_mode, conflict_mode):
-    """`order_func_nb` of `simulate_from_signals_nb`."""
-    if is_entry and not is_exit:
-        # Open or increase the position
-        if shares_now == 0. or accumulate:
-            order_size = abs(size)
-            order_price = entry_price
-        else:
-            return NoOrder
-    elif not is_entry and is_exit:
-        if shares_now > 0.:
-            # If in position
-            if not accumulate or (accumulate and accumulate_exit_mode == AccumulateExitMode.Close):
-                # Close the position
-                order_size = -np.inf
-                order_price = exit_price
-            elif accumulate and accumulate_exit_mode == AccumulateExitMode.Reduce:
-                # Decrease the position
-                order_size = -abs(size)
-                order_price = exit_price
-        else:
-            return NoOrder
-    elif is_entry and is_exit:
-        # Conflict
-        if conflict_mode == ConflictMode.Ignore:
-            return NoOrder
-        if shares_now > 0.:
-            # If in position
-            if accumulate and accumulate_exit_mode == AccumulateExitMode.Reduce:
-                # Selling and buying the same size makes no sense
-                return NoOrder
-            if conflict_mode == ConflictMode.Exit:
-                # Close the position
-                order_size = -np.inf
-                order_price = exit_price
-            elif conflict_mode == ConflictMode.ExitAndEntry:
-                # Do not sell and then buy, but buy/sell the difference (less fees)
-                order_size = abs(size) - shares_now
-                if order_size > 0:
-                    order_price = entry_price
-                elif order_size < 0:
-                    order_price = exit_price
-                else:
-                    return NoOrder
-            else:
-                return NoOrder
-        else:
-            return NoOrder
-    else:
-        return NoOrder
-    return Order(
-        order_size,
-        SizeType.Shares,
-        order_price,
-        fees,
-        fixed_fees,
-        slippage,
-        reject_prob
-    )
-
-
-@njit(cache=True)
 def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, size, size_type,
-                            price, fees, fixed_fees, slippage, reject_prob, min_size, val_price,
+                            price, fees, fixed_fees, slippage, reject_prob, val_price,
                             auto_call_seq, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on orders.
 
@@ -1281,7 +1438,7 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                 value_now = cash_now
                 for k in range(group_len):
                     col = from_col + k
-                    if last_shares[col] > 0.:
+                    if last_shares[col] != 0:
                         _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
                         holding_value = last_shares[col] * _val_price
                         value_now += holding_value
@@ -1323,7 +1480,7 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                 if not cash_sharing:
                     cash_now = last_cash[col]
                     value_now = cash_now
-                    if shares_now > 0.:
+                    if shares_now != 0:
                         value_now += shares_now * _val_price
 
                 # Convert target value or percent into target shares
@@ -1356,13 +1513,12 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                 )
 
                 # Process the order
-                cash_now, shares_now, order_result = process_order_nb(
-                    cash_now, shares_now, order, min_size[col])
+                cash_now, shares_now, order_result = process_order_nb(cash_now, shares_now, order)
 
                 if order_result.status == OrderStatus.Filled:
                     # Add a new record
                     if cash_sharing:
-                        r = get_record_idx_nb(target_shape, col, i)
+                        r = get_record_idx_nb(target_shape, i, col)
                     else:
                         r = j
                     order_records[r]['col'] = col
@@ -1413,7 +1569,7 @@ def shares_nb(share_flow):
         shares_now = 0.
         for i in range(share_flow.shape[0]):
             flow_value = share_flow[i, col]
-            if flow_value < 0 and is_close_or_less_nb(shares_now, -flow_value):
+            if is_addition_zero_nb(shares_now, flow_value):
                 shares_now = 0.  # numerical stability
             else:
                 shares_now += flow_value
@@ -1422,20 +1578,81 @@ def shares_nb(share_flow):
 
 
 @njit(cache=True)
-def holding_mask_grouped_nb(shares, group_counts):
-    """Get holding mask per group."""
-    check_group_counts(group_counts, shares.shape[1])
+def i_group_sum_reduce_nb(i, group, a):
+    """Sum reducer for grouped columns."""
+    return np.sum(a)
 
-    out = np.empty((shares.shape[0], len(group_counts)), dtype=np.bool_)
-    from_col = 0
-    for group in range(len(group_counts)):
-        to_col = from_col + group_counts[group]
-        out[:, group] = np.sum(shares[:, from_col:to_col], axis=1) > 0
-        from_col = to_col
-    return out
+
+@njit
+def pos_mask_nb(shares, group_counts):
+    """Get number of columns in position for each row and group."""
+    return generic_nb.reduce_grouped_row_wise_nb(shares != 0, group_counts, i_group_sum_reduce_nb) > 0
+
+
+@njit
+def long_pos_mask_nb(shares, group_counts):
+    """Get number of columns in long position for each row and group."""
+    return generic_nb.reduce_grouped_row_wise_nb(shares > 0, group_counts, i_group_sum_reduce_nb) > 0
+
+
+@njit
+def short_pos_mask_nb(shares, group_counts):
+    """Get number of columns in short position for each row and group."""
+    return generic_nb.reduce_grouped_row_wise_nb(shares < 0, group_counts, i_group_sum_reduce_nb) > 0
+
+
+@njit(cache=True)
+def group_mean_reduce_nb(group, a):
+    """Mean reducer for grouped columns."""
+    return np.mean(a)
+
+
+@njit
+def pos_duration_nb(shares, group_counts):
+    """Get duration of position for each row and group."""
+    return generic_nb.reduce_grouped_nb(shares != 0, group_counts, group_mean_reduce_nb)
+
+
+@njit
+def long_pos_duration_nb(shares, group_counts):
+    """Get duration of long position for each row and group."""
+    return generic_nb.reduce_grouped_nb(shares > 0, group_counts, group_mean_reduce_nb)
+
+
+@njit
+def short_pos_duration_nb(shares, group_counts):
+    """Get duration of short position for each row and group."""
+    return generic_nb.reduce_grouped_nb(shares < 0, group_counts, group_mean_reduce_nb)
 
 
 # ############# Cash ############# #
+
+@njit(cache=True)
+def cash_flow_ungrouped_nb(target_shape, order_records):
+    """Get cash flow series per column."""
+    out = np.full(target_shape, 0., dtype=np.float_)
+    for r in range(order_records.shape[0]):
+        record = order_records[r]
+        if record['side'] == OrderSide.Buy:
+            out[record['idx'], record['col']] -= record['size'] * record['price'] + record['fees']
+        else:
+            out[record['idx'], record['col']] += record['size'] * record['price'] - record['fees']
+    return out
+
+
+@njit(cache=True)
+def cash_flow_grouped_nb(cash_flow_ungrouped, group_counts):
+    """Get cash flow series per group."""
+    check_group_counts(group_counts, cash_flow_ungrouped.shape[1])
+
+    out = np.empty((cash_flow_ungrouped.shape[0], len(group_counts)), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_counts)):
+        to_col = from_col + group_counts[group]
+        out[:, group] = np.sum(cash_flow_ungrouped[:, from_col:to_col], axis=1)
+        from_col = to_col
+    return out
+
 
 @njit(cache=True)
 def init_cash_grouped_nb(init_cash, group_counts, cash_sharing):
@@ -1467,33 +1684,6 @@ def init_cash_ungrouped_nb(init_cash, group_counts, cash_sharing):
 
 
 @njit(cache=True)
-def cash_flow_ungrouped_nb(target_shape, order_records):
-    """Get cash flow series per column."""
-    out = np.full(target_shape, 0., dtype=np.float_)
-    for r in range(order_records.shape[0]):
-        record = order_records[r]
-        if record['side'] == OrderSide.Buy:
-            out[record['idx'], record['col']] -= record['size'] * record['price'] + record['fees']
-        else:
-            out[record['idx'], record['col']] += record['size'] * record['price'] - record['fees']
-    return out
-
-
-@njit(cache=True)
-def cash_flow_grouped_nb(cash_flow_ungrouped, group_counts):
-    """Get cash flow series per group."""
-    check_group_counts(group_counts, cash_flow_ungrouped.shape[1])
-
-    out = np.empty((cash_flow_ungrouped.shape[0], len(group_counts)), dtype=np.float_)
-    from_col = 0
-    for group in range(len(group_counts)):
-        to_col = from_col + group_counts[group]
-        out[:, group] = np.sum(cash_flow_ungrouped[:, from_col:to_col], axis=1)
-        from_col = to_col
-    return out
-
-
-@njit(cache=True)
 def cash_ungrouped_nb(cash_flow_ungrouped, group_counts, init_cash, call_seq, in_sim_order):
     """Get cash series per column.
 
@@ -1513,7 +1703,7 @@ def cash_ungrouped_nb(cash_flow_ungrouped, group_counts, init_cash, call_seq, in
                 if not in_sim_order:
                     cash_now = init_cash[col] if i == 0 else out[i - 1, col]
                 flow_value = cash_flow_ungrouped[i, col]
-                if flow_value < 0 and is_close_or_less_nb(cash_now, -flow_value):
+                if is_addition_zero_nb(cash_now, flow_value):
                     cash_now = 0.  # numerical stability
                 else:
                     cash_now += flow_value
@@ -1534,7 +1724,7 @@ def cash_grouped_nb(target_shape, cash_flow_grouped, group_counts, init_cash_gro
         cash_now = init_cash_grouped[group]
         for i in range(cash_flow_grouped.shape[0]):
             flow_value = cash_flow_grouped[i, group]
-            if flow_value < 0 and is_close_or_less_nb(cash_now, -flow_value):
+            if is_addition_zero_nb(cash_now, flow_value):
                 cash_now = 0.  # numerical stability
             else:
                 cash_now += flow_value
@@ -1608,7 +1798,7 @@ def value_nb(cash, holding_value):
     return cash + holding_value
 
 
-@njit
+@njit(cache=True)
 def total_profit_ungrouped_nb(target_shape, close, order_records, init_cash_ungrouped):
     """Get total profit per column.
 
@@ -1630,27 +1820,38 @@ def total_profit_ungrouped_nb(target_shape, close, order_records, init_cash_ungr
         if i < prev_i:
             raise ValueError("Order records must be sorted")
 
+        # Fill shares
         if record['side'] == OrderSide.Buy:
-            shares[col] += record['size']
+            order_size = record['size']
+            if is_addition_zero_nb(shares[col], order_size):
+                shares[col] = 0.
+            else:
+                shares[col] += order_size
         else:
             order_size = record['size']
-            if is_close_or_less_nb(shares[col], order_size):
-                shares[col] = 0.  # numerical stability
+            if is_subtraction_zero_nb(shares[col], order_size):
+                shares[col] = 0.
             else:
                 shares[col] -= order_size
+
+        # Fill cash
         if record['side'] == OrderSide.Buy:
             order_cash = record['size'] * record['price'] + record['fees']
-            if is_close_or_less_nb(cash[col], order_cash):
+            if is_subtraction_zero_nb(cash[col], order_cash):
                 cash[col] = 0.  # numerical stability
             else:
                 cash[col] -= order_cash
         else:
-            cash[col] += record['size'] * record['price'] - record['fees']
+            order_cash = record['size'] * record['price'] - record['fees']
+            if is_addition_zero_nb(cash[col], order_cash):
+                cash[col] = 0.  # numerical stability
+            else:
+                cash[col] += order_cash
 
     return cash + shares * close[-1, :] - init_cash_ungrouped
 
 
-@njit
+@njit(cache=True)
 def total_profit_grouped_nb(total_profit_ungrouped, group_counts):
     """Get total profit per group."""
     check_group_counts(group_counts, total_profit_ungrouped.shape[0])
@@ -1677,30 +1878,28 @@ def total_return_nb(total_profit, init_cash_regrouped):
 
 
 @njit(cache=True)
-def active_returns_nb(cash_flow, holding_value):
-    """Get active return series per column/group."""
-    out = np.empty_like(cash_flow)
-    for col in range(cash_flow.shape[1]):
-        for i in range(cash_flow.shape[0]):
-            input_value = 0. if i == 0 else holding_value[i - 1, col]
-            if cash_flow[i, col] < 0.:
-                input_value += -cash_flow[i, col]
-            if input_value == 0.:
-                out[i, col] = 0.
-                continue
-            output_value = holding_value[i, col]
-            if cash_flow[i, col] > 0.:
-                output_value += cash_flow[i, col]
-            out[i, col] = (output_value - input_value) / input_value
-    return out
+def get_return_nb(input_value, output_value):
+    """Get return from input and output value."""
+    if input_value == 0:
+        if output_value == 0:
+            return 0.
+        return np.inf * np.sign(output_value)
+    return_value = (output_value - input_value) / input_value
+    if input_value < 0:
+        return_value *= -1
+    return return_value
 
 
 @njit(cache=True)
 def returns_nb(value, init_cash_regrouped):
     """Get portfolio return series per column/group."""
     out = np.empty(value.shape, dtype=np.float_)
-    out[0, :] = (value[0, :] - init_cash_regrouped) / init_cash_regrouped
-    out[1:, :] = (value[1:, :] - value[:-1, :]) / value[:-1, :]
+    for col in range(out.shape[1]):
+        input_value = init_cash_regrouped[col]
+        for i in range(out.shape[0]):
+            output_value = value[i, col]
+            out[i, col] = get_return_nb(input_value, output_value)
+            input_value = output_value
     return out
 
 
@@ -1719,9 +1918,21 @@ def returns_in_sim_order_nb(value_iso, group_counts, init_cash_grouped, call_seq
             i = j // group_len
             col = from_col + call_seq[i, from_col + j % group_len]
             output_value = value_iso[i, col]
-            out[i, col] = (output_value - input_value) / input_value
+            out[i, col] = get_return_nb(input_value, output_value)
             input_value = output_value
         from_col = to_col
+    return out
+
+
+@njit(cache=True)
+def active_returns_nb(cash_flow, holding_value):
+    """Get active return series per column/group."""
+    out = np.empty_like(cash_flow)
+    for col in range(cash_flow.shape[1]):
+        for i in range(cash_flow.shape[0]):
+            input_value = 0. if i == 0 else holding_value[i - 1, col]
+            output_value = holding_value[i, col] + cash_flow[i, col]
+            out[i, col] = get_return_nb(input_value, output_value)
     return out
 
 

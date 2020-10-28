@@ -54,7 +54,7 @@ def set_by_mask_nb(a, mask, value):
 def set_by_mask_mult_1d_nb(a, mask, values):
     """Set each element in one array to the corresponding element in another by boolean mask.
 
-    `values` must be of the same shape as in `a`."""
+    `values` should be of the same shape as in `a`."""
     out = a.astype(np.float_)
     out[mask] = values[mask]
     return out
@@ -744,13 +744,13 @@ def expanding_std_nb(a, minp=1, ddof=0):
 def rolling_apply_nb(a, window, apply_func_nb, *args):
     """Provide rolling window calculations.
 
-    `apply_func_nb` must accept index of the current column, index of the current row, 
-    the array, and `*args`. Must return a single value."""
+    `apply_func_nb` should accept index of the row, index of the column,
+    the array, and `*args`. Should return a single value."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
         for i in range(a.shape[0]):
             window_a = a[max(0, i + 1 - window):i + 1, col]
-            out[i, col] = apply_func_nb(col, i, window_a, *args)
+            out[i, col] = apply_func_nb(i, col, window_a, *args)
     return out
 
 
@@ -758,8 +758,8 @@ def rolling_apply_nb(a, window, apply_func_nb, *args):
 def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
-    `apply_func_nb` must accept index of the current row, the 2-dim array, and `*args`. 
-    Must return a single value or an array of shape `a.shape[1]`."""
+    `apply_func_nb` should accept index of the row, the 2-dim array, and `*args`.
+    Should return a single value or an array of shape `a.shape[1]`."""
     out = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
         window_a = a[max(0, i + 1 - window):i + 1, :]
@@ -783,16 +783,16 @@ def expanding_apply_matrix_nb(a, apply_func_nb, *args):
 def groupby_apply_nb(a, groups, apply_func_nb, *args):
     """Provide group-by calculations.
 
-    `groups` must be a dictionary, where each key is an index that points to an element in the new array 
+    `groups` should be a dictionary, where each key is an index that points to an element in the new array
     where a group-by result will be stored, while the value should be an array of indices in `a`
     to apply `apply_func_nb` on.
 
-    `apply_func_nb` must accept index of the current column, indices of the current group, 
-    the array, and `*args`. Must return a single value."""
+    `apply_func_nb` should accept indices of the group, index of the column,
+    the array, and `*args`. Should return a single value."""
     out = np.empty((len(groups), a.shape[1]), dtype=np.float_)
     for col in range(a.shape[1]):
         for i, idxs in groups.items():
-            out[i, col] = apply_func_nb(col, idxs, a[idxs, col], *args)
+            out[i, col] = apply_func_nb(idxs, col, a[idxs, col], *args)
     return out
 
 
@@ -800,8 +800,8 @@ def groupby_apply_nb(a, groups, apply_func_nb, *args):
 def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
     """`groupby_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
-    `apply_func_nb` must accept indices of the current group, the 2-dim array, and `*args`. 
-    Must return a single value or an array of shape `a.shape[1]`."""
+    `apply_func_nb` should accept indices of the group, the 2-dim array, and `*args`.
+    Should return a single value or an array of shape `a.shape[1]`."""
     out = np.empty((len(groups), a.shape[1]), dtype=np.float_)
     for i, idxs in groups.items():
         out[i, :] = apply_func_nb(idxs, a[idxs, :], *args)
@@ -815,14 +815,14 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
 def applymap_nb(a, map_func_nb, *args):
     """Map non-NA elements elementwise using `map_func_nb`.
 
-    `map_func_nb` must accept index of the current column, index of the current element, 
-    the element itself, and `*args`. Must return an array of same size."""
+    `map_func_nb` should accept index of the row, index of the column,
+    the element itself, and `*args`. Should return an array of same size."""
     out = np.full_like(a, np.nan, dtype=np.float_)
 
     for col in range(out.shape[1]):
         idxs = np.flatnonzero(~np.isnan(a[:, col]))
         for i in idxs:
-            out[i, col] = map_func_nb(col, i, a[i, col], *args)
+            out[i, col] = map_func_nb(i, col, a[i, col], *args)
     return out
 
 
@@ -831,32 +831,32 @@ def filter_nb(a, filter_func_nb, *args):
     """Filter non-NA elements elementwise using `filter_func_nb`. 
     The filtered out elements will become NA.
 
-    `filter_func_nb` must accept index of the current column, index of the current element, 
-    the element itself, and `*args`. Must return a boolean value."""
+    `filter_func_nb` should accept index of the row, index of the column,
+    the element itself, and `*args`. Should return a boolean value."""
     out = a.astype(np.float_)
 
     for col in range(out.shape[1]):
         idxs = np.flatnonzero(~np.isnan(a[:, col]))
         for i in idxs:
-            if not filter_func_nb(col, i, a[i, col], *args):
+            if not filter_func_nb(i, col, a[i, col], *args):
                 out[i, col] = np.nan
     return out
 
 
 @njit
-def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
+def apply_and_reduce_nb(a, apply_func_nb, apply_args, reduce_func_nb, reduce_args):
     """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
 
-    `apply_func_nb` must accept index of the current column, the column itself, and `*args`. 
-    Must return an array.
+    `apply_func_nb` should accept index of the column, the column itself, and `*apply_args`.
+    Should return an array.
 
-    `reduce_func_nb` must accept index of the current column, the array of results from 
-    `apply_func_nb` for that column, and `*args`. Must return a single value."""
+    `reduce_func_nb` should accept index of the column, the array of results from
+    `apply_func_nb` for that column, and `*reduce_args`. Should return a single value."""
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
-        mapped = apply_func_nb(col, a[:, col], *args)
-        out[col] = reduce_func_nb(col, mapped, *args)
+        mapped = apply_func_nb(col, a[:, col], *apply_args)
+        out[col] = reduce_func_nb(col, mapped, *reduce_args)
     return out
 
 
@@ -864,8 +864,8 @@ def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
 def reduce_nb(a, reduce_func_nb, *args):
     """Reduce each column into a single value using `reduce_func_nb`.
 
-    `reduce_func_nb` must accept index of the current column, the array, and `*args`. 
-    Must return a single value."""
+    `reduce_func_nb` should accept index of the column, the array, and `*args`.
+    Should return a single value."""
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
@@ -877,10 +877,10 @@ def reduce_nb(a, reduce_func_nb, *args):
 def reduce_to_array_nb(a, reduce_func_nb, *args):
     """Reduce each column into an array of values using `reduce_func_nb`.
 
-    `reduce_func_nb` same as for `reduce_nb` but must return an array.
+    `reduce_func_nb` same as for `reduce_nb` but should return an array.
 
     !!! note
-        Output of `reduce_func_nb` must be strictly homogeneous."""
+        Output of `reduce_func_nb` should be strictly homogeneous."""
     out_inited = False
     for col in range(a.shape[1]):
         col_out = reduce_func_nb(col, a[:, col], *args)
@@ -892,8 +892,43 @@ def reduce_to_array_nb(a, reduce_func_nb, *args):
     return out
 
 
+@njit
+def reduce_grouped_nb(a, group_counts, reduce_func_nb, *args):
+    """Reduce each group of columns a single value using `reduce_func_nb`.
+
+    `reduce_func_nb` should accept index of the row, index of the group,
+    the array, and `*args`. Should return a single value."""
+    out = np.empty(len(group_counts), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_counts)):
+        to_col = from_col + group_counts[group]
+        out[group] = reduce_func_nb(group, a[:, from_col:to_col], *args)
+        from_col = to_col
+    return out
+
+
+@njit
+def reduce_grouped_row_wise_nb(a, group_counts, reduce_func_nb, *args):
+    """Reduce each row in a group of columns into a single value using `reduce_func_nb`.
+
+    `reduce_func_nb` should accept index of the row, index of the group,
+    the array, and `*args`. Should return a single value."""
+    out = np.empty((a.shape[0], len(group_counts)), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_counts)):
+        to_col = from_col + group_counts[group]
+        for i in range(a.shape[0]):
+            out[i, group] = reduce_func_nb(i, group, a[i, from_col:to_col], *args)
+        from_col = to_col
+    return out
+
+
+# ############# Reducers ############# #
+
+
 @njit(cache=True)
 def nst_reduce_nb(col, a, n, *args):
+    """Return nst element."""
     if n >= a.shape[0]:
         raise ValueError("index is out of bounds")
     return a[n]
@@ -901,42 +936,49 @@ def nst_reduce_nb(col, a, n, *args):
 
 @njit(cache=True)
 def min_reduce_nb(col, a, *args):
+    """Return min (ignores NaNs)."""
     return np.nanmin(a)
 
 
 @njit(cache=True)
 def max_reduce_nb(col, a, *args):
+    """Return max (ignores NaNs)."""
     return np.nanmax(a)
 
 
 @njit(cache=True)
 def mean_reduce_nb(col, a, *args):
+    """Return mean (ignores NaNs)."""
     return np.nanmean(a)
 
 
 @njit(cache=True)
 def median_reduce_nb(col, a, *args):
+    """Return median (ignores NaNs)."""
     return np.nanmedian(a)
 
 
 @njit(cache=True)
 def sum_reduce_nb(col, a, *args):
+    """Return sum (ignores NaNs)."""
     return np.nansum(a)
 
 
 @njit(cache=True)
 def count_reduce_nb(col, a, *args):
+    """Return count (ignores NaNs)."""
     return np.sum(~np.isnan(a))
 
 
 @njit(cache=True)
 def std_reduce_nb(col, a, ddof, *args):
+    """Return std (ignores NaNs)."""
     return nanstd_1d_nb(a, ddof=ddof)
 
 
 @njit(cache=True)
 def describe_reduce_nb(col, a, perc, ddof, *args):
-    """Return descriptive statistics.
+    """Return descriptive statistics (ignores NaNs).
 
     Numba equivalent to `pd.Series(a).describe(perc)`."""
     a = a[~np.isnan(a)]
@@ -955,6 +997,7 @@ def describe_reduce_nb(col, a, perc, ddof, *args):
 
 @njit(cache=True)
 def argmin_reduce_nb(col, a, *args):
+    """Return position of min."""
     a = np.copy(a)
     mask = np.isnan(a)
     if np.all(mask):
@@ -965,6 +1008,7 @@ def argmin_reduce_nb(col, a, *args):
 
 @njit(cache=True)
 def argmax_reduce_nb(col, a, *args):
+    """Return position of max."""
     a = np.copy(a)
     mask = np.isnan(a)
     if np.all(mask):

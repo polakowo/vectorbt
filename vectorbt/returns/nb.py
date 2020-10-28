@@ -17,7 +17,7 @@ from vectorbt.generic import nb as generic_nb
 
 
 @njit(cache=True)
-def total_return_apply_nb(col, idxs, returns):
+def total_return_apply_nb(idxs, col, returns):
     """Calculate total return from returns."""
     return generic_nb.product_1d_nb(returns + 1) - 1
 

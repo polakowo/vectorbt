@@ -90,7 +90,7 @@ Date
 * Accepts both Series and DataFrames as inputs
 * Broadcasts inputs to the same shape using vectorbt's own broadcasting rules
 * Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
-* Implements flexible broadcasting wherever possible to save memory
+* Implements flexible indexing wherever possible to save memory
 
 ### Grouping
 
@@ -218,10 +218,11 @@ from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.enums import (
     SizeType,
-    AccumulateExitMode,
+    AccumulationMode,
     ConflictMode,
     CallSeqType,
-    InitCashMode
+    InitCashMode,
+    SignalType
 )
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
 from vectorbt.records.orders import indexing_on_orders_meta
@@ -364,47 +365,114 @@ class Portfolio(Configured, PandasIndexer):
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, close, entries, exits, size=None, entry_price=None, exit_price=None,
-                     fees=None, fixed_fees=None, slippage=None, reject_prob=None, min_size=None,
-                     init_cash=None, cash_sharing=None, call_seq=None, accumulate=None,
-                     accumulate_exit_mode=None, conflict_mode=None, seed=None, freq=None, group_by=None,
+    def from_signals(cls,
+                     close,
+                     entries, exits,
+                     size=None, long_size=None, short_size=None,
+                     price=None, long_price=None, short_price=None,
+                     fees=None, long_fees=None, short_fees=None,
+                     fixed_fees=None, long_fixed_fees=None, short_fixed_fees=None,
+                     slippage=None, long_slippage=None, short_slippage=None,
+                     min_size=None, long_min_size=None, short_min_size=None,
+                     max_size=None, long_max_size=None, short_max_size=None,
+                     reject_prob=None, long_reject_prob=None, short_reject_prob=None,
+                     allow_partial=None, long_allow_partial=None, short_allow_partial=None,
+                     raise_by_reject=None, long_raise_by_reject=None, short_raise_by_reject=None,
+                     accumulation_mode=None, conflict_mode=None, signal_type=None, init_cash=None,
+                     cash_sharing=None, call_seq=None, seed=None, freq=None, group_by=None,
                      broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
         """Simulate portfolio from entry and exit signals.
 
-        Starting with initial cash `init_cash`, for each signal in `entries`, enters a position
-        by buying `size` of shares for `entry_price`. For each signal in `exits`, closes the position
-        by selling all shares for `exit_price`. When accumulation is enabled, each entry signal will
-        increase the position, and optionally each exit signal will decrease the position. When both
-        entry and exit signals are present, ignores them by default. When grouping is enabled with
-        `group_by`, will compute performance for the entire group. When, additionally, `cash_sharing`
-        is enabled, will share the cash among all columns in the group.
+        Starting with initial cash `init_cash`, for each signal in `entries`, enters a long/short
+        position by buying/selling `size` of shares. For each signal in `exits`, closes the position
+        by selling/buying shares. Depending upon accumulation options, each entry signal may increase
+        the position and each exit signal may decrease the position. When both entry and exit signals
+        are present, ignores them by default. When grouping is enabled with `group_by`, will compute
+        performance for the entire group. When, additionally, `cash_sharing` is enabled, will share
+        the cash among all columns in the group.
 
         Args:
-            close (array_like): Reference price, such as close. Will broadcast.
+            close (array_like): Reference price, such as close.
 
-                Will be used for calculating unrealized P&L and portfolio value.
-            entries (array_like of bool): Boolean array of entry signals. Will broadcast.
-            exits (array_like of bool): Boolean array of exit signals. Will broadcast.
-            size (float or array_like): Size to order. Will broadcast.
+                Will be used for calculating unrealized P&L and portfolio value. Will broadcast.
+            entries (array_like of bool): Boolean array of entry signals.
+                Will broadcast.
+
+                Becomes a long signal if `signal_type` is `LongShort` or `Long`, otherwise short.
+            exits (array_like of bool): Boolean array of exit signals.
+                Will broadcast.
+
+                Becomes a short signal if `signal_type` is `LongShort` or `Long`, otherwise long.
+            size (float or array_like): Size to order.
+                Will broadcast.
 
                 * Set to positive/negative to buy/sell.
                 * Set to `np.inf`/`-np.inf` to buy/sell everything.
                 * Set to `np.nan` or zero to skip.
-            entry_price (array_like of float): Entry price. Defaults to `close`. Will broadcast.
-
-                !!! note
-                    Setting order price to close is risky.
-            exit_price (array_like of float): Exit price. Defaults to `close`. Will broadcast.
-
-                !!! note
-                    Setting order price to close is risky.
-            fees (float or array_like): Fees in percentage of the order value. Will broadcast.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
-            slippage (float or array_like): Slippage in percentage of price. Will broadcast.
-            reject_prob (float or array_like): Order rejection probability. Will broadcast.
+            long_size (float or array_like): Overwrites `size` for long orders.
+                Defaults to `size`. Will broadcast.
+            short_size (float or array_like): Overwrites `size` for short orders.
+                Defaults to `size`. Will broadcast.
+            price (array_like of float): Order price.
+                Defaults to `close`. Will broadcast.
+            long_price (array_like of float): Overwrites `price` for long orders.
+                Defaults to `price`. Will broadcast.
+            short_price (array_like of float): Overwrites `price` for short orders.
+                Defaults to `price`. Will broadcast.
+            fees (float or array_like): Fees in percentage of the order value.
+                Will broadcast.
+            long_fees (float or array_like): Overwrites `fees` for long orders.
+                Defaults to `fees`. Will broadcast.
+            short_fees (float or array_like): Overwrites `fees` for short orders.
+                Defaults to `fees`. Will broadcast.
+            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
+                Will broadcast.
+            long_fixed_fees (float or array_like): Overwrites `fixed_fees` for long orders.
+                Defaults to `fixed_fees`. Will broadcast.
+            short_fixed_fees (float or array_like): Overwrites `fixed_fees` for short orders.
+                Defaults to `fixed_fees`. Will broadcast.
+            slippage (float or array_like): Slippage in percentage of price.
+                Will broadcast.
+            long_slippage (float or array_like): Overwrites `slippage` for long orders.
+                Defaults to `slippage`. Will broadcast.
+            short_slippage (float or array_like): Overwrites `slippage` for short orders.
+                Defaults to `slippage`. Will broadcast.
             min_size (float or array_like): Minimum size for an order to be accepted.
-
-                Will broadcast to the number of columns.
+                Will broadcast.
+            long_min_size (float or array_like): Overwrites `min_size` for long orders.
+                Defaults to `min_size`. Will broadcast.
+            short_min_size (float or array_like): Overwrites `min_size` for short orders.
+                Defaults to `min_size`. Will broadcast.
+            max_size (float or array_like): Maximum size for an order.
+                Will be partially filled if exceeded. Will broadcast.
+            long_max_size (float or array_like): Overwrites `max_size` for long orders.
+                Defaults to `max_size`. Will broadcast.
+            short_max_size (float or array_like): Overwrites `max_size` for short orders.
+                Defaults to `max_size`. Will broadcast.
+            reject_prob (float or array_like): Order rejection probability.
+                Will broadcast.
+            long_reject_prob (float or array_like): Overwrites `reject_prob` for long orders.
+                Defaults to `reject_prob`. Will broadcast.
+            short_reject_prob (float or array_like): Overwrites `reject_prob` for short orders.
+                Defaults to `reject_prob`. Will broadcast.
+            allow_partial (bool or array_like): Whether to allow partial fills.
+                Will broadcast.
+            long_allow_partial (bool or array_like): Overwrites `allow_partial` for long orders.
+                Defaults to `allow_partial`. Will broadcast.
+            short_allow_partial (bool or array_like): Overwrites `allow_partial` for short orders.
+                Defaults to `allow_partial`. Will broadcast.
+            raise_by_reject (bool or array_like): Whether to raise an exception if order gets rejected.
+                Will broadcast.
+            long_raise_by_reject (bool or array_like): Overwrites `raise_by_reject` for long orders.
+                Defaults to `raise_by_reject`. Will broadcast.
+            short_raise_by_reject (bool or array_like): Overwrites `raise_by_reject` for short orders.
+                Defaults to `raise_by_reject`. Will broadcast.
+            accumulation_mode (AccumulationMode or array_like): See `vectorbt.portfolio.enums.AccumulationMode`.
+                Will broadcast.
+            conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
+                Will broadcast.
+            signal_type (SignalType or array_like): See `vectorbt.portfolio.enums.SignalType`.
+                Will broadcast.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
                 By default, will broadcast to the number of columns.
@@ -417,25 +485,19 @@ class Portfolio(Configured, PandasIndexer):
                     will change the initial cash, so be aware when indexing.
 
                     Make sure that `init_cash` is a floating number if not using `InitCashMode`.
-
-
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
-                    Order execution cannot be considered parallel anymore.
+                    Introduces cross-asset dependencies.
 
                     This method presumes that in a group of assets that share the same capital all
                     orders will be executed within the same tick and retain their price regardless
                     of their position in the queue, even though they depend upon each other and thus
-                    cannot be executed in parallel. This behavior is risky.
+                    cannot be executed in parallel.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
-            accumulate (bool): If `accumulate` is True, entering the market when already
-                in the market will be allowed to increase the position.
-            accumulate_exit_mode (AccumulateExitMode): See `vectorbt.portfolio.enums.AccumulateExitMode`.
-            conflict_mode (ConflictMode): See `vectorbt.portfolio.enums.ConflictMode`.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             freq (any): Index frequency in case `close.index` is not datetime-like.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
@@ -443,8 +505,8 @@ class Portfolio(Configured, PandasIndexer):
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        All time series will be broadcast together using `vectorbt.base.reshape_fns.broadcast`.
-        At the end, they will have the same metadata.
+        All broadcastable arguments will be broadcast together using `vectorbt.base.reshape_fns.broadcast`
+        but keep original shape to utilize flexible indexing and save memory.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
@@ -529,20 +591,79 @@ class Portfolio(Configured, PandasIndexer):
         # Get defaults
         if size is None:
             size = defaults.portfolio['size']
-        if entry_price is None:
-            entry_price = close
-        if exit_price is None:
-            exit_price = close
+        if long_size is None:
+            long_size = size
+        if short_size is None:
+            short_size = size
+        if price is None:
+            price = close
+        if long_price is None:
+            long_price = price
+        if short_price is None:
+            short_price = price
         if fees is None:
             fees = defaults.portfolio['fees']
+        if long_fees is None:
+            long_fees = fees
+        if short_fees is None:
+            short_fees = fees
         if fixed_fees is None:
             fixed_fees = defaults.portfolio['fixed_fees']
+        if long_fixed_fees is None:
+            long_fixed_fees = fixed_fees
+        if short_fixed_fees is None:
+            short_fixed_fees = fixed_fees
         if slippage is None:
             slippage = defaults.portfolio['slippage']
-        if reject_prob is None:
-            reject_prob = defaults.portfolio['reject_prob']
+        if long_slippage is None:
+            long_slippage = slippage
+        if short_slippage is None:
+            short_slippage = slippage
         if min_size is None:
             min_size = defaults.portfolio['min_size']
+        if long_min_size is None:
+            long_min_size = min_size
+        if short_min_size is None:
+            short_min_size = min_size
+        if max_size is None:
+            max_size = defaults.portfolio['max_size']
+        if long_max_size is None:
+            long_max_size = max_size
+        if short_max_size is None:
+            short_max_size = max_size
+        if reject_prob is None:
+            reject_prob = defaults.portfolio['reject_prob']
+        if long_reject_prob is None:
+            long_reject_prob = reject_prob
+        if short_reject_prob is None:
+            short_reject_prob = reject_prob
+        if allow_partial is None:
+            allow_partial = defaults.portfolio['allow_partial']
+        if long_allow_partial is None:
+            long_allow_partial = allow_partial
+        if short_allow_partial is None:
+            short_allow_partial = allow_partial
+        if raise_by_reject is None:
+            raise_by_reject = defaults.portfolio['raise_by_reject']
+        if long_raise_by_reject is None:
+            long_raise_by_reject = raise_by_reject
+        if short_raise_by_reject is None:
+            short_raise_by_reject = raise_by_reject
+        if accumulation_mode is None:
+            accumulation_mode = defaults.portfolio['accumulation_mode']
+            if isinstance(accumulation_mode, str):
+                accumulation_mode = getattr(AccumulationMode, accumulation_mode)
+        checks.assert_in(accumulation_mode, AccumulationMode)
+        if conflict_mode is None:
+            conflict_mode = defaults.portfolio['conflict_mode']
+            if isinstance(conflict_mode, str):
+                conflict_mode = getattr(ConflictMode, conflict_mode)
+        checks.assert_in(conflict_mode, ConflictMode)
+        if signal_type is None:
+            signal_type = defaults.portfolio['signal_type']
+            if isinstance(signal_type, str):
+                signal_type = getattr(SignalType, signal_type)
+        checks.assert_in(signal_type, SignalType)
         if init_cash is None:
             init_cash = defaults.portfolio['init_cash']
             if isinstance(init_cash, str):
@@ -563,18 +684,6 @@ class Portfolio(Configured, PandasIndexer):
             checks.assert_in(call_seq, CallSeqType)
             if call_seq == CallSeqType.Auto:
                 raise ValueError("This method doesn't support CallSeqType.Auto")
-        if accumulate is None:
-            accumulate = defaults.portfolio['accumulate']
-        if accumulate_exit_mode is None:
-            accumulate_exit_mode = defaults.portfolio['accumulate_exit_mode']
-            if isinstance(accumulate_exit_mode, str):
-                accumulate_exit_mode = getattr(AccumulateExitMode, accumulate_exit_mode)
-        checks.assert_in(accumulate_exit_mode, AccumulateExitMode)
-        if conflict_mode is None:
-            conflict_mode = defaults.portfolio['conflict_mode']
-            if isinstance(conflict_mode, str):
-                conflict_mode = getattr(ConflictMode, conflict_mode)
-        checks.assert_in(conflict_mode, ConflictMode)
         if seed is None:
             seed = defaults.portfolio['seed']
         if seed is not None:
@@ -588,32 +697,29 @@ class Portfolio(Configured, PandasIndexer):
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
-        # Perform checks
-        checks.assert_subdtype(close, np.floating)
-        checks.assert_dtype(entries, np.bool)
-        checks.assert_dtype(exits, np.bool)
-        checks.assert_subdtype(size, np.floating)
-        checks.assert_subdtype(entry_price, np.floating)
-        checks.assert_subdtype(exit_price, np.floating)
-        checks.assert_subdtype(fees, np.floating)
-        checks.assert_subdtype(fixed_fees, np.floating)
-        checks.assert_subdtype(slippage, np.floating)
-        checks.assert_subdtype(reject_prob, np.floating)
-        checks.assert_subdtype(min_size, np.floating)
-        checks.assert_subdtype(init_cash, np.floating)
-        checks.assert_subdtype(call_seq, np.integer)
-
         # Broadcast inputs
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        keep_raw = (False, True, True, True, True, True, True, True, True, True, True)
+        broadcastable_args = (
+            close, entries, exits,
+            long_size, short_size,
+            long_price, short_price,
+            long_fees, short_fees,
+            long_fixed_fees, short_fixed_fees,
+            long_slippage, short_slippage,
+            long_min_size, short_min_size,
+            long_max_size, short_max_size,
+            long_reject_prob, short_reject_prob,
+            long_allow_partial, short_allow_partial,
+            long_raise_by_reject, short_raise_by_reject,
+            accumulation_mode, conflict_mode, signal_type
+        )
+        keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
         broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        close, entries, exits, size, entry_price, exit_price, fees, fixed_fees, slippage, reject_prob = \
-            broadcast(close, entries, exits, size, entry_price, exit_price, fees, fixed_fees,
-                slippage, reject_prob, **broadcast_kwargs, keep_raw=keep_raw)
+        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs, keep_raw=keep_raw)
+        close = broadcasted_args[0]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
-        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
         init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
@@ -629,19 +735,7 @@ class Portfolio(Configured, PandasIndexer):
             cs_group_counts,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            entries,
-            exits,
-            size,
-            entry_price,
-            exit_price,
-            fees,
-            fixed_fees,
-            slippage,
-            reject_prob,
-            min_size,
-            accumulate,
-            accumulate_exit_mode,
-            conflict_mode,
+            *broadcasted_args[1:],
             close.ndim == 2
         )
 
@@ -684,9 +778,6 @@ class Portfolio(Configured, PandasIndexer):
                 For target size, the final size will depend upon current holdings.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
             order_price (array_like of float): Order price. Defaults to `close`. Will broadcast.
-
-                !!! note
-                    Setting order price to close is risky.
             fees (float or array_like): Fees in percentage of the order value. Will broadcast.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
             slippage (float or array_like): Slippage in percentage of price. Will broadcast.
@@ -709,12 +800,12 @@ class Portfolio(Configured, PandasIndexer):
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
-                    Order execution cannot be considered parallel anymore.
+                    Introduces cross-asset dependencies.
 
                     This method presumes that in a group of assets that share the same capital all
                     orders will be executed within the same tick and retain their price regardless
                     of their position in the queue, even though they depend upon each other and thus
-                    cannot be executed in parallel. This behavior is risky.
+                    cannot be executed in parallel.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
@@ -967,7 +1058,7 @@ class Portfolio(Configured, PandasIndexer):
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
-                    Order execution cannot be considered parallel anymore.
+                    Introduces cross-asset dependencies.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
@@ -1117,12 +1208,6 @@ class Portfolio(Configured, PandasIndexer):
         if segment_prep_args is None:
             segment_prep_args = ()
 
-        prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in prep_args])
-        group_prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in group_prep_args])
-        row_prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in row_prep_args])
-        segment_prep_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in segment_prep_args])
-        order_args = tuple([arg.values if checks.is_pandas(arg) else arg for arg in order_args])
-
         # Perform calculation
         if row_wise:
             order_records = nb.simulate_row_wise_nb(
@@ -1230,99 +1315,6 @@ class Portfolio(Configured, PandasIndexer):
             close = generic_nb.ffill_nb(close[::-1, :])[::-1, :]
         return self.wrapper.wrap(close, group_by=False)
 
-    # ############# Cash ############# #
-
-    @cached_method
-    def init_cash(self, group_by=None):
-        """Get initial amount of cash per column/group."""
-        if isinstance(self._init_cash, int):
-            cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
-            init_cash = -np.min(np.cumsum(cash_flow, axis=0), axis=0)
-            if self._init_cash == InitCashMode.AutoAlign:
-                init_cash = np.full(init_cash.shape, np.max(init_cash))
-        else:
-            init_cash = to_1d(self._init_cash, raw=True)
-            if self.wrapper.grouper.is_grouped(group_by=group_by):
-                group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-                init_cash = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
-            else:
-                group_counts = self.wrapper.grouper.get_group_counts()
-                init_cash = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
-        return self.wrapper.wrap_reduced(init_cash, group_by=group_by)
-
-    @cached_method
-    def cash_flow(self, group_by=None):
-        """Get cash flow series per column/group."""
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            cash_flow_ungrouped = to_2d(self.cash_flow(group_by=False), raw=True)
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            cash_flow = nb.cash_flow_grouped_nb(cash_flow_ungrouped, group_counts)
-        else:
-            cash_flow = nb.cash_flow_ungrouped_nb(self.wrapper.shape_2d, self._orders.records_arr)
-        return self.wrapper.wrap(cash_flow, group_by=group_by)
-
-    @cached_method
-    def cash(self, group_by=None, in_sim_order=False):
-        """Get cash series per column/group."""
-        if in_sim_order and not self.cash_sharing:
-            raise ValueError("Cash sharing must be enabled for in_sim_order=True")
-
-        cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
-            cash = nb.cash_grouped_nb(
-                self.wrapper.shape_2d,
-                cash_flow,
-                group_counts,
-                init_cash
-            )
-        else:
-            group_counts = self.wrapper.grouper.get_group_counts()
-            init_cash = to_1d(self.init_cash(group_by=in_sim_order), raw=True)
-            call_seq = to_2d(self.call_seq, raw=True)
-            cash = nb.cash_ungrouped_nb(
-                cash_flow,
-                group_counts,
-                init_cash,
-                call_seq,
-                in_sim_order
-            )
-        return self.wrapper.wrap(cash, group_by=group_by)
-
-    # ############# Shares ############# #
-
-    @cached_method
-    def share_flow(self):
-        """Get share flow series per column."""
-        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self._orders.records_arr)
-        return self.wrapper.wrap(share_flow, group_by=False)
-
-    @cached_method
-    def shares(self):
-        """Get share series per column."""
-        share_flow = to_2d(self.share_flow(), raw=True)
-        shares = nb.shares_nb(share_flow)
-        return self.wrapper.wrap(shares, group_by=False)
-
-    @cached_method
-    def holding_mask(self, group_by=None):
-        """Get holding mask per column/group."""
-        shares = to_2d(self.shares(), raw=True)
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            holding_mask = nb.holding_mask_grouped_nb(shares, group_counts)
-        else:
-            holding_mask = shares > 0
-        return self.wrapper.wrap(holding_mask, group_by=group_by)
-
-    @cached_method
-    def holding_duration(self, group_by=None):
-        """Get holding duration per column/group."""
-        holding_mask = to_2d(self.holding_mask(group_by=group_by))
-        holding_duration = np.mean(holding_mask, axis=0)
-        return self.wrapper.wrap_reduced(holding_duration, group_by=group_by)
-
     # ############# Records ############# #
 
     @cached_method
@@ -1363,6 +1355,153 @@ class Portfolio(Configured, PandasIndexer):
         See `vectorbt.records.drawdowns.Drawdowns`."""
         return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
+    # ############# Shares ############# #
+
+    @cached_method
+    def share_flow(self):
+        """Get share flow series per column."""
+        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self._orders.records_arr)
+        return self.wrapper.wrap(share_flow, group_by=False)
+
+    @cached_method
+    def shares(self):
+        """Get share series per column."""
+        share_flow = to_2d(self.share_flow(), raw=True)
+        shares = nb.shares_nb(share_flow)
+        return self.wrapper.wrap(shares, group_by=False)
+
+    @cached_method
+    def pos_mask(self, group_by=None):
+        """Get position mask per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            pos_mask = nb.pos_mask_nb(shares, group_counts)
+        else:
+            pos_mask = shares != 0
+        return self.wrapper.wrap(pos_mask, group_by=group_by)
+
+    @cached_method
+    def long_pos_mask(self, group_by=None):
+        """Get long position mask per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            long_pos_mask = nb.long_pos_mask_nb(shares, group_counts)
+        else:
+            long_pos_mask = shares > 0
+        return self.wrapper.wrap(long_pos_mask, group_by=group_by)
+
+    @cached_method
+    def short_pos_mask(self, group_by=None):
+        """Get short position mask per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            short_pos_mask = nb.short_pos_mask_nb(shares, group_counts)
+        else:
+            short_pos_mask = shares < 0
+        return self.wrapper.wrap(short_pos_mask, group_by=group_by)
+
+    @cached_method
+    def pos_coverage(self, group_by=None):
+        """Get position coverage per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            pos_coverage = nb.pos_duration_nb(shares, group_counts)
+        else:
+            pos_coverage = np.mean(shares != 0, axis=0)
+        return self.wrapper.wrap_reduced(pos_coverage, group_by=group_by)
+
+    @cached_method
+    def long_pos_coverage(self, group_by=None):
+        """Get long position coverage per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            long_pos_coverage = nb.long_pos_duration_nb(shares, group_counts)
+        else:
+            long_pos_coverage = np.mean(shares > 0, axis=0)
+        return self.wrapper.wrap_reduced(long_pos_coverage, group_by=group_by)
+
+    @cached_method
+    def short_pos_coverage(self, group_by=None):
+        """Get short position coverage per column/group."""
+        shares = to_2d(self.shares(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            short_pos_coverage = nb.short_pos_duration_nb(shares, group_counts)
+        else:
+            short_pos_coverage = np.mean(shares < 0, axis=0)
+        return self.wrapper.wrap_reduced(short_pos_coverage, group_by=group_by)
+
+    # ############# Cash ############# #
+
+    @cached_method
+    def cash_flow(self, group_by=None):
+        """Get cash flow series per column/group."""
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            cash_flow_ungrouped = to_2d(self.cash_flow(group_by=False), raw=True)
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            cash_flow = nb.cash_flow_grouped_nb(cash_flow_ungrouped, group_counts)
+        else:
+            cash_flow = nb.cash_flow_ungrouped_nb(self.wrapper.shape_2d, self._orders.records_arr)
+        return self.wrapper.wrap(cash_flow, group_by=group_by)
+
+    @cached_method
+    def init_cash(self, group_by=None):
+        """Get initial amount of cash per column/group.
+
+        !!! note
+            If initial cash is found automatically and no own cash is used throughout simulation
+            (for example, when shorting), initial cash will be set to 1 instead of 0 to
+            enable smooth calculation of returns."""
+        if isinstance(self._init_cash, int):
+            cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
+            cash_min = np.min(np.cumsum(cash_flow, axis=0), axis=0)
+            init_cash = np.where(cash_min < 0, np.abs(cash_min), 1.)
+            if self._init_cash == InitCashMode.AutoAlign:
+                init_cash = np.full(init_cash.shape, np.max(init_cash))
+        else:
+            init_cash = to_1d(self._init_cash, raw=True)
+            if self.wrapper.grouper.is_grouped(group_by=group_by):
+                group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+                init_cash = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
+            else:
+                group_counts = self.wrapper.grouper.get_group_counts()
+                init_cash = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
+        return self.wrapper.wrap_reduced(init_cash, group_by=group_by)
+
+    @cached_method
+    def cash(self, group_by=None, in_sim_order=False):
+        """Get cash series per column/group."""
+        if in_sim_order and not self.cash_sharing:
+            raise ValueError("Cash sharing must be enabled for in_sim_order=True")
+
+        cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
+            cash = nb.cash_grouped_nb(
+                self.wrapper.shape_2d,
+                cash_flow,
+                group_counts,
+                init_cash
+            )
+        else:
+            group_counts = self.wrapper.grouper.get_group_counts()
+            init_cash = to_1d(self.init_cash(group_by=in_sim_order), raw=True)
+            call_seq = to_2d(self.call_seq, raw=True)
+            cash = nb.cash_ungrouped_nb(
+                cash_flow,
+                group_counts,
+                init_cash,
+                call_seq,
+                in_sim_order
+            )
+        return self.wrapper.wrap(cash, group_by=group_by)
+
     # ############# Performance ############# #
 
     @cached_method
@@ -1370,7 +1509,7 @@ class Portfolio(Configured, PandasIndexer):
         """Get holding value series per column/group."""
         close = to_2d(self.close, raw=True).copy()
         shares = to_2d(self.shares(), raw=True)
-        close[shares == 0.] = 0.  # for price being NaN
+        close[shares == 0] = 0.  # for price being NaN
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
             holding_value = nb.holding_value_grouped_nb(close, shares, group_counts)
@@ -1441,21 +1580,18 @@ class Portfolio(Configured, PandasIndexer):
         return self.wrapper.wrap_reduced(total_return, group_by=group_by)
 
     @cached_method
-    def buy_and_hold_return(self, group_by=None):
-        """Get total return of buy-and-hold.
-
-        If grouped, invests same amount of cash into each asset and returns the total
-        return of the entire group.
-
-        !!! note
-            Does not take into account fees and slippage. For this, create a separate portfolio."""
-        ref_price_filled = to_2d(self.fill_close(), raw=True)
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            total_return = nb.buy_and_hold_return_grouped_nb(ref_price_filled, group_counts)
+    def returns(self, group_by=None, in_sim_order=False):
+        """Get return series per column/group based on portfolio value."""
+        value = to_2d(self.value(group_by=group_by, in_sim_order=in_sim_order), raw=True)
+        if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
+            group_counts = self.wrapper.grouper.get_group_counts()
+            init_cash_grouped = to_1d(self.init_cash(), raw=True)
+            call_seq = to_2d(self.call_seq, raw=True)
+            returns = nb.returns_in_sim_order_nb(value, group_counts, init_cash_grouped, call_seq)
         else:
-            total_return = nb.buy_and_hold_return_ungrouped_nb(ref_price_filled)
-        return self.wrapper.wrap_reduced(total_return, group_by=group_by)
+            init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
+            returns = nb.returns_nb(value, init_cash)
+        return self.wrapper.wrap(returns, group_by=group_by)
 
     @cached_method
     def active_returns(self, group_by=None):
@@ -1471,18 +1607,21 @@ class Portfolio(Configured, PandasIndexer):
         return self.wrapper.wrap(active_returns, group_by=group_by)
 
     @cached_method
-    def returns(self, group_by=None, in_sim_order=False):
-        """Get return series per column/group based on portfolio value."""
-        value = to_2d(self.value(group_by=group_by, in_sim_order=in_sim_order), raw=True)
-        if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
-            group_counts = self.wrapper.grouper.get_group_counts()
-            init_cash_grouped = to_1d(self.init_cash(), raw=True)
-            call_seq = to_2d(self.call_seq, raw=True)
-            returns = nb.returns_in_sim_order_nb(value, group_counts, init_cash_grouped, call_seq)
+    def buy_and_hold_return(self, group_by=None):
+        """Get total return of buy-and-hold.
+
+        If grouped, invests same amount of cash into each asset and returns the total
+        return of the entire group.
+
+        !!! note
+            Does not take into account fees and slippage. For this, create a separate portfolio."""
+        ref_price_filled = to_2d(self.fill_close(), raw=True)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            total_return = nb.buy_and_hold_return_grouped_nb(ref_price_filled, group_counts)
         else:
-            init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
-            returns = nb.returns_nb(value, init_cash)
-        return self.wrapper.wrap(returns, group_by=group_by)
+            total_return = nb.buy_and_hold_return_ungrouped_nb(ref_price_filled)
+        return self.wrapper.wrap_reduced(total_return, group_by=group_by)
 
     @cached_method
     def stats(self, column=None, group_by=None, incl_unrealized=None, active_returns=False,
@@ -1512,10 +1651,10 @@ class Portfolio(Configured, PandasIndexer):
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.wrapper.freq,
-            'Holding Duration [%]': self.holding_duration(group_by=group_by) * 100,
             'Total Profit': self.total_profit(group_by=group_by),
             'Total Return [%]': self.total_return(group_by=group_by) * 100,
             'Buy & Hold Return [%]': self.buy_and_hold_return(group_by=group_by) * 100,
+            'Position Coverage [%]': self.pos_coverage(group_by=group_by) * 100,
             'Max. Drawdown [%]': -drawdowns.max_drawdown() * 100,
             'Avg. Drawdown [%]': -drawdowns.avg_drawdown() * 100,
             'Max. Drawdown Duration': drawdowns.max_duration(),
@@ -1545,4 +1684,3 @@ class Portfolio(Configured, PandasIndexer):
             agg_stats_sr.iloc[3:] = agg_func(stats_df.iloc[:, 3:])
             return agg_stats_sr
         return stats_df
-
