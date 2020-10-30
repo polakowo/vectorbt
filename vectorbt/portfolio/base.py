@@ -209,6 +209,7 @@ from inspect import signature
 from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.enum import convert_str_enum_value
 from vectorbt.utils.config import Configured, merge_kwargs
 from vectorbt.utils.random import set_seed
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast
@@ -218,7 +219,6 @@ from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.enums import (
     SizeType,
-    AccumulationMode,
     ConflictMode,
     CallSeqType,
     InitCashMode,
@@ -378,9 +378,11 @@ class Portfolio(Configured, PandasIndexer):
                      reject_prob=None, long_reject_prob=None, short_reject_prob=None,
                      allow_partial=None, long_allow_partial=None, short_allow_partial=None,
                      raise_by_reject=None, long_raise_by_reject=None, short_raise_by_reject=None,
-                     accumulation_mode=None, conflict_mode=None, signal_type=None, init_cash=None,
-                     cash_sharing=None, call_seq=None, seed=None, freq=None, group_by=None,
-                     broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
+                     close_first=None, long_close_first=None, short_close_first=None,
+                     accumulate=None, long_accumulate=None, short_accumulate=None,
+                     conflict_mode=None, signal_type=None, val_price=None,
+                     init_cash=None, cash_sharing=None, call_seq=None, seed=None, freq=None,
+                     group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
         """Simulate portfolio from entry and exit signals.
 
         Starting with initial cash `init_cash`, for each signal in `entries`, enters a long/short
@@ -393,8 +395,9 @@ class Portfolio(Configured, PandasIndexer):
 
         Args:
             close (array_like): Reference price, such as close.
+                Will broadcast.
 
-                Will be used for calculating unrealized P&L and portfolio value. Will broadcast.
+                Will be used for calculating unrealized P&L and portfolio value.
             entries (array_like of bool): Boolean array of entry signals.
                 Will broadcast.
 
@@ -406,9 +409,14 @@ class Portfolio(Configured, PandasIndexer):
             size (float or array_like): Size to order.
                 Will broadcast.
 
-                * Set to positive/negative to buy/sell.
-                * Set to `np.inf`/`-np.inf` to buy/sell everything.
-                * Set to `np.nan` or zero to skip.
+                * Set to any number to buy/sell some fixed amount of shares.
+                * Set to `np.inf` to use all cash. When going short, will borrow the amount
+                    of shares that can be covered by current value; you can still go beyond that
+                    by providing a finite number.
+                * Set to `np.nan` or 0 to skip.
+
+                !!! note
+                    Negative numbers will be treated as positive.
             long_size (float or array_like): Overwrites `size` for long orders.
                 Defaults to `size`. Will broadcast.
             short_size (float or array_like): Overwrites `size` for short orders.
@@ -444,7 +452,10 @@ class Portfolio(Configured, PandasIndexer):
             short_min_size (float or array_like): Overwrites `min_size` for short orders.
                 Defaults to `min_size`. Will broadcast.
             max_size (float or array_like): Maximum size for an order.
-                Will be partially filled if exceeded. Will broadcast.
+                Will broadcast.
+
+                Will be partially filled if exceeded. You might not be able to properly close
+                the position if accumulation is enabled and `max_size` is too low.
             long_max_size (float or array_like): Overwrites `max_size` for long orders.
                 Defaults to `max_size`. Will broadcast.
             short_max_size (float or array_like): Overwrites `max_size` for short orders.
@@ -457,6 +468,8 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `reject_prob`. Will broadcast.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
+
+                Does not apply when size is `np.inf`.
             long_allow_partial (bool or array_like): Overwrites `allow_partial` for long orders.
                 Defaults to `allow_partial`. Will broadcast.
             short_allow_partial (bool or array_like): Overwrites `allow_partial` for short orders.
@@ -467,37 +480,40 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `raise_by_reject`. Will broadcast.
             short_raise_by_reject (bool or array_like): Overwrites `raise_by_reject` for short orders.
                 Defaults to `raise_by_reject`. Will broadcast.
-            accumulation_mode (AccumulationMode or array_like): See `vectorbt.portfolio.enums.AccumulationMode`.
+            close_first (bool or array_like): Whether to close the position first before reversal.
                 Will broadcast.
+
+                Otherwise reverses the position with a single order and within the same tick.
+                Takes only effect under `SignalType.LongShort`. Requires a second signal to enter
+                the opposite position. This allows to define parameters such as `fixed_fees` for long
+                and short positions separately.
+            long_close_first (bool or array_like): Overwrites `close_first` for long orders.
+                Defaults to `close_first`. Will broadcast.
+            short_close_first (bool or array_like): Overwrites `close_first` for short orders.
+                Defaults to `close_first`. Will broadcast.
+            accumulate (bool or array_like): Whether to accumulate signals.
+                Will broadcast.
+            long_accumulate (bool or array_like): Overwrites `accumulate` for long orders.
+                Defaults to `accumulate`. Will broadcast.
+            short_accumulate (bool or array_like): Overwrites `accumulate` for short orders.
+                Defaults to `accumulate`. Will broadcast.
             conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
                 Will broadcast.
             signal_type (SignalType or array_like): See `vectorbt.portfolio.enums.SignalType`.
                 Will broadcast.
+            val_price (array_like of float): Asset valuation price.
+                Defaults to `price` if set, otherwise to previous `close`.
+                
+                See `val_price` in `Portfolio.from_orders`.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                By default, will broadcast to the number of columns.
-                If cash sharing is enabled, will broadcast to the number of groups.
-                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
-
-                !!! note
-                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
-                    to set the same initial cash for all columns/groups. Changing grouping
-                    will change the initial cash, so be aware when indexing.
-
-                    Make sure that `init_cash` is a floating number if not using `InitCashMode`.
+                See `init_cash` in `Portfolio.from_orders`.
             cash_sharing (bool): Whether to share cash within the same group.
 
-                !!! warning
-                    Introduces cross-asset dependencies.
-
-                    This method presumes that in a group of assets that share the same capital all
-                    orders will be executed within the same tick and retain their price regardless
-                    of their position in the queue, even though they depend upon each other and thus
-                    cannot be executed in parallel.
+                See `cash_sharing` in `Portfolio.from_orders`.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
-                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
-                * Set to array to specify custom sequence. Will not broadcast.
+                See `call_seq` in `Portfolio.from_orders`.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             freq (any): Index frequency in case `close.index` is not datetime-like.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
@@ -505,87 +521,124 @@ class Portfolio(Configured, PandasIndexer):
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        All broadcastable arguments will be broadcast together using `vectorbt.base.reshape_fns.broadcast`
-        but keep original shape to utilize flexible indexing and save memory.
+        All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
+        but keep original shape to utilize flexible indexing and to save memory.
 
         For defaults, see `vectorbt.defaults.portfolio`.
+
+        !!! note
+            Arguments with prefix `short_` don't necessarily apply to short positions, but to short orders.
+            For example, a single short order can close a long position and open a short one. To have
+            a more fine-grained control over each order, set those arguments per row, column, or element,
+            or use a more general simulation method such as `Portfolio.from_orders`.
 
         !!! note
             Only `SizeType.Shares` is supported. Other modes such as target percentage are not
             compatible with signals since their logic may contradict the direction the user has
             specified for the order.
 
-            With cash sharing enabled, at each timestamp, processing of the assets in a group
-            goes strictly in order defined in `call_seq`. This order can't be changed dynamically.
-
         !!! hint
             If you generated signals using close price, don't forget to shift your signals by one tick
             forward, for example, with `signals.vbt.fshift(1)`. In general, make sure to use a price
             that comes after the signal.
+            
+        Also see notes and hints for `Portfolio.from_orders`.
 
         Example:
-            Different ways of how signals are interpreted:
+            Some of the ways of how signals are interpreted:
 
             ```python-repl
-            >>> import numpy as np
             >>> import pandas as pd
-            >>> from datetime import datetime
             >>> import vectorbt as vbt
-            >>> from vectorbt.portfolio.enums import AccumulateExitMode, ConflictMode
 
-            >>> price = pd.Series([1., 2., 3., 4., 5.], index=pd.Index([
-            ...     datetime(2020, 1, 1),
-            ...     datetime(2020, 1, 2),
-            ...     datetime(2020, 1, 3),
-            ...     datetime(2020, 1, 4),
-            ...     datetime(2020, 1, 5)
-            ... ]))
+            >>> price = pd.Series([1, 2, 3, 4, 5])
             >>> entries = pd.Series([True, True, True, False, False])
             >>> exits = pd.Series([False, False, True, True, True])
 
+            >>> # Entry opens long, exit closes long
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1.)
+            ...     price, entries, exits, size=1., signal_type='long')
             >>> portfolio.share_flow()
-            2020-01-01    1.0
-            2020-01-02    0.0
-            2020-01-03    0.0
-            2020-01-04   -1.0
-            2020-01-05    0.0
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -1.0
+            4    0.0
             dtype: float64
 
+            >>> # Entry opens short, exit closes short
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1.,
-            ...     conflict_mode=ConflictMode.Exit)
+            ...     price, entries, exits, size=1., signal_type='short')
             >>> portfolio.share_flow()
-            2020-01-01    1.0
-            2020-01-02    0.0
-            2020-01-03   -1.0
-            2020-01-04    0.0
-            2020-01-05    0.0
+            0   -1.0
+            1    0.0
+            2    0.0
+            3    1.0
+            4    0.0
             dtype: float64
 
+            >>> # Entry opens long and closes short, exit closes long and opens short
+            >>> # Reversal within one tick
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1.,
-            ...     accumulate=True)
+            ...     price, entries, exits, size=1., signal_type='longshort')
             >>> portfolio.share_flow()
-            2020-01-01    1.0
-            2020-01-02    1.0
-            2020-01-03    0.0
-            2020-01-04   -2.0
-            2020-01-05    0.0
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -2.0
+            4    0.0
             dtype: float64
 
+            >>> # Reversal within two ticks
+            >>> # First signal closes position, second signal opens the opposite one
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1.,
-            ...     accumulate=True,
-            ...     accumulate_exit_mode=AccumulateExitMode.Reduce)
-            >>> portfolio.share_flow()  # same as using from_orders
-            2020-01-01    1.0
-            2020-01-02    1.0
-            2020-01-03    0.0
-            2020-01-04   -1.0
-            2020-01-05   -1.0
+            ...     price, entries, exits, size=1., signal_type='longshort',
+            ...     close_first=True)
+            >>> portfolio.share_flow()
+            0    1.0
+            1    0.0
+            2    0.0
+            3   -1.0
+            4   -1.0
             dtype: float64
+
+            >>> # If entry and exit, chooses exit
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, size=1., signal_type='longshort',
+            ...     close_first=True, conflict_mode='exit')
+            >>> portfolio.share_flow()
+            0    1.0
+            1    0.0
+            2   -1.0
+            3   -1.0
+            4    0.0
+            dtype: float64
+
+            >>> # Entry means long order, exit means short order
+            >>> # Acts similar to `from_orders`
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, size=1., accumulate=True)
+            >>> portfolio.share_flow()
+            0    1.0
+            1    1.0
+            2    0.0
+            3   -1.0
+            4   -1.0
+            dtype: float64
+
+            >>> # Testing multiple parameters (via broadcasting)
+            >>> from vectorbt.portfolio.enums import SignalType
+
+            >>> portfolio = vbt.Portfolio.from_signals(
+            ...     price, entries, exits, signal_type=[list(SignalType)],
+            ...     broadcast_kwargs=dict(columns_from=SignalType._fields))
+            >>> portfolio.share_flow()
+                Long  Short  LongShort
+            0  100.0 -100.0      100.0
+            1    0.0    0.0        0.0
+            2    0.0    0.0        0.0
+            3 -100.0   50.0     -200.0
+            4    0.0    0.0        0.0
             ```
         """
         # Get defaults
@@ -649,27 +702,38 @@ class Portfolio(Configured, PandasIndexer):
             long_raise_by_reject = raise_by_reject
         if short_raise_by_reject is None:
             short_raise_by_reject = raise_by_reject
-        if accumulation_mode is None:
-            accumulation_mode = defaults.portfolio['accumulation_mode']
-            if isinstance(accumulation_mode, str):
-                accumulation_mode = getattr(AccumulationMode, accumulation_mode)
-        checks.assert_in(accumulation_mode, AccumulationMode)
+        if close_first is None:
+            close_first = defaults.portfolio['close_first']
+        if long_close_first is None:
+            long_close_first = close_first
+        if short_close_first is None:
+            short_close_first = close_first
+        if accumulate is None:
+            accumulate = defaults.portfolio['accumulate']
+        if long_accumulate is None:
+            long_accumulate = accumulate
+        if short_accumulate is None:
+            short_accumulate = accumulate
         if conflict_mode is None:
             conflict_mode = defaults.portfolio['conflict_mode']
-            if isinstance(conflict_mode, str):
-                conflict_mode = getattr(ConflictMode, conflict_mode)
-        checks.assert_in(conflict_mode, ConflictMode)
+        conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
         if signal_type is None:
             signal_type = defaults.portfolio['signal_type']
-            if isinstance(signal_type, str):
-                signal_type = getattr(SignalType, signal_type)
-        checks.assert_in(signal_type, SignalType)
+        signal_type = convert_str_enum_value(SignalType, signal_type)
+        if val_price is None:
+            if price is None:
+                if checks.is_pandas(close):
+                    val_price = close.vbt.fshift(1)
+                else:
+                    val_price = np.require(close, dtype=np.float_)
+                    val_price = np.roll(val_price, 1, axis=0)
+                    val_price[0] = np.nan
+            else:
+                val_price = price
         if init_cash is None:
             init_cash = defaults.portfolio['init_cash']
-            if isinstance(init_cash, str):
-                init_cash = getattr(InitCashMode, init_cash)
-        if isinstance(init_cash, int):
-            checks.assert_in(init_cash, InitCashMode)
+        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
         else:
@@ -678,12 +742,12 @@ class Portfolio(Configured, PandasIndexer):
             cash_sharing = defaults.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = defaults.portfolio['call_seq']
-            if isinstance(call_seq, str):
-                call_seq = getattr(CallSeqType, call_seq)
+        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        auto_call_seq = False
         if isinstance(call_seq, int):
-            checks.assert_in(call_seq, CallSeqType)
             if call_seq == CallSeqType.Auto:
-                raise ValueError("This method doesn't support CallSeqType.Auto")
+                call_seq = CallSeqType.Default
+                auto_call_seq = True
         if seed is None:
             seed = defaults.portfolio['seed']
         if seed is not None:
@@ -711,7 +775,9 @@ class Portfolio(Configured, PandasIndexer):
             long_reject_prob, short_reject_prob,
             long_allow_partial, short_allow_partial,
             long_raise_by_reject, short_raise_by_reject,
-            accumulation_mode, conflict_mode, signal_type
+            long_close_first, short_close_first,
+            long_accumulate, short_accumulate,
+            conflict_mode, signal_type, val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
         broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
@@ -735,6 +801,7 @@ class Portfolio(Configured, PandasIndexer):
             cs_group_counts,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
+            auto_call_seq,
             *broadcasted_args[1:],
             close.ndim == 2
         )
@@ -750,41 +817,67 @@ class Portfolio(Configured, PandasIndexer):
         )
 
     @classmethod
-    def from_orders(cls, close, order_size, size_type=None, order_price=None, fees=None, fixed_fees=None,
-                    slippage=None, reject_prob=None, min_size=None, init_cash=None, cash_sharing=None,
-                    call_seq=None, val_price=None, freq=None, seed=None, group_by=None, broadcast_kwargs=None,
+    def from_orders(cls, close, size, size_type=None, price=None, fees=None, fixed_fees=None,
+                    slippage=None, min_size=None, max_size=None, reject_prob=None, allow_partial=None,
+                    raise_by_reject=None, val_price=None, init_cash=None, cash_sharing=None,
+                    call_seq=None, freq=None, seed=None, group_by=None, broadcast_kwargs=None,
                     wrapper_kwargs=None, **kwargs):
         """Simulate portfolio from orders.
 
-        Starting with initial cash `init_cash`, orders the number of shares specified in `order_size`
-        for `order_price`.
+        Starting with initial cash `init_cash`, orders the number of shares specified in `size`
+        for `price`.
 
         Args:
-            close (array_like): Reference price, such as close. Will broadcast.
+            close (array_like): Reference price, such as close.
+                Will broadcast.
 
                 Will be used for calculating unrealized P&L and portfolio value.
-            order_size (float or array_like): Size to order. Will broadcast.
+            size (float or array_like): Size to order.
+                Will broadcast.
 
-                For any size type:
+                Behavior depends upon `size_type`. For `SizeType.Shares`:
 
-                * Set to `np.nan` to skip.
-                * Set to `np.inf`/`-np.inf` to buy/sell everything.
-
-                For `SizeType.Shares`:
-
-                * Set to positive/negative to buy/sell.
-                * Set to zero to skip.
+                * Set to any number to buy/sell some fixed amount of shares.
+                * Set to `np.inf` to use all cash. When going short, will borrow the amount
+                    of shares that can be covered by current value; you can still go beyond that
+                    by providing a finite number.
+                * Set to `np.nan` or 0 to skip.
 
                 For target size, the final size will depend upon current holdings.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
-            order_price (array_like of float): Order price. Defaults to `close`. Will broadcast.
-            fees (float or array_like): Fees in percentage of the order value. Will broadcast.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per order. Will broadcast.
-            slippage (float or array_like): Slippage in percentage of price. Will broadcast.
-            reject_prob (float or array_like): Order rejection probability. Will broadcast.
+                Will broadcast.
+            price (array_like of float): Order price.
+                Defaults to `close`. Will broadcast.
+            fees (float or array_like): Fees in percentage of the order value.
+                Will broadcast.
+            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
+                Will broadcast.
+            slippage (float or array_like): Slippage in percentage of price.
+                Will broadcast.
             min_size (float or array_like): Minimum size for an order to be accepted.
+                Will broadcast.
+            max_size (float or array_like): Maximum size for an order.
+                Will broadcast.
 
-                Will broadcast to the number of columns.
+                Will be partially filled if exceeded.
+            reject_prob (float or array_like): Order rejection probability.
+                Will broadcast.
+            allow_partial (bool or array_like): Whether to allow partial fills.
+                Will broadcast.
+
+                Does not apply when size is `np.inf`.
+            raise_by_reject (bool or array_like): Whether to raise an exception if order gets rejected.
+                Will broadcast.
+            val_price (array_like of float): Asset valuation price.
+                Defaults to `price`. Will broadcast.
+
+                Used at the time of decision making to calculate value of each asset in the group,
+                for example, to convert target value into target shares.
+
+                !!! note
+                    Make sure to use timestamp for `val_price` that comes before timestamps of
+                    all orders in the group with cash sharing (previous `close` for example),
+                    otherwise you're cheating yourself.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
                 By default, will broadcast to the number of columns.
@@ -795,8 +888,6 @@ class Portfolio(Configured, PandasIndexer):
                     Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
                     to set the same initial cash for all columns/groups. Changing grouping
                     will change the initial cash, so be aware when indexing.
-
-                    Make sure that `init_cash` is a floating number if not using `InitCashMode`.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
@@ -807,6 +898,10 @@ class Portfolio(Configured, PandasIndexer):
                     of their position in the queue, even though they depend upon each other and thus
                     cannot be executed in parallel.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
+
+                Each value in this sequence should indicate the position of column in the group to
+                call next. Processing of `call_seq` goes always from left to right.
+                For example, `[2, 0, 1]` would first call column 'c', then 'a', and finally 'b'.
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
@@ -825,26 +920,18 @@ class Portfolio(Configured, PandasIndexer):
                     * Even if you're able to specify a slippage large enough to compensate for
                         this behavior, slippage itself should depend upon execution order.
                         This method doesn't let you do that.
-                    * If one order is rejected, it still will execute next orders and possibly
-                        leave them without funds that could have been released by the first order.
+                    * If one order is rejected, it still may execute next orders and possibly
+                        leave them without required funds.
 
                     For more control, use `Portfolio.from_order_func`.
-            val_price (array_like of float): Size valuation price. Defaults to previous `close`.
-                Will broadcast.
-
-                Used to calculate `SizeType.TargetPercent` and `SizeType.TargetValue`.
-
-                !!! note
-                    Make sure to use timestamp for `val_price` that comes before timestamps of all orders
-                    in the group with cash sharing, otherwise you're cheating yourself.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             freq (any): Index frequency in case `close.index` is not datetime-like.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
 
-        All time series will be broadcast together using `vectorbt.base.reshape_fns.broadcast`.
-        At the end, they will have the same metadata.
+        All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
+        but keep original shape to utilize flexible indexing and to save memory.
 
         For defaults, see `vectorbt.defaults.portfolio`.
 
@@ -857,6 +944,9 @@ class Portfolio(Configured, PandasIndexer):
             cannot work properly in this setting: one has to specify percentages for all assets beforehand
             and then tweak the processing order to sell to-be-sold assets first in order to release funds
             for to-be-bought assets. This can be automatically done by using `CallSeqType.Auto`.
+
+        !!! hint
+            All broadcastable arguments can be set per frame, series, row, column, or element.
 
         Example:
             The same equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb`.
@@ -876,11 +966,11 @@ class Portfolio(Configured, PandasIndexer):
             >>> portfolio = vbt.Portfolio.from_orders(
             ...     price,  # reference price for portfolio value
             ...     orders,
-            ...     order_price=price,  # order price
+            ...     price=price,  # order price
             ...     size_type=SizeType.TargetPercent,
             ...     val_price=price,  # order price known beforehand (don't do it)
             ...     call_seq=CallSeqType.Auto,  # first sell then buy
-            ...     group_by=np.array([0, 0, 0]),
+            ...     group_by=np.array([0, 0, 0]),  # one group
             ...     cash_sharing=True,
             ...     fees=0.001, fixed_fees=1., slippage=0.001
             ... )
@@ -895,30 +985,35 @@ class Portfolio(Configured, PandasIndexer):
             ```
         """
         # Get defaults
-        if order_size is None:
-            order_size = defaults.portfolio['order_size']
+        if size is None:
+            size = defaults.portfolio['size']
         if size_type is None:
             size_type = defaults.portfolio['size_type']
-            if isinstance(size_type, str):
-                size_type = getattr(SizeType, size_type)
-        if order_price is None:
-            order_price = close
+        size_type = convert_str_enum_value(SizeType, size_type)
+        if price is None:
+            price = close
         if fees is None:
             fees = defaults.portfolio['fees']
         if fixed_fees is None:
             fixed_fees = defaults.portfolio['fixed_fees']
         if slippage is None:
             slippage = defaults.portfolio['slippage']
-        if reject_prob is None:
-            reject_prob = defaults.portfolio['reject_prob']
         if min_size is None:
             min_size = defaults.portfolio['min_size']
+        if max_size is None:
+            max_size = defaults.portfolio['max_size']
+        if reject_prob is None:
+            reject_prob = defaults.portfolio['reject_prob']
+        if allow_partial is None:
+            allow_partial = defaults.portfolio['allow_partial']
+        if raise_by_reject is None:
+            raise_by_reject = defaults.portfolio['raise_by_reject']
+        if val_price is None:
+            val_price = price
         if init_cash is None:
             init_cash = defaults.portfolio['init_cash']
-            if isinstance(init_cash, str):
-                init_cash = getattr(InitCashMode, init_cash)
-        if isinstance(init_cash, int):
-            checks.assert_in(init_cash, InitCashMode)
+        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
         else:
@@ -927,20 +1022,12 @@ class Portfolio(Configured, PandasIndexer):
             cash_sharing = defaults.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = defaults.portfolio['call_seq']
-            if isinstance(call_seq, str):
-                call_seq = getattr(CallSeqType, call_seq)
+        call_seq = convert_str_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
-            checks.assert_in(call_seq, CallSeqType)
             if call_seq == CallSeqType.Auto:
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
-        if val_price is None:
-            if checks.is_pandas(close):
-                val_price = close.vbt.fshift(1)
-            else:
-                val_price = np.roll(np.asarray(close), 1, axis=0)
-                val_price[0] = np.nan
         if seed is None:
             seed = defaults.portfolio['seed']
         if seed is not None:
@@ -954,31 +1041,30 @@ class Portfolio(Configured, PandasIndexer):
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
-        # Perform checks
-        checks.assert_subdtype(close, np.floating)
-        checks.assert_subdtype(order_size, np.floating)
-        checks.assert_subdtype(size_type, np.integer)
-        checks.assert_subdtype(order_price, np.floating)
-        checks.assert_subdtype(fees, np.floating)
-        checks.assert_subdtype(fixed_fees, np.floating)
-        checks.assert_subdtype(slippage, np.floating)
-        checks.assert_subdtype(reject_prob, np.floating)
-        checks.assert_subdtype(min_size, np.floating)
-        checks.assert_subdtype(init_cash, np.floating)
-        checks.assert_subdtype(call_seq, np.integer)
-        checks.assert_subdtype(val_price, np.floating)
-
         # Broadcast inputs
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
-        keep_raw = (False, True, True, True, True, True, True, True, True, True)
+        broadcastable_args = (
+            close,
+            size,
+            size_type,
+            price,
+            fees,
+            fixed_fees,
+            slippage,
+            min_size,
+            max_size,
+            reject_prob,
+            allow_partial,
+            raise_by_reject,
+            val_price
+        )
+        keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
         broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        close, order_size, size_type, order_price, fees, fixed_fees, slippage, reject_prob, val_price = \
-            broadcast(close, order_size, size_type, order_price, fees, fixed_fees, slippage,
-                      reject_prob, val_price, **broadcast_kwargs, keep_raw=keep_raw)
+        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs, keep_raw=keep_raw)
+        close = broadcasted_args[0]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
-        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
         init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
@@ -994,15 +1080,7 @@ class Portfolio(Configured, PandasIndexer):
             cs_group_counts,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            order_size,
-            size_type,
-            order_price,
-            fees,
-            fixed_fees,
-            slippage,
-            reject_prob,
-            min_size,
-            val_price,
+            *broadcasted_args[1:],
             auto_call_seq,
             close.ndim == 2
         )
@@ -1053,8 +1131,6 @@ class Portfolio(Configured, PandasIndexer):
                     Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
                     to set the same initial cash for all columns/groups. Changing grouping
                     will change the initial cash, so be aware when indexing.
-
-                    Make sure that `init_cash` is a floating number if not using `InitCashMode`.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
@@ -1118,10 +1194,8 @@ class Portfolio(Configured, PandasIndexer):
             target_shape = close.shape
         if init_cash is None:
             init_cash = defaults.portfolio['init_cash']
-            if isinstance(init_cash, str):
-                init_cash = getattr(InitCashMode, init_cash)
-        if isinstance(init_cash, int):
-            checks.assert_in(init_cash, InitCashMode)
+        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
         else:
@@ -1130,10 +1204,8 @@ class Portfolio(Configured, PandasIndexer):
             cash_sharing = defaults.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = defaults.portfolio['call_seq']
-            if isinstance(call_seq, str):
-                call_seq = getattr(CallSeqType, call_seq)
+        call_seq = convert_str_enum_value(CallSeqType, call_seq)
         if isinstance(call_seq, int):
-            checks.assert_in(call_seq, CallSeqType)
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually."
                                  "Use auto_call_seq_ctx_nb in segment_prep_func_nb.")

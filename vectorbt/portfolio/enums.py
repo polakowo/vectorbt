@@ -275,29 +275,6 @@ Attributes:
     TargetPercent: Percentage of total value to hold after transaction.
 """
 
-# ############# AccumulationMode ############# #
-
-AccumulationMode = namedtuple('AccumulationMode', [
-    'Disable',
-    'LongShort',
-    'Long',
-    'Short'
-])(*range(4))
-"""_"""
-
-__pdoc__['AccumulationMode'] = f"""Accumulation mode.
-
-```plaintext
-{json.dumps(dict(zip(AccumulationMode._fields, AccumulationMode)), indent=2)}
-```
-
-Attributes:
-    Disable: Disable accumulation.
-    LongShort: Allow accumulation of long and short signals.
-    Long: Allow accumulation of long signals only.
-    Short: Allow accumulation of short signals only.
-"""
-
 # ############# ConflictMode ############# #
 
 ConflictMode = namedtuple('ConflictMode', [
@@ -320,7 +297,7 @@ Attributes:
     Ignore: Ignore both signals.
     Entry: Use entry signal.
     Exit: Use exit signal.
-    Opposite: Use opposite signal. Prefers long over short if uncertain.
+    Opposite: Use opposite signal. Takes effect only when in position.
 """
 
 # ############# Order ############# #
@@ -407,9 +384,9 @@ class RejectedOrderError(Exception):
 # ############# SignalType ############# #
 
 SignalType = namedtuple('SignalType', [
-    'LongShort',
     'Long',
-    'Short'
+    'Short',
+    'LongShort'
 ])(*range(3))
 """_"""
 
@@ -420,7 +397,8 @@ __pdoc__['SignalType'] = f"""Signal type.
 ```
 
 Attributes:
-    LongShort: Entry signal to go long, exit signal to go short.
     Long: Entry signal to go long, exit signal to close the long position.
     Short: Entry signal to go short, exit signal to close the short position.
+    LongShort: Entry signal to go long, exit signal to go short.
 """
+

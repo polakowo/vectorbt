@@ -3,8 +3,8 @@
 import numpy as np
 from numba import njit
 
-rel_tol = 1e-10
-abs_tol = 0.
+rel_tol = 1e-9  # 1,000,000,000 == 1,000,000,001
+abs_tol = 1e-12  # 0.000000000001 == 0.000000000002
 
 
 @njit(cache=True)
@@ -17,22 +17,6 @@ def is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
     if a == b:
         return True
     return abs(a - b) <= max(rel_tol * max(abs(a), abs(b)), abs_tol)
-
-
-@njit(cache=True)
-def is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
-    """Tell whether addition of two values yields zero."""
-    if np.sign(a) != np.sign(b):
-        return is_close_nb(abs(a), abs(b), rel_tol=rel_tol, abs_tol=abs_tol)
-    return is_close_nb(a + b, 0., rel_tol=rel_tol, abs_tol=abs_tol)
-
-
-@njit(cache=True)
-def is_subtraction_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
-    """Tell whether subtraction of two values yields zero."""
-    if np.sign(a) == np.sign(b):
-        return is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol)
-    return is_close_nb(a - b, 0., rel_tol=rel_tol, abs_tol=abs_tol)
 
 
 @njit(cache=True)
@@ -49,3 +33,29 @@ def is_less_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
     if is_close_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
         return False
     return a < b
+
+
+@njit(cache=True)
+def is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+    """Tell whether addition of two values yields zero."""
+    if np.sign(a) != np.sign(b):
+        return is_close_nb(abs(a), abs(b), rel_tol=rel_tol, abs_tol=abs_tol)
+    return is_close_nb(a + b, 0., rel_tol=rel_tol, abs_tol=abs_tol)
+
+
+@njit(cache=True)
+def add_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+    """Add two floats."""
+    if is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+        return 0.
+    return a + b
+
+
+@njit(cache=True)
+def add_int_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+    """Add two integers."""
+    if is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
+        return 0
+    return a + b
+
+

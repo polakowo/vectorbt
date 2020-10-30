@@ -3,9 +3,10 @@ import pandas as pd
 from numba import njit
 import pytest
 import os
+from collections import namedtuple
 
 from vectorbt import defaults
-from vectorbt.utils import checks, config, decorators, math, array, random
+from vectorbt.utils import checks, config, decorators, math, array, random, enum
 
 from tests.utils import hash
 
@@ -439,92 +440,89 @@ class TestChecks:
 # ############# math.py ############# #
 
 class TestMath:
-    @pytest.mark.parametrize(
-        "test_func",
-        [math.is_close, math.is_close_nb],
-    )
-    def test_is_close(self, test_func):
+    def test_is_close(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert test_func(a, a)
-        assert test_func(a, b)
-        assert test_func(-a, -b)
-        assert not test_func(-a, b)
-        assert not test_func(a, -b)
-        assert test_func(1e10 + a, 1e10 + b)
+        assert math.is_close_nb(a, a)
+        assert math.is_close_nb(a, b)
+        assert math.is_close_nb(-a, -b)
+        assert not math.is_close_nb(-a, b)
+        assert not math.is_close_nb(a, -b)
+        assert math.is_close_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not test_func(np.nan, b)
-        assert not test_func(a, np.nan)
+        assert not math.is_close_nb(np.nan, b)
+        assert not math.is_close_nb(a, np.nan)
 
         # test np.inf
-        assert not test_func(np.inf, b)
-        assert not test_func(a, np.inf)
-        assert not test_func(-np.inf, b)
-        assert not test_func(a, -np.inf)
-        assert not test_func(-np.inf, -np.inf)
-        assert not test_func(np.inf, np.inf)
-        assert not test_func(-np.inf, np.inf)
+        assert not math.is_close_nb(np.inf, b)
+        assert not math.is_close_nb(a, np.inf)
+        assert not math.is_close_nb(-np.inf, b)
+        assert not math.is_close_nb(a, -np.inf)
+        assert not math.is_close_nb(-np.inf, -np.inf)
+        assert not math.is_close_nb(np.inf, np.inf)
+        assert not math.is_close_nb(-np.inf, np.inf)
 
-    @pytest.mark.parametrize(
-        "test_func",
-        [math.is_close_or_less, math.is_close_or_less_nb],
-    )
-    def test_is_close_or_less(self, test_func):
+    def test_is_close_or_less(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert test_func(a, a)
-        assert test_func(a, b)
-        assert test_func(-a, -b)
-        assert test_func(-a, b)
-        assert not test_func(a, -b)
-        assert test_func(1e10 + a, 1e10 + b)
+        assert math.is_close_or_less_nb(a, a)
+        assert math.is_close_or_less_nb(a, b)
+        assert math.is_close_or_less_nb(-a, -b)
+        assert math.is_close_or_less_nb(-a, b)
+        assert not math.is_close_or_less_nb(a, -b)
+        assert math.is_close_or_less_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not test_func(np.nan, b)
-        assert not test_func(a, np.nan)
+        assert not math.is_close_or_less_nb(np.nan, b)
+        assert not math.is_close_or_less_nb(a, np.nan)
 
         # test np.inf
-        assert not test_func(np.inf, b)
-        assert test_func(a, np.inf)
-        assert test_func(-np.inf, b)
-        assert not test_func(a, -np.inf)
-        assert not test_func(-np.inf, -np.inf)
-        assert not test_func(np.inf, np.inf)
-        assert test_func(-np.inf, np.inf)
+        assert not math.is_close_or_less_nb(np.inf, b)
+        assert math.is_close_or_less_nb(a, np.inf)
+        assert math.is_close_or_less_nb(-np.inf, b)
+        assert not math.is_close_or_less_nb(a, -np.inf)
+        assert not math.is_close_or_less_nb(-np.inf, -np.inf)
+        assert not math.is_close_or_less_nb(np.inf, np.inf)
+        assert math.is_close_or_less_nb(-np.inf, np.inf)
 
-    @pytest.mark.parametrize(
-        "test_func",
-        [math.is_less, math.is_less_nb],
-    )
-    def test_is_less(self, test_func):
+    def test_is_less(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert not test_func(a, a)
-        assert not test_func(a, b)
-        assert not test_func(-a, -b)
-        assert test_func(-a, b)
-        assert not test_func(a, -b)
-        assert not test_func(1e10 + a, 1e10 + b)
+        assert not math.is_less_nb(a, a)
+        assert not math.is_less_nb(a, b)
+        assert not math.is_less_nb(-a, -b)
+        assert math.is_less_nb(-a, b)
+        assert not math.is_less_nb(a, -b)
+        assert not math.is_less_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not test_func(np.nan, b)
-        assert not test_func(a, np.nan)
+        assert not math.is_less_nb(np.nan, b)
+        assert not math.is_less_nb(a, np.nan)
 
         # test np.inf
-        assert not test_func(np.inf, b)
-        assert test_func(a, np.inf)
-        assert test_func(-np.inf, b)
-        assert not test_func(a, -np.inf)
-        assert not test_func(-np.inf, -np.inf)
-        assert not test_func(np.inf, np.inf)
-        assert test_func(-np.inf, np.inf)
+        assert not math.is_less_nb(np.inf, b)
+        assert math.is_less_nb(a, np.inf)
+        assert math.is_less_nb(-np.inf, b)
+        assert not math.is_less_nb(a, -np.inf)
+        assert not math.is_less_nb(-np.inf, -np.inf)
+        assert not math.is_less_nb(np.inf, np.inf)
+        assert math.is_less_nb(-np.inf, np.inf)
+
+    def test_is_addition_zero(self):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        assert not math.is_addition_zero_nb(a, b)
+        assert math.is_addition_zero_nb(-a, b)
+        assert math.is_addition_zero_nb(a, -b)
+        assert not math.is_addition_zero_nb(-a, -b)
 
 
 # ############# array.py ############# #
@@ -584,4 +582,26 @@ class TestRandom:
 
             assert test_seed_nb() == 0.3745401188473625
 
+
+# ############# enum.py ############# #
+
+Enum = namedtuple('Enum', ['Attr1', 'Attr2'])(*range(2))
+
+class TestEnum:
+    def test_caseins_getattr(self):
+        assert enum.caseins_getattr(Enum, 'Attr1') == 0
+        assert enum.caseins_getattr(Enum, 'attr1') == 0
+        assert enum.caseins_getattr(Enum, 'Attr2') == 1
+        assert enum.caseins_getattr(Enum, 'attr2') == 1
+        with pytest.raises(Exception) as e_info:
+            enum.caseins_getattr(Enum, 'Attr3')
+
+    def test_convert_str_enum_value(self):
+        assert enum.convert_str_enum_value(Enum, 0) == 0
+        assert enum.convert_str_enum_value(Enum, 10) == 10
+        assert enum.convert_str_enum_value(Enum, 10.) == 10.
+        assert enum.convert_str_enum_value(Enum, 'Attr1') == 0
+        assert enum.convert_str_enum_value(Enum, 'attr1') == 0
+        assert enum.convert_str_enum_value(Enum, ('attr1', 'attr2')) == (0, 1)
+        assert enum.convert_str_enum_value(Enum, [['attr1', 'attr2']]) == [[0, 1]]
 

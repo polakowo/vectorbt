@@ -30,12 +30,14 @@
         >>> 300000 - sum([0.3 for _ in range(1000000)])
         5.657668225467205e-06
 
-    While vectorbt has implemented tolerance checks when comparing floats for equality (look for 
-    lines with "numerical stability" comment), adding/subtracting small amounts large number of
-    times may still introduce a noticable error that cannot be corrected post factum.
+    While vectorbt has implemented tolerance checks when comparing floats for equality,
+    adding/subtracting small amounts large number of times may still introduce a noticable
+    error that cannot be corrected post factum.
 
-    To mitigate this issue, avoid repeating lots of micro-transactions of the same sign in favor of
-    one bigger transaction. Also reduce by `np.inf` or `shares_now` to close a long/short position.
+    To mitigate this issue, avoid repeating lots of micro-transactions of the same sign.
+    For example, reduce by `np.inf` or `shares_now` to close a long/short position.
+
+    See `vectorbt.utils.math` for current tolerance values.
 """
 
 import numpy as np
@@ -43,11 +45,12 @@ from numba import njit
 
 from vectorbt.utils.math import (
     is_close_or_less_nb,
+    is_less_nb,
     is_addition_zero_nb,
-    is_subtraction_zero_nb
+    add_nb
 )
 from vectorbt.utils.array import insert_argsort_nb
-from vectorbt.base.reshape_fns import flex_choose_i_and_col_nb, flex_select_nb, flex_select_auto_nb
+from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio.enums import (
     SimulationContext,
@@ -57,7 +60,6 @@ from vectorbt.portfolio.enums import (
     OrderContext,
     CallSeqType,
     SizeType,
-    AccumulationMode,
     ConflictMode,
     SignalType,
     Order,
@@ -96,18 +98,16 @@ def buy_shares_nb(cash_now, shares_now, order_price, order_size, order_fees,
         final_cash = adj_req_cash
 
         # Update current cash
-        if is_subtraction_zero_nb(cash_now, final_cash):
-            cash_now = 0.  # numerical stability
-        else:
-            cash_now -= final_cash
+        cash_now = add_nb(cash_now, -final_cash)
     else:
         # Insufficient cash, size will be less than requested
-        if not allow_partial:
+        if not np.isinf(order_size) and not allow_partial:
+            # np.inf doesn't count
             if raise_by_reject:
                 raise RejectedOrderError("Order rejected due to partial fill")
             return cash_now, shares_now, RejectedOrder
         if is_close_or_less_nb(cash_now, order_fixed_fees):
-            # Can't cover
+            # Can't fill
             if raise_by_reject:
                 raise RejectedOrderError("Order rejected due to insufficient funds")
             return cash_now, shares_now, RejectedOrder
@@ -121,13 +121,10 @@ def buy_shares_nb(cash_now, shares_now, order_price, order_size, order_fees,
         fees_paid = cash_now - final_cash
 
         # Update current cash
-        cash_now = 0.  # numerical stability
+        cash_now = 0.
 
     # Update current shares
-    if is_addition_zero_nb(shares_now, final_size):
-        shares_now = 0.  # numerical stability
-    else:
-        shares_now += final_size
+    shares_now = add_nb(shares_now, final_size)
 
     # Return filled order
     return cash_now, \
@@ -143,7 +140,7 @@ def buy_shares_nb(cash_now, shares_now, order_price, order_size, order_fees,
 
 @njit(cache=True)
 def sell_shares_nb(cash_now, shares_now, order_price, order_size,
-                   order_fees, order_fixed_fees, order_slippage):
+                   order_fees, order_fixed_fees, order_slippage, raise_by_reject):
     """Sell shares."""
 
     # Get price adjusted with slippage
@@ -156,14 +153,20 @@ def sell_shares_nb(cash_now, shares_now, order_price, order_size,
     fees_paid = acq_cash * order_fees + order_fixed_fees
 
     # Get final cash by subtracting costs
+    if is_less_nb(acq_cash, fees_paid):
+        # Can't fill
+        if raise_by_reject:
+            raise RejectedOrderError("Order rejected due to costs outweighing benefits")
+        return cash_now, shares_now, RejectedOrder
     final_cash = acq_cash - fees_paid
 
     # Update current cash and shares
     cash_now += final_cash
-    if is_subtraction_zero_nb(shares_now, order_size):
-        shares_now = 0.  # numerical stability
-    else:
-        shares_now -= order_size
+    shares_now = add_nb(shares_now, -order_size)
+
+    # use_last_price -> sequential, otherwise parallel assumption
+
+    # Return filled order
     return cash_now, \
            shares_now, \
            OrderResult(
@@ -173,6 +176,131 @@ def sell_shares_nb(cash_now, shares_now, order_price, order_size,
                OrderSide.Sell,
                OrderStatus.Filled
            )
+
+
+@njit(cache=True)
+def process_order_nb(cash_now, shares_now, value_now, val_price_now, order):
+    """Process an order given current cash and share balance.
+
+    Ignores order if size or price are NaN, or size is zero.
+
+    Args:
+        cash_now (float): Cash available to this asset or group with cash sharing.
+        shares_now (float): Holdings of this particular asset.
+        value_now (float): Value of this asset or group with cash sharing.
+        val_price_now (float): Valuation price for this particular asset.
+        order (Order): See `vectorbt.portfolio.enums.Order`.
+    """
+    if np.isnan(order.size) or np.isnan(order.price):
+        return cash_now, shares_now, IgnoredOrder
+
+    # Check order
+    if cash_now < 0:
+        raise ValueError("cash_now must be greater than 0")
+    if not np.isfinite(order.price) or order.price <= 0:
+        raise ValueError("order.price must be finite and greater than 0")
+    if not np.isfinite(order.fees) or order.fees < 0:
+        raise ValueError("order.fees must be finite and 0 or greater")
+    if not np.isfinite(order.fixed_fees) or order.fixed_fees < 0:
+        raise ValueError("order.fixed_fees must be finite and 0 or greater")
+    if not np.isfinite(order.slippage) or order.slippage < 0:
+        raise ValueError("order.slippage must be finite and 0 or greater")
+    if not np.isfinite(order.min_size) or order.min_size < 0:
+        raise ValueError("order.min_size must be finite and 0 or greater")
+    if order.max_size <= 0:
+        raise ValueError("order.max_size must be greater than 0")
+    if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
+        raise ValueError("order.reject_prob must be between 0 and 1")
+    if order.allow_partial != 0 and order.allow_partial != 1:
+        raise ValueError("order.allow_partial must be boolean")
+    if order.raise_by_reject != 0 and order.raise_by_reject != 1:
+        raise ValueError("order.raise_by_reject must be boolean")
+
+    if order.size_type == SizeType.Shares:
+        # Amount of shares
+        size = order.size
+    elif order.size_type == SizeType.TargetShares:
+        # Target amount of shares
+        size = order.size - shares_now
+    else:
+        # Target value
+        if not np.isfinite(value_now):
+            raise ValueError("value_now must be finite")
+        if not np.isfinite(val_price_now) or val_price_now <= 0:
+            raise ValueError("val_price must be finite and greater than 0")
+
+        if order.size_type == SizeType.TargetValue:
+            target_value = order.size
+        else:
+            # Percentage of value
+            target_value = order.size * value_now
+        size = target_value / val_price_now - shares_now
+
+    if size < 0 and np.isinf(size):
+        # Go short by current value of this asset
+        if not np.isfinite(value_now):
+            raise ValueError("value_now must be finite")
+        if not np.isfinite(val_price_now) or val_price_now <= 0:
+            raise ValueError("val_price must be finite and greater than 0")
+
+        size = 0.
+        if value_now > 0:
+            if shares_now > 0:
+                size -= shares_now
+            size -= value_now / val_price_now
+
+    if size == 0:
+        return cash_now, shares_now, IgnoredOrder
+
+    if abs(size) < order.min_size:
+        if order.raise_by_reject:
+            raise RejectedOrderError("Order rejected due to minimum size")
+        return cash_now, shares_now, RejectedOrder
+    if abs(size) > order.max_size:
+        if not order.allow_partial:
+            if order.raise_by_reject:
+                raise RejectedOrderError("Order rejected due to maximum size")
+            return cash_now, shares_now, RejectedOrder
+        if size > 0:
+            size = order.max_size
+        else:
+            size = -order.max_size
+
+    if order.reject_prob > 0:
+        if np.random.uniform(0, 1) < order.reject_prob:
+            if order.raise_by_reject:
+                raise RejectedOrderError("Order rejected due to rejection probability")
+            return cash_now, shares_now, RejectedOrder
+
+    if size > 0:
+        if np.isinf(size) and np.isinf(cash_now):
+            raise ValueError("Attempt to go in long direction indefinitely. Set max_size or finite init_cash.")
+
+        return buy_shares_nb(
+            cash_now,
+            shares_now,
+            order.price,
+            size,
+            order.fees,
+            order.fixed_fees,
+            order.slippage,
+            order.allow_partial,
+            order.raise_by_reject
+        )
+    else:
+        if np.isinf(size):
+            raise ValueError("Attempt to go in short direction indefinitely. Set max_size or finite init_cash.")
+
+        return sell_shares_nb(
+            cash_now,
+            shares_now,
+            order.price,
+            -size,
+            order.fees,
+            order.fixed_fees,
+            order.slippage,
+            order.raise_by_reject
+        )
 
 
 @njit(cache=True)
@@ -187,7 +315,7 @@ def create_order(size=np.nan,
                  reject_prob=0.,
                  allow_partial=True,
                  raise_by_reject=False):
-    """Create order with some defaults."""
+    """Convenience function to create an order with some defaults."""
 
     return Order(
         float(size),
@@ -205,107 +333,9 @@ def create_order(size=np.nan,
 
 
 @njit(cache=True)
-def process_order_nb(cash_now, shares_now, order):
-    """Process an order given current cash and share balance.
-
-    Ignores order if size or price are NaN, or size is zero."""
-    if np.isnan(order.size) or np.isnan(order.price):
-        return cash_now, shares_now, IgnoredOrder
-
-    # Check order
-    if cash_now < 0:
-        raise ValueError("cash_now must be greater than 0")
-    if not np.isfinite(order.price) or order.price <= 0:
-        raise ValueError("order.price must be finite and greater than 0")
-    if not np.isfinite(order.fees) or order.fees < 0:
-        raise ValueError("order.fees must be finite and 0 or greater")
-    if not np.isfinite(order.fixed_fees) or order.fixed_fees < 0:
-        raise ValueError("order.fixed_fees must be finite and 0 or greater")
-    if not np.isfinite(order.slippage) or order.slippage < 0:
-        raise ValueError("order.slippage must be finite and 0 or greater")
-    if not np.isfinite(order.min_size) or order.min_size < 0:
-        raise ValueError("order.min_size must be finite and 0 or greater")
-    if order.max_size < 0:
-        raise ValueError("order.max_size must be 0 or greater")
-    if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
-        raise ValueError("order.reject_prob must be between 0 and 1")
-    if order.allow_partial != 0 and order.allow_partial != 1:
-        raise ValueError("order.allow_partial must be boolean")
-    if order.raise_by_reject != 0 and order.raise_by_reject != 1:
-        raise ValueError("order.raise_by_reject must be boolean")
-
-    # Convert target size to shares
-    size = order.size
-    if order.size_type == SizeType.TargetShares:
-        # Target amount of shares
-        size = order.size - shares_now
-
-    elif order.size_type == SizeType.TargetValue:
-        # Value in monetary units of the asset
-        target_value = order.size
-        current_value = shares_now * order.price
-        size = (target_value - current_value) / order.price
-
-    elif order.size_type == SizeType.TargetPercent:
-        # Percentage from current value that can be moved by this asset
-        # Not to confuse with group value!
-        target_perc = order.size
-        current_value = shares_now * order.price
-        current_total_value = cash_now + current_value
-        target_value = target_perc * current_total_value
-        size = (target_value - current_value) / order.price
-
-    if size == 0:
-        return cash_now, shares_now, IgnoredOrder
-
-    if abs(size) < order.min_size:
-        if order.raise_by_reject:
-            raise RejectedOrderError("Order rejected due to minimum size")
-        return cash_now, shares_now, RejectedOrder
-    if abs(size) > order.max_size:
-        if not order.allow_partial:
-            if order.raise_by_reject:
-                raise RejectedOrderError("Order rejected due to partial fill")
-            return cash_now, shares_now, RejectedOrder
-        if size > 0:
-            size = order.max_size
-        else:
-            size = -order.max_size
-
-    if order.reject_prob > 0:
-        if np.random.uniform(0, 1) < order.reject_prob:
-            if order.raise_by_reject:
-                raise RejectedOrderError("Order rejected due to rejection probability")
-            return cash_now, shares_now, RejectedOrder
-
-    if size > 0:
-        if np.isinf(size) and np.isinf(cash_now):
-            raise ValueError("Size and current cash cannot be both infinite")
-
-        return buy_shares_nb(
-            cash_now,
-            shares_now,
-            order.price,
-            size,
-            order.fees,
-            order.fixed_fees,
-            order.slippage,
-            order.allow_partial,
-            order.raise_by_reject
-        )
-    else:
-        if np.isinf(size):
-            raise ValueError("Size cannot be both negative and infinite")
-
-        return sell_shares_nb(
-            cash_now,
-            shares_now,
-            order.price,
-            -size,
-            order.fees,
-            order.fixed_fees,
-            order.slippage
-        )
+def order_nothing():
+    """Convenience function to order nothing."""
+    return NoOrder
 
 
 @njit(cache=True)
@@ -1139,28 +1169,17 @@ def simulate_row_wise_nb(target_shape, close, group_counts, init_cash, cash_shar
 
 
 @njit(cache=True)
-def signals_order_func_nb(shares_now,
-                          is_entry, is_exit,
-                          long_size, short_size,
-                          long_price, short_price,
-                          long_fees, short_fees,
-                          long_fixed_fees, short_fixed_fees,
-                          long_slippage, short_slippage,
-                          long_min_size, short_min_size,
-                          long_max_size, short_max_size,
-                          long_reject_prob, short_reject_prob,
-                          long_allow_partial, short_allow_partial,
-                          long_raise_by_reject, short_raise_by_reject,
-                          accumulation_mode, conflict_mode, signal_type):
-    """`order_func_nb` of `simulate_from_signals_nb`."""
+def signals_get_size_nb(shares_now,
+                        is_entry, is_exit,
+                        long_size, short_size,
+                        long_close_first, short_close_first,
+                        long_accumulate, short_accumulate,
+                        conflict_mode, signal_type):
+    """Get order size given signals."""
     order_size = 0.
     abs_shares_now = abs(shares_now)
     abs_long_size = abs(long_size)
     abs_short_size = abs(short_size)
-    long_accumulate = accumulation_mode == AccumulationMode.LongShort \
-        or accumulation_mode == AccumulationMode.Long
-    short_accumulate = accumulation_mode == AccumulationMode.LongShort \
-        or accumulation_mode == AccumulationMode.Short
 
     if is_entry and is_exit:
         # Conflict
@@ -1175,15 +1194,11 @@ def signals_order_func_nb(shares_now,
             if signal_type == SignalType.LongShort:
                 if shares_now > 0:
                     is_entry = False
-                elif shares_now == 0:
-                    is_exit = False  # long is preferred here
-                else:
+                elif shares_now < 0:
                     is_exit = False
             else:
                 if shares_now != 0:
                     is_entry = False
-                else:
-                    is_exit = False
 
     if is_entry and not is_exit:
         if signal_type == SignalType.LongShort:
@@ -1193,7 +1208,10 @@ def signals_order_func_nb(shares_now,
             else:
                 if shares_now < 0:
                     # Reverse short position
-                    order_size = abs_shares_now + abs_long_size
+                    if short_close_first:
+                        order_size = abs_shares_now
+                    else:
+                        order_size = abs_shares_now + abs_long_size
                 elif shares_now == 0:
                     # Open long position
                     order_size = abs_long_size
@@ -1214,7 +1232,10 @@ def signals_order_func_nb(shares_now,
             else:
                 if shares_now > 0:
                     # Reverse long position
-                    order_size = -abs_shares_now - abs_short_size
+                    if long_close_first:
+                        order_size = -abs_shares_now
+                    else:
+                        order_size = -abs_shares_now - abs_short_size
                 elif shares_now == 0:
                     # Open short position
                     order_size = -abs_short_size
@@ -1234,43 +1255,12 @@ def signals_order_func_nb(shares_now,
                 else:
                     # Close long position
                     order_size = -abs_shares_now
-
-    if order_size == 0:
-        return NoOrder
-    if order_size > 0:
-        # Go long
-        return create_order(
-            size=order_size,
-            size_type=SizeType.Shares,
-            price=long_price,
-            fees=long_fees,
-            fixed_fees=long_fixed_fees,
-            slippage=long_slippage,
-            min_size=long_min_size,
-            max_size=long_max_size,
-            reject_prob=long_reject_prob,
-            allow_partial=long_allow_partial,
-            raise_by_reject=long_raise_by_reject
-        )
-    # Go short
-    return create_order(
-        size=order_size,
-        size_type=SizeType.Shares,
-        price=short_price,
-        fees=short_fees,
-        fixed_fees=short_fixed_fees,
-        slippage=short_slippage,
-        min_size=short_min_size,
-        max_size=short_max_size,
-        reject_prob=short_reject_prob,
-        allow_partial=short_allow_partial,
-        raise_by_reject=short_raise_by_reject
-    )
+    return order_size
 
 
 @njit(cache=True)
-def simulate_from_signals_nb(target_shape,
-                             group_counts, init_cash, call_seq,
+def simulate_from_signals_nb(target_shape, group_counts, init_cash,
+                             call_seq, auto_call_seq,
                              entries, exits,
                              long_size, short_size,
                              long_price, short_price,
@@ -1282,7 +1272,10 @@ def simulate_from_signals_nb(target_shape,
                              long_reject_prob, short_reject_prob,
                              long_allow_partial, short_allow_partial,
                              long_raise_by_reject, short_raise_by_reject,
-                             accumulation_mode, conflict_mode, signal_type, flex_2d):
+                             long_close_first, short_close_first,
+                             long_accumulate, short_accumulate,
+                             conflict_mode, signal_type,
+                             val_price, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals.
 
     Utilizes flexible broadcasting.
@@ -1298,6 +1291,8 @@ def simulate_from_signals_nb(target_shape,
     j = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
+    order_size = np.empty(target_shape[1], dtype=np.float_)
+    temp_order_value = np.empty(target_shape[1], dtype=np.float_)
 
     from_col = 0
     for group in range(len(group_counts)):
@@ -1309,6 +1304,47 @@ def simulate_from_signals_nb(target_shape,
             cash_now = last_cash[group]
 
         for i in range(target_shape[0]):
+
+            # Get size and value of each order
+            for k in range(group_len):
+                col = from_col + k  # order doesn't matter
+                _order_size = signals_get_size_nb(
+                    last_shares[col],
+                    flex_select_auto_nb(i, col, entries, flex_2d),
+                    flex_select_auto_nb(i, col, exits, flex_2d),
+                    flex_select_auto_nb(i, col, long_size, flex_2d),
+                    flex_select_auto_nb(i, col, short_size, flex_2d),
+                    flex_select_auto_nb(i, col, long_close_first, flex_2d),
+                    flex_select_auto_nb(i, col, short_close_first, flex_2d),
+                    flex_select_auto_nb(i, col, long_accumulate, flex_2d),
+                    flex_select_auto_nb(i, col, short_accumulate, flex_2d),
+                    flex_select_auto_nb(i, col, conflict_mode, flex_2d),
+                    flex_select_auto_nb(i, col, signal_type, flex_2d)
+                )
+                order_size[col] = _order_size
+
+                if cash_sharing:
+                    if _order_size > 0:
+                        order_price = flex_select_auto_nb(i, col, long_price, flex_2d)
+                    elif _order_size < 0:
+                        order_price = flex_select_auto_nb(i, col, short_price, flex_2d)
+                    else:
+                        order_price = 0.
+                    temp_order_value[k] = _order_size * order_price
+
+            if cash_sharing:
+                # Dynamically sort by order value -> selling comes first to release funds early
+                if auto_call_seq:
+                    insert_argsort_nb(temp_order_value[:group_len], call_seq[i, from_col:to_col])
+
+                # Same as get_group_value_ctx_nb but with flexible indexing
+                value_now = cash_now
+                for k in range(group_len):
+                    col = from_col + k
+                    if last_shares[col] != 0:
+                        _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
+                        value_now += last_shares[col] * _val_price
+
             for k in range(group_len):
                 col = from_col + k
                 if cash_sharing:
@@ -1318,45 +1354,49 @@ def simulate_from_signals_nb(target_shape,
                     col = from_col + col_i
 
                 # Get running values per column
+                shares_now = last_shares[col]
+                val_price_now = flex_select_auto_nb(i, col, val_price, flex_2d)
                 if not cash_sharing:
                     cash_now = last_cash[col]
-                shares_now = last_shares[col]
+                    value_now = cash_now
+                    if shares_now != 0:
+                        value_now += shares_now * val_price_now
 
-                is_entry = flex_select_auto_nb(i, col, entries, flex_2d)
-                is_exit = flex_select_auto_nb(i, col, exits, flex_2d)
-                if is_entry or is_exit:
-                    # Generate the next order
-                    order = signals_order_func_nb(
-                        shares_now,
-                        is_entry,
-                        is_exit,
-                        flex_select_auto_nb(i, col, long_size, flex_2d),
-                        flex_select_auto_nb(i, col, short_size, flex_2d),
-                        flex_select_auto_nb(i, col, long_price, flex_2d),
-                        flex_select_auto_nb(i, col, short_price, flex_2d),
-                        flex_select_auto_nb(i, col, long_fees, flex_2d),
-                        flex_select_auto_nb(i, col, short_fees, flex_2d),
-                        flex_select_auto_nb(i, col, long_fixed_fees, flex_2d),
-                        flex_select_auto_nb(i, col, short_fixed_fees, flex_2d),
-                        flex_select_auto_nb(i, col, long_slippage, flex_2d),
-                        flex_select_auto_nb(i, col, short_slippage, flex_2d),
-                        flex_select_auto_nb(i, col, long_min_size, flex_2d),
-                        flex_select_auto_nb(i, col, short_min_size, flex_2d),
-                        flex_select_auto_nb(i, col, long_max_size, flex_2d),
-                        flex_select_auto_nb(i, col, short_max_size, flex_2d),
-                        flex_select_auto_nb(i, col, long_reject_prob, flex_2d),
-                        flex_select_auto_nb(i, col, short_reject_prob, flex_2d),
-                        flex_select_auto_nb(i, col, long_allow_partial, flex_2d),
-                        flex_select_auto_nb(i, col, short_allow_partial, flex_2d),
-                        flex_select_auto_nb(i, col, long_raise_by_reject, flex_2d),
-                        flex_select_auto_nb(i, col, short_raise_by_reject, flex_2d),
-                        flex_select_auto_nb(i, col, accumulation_mode, flex_2d),
-                        flex_select_auto_nb(i, col, conflict_mode, flex_2d),
-                        flex_select_auto_nb(i, col, signal_type, flex_2d)
-                    )
+                # Generate the next order
+                _order_size = order_size[col]
+                if _order_size != 0:
+                    if _order_size > 0:
+                        order = create_order(
+                            size=_order_size,
+                            size_type=SizeType.Shares,
+                            price=flex_select_auto_nb(i, col, long_price, flex_2d),
+                            fees=flex_select_auto_nb(i, col, long_fees, flex_2d),
+                            fixed_fees=flex_select_auto_nb(i, col, long_fixed_fees, flex_2d),
+                            slippage=flex_select_auto_nb(i, col, long_slippage, flex_2d),
+                            min_size=flex_select_auto_nb(i, col, long_min_size, flex_2d),
+                            max_size=flex_select_auto_nb(i, col, long_max_size, flex_2d),
+                            reject_prob=flex_select_auto_nb(i, col, long_reject_prob, flex_2d),
+                            allow_partial=flex_select_auto_nb(i, col, long_allow_partial, flex_2d),
+                            raise_by_reject=flex_select_auto_nb(i, col, long_raise_by_reject, flex_2d)
+                        )
+                    else:
+                        order = create_order(
+                            size=_order_size,
+                            size_type=SizeType.Shares,
+                            price=flex_select_auto_nb(i, col, short_price, flex_2d),
+                            fees=flex_select_auto_nb(i, col, short_fees, flex_2d),
+                            fixed_fees=flex_select_auto_nb(i, col, short_fixed_fees, flex_2d),
+                            slippage=flex_select_auto_nb(i, col, short_slippage, flex_2d),
+                            min_size=flex_select_auto_nb(i, col, short_min_size, flex_2d),
+                            max_size=flex_select_auto_nb(i, col, short_max_size, flex_2d),
+                            reject_prob=flex_select_auto_nb(i, col, short_reject_prob, flex_2d),
+                            allow_partial=flex_select_auto_nb(i, col, short_allow_partial, flex_2d),
+                            raise_by_reject=flex_select_auto_nb(i, col, short_raise_by_reject, flex_2d)
+                        )
 
                     # Process the order
-                    cash_now, shares_now, order_result = process_order_nb(cash_now, shares_now, order)
+                    cash_now, shares_now, order_result = process_order_nb(
+                        cash_now, shares_now, value_now, val_price_now, order)
 
                     if order_result.status == OrderStatus.Filled:
                         # Add a new record
@@ -1391,8 +1431,8 @@ def simulate_from_signals_nb(target_shape,
 
 @njit(cache=True)
 def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, size, size_type,
-                            price, fees, fixed_fees, slippage, reject_prob, val_price,
-                            auto_call_seq, flex_2d):
+                            price, fees, fixed_fees, slippage, min_size, max_size, reject_prob,
+                            allow_partial, raise_by_reject, val_price, auto_call_seq, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on orders.
 
     Utilizes flexible broadcasting.
@@ -1412,16 +1452,6 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
 
-    # Inputs were not broadcast -> use flexible indexing
-    flex_i1, flex_col1 = flex_choose_i_and_col_nb(size, flex_2d)
-    flex_i2, flex_col2 = flex_choose_i_and_col_nb(size_type, flex_2d)
-    flex_i3, flex_col3 = flex_choose_i_and_col_nb(price, flex_2d)
-    flex_i4, flex_col4 = flex_choose_i_and_col_nb(fees, flex_2d)
-    flex_i5, flex_col5 = flex_choose_i_and_col_nb(fixed_fees, flex_2d)
-    flex_i6, flex_col6 = flex_choose_i_and_col_nb(slippage, flex_2d)
-    flex_i7, flex_col7 = flex_choose_i_and_col_nb(reject_prob, flex_2d)
-    flex_i8, flex_col8 = flex_choose_i_and_col_nb(val_price, flex_2d)
-
     from_col = 0
     for group in range(len(group_counts)):
         to_col = from_col + group_counts[group]
@@ -1439,18 +1469,17 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                 for k in range(group_len):
                     col = from_col + k
                     if last_shares[col] != 0:
-                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
-                        holding_value = last_shares[col] * _val_price
-                        value_now += holding_value
+                        _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
+                        value_now += last_shares[col] * _val_price
 
                 # Dynamically sort by order value -> selling comes first to release funds early
                 if auto_call_seq:
                     # Same as sort_by_order_value_ctx_nb but with flexible indexing
                     for k in range(group_len):
                         col = from_col + k
-                        _size = flex_select_nb(i, col, size, flex_i1, flex_col1, flex_2d)
-                        _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, flex_2d)
-                        _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
+                        _size = flex_select_auto_nb(i, col, size, flex_2d)
+                        _size_type = flex_select_auto_nb(i, col, size_type, flex_2d)
+                        _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
                         holding_value_now = last_shares[col] * _val_price
 
                         if _size_type == SizeType.Shares:
@@ -1466,54 +1495,40 @@ def simulate_from_orders_nb(target_shape, group_counts, init_cash, call_seq, siz
                     insert_argsort_nb(temp_order_value[:group_len], call_seq[i, from_col:to_col])
 
             for k in range(group_len):
+                col = from_col + k
                 if cash_sharing:
-                    col_i = call_seq[i, from_col + k]
+                    col_i = call_seq[i, col]
                     if col_i >= group_len:
                         raise ValueError("Call index exceeds bounds of the group")
                     col = from_col + col_i
-                else:
-                    col = from_col + k
 
                 # Get running values per column
                 shares_now = last_shares[col]
-                _val_price = flex_select_nb(i, col, val_price, flex_i8, flex_col8, flex_2d)
+                val_price_now = flex_select_auto_nb(i, col, val_price, flex_2d)
                 if not cash_sharing:
                     cash_now = last_cash[col]
                     value_now = cash_now
                     if shares_now != 0:
-                        value_now += shares_now * _val_price
-
-                # Convert target value or percent into target shares
-                _size = flex_select_nb(i, col, size, flex_i1, flex_col1, flex_2d)
-                _size_type = flex_select_nb(i, col, size_type, flex_i2, flex_col2, flex_2d)
-                if _size_type == SizeType.TargetPercent:
-                    if not np.isnan(_size):
-                        if np.isnan(_val_price):
-                            raise ValueError("Valuation price is NaN")
-                        if np.isnan(value_now):
-                            raise ValueError("Value of the group is NaN")
-                    _size = _size * value_now / _val_price
-                    _size_type = SizeType.TargetShares
-                elif _size_type == SizeType.TargetValue:
-                    if not np.isnan(_size):
-                        if np.isnan(_val_price):
-                            raise ValueError("Valuation price is NaN")
-                    _size = _size / _val_price
-                    _size_type = SizeType.TargetShares
+                        value_now += shares_now * val_price_now
 
                 # Generate the next order
                 order = Order(
-                    _size,
-                    _size_type,
-                    flex_select_nb(i, col, price, flex_i3, flex_col3, flex_2d),
-                    flex_select_nb(i, col, fees, flex_i4, flex_col4, flex_2d),
-                    flex_select_nb(i, col, fixed_fees, flex_i5, flex_col5, flex_2d),
-                    flex_select_nb(i, col, slippage, flex_i6, flex_col6, flex_2d),
-                    flex_select_nb(i, col, reject_prob, flex_i7, flex_col7, flex_2d)
+                    flex_select_auto_nb(i, col, size, flex_2d),
+                    flex_select_auto_nb(i, col, size_type, flex_2d),
+                    flex_select_auto_nb(i, col, price, flex_2d),
+                    flex_select_auto_nb(i, col, fees, flex_2d),
+                    flex_select_auto_nb(i, col, fixed_fees, flex_2d),
+                    flex_select_auto_nb(i, col, slippage, flex_2d),
+                    flex_select_auto_nb(i, col, min_size, flex_2d),
+                    flex_select_auto_nb(i, col, max_size, flex_2d),
+                    flex_select_auto_nb(i, col, reject_prob, flex_2d),
+                    flex_select_auto_nb(i, col, allow_partial, flex_2d),
+                    flex_select_auto_nb(i, col, raise_by_reject, flex_2d)
                 )
 
                 # Process the order
-                cash_now, shares_now, order_result = process_order_nb(cash_now, shares_now, order)
+                cash_now, shares_now, order_result = process_order_nb(
+                    cash_now, shares_now, value_now, val_price_now, order)
 
                 if order_result.status == OrderStatus.Filled:
                     # Add a new record
@@ -1570,7 +1585,7 @@ def shares_nb(share_flow):
         for i in range(share_flow.shape[0]):
             flow_value = share_flow[i, col]
             if is_addition_zero_nb(shares_now, flow_value):
-                shares_now = 0.  # numerical stability
+                shares_now = 0.
             else:
                 shares_now += flow_value
             out[i, col] = shares_now
@@ -1704,7 +1719,7 @@ def cash_ungrouped_nb(cash_flow_ungrouped, group_counts, init_cash, call_seq, in
                     cash_now = init_cash[col] if i == 0 else out[i - 1, col]
                 flow_value = cash_flow_ungrouped[i, col]
                 if is_addition_zero_nb(cash_now, flow_value):
-                    cash_now = 0.  # numerical stability
+                    cash_now = 0.
                 else:
                     cash_now += flow_value
                 out[i, col] = cash_now
@@ -1725,7 +1740,7 @@ def cash_grouped_nb(target_shape, cash_flow_grouped, group_counts, init_cash_gro
         for i in range(cash_flow_grouped.shape[0]):
             flow_value = cash_flow_grouped[i, group]
             if is_addition_zero_nb(cash_now, flow_value):
-                cash_now = 0.  # numerical stability
+                cash_now = 0.
             else:
                 cash_now += flow_value
             out[i, group] = cash_now
@@ -1838,13 +1853,13 @@ def total_profit_ungrouped_nb(target_shape, close, order_records, init_cash_ungr
         if record['side'] == OrderSide.Buy:
             order_cash = record['size'] * record['price'] + record['fees']
             if is_subtraction_zero_nb(cash[col], order_cash):
-                cash[col] = 0.  # numerical stability
+                cash[col] = 0.
             else:
                 cash[col] -= order_cash
         else:
             order_cash = record['size'] * record['price'] - record['fees']
             if is_addition_zero_nb(cash[col], order_cash):
-                cash[col] = 0.  # numerical stability
+                cash[col] = 0.
             else:
                 cash[col] += order_cash
 

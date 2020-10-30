@@ -167,7 +167,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
                                 # If pandas objects have different index/columns, raise an exception
                                 if not pd.Index.equals(index, new_index):
                                     raise ValueError(
-                                        f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
+                                        f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
                             # Broadcasting index must follow the rules of a regular broadcasting operation
                             # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
                             # 1. rule: if indexes are of the same length, they are simply stacked
@@ -190,7 +190,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
         if new_index is not None:
             if maxlen > len(new_index):
                 if index_from == 'strict':
-                    raise ValueError(f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
+                    raise ValueError(f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
                 # This happens only when some numpy object is longer than the new pandas index
                 # In this case, new pandas index (one element) should be repeated to match this length.
                 if maxlen > 1 and len(new_index) > 1:
