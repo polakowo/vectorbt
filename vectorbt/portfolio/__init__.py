@@ -66,6 +66,6 @@ from vectorbt.portfolio.enums import (
     ConflictMode,
     Order,
     NoOrder,
-    SignalType
+    Direction
 )
 from vectorbt.portfolio.base import Portfolio

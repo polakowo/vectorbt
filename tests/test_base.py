@@ -67,6 +67,10 @@ class TestColumnGrouper:
         assert not column_grouper.group_by_to_index(some_columns, group_by=False)
         assert column_grouper.group_by_to_index(some_columns, group_by=None) is None
         pd.testing.assert_index_equal(
+            column_grouper.group_by_to_index(some_columns, group_by=True),
+            pd.Int64Index([0, 0, 0, 0, 0, 0, 0, 0], dtype='int64')
+        )
+        pd.testing.assert_index_equal(
             column_grouper.group_by_to_index(some_columns, group_by=0),
             pd.Int64Index([1, 1, 1, 1, 0, 0, 0, 0], dtype='int64', name='first')
         )
@@ -127,25 +131,25 @@ class TestColumnGrouper:
         with pytest.raises(Exception) as e_info:
             column_grouper.get_groups_and_index(some_columns[[0, -1, 0]], group_by=[0, 1])
 
-    def test_get_group_counts_nb(self):
+    def test_get_group_lens_nb(self):
         np.testing.assert_array_equal(
-            column_grouper.get_group_counts_nb(np.array([0, 0, 0, 0, 1, 1, 1, 1])),
+            column_grouper.get_group_lens_nb(np.array([0, 0, 0, 0, 1, 1, 1, 1])),
             np.array([4, 4])
         )
         np.testing.assert_array_equal(
-            column_grouper.get_group_counts_nb(np.array([0, 1])),
+            column_grouper.get_group_lens_nb(np.array([0, 1])),
             np.array([1, 1])
         )
         np.testing.assert_array_equal(
-            column_grouper.get_group_counts_nb(np.array([0, 0])),
+            column_grouper.get_group_lens_nb(np.array([0, 0])),
             np.array([2])
         )
         np.testing.assert_array_equal(
-            column_grouper.get_group_counts_nb(np.array([0])),
+            column_grouper.get_group_lens_nb(np.array([0])),
             np.array([1])
         )
         np.testing.assert_array_equal(
-            column_grouper.get_group_counts_nb(np.array([])),
+            column_grouper.get_group_lens_nb(np.array([])),
             np.array([])
         )
 
@@ -156,7 +160,7 @@ class TestColumnGrouper:
         assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouped(group_by=False)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouped()
         assert column_grouper.ColumnGrouper(some_columns).is_grouped(group_by=0)
-        assert not column_grouper.ColumnGrouper(some_columns).is_grouped(group_by=True)
+        assert column_grouper.ColumnGrouper(some_columns).is_grouped(group_by=True)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouped(group_by=False)
 
     def test_is_grouping_enabled(self):
@@ -166,7 +170,7 @@ class TestColumnGrouper:
         assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_enabled(group_by=False)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouping_enabled()
         assert column_grouper.ColumnGrouper(some_columns).is_grouping_enabled(group_by=0)
-        assert not column_grouper.ColumnGrouper(some_columns).is_grouping_enabled(group_by=True)
+        assert column_grouper.ColumnGrouper(some_columns).is_grouping_enabled(group_by=True)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouping_enabled(group_by=False)
 
     def test_is_grouping_disabled(self):
@@ -181,7 +185,7 @@ class TestColumnGrouper:
 
     def test_is_grouping_modified(self):
         assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_modified()
-        assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_modified(group_by=True)
+        assert column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_modified(group_by=True)
         assert column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_modified(group_by=1)
         assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_modified(group_by=False)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouping_modified()
@@ -191,12 +195,12 @@ class TestColumnGrouper:
 
     def test_is_grouping_changed(self):
         assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_changed()
-        assert not column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_changed(group_by=True)
+        assert column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_changed(group_by=True)
         assert column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_changed(group_by=1)
         assert column_grouper.ColumnGrouper(some_columns, group_by=0).is_grouping_changed(group_by=False)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouping_changed()
         assert column_grouper.ColumnGrouper(some_columns).is_grouping_changed(group_by=0)
-        assert not column_grouper.ColumnGrouper(some_columns).is_grouping_changed(group_by=True)
+        assert column_grouper.ColumnGrouper(some_columns).is_grouping_changed(group_by=True)
         assert not column_grouper.ColumnGrouper(some_columns).is_grouping_changed(group_by=False)
 
     def test_check_group_by(self):
@@ -253,13 +257,13 @@ class TestColumnGrouper:
             pd.Int64Index([1, 0], dtype='int64', name='first')
         )
 
-    def test_get_group_counts(self):
+    def test_get_group_lens(self):
         np.testing.assert_array_equal(
-            column_grouper.ColumnGrouper(some_columns).get_group_counts(),
+            column_grouper.ColumnGrouper(some_columns).get_group_lens(),
             np.array([1, 1, 1, 1, 1, 1, 1, 1])
         )
         np.testing.assert_array_equal(
-            column_grouper.ColumnGrouper(some_columns).get_group_counts(group_by=0),
+            column_grouper.ColumnGrouper(some_columns).get_group_lens(group_by=0),
             np.array([4, 4])
         )
 
@@ -2799,6 +2803,10 @@ class TestAccessors:
         pd.testing.assert_frame_equal(df4.vbt.apply(apply_func=lambda x: x ** 2), df4 ** 2)
 
     def test_concat(self):
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.concat(pd.Series([1, 2, 3]), pd.Series([1, 2, 3])),
+            pd.DataFrame({0: pd.Series([1, 2, 3]), 1: pd.Series([1, 2, 3])})
+        )
         target = pd.DataFrame(
             np.array([
                 [1, 1, 1, 10, 10, 10, 1, 2, 3],

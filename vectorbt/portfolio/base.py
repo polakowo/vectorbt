@@ -67,11 +67,11 @@ Date
 >>> result = result.vbt.fshift(1)
 
 >>> # Treat each number as order value in USD
->>> order_size = result / price['Open']
+>>> size = result / price['Open']
 
 >>> # Simulate portfolio
 >>> portfolio = vbt.Portfolio.from_orders(
-...     price['Close'], order_size, order_price=price['Open'],
+...     price['Close'], size, price=price['Open'],
 ...     init_cash=InitCashMode.AutoAlign, fees=0.001, slippage=0.001
 ... )
 
@@ -108,7 +108,7 @@ For example, let's divide our portfolio into two groups sharing the same cash:
 ...     'second', 'second', 'second'
 ... ], name='group')
 >>> comb_portfolio = vbt.Portfolio.from_orders(
-...     price['Close'], order_size, order_price=price['Open'],
+...     price['Close'], size, price=price['Open'],
 ...     init_cash=InitCashMode.AutoAlign, fees=0.001, slippage=0.001,
 ...     group_by=group_by, cash_sharing=True
 ... )
@@ -116,8 +116,8 @@ For example, let's divide our portfolio into two groups sharing the same cash:
 >>> # Get total profit per group
 >>> comb_portfolio.total_profit()
 group
-first     21793.882832
-second     8333.660493
+first     21474.794005
+second     7973.848970
 dtype: float64
 ```
 
@@ -126,12 +126,12 @@ Not only can you analyze each group, but also each column in the group:
 ```python-repl
 >>> # Get total profit per column
 >>> comb_portfolio.total_profit(group_by=False)
-BTC-USD     5166.373585
-ETH-USD    13098.913381
-XRP-USD     3528.595867
-BNB-USD     5345.521391
-BCH-USD     -235.128582
-LTC-USD     3223.267684
+BTC-USD     5101.957521
+ETH-USD    12866.045602
+XRP-USD     3506.790882
+BNB-USD     5065.017577
+BCH-USD     -240.275095
+LTC-USD     3149.106488
 dtype: float64
 ```
 
@@ -141,8 +141,8 @@ In the same way, you can introduce new grouping to the method itself:
 >>> # Get total profit per group
 >>> portfolio.total_profit(group_by=group_by)
 group
-first     21793.882832
-second     8333.660493
+first     21474.794005
+second     7973.848970
 dtype: float64
 ```
 
@@ -159,7 +159,7 @@ indexing operation to each argument with index:
 <vectorbt.portfolio.base.Portfolio at 0x7fac7517ac88>
 
 >>> portfolio['BTC-USD'].total_profit()
-5166.373584618163
+5101.957521326392
 ```
 
 Combined portfolio is indexed by group:
@@ -169,7 +169,7 @@ Combined portfolio is indexed by group:
 <vectorbt.portfolio.base.Portfolio at 0x7fac5756b828>
 
 >>> comb_portfolio['first'].total_profit()
-21793.882832230272
+21474.794005172986
 ```
 
 !!! note
@@ -222,7 +222,7 @@ from vectorbt.portfolio.enums import (
     ConflictMode,
     CallSeqType,
     InitCashMode,
-    SignalType
+    Direction
 )
 from vectorbt.records import Orders, Trades, Positions, Drawdowns
 from vectorbt.records.orders import indexing_on_orders_meta
@@ -380,7 +380,7 @@ class Portfolio(Configured, PandasIndexer):
                      raise_by_reject=None, long_raise_by_reject=None, short_raise_by_reject=None,
                      close_first=None, long_close_first=None, short_close_first=None,
                      accumulate=None, long_accumulate=None, short_accumulate=None,
-                     conflict_mode=None, signal_type=None, val_price=None,
+                     conflict_mode=None, direction=None, val_price=None,
                      init_cash=None, cash_sharing=None, call_seq=None, seed=None, freq=None,
                      group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
         """Simulate portfolio from entry and exit signals.
@@ -401,18 +401,18 @@ class Portfolio(Configured, PandasIndexer):
             entries (array_like of bool): Boolean array of entry signals.
                 Will broadcast.
 
-                Becomes a long signal if `signal_type` is `LongShort` or `Long`, otherwise short.
+                Becomes a long signal if `direction` is `All` or `Long`, otherwise short.
             exits (array_like of bool): Boolean array of exit signals.
                 Will broadcast.
 
-                Becomes a short signal if `signal_type` is `LongShort` or `Long`, otherwise long.
+                Becomes a short signal if `direction` is `All` or `Long`, otherwise long.
             size (float or array_like): Size to order.
                 Will broadcast.
 
                 * Set to any number to buy/sell some fixed amount of shares.
-                * Set to `np.inf` to use all cash. When going short, will borrow the amount
-                    of shares that can be covered by current value; you can still go beyond that
-                    by providing a finite number.
+                * Set to `np.inf` to utilize all cash. When shorting with `-np.inf`, will
+                    borrow the amount of shares that can be covered by current value;
+                    you can still go beyond that by providing a finite number.
                 * Set to `np.nan` or 0 to skip.
 
                 !!! note
@@ -484,7 +484,7 @@ class Portfolio(Configured, PandasIndexer):
                 Will broadcast.
 
                 Otherwise reverses the position with a single order and within the same tick.
-                Takes only effect under `SignalType.LongShort`. Requires a second signal to enter
+                Takes only effect under `Direction.All`. Requires a second signal to enter
                 the opposite position. This allows to define parameters such as `fixed_fees` for long
                 and short positions separately.
             long_close_first (bool or array_like): Overwrites `close_first` for long orders.
@@ -499,7 +499,7 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `accumulate`. Will broadcast.
             conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
                 Will broadcast.
-            signal_type (SignalType or array_like): See `vectorbt.portfolio.enums.SignalType`.
+            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
                 Will broadcast.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price` if set, otherwise to previous `close`.
@@ -507,7 +507,7 @@ class Portfolio(Configured, PandasIndexer):
                 See `val_price` in `Portfolio.from_orders`.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                See `init_cash` in `Portfolio.from_orders`.
+                See `init_cash` in `Portfolio.from_order_func`.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 See `cash_sharing` in `Portfolio.from_orders`.
@@ -551,13 +551,13 @@ class Portfolio(Configured, PandasIndexer):
             >>> import pandas as pd
             >>> import vectorbt as vbt
 
-            >>> price = pd.Series([1, 2, 3, 4, 5])
+            >>> close = pd.Series([1, 2, 3, 4, 5])
             >>> entries = pd.Series([True, True, True, False, False])
             >>> exits = pd.Series([False, False, True, True, True])
 
             >>> # Entry opens long, exit closes long
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1., signal_type='long')
+            ...     close, entries, exits, size=1., direction='long')
             >>> portfolio.share_flow()
             0    1.0
             1    0.0
@@ -568,7 +568,7 @@ class Portfolio(Configured, PandasIndexer):
 
             >>> # Entry opens short, exit closes short
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1., signal_type='short')
+            ...     close, entries, exits, size=1., direction='short')
             >>> portfolio.share_flow()
             0   -1.0
             1    0.0
@@ -580,7 +580,7 @@ class Portfolio(Configured, PandasIndexer):
             >>> # Entry opens long and closes short, exit closes long and opens short
             >>> # Reversal within one tick
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1., signal_type='longshort')
+            ...     close, entries, exits, size=1., direction='all')
             >>> portfolio.share_flow()
             0    1.0
             1    0.0
@@ -592,7 +592,7 @@ class Portfolio(Configured, PandasIndexer):
             >>> # Reversal within two ticks
             >>> # First signal closes position, second signal opens the opposite one
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1., signal_type='longshort',
+            ...     close, entries, exits, size=1., direction='all',
             ...     close_first=True)
             >>> portfolio.share_flow()
             0    1.0
@@ -604,7 +604,7 @@ class Portfolio(Configured, PandasIndexer):
 
             >>> # If entry and exit, chooses exit
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1., signal_type='longshort',
+            ...     close, entries, exits, size=1., direction='all',
             ...     close_first=True, conflict_mode='exit')
             >>> portfolio.share_flow()
             0    1.0
@@ -617,7 +617,7 @@ class Portfolio(Configured, PandasIndexer):
             >>> # Entry means long order, exit means short order
             >>> # Acts similar to `from_orders`
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, size=1., accumulate=True)
+            ...     close, entries, exits, size=1., accumulate=True)
             >>> portfolio.share_flow()
             0    1.0
             1    1.0
@@ -627,13 +627,13 @@ class Portfolio(Configured, PandasIndexer):
             dtype: float64
 
             >>> # Testing multiple parameters (via broadcasting)
-            >>> from vectorbt.portfolio.enums import SignalType
+            >>> from vectorbt.portfolio.enums import Direction
 
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     price, entries, exits, signal_type=[list(SignalType)],
-            ...     broadcast_kwargs=dict(columns_from=SignalType._fields))
+            ...     close, entries, exits, direction=[list(Direction)],
+            ...     broadcast_kwargs=dict(columns_from=Direction._fields))
             >>> portfolio.share_flow()
-                Long  Short  LongShort
+                Long  Short  All
             0  100.0 -100.0      100.0
             1    0.0    0.0        0.0
             2    0.0    0.0        0.0
@@ -717,9 +717,9 @@ class Portfolio(Configured, PandasIndexer):
         if conflict_mode is None:
             conflict_mode = defaults.portfolio['conflict_mode']
         conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
-        if signal_type is None:
-            signal_type = defaults.portfolio['signal_type']
-        signal_type = convert_str_enum_value(SignalType, signal_type)
+        if direction is None:
+            direction = defaults.portfolio['direction']
+        direction = convert_str_enum_value(Direction, direction)
         if val_price is None:
             if price is None:
                 if checks.is_pandas(close):
@@ -777,7 +777,7 @@ class Portfolio(Configured, PandasIndexer):
             long_raise_by_reject, short_raise_by_reject,
             long_close_first, short_close_first,
             long_accumulate, short_accumulate,
-            conflict_mode, signal_type, val_price
+            conflict_mode, direction, val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
         broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
@@ -787,18 +787,18 @@ class Portfolio(Configured, PandasIndexer):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
-        cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
-        init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
-        group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
+        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
+        init_cash = np.broadcast_to(init_cash, (len(cs_group_lens),))
+        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
-            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
+            call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Perform calculation
         order_records = nb.simulate_from_signals_nb(
             target_shape_2d,
-            cs_group_counts,  # group only if cash sharing is enabled to speed up
+            cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
             auto_call_seq,
@@ -819,7 +819,7 @@ class Portfolio(Configured, PandasIndexer):
     @classmethod
     def from_orders(cls, close, size, size_type=None, price=None, fees=None, fixed_fees=None,
                     slippage=None, min_size=None, max_size=None, reject_prob=None, allow_partial=None,
-                    raise_by_reject=None, val_price=None, init_cash=None, cash_sharing=None,
+                    raise_by_reject=None, direction=None, val_price=None, init_cash=None, cash_sharing=None,
                     call_seq=None, freq=None, seed=None, group_by=None, broadcast_kwargs=None,
                     wrapper_kwargs=None, **kwargs):
         """Simulate portfolio from orders.
@@ -835,15 +835,20 @@ class Portfolio(Configured, PandasIndexer):
             size (float or array_like): Size to order.
                 Will broadcast.
 
-                Behavior depends upon `size_type`. For `SizeType.Shares`:
+                Behavior depends upon `size_type` and `direction`. For `SizeType.Shares`:
 
                 * Set to any number to buy/sell some fixed amount of shares.
-                * Set to `np.inf` to use all cash. When going short, will borrow the amount
-                    of shares that can be covered by current value; you can still go beyond that
-                    by providing a finite number.
+                * Set to `np.inf` to utilize all cash. When shorting with `-np.inf`, will
+                    borrow the amount of shares that can be covered by current value;
+                    you can still go beyond that by providing a finite number. If `direction`
+                    is not `all`, will close the position instead of reversal.
                 * Set to `np.nan` or 0 to skip.
 
-                For target size, the final size will depend upon current holdings.
+                For any target size:
+
+                * Set to any number to buy/sell amount of shares relative to current holdings or value.
+                * Set to 0 to close the current position.
+                * Set to `np.nan` to skip.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
                 Will broadcast.
             price (array_like of float): Order price.
@@ -868,6 +873,8 @@ class Portfolio(Configured, PandasIndexer):
                 Does not apply when size is `np.inf`.
             raise_by_reject (bool or array_like): Whether to raise an exception if order gets rejected.
                 Will broadcast.
+            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
+                Will broadcast.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price`. Will broadcast.
 
@@ -880,14 +887,7 @@ class Portfolio(Configured, PandasIndexer):
                     otherwise you're cheating yourself.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                By default, will broadcast to the number of columns.
-                If cash sharing is enabled, will broadcast to the number of groups.
-                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
-
-                !!! note
-                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
-                    to set the same initial cash for all columns/groups. Changing grouping
-                    will change the initial cash, so be aware when indexing.
+                See `init_cash` in `Portfolio.from_order_func`.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
@@ -949,40 +949,76 @@ class Portfolio(Configured, PandasIndexer):
             All broadcastable arguments can be set per frame, series, row, column, or element.
 
         Example:
-            The same equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb`.
-            It's more compact but has no control over how order of execution impacts order price.
-
+            Buy 10 shares each tick:
             ```python-repl
-            >>> import numpy as np
             >>> import pandas as pd
             >>> import vectorbt as vbt
-            >>> from vectorbt.portfolio.enums import SizeType, CallSeqType
 
-            >>> np.random.seed(42)
-            >>> price = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
-            >>> orders = pd.DataFrame(np.full((5, 3), 1.) / 3)  # each column 33.3%
-            >>> orders[1::2] = np.nan  # skip every second tick
+            >>> close = pd.Series([1, 2, 3, 4, 5])
+            >>> portfolio = vbt.Portfolio.from_orders(close, 10)
+
+            >>> portfolio.shares()
+            0    10.0
+            1    20.0
+            2    30.0
+            3    40.0
+            4    40.0
+            dtype: float64
+            >>> portfolio.cash()
+            0    90.0
+            1    70.0
+            2    40.0
+            3     0.0
+            4     0.0
+            dtype: float64
+            ```
+
+            Reverse position each tick:
+            ```python-repl
+            >>> import numpy as np
 
             >>> portfolio = vbt.Portfolio.from_orders(
-            ...     price,  # reference price for portfolio value
-            ...     orders,
-            ...     price=price,  # order price
-            ...     size_type=SizeType.TargetPercent,
-            ...     val_price=price,  # order price known beforehand (don't do it)
-            ...     call_seq=CallSeqType.Auto,  # first sell then buy
-            ...     group_by=np.array([0, 0, 0]),  # one group
-            ...     cash_sharing=True,
-            ...     fees=0.001, fixed_fees=1., slippage=0.001
+            ...     close, [np.inf, -np.inf, np.inf, -np.inf, np.inf])
+
+            >>> portfolio.shares()
+            0    100.000000
+            1   -100.000000
+            2     33.333333
+            3    -33.333333
+            4     20.000000
+            dtype: float64
+            >>> portfolio.cash()
+            0      0.000000
+            1    400.000000
+            2      0.000000
+            3    266.666667
+            4      0.000000
+            dtype: float64
+            ```
+
+            Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+            It's more compact but has less control over execution:
+
+            ```python-repl
+            >>> np.random.seed(42)
+            >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
+            >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
+            >>> size[1::2] = np.nan  # skip every second tick
+
+            >>> portfolio = vbt.Portfolio.from_orders(
+            ...     close,  # acts both as reference and order price here
+            ...     size,
+            ...     size_type='targetpercent',
+            ...     call_seq='auto',  # first sell then buy
+            ...     group_by=True,  # one group
+            ...     cash_sharing=True,  # assets share the same cash
+            ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
             ... )
 
-            >>> portfolio.holding_value(group_by=False)
-                       0          1          2
-            0  33.333333  33.333333  30.139624
-            1  48.716002   8.385865   9.548589
-            2  19.546625  22.584433  22.584433
-            3  94.638155   3.043394  34.278783
-            4  41.923304  38.661499  41.923304
+            >>> portfolio.holding_value(group_by=False).vbt.scatter()
             ```
+
+            ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
         if size is None:
@@ -1008,6 +1044,9 @@ class Portfolio(Configured, PandasIndexer):
             allow_partial = defaults.portfolio['allow_partial']
         if raise_by_reject is None:
             raise_by_reject = defaults.portfolio['raise_by_reject']
+        if direction is None:
+            direction = defaults.portfolio['direction']
+        direction = convert_str_enum_value(Direction, direction)
         if val_price is None:
             val_price = price
         if init_cash is None:
@@ -1056,6 +1095,7 @@ class Portfolio(Configured, PandasIndexer):
             reject_prob,
             allow_partial,
             raise_by_reject,
+            direction,
             val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
@@ -1066,22 +1106,22 @@ class Portfolio(Configured, PandasIndexer):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
-        cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
-        init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
-        group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
+        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
+        init_cash = np.broadcast_to(init_cash, (len(cs_group_lens),))
+        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
-            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
+            call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Perform calculation
         order_records = nb.simulate_from_orders_nb(
             target_shape_2d,
-            cs_group_counts,  # group only if cash sharing is enabled to speed up
+            cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            *broadcasted_args[1:],
             auto_call_seq,
+            *broadcasted_args[1:],
             close.ndim == 2
         )
 
@@ -1097,7 +1137,7 @@ class Portfolio(Configured, PandasIndexer):
 
     @classmethod
     def from_order_func(cls, close, order_func_nb, *order_args, target_shape=None, keys=None,
-                        init_cash=None, cash_sharing=None, call_seq=None, active_mask=None, min_size=None,
+                        init_cash=None, cash_sharing=None, call_seq=None, active_mask=None,
                         prep_func_nb=None, prep_args=None, group_prep_func_nb=None, group_prep_args=None,
                         row_prep_func_nb=None, row_prep_args=None, segment_prep_func_nb=None,
                         segment_prep_args=None, row_wise=None, seed=None, freq=None, group_by=None,
@@ -1109,11 +1149,13 @@ class Portfolio(Configured, PandasIndexer):
         if `row_wise` is True, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
 
         Args:
-            close (array_like): Reference price, such as close. Will broadcast to `target_shape`.
+            close (array_like): Reference price, such as close.
+                Will broadcast to `target_shape`.
 
                 Will be used for calculating unrealized P&L and portfolio value.
 
                 Previous `close` will also be used for valuating assets/groups during the simulation.
+                To use current order price, overwrite it explicitly in `segment_prep_func_nb`.
             order_func_nb (callable): Order generation function.
             *order_args: Arguments passed to `order_func_nb`.
             target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
@@ -1139,12 +1181,14 @@ class Portfolio(Configured, PandasIndexer):
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
-            active_mask (bool or array_like): Mask of whether a particular segment should be executed.
 
-                By default, will broadcast to the number of rows and groups.
-            min_size (float or array_like): Minimum size for an order to be accepted.
+                !!! note
+                    CallSeqType.Auto should be implemented manually.
+                    Use `auto_call_seq_ctx_nb` in `segment_prep_func_nb`.
+            active_mask (int or array_like of bool): Mask of whether a particular segment should be executed.
 
-                Will broadcast to the number of columns.
+                Supplying an integer will activate every n-th row (just for convenience).
+                Supplying a boolean will broadcast to the number of rows and groups.
             prep_func_nb (callable): Simulation preparation function.
             prep_args (tuple): Packed arguments passed to `prep_func_nb`.
 
@@ -1184,6 +1228,140 @@ class Portfolio(Configured, PandasIndexer):
             as their purpose is unknown. You should broadcast manually or use flexible indexing.
 
             Also see notes on `Portfolio.from_orders`.
+
+        Example:
+            Buy 10 shares each tick:
+            ```python-repl
+            >>> import pandas as pd
+            >>> from numba import njit
+            >>> import vectorbt as vbt
+            >>> from vectorbt.portfolio.nb import create_order_nb
+
+            >>> @njit
+            ... def order_func_nb(oc, size):
+            ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
+
+            >>> close = pd.Series([1, 2, 3, 4, 5])
+            >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
+
+            >>> portfolio.shares()
+            0    10.0
+            1    20.0
+            2    30.0
+            3    40.0
+            4    40.0
+            dtype: float64
+            >>> portfolio.cash()
+            0    90.0
+            1    70.0
+            2    40.0
+            3     0.0
+            4     0.0
+            dtype: float64
+            ```
+
+            Reverse each position by first closing it. Keep state of last position to determine
+            which position to open next:
+            ```python-repl
+            >>> import numpy as np
+
+            >>> @njit
+            ... def group_prep_func_nb(gc):
+            ...     last_pos_state = np.array([-1])
+            ...     return (last_pos_state,)
+
+            >>> @njit
+            ... def order_func_nb(oc, last_pos_state):
+            ...     if oc.shares_now > 0:
+            ...         size = -oc.shares_now  # close long
+            ...     elif oc.shares_now < 0:
+            ...         size = -oc.shares_now  # close short
+            ...     else:
+            ...         if last_pos_state[0] == 1:
+            ...             size = -np.inf  # open short
+            ...             last_pos_state[0] = -1
+            ...         else:
+            ...             size = np.inf  # open long
+            ...             last_pos_state[0] = 1
+            ...
+            ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
+
+            >>> portfolio = vbt.Portfolio.from_order_func(
+            ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
+
+            >>> portfolio.shares()
+            0    100.0
+            1      0.0
+            2   -100.0
+            3      0.0
+            4     20.0
+            dtype: float64
+            >>> portfolio.cash()
+            0      0.0
+            1    200.0
+            2    500.0
+            3    100.0
+            4      0.0
+            dtype: float64
+            ```
+
+            Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+            ```python-repl
+            >>> from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
+            >>> from vectorbt.portfolio.enums import SizeType, Direction
+
+            >>> @njit
+            ... def group_prep_func_nb(gc):
+            ...     '''Define empty arrays for each group.'''
+            ...     size = np.empty(gc.group_len, dtype=np.float_)
+            ...     size_type = np.empty(gc.group_len, dtype=np.int_)
+            ...     direction = np.empty(gc.group_len, dtype=np.int_)
+            ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
+            ...     return size, size_type, direction, temp_float_arr
+
+            >>> @njit
+            ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
+            ...     '''Perform rebalancing at each segment.'''
+            ...     for k in range(sc.group_len):
+            ...         col = sc.from_col + k
+            ...         size[k] = 1 / sc.group_len
+            ...         size_type[k] = SizeType.TargetPercent
+            ...         direction[k] = Direction.Long
+            ...         sc.last_val_price[col] = sc.close[sc.i, col]
+            ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
+            ...     return size, size_type, direction
+
+            >>> @njit
+            ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
+            ...     '''Place an order.'''
+            ...     col_i = oc.call_seq_now[oc.call_idx]
+            ...     return create_order_nb(
+            ...         size=size[col_i],
+            ...         size_type=size_type[col_i],
+            ...         price=oc.close[oc.i, oc.col],
+            ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage,
+            ...         direction=direction[col_i]
+            ...     )
+
+            >>> np.random.seed(42)
+            >>> close = np.random.uniform(1, 10, size=(5, 3))
+            >>> fees = 0.001
+            >>> fixed_fees = 1.
+            >>> slippage = 0.001
+
+            >>> portfolio = vbt.Portfolio.from_order_func(
+            ...     close,  # acts both as reference and order price here
+            ...     order_func_nb, fees, fixed_fees, slippage,  # order_args as *args
+            ...     active_mask=2,  # rebalance every second tick
+            ...     group_prep_func_nb=group_prep_func_nb,
+            ...     segment_prep_func_nb=segment_prep_func_nb,
+            ...     cash_sharing=True, group_by=True,  # one group with cash sharing
+            ... )
+
+            >>> portfolio.holding_value(group_by=False).vbt.scatter()
+            ```
+
+            ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
         if not checks.is_pandas(close):
@@ -1207,12 +1385,10 @@ class Portfolio(Configured, PandasIndexer):
         call_seq = convert_str_enum_value(CallSeqType, call_seq)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
-                raise ValueError("CallSeqType.Auto should be implemented manually."
+                raise ValueError("CallSeqType.Auto should be implemented manually. "
                                  "Use auto_call_seq_ctx_nb in segment_prep_func_nb.")
         if active_mask is None:
             active_mask = True
-        if min_size is None:
-            min_size = defaults.portfolio['min_size']
         if row_wise is None:
             row_wise = defaults.portfolio['row_wise']
         if seed is None:
@@ -1230,11 +1406,6 @@ class Portfolio(Configured, PandasIndexer):
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
-        # Perform checks
-        checks.assert_subdtype(close, np.floating)
-        checks.assert_subdtype(init_cash, np.floating)
-        checks.assert_subdtype(call_seq, np.integer)
-
         # Broadcast inputs
         target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
         if close.shape != target_shape:
@@ -1246,21 +1417,25 @@ class Portfolio(Configured, PandasIndexer):
                 tile_times = target_shape_2d[1] // len(close.vbt.columns)
                 close = close.vbt.tile(tile_times, keys=keys)
         close = broadcast(close, to_shape=target_shape, **broadcast_kwargs)
-        min_size = np.require(np.broadcast_to(min_size, (target_shape_2d[1],)), requirements='W')
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
-        cs_group_counts = wrapper.grouper.get_group_counts(group_by=cash_sharing)
-        init_cash = np.broadcast_to(init_cash, (len(cs_group_counts),))
-        group_counts = wrapper.grouper.get_group_counts(group_by=group_by)
-        active_mask = broadcast(
-            active_mask,
-            to_shape=(target_shape_2d[0], len(group_counts)),
-            to_pd=False,
-            **require_kwargs
-        )
+        cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
+        init_cash = np.broadcast_to(init_cash, (len(cs_group_lens),))
+        group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
+        if isinstance(active_mask, int):
+            _active_mask = np.full((target_shape_2d[0], len(group_lens)), False)
+            _active_mask[0::active_mask] = True
+            active_mask = _active_mask
+        else:
+            active_mask = broadcast(
+                active_mask,
+                to_shape=(target_shape_2d[0], len(group_lens)),
+                to_pd=False,
+                **require_kwargs
+            )
         if checks.is_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
-            call_seq = nb.build_call_seq(target_shape_2d, group_counts, call_seq_type=call_seq)
+            call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Prepare arguments
         if prep_func_nb is None:
@@ -1285,12 +1460,11 @@ class Portfolio(Configured, PandasIndexer):
             order_records = nb.simulate_row_wise_nb(
                 target_shape_2d,
                 to_2d(close, raw=True),
-                group_counts,
+                group_lens,
                 init_cash,
                 cash_sharing,
                 call_seq,
                 active_mask,
-                min_size,
                 prep_func_nb,
                 prep_args,
                 row_prep_func_nb,
@@ -1304,12 +1478,11 @@ class Portfolio(Configured, PandasIndexer):
             order_records = nb.simulate_nb(
                 target_shape_2d,
                 to_2d(close, raw=True),
-                group_counts,
+                group_lens,
                 init_cash,
                 cash_sharing,
                 call_seq,
                 active_mask,
-                min_size,
                 prep_func_nb,
                 prep_args,
                 group_prep_func_nb,
@@ -1447,8 +1620,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get position mask per column/group."""
         shares = to_2d(self.shares(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            pos_mask = nb.pos_mask_nb(shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            pos_mask = nb.pos_mask_nb(shares, group_lens)
         else:
             pos_mask = shares != 0
         return self.wrapper.wrap(pos_mask, group_by=group_by)
@@ -1458,8 +1631,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get long position mask per column/group."""
         shares = to_2d(self.shares(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            long_pos_mask = nb.long_pos_mask_nb(shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            long_pos_mask = nb.long_pos_mask_nb(shares, group_lens)
         else:
             long_pos_mask = shares > 0
         return self.wrapper.wrap(long_pos_mask, group_by=group_by)
@@ -1469,8 +1642,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get short position mask per column/group."""
         shares = to_2d(self.shares(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            short_pos_mask = nb.short_pos_mask_nb(shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            short_pos_mask = nb.short_pos_mask_nb(shares, group_lens)
         else:
             short_pos_mask = shares < 0
         return self.wrapper.wrap(short_pos_mask, group_by=group_by)
@@ -1480,8 +1653,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get position coverage per column/group."""
         shares = to_2d(self.shares(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            pos_coverage = nb.pos_duration_nb(shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            pos_coverage = nb.pos_duration_nb(shares, group_lens)
         else:
             pos_coverage = np.mean(shares != 0, axis=0)
         return self.wrapper.wrap_reduced(pos_coverage, group_by=group_by)
@@ -1491,8 +1664,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get long position coverage per column/group."""
         shares = to_2d(self.shares(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            long_pos_coverage = nb.long_pos_duration_nb(shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            long_pos_coverage = nb.long_pos_duration_nb(shares, group_lens)
         else:
             long_pos_coverage = np.mean(shares > 0, axis=0)
         return self.wrapper.wrap_reduced(long_pos_coverage, group_by=group_by)
@@ -1502,8 +1675,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get short position coverage per column/group."""
         shares = to_2d(self.shares(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            short_pos_coverage = nb.short_pos_duration_nb(shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            short_pos_coverage = nb.short_pos_duration_nb(shares, group_lens)
         else:
             short_pos_coverage = np.mean(shares < 0, axis=0)
         return self.wrapper.wrap_reduced(short_pos_coverage, group_by=group_by)
@@ -1515,8 +1688,8 @@ class Portfolio(Configured, PandasIndexer):
         """Get cash flow series per column/group."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             cash_flow_ungrouped = to_2d(self.cash_flow(group_by=False), raw=True)
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            cash_flow = nb.cash_flow_grouped_nb(cash_flow_ungrouped, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            cash_flow = nb.cash_flow_grouped_nb(cash_flow_ungrouped, group_lens)
         else:
             cash_flow = nb.cash_flow_ungrouped_nb(self.wrapper.shape_2d, self._orders.records_arr)
         return self.wrapper.wrap(cash_flow, group_by=group_by)
@@ -1538,11 +1711,11 @@ class Portfolio(Configured, PandasIndexer):
         else:
             init_cash = to_1d(self._init_cash, raw=True)
             if self.wrapper.grouper.is_grouped(group_by=group_by):
-                group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-                init_cash = nb.init_cash_grouped_nb(init_cash, group_counts, self.cash_sharing)
+                group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+                init_cash = nb.init_cash_grouped_nb(init_cash, group_lens, self.cash_sharing)
             else:
-                group_counts = self.wrapper.grouper.get_group_counts()
-                init_cash = nb.init_cash_ungrouped_nb(init_cash, group_counts, self.cash_sharing)
+                group_lens = self.wrapper.grouper.get_group_lens()
+                init_cash = nb.init_cash_ungrouped_nb(init_cash, group_lens, self.cash_sharing)
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by)
 
     @cached_method
@@ -1553,21 +1726,21 @@ class Portfolio(Configured, PandasIndexer):
 
         cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
             cash = nb.cash_grouped_nb(
                 self.wrapper.shape_2d,
                 cash_flow,
-                group_counts,
+                group_lens,
                 init_cash
             )
         else:
-            group_counts = self.wrapper.grouper.get_group_counts()
+            group_lens = self.wrapper.grouper.get_group_lens()
             init_cash = to_1d(self.init_cash(group_by=in_sim_order), raw=True)
             call_seq = to_2d(self.call_seq, raw=True)
             cash = nb.cash_ungrouped_nb(
                 cash_flow,
-                group_counts,
+                group_lens,
                 init_cash,
                 call_seq,
                 in_sim_order
@@ -1583,8 +1756,8 @@ class Portfolio(Configured, PandasIndexer):
         shares = to_2d(self.shares(), raw=True)
         close[shares == 0] = 0.  # for price being NaN
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            holding_value = nb.holding_value_grouped_nb(close, shares, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            holding_value = nb.holding_value_grouped_nb(close, shares, group_lens)
         else:
             holding_value = nb.holding_value_ungrouped_nb(close, shares)
         return self.wrapper.wrap(holding_value, group_by=group_by)
@@ -1604,9 +1777,9 @@ class Portfolio(Configured, PandasIndexer):
         cash = to_2d(self.cash(group_by=group_by, in_sim_order=in_sim_order), raw=True)
         holding_value = to_2d(self.holding_value(group_by=group_by), raw=True)
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
-            group_counts = self.wrapper.grouper.get_group_counts()
+            group_lens = self.wrapper.grouper.get_group_lens()
             call_seq = to_2d(self.call_seq, raw=True)
-            value = nb.value_in_sim_order_nb(cash, holding_value, group_counts, call_seq)
+            value = nb.value_in_sim_order_nb(cash, holding_value, group_lens, call_seq)
             # price of NaN is already addressed by ungrouped_value_nb
         else:
             value = nb.value_nb(cash, holding_value)
@@ -1619,10 +1792,10 @@ class Portfolio(Configured, PandasIndexer):
         Calculated directly from order records. Very fast."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             total_profit_ungrouped = to_1d(self.total_profit(group_by=False), raw=True)
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             total_profit = nb.total_profit_grouped_nb(
                 total_profit_ungrouped,
-                group_counts
+                group_lens
             )
         else:
             close = to_2d(self.fill_close(), raw=True)
@@ -1656,10 +1829,10 @@ class Portfolio(Configured, PandasIndexer):
         """Get return series per column/group based on portfolio value."""
         value = to_2d(self.value(group_by=group_by, in_sim_order=in_sim_order), raw=True)
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
-            group_counts = self.wrapper.grouper.get_group_counts()
+            group_lens = self.wrapper.grouper.get_group_lens()
             init_cash_grouped = to_1d(self.init_cash(), raw=True)
             call_seq = to_2d(self.call_seq, raw=True)
-            returns = nb.returns_in_sim_order_nb(value, group_counts, init_cash_grouped, call_seq)
+            returns = nb.returns_in_sim_order_nb(value, group_lens, init_cash_grouped, call_seq)
         else:
             init_cash = to_1d(self.init_cash(group_by=group_by), raw=True)
             returns = nb.returns_nb(value, init_cash)
@@ -1689,8 +1862,8 @@ class Portfolio(Configured, PandasIndexer):
             Does not take into account fees and slippage. For this, create a separate portfolio."""
         ref_price_filled = to_2d(self.fill_close(), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            group_counts = self.wrapper.grouper.get_group_counts(group_by=group_by)
-            total_return = nb.buy_and_hold_return_grouped_nb(ref_price_filled, group_counts)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            total_return = nb.buy_and_hold_return_grouped_nb(ref_price_filled, group_lens)
         else:
             total_return = nb.buy_and_hold_return_ungrouped_nb(ref_price_filled)
         return self.wrapper.wrap_reduced(total_return, group_by=group_by)

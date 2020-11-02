@@ -137,9 +137,9 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
 
             # Get indices of selected groups corresponding to the new columns
             # We could do obj.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
-            group_counts = obj.grouper.get_group_counts()[group_idxs_arr]
+            group_lens = obj.grouper.get_group_lens()[group_idxs_arr]
             ungrouped_group_idxs = np.full(len(ungrouped_columns), 0)
-            ungrouped_group_idxs[group_counts[:-1]] = 1
+            ungrouped_group_idxs[group_lens[:-1]] = 1
             ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
 
             return obj.copy(
@@ -316,6 +316,8 @@ class ArrayWrapper(Configured, PandasIndexer):
     def grouped_ndim(self):
         """Number of dimensions under column grouping."""
         if self._grouped_ndim is None:
+            if self.grouper.is_grouped():
+                return 2 if self.grouper.get_group_count() > 1 else 1
             return self.ndim
         return self._grouped_ndim
 

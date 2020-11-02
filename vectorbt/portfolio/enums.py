@@ -13,12 +13,11 @@ __pdoc__ = {}
 SimulationContext = namedtuple('SimulationContext', [
     'target_shape',
     'close',
-    'group_counts',
+    'group_lens',
     'init_cash',
     'cash_sharing',
     'call_seq',
     'active_mask',
-    'min_size',
     'order_records',
     'record_mask',
     'last_cash',
@@ -35,13 +34,13 @@ __pdoc__['SimulationContext.close'] = """Reference price, such as close.
 
 Has shape `target_shape`.
 """
-__pdoc__['SimulationContext.group_counts'] = """Column count per group.
+__pdoc__['SimulationContext.group_lens'] = """Column count per group.
 
-Even if columns are not grouped, `group_counts` contains ones - one column per group.
+Even if columns are not grouped, `group_lens` contains ones - one column per group.
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column, or per group if cash sharing is enabled.
 
-If `cash_sharing` is True, has shape `(target_shape[0], group_counts.shape[0])`. 
+If `cash_sharing` is True, has shape `(target_shape[0], group_lens.shape[0])`. 
 Otherwise, has shape `target_shape`.
 """
 __pdoc__['SimulationContext.cash_sharing'] = """Whether cash sharing is enabled."""
@@ -58,11 +57,7 @@ __pdoc__['SimulationContext.active_mask'] = """Mask of whether a particular segm
 
 A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
-Has shape `(target_shape[0], group_counts.shape[0])`.
-"""
-__pdoc__['SimulationContext.min_size'] = """Minimum size for an order to be accepted.
-
-Has shape `(target_shape[1],)`.
+Has shape `(target_shape[0], group_lens.shape[0])`.
 """
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
@@ -109,11 +104,11 @@ for field in SimulationContext._fields:
     __pdoc__[f'GroupContext.{field}'] = f"See `SimulationContext.{field}`."
 __pdoc__['GroupContext.group'] = """Index of the group.
 
-Has range `[0, group_counts.shape[0])`.
+Has range `[0, group_lens.shape[0])`.
 """
 __pdoc__['GroupContext.group_len'] = """Number of columns in the group.
 
-Scalar value. Same as `group_counts[group]`.
+Scalar value. Same as `group_lens[group]`.
 """
 __pdoc__['GroupContext.from_col'] = """Index of the first column in the group.
 
@@ -313,7 +308,8 @@ Order = namedtuple('Order', [
     'max_size',
     'reject_prob',
     'allow_partial',
-    'raise_by_reject'
+    'raise_by_reject',
+    'direction'
 ])
 
 __pdoc__['Order'] = "A named tuple representing an order."
@@ -328,8 +324,9 @@ __pdoc__['Order.max_size'] = "Maximum size. Higher than that will be cut."
 __pdoc__['Order.reject_prob'] = "Probability of rejecting this order."
 __pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
 __pdoc__['Order.raise_by_reject'] = "Whether to raise exception if order has been rejected."
+__pdoc__['Order.direction'] = "See `Direction`."
 
-NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False)
+NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False, -1)
 """_"""
 
 __pdoc__['NoOrder'] = "Order that will not be processed."
@@ -381,24 +378,24 @@ class RejectedOrderError(Exception):
     pass
 
 
-# ############# SignalType ############# #
+# ############# Direction ############# #
 
-SignalType = namedtuple('SignalType', [
+Direction = namedtuple('Direction', [
     'Long',
     'Short',
-    'LongShort'
+    'All'
 ])(*range(3))
 """_"""
 
-__pdoc__['SignalType'] = f"""Signal type.
+__pdoc__['Direction'] = f"""Position direction.
 
 ```plaintext
-{json.dumps(dict(zip(SignalType._fields, SignalType)), indent=2)}
+{json.dumps(dict(zip(Direction._fields, Direction)), indent=2)}
 ```
 
 Attributes:
-    Long: Entry signal to go long, exit signal to close the long position.
-    Short: Entry signal to go short, exit signal to close the short position.
-    LongShort: Entry signal to go long, exit signal to go short.
+    Long: Only long positions.
+    Short: Only short positions.
+    All: Both long and short positions.
 """
 

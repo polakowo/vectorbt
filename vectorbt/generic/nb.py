@@ -893,30 +893,30 @@ def reduce_to_array_nb(a, reduce_func_nb, *args):
 
 
 @njit
-def reduce_grouped_nb(a, group_counts, reduce_func_nb, *args):
+def reduce_grouped_nb(a, group_lens, reduce_func_nb, *args):
     """Reduce each group of columns a single value using `reduce_func_nb`.
 
     `reduce_func_nb` should accept index of the row, index of the group,
     the array, and `*args`. Should return a single value."""
-    out = np.empty(len(group_counts), dtype=np.float_)
+    out = np.empty(len(group_lens), dtype=np.float_)
     from_col = 0
-    for group in range(len(group_counts)):
-        to_col = from_col + group_counts[group]
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
         out[group] = reduce_func_nb(group, a[:, from_col:to_col], *args)
         from_col = to_col
     return out
 
 
 @njit
-def reduce_grouped_row_wise_nb(a, group_counts, reduce_func_nb, *args):
+def reduce_grouped_row_wise_nb(a, group_lens, reduce_func_nb, *args):
     """Reduce each row in a group of columns into a single value using `reduce_func_nb`.
 
     `reduce_func_nb` should accept index of the row, index of the group,
     the array, and `*args`. Should return a single value."""
-    out = np.empty((a.shape[0], len(group_counts)), dtype=np.float_)
+    out = np.empty((a.shape[0], len(group_lens)), dtype=np.float_)
     from_col = 0
-    for group in range(len(group_counts)):
-        to_col = from_col + group_counts[group]
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
         for i in range(a.shape[0]):
             out[i, group] = reduce_func_nb(i, group, a[i, from_col:to_col], *args)
         from_col = to_col

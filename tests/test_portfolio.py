@@ -45,19 +45,19 @@ big_price_wide = big_price.vbt.tile(1000)
 # ############# nb ############# #
 
 def test_build_call_seq_nb():
-    group_counts = np.array([1, 2, 3, 4])
+    group_lens = np.array([1, 2, 3, 4])
     np.testing.assert_array_equal(
-        build_call_seq_nb((10, 10), group_counts, CallSeqType.Default),
-        build_call_seq((10, 10), group_counts, CallSeqType.Default)
+        build_call_seq_nb((10, 10), group_lens, CallSeqType.Default),
+        build_call_seq((10, 10), group_lens, CallSeqType.Default)
     )
     np.testing.assert_array_equal(
-        build_call_seq_nb((10, 10), group_counts, CallSeqType.Reversed),
-        build_call_seq((10, 10), group_counts, CallSeqType.Reversed)
+        build_call_seq_nb((10, 10), group_lens, CallSeqType.Reversed),
+        build_call_seq((10, 10), group_lens, CallSeqType.Reversed)
     )
     set_seed(seed)
-    out1 = build_call_seq_nb((10, 10), group_counts, CallSeqType.Random)
+    out1 = build_call_seq_nb((10, 10), group_lens, CallSeqType.Random)
     set_seed(seed)
-    out2 = build_call_seq((10, 10), group_counts, CallSeqType.Random)
+    out2 = build_call_seq((10, 10), group_lens, CallSeqType.Random)
     np.testing.assert_array_equal(out1, out2)
 
 

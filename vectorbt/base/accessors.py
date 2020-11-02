@@ -327,9 +327,9 @@ class Base_Accessor(ArrayWrapper):
             objs = (self_or_cls._obj,) + others
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
         broadcasted = tuple(map(reshape_fns.to_2d, broadcasted))
-        concatenated = pd.concat(broadcasted, axis=1)
-        if keys is not None:
-            concatenated.columns = index_fns.combine_indexes(keys, broadcasted[0].columns)
+        concatenated = pd.concat(broadcasted, axis=1, keys=keys)
+        if np.all(concatenated.columns == 0):
+            concatenated.columns = pd.RangeIndex(start=0, stop=len(concatenated.columns), step=1)
         return concatenated
 
     def apply_and_concat(self, ntimes, *args, apply_func=None, to_2d=False, keys=None, **kwargs):

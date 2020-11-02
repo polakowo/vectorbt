@@ -317,7 +317,7 @@ class BaseEvents(Records):
     def coverage(self, group_by=None, **kwargs):
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
-        total_steps = self.wrapper.grouper.get_group_counts(group_by=group_by) * self.wrapper.shape[0]
+        total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
         return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **kwargs)
 
     @cached_property

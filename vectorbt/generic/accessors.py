@@ -465,11 +465,11 @@ class Generic_Accessor(Base_Accessor):
             raise ValueError("Grouping required")
         checks.assert_numba_func(reduce_func_nb)
 
-        group_counts = self.grouper.get_group_counts(group_by=group_by)
+        group_lens = self.grouper.get_group_lens(group_by=group_by)
         if row_wise:
-            out = nb.reduce_grouped_row_wise_nb(self.to_2d_array(), group_counts, reduce_func_nb, *args)
+            out = nb.reduce_grouped_row_wise_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
         else:
-            out = nb.reduce_grouped_nb(self.to_2d_array(), group_counts, reduce_func_nb, *args)
+            out = nb.reduce_grouped_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
         return self.wrap_reduced(out, group_by=group_by, **kwargs)
 
     def min(self, **kwargs):

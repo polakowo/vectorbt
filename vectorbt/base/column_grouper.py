@@ -16,9 +16,10 @@ def group_by_to_index(index, group_by):
 
     !!! note
         Index and mapper must have the same length."""
-    if group_by is None or isinstance(group_by, bool):
+    if group_by is None or group_by is False:
         return group_by
-
+    if group_by is True:
+        group_by = pd.Index(np.full(len(index), 0))  # one group
     if isinstance(group_by, (int, str, tuple, list)):
         group_by = index_fns.select_levels(index, group_by)
     if not isinstance(group_by, pd.Index):
@@ -31,7 +32,7 @@ def group_by_to_index(index, group_by):
 def get_groups_and_index(index, group_by):
     """Return array of group indices pointing to the original index, and grouped index.
     """
-    if group_by is None or isinstance(group_by, bool):
+    if group_by is None or group_by is False:
         return np.arange(len(index)), index
 
     group_by = group_by_to_index(index, group_by)
@@ -48,7 +49,7 @@ def get_groups_and_index(index, group_by):
 
 
 @njit(cache=True)
-def get_group_counts_nb(groups):
+def get_group_lens_nb(groups):
     """Return count per group."""
     result = np.empty(groups.shape[0], dtype=np.int_)
     j = 0
@@ -77,8 +78,14 @@ def get_group_counts_nb(groups):
 class ColumnGrouper(Configured):
     """Class that exposes methods to group columns.
 
-    `group_by` can be integer (level by position), string (level by name), tuple or list
-    (multiple levels), index or series (named index with groups), or NumPy array (raw groups).
+    `group_by` can be:
+
+    * boolean (False for no grouping, True for one group),
+    * integer (level by position),
+    * string (level by name),
+    * tuple or list (multiple levels),
+    * index or series (named index with groups),
+    * or NumPy array (raw groups).
 
     Set `allow_enable` to False to prohibit grouping if `ColumnGrouper.group_by` is None.
     Set `allow_disable` to False to prohibit disabling of grouping if `ColumnGrouper.group_by` is not None.
@@ -104,7 +111,7 @@ class ColumnGrouper(Configured):
 
         checks.assert_not_none(columns)
         self._columns = columns
-        if group_by is None or isinstance(group_by, bool):
+        if group_by is None or group_by is False:
             self._group_by = None
         else:
             self._group_by = group_by_to_index(columns, group_by)
@@ -143,7 +150,7 @@ class ColumnGrouper(Configured):
         """Check whether columns are grouped."""
         if group_by is False:
             return False
-        if group_by is None or group_by is True:
+        if group_by is None:
             group_by = self.group_by
         return group_by is not None
 
@@ -190,7 +197,7 @@ class ColumnGrouper(Configured):
 
     def resolve_group_by(self, group_by=None, **kwargs):
         """Resolve `group_by` from either object variable or keyword argument."""
-        if group_by is None or group_by is True:
+        if group_by is None:
             group_by = self.group_by
         if group_by is False and self.group_by is None:
             group_by = None
@@ -212,22 +219,27 @@ class ColumnGrouper(Configured):
         return self.get_groups_and_columns(**kwargs)[1]
 
     @cached_method
-    def get_group_counts(self, **kwargs):
-        """See get_group_counts_nb."""
+    def get_group_lens(self, **kwargs):
+        """See get_group_lens_nb."""
         group_by = self.resolve_group_by(**kwargs)
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.columns), 1)
         groups = self.get_groups(**kwargs)
-        return get_group_counts_nb(groups)
+        return get_group_lens_nb(groups)
+
+    @cached_method
+    def get_group_count(self, **kwargs):
+        """Get number of groups."""
+        return len(self.get_group_lens(**kwargs))
 
     @cached_method
     def get_group_start_idxs(self, **kwargs):
         """Get first index of each group as an array."""
-        group_counts = self.get_group_counts(**kwargs)
-        return np.cumsum(group_counts) - group_counts
+        group_lens = self.get_group_lens(**kwargs)
+        return np.cumsum(group_lens) - group_lens
 
     @cached_method
     def get_group_end_idxs(self, **kwargs):
         """Get end index of each group as an array."""
-        group_counts = self.get_group_counts(**kwargs)
-        return np.cumsum(group_counts)
+        group_lens = self.get_group_lens(**kwargs)
+        return np.cumsum(group_lens)
