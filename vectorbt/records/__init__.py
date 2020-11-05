@@ -143,10 +143,6 @@ to generate trade records from order records. This is done automatically in the
 `vectorbt.records.events.Positions` class has the same properties as trades and is also
 natively supported by `vectorbt.portfolio.base.Portfolio`.
 
-## Enums
-
-`vectorbt.records.enums` defines schemas for all records used across vectorbt.
-
 ## Numba-compiled functions
 
 `vectorbt.records.nb` provides an arsenal of Numba-compiled functions that are used for generating,
@@ -154,17 +150,8 @@ mapping, and reducing records. These only accept NumPy arrays and other Numba-co
 
 """
 
-from vectorbt.records.enums import (
-    DrawdownStatus,
-    drawdown_dt,
-    OrderSide,
-    order_dt,
-    event_dt,
-    EventStatus,
-    trade_dt,
-    position_dt
-)
 from vectorbt.records.base import MappedArray, Records
 from vectorbt.records.orders import Orders
 from vectorbt.records.events import Events, Trades, Positions
 from vectorbt.records.drawdowns import Drawdowns
+from vectorbt.records.logs import Logs

@@ -1,11 +1,5 @@
 """Enum utilities."""
 
-import numpy as np
-import pandas as pd
-
-from vectorbt.utils.checks import assert_in, assert_type
-import warnings
-
 
 def caseins_getattr(enum, attr):
     """Case-insensitive `getattr` for enumerated types."""
@@ -40,3 +34,13 @@ def convert_str_enum_value(enum, value):
                 value[i] = _converter(value[i])
         return value_type(value)
     return value
+
+
+def create_value_map(enum):
+    """Create value map from enumerated type."""
+    value_map = dict(zip(tuple(enum), enum._fields))
+    if -1 not in value_map:
+        value_map[-1] = None
+    return value_map
+
+

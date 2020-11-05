@@ -486,7 +486,7 @@ class Signals_Accessor(Generic_Accessor):
 
         Example:
             ```python-repl
-            >>> from vectorbt.signals.enums import StopType
+            >>> from vectorbt.enums import StopType
 
             >>> price = pd.DataFrame({
             ...     'open': [10, 11, 12, 11, 10],

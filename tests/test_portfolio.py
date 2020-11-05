@@ -6,20 +6,24 @@ from datetime import datetime, timedelta
 import pytest
 
 import vectorbt as vbt
-from vectorbt import defaults
-from vectorbt.utils.random import set_seed
-from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.portfolio.enums import (
+from vectorbt.enums import (
     SizeType,
-    AccumulationMode,
+    Direction,
     ConflictMode,
     CallSeqType,
     Order,
     NoOrder,
-    InitCashMode
+    OrderResult,
+    InitCashMode,
+    order_dt,
+    trade_dt,
+    position_dt,
+    debug_info_dt
 )
-from vectorbt.portfolio.nb import auto_call_seq_ctx_nb, build_call_seq_nb, build_call_seq
-from vectorbt.records import order_dt, trade_dt, position_dt
+from vectorbt import defaults
+from vectorbt.utils.random import set_seed
+from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.portfolio import nb
 
 from tests.utils import record_arrays_close
 
@@ -44,20 +48,377 @@ big_price_wide = big_price.vbt.tile(1000)
 
 # ############# nb ############# #
 
+def assert_same_tuple(tup1, tup2):
+    for i in range(len(tup1)):
+        assert tup1[i] == tup2[i] or np.isnan(tup1[i]) and np.isnan(tup2[i])
+
+
+def test_process_order_nb():
+    # Errors, ignored and rejected orders
+    debug_info_record = np.empty(1, dtype=debug_info_dt)[0]
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=0))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=10), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=1))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, -100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, np.nan, 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., np.inf, 10., 1100.,
+            nb.create_order_nb(size=10, price=10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., np.nan, 10., 1100.,
+            nb.create_order_nb(size=10, price=10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., np.inf, 1100.,
+            nb.create_order_nb(size=10, price=10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., -10., 1100.,
+            nb.create_order_nb(size=10, price=10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., -100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, direction=Direction.Long), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, direction=Direction.Short), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=np.inf), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=-10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, fees=np.inf), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, fees=-1), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, fixed_fees=np.inf), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, fixed_fees=-1), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, slippage=np.inf), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, slippage=-1), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, min_size=np.inf), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, min_size=-1), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, max_size=0), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, max_size=-10), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, reject_prob=np.nan), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, reject_prob=-1), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, reject_prob=2), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., np.nan,
+        nb.create_order_nb(size=1, price=10, size_type=SizeType.TargetPercent), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=3))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., np.nan, 1100.,
+        nb.create_order_nb(size=10, price=10, size_type=SizeType.TargetValue), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=2))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=15, price=10, max_size=10, allow_partial=False, raise_reject=True),
+            debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=15, price=10, max_size=10, allow_partial=False), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, reject_prob=1., raise_reject=True), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=10, price=10, reject_prob=1.), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=8))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, np.inf, 100., 10., 1100.,
+            nb.create_order_nb(size=np.inf, price=10, direction=Direction.Long), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, np.inf, 100., 10., 1100.,
+            nb.create_order_nb(size=np.inf, price=10, direction=Direction.All), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 1100.,
+        nb.create_order_nb(size=-10, price=10, direction=Direction.Short), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 0.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=6))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., np.inf,
+            nb.create_order_nb(size=np.inf, price=10, direction=Direction.Short), debug_info_record)
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., np.inf,
+            nb.create_order_nb(size=-np.inf, price=10, direction=Direction.All), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 1100.,
+        nb.create_order_nb(size=-10, price=10, direction=Direction.Long), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 0.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=5))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, fixed_fees=100, raise_reject=True), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=10, price=10, fixed_fees=100), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=9))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=10, price=10, min_size=100, raise_reject=True), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=10, price=10, min_size=100), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=10))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=100, price=10, allow_partial=False, raise_reject=True), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=100, price=10, allow_partial=False), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=11))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=-10, price=10, min_size=100, raise_reject=True), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=-10, price=10, min_size=100), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=10))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=-200, price=10, direction=Direction.Long, allow_partial=False,
+                               raise_reject=True),
+            debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=-200, price=10, direction=Direction.Long, allow_partial=False), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=11))
+    with pytest.raises(Exception) as e_info:
+        cash_now, shares_now, order_result = nb.process_order_nb(
+            0, 0, 0, 100., 100., 10., 1100.,
+            nb.create_order_nb(size=-10, price=10, fixed_fees=1000, raise_reject=True), debug_info_record)
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 100., 10., 1100.,
+        nb.create_order_nb(size=-10, price=10, fixed_fees=1000), debug_info_record)
+    assert cash_now == 100.
+    assert shares_now == 100.
+    assert_same_tuple(order_result, OrderResult(
+        size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=9))
+
+    # Calculations
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=10, price=10, fees=0.1, fixed_fees=1, slippage=0.1), debug_info_record)
+    assert cash_now == 0.
+    assert shares_now == 8.18181818181818
+    assert_same_tuple(order_result, OrderResult(
+        size=8.18181818181818, price=11.0, fees=10.000000000000014, side=0, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=100, price=10, fees=0.1, fixed_fees=1, slippage=0.1), debug_info_record)
+    assert cash_now == 0.
+    assert shares_now == 8.18181818181818
+    assert_same_tuple(order_result, OrderResult(
+        size=8.18181818181818, price=11.0, fees=10.000000000000014, side=0, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-10, price=10, fees=0.1, fixed_fees=1, slippage=0.1), debug_info_record)
+    assert cash_now == 180.
+    assert shares_now == -10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10.0, price=9.0, fees=10.0, side=1, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-100, price=10, fees=0.1, fixed_fees=1, slippage=0.1), debug_info_record)
+    assert cash_now == 909.
+    assert shares_now == -100.
+    assert_same_tuple(order_result, OrderResult(
+        size=100.0, price=9.0, fees=91.0, side=1, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=10, price=10, size_type=SizeType.TargetShares), debug_info_record)
+    assert cash_now == 0.
+    assert shares_now == 10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-10, price=10, size_type=SizeType.TargetShares), debug_info_record)
+    assert cash_now == 200.
+    assert shares_now == -10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=100, price=10, size_type=SizeType.TargetValue), debug_info_record)
+    assert cash_now == 0.
+    assert shares_now == 10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-100, price=10, size_type=SizeType.TargetValue), debug_info_record)
+    assert cash_now == 200.
+    assert shares_now == -10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=1, price=10, size_type=SizeType.TargetPercent), debug_info_record)
+    assert cash_now == 0.
+    assert shares_now == 10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-1, price=10, size_type=SizeType.TargetPercent), debug_info_record)
+    assert cash_now == 200.
+    assert shares_now == -10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=np.inf, price=10), debug_info_record)
+    assert cash_now == 0.
+    assert shares_now == 10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
+    cash_now, shares_now, order_result = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-np.inf, price=10), debug_info_record)
+    assert cash_now == 200.
+    assert shares_now == -10.
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
+
+    # Debugging
+    _ = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(debug=True), debug_info_record)
+    assert_same_tuple(debug_info_record, (
+        0, 0, 0, 100., 0., 10., 100., np.nan, 0, np.nan, 0., 0., 0., 0., np.inf, 0.,
+        True, False, 2, 100., 0., np.nan, np.nan, np.nan, -1, 1, 0))
+    _ = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=np.inf, price=10, debug=True), debug_info_record)
+    assert_same_tuple(debug_info_record, (
+        0, 0, 0, 100., 0., 10., 100., np.inf, 0, 10., 0., 0., 0., 0., np.inf, 0.,
+        True, False, 2, 0., 10., 10., 10., 0., 0, 0, -1))
+    _ = nb.process_order_nb(
+        0, 0, 0, 100., 0., 10., 100.,
+        nb.create_order_nb(size=-np.inf, price=10, debug=True), debug_info_record)
+    assert_same_tuple(debug_info_record, (
+        0, 0, 0, 100., 0., 10., 100., -np.inf, 0, 10., 0., 0., 0., 0., np.inf, 0.,
+        True, False, 2, 200., -10., 10., 10., 0., 1, 0, -1))
+
+
 def test_build_call_seq_nb():
     group_lens = np.array([1, 2, 3, 4])
     np.testing.assert_array_equal(
-        build_call_seq_nb((10, 10), group_lens, CallSeqType.Default),
-        build_call_seq((10, 10), group_lens, CallSeqType.Default)
+        nb.build_call_seq_nb((10, 10), group_lens, CallSeqType.Default),
+        nb.build_call_seq((10, 10), group_lens, CallSeqType.Default)
     )
     np.testing.assert_array_equal(
-        build_call_seq_nb((10, 10), group_lens, CallSeqType.Reversed),
-        build_call_seq((10, 10), group_lens, CallSeqType.Reversed)
+        nb.build_call_seq_nb((10, 10), group_lens, CallSeqType.Reversed),
+        nb.build_call_seq((10, 10), group_lens, CallSeqType.Reversed)
     )
     set_seed(seed)
-    out1 = build_call_seq_nb((10, 10), group_lens, CallSeqType.Random)
+    out1 = nb.build_call_seq_nb((10, 10), group_lens, CallSeqType.Random)
     set_seed(seed)
-    out2 = build_call_seq((10, 10), group_lens, CallSeqType.Random)
+    out2 = nb.build_call_seq((10, 10), group_lens, CallSeqType.Random)
     np.testing.assert_array_equal(out1, out2)
 
 

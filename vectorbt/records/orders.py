@@ -4,13 +4,13 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from vectorbt.enums import order_dt, OrderSide
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.config import Configured
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.records.base import Records, indexing_on_records_meta
-from vectorbt.records.enums import OrderSide, order_dt
 
 
 def indexing_on_orders_meta(obj, pd_indexing_func):
@@ -24,7 +24,7 @@ def indexing_on_orders_meta(obj, pd_indexing_func):
     ), group_idxs, col_idxs
 
 
-def _indexing_func(obj, pd_indexing_func):
+def orders_indexing_func(obj, pd_indexing_func):
     """See `indexing_on_orders`."""
     return indexing_on_orders_meta(obj, pd_indexing_func)[0]
 
@@ -69,7 +69,7 @@ class BaseOrders(Records):
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise ValueError("Records array must have all fields defined in order_dt")
 
-        PandasIndexer.__init__(self, _indexing_func)
+        PandasIndexer.__init__(self, orders_indexing_func)
 
     @property  # no need for cached
     def records_readable(self):
@@ -204,7 +204,7 @@ class Orders(BaseOrders):
     def side(self):
         """Side of each order.
 
-        See `vectorbt.records.enums.OrderSide`."""
+        See `vectorbt.enums.OrderSide`."""
         return self.map_field('side')
 
     @cached_property

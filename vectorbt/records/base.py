@@ -344,6 +344,7 @@ import pandas as pd
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import Configured
+from vectorbt.utils.enum import create_value_map
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base import reshape_fns
 from vectorbt.base.common import (
@@ -397,6 +398,8 @@ def _mapped_binary_translate_func(self, other, np_func):
         if self.idx_arr is not None or other.idx_arr is not None:
             if not np.array_equal(self.idx_arr, other.idx_arr):
                 passed = False
+        if self.value_map != other.value_map:
+            passed = False
         if not passed:
             raise ValueError("Both MappedArray instances must have same metadata")
         other = other.mapped_arr
@@ -404,7 +407,8 @@ def _mapped_binary_translate_func(self, other, np_func):
         self.wrapper,
         np_func(self.mapped_arr, other),
         self.col_arr,
-        idx_arr=self.idx_arr
+        idx_arr=self.idx_arr,
+        value_map=self.value_map
     )
 
 
@@ -418,7 +422,8 @@ def _mapped_binary_translate_func(self, other, np_func):
         self.wrapper,
         np_func(self.mapped_arr),
         self.col_arr,
-        idx_arr=self.idx_arr
+        idx_arr=self.idx_arr,
+        value_map=self.value_map
     )
 )
 class MappedArray(Configured, PandasIndexer):
@@ -435,17 +440,19 @@ class MappedArray(Configured, PandasIndexer):
         idx_arr (array_like): A one-dimensional index array. Optional.
 
             Must be of the same size as `mapped_arr`.
+        value_map (dict or namedtuple): Value map.
 
     !!! note
         This class is meant to be immutable. To change any attribute, use `MappedArray.copy`."""
 
-    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None):
+    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None, value_map=None):
         Configured.__init__(
             self,
             wrapper=wrapper,
             mapped_arr=mapped_arr,
             col_arr=col_arr,
-            idx_arr=idx_arr
+            idx_arr=idx_arr,
+            value_map=value_map
         )
         checks.assert_type(wrapper, ArrayWrapper)
         if not isinstance(mapped_arr, np.ndarray):
@@ -457,11 +464,16 @@ class MappedArray(Configured, PandasIndexer):
             if not isinstance(idx_arr, np.ndarray):
                 idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
+        if value_map is not None:
+            if checks.is_namedtuple(value_map):
+                value_map = create_value_map(value_map)
+            checks.assert_type(value_map, dict)
 
         self._wrapper = wrapper
         self._mapped_arr = mapped_arr
         self._col_arr = col_arr
         self._idx_arr = idx_arr
+        self._value_map = value_map
 
         PandasIndexer.__init__(self, _mapped_array_indexing_func)
 
@@ -492,17 +504,24 @@ class MappedArray(Configured, PandasIndexer):
         """Index array."""
         return self._idx_arr
 
+    @property
+    def value_map(self):
+        """Value map."""
+        return self._value_map
+
     @cached_property
     def col_index(self):
         """Column index for `MappedArray.mapped_arr`."""
         return nb.mapped_col_index_nb(self.mapped_arr, self.col_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask, idx_arr=None, group_by=None, **kwargs):
+    def filter_by_mask(self, mask, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         if idx_arr is not None:
             idx_arr = self.idx_arr[mask]
+        if value_map is None:
+            value_map = self.value_map
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
@@ -512,6 +531,7 @@ class MappedArray(Configured, PandasIndexer):
             mapped_arr=self.mapped_arr[mask],
             col_arr=self.col_arr[mask],
             idx_arr=idx_arr,
+            value_map=value_map,
             **kwargs
         )
 
@@ -754,6 +774,25 @@ class MappedArray(Configured, PandasIndexer):
         """Plot box plot by column."""
         return self.plot_by_func(lambda x: x.vbt.box(**kwargs), group_by=group_by)
 
+    def value_counts(self, group_by=None, value_map=None):
+        """Return a pandas object containing counts of unique values."""
+        group_arr, columns = self.wrapper.grouper.get_groups_and_columns(group_by=group_by)
+        unique_vals = np.unique(self.mapped_arr)
+        counts_df = pd.DataFrame(np.full((len(unique_vals), len(columns)), 0), columns=columns, index=unique_vals)
+        if group_arr is not None:
+            col_arr = group_arr[self.col_arr]
+        else:
+            col_arr = self.col_arr
+        for col in range(len(columns)):
+            masked_arr = self.mapped_arr[col_arr == col]
+            masked_unique, masked_counts = np.unique(masked_arr, return_counts=True)
+            counts_df.loc[masked_unique, columns[col]] = masked_counts
+        if value_map is None:
+            value_map = self.value_map
+        if value_map is not None:
+            counts_df.index = counts_df.index.map(value_map)
+        return counts_df
+
 
 def indexing_on_records_meta(obj, pd_indexing_func):
     """Perform indexing on `Records` and return metadata."""
@@ -767,7 +806,7 @@ def indexing_on_records_meta(obj, pd_indexing_func):
     return new_wrapper, new_records_arr, group_idxs, col_idxs
 
 
-def _records_indexing_func(obj, pd_indexing_func):
+def records_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Records`."""
     new_wrapper, new_records_arr, _, _ = indexing_on_records_meta(obj, pd_indexing_func)
     return obj.copy(
@@ -815,7 +854,7 @@ class Records(Configured, PandasIndexer):
         self._records_arr = records_arr
         self._idx_field = idx_field
 
-        PandasIndexer.__init__(self, _records_indexing_func)
+        PandasIndexer.__init__(self, records_indexing_func)
 
     @property
     def wrapper(self):
@@ -866,7 +905,7 @@ class Records(Configured, PandasIndexer):
             **kwargs
         )
 
-    def map(self, map_func_nb, *args, idx_arr=None, group_by=None, **kwargs):
+    def map(self, map_func_nb, *args, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Map each record to a scalar value. Returns `MappedArray`.
 
         See `vectorbt.records.nb.map_records_nb`."""
@@ -888,10 +927,11 @@ class Records(Configured, PandasIndexer):
             mapped_arr,
             self.records_arr['col'],
             idx_arr=idx_arr,
+            value_map=value_map,
             **kwargs
         )
 
-    def map_field(self, field, idx_arr=None, group_by=None, **kwargs):
+    def map_field(self, field, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Convert field to `MappedArray`."""
         if idx_arr is None:
             if self.idx_field is not None:
@@ -908,10 +948,11 @@ class Records(Configured, PandasIndexer):
             self.records_arr[field],
             self.records_arr['col'],
             idx_arr=idx_arr,
+            value_map=value_map,
             **kwargs
         )
 
-    def map_array(self, a, idx_arr=None, group_by=None, **kwargs):
+    def map_array(self, a, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Convert array to `MappedArray`.
 
          The length of the array should match that of the records."""
@@ -934,6 +975,7 @@ class Records(Configured, PandasIndexer):
             a,
             self.records_arr['col'],
             idx_arr=idx_arr,
+            value_map=value_map,
             **kwargs
         )
 

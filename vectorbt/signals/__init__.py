@@ -24,10 +24,6 @@ dtype: int64
 
 The accessors extend `vectorbt.generic.accessors`.
 
-## Enums
-
-`vectorbt.signals.enums` defines schemas for working with signals.
-
 ## Numba-compiled functions
 
 `vectorbt.signals.nb` provides an arsenal of Numba-compiled functions that are used by accessors
@@ -54,7 +50,6 @@ signals for an arbitrary combination of your inputs and parameters.
 random signal generator, all built with `vectorbt.signals.factory.SignalFactory`.
 """
 
-from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.basic import (
     RAND,

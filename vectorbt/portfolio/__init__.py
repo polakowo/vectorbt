@@ -49,23 +49,10 @@ Calmar Ratio                           0.4932
 Name: (Close, Open), dtype: object
 ```
 
-## Enums
-
-`vectorbt.portfolio.enums` defines schemas for orders.
-
 ## Numba-compiled functions
 
 `vectorbt.portfolio.nb` provides an arsenal of Numba-compiled functions that are used for portfolio
 modeling, such as generating and filling orders. These only accept NumPy arrays and other Numba-compatible types.
 """
 
-from vectorbt.portfolio.enums import (
-    InitCashMode,
-    CallSeqType,
-    SizeType,
-    ConflictMode,
-    Order,
-    NoOrder,
-    Direction
-)
 from vectorbt.portfolio.base import Portfolio

@@ -70,7 +70,7 @@ def is_default_index(arg):
 
 
 def is_equal(arg1, arg2, equality_func):
-    """Determines whether two objects are equal."""
+    """Determine whether two objects are equal."""
     if arg1 is None or arg2 is None:
         if arg1 is not None or arg2 is not None:
             return False
@@ -78,6 +78,18 @@ def is_equal(arg1, arg2, equality_func):
         if not equality_func(arg1, arg2):
             return False
     return True
+
+
+def is_namedtuple(x):
+    """Determines whether object is an instance of namedtuple."""
+    t = type(x)
+    b = t.__bases__
+    if len(b) != 1 or b[0] != tuple:
+        return False
+    f = getattr(t, '_fields', None)
+    if not isinstance(f, tuple):
+        return False
+    return all(type(n) == str for n in f)
 
 
 # ############# Asserts ############# #

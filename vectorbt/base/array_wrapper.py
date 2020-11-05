@@ -170,7 +170,7 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
     ), idx_idxs, col_idxs, col_idxs
 
 
-def _indexing_func(obj, pd_indexing_func, **kwargs):
+def array_wrapper_indexing_func(obj, pd_indexing_func, **kwargs):
     """Perform indexing on `ArrayWrapper`"""
     return indexing_on_wrapper_meta(obj, pd_indexing_func, **kwargs)[0]
 
@@ -225,7 +225,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         PandasIndexer.__init__(
             self,
-            _indexing_func,
+            array_wrapper_indexing_func,
             column_only_select=column_only_select,
             group_select=group_select
         )

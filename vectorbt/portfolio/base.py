@@ -34,7 +34,6 @@ in 2020 against every single pattern found in TA-Lib, and translates them into o
 >>> import yfinance as yf
 >>> import talib
 >>> import vectorbt as vbt
->>> from vectorbt.portfolio.enums import InitCashMode
 
 >>> # Fetch price history
 >>> pairs = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
@@ -72,7 +71,7 @@ Date
 >>> # Simulate portfolio
 >>> portfolio = vbt.Portfolio.from_orders(
 ...     price['Close'], size, price=price['Open'],
-...     init_cash=InitCashMode.AutoAlign, fees=0.001, slippage=0.001
+...     init_cash='autoalign', fees=0.001, slippage=0.001
 ... )
 
 >>> # Visualize portfolio value
@@ -109,7 +108,7 @@ For example, let's divide our portfolio into two groups sharing the same cash:
 ... ], name='group')
 >>> comb_portfolio = vbt.Portfolio.from_orders(
 ...     price['Close'], size, price=price['Open'],
-...     init_cash=InitCashMode.AutoAlign, fees=0.001, slippage=0.001,
+...     init_cash='autoalign', fees=0.001, slippage=0.001,
 ...     group_by=group_by, cash_sharing=True
 ... )
 
@@ -180,6 +179,52 @@ Combined portfolio is indexed by group:
     For example, if `group_select` is enabled indexing will be performed on groups,
     otherwise on single columns. You can pass wrapper arguments with `wrapper_kwargs`.
 
+### Logging
+
+To collect more information on how a specific order was processed or to be able to track the whole
+simulation from the beginning to the end, you can turn on logging.
+
+```python-repl
+>>> # Simulate portfolio with logging
+>>> portfolio = vbt.Portfolio.from_orders(
+...     price['Close'], size, price=price['Open'],
+...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True
+... )
+
+>>> portfolio.logs().records
+      idx  col  group  cash_now  shares_now  val_price_now  value_now  \
+0       0    0      0       inf    0.000000        7294.44        inf
+...   ...  ...    ...       ...         ...            ...        ...
+1469  244    5      5       inf  273.894381          62.84        inf
+
+          size  size_type  direction  ...  raise_reject   log  new_cash  \
+0          NaN          0          2  ...         False  True       inf
+...        ...        ...        ...  ...           ...   ...       ...
+1469  7.956715          0          2  ...         False  True       inf
+
+      new_shares  res_size   res_price  res_fees  res_side  res_status  \
+0       0.000000       NaN         NaN       NaN        -1           1
+...          ...       ...         ...       ...       ...         ...
+1469  281.851096  7.956715    62.90284    0.5005         0           0
+```
+
+Just as orders, logs are also records and thus can be easily analyzed:
+
+```python-repl
+>>> from vectorbt.enums import OrderStatus
+
+>>> portfolio.logs().map_field('res_status', value_map=OrderStatus).value_counts()
+         BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
+Filled       186      169      172      171      177      180
+Ignored       59       76       73       74       68       65
+```
+
+Logging can also be turned on just for one order, row, or column, since as many other
+variables it's specified per order and can broadcast automatically.
+
+!!! note
+    Logging can slow down simulation.
+
 ### Caching
 
 This class supports caching. If a method or a property requires heavy computation, it's wrapped
@@ -206,6 +251,13 @@ import numpy as np
 import pandas as pd
 from inspect import signature
 
+from vectorbt.enums import (
+    SizeType,
+    ConflictMode,
+    CallSeqType,
+    InitCashMode,
+    Direction
+)
 from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
@@ -217,20 +269,15 @@ from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb as generic_nb
 from vectorbt.portfolio import nb
-from vectorbt.portfolio.enums import (
-    SizeType,
-    ConflictMode,
-    CallSeqType,
-    InitCashMode,
-    Direction
-)
-from vectorbt.records import Orders, Trades, Positions, Drawdowns
+from vectorbt.records import Orders, Trades, Positions, Drawdowns, Logs
+from vectorbt.records.base import records_indexing_func
 from vectorbt.records.orders import indexing_on_orders_meta
 
 
-def _indexing_func(obj, pd_indexing_func):
+def portfolio_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Portfolio`."""
     new_orders, group_idxs, col_idxs = indexing_on_orders_meta(obj._orders, pd_indexing_func)
+    new_logs = records_indexing_func(obj._logs, pd_indexing_func)
     if isinstance(obj._init_cash, int):
         new_init_cash = obj._init_cash
     else:
@@ -239,6 +286,7 @@ def _indexing_func(obj, pd_indexing_func):
 
     return obj.copy(
         orders=new_orders,
+        logs=new_logs,
         init_cash=new_init_cash,
         call_seq=new_call_seq
     )
@@ -322,7 +370,8 @@ class Portfolio(Configured, PandasIndexer):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
-        orders (Orders): Order records.
+        orders (Orders): Order records of type `vectorbt.records.orders.Orders`.
+        logs (Logs): Log records of type `vectorbt.records.logs.Logs`.
         init_cash (InitCashMode, float or array_like of float): Initial capital.
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (array_like of int): Sequence of calls per row and group.
@@ -335,10 +384,11 @@ class Portfolio(Configured, PandasIndexer):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
-    def __init__(self, orders, init_cash, cash_sharing, call_seq, incl_unrealized=None):
+    def __init__(self, orders, logs, init_cash, cash_sharing, call_seq, incl_unrealized=None):
         Configured.__init__(
             self,
             orders=orders,
+            logs=logs,
             init_cash=init_cash,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
@@ -350,17 +400,19 @@ class Portfolio(Configured, PandasIndexer):
 
         # Perform checks
         checks.assert_type(orders, Orders)
+        checks.assert_type(logs, Logs)
 
         # Store passed arguments
         self._ref_price = orders.close
         self._orders = orders
+        self._logs = logs
         self._init_cash = init_cash
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
         self._incl_unrealized = incl_unrealized
 
         # Supercharge
-        PandasIndexer.__init__(self, _indexing_func)
+        PandasIndexer.__init__(self, portfolio_indexing_func)
 
     # ############# Class methods ############# #
 
@@ -376,10 +428,11 @@ class Portfolio(Configured, PandasIndexer):
                      min_size=None, long_min_size=None, short_min_size=None,
                      max_size=None, long_max_size=None, short_max_size=None,
                      reject_prob=None, long_reject_prob=None, short_reject_prob=None,
-                     allow_partial=None, long_allow_partial=None, short_allow_partial=None,
-                     raise_by_reject=None, long_raise_by_reject=None, short_raise_by_reject=None,
                      close_first=None, long_close_first=None, short_close_first=None,
+                     allow_partial=None, long_allow_partial=None, short_allow_partial=None,
+                     raise_reject=None, long_raise_reject=None, short_raise_reject=None,
                      accumulate=None, long_accumulate=None, short_accumulate=None,
+                     log=None, long_log=None, short_log=None,
                      conflict_mode=None, direction=None, val_price=None,
                      init_cash=None, cash_sharing=None, call_seq=None, seed=None, freq=None,
                      group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
@@ -401,22 +454,22 @@ class Portfolio(Configured, PandasIndexer):
             entries (array_like of bool): Boolean array of entry signals.
                 Will broadcast.
 
-                Becomes a long signal if `direction` is `All` or `Long`, otherwise short.
+                Becomes a long signal if `direction` is `all` or `longonly`, otherwise short.
             exits (array_like of bool): Boolean array of exit signals.
                 Will broadcast.
 
-                Becomes a short signal if `direction` is `All` or `Long`, otherwise long.
+                Becomes a short signal if `direction` is `all` or `longonly`, otherwise long.
             size (float or array_like): Size to order.
                 Will broadcast.
 
                 * Set to any number to buy/sell some fixed amount of shares.
-                * Set to `np.inf` to utilize all cash. When shorting with `-np.inf`, will
-                    borrow the amount of shares that can be covered by current value;
-                    you can still go beyond that by providing a finite number.
+                    Longs are limited by cash in the account, while shorts are unlimited.
+                * Set to `np.inf` to buy shares for all cash, or `-np.inf` to sell shares for
+                    initial margin of 100%. If `direction` is not `all`, `-np.inf` will close the position.
                 * Set to `np.nan` or 0 to skip.
 
                 !!! note
-                    Negative numbers will be treated as positive.
+                    Sign will be ignored.
             long_size (float or array_like): Overwrites `size` for long orders.
                 Defaults to `size`. Will broadcast.
             short_size (float or array_like): Overwrites `size` for short orders.
@@ -466,6 +519,14 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `reject_prob`. Will broadcast.
             short_reject_prob (float or array_like): Overwrites `reject_prob` for short orders.
                 Defaults to `reject_prob`. Will broadcast.
+            close_first (bool or array_like): Whether to close the position first before reversal.
+                Will broadcast.
+
+                See `close_first` in `Portfolio.from_order_func`.
+            long_close_first (bool or array_like): Overwrites `close_first` for long orders.
+                Defaults to `close_first`. Will broadcast.
+            short_close_first (bool or array_like): Overwrites `close_first` for short orders.
+                Defaults to `close_first`. Will broadcast.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
 
@@ -474,32 +535,29 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `allow_partial`. Will broadcast.
             short_allow_partial (bool or array_like): Overwrites `allow_partial` for short orders.
                 Defaults to `allow_partial`. Will broadcast.
-            raise_by_reject (bool or array_like): Whether to raise an exception if order gets rejected.
+            raise_reject (bool or array_like): Whether to raise an exception if order gets rejected.
                 Will broadcast.
-            long_raise_by_reject (bool or array_like): Overwrites `raise_by_reject` for long orders.
-                Defaults to `raise_by_reject`. Will broadcast.
-            short_raise_by_reject (bool or array_like): Overwrites `raise_by_reject` for short orders.
-                Defaults to `raise_by_reject`. Will broadcast.
-            close_first (bool or array_like): Whether to close the position first before reversal.
+            long_raise_reject (bool or array_like): Overwrites `raise_reject` for long orders.
+                Defaults to `raise_reject`. Will broadcast.
+            short_raise_reject (bool or array_like): Overwrites `raise_reject` for short orders.
+                Defaults to `raise_reject`. Will broadcast.
+            log (bool or array_like): Whether to log orders.
                 Will broadcast.
-
-                Otherwise reverses the position with a single order and within the same tick.
-                Takes only effect under `Direction.All`. Requires a second signal to enter
-                the opposite position. This allows to define parameters such as `fixed_fees` for long
-                and short positions separately.
-            long_close_first (bool or array_like): Overwrites `close_first` for long orders.
-                Defaults to `close_first`. Will broadcast.
-            short_close_first (bool or array_like): Overwrites `close_first` for short orders.
-                Defaults to `close_first`. Will broadcast.
+            long_log (bool or array_like): Overwrites `log` for long orders.
+                Defaults to `log`. Will broadcast.
+            short_log (bool or array_like): Overwrites `log` for short orders.
+                Defaults to `log`. Will broadcast.
             accumulate (bool or array_like): Whether to accumulate signals.
                 Will broadcast.
+
+                Behaves similarly to `Portfolio.from_orders`.
             long_accumulate (bool or array_like): Overwrites `accumulate` for long orders.
                 Defaults to `accumulate`. Will broadcast.
             short_accumulate (bool or array_like): Overwrites `accumulate` for short orders.
                 Defaults to `accumulate`. Will broadcast.
-            conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
+            conflict_mode (ConflictMode or array_like): See `vectorbt.enums.ConflictMode`.
                 Will broadcast.
-            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
+            direction (Direction or array_like): See `vectorbt.enums.Direction`.
                 Will broadcast.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price` if set, otherwise to previous `close`.
@@ -557,7 +615,7 @@ class Portfolio(Configured, PandasIndexer):
 
             >>> # Entry opens long, exit closes long
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='long')
+            ...     close, entries, exits, size=1., direction='longonly')
             >>> portfolio.share_flow()
             0    1.0
             1    0.0
@@ -568,7 +626,7 @@ class Portfolio(Configured, PandasIndexer):
 
             >>> # Entry opens short, exit closes short
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='short')
+            ...     close, entries, exits, size=1., direction='shortonly')
             >>> portfolio.share_flow()
             0   -1.0
             1    0.0
@@ -627,18 +685,18 @@ class Portfolio(Configured, PandasIndexer):
             dtype: float64
 
             >>> # Testing multiple parameters (via broadcasting)
-            >>> from vectorbt.portfolio.enums import Direction
+            >>> from vectorbt.enums import Direction
 
             >>> portfolio = vbt.Portfolio.from_signals(
             ...     close, entries, exits, direction=[list(Direction)],
             ...     broadcast_kwargs=dict(columns_from=Direction._fields))
             >>> portfolio.share_flow()
-                Long  Short  All
-            0  100.0 -100.0      100.0
-            1    0.0    0.0        0.0
-            2    0.0    0.0        0.0
-            3 -100.0   50.0     -200.0
-            4    0.0    0.0        0.0
+                Long  Short    All
+            0  100.0 -100.0  100.0
+            1    0.0    0.0    0.0
+            2    0.0    0.0    0.0
+            3 -100.0   50.0 -200.0
+            4    0.0    0.0    0.0
             ```
         """
         # Get defaults
@@ -690,24 +748,30 @@ class Portfolio(Configured, PandasIndexer):
             long_reject_prob = reject_prob
         if short_reject_prob is None:
             short_reject_prob = reject_prob
-        if allow_partial is None:
-            allow_partial = defaults.portfolio['allow_partial']
-        if long_allow_partial is None:
-            long_allow_partial = allow_partial
-        if short_allow_partial is None:
-            short_allow_partial = allow_partial
-        if raise_by_reject is None:
-            raise_by_reject = defaults.portfolio['raise_by_reject']
-        if long_raise_by_reject is None:
-            long_raise_by_reject = raise_by_reject
-        if short_raise_by_reject is None:
-            short_raise_by_reject = raise_by_reject
         if close_first is None:
             close_first = defaults.portfolio['close_first']
         if long_close_first is None:
             long_close_first = close_first
         if short_close_first is None:
             short_close_first = close_first
+        if allow_partial is None:
+            allow_partial = defaults.portfolio['allow_partial']
+        if long_allow_partial is None:
+            long_allow_partial = allow_partial
+        if short_allow_partial is None:
+            short_allow_partial = allow_partial
+        if raise_reject is None:
+            raise_reject = defaults.portfolio['raise_reject']
+        if long_raise_reject is None:
+            long_raise_reject = raise_reject
+        if short_raise_reject is None:
+            short_raise_reject = raise_reject
+        if log is None:
+            log = defaults.portfolio['log']
+        if long_log is None:
+            long_log = log
+        if short_log is None:
+            short_log = log
         if accumulate is None:
             accumulate = defaults.portfolio['accumulate']
         if long_accumulate is None:
@@ -773,10 +837,11 @@ class Portfolio(Configured, PandasIndexer):
             long_min_size, short_min_size,
             long_max_size, short_max_size,
             long_reject_prob, short_reject_prob,
-            long_allow_partial, short_allow_partial,
-            long_raise_by_reject, short_raise_by_reject,
             long_close_first, short_close_first,
+            long_allow_partial, short_allow_partial,
+            long_raise_reject, short_raise_reject,
             long_accumulate, short_accumulate,
+            long_log, short_log,
             conflict_mode, direction, val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
@@ -796,7 +861,7 @@ class Portfolio(Configured, PandasIndexer):
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Perform calculation
-        order_records = nb.simulate_from_signals_nb(
+        order_records, log_records = nb.simulate_from_signals_nb(
             target_shape_2d,
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
@@ -808,8 +873,10 @@ class Portfolio(Configured, PandasIndexer):
 
         # Create an instance
         orders = Orders(wrapper, order_records, close)
+        logs = Logs(wrapper, log_records)
         return cls(
             orders,
+            logs,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
@@ -817,11 +884,11 @@ class Portfolio(Configured, PandasIndexer):
         )
 
     @classmethod
-    def from_orders(cls, close, size, size_type=None, price=None, fees=None, fixed_fees=None,
-                    slippage=None, min_size=None, max_size=None, reject_prob=None, allow_partial=None,
-                    raise_by_reject=None, direction=None, val_price=None, init_cash=None, cash_sharing=None,
-                    call_seq=None, freq=None, seed=None, group_by=None, broadcast_kwargs=None,
-                    wrapper_kwargs=None, **kwargs):
+    def from_orders(cls, close, size, size_type=None, direction=None, price=None, fees=None,
+                    fixed_fees=None, slippage=None, min_size=None, max_size=None, reject_prob=None,
+                    close_first=None, allow_partial=None, raise_reject=None, log=None, val_price=None,
+                    init_cash=None, cash_sharing=None, call_seq=None, freq=None, seed=None,
+                    group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
         """Simulate portfolio from orders.
 
         Starting with initial cash `init_cash`, orders the number of shares specified in `size`
@@ -838,10 +905,9 @@ class Portfolio(Configured, PandasIndexer):
                 Behavior depends upon `size_type` and `direction`. For `SizeType.Shares`:
 
                 * Set to any number to buy/sell some fixed amount of shares.
-                * Set to `np.inf` to utilize all cash. When shorting with `-np.inf`, will
-                    borrow the amount of shares that can be covered by current value;
-                    you can still go beyond that by providing a finite number. If `direction`
-                    is not `all`, will close the position instead of reversal.
+                    Longs are limited by cash in the account, while shorts are unlimited.
+                * Set to `np.inf` to buy shares for all cash, or `-np.inf` to sell shares for
+                    initial margin of 100%. If `direction` is not `all`, `-np.inf` will close the position.
                 * Set to `np.nan` or 0 to skip.
 
                 For any target size:
@@ -849,7 +915,9 @@ class Portfolio(Configured, PandasIndexer):
                 * Set to any number to buy/sell amount of shares relative to current holdings or value.
                 * Set to 0 to close the current position.
                 * Set to `np.nan` to skip.
-            size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
+            size_type (SizeType or array_like): See `vectorbt.enums.SizeType`.
+                Will broadcast.
+            direction (Direction or array_like): See `vectorbt.enums.Direction`.
                 Will broadcast.
             price (array_like of float): Order price.
                 Defaults to `close`. Will broadcast.
@@ -867,13 +935,20 @@ class Portfolio(Configured, PandasIndexer):
                 Will be partially filled if exceeded.
             reject_prob (float or array_like): Order rejection probability.
                 Will broadcast.
+            close_first (bool or array_like): Whether to close the position first before reversal.
+                Will broadcast.
+
+                Otherwise reverses the position with a single order and within the same tick.
+                Takes only effect under `Direction.All`. Requires a second signal to enter
+                the opposite position. This allows to define parameters such as `fixed_fees` for long
+                and short positions separately.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
 
                 Does not apply when size is `np.inf`.
-            raise_by_reject (bool or array_like): Whether to raise an exception if order gets rejected.
+            raise_reject (bool or array_like): Whether to raise an exception if order gets rejected.
                 Will broadcast.
-            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
+            log (bool or array_like): Whether to log orders.
                 Will broadcast.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price`. Will broadcast.
@@ -903,7 +978,7 @@ class Portfolio(Configured, PandasIndexer):
                 call next. Processing of `call_seq` goes always from left to right.
                 For example, `[2, 0, 1]` would first call column 'c', then 'a', and finally 'b'.
 
-                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
+                * Use `vectorbt.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
 
                 If `CallSeqType.Auto` selected, rearranges calls dynamically based on order value.
@@ -973,25 +1048,26 @@ class Portfolio(Configured, PandasIndexer):
             dtype: float64
             ```
 
-            Reverse position each tick:
+            Reverse each position by first closing it:
             ```python-repl
             >>> import numpy as np
 
+            >>> size = [np.inf, -np.inf, -np.inf, np.inf, np.inf]
             >>> portfolio = vbt.Portfolio.from_orders(
-            ...     close, [np.inf, -np.inf, np.inf, -np.inf, np.inf])
+            ...     close, size, close_first=True)
 
             >>> portfolio.shares()
             0    100.000000
-            1   -100.000000
-            2     33.333333
-            3    -33.333333
-            4     20.000000
+            1      0.000000
+            2    -66.666667
+            3      0.000000
+            4     26.666667
             dtype: float64
             >>> portfolio.cash()
             0      0.000000
-            1    400.000000
-            2      0.000000
-            3    266.666667
+            1    200.000000
+            2    400.000000
+            3    133.333333
             4      0.000000
             dtype: float64
             ```
@@ -1026,6 +1102,9 @@ class Portfolio(Configured, PandasIndexer):
         if size_type is None:
             size_type = defaults.portfolio['size_type']
         size_type = convert_str_enum_value(SizeType, size_type)
+        if direction is None:
+            direction = defaults.portfolio['direction']
+        direction = convert_str_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
@@ -1040,13 +1119,14 @@ class Portfolio(Configured, PandasIndexer):
             max_size = defaults.portfolio['max_size']
         if reject_prob is None:
             reject_prob = defaults.portfolio['reject_prob']
+        if close_first is None:
+            close_first = defaults.portfolio['close_first']
         if allow_partial is None:
             allow_partial = defaults.portfolio['allow_partial']
-        if raise_by_reject is None:
-            raise_by_reject = defaults.portfolio['raise_by_reject']
-        if direction is None:
-            direction = defaults.portfolio['direction']
-        direction = convert_str_enum_value(Direction, direction)
+        if raise_reject is None:
+            raise_reject = defaults.portfolio['raise_reject']
+        if log is None:
+            log = defaults.portfolio['log']
         if val_price is None:
             val_price = price
         if init_cash is None:
@@ -1086,6 +1166,7 @@ class Portfolio(Configured, PandasIndexer):
             close,
             size,
             size_type,
+            direction,
             price,
             fees,
             fixed_fees,
@@ -1093,9 +1174,10 @@ class Portfolio(Configured, PandasIndexer):
             min_size,
             max_size,
             reject_prob,
+            close_first,
             allow_partial,
-            raise_by_reject,
-            direction,
+            raise_reject,
+            log,
             val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
@@ -1115,7 +1197,7 @@ class Portfolio(Configured, PandasIndexer):
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
 
         # Perform calculation
-        order_records = nb.simulate_from_orders_nb(
+        order_records, log_records = nb.simulate_from_orders_nb(
             target_shape_2d,
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
@@ -1127,8 +1209,10 @@ class Portfolio(Configured, PandasIndexer):
 
         # Create an instance
         orders = Orders(wrapper, order_records, close)
+        logs = Logs(wrapper, log_records)
         return cls(
             orders,
+            logs,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
@@ -1154,8 +1238,10 @@ class Portfolio(Configured, PandasIndexer):
 
                 Will be used for calculating unrealized P&L and portfolio value.
 
-                Previous `close` will also be used for valuating assets/groups during the simulation.
-                To use current order price, overwrite it explicitly in `segment_prep_func_nb`.
+                !!! note
+                    In contrast to other methods, the valuation price is previous `close`
+                    instead of order price, since the price of an order is unknown before call.
+                    You can still set valuation price explicitly in `segment_prep_func_nb`.
             order_func_nb (callable): Order generation function.
             *order_args: Arguments passed to `order_func_nb`.
             target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
@@ -1167,7 +1253,7 @@ class Portfolio(Configured, PandasIndexer):
 
                 By default, will broadcast to the number of columns.
                 If cash sharing is enabled, will broadcast to the number of groups.
-                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
+                See `vectorbt.enums.InitCashMode` to find optimal initial cash.
 
                 !!! note
                     Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
@@ -1179,7 +1265,7 @@ class Portfolio(Configured, PandasIndexer):
                     Introduces cross-asset dependencies.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
-                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
+                * Use `vectorbt.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
 
                 !!! note
@@ -1261,7 +1347,7 @@ class Portfolio(Configured, PandasIndexer):
             ```
 
             Reverse each position by first closing it. Keep state of last position to determine
-            which position to open next:
+            which position to open next (just for example, there are easier ways to do this):
             ```python-repl
             >>> import numpy as np
 
@@ -1308,7 +1394,7 @@ class Portfolio(Configured, PandasIndexer):
             Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
             ```python-repl
             >>> from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
-            >>> from vectorbt.portfolio.enums import SizeType, Direction
+            >>> from vectorbt.enums import SizeType, Direction
 
             >>> @njit
             ... def group_prep_func_nb(gc):
@@ -1326,7 +1412,7 @@ class Portfolio(Configured, PandasIndexer):
             ...         col = sc.from_col + k
             ...         size[k] = 1 / sc.group_len
             ...         size_type[k] = SizeType.TargetPercent
-            ...         direction[k] = Direction.Long
+            ...         direction[k] = Direction.LongOnly
             ...         sc.last_val_price[col] = sc.close[sc.i, col]
             ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
             ...     return size, size_type, direction
@@ -1457,7 +1543,7 @@ class Portfolio(Configured, PandasIndexer):
 
         # Perform calculation
         if row_wise:
-            order_records = nb.simulate_row_wise_nb(
+            order_records, log_records = nb.simulate_row_wise_nb(
                 target_shape_2d,
                 to_2d(close, raw=True),
                 group_lens,
@@ -1475,7 +1561,7 @@ class Portfolio(Configured, PandasIndexer):
                 order_args
             )
         else:
-            order_records = nb.simulate_nb(
+            order_records, log_records = nb.simulate_nb(
                 target_shape_2d,
                 to_2d(close, raw=True),
                 group_lens,
@@ -1495,8 +1581,10 @@ class Portfolio(Configured, PandasIndexer):
 
         # Create an instance
         orders = Orders(wrapper, order_records, close)
+        logs = Logs(wrapper, log_records)
         return cls(
             orders,
+            logs,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
@@ -1568,6 +1656,13 @@ class Portfolio(Configured, PandasIndexer):
 
         See `vectorbt.records.orders.Orders`."""
         return self._orders.regroup(group_by=group_by)
+
+    @cached_method
+    def logs(self, group_by=None):
+        """Log records.
+
+        See `vectorbt.records.logs.Logs`."""
+        return self._logs.regroup(group_by=group_by)
 
     @cached_method
     def trades(self, group_by=None, incl_unrealized=None):

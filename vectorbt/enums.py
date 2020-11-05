@@ -1,4 +1,6 @@
-"""Named tuples and enumerated types."""
+"""Named tuples and enumerated types.
+
+We are not distributing them across modules to avoid circular dependencies."""
 
 import numpy as np
 from collections import namedtuple
@@ -8,7 +10,7 @@ __pdoc__ = {}
 
 # We use namedtuple for enums and classes to be able to use them in Numba
 
-# ############# SimulationContext ############# #
+# ############# Portfolio ############# #
 
 SimulationContext = namedtuple('SimulationContext', [
     'target_shape',
@@ -20,6 +22,7 @@ SimulationContext = namedtuple('SimulationContext', [
     'active_mask',
     'order_records',
     'record_mask',
+    'log_records',
     'last_cash',
     'last_shares',
     'last_val_price'
@@ -61,8 +64,8 @@ Has shape `(target_shape[0], group_lens.shape[0])`.
 """
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
-Order records are not filled incrementally from left to right, but based on their position 
-in the matrix. To get index of a record, use `col * target_shape[0] + i`.
+Order records are not filled incrementally, but based on their position in the matrix. 
+To get index of a record, use `col * target_shape[0] + i`.
 
 !!! warning
     Initially, all records are empty. Accessing empty records will not raise any errors or warnings, 
@@ -73,6 +76,10 @@ __pdoc__['SimulationContext.record_mask'] = """Mask of records that have been se
 
 Has the same length as `order_records`.
 """
+__pdoc__['SimulationContext.log_records'] = """Log records.
+
+In contrast to order records, log records are filled incrementally.
+For example, to get the latest filled log record, use `log_records[num_logs - 1]`."""
 __pdoc__['SimulationContext.last_cash'] = """Last cash per column, or per group if cash sharing is enabled.
 
 Has the same shape as `init_cash`.
@@ -88,15 +95,14 @@ Used to calculate `value_now`. Can be changed in-place before group valuation.
 Has shape `(target_shape[1],)`.
 """
 
-# ############# GroupContext ############# #
-
 GroupContext = namedtuple('GroupContext', [
     *SimulationContext._fields,
     'group',
     'group_len',
     'from_col',
     'to_col',
-    'num_records'
+    'num_records',
+    'num_logs'
 ])
 
 __pdoc__['GroupContext'] = "A named tuple representing context of the group."
@@ -120,14 +126,14 @@ Has range `[1, target_shape[1] + 1)`.
 
 If columns are not grouped, equals `from_col + 1`.
 """
-__pdoc__['GroupContext.num_records'] = "Number of records filled up to this point."
-
-# ############# RowContext ############# #
+__pdoc__['GroupContext.num_records'] = "Number of order records filled up to this point."
+__pdoc__['GroupContext.num_logs'] = "Number of log records filled up to this point."
 
 RowContext = namedtuple('RowContext', [
     *SimulationContext._fields,
     'i',
-    'num_records'
+    'num_records',
+    'num_logs'
 ])
 __pdoc__['RowContext'] = "A named tuple representing context of the row."
 for field in SimulationContext._fields:
@@ -137,8 +143,7 @@ __pdoc__['RowContext.i'] = """Current row (time axis).
 Has range `[0, target_shape[0])`.
 """
 __pdoc__['RowContext.num_records'] = "See `GroupContext.num_records`."
-
-# ############# SegmentContext ############# #
+__pdoc__['RowContext.num_logs'] = "See `GroupContext.num_logs`."
 
 SegmentContext = namedtuple('SegmentContext', [
     *SimulationContext._fields,
@@ -148,6 +153,7 @@ SegmentContext = namedtuple('SegmentContext', [
     'from_col',
     'to_col',
     'num_records',
+    'num_logs',
     'call_seq_now'
 ])
 __pdoc__['SegmentContext'] = "A named tuple representing context of the segment."
@@ -159,12 +165,11 @@ __pdoc__['SegmentContext.group_len'] = "See `GroupContext.group_len`."
 __pdoc__['SegmentContext.from_col'] = "See `GroupContext.from_col`."
 __pdoc__['SegmentContext.to_col'] = "See `GroupContext.to_col`."
 __pdoc__['SegmentContext.num_records'] = "See `GroupContext.num_records`."
+__pdoc__['SegmentContext.num_logs'] = "See `GroupContext.num_logs`."
 __pdoc__['SegmentContext.call_seq_now'] = """Current sequence of calls.
 
 Has shape `(group_len,)`. 
 """
-
-# ############# OrderContext ############# #
 
 OrderContext = namedtuple('OrderContext', [
     *SegmentContext._fields,
@@ -205,8 +210,6 @@ Scalar value. Per group if cash sharing is enabled, otherwise per column.
 Current value is calculated using `last_val_price`.
 """
 
-# ############# InitCashMode ############# #
-
 InitCashMode = namedtuple('InitCashMode', [
     'Auto',
     'AutoAlign'
@@ -223,8 +226,6 @@ Attributes:
     Auto: Optimal initial cash for each column.
     AutoAlign: Optimal initial cash aligned across all columns.
 """
-
-# ############# CallSeqType ############# #
 
 CallSeqType = namedtuple('CallSeqType', [
     'Default',
@@ -247,8 +248,6 @@ Attributes:
     Auto: Place calls dynamically based on order value.
 """
 
-# ############# SizeType ############# #
-
 SizeType = namedtuple('SizeType', [
     'Shares',
     'TargetShares',
@@ -269,8 +268,6 @@ Attributes:
     TargetValue: Total value of holdings to hold after transaction.
     TargetPercent: Percentage of total value to hold after transaction.
 """
-
-# ############# ConflictMode ############# #
 
 ConflictMode = namedtuple('ConflictMode', [
     'Ignore',
@@ -295,11 +292,10 @@ Attributes:
     Opposite: Use opposite signal. Takes effect only when in position.
 """
 
-# ############# Order ############# #
-
 Order = namedtuple('Order', [
     'size',
     'size_type',
+    'direction',
     'price',
     'fees',
     'fixed_fees',
@@ -307,31 +303,34 @@ Order = namedtuple('Order', [
     'min_size',
     'max_size',
     'reject_prob',
+    'close_first',
     'allow_partial',
-    'raise_by_reject',
-    'direction'
+    'raise_reject',
+    'log'
 ])
 
 __pdoc__['Order'] = "A named tuple representing an order."
-__pdoc__['Order.size'] = "Size in shares. Filled size will depend upon your funds."
+__pdoc__['Order.size'] = "Size in shares. Final size will depend upon your funds."
 __pdoc__['Order.size_type'] = "See `SizeType`."
-__pdoc__['Order.price'] = "Price per share. Filled price will depend upon slippage."
+__pdoc__['Order.direction'] = "See `Direction`."
+__pdoc__['Order.price'] = "Price per share. Final price will depend upon slippage."
 __pdoc__['Order.fees'] = "Fees in percentage of the order value."
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
 __pdoc__['Order.min_size'] = "Minimum size. Lower than that will be rejected."
 __pdoc__['Order.max_size'] = "Maximum size. Higher than that will be cut."
 __pdoc__['Order.reject_prob'] = "Probability of rejecting this order."
-__pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
-__pdoc__['Order.raise_by_reject'] = "Whether to raise exception if order has been rejected."
-__pdoc__['Order.direction'] = "See `Direction`."
+__pdoc__['Order.close_first'] = """Whether reversal should close the position first. 
 
-NoOrder = Order(np.nan, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False, -1)
+Requires second order to open opposite position."""
+__pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
+__pdoc__['Order.raise_reject'] = "Whether to raise exception if order has been rejected."
+__pdoc__['Order.log'] = "Whether to log this order by filling a log record."
+
+NoOrder = Order(np.nan, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False, False, False)
 """_"""
 
 __pdoc__['NoOrder'] = "Order that will not be processed."
-
-# ############# OrderStatus ############# #
 
 OrderStatus = namedtuple('OrderStatus', [
     'Filled',
@@ -352,25 +351,77 @@ Attributes:
     Rejected: Order rejected.
 """
 
-# ############# OrderResult ############# #
+OrderSide = namedtuple('OrderSide', [
+    'Buy',
+    'Sell'
+])(*range(2))
+"""_"""
+
+__pdoc__['OrderSide'] = f"""Order side.
+
+```plaintext
+{json.dumps(dict(zip(OrderSide._fields, OrderSide)), indent=2)}
+```
+"""
+
+status_info_desc = [
+    "Size is NaN",
+    "Price is NaN",
+    "Asset valuation price is NaN",
+    "Asset/group value is NaN",
+    "Asset/group value is zero or negative",
+    "Size is zero",
+    "Not enough cash to short",
+    "Not enough cash to long",
+    "No open position to reduce/close",
+    "Size is greater than maximum allowed",
+    "Random event happened",
+    "Fees cannot be covered",
+    "Final size is less than minimum allowed",
+    "Final size is less than requested"
+]
+
+StatusInfo = namedtuple('StatusInfo', [
+    'SizeNaN',
+    'PriceNaN',
+    'ValPriceNaN',
+    'ValueNaN',
+    'ValueZeroNeg',
+    'SizeZero',
+    'NoCashShort',
+    'NoCashLong',
+    'NoOpenPosition',
+    'MaxSizeExceeded',
+    'RandomEvent',
+    'CantCoverFees',
+    'MinSizeNotReached',
+    'PartialFill'
+])(*range(14))
+"""_"""
+
+__pdoc__['StatusInfo'] = f"""Order status information.
+
+```plaintext
+{json.dumps(dict(zip(StatusInfo._fields, zip(StatusInfo, status_info_desc))), indent=2)}
+```
+"""
 
 OrderResult = namedtuple('OrderResult', [
     'size',
     'price',
     'fees',
     'side',
-    'status'
+    'status',
+    'status_info'
 ])
 
 __pdoc__['OrderResult'] = "A named tuple representing an order result."
 __pdoc__['OrderResult.size'] = "Filled size in shares."
 __pdoc__['OrderResult.price'] = "Filled price per share, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
-__pdoc__['OrderResult.side'] = "See `vectorbt.records.enums.OrderSide`."
+__pdoc__['OrderResult.side'] = "See `vectorbt.enums.OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
-
-IgnoredOrder = OrderResult(np.nan, np.nan, np.nan, -1, OrderStatus.Ignored)
-RejectedOrder = OrderResult(np.nan, np.nan, np.nan, -1, OrderStatus.Rejected)
+__pdoc__['OrderResult.status_info'] = "See `vectorbt.enums.StatusInfo`."
 
 
 class RejectedOrderError(Exception):
@@ -378,11 +429,9 @@ class RejectedOrderError(Exception):
     pass
 
 
-# ############# Direction ############# #
-
 Direction = namedtuple('Direction', [
-    'Long',
-    'Short',
+    'LongOnly',
+    'ShortOnly',
     'All'
 ])(*range(3))
 """_"""
@@ -394,8 +443,207 @@ __pdoc__['Direction'] = f"""Position direction.
 ```
 
 Attributes:
-    Long: Only long positions.
-    Short: Only short positions.
+    LongOnly: Only long positions.
+    ShortOnly: Only short positions.
     All: Both long and short positions.
 """
 
+# ############# Records ############# #
+
+DrawdownStatus = namedtuple('DrawdownStatus', [
+    'Active',
+    'Recovered'
+])(*range(2))
+"""_"""
+
+__pdoc__['DrawdownStatus'] = f"""Drawdown status.
+
+```plaintext
+{json.dumps(dict(zip(DrawdownStatus._fields, DrawdownStatus)), indent=2)}
+```
+"""
+
+drawdown_dt = np.dtype([
+    ('col', np.int_),
+    ('start_idx', np.int_),
+    ('valley_idx', np.int_),
+    ('end_idx', np.int_),
+    ('status', np.int_),
+], align=True)
+"""_"""
+
+__pdoc__['drawdown_dt'] = f"""`np.dtype` of drawdown records.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(drawdown_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(drawdown_dt.fields).values()))
+)), indent=2)}
+```
+"""
+
+order_dt = np.dtype([
+    ('col', np.int_),
+    ('idx', np.int_),
+    ('size', np.float_),
+    ('price', np.float_),
+    ('fees', np.float_),
+    ('side', np.int_),
+], align=True)
+"""_"""
+
+__pdoc__['order_dt'] = f"""`np.dtype` of order records.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(order_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(order_dt.fields).values()))
+)), indent=2)}
+```
+"""
+
+EventDirection = namedtuple('EventDirection', [
+    'Long',
+    'Short'
+])(*range(2))
+"""_"""
+
+__pdoc__['EventDirection'] = f"""Event direction.
+
+```plaintext
+{json.dumps(dict(zip(EventDirection._fields, EventDirection)), indent=2)}
+```
+"""
+
+EventStatus = namedtuple('EventStatus', [
+    'Open',
+    'Closed'
+])(*range(2))
+"""_"""
+
+__pdoc__['EventStatus'] = f"""Event status.
+
+```plaintext
+{json.dumps(dict(zip(EventStatus._fields, EventStatus)), indent=2)}
+```
+"""
+
+_event_fields = [
+    ('col', np.int_),
+    ('size', np.float_),
+    ('entry_idx', np.int_),
+    ('entry_price', np.float_),
+    ('entry_fees', np.float_),
+    ('exit_idx', np.int_),
+    ('exit_price', np.float_),
+    ('exit_fees', np.float_),
+    ('pnl', np.float_),
+    ('return', np.float_),
+    ('direction', np.int_),
+    ('status', np.int_)
+]
+
+event_dt = np.dtype(_event_fields, align=True)
+"""_"""
+
+__pdoc__['event_dt'] = f"""`np.dtype` of event records.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(event_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(event_dt.fields).values()))
+)), indent=2)}
+```
+"""
+
+trade_dt = np.dtype([
+    *_event_fields,
+    ('position_idx', np.int_)
+], align=True)
+"""_"""
+
+__pdoc__['trade_dt'] = f"""`np.dtype` of trade records. Follows `event_dt`.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(trade_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(trade_dt.fields).values()))
+)), indent=2)}
+```
+"""
+
+position_dt = np.dtype([
+    *_event_fields
+], align=True)
+"""_"""
+
+__pdoc__['position_dt'] = f"""`np.dtype` of position records. Follows `event_dt`.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(position_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(position_dt.fields).values()))
+)), indent=2)}
+```
+"""
+
+_log_fields = [
+    ('idx', np.int_),
+    ('col', np.int_),
+    ('group', np.int_),
+    ('cash_now', np.float_),
+    ('shares_now', np.float_),
+    ('val_price_now', np.float_),
+    ('value_now', np.float_),
+    ('size', np.float_),
+    ('size_type', np.int_),
+    ('direction', np.int_),
+    ('price', np.float_),
+    ('fees', np.float_),
+    ('fixed_fees', np.float_),
+    ('slippage', np.float_),
+    ('min_size', np.float_),
+    ('max_size', np.float_),
+    ('reject_prob', np.float_),
+    ('close_first', np.bool_),
+    ('allow_partial', np.bool_),
+    ('raise_reject', np.bool_),
+    ('log', np.bool_),
+    ('new_cash', np.float_),
+    ('new_shares', np.float_),
+    ('res_size', np.float_),
+    ('res_price', np.float_),
+    ('res_fees', np.float_),
+    ('res_side', np.int_),
+    ('res_status', np.int_),
+    ('res_status_info', np.int_)
+]
+
+log_dt = np.dtype(_log_fields, align=True)
+"""_"""
+
+__pdoc__['log_dt'] = f"""`np.dtype` of log records.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(log_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(log_dt.fields).values()))
+)), indent=2)}
+```
+"""
+
+# ############# Signals ############# #
+
+StopType = namedtuple('StopType', [
+    'StopLoss',
+    'TrailStop',
+    'TakeProfit'
+])(*range(3))
+"""_"""
+
+__pdoc__['StopType'] = f"""Stop type.
+
+```plaintext
+{json.dumps(dict(zip(StopType._fields, StopType)), indent=2)}
+```
+"""

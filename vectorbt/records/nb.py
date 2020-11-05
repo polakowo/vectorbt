@@ -12,15 +12,15 @@
 import numpy as np
 from numba import njit
 
-from vectorbt.utils.math import is_close_nb
-from vectorbt.records.enums import (
+from vectorbt.enums import (
+    OrderSide,
     DrawdownStatus,
     drawdown_dt,
-    OrderSide,
     EventStatus,
     trade_dt,
     position_dt
 )
+from vectorbt.utils.math import is_close_nb
 
 size_zero_err = "Found order with size equal or less than zero"
 price_zero_err = "Found order with price equal or less than zero"
@@ -485,7 +485,7 @@ def trade_records_nb(price, order_records):
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio import Order, SizeType
+        >>> from vectorbt.enums import Order, SizeType
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import trade_records_nb
 
@@ -669,7 +669,7 @@ def position_records_nb(price, order_records):
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
-        >>> from vectorbt.portfolio import Order, SizeType
+        >>> from vectorbt.enums import Order, SizeType
         >>> from vectorbt.portfolio.nb import simulate_nb
         >>> from vectorbt.records.nb import position_records_nb
 

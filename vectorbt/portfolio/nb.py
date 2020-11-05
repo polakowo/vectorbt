@@ -43,15 +43,7 @@
 import numpy as np
 from numba import njit
 
-from vectorbt.utils.math import (
-    is_close_or_less_nb,
-    is_less_nb,
-    add_nb
-)
-from vectorbt.utils.array import insert_argsort_nb
-from vectorbt.base.reshape_fns import flex_select_auto_nb
-from vectorbt.generic import nb as generic_nb
-from vectorbt.portfolio.enums import (
+from vectorbt.enums import (
     SimulationContext,
     GroupContext,
     RowContext,
@@ -63,57 +55,113 @@ from vectorbt.portfolio.enums import (
     Direction,
     Order,
     NoOrder,
-    OrderStatus,
-    OrderResult,
-    IgnoredOrder,
-    RejectedOrder,
-    RejectedOrderError
-)
-from vectorbt.records.enums import (
     OrderSide,
-    order_dt
+    OrderStatus,
+    StatusInfo,
+    OrderResult,
+    RejectedOrderError,
+    order_dt,
+    log_dt
 )
+from vectorbt.utils.math import (
+    is_close_nb,
+    is_close_or_less_nb,
+    is_less_nb,
+    add_nb
+)
+from vectorbt.utils.array import insert_argsort_nb
+from vectorbt.base.reshape_fns import flex_select_auto_nb
+from vectorbt.generic import nb as generic_nb
 
 
 # ############# Simulation ############# #
 
 @njit(cache=True)
-def buy_shares_nb(cash_now, shares_now, price, size, fees, fixed_fees, slippage,
-                  min_size, allow_partial, raise_by_reject, direction):
+def fill_req_log_nb(i, col, group, cash_now, shares_now, val_price_now,
+                           value_now, order, log_record):
+    """Fill log record on order request."""
+    log_record['idx'] = i
+    log_record['col'] = col
+    log_record['group'] = group
+    log_record['cash_now'] = cash_now
+    log_record['shares_now'] = shares_now
+    log_record['val_price_now'] = val_price_now
+    log_record['value_now'] = value_now
+    log_record['size'] = order.size
+    log_record['size_type'] = order.size_type
+    log_record['direction'] = order.direction
+    log_record['price'] = order.price
+    log_record['fees'] = order.fees
+    log_record['fixed_fees'] = order.fixed_fees
+    log_record['slippage'] = order.slippage
+    log_record['min_size'] = order.min_size
+    log_record['max_size'] = order.max_size
+    log_record['reject_prob'] = order.reject_prob
+    log_record['close_first'] = order.close_first
+    log_record['allow_partial'] = order.allow_partial
+    log_record['raise_reject'] = order.raise_reject
+    log_record['log'] = order.log
+
+
+@njit(cache=True)
+def fill_res_log_nb(new_cash, new_shares, order_result, log_record):
+    """Fill log record on order result."""
+    log_record['new_cash'] = new_cash
+    log_record['new_shares'] = new_shares
+    log_record['res_size'] = order_result.size
+    log_record['res_price'] = order_result.price
+    log_record['res_fees'] = order_result.fees
+    log_record['res_side'] = order_result.side
+    log_record['res_status'] = order_result.status
+    log_record['res_status_info'] = order_result.status_info
+
+
+@njit(cache=True)
+def order_not_filled_nb(cash_now, shares_now, status, status_info, log_record, log):
+    """Return `cash_now`, `shares_now` and `OrderResult` for order that hasn't been filled."""
+    order_result = OrderResult(np.nan, np.nan, np.nan, -1, status, status_info)
+    if log:
+        fill_res_log_nb(cash_now, shares_now, order_result, log_record)
+    return cash_now, shares_now, order_result
+
+
+@njit(cache=True)
+def buy_shares_nb(cash_now, shares_now, size, direction, price, fees, fixed_fees, slippage,
+                  min_size, allow_partial, raise_reject, log_record, log):
     """Buy shares."""
 
     # Get optimal order size
-    if direction == Direction.Short:
-        size = min(-shares_now, size)
+    if direction == Direction.ShortOnly:
+        adj_size = min(-shares_now, size)
+    else:
+        adj_size = size
 
     # Get price adjusted with slippage
     adj_price = price * (1 + slippage)
 
     # Get cash required to complete this order
-    req_cash = size * adj_price
+    req_cash = adj_size * adj_price
     req_fees = req_cash * fees + fixed_fees
     adj_req_cash = req_cash + req_fees
 
     if is_close_or_less_nb(adj_req_cash, cash_now):
         # Sufficient cash
-        final_size = size
+        final_size = adj_size
         fees_paid = req_fees
         final_cash = adj_req_cash
 
         # Update current cash
-        cash_now = add_nb(cash_now, -final_cash)
+        new_cash = add_nb(cash_now, -final_cash)
     else:
         # Insufficient cash, size will be less than requested
-        if not np.isinf(size) and not allow_partial:
-            # np.inf doesn't count
-            if raise_by_reject:
-                raise RejectedOrderError("Order rejected: Partial fill")
-            return cash_now, shares_now, RejectedOrder
         if is_close_or_less_nb(cash_now, fixed_fees):
             # Can't fill
-            if raise_by_reject:
-                raise RejectedOrderError("Order rejected: Insufficient funds")
-            return cash_now, shares_now, RejectedOrder
+            if raise_reject:
+                raise RejectedOrderError("Order rejected: Fees cannot be covered")
+            return order_not_filled_nb(
+                cash_now, shares_now,
+                OrderStatus.Rejected, StatusInfo.CantCoverFees,
+                log_record, log)
 
         # For fees of 10% and 1$ per transaction, you can buy shares for 90$ (effect_cash)
         # to spend 100$ (adj_req_cash) in total
@@ -124,45 +172,72 @@ def buy_shares_nb(cash_now, shares_now, price, size, fees, fixed_fees, slippage,
         fees_paid = cash_now - final_cash
 
         # Update current cash
-        cash_now = 0.  # numerical stability
+        new_cash = 0.  # numerical stability
 
     # Check against minimum size
     if abs(final_size) < min_size:
-        if raise_by_reject:
-            raise RejectedOrderError("Order rejected: Size is less than minimum allowed")
-        return cash_now, shares_now, RejectedOrder
+        if raise_reject:
+            raise RejectedOrderError("Order rejected: Final size is less than minimum allowed")
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Rejected, StatusInfo.MinSizeNotReached,
+            log_record, log)
+
+    # Check against partial fill (np.inf doesn't count)
+    if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
+        if raise_reject:
+            raise RejectedOrderError("Order rejected: Final size is less than requested")
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Rejected, StatusInfo.PartialFill,
+            log_record, log)
 
     # Update current shares
-    shares_now = add_nb(shares_now, final_size)
+    new_shares = add_nb(shares_now, final_size)
 
     # Return filled order
-    return cash_now, \
-           shares_now, \
-           OrderResult(
-               final_size,
-               adj_price,
-               fees_paid,
-               OrderSide.Buy,
-               OrderStatus.Filled
-           )
+    order_result = OrderResult(
+        final_size,
+        adj_price,
+        fees_paid,
+        OrderSide.Buy,
+        OrderStatus.Filled,
+        -1
+    )
+    if log:
+        fill_res_log_nb(new_cash, new_shares, order_result, log_record)
+    return new_cash, new_shares, order_result
 
 
 @njit(cache=True)
-def sell_shares_nb(cash_now, shares_now, price, size, fees, fixed_fees, slippage,
-                   min_size, raise_by_reject, direction):
+def sell_shares_nb(cash_now, shares_now, size, direction, price, fees, fixed_fees, slippage,
+                   min_size, allow_partial, raise_reject, log_record, log):
     """Sell shares."""
 
     # Get optimal order size
-    if direction == Direction.Long:
+    if direction == Direction.LongOnly:
         final_size = min(shares_now, size)
     else:
         final_size = size
 
     # Check against minimum size
     if abs(final_size) < min_size:
-        if raise_by_reject:
-            raise RejectedOrderError("Order rejected: Size is less than minimum allowed")
-        return cash_now, shares_now, RejectedOrder
+        if raise_reject:
+            raise RejectedOrderError("Order rejected: Final size is less than minimum allowed")
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Rejected, StatusInfo.MinSizeNotReached,
+            log_record, log)
+
+    # Check against partial fill
+    if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
+        # np.inf doesn't count
+        if raise_reject:
+            raise RejectedOrderError("Order rejected: Final size is less than requested")
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Rejected, StatusInfo.PartialFill,
+            log_record, log)
 
     # Get price adjusted with slippage
     adj_price = price * (1 - slippage)
@@ -176,45 +251,73 @@ def sell_shares_nb(cash_now, shares_now, price, size, fees, fixed_fees, slippage
     # Get final cash by subtracting costs
     if is_less_nb(acq_cash, fees_paid):
         # Can't fill
-        if raise_by_reject:
-            raise RejectedOrderError("Order rejected: Cost outweighs the benefits")
-        return cash_now, shares_now, RejectedOrder
+        if raise_reject:
+            raise RejectedOrderError("Order rejected: Fees cannot be covered")
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Rejected, StatusInfo.CantCoverFees,
+            log_record, log)
     final_cash = acq_cash - fees_paid
 
     # Update current cash and shares
-    cash_now += final_cash
-    shares_now = add_nb(shares_now, -final_size)
+    new_cash = cash_now + final_cash
+    new_shares = add_nb(shares_now, -final_size)
 
     # Return filled order
-    return cash_now, \
-           shares_now, \
-           OrderResult(
-               final_size,
-               adj_price,
-               fees_paid,
-               OrderSide.Sell,
-               OrderStatus.Filled
-           )
+    order_result = OrderResult(
+        final_size,
+        adj_price,
+        fees_paid,
+        OrderSide.Sell,
+        OrderStatus.Filled,
+        -1
+    )
+    if log:
+        fill_res_log_nb(new_cash, new_shares, order_result, log_record)
+    return new_cash, new_shares, order_result
 
 
 @njit(cache=True)
-def process_order_nb(cash_now, shares_now, val_price_now, value_now, order):
+def process_order_nb(i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_record):
     """Process an order given current cash and share balance.
 
-    Ignores order if size is 0 or size, price, value or valuation price is NaN.
-
     Args:
+        i (int): Current index.
+        col (int): Current column.
+        group (int): Current group.
         cash_now (float): Cash available to this asset or group with cash sharing.
         shares_now (float): Holdings of this particular asset.
         val_price_now (float): Valuation price for this particular asset.
+
+            Used to convert `SizeType.TargetValue` to `SizeType.TargetShares`.
         value_now (float): Value of this asset or group with cash sharing.
-        order (Order): See `vectorbt.portfolio.enums.Order`.
+
+            Used to convert `SizeType.TargetPercent` to `SizeType.TargetValue`.
+        order (Order): See `vectorbt.enums.Order`.
+        log_record (log_dt): Record of type `vectorbt.enums.log_dt`.
+
+    Error is thrown if an input has value that is not expected.
+    Order is ignored if its execution has no effect on current balance.
+    Order is rejected if an input goes over a limit/restriction.
     """
-    if np.isnan(order.size) or np.isnan(order.price):
-        return cash_now, shares_now, IgnoredOrder
+    if order.log:
+        fill_req_log_nb(
+            i, col, group, cash_now, shares_now, val_price_now,
+            value_now, order, log_record)
+
+    if np.isnan(order.size):
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Ignored, StatusInfo.SizeNaN,
+            log_record, order.log)
+    if np.isnan(order.price):
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Ignored, StatusInfo.PriceNaN,
+            log_record, order.log)
 
     # Check variables
-    if cash_now < 0:
+    if np.isnan(cash_now) or cash_now < 0:
         raise ValueError("cash_now must be greater than 0")
     if not np.isfinite(shares_now):
         raise ValueError("shares_now must be finite")
@@ -222,6 +325,10 @@ def process_order_nb(cash_now, shares_now, val_price_now, value_now, order):
         raise ValueError("val_price_now must be finite and greater than 0")
 
     # Check order
+    if order.direction == Direction.LongOnly and shares_now < 0:
+        raise ValueError("shares_now is negative but order.direction is Direction.LongOnly")
+    if order.direction == Direction.ShortOnly and shares_now > 0:
+        raise ValueError("shares_now is positive but order.direction is Direction.ShortOnly")
     if not np.isfinite(order.price) or order.price <= 0:
         raise ValueError("order.price must be finite and greater than 0")
     if not np.isfinite(order.fees) or order.fees < 0:
@@ -236,32 +343,26 @@ def process_order_nb(cash_now, shares_now, val_price_now, value_now, order):
         raise ValueError("order.max_size must be greater than 0")
     if not np.isfinite(order.reject_prob) or order.reject_prob < 0 or order.reject_prob > 1:
         raise ValueError("order.reject_prob must be between 0 and 1")
-    if order.allow_partial != 0 and order.allow_partial != 1:
-        raise ValueError("order.allow_partial must be boolean")
-    if order.raise_by_reject != 0 and order.raise_by_reject != 1:
-        raise ValueError("order.raise_by_reject must be boolean")
-    if order.direction == Direction.Long and shares_now < 0:
-        raise ValueError("shares_now is negative but order.direction is Direction.Long")
-    if order.direction == Direction.Short and shares_now > 0:
-        raise ValueError("shares_now is positive but order.direction is Direction.Short")
 
     order_size = order.size
     order_size_type = order.size_type
 
-    if order.direction == Direction.Short:
+    if order.direction == Direction.ShortOnly:
         # Positive size in short direction should be treated as negative
         order_size *= -1
-
-    if order.direction == Direction.Short or order.direction == Direction.All:
-        if order_size < 0 and np.isinf(order_size):
-            # Go full short, depends upon current value
-            order_size = -1.
-            order_size_type = SizeType.TargetPercent
 
     if order_size_type == SizeType.TargetPercent:
         # Target percentage of current value
         if np.isnan(value_now):
-            return cash_now, shares_now, IgnoredOrder
+            return order_not_filled_nb(
+                cash_now, shares_now,
+                OrderStatus.Ignored, StatusInfo.ValueNaN,
+                log_record, order.log)
+        if value_now <= 0:
+            return order_not_filled_nb(
+                cash_now, shares_now,
+                OrderStatus.Rejected, StatusInfo.ValueZeroNeg,
+                log_record, order.log)
 
         order_size *= value_now
         order_size_type = SizeType.TargetValue
@@ -269,7 +370,10 @@ def process_order_nb(cash_now, shares_now, val_price_now, value_now, order):
     if order_size_type == SizeType.TargetValue:
         # Target value
         if np.isnan(val_price_now):
-            return cash_now, shares_now, IgnoredOrder
+            return order_not_filled_nb(
+                cash_now, shares_now,
+                OrderStatus.Ignored, StatusInfo.ValPriceNaN,
+                log_record, order.log)
 
         order_size = order_size / val_price_now
         order_size_type = SizeType.TargetShares
@@ -278,84 +382,145 @@ def process_order_nb(cash_now, shares_now, val_price_now, value_now, order):
         # Target amount of shares
         order_size -= shares_now
 
-    if order_size == 0:
-        return cash_now, shares_now, IgnoredOrder
+    if order.direction == Direction.ShortOnly or order.direction == Direction.All:
+        if order_size < 0 and np.isinf(order_size):
+            # Similar to going all long, going all short also depends upon current funds
+            # If in short position, also subtract cash that covers this position (1:1)
+            # This way, two successive -np.inf operations with same price will trigger only one short
+            order_size = -2 * shares_now - cash_now / order.price
+            if order_size >= 0:
+                if order.raise_reject:
+                    raise RejectedOrderError("Order rejected: Not enough cash to short")
+                return order_not_filled_nb(
+                    cash_now, shares_now,
+                    OrderStatus.Rejected, StatusInfo.NoCashShort,
+                    log_record, order.log)
+
+    direction = order.direction
+    if order.close_first:
+        # Close position before reversal, requires second order to open opposite position
+        if not is_close_nb(shares_now, 0):
+            if shares_now > 0:
+                if order_size < 0:
+                    # Restrict at bottom
+                    direction = Direction.LongOnly
+            else:
+                if order_size > 0:
+                    # Restrict at top
+                    direction = Direction.ShortOnly
+
+    if is_close_nb(order_size, 0):
+        return order_not_filled_nb(
+            cash_now, shares_now,
+            OrderStatus.Ignored, StatusInfo.SizeZero,
+            log_record, order.log)
 
     if abs(order_size) > order.max_size:
         if not order.allow_partial:
-            if order.raise_by_reject:
+            if order.raise_reject:
                 raise RejectedOrderError("Order rejected: Size is greater than maximum allowed")
-            return cash_now, shares_now, RejectedOrder
+            return order_not_filled_nb(
+                cash_now, shares_now,
+                OrderStatus.Rejected, StatusInfo.MaxSizeExceeded,
+                log_record, order.log)
 
         order_size = np.sign(order_size) * order.max_size
 
     if order.reject_prob > 0:
         if np.random.uniform(0, 1) < order.reject_prob:
-            if order.raise_by_reject:
-                raise RejectedOrderError("Order rejected: Random event")
-            return cash_now, shares_now, RejectedOrder
+            if order.raise_reject:
+                raise RejectedOrderError("Random event happened")
+            return order_not_filled_nb(
+                cash_now, shares_now,
+                OrderStatus.Rejected, StatusInfo.RandomEvent,
+                log_record, order.log)
 
     if order_size > 0:
-        if order.direction == Direction.Long or order.direction == Direction.All:
+        if direction == Direction.LongOnly or direction == Direction.All:
+            if is_close_nb(cash_now, 0):
+                if order.raise_reject:
+                    raise RejectedOrderError("Order rejected: Not enough cash to long")
+                return order_not_filled_nb(
+                    0., shares_now,
+                    OrderStatus.Rejected, StatusInfo.NoCashLong,
+                    log_record, order.log)
             if np.isinf(order_size) and np.isinf(cash_now):
                 raise ValueError("Attempt to go in long direction indefinitely. Set max_size or finite init_cash.")
         else:
-            if shares_now == 0:
-                return cash_now, shares_now, IgnoredOrder
+            if is_close_nb(shares_now, 0):
+                if order.raise_reject:
+                    raise RejectedOrderError("Order rejected: No open position to reduce/close")
+                return order_not_filled_nb(
+                    cash_now, 0.,
+                    OrderStatus.Rejected, StatusInfo.NoOpenPosition,
+                    log_record, order.log)
 
         return buy_shares_nb(
             cash_now,
             shares_now,
-            order.price,
             order_size,
+            direction,
+            order.price,
             order.fees,
             order.fixed_fees,
             order.slippage,
             order.min_size,
             order.allow_partial,
-            order.raise_by_reject,
-            order.direction
+            order.raise_reject,
+            log_record,
+            order.log
         )
     else:
-        if order.direction == Direction.Short or order.direction == Direction.All:
+        if direction == Direction.ShortOnly or direction == Direction.All:
             if np.isinf(order_size):
                 raise ValueError("Attempt to go in short direction indefinitely. Set max_size or finite init_cash.")
         else:
-            if shares_now == 0:
-                return cash_now, shares_now, IgnoredOrder
+            if is_close_nb(shares_now, 0):
+                if order.raise_reject:
+                    raise RejectedOrderError("Order rejected: No open position to reduce/close")
+                return order_not_filled_nb(
+                    cash_now, 0.,
+                    OrderStatus.Rejected, StatusInfo.NoOpenPosition,
+                    log_record, order.log)
 
         return sell_shares_nb(
             cash_now,
             shares_now,
-            order.price,
             -order_size,
+            direction,
+            order.price,
             order.fees,
             order.fixed_fees,
             order.slippage,
             order.min_size,
-            order.raise_by_reject,
-            order.direction
+            order.allow_partial,
+            order.raise_reject,
+            log_record,
+            order.log
         )
 
 
 @njit(cache=True)
 def create_order_nb(size=np.nan,
-                 size_type=SizeType.Shares,
-                 price=np.nan,
-                 fees=0.,
-                 fixed_fees=0.,
-                 slippage=0.,
-                 min_size=0.,
-                 max_size=np.inf,
-                 reject_prob=0.,
-                 allow_partial=True,
-                 raise_by_reject=False,
-                 direction=Direction.All):
+                    size_type=SizeType.Shares,
+                    direction=Direction.All,
+                    price=np.nan,
+                    fees=0.,
+                    fixed_fees=0.,
+                    slippage=0.,
+                    min_size=0.,
+                    max_size=np.inf,
+                    reject_prob=0.,
+                    close_first=False,
+                    allow_partial=True,
+                    raise_reject=False,
+                    log=False):
     """Convenience function to create an order with some defaults."""
 
     return Order(
         float(size),
         size_type,
+        direction,
         float(price),
         float(fees),
         float(fixed_fees),
@@ -363,9 +528,10 @@ def create_order_nb(size=np.nan,
         float(min_size),
         float(max_size),
         float(reject_prob),
-        bool(allow_partial),
-        bool(raise_by_reject),
-        direction
+        close_first,
+        allow_partial,
+        raise_reject,
+        log
     )
 
 
@@ -477,7 +643,7 @@ def get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price):
 def get_group_value_ctx_nb(sc_oc):
     """Get group value from context.
 
-    Accepts `vectorbt.portfolio.enums.SegmentContext` and `vectorbt.portfolio.enums.OrderContext`.
+    Accepts `vectorbt.enums.SegmentContext` and `vectorbt.enums.OrderContext`.
 
     Best called once from `segment_prep_func_nb`.
     To set the valuation price, change `last_val_price` of the context in-place.
@@ -498,7 +664,7 @@ def get_group_value_ctx_nb(sc_oc):
 @njit(cache=True)
 def get_order_value_nb(size, size_type, shares_now, val_price_now, value_now, direction):
     """Get potential value of an order."""
-    if direction == Direction.Short:
+    if direction == Direction.ShortOnly:
         size *= -1
     holding_value_now = shares_now * val_price_now
     if size_type == SizeType.Shares:
@@ -516,7 +682,7 @@ def get_order_value_nb(size, size_type, shares_now, val_price_now, value_now, di
 def auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr):
     """Generate call sequence based on order value dynamically, for example, to rebalance.
 
-    Accepts `vectorbt.portfolio.enums.SegmentContext`.
+    Accepts `vectorbt.enums.SegmentContext`.
 
     Arrays `size`, `size_type`, `direction` and `temp_float_arr` should match the number
     of columns in the group. Array `temp_float_arr` should be empty and will contain
@@ -557,7 +723,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     order. If unsuccessful due to insufficient cash/shares, always orders the available fraction.
     Updates then the current cash and shares balance.
 
-    Returns order records of layout `vectorbt.records.enums.order_dt`.
+    Returns order records of layout `vectorbt.enums.order_dt` and log records of layout `vectorbt.enums.log_dt`.
 
     As opposed to `simulate_row_wise_nb`, order processing happens in row-major order, that is,
     from top to bottom slower (along time axis) and from left to right faster (along asset axis).
@@ -568,7 +734,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
             A tuple with exactly two elements: the number of steps and columns.
         close (np.ndarray): Reference price, such as close.
-        
+
             Should have shape `target_shape`.
         group_lens (np.ndarray): Column count per group.
 
@@ -598,14 +764,14 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         group_prep_func_nb (callable): Group preparation function.
 
             Executed before each group. Should accept the current group context
-            `vectorbt.portfolio.enums.GroupContext`, unpacked tuple from `prep_func_nb`, and
+            `vectorbt.enums.GroupContext`, unpacked tuple from `prep_func_nb`, and
             `*group_prep_args`. Should return a tuple of any content, which is then passed to
             `segment_prep_func_nb`.
         group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
         segment_prep_func_nb (callable): Segment preparation function.
 
             Executed before each row in a group. Should accept the current segment context
-            `vectorbt.portfolio.enums.SegmentContext`, unpacked tuple from `group_prep_func_nb`,
+            `vectorbt.enums.SegmentContext`, unpacked tuple from `group_prep_func_nb`,
             and `*segment_prep_args`. Should return a tuple of any content, which is then
             passed to `order_func_nb`.
 
@@ -624,9 +790,9 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         order_func_nb (callable): Order generation function.
 
             Used for either generating an order or skipping. Should accept the current order context
-            `vectorbt.portfolio.enums.OrderContext`, unpacked tuple from `segment_prep_func_nb`, and
-            `*order_args`. Should either return `vectorbt.portfolio.enums.Order`, or
-            `vectorbt.portfolio.enums.NoOrder` to do nothing.
+            `vectorbt.enums.OrderContext`, unpacked tuple from `segment_prep_func_nb`, and
+            `*order_args`. Should either return `vectorbt.enums.Order`, or
+            `vectorbt.enums.NoOrder` to do nothing.
         order_args (tuple): Arguments passed to `order_func_nb`.
 
     !!! note
@@ -665,7 +831,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         ...     shares_nb,
         ...     holding_value_ungrouped_nb
         ... )
-        >>> from vectorbt.portfolio.enums import SizeType, Direction
+        >>> from vectorbt.enums import SizeType, Direction
 
         >>> @njit
         ... def prep_func_nb(simc):  # do nothing
@@ -691,7 +857,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         ...         col = sc.from_col + k
         ...         size[k] = 1 / sc.group_len
         ...         size_type[k] = SizeType.TargetPercent
-        ...         direction[k] = Direction.Long  # long positions only
+        ...         direction[k] = Direction.LongOnly  # long positions only
         ...         # Here we use order price instead of previous close to valuate the assets
         ...         sc.last_val_price[col] = sc.close[sc.i, col]
         ...     # Reorder call sequence such that selling orders come first and buying last
@@ -706,9 +872,9 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         ...     return create_order_nb(
         ...         size=size[col_i],
         ...         size_type=size_type[col_i],
+        ...         direction=direction[col_i],
         ...         price=oc.close[oc.i, oc.col],
-        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage,
-        ...         direction=direction[col_i]
+        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage
         ...     )
 
         >>> target_shape = (5, 3)
@@ -724,7 +890,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         >>> fixed_fees = 1.
         >>> slippage = 0.001
 
-        >>> order_records = simulate_nb(
+        >>> order_records, log_records = simulate_nb(
         ...     target_shape,
         ...     close,
         ...     group_lens,
@@ -787,7 +953,9 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     record_mask = np.full(target_shape[0] * target_shape[1], False)
-    j = 0
+    ridx = 0
+    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     last_val_price = np.full_like(last_shares, np.nan, dtype=np.float_)
@@ -803,6 +971,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         active_mask,
         order_records,
         record_mask,
+        log_records,
         last_cash,
         last_shares,
         last_val_price
@@ -827,6 +996,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                 active_mask,
                 order_records,
                 record_mask,
+                log_records,
                 last_cash,
                 last_shares,
                 last_val_price,
@@ -834,7 +1004,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                 group_len,
                 from_col,
                 to_col,
-                j
+                ridx,
+                lidx
             )
             group_prep_out = group_prep_func_nb(gc, *prep_out, *group_prep_args)
 
@@ -858,6 +1029,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                         active_mask,
                         order_records,
                         record_mask,
+                        log_records,
                         last_cash,
                         last_shares,
                         last_val_price,
@@ -866,7 +1038,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                         group_len,
                         from_col,
                         to_col,
-                        j,
+                        ridx,
+                        lidx,
                         call_seq_now
                     )
                     segment_prep_out = segment_prep_func_nb(sc, *group_prep_out, *segment_prep_args)
@@ -902,6 +1075,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                             active_mask,
                             order_records,
                             record_mask,
+                            log_records,
                             last_cash,
                             last_shares,
                             last_val_price,
@@ -910,7 +1084,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                             group_len,
                             from_col,
                             to_col,
-                            j,
+                            ridx,
+                            lidx,
                             call_seq_now,
                             col,
                             k,
@@ -923,7 +1098,11 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
                         # Process the order
                         cash_now, shares_now, order_result = process_order_nb(
-                            cash_now, shares_now, val_price_now, value_now, order)
+                            i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+
+                        # Increment log index
+                        if order.log:
+                            lidx += 1
 
                         if order_result.status == OrderStatus.Filled:
                             # Add a new record
@@ -935,7 +1114,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                             order_records[r]['fees'] = order_result.fees
                             order_records[r]['side'] = order_result.side
                             record_mask[r] = True
-                            j += 1
+                            ridx += 1
 
                         # Now becomes last
                         if cash_sharing:
@@ -947,7 +1126,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
             from_col = to_col
 
     # Order records are not sorted yet
-    return order_records[record_mask]
+    return order_records[record_mask], log_records[:lidx]
 
 
 @njit
@@ -958,7 +1137,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
     changing fastest, and the columns/groups changing slowest.
 
     The main difference is that instead of `group_prep_func_nb` it now exposes `row_prep_func_nb`,
-    which is executed per entire row. It should accept `vectorbt.portfolio.enums.RowContext`.
+    which is executed per entire row. It should accept `vectorbt.enums.RowContext`.
 
     !!! note
         Function `row_prep_func_nb` is only called if there is at least on active segment in
@@ -1001,7 +1180,9 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     record_mask = np.full(target_shape[0] * target_shape[1], False)
-    j = 0
+    ridx = 0
+    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     last_val_price = np.full_like(last_shares, np.nan, dtype=np.float_)
@@ -1042,11 +1223,13 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                 active_mask,
                 order_records,
                 record_mask,
+                log_records,
                 last_cash,
                 last_shares,
                 last_val_price,
                 i,
-                j
+                ridx,
+                lidx
             )
             row_prep_out = row_prep_func_nb(rc, *prep_out, *row_prep_args)
 
@@ -1069,6 +1252,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                         active_mask,
                         order_records,
                         record_mask,
+                        log_records,
                         last_cash,
                         last_shares,
                         last_val_price,
@@ -1077,7 +1261,8 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                         group_len,
                         from_col,
                         to_col,
-                        j,
+                        ridx,
+                        lidx,
                         call_seq_now
                     )
                     segment_prep_out = segment_prep_func_nb(sc, *row_prep_out, *segment_prep_args)
@@ -1113,6 +1298,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                             active_mask,
                             order_records,
                             record_mask,
+                            log_records,
                             last_cash,
                             last_shares,
                             last_val_price,
@@ -1121,7 +1307,8 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                             group_len,
                             from_col,
                             to_col,
-                            j,
+                            ridx,
+                            lidx,
                             call_seq_now,
                             col,
                             k,
@@ -1134,7 +1321,11 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 
                         # Process the order
                         cash_now, shares_now, order_result = process_order_nb(
-                            cash_now, shares_now, val_price_now, value_now, order)
+                            i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+
+                        # Increment log index
+                        if order.log:
+                            lidx += 1
 
                         if order_result.status == OrderStatus.Filled:
                             # Add a new record
@@ -1146,7 +1337,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                             order_records[r]['fees'] = order_result.fees
                             order_records[r]['side'] = order_result.side
                             record_mask[r] = True
-                            j += 1
+                            ridx += 1
 
                         # Now becomes last
                         if cash_sharing:
@@ -1158,13 +1349,14 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                     from_col = to_col
 
     # Order records are not sorted yet
-    return order_records[record_mask]
+    return order_records[record_mask], log_records
 
 
 @njit(cache=True)
 def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_call_seq,
-                            size, size_type, price, fees, fixed_fees, slippage, min_size, max_size,
-                            reject_prob, allow_partial, raise_by_reject, direction, val_price, flex_2d):
+                            size, size_type, direction, price, fees, fixed_fees, slippage,
+                            min_size, max_size, reject_prob, close_first, allow_partial,
+                            raise_reject, log, val_price, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on orders.
 
     Utilizes flexible broadcasting.
@@ -1179,7 +1371,9 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     record_mask = np.full(target_shape[0] * target_shape[1], False)
-    j = 0
+    ridx = 0
+    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
@@ -1239,31 +1433,37 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
                         value_now += shares_now * val_price_now
 
                 # Generate the next order
-                order = Order(
-                    flex_select_auto_nb(i, col, size, flex_2d),
-                    flex_select_auto_nb(i, col, size_type, flex_2d),
-                    flex_select_auto_nb(i, col, price, flex_2d),
-                    flex_select_auto_nb(i, col, fees, flex_2d),
-                    flex_select_auto_nb(i, col, fixed_fees, flex_2d),
-                    flex_select_auto_nb(i, col, slippage, flex_2d),
-                    flex_select_auto_nb(i, col, min_size, flex_2d),
-                    flex_select_auto_nb(i, col, max_size, flex_2d),
-                    flex_select_auto_nb(i, col, reject_prob, flex_2d),
-                    flex_select_auto_nb(i, col, allow_partial, flex_2d),
-                    flex_select_auto_nb(i, col, raise_by_reject, flex_2d),
-                    flex_select_auto_nb(i, col, direction, flex_2d)
+                order = create_order_nb(
+                    size=flex_select_auto_nb(i, col, size, flex_2d),
+                    size_type=flex_select_auto_nb(i, col, size_type, flex_2d),
+                    direction=flex_select_auto_nb(i, col, direction, flex_2d),
+                    price=flex_select_auto_nb(i, col, price, flex_2d),
+                    fees=flex_select_auto_nb(i, col, fees, flex_2d),
+                    fixed_fees=flex_select_auto_nb(i, col, fixed_fees, flex_2d),
+                    slippage=flex_select_auto_nb(i, col, slippage, flex_2d),
+                    min_size=flex_select_auto_nb(i, col, min_size, flex_2d),
+                    max_size=flex_select_auto_nb(i, col, max_size, flex_2d),
+                    reject_prob=flex_select_auto_nb(i, col, reject_prob, flex_2d),
+                    close_first=flex_select_auto_nb(i, col, close_first, flex_2d),
+                    allow_partial=flex_select_auto_nb(i, col, allow_partial, flex_2d),
+                    raise_reject=flex_select_auto_nb(i, col, raise_reject, flex_2d),
+                    log=flex_select_auto_nb(i, col, log, flex_2d)
                 )
 
                 # Process the order
                 cash_now, shares_now, order_result = process_order_nb(
-                    cash_now, shares_now, val_price_now, value_now, order)
+                    i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+
+                # Increment log index
+                if order.log:
+                    lidx += 1
 
                 if order_result.status == OrderStatus.Filled:
                     # Add a new record
                     if cash_sharing:
                         r = get_record_idx_nb(target_shape, i, col)
                     else:
-                        r = j
+                        r = ridx
                     order_records[r]['col'] = col
                     order_records[r]['idx'] = i
                     order_records[r]['size'] = order_result.size
@@ -1272,7 +1472,7 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
                     order_records[r]['side'] = order_result.side
                     if cash_sharing:
                         record_mask[r] = True
-                    j += 1
+                    ridx += 1
 
                 # Now becomes last
                 if cash_sharing:
@@ -1285,15 +1485,14 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
 
     # Order records are not sorted yet
     if cash_sharing:
-        return order_records[record_mask]
-    return order_records[:j]
+        return order_records[record_mask], log_records[:lidx]
+    return order_records[:ridx], log_records[:lidx]
 
 
 @njit(cache=True)
 def signals_get_size_nb(shares_now,
                         is_entry, is_exit,
                         long_size, short_size,
-                        long_close_first, short_close_first,
                         long_accumulate, short_accumulate,
                         conflict_mode, direction):
     """Get order size given signals."""
@@ -1323,20 +1522,17 @@ def signals_get_size_nb(shares_now,
 
     if is_entry and not is_exit:
         if direction == Direction.All:
-            # Behaves like Direction.Long
+            # Behaves like Direction.LongOnly
             if long_accumulate:
                 order_size = abs_long_size
             else:
                 if shares_now < 0:
                     # Reverse short position
-                    if short_close_first:
-                        order_size = abs_shares_now
-                    else:
-                        order_size = abs_shares_now + abs_long_size
+                    order_size = abs_shares_now + abs_long_size
                 elif shares_now == 0:
                     # Open long position
                     order_size = abs_long_size
-        elif direction == Direction.Long:
+        elif direction == Direction.LongOnly:
             if shares_now == 0 or long_accumulate:
                 # Open or increase long position
                 order_size = abs_long_size
@@ -1347,20 +1543,17 @@ def signals_get_size_nb(shares_now,
 
     elif not is_entry and is_exit:
         if direction == Direction.All:
-            # Behaves like Direction.Short
+            # Behaves like Direction.ShortOnly
             if short_accumulate:
                 order_size = -abs_short_size
             else:
                 if shares_now > 0:
                     # Reverse long position
-                    if long_close_first:
-                        order_size = -abs_shares_now
-                    else:
-                        order_size = -abs_shares_now - abs_short_size
+                    order_size = -abs_shares_now - abs_short_size
                 elif shares_now == 0:
                     # Open short position
                     order_size = -abs_short_size
-        elif direction == Direction.Short:
+        elif direction == Direction.ShortOnly:
             if shares_now < 0:
                 if long_accumulate:
                     # Reduce short position
@@ -1391,10 +1584,11 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
                              long_min_size, short_min_size,
                              long_max_size, short_max_size,
                              long_reject_prob, short_reject_prob,
-                             long_allow_partial, short_allow_partial,
-                             long_raise_by_reject, short_raise_by_reject,
                              long_close_first, short_close_first,
+                             long_allow_partial, short_allow_partial,
+                             long_raise_reject, short_raise_reject,
                              long_accumulate, short_accumulate,
+                             long_log, short_log,
                              conflict_mode, direction,
                              val_price, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals.
@@ -1409,7 +1603,9 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
     record_mask = np.full(target_shape[0] * target_shape[1], False)
-    j = 0
+    ridx = 0
+    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     order_size = np.empty(target_shape[1], dtype=np.float_)
@@ -1435,8 +1631,6 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
                     flex_select_auto_nb(i, col, exits, flex_2d),
                     flex_select_auto_nb(i, col, long_size, flex_2d),
                     flex_select_auto_nb(i, col, short_size, flex_2d),
-                    flex_select_auto_nb(i, col, long_close_first, flex_2d),
-                    flex_select_auto_nb(i, col, short_close_first, flex_2d),
                     flex_select_auto_nb(i, col, long_accumulate, flex_2d),
                     flex_select_auto_nb(i, col, short_accumulate, flex_2d),
                     flex_select_auto_nb(i, col, conflict_mode, flex_2d),
@@ -1488,51 +1682,59 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
                 if _order_size != 0:
                     if _order_size > 0:  # long order
                         _direction = flex_select_auto_nb(i, col, direction, flex_2d)
-                        if _direction == Direction.Short:
+                        if _direction == Direction.ShortOnly:
                             _order_size *= -1  # must reverse for process_order_nb
                         order = create_order_nb(
                             size=_order_size,
                             size_type=SizeType.Shares,
+                            direction=_direction,
                             price=flex_select_auto_nb(i, col, long_price, flex_2d),
                             fees=flex_select_auto_nb(i, col, long_fees, flex_2d),
                             fixed_fees=flex_select_auto_nb(i, col, long_fixed_fees, flex_2d),
                             slippage=flex_select_auto_nb(i, col, long_slippage, flex_2d),
                             min_size=flex_select_auto_nb(i, col, long_min_size, flex_2d),
                             max_size=flex_select_auto_nb(i, col, long_max_size, flex_2d),
+                            close_first=flex_select_auto_nb(i, col, long_close_first, flex_2d),
                             reject_prob=flex_select_auto_nb(i, col, long_reject_prob, flex_2d),
                             allow_partial=flex_select_auto_nb(i, col, long_allow_partial, flex_2d),
-                            raise_by_reject=flex_select_auto_nb(i, col, long_raise_by_reject, flex_2d),
-                            direction=_direction
+                            raise_reject=flex_select_auto_nb(i, col, long_raise_reject, flex_2d),
+                            log=flex_select_auto_nb(i, col, long_log, flex_2d)
                         )
                     else:  # short order
                         _direction = flex_select_auto_nb(i, col, direction, flex_2d)
-                        if _direction == Direction.Short:
+                        if _direction == Direction.ShortOnly:
                             _order_size *= -1
                         order = create_order_nb(
                             size=_order_size,
                             size_type=SizeType.Shares,
+                            direction=_direction,
                             price=flex_select_auto_nb(i, col, short_price, flex_2d),
                             fees=flex_select_auto_nb(i, col, short_fees, flex_2d),
                             fixed_fees=flex_select_auto_nb(i, col, short_fixed_fees, flex_2d),
                             slippage=flex_select_auto_nb(i, col, short_slippage, flex_2d),
                             min_size=flex_select_auto_nb(i, col, short_min_size, flex_2d),
                             max_size=flex_select_auto_nb(i, col, short_max_size, flex_2d),
+                            close_first=flex_select_auto_nb(i, col, short_close_first, flex_2d),
                             reject_prob=flex_select_auto_nb(i, col, short_reject_prob, flex_2d),
                             allow_partial=flex_select_auto_nb(i, col, short_allow_partial, flex_2d),
-                            raise_by_reject=flex_select_auto_nb(i, col, short_raise_by_reject, flex_2d),
-                            direction=_direction
+                            raise_reject=flex_select_auto_nb(i, col, short_raise_reject, flex_2d),
+                            log=flex_select_auto_nb(i, col, short_log, flex_2d)
                         )
 
                     # Process the order
                     cash_now, shares_now, order_result = process_order_nb(
-                        cash_now, shares_now, val_price_now, value_now, order)
+                        i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+
+                    # Increment log index
+                    if order.log:
+                        lidx += 1
 
                     if order_result.status == OrderStatus.Filled:
                         # Add a new record
                         if cash_sharing:
                             r = get_record_idx_nb(target_shape, i, col)
                         else:
-                            r = j
+                            r = ridx
                         order_records[r]['col'] = col
                         order_records[r]['idx'] = i
                         order_records[r]['size'] = order_result.size
@@ -1541,7 +1743,7 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
                         order_records[r]['side'] = order_result.side
                         if cash_sharing:
                             record_mask[r] = True
-                        j += 1
+                        ridx += 1
 
                 # Now becomes last
                 if cash_sharing:
@@ -1554,8 +1756,8 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
 
     # Order records are not sorted yet
     if cash_sharing:
-        return order_records[record_mask]
-    return order_records[:j]
+        return order_records[record_mask], log_records[:lidx]
+    return order_records[:ridx], log_records[:lidx]
 
 
 # ############# Shares ############# #

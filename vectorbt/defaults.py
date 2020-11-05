@@ -13,6 +13,7 @@ Changes take effect immediately."""
 import numpy as np
 import json
 
+from vectorbt.enums import CallSeqType, SizeType, ConflictMode, Direction
 from vectorbt.utils.config import Config
 
 __pdoc__ = {}
@@ -152,10 +153,10 @@ __pdoc__['returns'] = f"""Parameters for returns.
 
 # Portfolio
 portfolio = Config(
-    call_seq='Default',
+    call_seq=CallSeqType.Default,
     init_cash=100.,
     size=np.inf,
-    size_type='Shares',
+    size_type=SizeType.Shares,
     fees=0.,
     fixed_fees=0.,
     slippage=0.,
@@ -163,11 +164,12 @@ portfolio = Config(
     min_size=1e-8,
     max_size=np.inf,
     allow_partial=True,
-    raise_by_reject=False,
+    raise_reject=False,
     close_first=False,
     accumulate=False,
-    conflict_mode='Ignore',
-    direction='All',
+    log=False,
+    conflict_mode=ConflictMode.Ignore,
+    direction=Direction.All,
     cash_sharing=False,
     row_wise=False,
     seed=None,

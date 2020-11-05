@@ -284,6 +284,10 @@ class TestChecks:
         assert not checks.is_equal(None, np.arange(3), np.array_equal)
         assert checks.is_equal(None, None, np.array_equal)
 
+    def test_is_namedtuple(self):
+        assert checks.is_namedtuple(namedtuple('Hello', ['world'])(*range(1)))
+        assert not checks.is_namedtuple((0,))
+
     def test_assert_in(self):
         checks.assert_in(0, (0, 1))
         with pytest.raises(Exception) as e_info:

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from vectorbt.enums import DrawdownStatus, drawdown_dt
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import Configured
@@ -14,11 +15,10 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.records.base import Records, indexing_on_records_meta
-from vectorbt.records.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records import nb
 
 
-def _indexing_func(obj, pd_indexing_func):
+def drawdowns_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseDrawdowns`."""
     new_wrapper, new_records_arr, _, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
     new_ts = new_wrapper.wrap(obj.ts.values[:, col_idxs], group_by=False)
@@ -32,7 +32,7 @@ def _indexing_func(obj, pd_indexing_func):
 class BaseDrawdowns(Records):
     """Extends `Records` for working with drawdown records.
 
-    Requires `records_arr` to have all fields defined in `vectorbt.records.enums.drawdown_dt`."""
+    Requires `records_arr` to have all fields defined in `vectorbt.enums.drawdown_dt`."""
 
     def __init__(self, wrapper, records_arr, ts, idx_field='end_idx'):
         Records.__init__(
@@ -53,7 +53,7 @@ class BaseDrawdowns(Records):
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
             raise ValueError("Records array must have all fields defined in drawdown_dt")
 
-        PandasIndexer.__init__(self, _indexing_func)
+        PandasIndexer.__init__(self, drawdowns_indexing_func)
 
     @classmethod
     def from_ts(cls, ts, idx_field='end_idx', **kwargs):
@@ -457,7 +457,7 @@ class Drawdowns(BaseDrawdowns):
 
     @cached_property
     def status(self):
-        """See `vectorbt.records.enums.DrawdownStatus`."""
+        """See `vectorbt.enums.DrawdownStatus`."""
         return self.map_field('status')
 
     @cached_method

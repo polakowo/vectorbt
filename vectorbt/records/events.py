@@ -11,6 +11,12 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from vectorbt.enums import (
+    EventStatus,
+    event_dt,
+    trade_dt,
+    position_dt
+)
 from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property, cached_method
@@ -20,12 +26,6 @@ from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.records.base import Records, indexing_on_records_meta
 from vectorbt.records import nb
-from vectorbt.records.enums import (
-    EventStatus,
-    event_dt,
-    trade_dt,
-    position_dt
-)
 
 
 def indexing_on_events_meta(obj, pd_indexing_func):
@@ -39,7 +39,7 @@ def indexing_on_events_meta(obj, pd_indexing_func):
     ), group_idxs, col_idxs
 
 
-def _indexing_func(obj, pd_indexing_func):
+def events_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `BaseEvents`."""
     return indexing_on_events_meta(obj, pd_indexing_func)[0]
 
@@ -69,7 +69,7 @@ class BaseEvents(Records):
         if not all(field in records_arr.dtype.names for field in event_dt.names):
             raise ValueError("Records array must have all fields defined in event_dt")
 
-        PandasIndexer.__init__(self, _indexing_func)
+        PandasIndexer.__init__(self, events_indexing_func)
 
     @property  # no need for cached
     def records_readable(self):
@@ -409,7 +409,7 @@ class Events(BaseEventsByResult):
 
     @cached_property
     def status(self):
-        """See `vectorbt.records.enums.EventStatus`."""
+        """See `vectorbt.enums.EventStatus`."""
         return self.map_field('status')
 
     @cached_method

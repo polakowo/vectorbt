@@ -3,10 +3,10 @@
 import numpy as np
 import plotly.graph_objects as go
 
+from vectorbt.enums import StopType
 from vectorbt.utils.config import Config
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.utils.widgets import CustomFigureWidget
-from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.nb import (
     rand_enex_apply_nb,
