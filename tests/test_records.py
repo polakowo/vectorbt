@@ -5,23 +5,6 @@ from numba import njit
 import pytest
 
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.records import (
-    drawdown_dt,
-    order_dt,
-    event_dt,
-    trade_dt,
-    position_dt
-)
-from vectorbt.records.drawdowns import ActiveDrawdowns, RecoveredDrawdowns
-from vectorbt.records.orders import BaseOrders
-from vectorbt.records.events import (
-    BaseEvents,
-    BaseEventsByResult,
-    BaseTrades,
-    BaseTradesByResult,
-    BasePositions,
-    BasePositionsByResult
-)
 
 from tests.utils import record_arrays_close
 
@@ -1545,7 +1528,7 @@ event_records_arr = np.array([
     (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618, -0.00990099, 0),
     (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1),
     (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
-], dtype=event_dt)
+], dtype=trade_dt)
 
 events = vbt.Events(wrapper2, event_records_arr, price)
 events_grouped = vbt.Events(wrapper2_grouped, event_records_arr, price)
@@ -1631,21 +1614,21 @@ class TestEvents:
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1),
                 (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             events['a'].winning.records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             events.winning['a'].records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
 
     def test_losing_records(self):
@@ -1659,15 +1642,15 @@ class TestEvents:
                 (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618, -0.00990099, 0),
                 (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1),
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             events['a'].losing.records_arr,
-            np.array([], dtype=event_dt)
+            np.array([], dtype=trade_dt)
         )
         record_arrays_close(
             events.losing['a'].records_arr,
-            np.array([], dtype=event_dt)
+            np.array([], dtype=trade_dt)
         )
 
     def test_win_rate(self):
@@ -1743,15 +1726,15 @@ class TestEvents:
             np.array([
                 (2, 194.09861778, 6, 1., 1.94098618, 6, 1., 0., -1.94098618, -0.00990099, 0),
                 (3, 24.26232722, 6, 4., 0.97049309, 6, 4., 0., -0.97049309, -0.00990099, 0)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             events['a'].open.records_arr,
-            np.array([], dtype=event_dt)
+            np.array([], dtype=trade_dt)
         )
         record_arrays_close(
             events.open['a'].records_arr,
-            np.array([], dtype=event_dt)
+            np.array([], dtype=trade_dt)
         )
 
     def test_closed_records(self):
@@ -1766,21 +1749,21 @@ class TestEvents:
                 (1, 16.63702438, 4, 5., 0.83185122, 5, 4., 0.66548098, -18.13435658, -0.21584158, 1),
                 (2, 99.00990099, 0, 1., 0.99009901, 1, 2., 1.98019802, 96.03960396, 0.96039604, 1),
                 (3, 49.5049505, 2, 2., 0.99009901, 4, 2., 0.99009901, -1.98019802, -0.01980198, 1)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             events['a'].closed.records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
         record_arrays_close(
             events.closed['a'].records_arr,
             np.array([
                 (0, 33.00330033, 2, 3., 0.99009901, 3, 4., 1.32013201, 30.69306931, 0.30693069, 1),
                 (0, 25.8798157, 4, 5., 1.29399079, 6, 7., 1.8115871, 48.65405351, 0.37227723, 1)
-            ], dtype=event_dt)
+            ], dtype=trade_dt)
         )
 
 

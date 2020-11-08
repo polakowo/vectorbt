@@ -36,7 +36,7 @@ def convert_str_enum_value(enum, value):
     return value
 
 
-def create_value_map(enum):
+def to_value_map(enum):
     """Create value map from enumerated type."""
     value_map = dict(zip(tuple(enum), enum._fields))
     if -1 not in value_map:

@@ -1,4 +1,4 @@
-"""Modules for working with data of any type.
+"""Modules for working with any time series.
 
 In contrast to the `vectorbt.base` sub-package, focuses on the data itself.
 
@@ -35,6 +35,19 @@ in Jupyter Notebook and JupyterLab environments. For more details on using Plotl
 
 The module can be accessed directly via `vbt.plotting`.
 
+## Drawdowns
+
+`vectorbt.generic.drawdowns.Drawdowns` class accepts drawdown records and the corresponding time series
+to analyze the periods of drawdown. Using `vectorbt.generic.drawdowns.Drawdowns.from_ts`, you can generate
+drawdown records for any time series and analyze them right away.
+
+Moreover, all time series accessors have a method `drawdowns`:
+
+```python-repl
+>>> price.vbt.drawdowns().active.current_drawdown()
+-0.4473361334272673
+```
+
 ## Numba-compiled functions
 
 `vectorbt.generic.nb` provides an arsenal of Numba-compiled functions that are used by accessors
@@ -48,5 +61,11 @@ The module can be accessed directly via `vbt.nb`.
 >>> vbt.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
 array([nan, 1.5, 2.5, 3.5])
 ```
+
+## Enums
+
+`vectorbt.generic.enums` defines enums and other schemas for `vectorbt.generic`.
 """
 
+from vectorbt.generic.enums import *
+from vectorbt.generic.drawdowns import Drawdowns

@@ -13,7 +13,7 @@ Changes take effect immediately."""
 import numpy as np
 import json
 
-from vectorbt.enums import CallSeqType, SizeType, ConflictMode, Direction
+from vectorbt.portfolio.enums import CallSeqType, SizeType, ConflictMode, Direction
 from vectorbt.utils.config import Config
 
 __pdoc__ = {}

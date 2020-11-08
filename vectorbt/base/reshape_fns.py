@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
-from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.base import index_fns, array_wrapper
 
@@ -371,6 +370,8 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
         c  7  8  9
         ```
     """
+    from vectorbt import defaults
+
     is_pd = False
     is_2d = False
     args = list(args)

@@ -1,25 +1,24 @@
-"""Classes for working with drawdown records."""
+"""Base class for working with drawdown records."""
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from vectorbt.enums import DrawdownStatus, drawdown_dt
-from vectorbt.defaults import contrast_color_schema
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import Configured
-from vectorbt.base.reshape_fns import to_1d
-from vectorbt.base.indexing import PandasIndexer
-from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeTypes
+from vectorbt.utils.enum import to_value_map
+from vectorbt.base.reshape_fns import to_1d
+from vectorbt.base.indexing import PandasIndexer
+from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.generic import nb
+from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records.base import Records, indexing_on_records_meta
-from vectorbt.records import nb
 
 
 def drawdowns_indexing_func(obj, pd_indexing_func):
-    """Perform indexing on `BaseDrawdowns`."""
+    """Perform indexing on `Drawdowns`."""
     new_wrapper, new_records_arr, _, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
     new_ts = new_wrapper.wrap(obj.ts.values[:, col_idxs], group_by=False)
     return obj.copy(
@@ -29,24 +28,57 @@ def drawdowns_indexing_func(obj, pd_indexing_func):
     )
 
 
-class BaseDrawdowns(Records):
+class Drawdowns(Records):
     """Extends `Records` for working with drawdown records.
 
-    Requires `records_arr` to have all fields defined in `vectorbt.enums.drawdown_dt`."""
+    Requires `records_arr` to have all fields defined in `vectorbt.generic.enums.drawdown_dt`.
 
-    def __init__(self, wrapper, records_arr, ts, idx_field='end_idx'):
+    Example:
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> import yfinance as yf
+        >>> from datetime import datetime
+
+        >>> start = datetime(2019, 1, 1)
+        >>> end = datetime(2020, 1, 1)
+        >>> price = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
+        >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
+
+        >>> drawdowns.records.head()
+           col  start_idx  valley_idx  end_idx  status
+        0    0          2           3        6       1
+        1    0          6          38       54       1
+        2    0         54          63       91       1
+        3    0         93          94       95       1
+        4    0         98          99      100       1
+
+        >>> drawdowns.plot()
+        ```
+
+        ![](/vectorbt/docs/img/drawdowns_plot.png)
+
+        ```python-repl
+        >>> drawdowns.drawdown
+        <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
+
+        >>> drawdowns.drawdown.min()
+        -0.48982769972565016
+
+        >>> drawdowns.drawdown.hist(trace_kwargs=dict(nbinsx=50))
+        ```
+
+        ![](/vectorbt/docs/img/drawdowns_drawdown_hist.png)"""
+
+    def __init__(self, wrapper, records_arr, ts, idx_field='end_idx', **kwargs):
         Records.__init__(
             self,
             wrapper,
             records_arr,
-            idx_field=idx_field
-        )
-        Configured.__init__(
-            self,
-            wrapper=wrapper,
-            records_arr=records_arr,
+            idx_field=idx_field,
             ts=ts,
-            idx_field=idx_field
+            **kwargs
         )
         self._ts = ts
 
@@ -57,10 +89,10 @@ class BaseDrawdowns(Records):
 
     @classmethod
     def from_ts(cls, ts, idx_field='end_idx', **kwargs):
-        """Build `BaseDrawdowns` from time series `ts`.
+        """Build `Drawdowns` from time series `ts`.
 
-        `**kwargs` such as `freq` will be passed to `BaseDrawdowns.__init__`."""
-        records_arr = nb.drawdown_records_nb(ts.vbt.to_2d_array())
+        `**kwargs` such as `freq` will be passed to `Drawdowns.__init__`."""
+        records_arr = nb.find_drawdowns_nb(ts.vbt.to_2d_array())
         wrapper = ArrayWrapper.from_obj(ts, **kwargs)
         return cls(wrapper, records_arr, ts, idx_field=idx_field)
 
@@ -73,13 +105,151 @@ class BaseDrawdowns(Records):
     def records_readable(self):
         """Records in readable format."""
         records_df = self.records
-        out = pd.DataFrame(columns=['Column', 'Start Date', 'Valley Date', 'End Date', 'Status'])
+        out = pd.DataFrame()
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Start Date'] = records_df['start_idx'].map(lambda x: self.wrapper.index[x])
         out['Valley Date'] = records_df['valley_idx'].map(lambda x: self.wrapper.index[x])
         out['End Date'] = records_df['end_idx'].map(lambda x: self.wrapper.index[x])
-        out['Status'] = records_df['status'].map(lambda x: DrawdownStatus._fields[x])
+        out['Status'] = records_df['status'].map(to_value_map(DrawdownStatus))
         return out
+
+    @cached_property
+    def start_value(self):
+        """Start value of each drawdown."""
+        return self.map(nb.dd_start_value_map_nb, self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def valley_value(self):
+        """Valley value of each drawdown."""
+        return self.map(nb.dd_valley_value_map_nb, self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def end_value(self):
+        """End value of each drawdown."""
+        return self.map(nb.dd_end_value_map_nb, self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def drawdown(self):
+        """Drawdown value (in percentage)."""
+        return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
+
+    @cached_method
+    def avg_drawdown(self, default_val=0., **kwargs):
+        """Average drawdown (ADD)."""
+        return self.drawdown.mean(default_val=default_val, **kwargs)
+
+    @cached_method
+    def max_drawdown(self, default_val=0., **kwargs):
+        """Maximum drawdown (MDD)."""
+        return self.drawdown.min(default_val=default_val, **kwargs)
+
+    @cached_property
+    def duration(self):
+        """Duration of each drawdown (in raw format)."""
+        return self.map(nb.dd_duration_map_nb)
+
+    @cached_method
+    def avg_duration(self, time_units=True, **kwargs):
+        """Average drawdown duration (in time units)."""
+        return self.duration.mean(time_units=time_units, **kwargs)
+
+    @cached_method
+    def max_duration(self, time_units=True, **kwargs):
+        """Maximum drawdown duration (in time units)."""
+        return self.duration.max(time_units=time_units, **kwargs)
+
+    @cached_method
+    def coverage(self, group_by=None, **kwargs):
+        """Coverage, that is, total duration divided by the whole period."""
+        total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
+        total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
+        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **kwargs)
+
+    @cached_property
+    def ptv_duration(self):
+        """Peak-to-valley (PtV) duration of each drawdown."""
+        return self.map(nb.dd_ptv_duration_map_nb)
+
+    # ############# DrawdownStatus.Active ############# #
+
+    @cached_method
+    def current_drawdown(self, group_by=None, **kwargs):
+        """Current drawdown from peak.
+
+        Does not support `group_by`."""
+        curr_end_val = self.end_value.nst(-1, group_by=group_by)
+        curr_start_val = self.start_value.nst(-1, group_by=group_by)
+        curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
+        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
+
+    @cached_method
+    def current_duration(self, time_units=True, **kwargs):
+        """Current duration from peak.
+
+        Does not support `group_by`."""
+        return self.duration.nst(-1, time_units=time_units, **kwargs)
+
+    @cached_method
+    def current_return(self, **kwargs):
+        """Current return from valley.
+
+        Does not support `group_by`."""
+        recovery_return = self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+        return recovery_return.nst(-1, **kwargs)
+
+    # ############# DrawdownStatus.Recovered ############# #
+
+    @cached_property
+    def recovery_return(self):
+        """Recovery return of each drawdown."""
+        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def vtr_duration(self):
+        """Valley-to-recovery (VtR) duration of each drawdown."""
+        return self.map(nb.dd_vtr_duration_map_nb)
+
+    @cached_property
+    def vtr_duration_ratio(self):
+        """Ratio of VtR duration to total duration of each drawdown.
+
+        The time from valley to recovery divided by the time from peak to valley."""
+        return self.map(nb.dd_vtr_duration_ratio_map_nb)
+
+    # ############# DrawdownStatus ############# #
+
+    @cached_property
+    def status(self):
+        """See `vectorbt.generic.enums.DrawdownStatus`."""
+        return self.map_field('status')
+
+    @cached_property
+    def active(self):
+        """Active drawdowns."""
+        filter_mask = self.records_arr['status'] == DrawdownStatus.Active
+        return self.filter_by_mask(filter_mask)
+
+    @cached_method
+    def active_rate(self, group_by=None, **kwargs):
+        """Rate of recovered drawdowns."""
+        active_count = to_1d(self.active.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        return self.wrapper.wrap_reduced(active_count / total_count, group_by=group_by, **kwargs)
+
+    @cached_property
+    def recovered(self):
+        """Recovered drawdowns."""
+        filter_mask = self.records_arr['status'] == DrawdownStatus.Recovered
+        return self.filter_by_mask(filter_mask)
+
+    @cached_method
+    def recovered_rate(self, group_by=None, **kwargs):
+        """Rate of recovered drawdowns."""
+        recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **kwargs)
+
+    # ############# Plotting ############# #
 
     def plot(self,
              column=None,
@@ -113,10 +283,12 @@ class BaseDrawdowns(Records):
             >>> import pandas as pd
 
             >>> ts = pd.Series([1, 2, 1, 2, 3, 2, 1, 2])
-            >>> vbt.records.Drawdowns.from_ts(ts, freq='1 days').plot()
+            >>> vbt.Drawdowns.from_ts(ts, freq='1 days').plot()
             ```
 
             ![](/vectorbt/docs/img/drawdowns.png)"""
+        from vectorbt.defaults import contrast_color_schema
+
         if column is not None:
             if self.wrapper.grouper.group_by is None:
                 self_col = self[column]
@@ -310,181 +482,3 @@ class BaseDrawdowns(Records):
                 ), active_shape_kwargs))
 
         return fig
-
-    @cached_property
-    def start_value(self):
-        """Start value of each drawdown."""
-        return self.map(nb.dd_start_value_map_nb, self.ts.vbt.to_2d_array())
-
-    @cached_property
-    def valley_value(self):
-        """Valley value of each drawdown."""
-        return self.map(nb.dd_valley_value_map_nb, self.ts.vbt.to_2d_array())
-
-    @cached_property
-    def end_value(self):
-        """End value of each drawdown."""
-        return self.map(nb.dd_end_value_map_nb, self.ts.vbt.to_2d_array())
-
-    @cached_property
-    def drawdown(self):
-        """Drawdown value (in percentage)."""
-        return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
-
-    @cached_method
-    def avg_drawdown(self, default_val=0., **kwargs):
-        """Average drawdown (ADD)."""
-        return self.drawdown.mean(default_val=default_val, **kwargs)
-
-    @cached_method
-    def max_drawdown(self, default_val=0., **kwargs):
-        """Maximum drawdown (MDD)."""
-        return self.drawdown.min(default_val=default_val, **kwargs)
-
-    @cached_property
-    def duration(self):
-        """Duration of each drawdown (in raw format)."""
-        return self.map(nb.dd_duration_map_nb)
-
-    @cached_method
-    def avg_duration(self, time_units=True, **kwargs):
-        """Average drawdown duration (in time units)."""
-        return self.duration.mean(time_units=time_units, **kwargs)
-
-    @cached_method
-    def max_duration(self, time_units=True, **kwargs):
-        """Maximum drawdown duration (in time units)."""
-        return self.duration.max(time_units=time_units, **kwargs)
-
-    @cached_method
-    def coverage(self, group_by=None, **kwargs):
-        """Coverage, that is, total duration divided by the whole period."""
-        total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
-        total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
-        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **kwargs)
-
-    @cached_property
-    def ptv_duration(self):
-        """Peak-to-valley (PtV) duration of each drawdown."""
-        return self.map(nb.dd_ptv_duration_map_nb)
-
-
-class ActiveDrawdowns(BaseDrawdowns):
-    """Extends `BaseDrawdowns` by properties for active drawdowns."""
-
-    @cached_method
-    def current_drawdown(self, group_by=None, **kwargs):
-        """Current drawdown from peak.
-
-        Does not support `group_by`."""
-        curr_end_val = self.end_value.nst(-1, group_by=group_by)
-        curr_start_val = self.start_value.nst(-1, group_by=group_by)
-        curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
-        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
-
-    @cached_method
-    def current_duration(self, time_units=True, **kwargs):
-        """Current duration from peak.
-
-        Does not support `group_by`."""
-        return self.duration.nst(-1, time_units=time_units, **kwargs)
-
-    @cached_method
-    def current_return(self, **kwargs):
-        """Current return from valley.
-
-        Does not support `group_by`."""
-        recovery_return = self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
-        return recovery_return.nst(-1, **kwargs)
-
-
-class RecoveredDrawdowns(BaseDrawdowns):
-    """Extends `BaseDrawdowns` by properties for recovered drawdowns."""
-
-    @cached_property
-    def recovery_return(self):
-        """Recovery return of each drawdown."""
-        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
-
-    @cached_property
-    def vtr_duration(self):
-        """Valley-to-recovery (VtR) duration of each drawdown."""
-        return self.map(nb.dd_vtr_duration_map_nb)
-
-    @cached_property
-    def vtr_duration_ratio(self):
-        """Ratio of VtR duration to total duration of each drawdown.
-
-        The time from valley to recovery divided by the time from peak to valley."""
-        return self.map(nb.dd_vtr_duration_ratio_map_nb)
-
-
-class Drawdowns(BaseDrawdowns):
-    """Extends `BaseDrawdowns` by further dividing drawdowns into active and recovered.
-
-    Example:
-        Compare the average duration of active and recovered drawdowns:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
-
-        >>> ts = pd.DataFrame([
-        ...     [1, 1, 1],
-        ...     [2, 2, 2],
-        ...     [3, 3, 1],
-        ...     [2, 2, 3],
-        ...     [1, 3, 1]
-        ... ], columns=['a', 'b', 'c'])
-        >>> drawdowns = vbt.Drawdowns.from_ts(ts, freq='1 days')
-
-        >>> drawdowns.records
-           col  start_idx  valley_idx  end_idx  status
-        0    0          2           4        4       0
-        1    1          2           3        4       1
-        2    2          1           2        3       1
-        3    2          3           4        4       0
-        >>> drawdowns.active.avg_duration()
-        a   2 days
-        b      NaT
-        c   1 days
-        dtype: timedelta64[ns]
-        >>> drawdowns.recovered.avg_duration()
-        a      NaT
-        b   2 days
-        c   2 days
-        dtype: timedelta64[ns]
-        ```"""
-
-    @cached_property
-    def status(self):
-        """See `vectorbt.enums.DrawdownStatus`."""
-        return self.map_field('status')
-
-    @cached_method
-    def recovered_rate(self, group_by=None, **kwargs):
-        """Rate of recovered drawdowns."""
-        recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
-        total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **kwargs)
-
-    @cached_property
-    def active(self):
-        """Active drawdowns of type `BaseDrawdowns`."""
-        filter_mask = self.records_arr['status'] == DrawdownStatus.Active
-        return ActiveDrawdowns(
-            self.wrapper,
-            self.records_arr[filter_mask],
-            self.ts,
-            idx_field=self.idx_field
-        )
-
-    @cached_property
-    def recovered(self):
-        """Recovered drawdowns of type `RecoveredDrawdowns`."""
-        filter_mask = self.records_arr['status'] == DrawdownStatus.Recovered
-        return RecoveredDrawdowns(
-            self.wrapper,
-            self.records_arr[filter_mask],
-            self.ts,
-            idx_field=self.idx_field
-        )

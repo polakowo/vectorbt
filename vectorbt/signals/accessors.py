@@ -38,7 +38,6 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from vectorbt.defaults import contrast_color_schema
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
@@ -486,7 +485,7 @@ class Signals_Accessor(Generic_Accessor):
 
         Example:
             ```python-repl
-            >>> from vectorbt.enums import StopType
+            >>> from vectorbt.signals.enums import StopType
 
             >>> price = pd.DataFrame({
             ...     'open': [10, 11, 12, 11, 10],
@@ -909,6 +908,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             ```
 
             ![](/vectorbt/docs/img/signals_plot_as_markers.png)"""
+        from vectorbt.defaults import contrast_color_schema
+
         if trace_kwargs is None:
             trace_kwargs = {}
 
@@ -944,6 +945,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         """Plot signals as entry markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
+        from vectorbt.defaults import contrast_color_schema
+
         if trace_kwargs is None:
             trace_kwargs = {}
         trace_kwargs = merge_kwargs(dict(
@@ -963,6 +966,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         """Plot signals as exit markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
+        from vectorbt.defaults import contrast_color_schema
+
         if trace_kwargs is None:
             trace_kwargs = {}
         trace_kwargs = merge_kwargs(dict(

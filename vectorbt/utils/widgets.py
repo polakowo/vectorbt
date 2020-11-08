@@ -2,14 +2,14 @@
 
 import plotly.graph_objects as go
 
-from vectorbt import defaults
-
 
 class CustomFigure(go.Figure):
     """Subclass of the `plotly.graph_objects.Figure` class initialized
     with default parameters from `vectorbt.defaults.layout`."""
 
     def __init__(self, *args, **kwargs):
+        from vectorbt import defaults
+
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
         self.update_layout(**defaults.layout)
@@ -25,6 +25,8 @@ class CustomFigureWidget(go.FigureWidget):
         with default parameters from `vectorbt.defaults.layout`."""
 
     def __init__(self, *args, **kwargs):
+        from vectorbt import defaults
+
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
         self.update_layout(**defaults.layout)

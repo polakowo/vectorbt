@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.utils.config import Configured
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes, to_time_units
@@ -29,6 +28,8 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
         as a Series of columns rather than a DataFrame. For example, the operation
         `.iloc[:, :2]` should become `.iloc[:2]`. Operations are not allowed if the
         object is already a Series and thus has only one column/group."""
+    from vectorbt import defaults
+
     if column_only_select is None:
         column_only_select = obj.column_only_select
     if column_only_select is None:
@@ -61,7 +62,7 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
             col_mapper = pd_indexing_func(col_mapper)
         except pd.core.indexing.IndexingError as err:
             warnings.warn("Columns only: Make sure to treat this object "
-                          "as a Series of columns rather than a DataFrame")
+                          "as a Series of columns rather than a DataFrame", stacklevel=2)
             raise err
         if checks.is_series(col_mapper):
             new_columns = col_mapper.index
@@ -279,6 +280,8 @@ class ArrayWrapper(Configured, PandasIndexer):
     @property
     def freq(self):
         """Index frequency."""
+        from vectorbt import defaults
+
         freq = self._freq
         if freq is None:
             freq = defaults.array_wrapper['freq']
@@ -289,12 +292,12 @@ class ArrayWrapper(Configured, PandasIndexer):
                 try:
                     return freq_delta(self.index.freq)
                 except ValueError as e:
-                    warnings.warn(repr(e))
+                    warnings.warn(repr(e), stacklevel=2)
             if self.index.inferred_freq is not None:
                 try:
                     return freq_delta(self.index.inferred_freq)
                 except ValueError as e:
-                    warnings.warn(repr(e))
+                    warnings.warn(repr(e), stacklevel=2)
         return freq
 
     @property

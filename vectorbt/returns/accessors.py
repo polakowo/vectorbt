@@ -10,7 +10,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import skew, kurtosis
 
-from vectorbt import defaults
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.base import reshape_fns
@@ -45,6 +44,8 @@ class Returns_Accessor(Generic_Accessor):
     @property
     def year_freq(self):
         """Year frequency."""
+        from vectorbt import defaults
+
         year_freq = self._year_freq
         if year_freq is None:
             year_freq = defaults.returns['year_freq']
@@ -260,7 +261,7 @@ class Returns_Accessor(Generic_Accessor):
     def drawdowns(self, **kwargs):
         """Generate drawdown records of cumulative returns.
 
-        See `vectorbt.records.drawdowns.Drawdowns`."""
+        See `vectorbt.generic.drawdowns.Drawdowns`."""
         return self.cumulative(start_value=1.).vbt(freq=self.freq).drawdowns(**kwargs)
 
 

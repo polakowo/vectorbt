@@ -1,20 +1,28 @@
-"""Classes for working with log records."""
+"""Base class for working with log records."""
 
 import pandas as pd
 
-from vectorbt.enums import log_dt, SizeType, Direction, OrderSide, OrderStatus, StatusInfo
 from vectorbt.records.base import Records
+from vectorbt.portfolio.enums import (
+    log_dt,
+    SizeType,
+    Direction,
+    OrderSide,
+    OrderStatus,
+    StatusInfo
+)
 
 
 class Logs(Records):
     """Extends `Records` for working with log records."""
-    
-    def __init__(self, wrapper, records_arr, idx_field='idx'):
+
+    def __init__(self, wrapper, records_arr, idx_field='idx', **kwargs):
         Records.__init__(
             self,
             wrapper,
             records_arr,
-            idx_field=idx_field
+            idx_field=idx_field,
+            **kwargs
         )
 
         if not all(field in records_arr.dtype.names for field in log_dt.names):

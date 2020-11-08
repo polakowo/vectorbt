@@ -6,7 +6,6 @@
 import numpy as np
 import plotly.graph_objects as go
 
-from vectorbt import defaults
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.widgets import CustomFigureWidget
@@ -51,6 +50,8 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             ```
 
             ![](/vectorbt/docs/img/ohlcv.png)"""
+        from vectorbt import defaults
+
         column_names = defaults.ohlcv['column_names'] if self._column_names is None else self._column_names
         open = self._obj[column_names['open']]
         high = self._obj[column_names['high']]

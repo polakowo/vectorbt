@@ -6,20 +6,7 @@ from datetime import datetime, timedelta
 import pytest
 
 import vectorbt as vbt
-from vectorbt.enums import (
-    SizeType,
-    Direction,
-    ConflictMode,
-    CallSeqType,
-    Order,
-    NoOrder,
-    OrderResult,
-    InitCashMode,
-    order_dt,
-    trade_dt,
-    position_dt,
-    debug_info_dt
-)
+from vectorbt.portfolio.enums import *
 from vectorbt import defaults
 from vectorbt.utils.random import set_seed
 from vectorbt.base.array_wrapper import ArrayWrapper

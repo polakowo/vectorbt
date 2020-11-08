@@ -13,7 +13,7 @@ The workflow of `Portfolio` is simple:
 2. Uses them to generate and fill orders in form of records (simulation part)
 3. Calculates a broad range of risk & performance metrics based on these records (analysis part)
 
-It basically builds upon the `vectorbt.records.orders.Orders` class. To simplify creation of order
+It basically builds upon the `vectorbt.portfolio.orders.Orders` class. To simplify creation of order
 records and keep track of balances, it exposes several convenience methods with prefix `from_`.
 For example, you can use `Portfolio.from_signals` method to generate orders from entry and exit signals.
 Alternatively, you can use `Portfolio.from_order_func` to run a custom order function on each tick.
@@ -211,7 +211,7 @@ simulation from the beginning to the end, you can turn on logging.
 Just as orders, logs are also records and thus can be easily analyzed:
 
 ```python-repl
->>> from vectorbt.enums import OrderStatus
+>>> from vectorbt.portfolio.enums import OrderStatus
 
 >>> portfolio.logs().map_field('res_status', value_map=OrderStatus).value_counts()
          BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
@@ -251,14 +251,6 @@ import numpy as np
 import pandas as pd
 from inspect import signature
 
-from vectorbt.enums import (
-    SizeType,
-    ConflictMode,
-    CallSeqType,
-    InitCashMode,
-    Direction
-)
-from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import convert_str_enum_value
@@ -268,10 +260,20 @@ from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb as generic_nb
-from vectorbt.portfolio import nb
-from vectorbt.records import Orders, Trades, Positions, Drawdowns, Logs
+from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.records.base import records_indexing_func
-from vectorbt.records.orders import indexing_on_orders_meta
+from vectorbt.portfolio import nb
+from vectorbt.portfolio.orders import Orders, indexing_on_orders_meta
+from vectorbt.portfolio.trades import Trades, Positions
+from vectorbt.portfolio.logs import Logs
+from vectorbt.portfolio.enums import (
+    InitCashMode,
+    CallSeqType,
+    SizeType,
+    ConflictMode,
+    OrderStatus,
+    Direction
+)
 
 
 def portfolio_indexing_func(obj, pd_indexing_func):
@@ -370,8 +372,8 @@ class Portfolio(Configured, PandasIndexer):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
-        orders (Orders): Order records of type `vectorbt.records.orders.Orders`.
-        logs (Logs): Log records of type `vectorbt.records.logs.Logs`.
+        orders (Orders): Order records of type `vectorbt.portfolio.orders.Orders`.
+        logs (Logs): Log records of type `vectorbt.portfolio.logs.Logs`.
         init_cash (InitCashMode, float or array_like of float): Initial capital.
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (array_like of int): Sequence of calls per row and group.
@@ -395,6 +397,8 @@ class Portfolio(Configured, PandasIndexer):
             incl_unrealized=incl_unrealized
         )
         # Get defaults
+        from vectorbt import defaults
+
         if incl_unrealized is None:
             incl_unrealized = defaults.portfolio['incl_unrealized']
 
@@ -555,9 +559,9 @@ class Portfolio(Configured, PandasIndexer):
                 Defaults to `accumulate`. Will broadcast.
             short_accumulate (bool or array_like): Overwrites `accumulate` for short orders.
                 Defaults to `accumulate`. Will broadcast.
-            conflict_mode (ConflictMode or array_like): See `vectorbt.enums.ConflictMode`.
+            conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
                 Will broadcast.
-            direction (Direction or array_like): See `vectorbt.enums.Direction`.
+            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
                 Will broadcast.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price` if set, otherwise to previous `close`.
@@ -685,7 +689,7 @@ class Portfolio(Configured, PandasIndexer):
             dtype: float64
 
             >>> # Testing multiple parameters (via broadcasting)
-            >>> from vectorbt.enums import Direction
+            >>> from vectorbt.portfolio.enums import Direction
 
             >>> portfolio = vbt.Portfolio.from_signals(
             ...     close, entries, exits, direction=[list(Direction)],
@@ -700,6 +704,8 @@ class Portfolio(Configured, PandasIndexer):
             ```
         """
         # Get defaults
+        from vectorbt import defaults
+
         if size is None:
             size = defaults.portfolio['size']
         if long_size is None:
@@ -915,9 +921,9 @@ class Portfolio(Configured, PandasIndexer):
                 * Set to any number to buy/sell amount of shares relative to current holdings or value.
                 * Set to 0 to close the current position.
                 * Set to `np.nan` to skip.
-            size_type (SizeType or array_like): See `vectorbt.enums.SizeType`.
+            size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
                 Will broadcast.
-            direction (Direction or array_like): See `vectorbt.enums.Direction`.
+            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
                 Will broadcast.
             price (array_like of float): Order price.
                 Defaults to `close`. Will broadcast.
@@ -978,7 +984,7 @@ class Portfolio(Configured, PandasIndexer):
                 call next. Processing of `call_seq` goes always from left to right.
                 For example, `[2, 0, 1]` would first call column 'c', then 'a', and finally 'b'.
 
-                * Use `vectorbt.enums.CallSeqType` to select a sequence type.
+                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
 
                 If `CallSeqType.Auto` selected, rearranges calls dynamically based on order value.
@@ -1097,6 +1103,8 @@ class Portfolio(Configured, PandasIndexer):
             ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
+        from vectorbt import defaults
+
         if size is None:
             size = defaults.portfolio['size']
         if size_type is None:
@@ -1253,7 +1261,7 @@ class Portfolio(Configured, PandasIndexer):
 
                 By default, will broadcast to the number of columns.
                 If cash sharing is enabled, will broadcast to the number of groups.
-                See `vectorbt.enums.InitCashMode` to find optimal initial cash.
+                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
 
                 !!! note
                     Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
@@ -1265,7 +1273,7 @@ class Portfolio(Configured, PandasIndexer):
                     Introduces cross-asset dependencies.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
-                * Use `vectorbt.enums.CallSeqType` to select a sequence type.
+                * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
 
                 !!! note
@@ -1394,7 +1402,7 @@ class Portfolio(Configured, PandasIndexer):
             Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
             ```python-repl
             >>> from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
-            >>> from vectorbt.enums import SizeType, Direction
+            >>> from vectorbt.portfolio.enums import SizeType, Direction
 
             >>> @njit
             ... def group_prep_func_nb(gc):
@@ -1450,6 +1458,8 @@ class Portfolio(Configured, PandasIndexer):
             ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
+        from vectorbt import defaults
+
         if not checks.is_pandas(close):
             if not checks.is_array(close):
                 close = np.asarray(close)
@@ -1618,6 +1628,18 @@ class Portfolio(Configured, PandasIndexer):
         """Whether to include unrealized trade P&L in statistics."""
         return self._incl_unrealized
 
+    @property  # lazy property
+    def _trades(self):
+        _trades = Trades.from_orders(self._orders)
+        self.__dict__['_trades'] = _trades
+        return _trades
+
+    @property  # lazy property
+    def _positions(self):
+        _positions = Positions.from_trades(self._trades)
+        self.__dict__['_positions'] = _positions
+        return _positions
+
     # ############# Regrouping ############# #
 
     def regroup(self, group_by):
@@ -1652,47 +1674,47 @@ class Portfolio(Configured, PandasIndexer):
 
     @cached_method
     def orders(self, group_by=None):
-        """Order records.
+        """Get order records.
 
-        See `vectorbt.records.orders.Orders`."""
+        See `vectorbt.portfolio.orders.Orders`."""
         return self._orders.regroup(group_by=group_by)
 
     @cached_method
     def logs(self, group_by=None):
-        """Log records.
+        """Get log records.
 
-        See `vectorbt.records.logs.Logs`."""
+        See `vectorbt.portfolio.logs.Logs`."""
         return self._logs.regroup(group_by=group_by)
 
     @cached_method
     def trades(self, group_by=None, incl_unrealized=None):
-        """Get trade records from orders.
+        """Get trade records.
 
-        See `vectorbt.records.events.Trades`."""
-        trades = Trades.from_orders(self.orders(group_by=group_by))
+        See `vectorbt.portfolio.events.Trades`."""
         if incl_unrealized is None:
             incl_unrealized = self.incl_unrealized
-        if incl_unrealized:
-            return trades
-        return trades.closed
+        trades = self._trades.regroup(group_by=group_by)
+        if not incl_unrealized:
+            return trades.closed
+        return trades
 
     @cached_method
     def positions(self, group_by=None, incl_unrealized=None):
-        """Get position records from orders.
+        """Get position records.
 
-        See `vectorbt.records.events.Positions`."""
-        positions = Positions.from_orders(self.orders(group_by=group_by))
+        See `vectorbt.portfolio.events.Positions`."""
         if incl_unrealized is None:
             incl_unrealized = self.incl_unrealized
-        if incl_unrealized:
-            return positions
-        return positions.closed
+        positions = self._positions.regroup(group_by=group_by)
+        if not incl_unrealized:
+            return positions.closed
+        return positions
 
     @cached_method
     def drawdowns(self, **kwargs):
         """Get drawdown records from `Portfolio.value`.
 
-        See `vectorbt.records.drawdowns.Drawdowns`."""
+        See `vectorbt.generic.drawdowns.Drawdowns`."""
         return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
     # ############# Shares ############# #

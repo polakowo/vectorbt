@@ -6,7 +6,7 @@
     
     All functions passed as argument should be Numba-compiled.
     
-    Records should remain the order they were created in.
+    Records should retain the order they were created in.
 
 !!! warning
     Accumulation of roundoff error possible.
@@ -43,26 +43,6 @@
 import numpy as np
 from numba import njit
 
-from vectorbt.enums import (
-    SimulationContext,
-    GroupContext,
-    RowContext,
-    SegmentContext,
-    OrderContext,
-    CallSeqType,
-    SizeType,
-    ConflictMode,
-    Direction,
-    Order,
-    NoOrder,
-    OrderSide,
-    OrderStatus,
-    StatusInfo,
-    OrderResult,
-    RejectedOrderError,
-    order_dt,
-    log_dt
-)
 from vectorbt.utils.math import (
     is_close_nb,
     is_close_or_less_nb,
@@ -72,6 +52,29 @@ from vectorbt.utils.math import (
 from vectorbt.utils.array import insert_argsort_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
+from vectorbt.portfolio.enums import (
+    SimulationContext,
+    GroupContext,
+    RowContext,
+    SegmentContext,
+    OrderContext,
+    CallSeqType,
+    SizeType,
+    ConflictMode,
+    Order,
+    NoOrder,
+    OrderStatus,
+    OrderSide,
+    StatusInfo,
+    OrderResult,
+    RejectedOrderError,
+    Direction,
+    order_dt,
+    TradeDirection,
+    TradeStatus,
+    trade_dt,
+    log_dt
+)
 
 
 # ############# Simulation ############# #
@@ -293,8 +296,8 @@ def process_order_nb(i, col, group, cash_now, shares_now, val_price_now, value_n
         value_now (float): Value of this asset or group with cash sharing.
 
             Used to convert `SizeType.TargetPercent` to `SizeType.TargetValue`.
-        order (Order): See `vectorbt.enums.Order`.
-        log_record (log_dt): Record of type `vectorbt.enums.log_dt`.
+        order (Order): See `vectorbt.portfolio.enums.Order`.
+        log_record (log_dt): Record of type `vectorbt.portfolio.enums.log_dt`.
 
     Error is thrown if an input has value that is not expected.
     Order is ignored if its execution has no effect on current balance.
@@ -643,7 +646,7 @@ def get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price):
 def get_group_value_ctx_nb(sc_oc):
     """Get group value from context.
 
-    Accepts `vectorbt.enums.SegmentContext` and `vectorbt.enums.OrderContext`.
+    Accepts `vectorbt.portfolio.enums.SegmentContext` and `vectorbt.portfolio.enums.OrderContext`.
 
     Best called once from `segment_prep_func_nb`.
     To set the valuation price, change `last_val_price` of the context in-place.
@@ -682,7 +685,7 @@ def get_order_value_nb(size, size_type, shares_now, val_price_now, value_now, di
 def auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr):
     """Generate call sequence based on order value dynamically, for example, to rebalance.
 
-    Accepts `vectorbt.enums.SegmentContext`.
+    Accepts `vectorbt.portfolio.enums.SegmentContext`.
 
     Arrays `size`, `size_type`, `direction` and `temp_float_arr` should match the number
     of columns in the group. Array `temp_float_arr` should be empty and will contain
@@ -723,7 +726,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     order. If unsuccessful due to insufficient cash/shares, always orders the available fraction.
     Updates then the current cash and shares balance.
 
-    Returns order records of layout `vectorbt.enums.order_dt` and log records of layout `vectorbt.enums.log_dt`.
+    Returns order records of layout `vectorbt.portfolio.enums.order_dt` and log records of layout `vectorbt.enums.log_dt`.
 
     As opposed to `simulate_row_wise_nb`, order processing happens in row-major order, that is,
     from top to bottom slower (along time axis) and from left to right faster (along asset axis).
@@ -764,14 +767,14 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         group_prep_func_nb (callable): Group preparation function.
 
             Executed before each group. Should accept the current group context
-            `vectorbt.enums.GroupContext`, unpacked tuple from `prep_func_nb`, and
+            `vectorbt.portfolio.enums.GroupContext`, unpacked tuple from `prep_func_nb`, and
             `*group_prep_args`. Should return a tuple of any content, which is then passed to
             `segment_prep_func_nb`.
         group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
         segment_prep_func_nb (callable): Segment preparation function.
 
             Executed before each row in a group. Should accept the current segment context
-            `vectorbt.enums.SegmentContext`, unpacked tuple from `group_prep_func_nb`,
+            `vectorbt.portfolio.enums.SegmentContext`, unpacked tuple from `group_prep_func_nb`,
             and `*segment_prep_args`. Should return a tuple of any content, which is then
             passed to `order_func_nb`.
 
@@ -790,9 +793,9 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         order_func_nb (callable): Order generation function.
 
             Used for either generating an order or skipping. Should accept the current order context
-            `vectorbt.enums.OrderContext`, unpacked tuple from `segment_prep_func_nb`, and
-            `*order_args`. Should either return `vectorbt.enums.Order`, or
-            `vectorbt.enums.NoOrder` to do nothing.
+            `vectorbt.portfolio.enums.OrderContext`, unpacked tuple from `segment_prep_func_nb`, and
+            `*order_args`. Should either return `vectorbt.portfolio.enums.Order`, or
+            `vectorbt.portfolio.enums.NoOrder` to do nothing.
         order_args (tuple): Arguments passed to `order_func_nb`.
 
     !!! note
@@ -831,7 +834,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         ...     shares_nb,
         ...     holding_value_ungrouped_nb
         ... )
-        >>> from vectorbt.enums import SizeType, Direction
+        >>> from vectorbt.portfolio.enums import SizeType, Direction
 
         >>> @njit
         ... def prep_func_nb(simc):  # do nothing
@@ -1137,7 +1140,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
     changing fastest, and the columns/groups changing slowest.
 
     The main difference is that instead of `group_prep_func_nb` it now exposes `row_prep_func_nb`,
-    which is executed per entire row. It should accept `vectorbt.enums.RowContext`.
+    which is executed per entire row. It should accept `vectorbt.portfolio.enums.RowContext`.
 
     !!! note
         Function `row_prep_func_nb` is only called if there is at least on active segment in
@@ -1758,6 +1761,429 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash,
     if cash_sharing:
         return order_records[record_mask], log_records[:lidx]
     return order_records[:ridx], log_records[:lidx]
+
+
+# ############# Trades ############# #
+
+
+@njit(cache=True)
+def trade_duration_map_nb(record):
+    """`map_func_nb` that returns trade duration."""
+    return record['exit_idx'] - record['entry_idx']
+
+
+@njit(cache=True)
+def get_trade_stats_nb(size, entry_price, entry_fees, exit_price, exit_fees, direction):
+    """Get trade statistics."""
+    entry_val = size * entry_price
+    exit_val = size * exit_price
+    val_diff = add_nb(exit_val, -entry_val)
+    if val_diff != 0 and direction == TradeDirection.Short:
+        val_diff *= -1
+    pnl = val_diff - entry_fees - exit_fees
+    ret = pnl / entry_val
+    return pnl, ret
+
+
+size_zero_neg_err = "Found order with size 0 or less"
+price_zero_neg_err = "Found order with price 0 or less"
+
+
+@njit(cache=True)
+def save_trade_nb(record, col,
+                  entry_idx, entry_size_sum, entry_gross_sum, entry_fees_sum,
+                  exit_idx, exit_size, exit_price, exit_fees,
+                  direction, status, position_idx):
+    """Save trade to the record."""
+    # Size-weighted average of price
+    entry_price = entry_gross_sum / entry_size_sum
+
+    # Fraction of fees
+    size_fraction = exit_size / entry_size_sum
+    entry_fees = size_fraction * entry_fees_sum
+
+    # Get P&L and return
+    pnl, ret = get_trade_stats_nb(
+        exit_size,
+        entry_price,
+        entry_fees,
+        exit_price,
+        exit_fees,
+        direction
+    )
+
+    # Save trade
+    record['col'] = col
+    record['size'] = exit_size
+    record['entry_idx'] = entry_idx
+    record['entry_price'] = entry_price
+    record['entry_fees'] = entry_fees
+    record['exit_idx'] = exit_idx
+    record['exit_price'] = exit_price
+    record['exit_fees'] = exit_fees
+    record['pnl'] = pnl
+    record['return'] = ret
+    record['direction'] = direction
+    record['status'] = status
+    record['position_idx'] = position_idx
+
+
+@njit(cache=True)
+def orders_to_trades_nb(close, order_records):
+    """Find trades and store their information as records to an array.
+
+    Example:
+        Simulate a strategy and find all trades in generated orders:
+        ```python-repl
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> from numba import njit
+        >>> from vectorbt.portfolio.nb import (
+        ...     simulate_nb,
+        ...     create_order_nb,
+        ...     empty_prep_nb,
+        ...     orders_to_trades_nb
+        ... )
+
+        >>> @njit
+        ... def order_func_nb(order_context, order_size, order_price):
+        ...     i = order_context.i
+        ...     col = order_context.col
+        ...     return create_order_nb(size=order_size[i, col], price=order_price[i, col])
+
+        >>> order_size = np.asarray([
+        ...     [1, -1],
+        ...     [0.1, -0.1],
+        ...     [-1, 1],
+        ...     [-0.1, 0.1],
+        ...     [1, -1],
+        ...     [-2, 2]
+        ... ])
+        >>> close = order_price = np.array([
+        ...     [1, 6],
+        ...     [2, 5],
+        ...     [3, 4],
+        ...     [4, 3],
+        ...     [5, 2],
+        ...     [6, 1]
+        ... ])
+        >>> target_shape = order_size.shape
+        >>> group_lens = np.full(target_shape[1], 1)
+        >>> init_cash = np.full(target_shape[1], 100)
+        >>> cash_sharing = False
+        >>> call_seq = np.full(target_shape, 0)
+        >>> active_mask = np.full(target_shape, True)
+
+        >>> order_records, log_records = simulate_nb(
+        ...     target_shape, close, group_lens,
+        ...     init_cash, cash_sharing, call_seq, active_mask,
+        ...     empty_prep_nb, (),
+        ...     empty_prep_nb, (),
+        ...     empty_prep_nb, (),
+        ...     order_func_nb, (order_size, order_price))
+
+        >>> trade_records = orders_to_trades_nb(close, order_records)
+        >>> pd.DataFrame.from_records(trade_records)
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+        0    0   1.0          0     1.090909         0.0         2         3.0
+        1    0   0.1          0     1.090909         0.0         3         4.0
+        2    0   1.0          4     5.000000         0.0         5         6.0
+        3    0   1.0          5     6.000000         0.0         5         6.0
+        4    1   1.0          0     5.909091         0.0         2         4.0
+        5    1   0.1          0     5.909091         0.0         3         3.0
+        6    1   1.0          4     2.000000         0.0         5         1.0
+        7    1   1.0          5     1.000000         0.0         5         1.0
+
+           exit_fees       pnl    return  direction  status  position_idx
+        0        0.0  1.909091  1.750000          0       1             0
+        1        0.0  0.290909  2.666667          0       1             0
+        2        0.0  1.000000  0.200000          0       1             1
+        3        0.0  0.000000  0.000000          1       0             2
+        4        0.0  1.909091  0.323077          1       1             0
+        5        0.0  0.290909  0.492308          1       1             0
+        6        0.0  1.000000  0.500000          1       1             1
+        7        0.0  0.000000  0.000000          0       0             2
+        ```
+        """
+    records = np.empty(close.shape[0] * close.shape[1], dtype=trade_dt)
+    ridx = 0
+    prev_col = -1
+    entry_size_sum = 0.
+    entry_gross_sum = 0.
+    entry_fees_sum = 0.
+    entry_idx = -1
+    direction = -1
+    position_idx = -1
+
+    for r in range(order_records.shape[0]):
+        col = int(order_records[r]['col'])
+        if col < prev_col:
+            raise ValueError("order_records must be sorted")
+        i = int(order_records[r]['idx'])
+        order_size = order_records[r]['size']
+        order_price = order_records[r]['price']
+        order_fees = order_records[r]['fees']
+        order_side = order_records[r]['side']
+
+        if order_size <= 0.:
+            raise ValueError(size_zero_neg_err)
+        if order_price <= 0.:
+            raise ValueError(price_zero_neg_err)
+
+        if col != prev_col:
+            # Column has changed
+            if prev_col != -1:
+                if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
+                    # Trade in the previous column hasn't been closed
+                    exit_size = entry_size_sum
+                    exit_price = close[close.shape[0] - 1, prev_col]
+                    exit_fees = 0.
+                    exit_idx = close.shape[0] - 1
+                    save_trade_nb(
+                        records[ridx],
+                        prev_col,
+                        entry_idx,
+                        entry_size_sum,
+                        entry_gross_sum,
+                        entry_fees_sum,
+                        exit_idx,
+                        exit_size,
+                        exit_price,
+                        exit_fees,
+                        direction,
+                        TradeStatus.Open,
+                        position_idx
+                    )
+                    ridx += 1
+
+            prev_col = col
+            entry_idx = -1
+            direction = -1
+            position_idx = -1
+
+        if entry_idx == -1:
+            # Trade opened
+            entry_idx = i
+            if order_side == OrderSide.Buy:
+                direction = TradeDirection.Long
+            else:
+                direction = TradeDirection.Short
+            position_idx += 1
+
+            # Reset running vars for a new position
+            entry_size_sum = 0.
+            entry_gross_sum = 0.
+            entry_fees_sum = 0.
+
+        if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
+                or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
+            # Position increased
+            entry_size_sum += order_size
+            entry_gross_sum += order_size * order_price
+            entry_fees_sum += order_fees
+
+        elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
+                or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+            if is_close_or_less_nb(order_size, entry_size_sum):
+                # Trade closed
+                if is_close_nb(order_size, entry_size_sum):
+                    exit_size = entry_size_sum
+                else:
+                    exit_size = order_size
+                exit_price = order_price
+                exit_fees = order_fees
+                exit_idx = i
+                save_trade_nb(
+                    records[ridx],
+                    col,
+                    entry_idx,
+                    entry_size_sum,
+                    entry_gross_sum,
+                    entry_fees_sum,
+                    exit_idx,
+                    exit_size,
+                    exit_price,
+                    exit_fees,
+                    direction,
+                    TradeStatus.Closed,
+                    position_idx
+                )
+                ridx += 1
+
+                if is_close_nb(order_size, entry_size_sum):
+                    # Position closed
+                    entry_idx = -1
+                    direction = -1
+                else:
+                    # Position decreased, previous orders have now less impact
+                    size_fraction = (entry_size_sum - order_size) / entry_size_sum
+                    entry_size_sum *= size_fraction
+                    entry_gross_sum *= size_fraction
+                    entry_fees_sum *= size_fraction
+            else:
+                # Trade reversed
+                # Close current trade
+                cl_exit_size = entry_size_sum
+                cl_exit_price = order_price
+                cl_exit_fees = cl_exit_size / order_size * order_fees
+                cl_exit_idx = i
+                save_trade_nb(
+                    records[ridx],
+                    col,
+                    entry_idx,
+                    entry_size_sum,
+                    entry_gross_sum,
+                    entry_fees_sum,
+                    cl_exit_idx,
+                    cl_exit_size,
+                    cl_exit_price,
+                    cl_exit_fees,
+                    direction,
+                    TradeStatus.Closed,
+                    position_idx
+                )
+                ridx += 1
+
+                # Open a new trade
+                entry_size_sum = order_size - cl_exit_size
+                entry_gross_sum = entry_size_sum * order_price
+                entry_fees_sum = order_fees - cl_exit_fees
+                entry_idx = i
+                if direction == TradeDirection.Long:
+                    direction = TradeDirection.Short
+                else:
+                    direction = TradeDirection.Long
+                position_idx += 1
+
+        if r == order_records.shape[0] - 1:
+            if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
+                # Trade in the current column hasn't been closed
+                exit_size = entry_size_sum
+                exit_price = close[close.shape[0] - 1, col]
+                exit_fees = 0.
+                exit_idx = close.shape[0] - 1
+                save_trade_nb(
+                    records[ridx],
+                    col,
+                    entry_idx,
+                    entry_size_sum,
+                    entry_gross_sum,
+                    entry_fees_sum,
+                    exit_idx,
+                    exit_size,
+                    exit_price,
+                    exit_fees,
+                    direction,
+                    TradeStatus.Open,
+                    position_idx
+                )
+                ridx += 1
+                entry_idx = -1
+                direction = -1
+
+    return records[:ridx]
+
+
+# ############# Positions ############# #
+
+@njit(cache=True)
+def save_position_nb(record, trade_records):
+    """Save position to the record."""
+    # Aggregate trades
+    col = trade_records['col'][0]
+    size = np.sum(trade_records['size'])
+    entry_idx = trade_records['entry_idx'][0]
+    entry_price = trade_records['entry_price'][0]
+    entry_fees = np.sum(trade_records['entry_fees'])
+    exit_idx = trade_records['exit_idx'][-1]
+    exit_price = np.sum(trade_records['size'] * trade_records['exit_price']) / size
+    exit_fees = np.sum(trade_records['exit_fees'])
+    direction = trade_records['direction'][-1]
+    status = trade_records['status'][-1]
+    position_idx = trade_records['position_idx'][-1]
+    pnl, ret = get_trade_stats_nb(
+        size,
+        entry_price,
+        entry_fees,
+        exit_price,
+        exit_fees,
+        direction
+    )
+
+    # Save trade
+    record['col'] = col
+    record['size'] = size
+    record['entry_idx'] = entry_idx
+    record['entry_price'] = entry_price
+    record['entry_fees'] = entry_fees
+    record['exit_idx'] = exit_idx
+    record['exit_price'] = exit_price
+    record['exit_fees'] = exit_fees
+    record['pnl'] = pnl
+    record['return'] = ret
+    record['direction'] = direction
+    record['status'] = status
+    record['position_idx'] = position_idx
+
+
+@njit(cache=True)
+def trades_to_positions_nb(trade_records):
+    """Find positions and store their information as records to an array.
+
+    Example:
+        Building upon the example in `orders_to_trades_nb`, convert trades to positions:
+        ```python-repl
+        >>> position_records = trades_to_positions_nb(trade_records)
+        >>> pd.DataFrame.from_records(position_records)
+           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+        0    0   1.1          0     1.090909         0.0         3    3.090909
+        1    0   1.0          4     5.000000         0.0         5    6.000000
+        2    0   1.0          5     6.000000         0.0         5    6.000000
+        3    1   1.1          0     5.909091         0.0         3    3.909091
+        4    1   1.0          4     2.000000         0.0         5    1.000000
+        5    1   1.0          5     1.000000         0.0         5    1.000000
+
+           exit_fees  pnl    return  direction  status  position_idx
+        0        0.0  2.2  1.833333          0       1             0
+        1        0.0  1.0  0.200000          0       1             1
+        2        0.0  0.0  0.000000          1       0             2
+        3        0.0  2.2  0.338462          1       1             0
+        4        0.0  1.0  0.500000          1       1             1
+        5        0.0  0.0  0.000000          0       0             2
+        ```
+    """
+    records = np.empty(trade_records.shape[0], dtype=trade_dt)
+    ridx = 0
+    prev_col = -1
+    prev_position_idx = -1
+    from_r = -1
+
+    for r in range(trade_records.shape[0]):
+        col = int(trade_records[r]['col'])
+        position_idx = int(trade_records[r]['position_idx'])
+        if col < prev_col or (col == prev_col and position_idx < prev_position_idx):
+            raise ValueError("trade_records must be sorted")
+
+        if col != prev_col or position_idx != prev_position_idx:
+            if prev_col != -1 and prev_position_idx != -1:
+                if r - from_r > 1:
+                    save_position_nb(records[ridx], trade_records[from_r:r])
+                else:
+                    # Speed up
+                    records[ridx] = trade_records[from_r]
+                ridx += 1
+            from_r = r
+            prev_col = col
+            prev_position_idx = position_idx
+        if r == trade_records.shape[0] - 1:
+            if r - from_r > 0:
+                save_position_nb(records[ridx], trade_records[from_r:r + 1])
+            else:
+                # Speed up
+                records[ridx] = trade_records[from_r]
+            ridx += 1
+
+    return records[:ridx]
 
 
 # ############# Shares ############# #

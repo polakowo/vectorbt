@@ -24,18 +24,6 @@ dtype: int64
 
 The accessors extend `vectorbt.generic.accessors`.
 
-## Numba-compiled functions
-
-`vectorbt.signals.nb` provides an arsenal of Numba-compiled functions that are used by accessors
-and in many other parts of the backtesting pipeline, such as technical indicators.
-These only accept NumPy arrays and other Numba-compatible types.
-
-```python-repl
->>> # vectorbt.signals.nb.rank_1d_nb
->>> vbt.signals.nb.rank_1d_nb(np.array([False, True, True, True, False]))
-array([0, 1, 2, 3, 0])
-```
-
 ## Signal factory
 
 The signal factory class `vectorbt.signals.factory.SignalFactory` extends
@@ -48,8 +36,25 @@ signals for an arbitrary combination of your inputs and parameters.
 
 `vectorbt.signals.basic` provides a collection of basic signal generators, such as
 random signal generator, all built with `vectorbt.signals.factory.SignalFactory`.
+
+## Numba-compiled functions
+
+`vectorbt.signals.nb` provides an arsenal of Numba-compiled functions that are used by accessors
+and in many other parts of the backtesting pipeline, such as technical indicators.
+These only accept NumPy arrays and other Numba-compatible types.
+
+```python-repl
+>>> # vectorbt.signals.nb.rank_1d_nb
+>>> vbt.signals.nb.rank_1d_nb(np.array([False, True, True, True, False]))
+array([0, 1, 2, 3, 0])
+```
+
+## Enums
+
+`vectorbt.signals.enums` defines enums and other schemas for `vectorbt.signals`.
 """
 
+from vectorbt.signals.enums import *
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.basic import (
     RAND,

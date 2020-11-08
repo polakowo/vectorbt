@@ -1,20 +1,20 @@
-"""Classes for working with order records."""
+"""Base class for working with order records."""
 
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from vectorbt.enums import order_dt, OrderSide
-from vectorbt.defaults import contrast_color_schema
-from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.config import Configured
+from vectorbt.utils.enum import to_value_map
 from vectorbt.base.indexing import PandasIndexer
+from vectorbt.base.reshape_fns import to_1d
 from vectorbt.records.base import Records, indexing_on_records_meta
+from vectorbt.portfolio.enums import order_dt, OrderSide
 
 
 def indexing_on_orders_meta(obj, pd_indexing_func):
-    """Perform indexing on `BaseOrders`."""
+    """Perform indexing on `Orders`."""
     new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
     new_ref_price = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
@@ -29,7 +29,7 @@ def orders_indexing_func(obj, pd_indexing_func):
     return indexing_on_orders_meta(obj, pd_indexing_func)[0]
 
 
-class BaseOrders(Records):
+class Orders(Records):
     """Extends `Records` for working with order records.
 
     Example:
@@ -39,10 +39,8 @@ class BaseOrders(Records):
         >>> import pandas as pd
 
         >>> price = pd.Series([1., 2., 3., 2., 1.])
-        >>> orders = pd.Series([1., 1., 1., 1., -1.])
-        >>> portfolio = vbt.Portfolio.from_orders(price, orders,
-        ...      init_cash=100., freq='1D')
-        >>> orders = portfolio.orders()
+        >>> size = pd.Series([1., 1., 1., 1., -1.])
+        >>> orders = vbt.Portfolio.from_orders(price, size).orders()
 
         >>> orders.buy.count()
         4
@@ -50,19 +48,14 @@ class BaseOrders(Records):
         1
         ```"""
 
-    def __init__(self, wrapper, records_arr, close, idx_field='idx'):
+    def __init__(self, wrapper, records_arr, close, idx_field='idx', **kwargs):
         Records.__init__(
             self,
             wrapper,
             records_arr,
-            idx_field=idx_field
-        )
-        Configured.__init__(
-            self,
-            wrapper=wrapper,
-            records_arr=records_arr,
+            idx_field=idx_field,
             close=close,
-            idx_field=idx_field
+            **kwargs
         )
         self.close = close
 
@@ -75,14 +68,66 @@ class BaseOrders(Records):
     def records_readable(self):
         """Records in readable format."""
         records_df = self.records
-        out = pd.DataFrame(columns=['Column', 'Date', 'Size', 'Price', 'Fees', 'Side'])
+        out = pd.DataFrame()
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Date'] = records_df['idx'].map(lambda x: self.wrapper.index[x])
         out['Size'] = records_df['size']
         out['Price'] = records_df['price']
         out['Fees'] = records_df['fees']
-        out['Side'] = records_df['side'].map(lambda x: OrderSide._fields[x])
+        out['Side'] = records_df['side'].map(to_value_map(OrderSide))
         return out
+
+    @cached_property
+    def size(self):
+        """Size of each order."""
+        return self.map_field('size')
+
+    @cached_property
+    def price(self):
+        """Price of each order."""
+        return self.map_field('price')
+
+    @cached_property
+    def fees(self):
+        """Fees paid for each order."""
+        return self.map_field('fees')
+
+    # ############# OrderSide ############# #
+
+    @cached_property
+    def side(self):
+        """Side of each order.
+
+        See `vectorbt.portfolio.enums.OrderSide`."""
+        return self.map_field('side')
+
+    @cached_property
+    def buy(self):
+        """Buy operations."""
+        filter_mask = self.records_arr['side'] == OrderSide.Buy
+        return self.filter_by_mask(filter_mask)
+
+    @cached_method
+    def buy_rate(self, group_by=None, **kwargs):
+        """Rate of buy operations."""
+        buy_count = to_1d(self.buy.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        return self.wrapper.wrap_reduced(buy_count / total_count, group_by=group_by, **kwargs)
+
+    @cached_property
+    def sell(self):
+        """Sell operations."""
+        filter_mask = self.records_arr['side'] == OrderSide.Sell
+        return self.filter_by_mask(filter_mask)
+
+    @cached_method
+    def sell_rate(self, group_by=None, **kwargs):
+        """Rate of sell operations."""
+        sell_count = to_1d(self.sell.count(group_by=group_by), raw=True)
+        total_count = to_1d(self.count(group_by=group_by), raw=True)
+        return self.wrapper.wrap_reduced(sell_count / total_count, group_by=group_by, **kwargs)
+
+    # ############# Plotting ############# #
 
     def plot(self,
              column=None,
@@ -106,6 +151,8 @@ class BaseOrders(Records):
             ```
 
             ![](/vectorbt/docs/img/orders.png)"""
+        from vectorbt.defaults import contrast_color_schema
+
         if column is not None:
             if self.wrapper.grouper.group_by is None:
                 self_col = self[column]
@@ -180,51 +227,3 @@ class BaseOrders(Records):
         fig.add_trace(sell_scatter)
 
         return fig
-
-    @cached_property
-    def size(self):
-        """Size of each order."""
-        return self.map_field('size')
-
-    @cached_property
-    def price(self):
-        """Price of each order."""
-        return self.map_field('price')
-
-    @cached_property
-    def fees(self):
-        """Fees paid for each order."""
-        return self.map_field('fees')
-
-
-class Orders(BaseOrders):
-    """Extends `BaseOrders` by further dividing orders into buy and sell orders."""
-
-    @cached_property
-    def side(self):
-        """Side of each order.
-
-        See `vectorbt.enums.OrderSide`."""
-        return self.map_field('side')
-
-    @cached_property
-    def buy(self):
-        """Buy operations of type `BaseOrders`."""
-        filter_mask = self.records_arr['side'] == OrderSide.Buy
-        return BaseOrders(
-            self.wrapper,
-            self.records_arr[filter_mask],
-            self.close,
-            idx_field=self.idx_field
-        )
-
-    @cached_property
-    def sell(self):
-        """Sell operations of type `BaseOrders`."""
-        filter_mask = self.records_arr['side'] == OrderSide.Sell
-        return BaseOrders(
-            self.wrapper,
-            self.records_arr[filter_mask],
-            self.close,
-            idx_field=self.idx_field
-        )

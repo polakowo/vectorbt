@@ -1,10 +1,34 @@
-"""Named tuples and enumerated types.
-
-We are not distributing them across modules to avoid circular dependencies."""
+"""Named tuples and enumerated types."""
 
 import numpy as np
 from collections import namedtuple
 import json
+
+__all__ = [
+    'SimulationContext',
+    'GroupContext',
+    'RowContext',
+    'SegmentContext',
+    'OrderContext',
+    'InitCashMode',
+    'CallSeqType',
+    'SizeType',
+    'ConflictMode',
+    'Order',
+    'NoOrder',
+    'OrderStatus',
+    'OrderSide',
+    'status_info_desc',
+    'StatusInfo',
+    'OrderResult',
+    'RejectedOrderError',
+    'Direction',
+    'order_dt',
+    'TradeDirection',
+    'TradeStatus',
+    'trade_dt',
+    'log_dt'
+]
 
 __pdoc__ = {}
 
@@ -419,9 +443,9 @@ __pdoc__['OrderResult'] = "A named tuple representing an order result."
 __pdoc__['OrderResult.size'] = "Filled size in shares."
 __pdoc__['OrderResult.price'] = "Filled price per share, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
-__pdoc__['OrderResult.side'] = "See `vectorbt.enums.OrderSide`."
+__pdoc__['OrderResult.side'] = "See `vectorbt.portfolio.enums.OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
-__pdoc__['OrderResult.status_info'] = "See `vectorbt.enums.StatusInfo`."
+__pdoc__['OrderResult.status_info'] = "See `vectorbt.portfolio.enums.StatusInfo`."
 
 
 class RejectedOrderError(Exception):
@@ -450,38 +474,6 @@ Attributes:
 
 # ############# Records ############# #
 
-DrawdownStatus = namedtuple('DrawdownStatus', [
-    'Active',
-    'Recovered'
-])(*range(2))
-"""_"""
-
-__pdoc__['DrawdownStatus'] = f"""Drawdown status.
-
-```plaintext
-{json.dumps(dict(zip(DrawdownStatus._fields, DrawdownStatus)), indent=2)}
-```
-"""
-
-drawdown_dt = np.dtype([
-    ('col', np.int_),
-    ('start_idx', np.int_),
-    ('valley_idx', np.int_),
-    ('end_idx', np.int_),
-    ('status', np.int_),
-], align=True)
-"""_"""
-
-__pdoc__['drawdown_dt'] = f"""`np.dtype` of drawdown records.
-
-```plaintext
-{json.dumps(dict(zip(
-    dict(drawdown_dt.fields).keys(),
-    list(map(lambda x: str(x[0]), dict(drawdown_dt.fields).values()))
-)), indent=2)}
-```
-"""
-
 order_dt = np.dtype([
     ('col', np.int_),
     ('idx', np.int_),
@@ -502,33 +494,33 @@ __pdoc__['order_dt'] = f"""`np.dtype` of order records.
 ```
 """
 
-EventDirection = namedtuple('EventDirection', [
+TradeDirection = namedtuple('TradeDirection', [
     'Long',
     'Short'
 ])(*range(2))
 """_"""
 
-__pdoc__['EventDirection'] = f"""Event direction.
+__pdoc__['TradeDirection'] = f"""Event direction.
 
 ```plaintext
-{json.dumps(dict(zip(EventDirection._fields, EventDirection)), indent=2)}
+{json.dumps(dict(zip(TradeDirection._fields, TradeDirection)), indent=2)}
 ```
 """
 
-EventStatus = namedtuple('EventStatus', [
+TradeStatus = namedtuple('TradeStatus', [
     'Open',
     'Closed'
 ])(*range(2))
 """_"""
 
-__pdoc__['EventStatus'] = f"""Event status.
+__pdoc__['TradeStatus'] = f"""Event status.
 
 ```plaintext
-{json.dumps(dict(zip(EventStatus._fields, EventStatus)), indent=2)}
+{json.dumps(dict(zip(TradeStatus._fields, TradeStatus)), indent=2)}
 ```
 """
 
-_event_fields = [
+_trade_fields = [
     ('col', np.int_),
     ('size', np.float_),
     ('entry_idx', np.int_),
@@ -540,49 +532,19 @@ _event_fields = [
     ('pnl', np.float_),
     ('return', np.float_),
     ('direction', np.int_),
-    ('status', np.int_)
+    ('status', np.int_),
+    ('position_idx', np.int_)
 ]
 
-event_dt = np.dtype(_event_fields, align=True)
+trade_dt = np.dtype(_trade_fields, align=True)
 """_"""
 
-__pdoc__['event_dt'] = f"""`np.dtype` of event records.
-
-```plaintext
-{json.dumps(dict(zip(
-    dict(event_dt.fields).keys(),
-    list(map(lambda x: str(x[0]), dict(event_dt.fields).values()))
-)), indent=2)}
-```
-"""
-
-trade_dt = np.dtype([
-    *_event_fields,
-    ('position_idx', np.int_)
-], align=True)
-"""_"""
-
-__pdoc__['trade_dt'] = f"""`np.dtype` of trade records. Follows `event_dt`.
+__pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 
 ```plaintext
 {json.dumps(dict(zip(
     dict(trade_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(trade_dt.fields).values()))
-)), indent=2)}
-```
-"""
-
-position_dt = np.dtype([
-    *_event_fields
-], align=True)
-"""_"""
-
-__pdoc__['position_dt'] = f"""`np.dtype` of position records. Follows `event_dt`.
-
-```plaintext
-{json.dumps(dict(zip(
-    dict(position_dt.fields).keys(),
-    list(map(lambda x: str(x[0]), dict(position_dt.fields).values()))
 )), indent=2)}
 ```
 """
@@ -629,21 +591,5 @@ __pdoc__['log_dt'] = f"""`np.dtype` of log records.
     dict(log_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(log_dt.fields).values()))
 )), indent=2)}
-```
-"""
-
-# ############# Signals ############# #
-
-StopType = namedtuple('StopType', [
-    'StopLoss',
-    'TrailStop',
-    'TakeProfit'
-])(*range(3))
-"""_"""
-
-__pdoc__['StopType'] = f"""Stop type.
-
-```plaintext
-{json.dumps(dict(zip(StopType._fields, StopType)), indent=2)}
 ```
 """

@@ -40,12 +40,12 @@ import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.base.common import add_nb_methods
 from vectorbt.generic import plotting, nb
-from vectorbt.records.drawdowns import Drawdowns
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.generic.drawdowns import Drawdowns
 
 try:  # pragma: no cover
     # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
@@ -591,7 +591,7 @@ class Generic_Accessor(Base_Accessor):
     def drawdowns(self, **kwargs):
         """Generate drawdown records.
 
-        See `vectorbt.records.drawdowns.Drawdowns`."""
+        See `vectorbt.generic.drawdowns.Drawdowns`."""
         return Drawdowns.from_ts(self._obj, freq=self.freq, **kwargs)
 
     # ############# Plotting ############# #
@@ -882,7 +882,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             )
 
         if contains_nans:
-            warnings.warn("Data contains NaNs. In case of visualization issues, use .show() method on the widget.")
+            warnings.warn("Data contains NaNs. In case of visualization issues, "
+                          "use .show() method on the widget.", stacklevel=2)
         return fig
 
 

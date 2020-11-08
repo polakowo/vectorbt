@@ -5,7 +5,7 @@ import pytest
 import empyrical
 
 from vectorbt import defaults
-from vectorbt.records.drawdowns import Drawdowns
+from vectorbt.generic.drawdowns import Drawdowns
 
 from tests.utils import isclose
 

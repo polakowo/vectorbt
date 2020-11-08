@@ -2,7 +2,6 @@
 
 from functools import wraps, lru_cache, RLock
 
-from vectorbt import defaults
 from vectorbt.utils import checks
 
 
@@ -94,6 +93,8 @@ class cached_property(custom_property):
         self.attrname = '__cached_' + name  # here is the difference
 
     def __get__(self, instance, owner=None):
+        from vectorbt import defaults
+
         if instance is None:
             return self
         if not defaults.caching or self.disabled:  # you can manually disable cache here
@@ -167,6 +168,8 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(instance, *args, **kwargs):
+            from vectorbt import defaults
+
             def partial_func(*args, **kwargs):
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)

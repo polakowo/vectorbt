@@ -28,7 +28,6 @@ Date
 import numpy as np
 import plotly.graph_objects as go
 
-from vectorbt import defaults
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.generic import nb as generic_nb
@@ -206,6 +205,8 @@ class BBANDS(BBANDS):
             ```
 
             ![](/vectorbt/docs/img/BBANDS.png)"""
+        from vectorbt import defaults
+
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 

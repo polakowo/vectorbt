@@ -14,6 +14,8 @@
 from numba import njit
 import numpy as np
 
+from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
+
 
 @njit(cache=True)
 def prepend_1d_nb(a, n, value):
@@ -491,7 +493,7 @@ def rolling_std_1d_nb(a, window, minp=None, ddof=0):
         else:
             mean = window_cumsum / window_len
             out[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum *
-                                       mean + window_len * mean ** 2) / (window_len - ddof))
+                                    mean + window_len * mean ** 2) / (window_len - ddof))
     return out
 
 
@@ -1015,3 +1017,158 @@ def argmax_reduce_nb(col, a, *args):
         raise ValueError("All-NaN slice encountered")
     a[mask] = -np.inf
     return np.argmax(a)
+
+
+# ############# Drawdowns ############# #
+
+@njit(cache=True)
+def find_drawdowns_nb(ts):
+    """Find drawdows and store their information as records to an array.
+
+        Example:
+            Find drawdowns in time series:
+            ```python-repl
+            >>> import numpy as np
+            >>> import pandas as pd
+            >>> from vectorbt.generic.nb import find_drawdowns_nb
+
+            >>> ts = np.asarray([
+            ...     [1, 5, 1, 3],
+            ...     [2, 4, 2, 2],
+            ...     [3, 3, 3, 1],
+            ...     [4, 2, 2, 2],
+            ...     [5, 1, 1, 3]
+            ... ])
+            >>> records = find_drawdowns_nb(ts)
+
+            >>> pd.DataFrame.from_records(records)
+               col  start_idx  valley_idx  end_idx  status
+            0    1          0           4        4       0
+            1    2          2           4        4       0
+            2    3          0           2        4       1
+            ```"""
+    out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
+    j = 0
+
+    for col in range(ts.shape[1]):
+        drawdown_started = False
+        peak_idx = np.nan
+        valley_idx = np.nan
+        peak_val = ts[0, col]
+        valley_val = ts[0, col]
+        store_drawdown = False
+        status = -1
+
+        for i in range(ts.shape[0]):
+            cur_val = ts[i, col]
+
+            if not np.isnan(cur_val):
+                if np.isnan(peak_val) or cur_val >= peak_val:
+                    # Value increased
+                    if not drawdown_started:
+                        # If not running, register new peak
+                        peak_val = cur_val
+                        peak_idx = i
+                    else:
+                        # If running, potential recovery
+                        if cur_val >= peak_val:
+                            drawdown_started = False
+                            store_drawdown = True
+                            status = DrawdownStatus.Recovered
+                else:
+                    # Value decreased
+                    if not drawdown_started:
+                        # If not running, start new drawdown
+                        drawdown_started = True
+                        valley_val = cur_val
+                        valley_idx = i
+                    else:
+                        # If running, potential valley
+                        if cur_val < valley_val:
+                            valley_val = cur_val
+                            valley_idx = i
+
+                if i == ts.shape[0] - 1 and drawdown_started:
+                    # If still running, mark for save
+                    drawdown_started = False
+                    store_drawdown = True
+                    status = DrawdownStatus.Active
+
+                if store_drawdown:
+                    # Save drawdown to the records
+                    out[j]['col'] = col
+                    out[j]['start_idx'] = peak_idx
+                    out[j]['valley_idx'] = valley_idx
+                    out[j]['end_idx'] = i
+                    out[j]['status'] = status
+                    j += 1
+
+                    # Reset running vars for a new drawdown
+                    peak_idx = i
+                    valley_idx = i
+                    peak_val = cur_val
+                    valley_val = cur_val
+                    store_drawdown = False
+                    status = -1
+
+    return out[:j]
+
+
+@njit(cache=True)
+def dd_start_value_map_nb(record, ts):
+    """`map_func_nb` that returns start value of a drawdown."""
+    return ts[record['start_idx'], record['col']]
+
+
+@njit(cache=True)
+def dd_valley_value_map_nb(record, ts):
+    """`map_func_nb` that returns valley value of a drawdown."""
+    return ts[record['valley_idx'], record['col']]
+
+
+@njit(cache=True)
+def dd_end_value_map_nb(record, ts):
+    """`map_func_nb` that returns end value of a drawdown.
+
+    This can be either recovery value or last value of an active drawdown."""
+    return ts[record['end_idx'], record['col']]
+
+
+@njit(cache=True)
+def dd_drawdown_map_nb(record, ts):
+    """`map_func_nb` that returns drawdown value of a drawdown."""
+    valley_val = dd_valley_value_map_nb(record, ts)
+    start_val = dd_start_value_map_nb(record, ts)
+    return (valley_val - start_val) / start_val
+
+
+@njit(cache=True)
+def dd_duration_map_nb(record):
+    """`map_func_nb` that returns total duration of a drawdown."""
+    return record['end_idx'] - record['start_idx']
+
+
+@njit(cache=True)
+def dd_ptv_duration_map_nb(record):
+    """`map_func_nb` that returns duration of the peak-to-valley (PtV) phase."""
+    return record['valley_idx'] - record['start_idx']
+
+
+@njit(cache=True)
+def dd_vtr_duration_map_nb(record):
+    """`map_func_nb` that returns duration of the valley-to-recovery (VtR) phase."""
+    return record['end_idx'] - record['valley_idx']
+
+
+@njit(cache=True)
+def dd_vtr_duration_ratio_map_nb(record):
+    """`map_func_nb` that returns ratio of VtR duration to total duration."""
+    return dd_vtr_duration_map_nb(record) / dd_duration_map_nb(record)
+
+
+@njit(cache=True)
+def dd_recovery_return_map_nb(record, ts):
+    """`map_func_nb` that returns recovery return of a drawdown."""
+    end_val = dd_end_value_map_nb(record, ts)
+    valley_val = dd_valley_value_map_nb(record, ts)
+    return (end_val - valley_val) / valley_val

@@ -5,7 +5,6 @@ import pandas as pd
 from numba import njit
 from collections.abc import Iterable
 
-from vectorbt import defaults
 from vectorbt.utils import checks
 
 
@@ -63,6 +62,8 @@ def tile_index(index, n):
 
 def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None):
     """Stack each index in `indexes` on top of each other, from top to bottom."""
+    from vectorbt import defaults
+
     if drop_duplicates is None:
         drop_duplicates = defaults.broadcasting['drop_duplicates']
     if drop_redundant is None:
@@ -180,6 +181,8 @@ def drop_duplicate_levels(index, keep=None):
     """Drop levels in `index` with the same name and values.
 
     Set `keep` to 'last' to keep last levels, otherwise 'first'."""
+    from vectorbt import defaults
+
     if keep is None:
         keep = defaults.broadcasting['keep']
     if not isinstance(index, pd.MultiIndex):

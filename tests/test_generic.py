@@ -6,7 +6,7 @@ import pytest
 from itertools import product
 
 from vectorbt.generic import nb
-from vectorbt.records.drawdowns import Drawdowns
+from vectorbt.generic.drawdowns import Drawdowns
 
 day_dt = np.timedelta64(86400000000000)
 

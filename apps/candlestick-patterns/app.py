@@ -26,8 +26,8 @@ from talib._ta_lib import (
     _ta_set_candle_settings
 )
 import vectorbt as vbt
-from vectorbt.enums import InitCashMode, AccumulationMode
 from vectorbt.utils.config import merge_kwargs
+from vectorbt.portfolio.enums import InitCashMode, AccumulationMode
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
