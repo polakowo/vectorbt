@@ -218,6 +218,7 @@ method/property. There is currently no way to disable caching for an entire clas
 
 import numpy as np
 import pandas as pd
+import logging
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
@@ -234,6 +235,8 @@ from vectorbt.base.common import (
 from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
 from vectorbt.generic import nb as generic_nb
 from vectorbt.records import nb
+
+logger = logging.getLogger(__name__)
 
 
 def indexing_on_mapped_array_meta(obj, pd_indexing_func):
@@ -278,6 +281,8 @@ def _mapped_binary_translate_func(self, other, np_func):
                 passed = False
         if self.value_map != other.value_map:
             passed = False
+        if self.filter_id != other.filter_id:
+            passed = False
         if not passed:
             raise ValueError("Both MappedArray instances must have same metadata")
         other = other.mapped_arr
@@ -307,12 +312,15 @@ class MappedArray(Configured, PandasIndexer):
 
             Must be of the same size as `mapped_arr`.
         value_map (dict or namedtuple): Value map.
+        filter_ids (set): IDs of applied filters.
+
+            Prevents applying same filters again and calling contradictive attributes.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None, value_map=None, **kwargs):
+    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None, value_map=None, filter_id=None, **kwargs):
         Configured.__init__(
             self,
             wrapper=wrapper,
@@ -320,6 +328,7 @@ class MappedArray(Configured, PandasIndexer):
             col_arr=col_arr,
             idx_arr=idx_arr,
             value_map=value_map,
+            filter_id=filter_id,
             **kwargs
         )
         checks.assert_type(wrapper, ArrayWrapper)
@@ -336,12 +345,15 @@ class MappedArray(Configured, PandasIndexer):
             if checks.is_namedtuple(value_map):
                 value_map = to_value_map(value_map)
             checks.assert_type(value_map, dict)
+        if filter_id is None:
+            filter_id = set()
 
         self._wrapper = wrapper
         self._mapped_arr = mapped_arr
         self._col_arr = col_arr
         self._idx_arr = idx_arr
         self._value_map = value_map
+        self._filter_id = filter_id
 
         PandasIndexer.__init__(self, _mapped_array_indexing_func)
 
@@ -377,12 +389,17 @@ class MappedArray(Configured, PandasIndexer):
         """Value map."""
         return self._value_map
 
+    @property
+    def filter_ids(self):
+        """IDs of applied filters."""
+        return self._filter_ids
+
     @cached_property
     def col_index(self):
         """Column index for `MappedArray.mapped_arr`."""
         return nb.mapped_col_index_nb(self.mapped_arr, self.col_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask, idx_arr=None, value_map=None, group_by=None, **kwargs):
+    def filter_by_mask(self, mask, idx_arr=None, value_map=None, group_by=None, filter_id=None, **kwargs):
         """Return a new class instance, filtered by mask."""
         if idx_arr is None:
             idx_arr = self.idx_arr
@@ -394,12 +411,19 @@ class MappedArray(Configured, PandasIndexer):
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
             wrapper = self.wrapper
+        if filter_id in self.filter_ids:
+            raise ValueError(f"Filter \"{filter_id}\" already applied")
+        if np.all(mask):
+            logger.debug(f"Records already satisfy this mask")
+        elif not np.any(mask):
+            logger.debug(f"No records satisfy this mask")
         return self.copy(
             wrapper=wrapper,
             mapped_arr=self.mapped_arr[mask],
             col_arr=self.col_arr[mask],
             idx_arr=idx_arr,
             value_map=value_map,
+            filter_ids=self.filter_ids | {filter_id},
             **kwargs
         )
 

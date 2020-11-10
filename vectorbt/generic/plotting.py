@@ -136,9 +136,11 @@ def create_bar(data=None, trace_names=None, x_labels=None,
         fig = CustomFigureWidget()
     fig.update_layout(**layout_kwargs)
     for i, trace_name in enumerate(trace_names):
+        if trace_name is not None:
+            trace_name = str(trace_name)
         bar = go.Bar(
             x=x_labels,
-            name=str(trace_name),
+            name=trace_name,
             showlegend=trace_name is not None
         )
         bar.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
@@ -221,9 +223,11 @@ def create_scatter(data=None, trace_names=None, x_labels=None,
         fig = CustomFigureWidget()
     fig.update_layout(**layout_kwargs)
     for i, trace_name in enumerate(trace_names):
+        if trace_name is not None:
+            trace_name = str(trace_name)
         scatter = go.Scatter(
             x=x_labels,
-            name=str(trace_name),
+            name=trace_name,
             showlegend=trace_name is not None
         )
         scatter.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
@@ -298,9 +302,11 @@ def create_hist(data=None, trace_names=None, horizontal=False,
         fig.update_layout(barmode='overlay')
     fig.update_layout(**layout_kwargs)
     for i, trace_name in enumerate(trace_names):
+        if trace_name is not None:
+            trace_name = str(trace_name)
         hist = go.Histogram(
             opacity=0.75 if len(trace_names) > 1 else 1,
-            name=str(trace_name),
+            name=trace_name,
             showlegend=trace_name is not None
         )
         hist.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
@@ -379,8 +385,10 @@ def create_box(data=None, trace_names=None, horizontal=False,
         fig.update_layout(barmode='overlay')
     fig.update_layout(**layout_kwargs)
     for i, trace_name in enumerate(trace_names):
+        if trace_name is not None:
+            trace_name = str(trace_name)
         box = go.Box(
-            name=str(trace_name),
+            name=trace_name,
             showlegend=trace_name is not None
         )
         box.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))

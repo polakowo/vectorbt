@@ -871,13 +871,18 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         )
         fig.update_layout(**layout_kwargs)
         if name is None:
-            name = self._obj.name
+            if 'name' in trace_kwargs:
+                name = trace_kwargs.pop('name')
+            else:
+                name = self._obj.name
+        if name is not None:
+            name = str(name)
 
         scatter = go.Scatter(
             x=self.index,
             y=self._obj.values,
             mode='lines',
-            name=str(name),
+            name=name,
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
@@ -917,7 +922,12 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
         if name is None:
-            name = self._obj.name
+            if 'name' in trace_kwargs:
+                name = trace_kwargs.pop('name')
+            else:
+                name = self._obj.name
+        if name is not None:
+            name = str(name)
 
         # Plot markers
         _y = 1 if y is None else y
@@ -934,7 +944,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                     color=adjust_lightness(contrast_color_schema['blue'])
                 )
             ),
-            name=str(name),
+            name=name,
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)

@@ -13,6 +13,8 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
+from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.records.base import Records, indexing_on_records_meta
@@ -23,11 +25,11 @@ from vectorbt.portfolio import nb
 def indexing_on_trades_meta(obj, pd_indexing_func):
     """Perform indexing on `Trades` and also return metadata."""
     new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
-    new_ref_price = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
+    new_close = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
         records_arr=new_records_arr,
-        close=new_ref_price
+        close=new_close
     ), group_idxs, col_idxs
 
 
@@ -45,7 +47,7 @@ class Trades(Records):
     In vectorbt, a trade is a partial closing operation; it's is a more fine-grained representation
     of a position. One position can incorporate multiple trades. Performance for this operation is
     calculated based on the size-weighted average of previous opening operations within the same
-    position. The P&L of all trades combined always equals to the P&L of the entire position.
+    position. The PnL of all trades combined always equals to the PnL of the entire position.
 
     For example, if you have a single large buy operation and 100 small sell operations, you will see
     100 trades, each opening with a fraction of the buy operation's size and fees. On the other hand,
@@ -108,7 +110,7 @@ class Trades(Records):
         3        1.0 -2.5  -0.625          1       1             3
         ```
 
-        Get count and P&L of trades:
+        Get count and PnL of trades:
         ```python-repl
         >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
         >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
@@ -125,7 +127,7 @@ class Trades(Records):
         1.5
         ```
 
-        Get count and P&L of trades with duration of more than 2 days:
+        Get count and PnL of trades with duration of more than 2 days:
         ```python-repl
         >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
         >>> trades_filtered = trades.filter_by_mask(mask)
@@ -171,7 +173,7 @@ class Trades(Records):
         out['Exit Date'] = records_df['exit_idx'].map(lambda x: self.wrapper.index[x])
         out['Exit Price'] = records_df['exit_price']
         out['Exit Fees'] = records_df['exit_fees']
-        out['P&L'] = records_df['pnl']
+        out['PnL'] = records_df['pnl']
         out['Return'] = records_df['return']
         out['Direction'] = records_df['direction'].map(to_value_map(TradeDirection))
         out['Status'] = records_df['status'].map(to_value_map(TradeStatus))
@@ -198,13 +200,13 @@ class Trades(Records):
         """Position index of each trade."""
         return self.map_field('position_idx')
 
-    # ############# P&L ############# #
+    # ############# PnL ############# #
 
     @cached_property
     def winning(self):
         """Winning trades."""
         filter_mask = self.records_arr['pnl'] > 0.
-        return self.filter_by_mask(filter_mask)
+        return self.filter_by_mask(filter_mask, filter_id='pnl')
 
     @cached_method
     def win_rate(self, group_by=None, **kwargs):
@@ -217,7 +219,7 @@ class Trades(Records):
     def losing(self):
         """Losing trades."""
         filter_mask = self.records_arr['pnl'] < 0.
-        return self.filter_by_mask(filter_mask)
+        return self.filter_by_mask(filter_mask, filter_id='pnl')
 
     @cached_method
     def loss_rate(self, group_by=None, **kwargs):
@@ -275,7 +277,7 @@ class Trades(Records):
     def long(self):
         """Long trades."""
         filter_mask = self.records_arr['direction'] == TradeDirection.Long
-        return self.filter_by_mask(filter_mask)
+        return self.filter_by_mask(filter_mask, filter_id='direction')
 
     @cached_method
     def long_rate(self, group_by=None, **kwargs):
@@ -288,7 +290,7 @@ class Trades(Records):
     def short(self):
         """Short trades."""
         filter_mask = self.records_arr['direction'] == TradeDirection.Short
-        return self.filter_by_mask(filter_mask)
+        return self.filter_by_mask(filter_mask, filter_id='direction')
 
     @cached_method
     def short_rate(self, group_by=None, **kwargs):
@@ -308,7 +310,7 @@ class Trades(Records):
     def open(self):
         """Open trades."""
         filter_mask = self.records_arr['status'] == TradeStatus.Open
-        return self.filter_by_mask(filter_mask)
+        return self.filter_by_mask(filter_mask, filter_id='status')
 
     @cached_method
     def open_rate(self, group_by=None, **kwargs):
@@ -321,7 +323,7 @@ class Trades(Records):
     def closed(self):
         """Closed trades."""
         filter_mask = self.records_arr['status'] == TradeStatus.Closed
-        return self.filter_by_mask(filter_mask)
+        return self.filter_by_mask(filter_mask, filter_id='status')
 
     @cached_method
     def closed_rate(self, group_by=None, **kwargs):
@@ -332,9 +334,134 @@ class Trades(Records):
 
     # ############# Plotting ############# #
 
+    def plot_pnl(self,
+                 column=None,
+                 marker_size_range=[7, 14],
+                 opacity_range=[0.5, 1.],
+                 profit_trace_kwargs=None,
+                 loss_trace_kwargs=None,
+                 zeroline_shape_kwargs=None,
+                 fig=None,
+                 **layout_kwargs):  # pragma: no cover
+        """Plot trade PnL.
+
+        Args:
+            column (str): Name of the column to plot.
+            profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Profit" markers.
+            loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Loss" markers.
+            zeroline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Example:
+            ```python-repl
+            >>> trades.plot_pnl()
+            ```
+
+            ![](/vectorbt/docs/img/trades_pnl.png)"""
+        from vectorbt.defaults import contrast_color_schema
+
+        if column is not None:
+            if self.wrapper.grouper.group_by is None:
+                self_col = self[column]
+            else:
+                self_col = self.copy(wrapper=self.wrapper.copy(group_by=None))[column]
+        else:
+            self_col = self
+        if self_col.wrapper.ndim > 1:
+            raise TypeError("Select a column first. Use indexing or column argument.")
+
+        if profit_trace_kwargs is None:
+            profit_trace_kwargs = {}
+        if loss_trace_kwargs is None:
+            loss_trace_kwargs = {}
+        if zeroline_shape_kwargs is None:
+            zeroline_shape_kwargs = {}
+        marker_size_range = tuple(marker_size_range)
+        opacity_range = tuple(opacity_range)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
+        if len(self_col.records_arr) == 0:
+            return fig
+
+        # Extract information
+        exit_idx = self.records_arr['exit_idx']
+        pnl = self.records_arr['pnl']
+        returns = self.records_arr['return']
+        zero_mask = pnl == 0
+        profit_mask = pnl > 0
+        loss_mask = pnl < 0
+        exit_idx = exit_idx[~zero_mask]  # needed for rel_rescale
+        pnl = pnl[~zero_mask]
+        returns = returns[~zero_mask]
+        marker_size = min_rel_rescale(np.abs(returns), marker_size_range)
+        opacity = max_rel_rescale(np.abs(returns), opacity_range)
+
+        if np.any(profit_mask):
+            # Plot Profit markers
+            profit_scatter = go.Scatter(
+                x=self_col.wrapper.index[exit_idx[profit_mask]],
+                y=pnl[profit_mask],
+                mode='markers',
+                marker=dict(
+                    symbol='circle',
+                    color=contrast_color_schema['green'],
+                    size=marker_size[profit_mask],
+                    opacity=opacity[profit_mask],
+                    line=dict(
+                        width=1,
+                        color=adjust_lightness(contrast_color_schema['green'])
+                    ),
+                ),
+                name='Profit',
+                customdata=returns[profit_mask],
+                hovertemplate="(%{x}, %{y})<br>Return: %{customdata:.2%}"
+            )
+            profit_scatter.update(**profit_trace_kwargs)
+            fig.add_trace(profit_scatter)
+
+        if np.any(loss_mask):
+            # Plot Loss markers
+            loss_scatter = go.Scatter(
+                x=self_col.wrapper.index[exit_idx[loss_mask]],
+                y=pnl[loss_mask],
+                mode='markers',
+                marker=dict(
+                    symbol='circle',
+                    color=contrast_color_schema['red'],
+                    size=marker_size[loss_mask],
+                    opacity=opacity[loss_mask],
+                    line=dict(
+                        width=1,
+                        color=adjust_lightness(contrast_color_schema['red'])
+                    )
+                ),
+                name='Loss',
+                customdata=returns[loss_mask],
+                hovertemplate="(%{x}, %{y})<br>Return: %{customdata:.2%}"
+            )
+            loss_scatter.update(**loss_trace_kwargs)
+            fig.add_trace(loss_scatter)
+
+        # Plot zeroline
+        fig.add_shape(**merge_kwargs(dict(
+            xref="paper",
+            yref="y",
+            x0=0,
+            y0=0,
+            x1=1,
+            y1=0,
+            line=dict(
+                color="gray",
+                dash="dashdot",
+            )
+        ), zeroline_shape_kwargs))
+        return fig
+
     def plot(self,
              column=None,
-             ref_price_trace_kwargs=None,
+             close_trace_kwargs=None,
              entry_trace_kwargs=None,
              exit_trace_kwargs=None,
              exit_profit_trace_kwargs=None,
@@ -348,7 +475,7 @@ class Trades(Records):
 
         Args:
             column (str): Name of the column to plot.
-            ref_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Trades.close`.
             entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Entry" markers.
             exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit" markers.
             exit_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit - Profit" markers.
@@ -382,8 +509,8 @@ class Trades(Records):
         if self_col.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing or column argument.")
 
-        if ref_price_trace_kwargs is None:
-            ref_price_trace_kwargs = {}
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
         if entry_trace_kwargs is None:
             entry_trace_kwargs = {}
         if exit_trace_kwargs is None:
@@ -400,7 +527,9 @@ class Trades(Records):
             loss_shape_kwargs = {}
 
         # Plot main price
-        fig = self_col.close.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, fig=fig, **layout_kwargs)
+        if len(self_col.records_arr) == 0:
+            return fig
 
         # Extract information
         size = self_col.records_arr['size']
@@ -429,77 +558,79 @@ class Trades(Records):
 
         duration = get_duration_str(entry_idx, exit_idx)
 
-        # Plot Entry markers
-        entry_customdata = np.stack((
-            size,
-            entry_fees,
-            direction,
-            position_idx
-        ), axis=1)
-        entry_scatter = go.Scatter(
-            x=self_col.wrapper.index[entry_idx],
-            y=entry_price,
-            mode='markers',
-            marker=dict(
-                symbol='circle',
-                color=contrast_color_schema['blue'],
-                size=7,
-                line=dict(
-                    width=1,
-                    color=adjust_lightness(contrast_color_schema['blue'])
-                )
-            ),
-            name='Entry',
-            customdata=entry_customdata,
-            hovertemplate="%{x}<br>Price: %{y}"
-                          "<br>Size: %{customdata[0]:.4f}"
-                          "<br>Fees: %{customdata[1]:.4f}"
-                          "<br>Direction: %{customdata[2]}"
-                          "<br>Position: %{customdata[3]}"
-        )
-        entry_scatter.update(**entry_trace_kwargs)
-        fig.add_trace(entry_scatter)
-
-        # Plot end markers
-        def plot_end_markers(mask, name, color, kwargs):
-            customdata = np.stack((
-                size[mask],
-                exit_fees[mask],
-                pnl[mask],
-                ret[mask],
-                direction[mask],
-                position_idx[mask],
-                duration[mask]
+        if len(entry_idx) > 0:
+            # Plot Entry markers
+            entry_customdata = np.stack((
+                size,
+                entry_fees,
+                direction,
+                position_idx
             ), axis=1)
-            scatter = go.Scatter(
-                x=self_col.wrapper.index[exit_idx[mask]],
-                y=exit_price[mask],
+            entry_scatter = go.Scatter(
+                x=self_col.wrapper.index[entry_idx],
+                y=entry_price,
                 mode='markers',
                 marker=dict(
-                    symbol='circle',
-                    color=color,
+                    symbol='square',
+                    color=contrast_color_schema['blue'],
                     size=7,
                     line=dict(
                         width=1,
-                        color=adjust_lightness(color)
+                        color=adjust_lightness(contrast_color_schema['blue'])
                     )
                 ),
-                name=name,
-                customdata=customdata,
+                name='Entry',
+                customdata=entry_customdata,
                 hovertemplate="%{x}<br>Price: %{y}"
                               "<br>Size: %{customdata[0]:.4f}"
                               "<br>Fees: %{customdata[1]:.4f}"
-                              "<br>PnL: %{customdata[2]:.4f}"
-                              "<br>Return: %{customdata[3]:.2%}"
-                              "<br>Direction: %{customdata[4]}"
-                              "<br>Position: %{customdata[5]}"
-                              "<br>Duration: %{customdata[6]}"
+                              "<br>Direction: %{customdata[2]}"
+                              "<br>Position: %{customdata[3]}"
             )
-            scatter.update(**kwargs)
-            fig.add_trace(scatter)
+            entry_scatter.update(**entry_trace_kwargs)
+            fig.add_trace(entry_scatter)
+
+        # Plot end markers
+        def _plot_end_markers(mask, name, color, kwargs):
+            if np.any(mask):
+                customdata = np.stack((
+                    size[mask],
+                    exit_fees[mask],
+                    pnl[mask],
+                    ret[mask],
+                    direction[mask],
+                    position_idx[mask],
+                    duration[mask]
+                ), axis=1)
+                scatter = go.Scatter(
+                    x=self_col.wrapper.index[exit_idx[mask]],
+                    y=exit_price[mask],
+                    mode='markers',
+                    marker=dict(
+                        symbol='square',
+                        color=color,
+                        size=7,
+                        line=dict(
+                            width=1,
+                            color=adjust_lightness(color)
+                        )
+                    ),
+                    name=name,
+                    customdata=customdata,
+                    hovertemplate="%{x}<br>Price: %{y}"
+                                  "<br>Size: %{customdata[0]:.4f}"
+                                  "<br>Fees: %{customdata[1]:.4f}"
+                                  "<br>PnL: %{customdata[2]:.4f}"
+                                  "<br>Return: %{customdata[3]:.2%}"
+                                  "<br>Direction: %{customdata[4]}"
+                                  "<br>Position: %{customdata[5]}"
+                                  "<br>Duration: %{customdata[6]}"
+                )
+                scatter.update(**kwargs)
+                fig.add_trace(scatter)
 
         # Plot Exit markers
-        plot_end_markers(
+        _plot_end_markers(
             (status == TradeStatus.Closed) & (pnl == 0.),
             'Exit',
             contrast_color_schema['gray'],
@@ -507,7 +638,7 @@ class Trades(Records):
         )
 
         # Plot Exit - Profit markers
-        plot_end_markers(
+        _plot_end_markers(
             (status == TradeStatus.Closed) & (pnl > 0.),
             'Exit - Profit',
             contrast_color_schema['green'],
@@ -515,7 +646,7 @@ class Trades(Records):
         )
 
         # Plot Exit - Loss markers
-        plot_end_markers(
+        _plot_end_markers(
             (status == TradeStatus.Closed) & (pnl < 0.),
             'Exit - Loss',
             contrast_color_schema['red'],
@@ -523,48 +654,50 @@ class Trades(Records):
         )
 
         # Plot Active markers
-        plot_end_markers(
+        _plot_end_markers(
             status == TradeStatus.Open,
             'Active',
             contrast_color_schema['orange'],
             active_trace_kwargs
         )
 
-        # Plot profit zones
         profit_mask = pnl > 0.
-        for i in np.flatnonzero(profit_mask):
-            fig.add_shape(**merge_kwargs(dict(
-                type="rect",
-                xref="x",
-                yref="y",
-                x0=self_col.wrapper.index[entry_idx[i]],
-                y0=entry_price[i],
-                x1=self_col.wrapper.index[exit_idx[i]],
-                y1=exit_price[i],
-                fillcolor='green',
-                opacity=0.15,
-                layer="below",
-                line_width=0,
-            ), profit_shape_kwargs))
+        if np.any(profit_mask):
+            # Plot profit zones
+            for i in np.flatnonzero(profit_mask):
+                fig.add_shape(**merge_kwargs(dict(
+                    type="rect",
+                    xref="x",
+                    yref="y",
+                    x0=self_col.wrapper.index[entry_idx[i]],
+                    y0=entry_price[i],
+                    x1=self_col.wrapper.index[exit_idx[i]],
+                    y1=exit_price[i],
+                    fillcolor='green',
+                    opacity=0.15,
+                    layer="below",
+                    line_width=0,
+                ), profit_shape_kwargs))
 
-        # Plot loss zones
         loss_mask = pnl < 0.
-        for i in np.flatnonzero(loss_mask):
-            fig.add_shape(**merge_kwargs(dict(
-                type="rect",
-                xref="x",
-                yref="y",
-                x0=self_col.wrapper.index[entry_idx[i]],
-                y0=entry_price[i],
-                x1=self_col.wrapper.index[exit_idx[i]],
-                y1=exit_price[i],
-                fillcolor='red',
-                opacity=0.15,
-                layer="below",
-                line_width=0,
-            ), loss_shape_kwargs))
+        if np.any(loss_mask):
+            # Plot loss zones
+            for i in np.flatnonzero(loss_mask):
+                fig.add_shape(**merge_kwargs(dict(
+                    type="rect",
+                    xref="x",
+                    yref="y",
+                    x0=self_col.wrapper.index[entry_idx[i]],
+                    y0=entry_price[i],
+                    x1=self_col.wrapper.index[exit_idx[i]],
+                    y1=exit_price[i],
+                    fillcolor='red',
+                    opacity=0.15,
+                    layer="below",
+                    line_width=0,
+                ), loss_shape_kwargs))
 
-        return fig
+            return fig
 
 
 # ############# Positions ############# #

@@ -119,6 +119,7 @@ broadcasting = Config(
     align_columns=True,
     index_from='strict',
     columns_from='stack',
+    ignore_sr_name=True,
     drop_duplicates=True,
     keep='last',
     drop_redundant=True

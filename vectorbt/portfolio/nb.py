@@ -736,24 +736,24 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         target_shape (tuple): Target shape.
 
             A tuple with exactly two elements: the number of steps and columns.
-        close (np.ndarray): Reference price, such as close.
+        close (array_like of float): Reference price, such as close.
 
             Should have shape `target_shape`.
-        group_lens (np.ndarray): Column count per group.
+        group_lens (array_like of int): Column count per group.
 
             Even if columns are not grouped, `group_lens` should contain ones - one column per group.
-        init_cash (np.ndarray): Initial capital per column, or per group if cash sharing is enabled.
+        init_cash (array_like of float): Initial capital per column, or per group if cash sharing is enabled.
 
             If `cash_sharing` is True, should have shape `(target_shape[0], group_lens.shape[0])`.
             Otherwise, should have shape `target_shape`.
         cash_sharing (bool): Whether to share cash within the same group.
-        call_seq (np.ndarray): Default sequence of calls per row and group.
+        call_seq (array_like of int): Default sequence of calls per row and group.
 
             Should have shape `target_shape` and each value indicate the index of a column in a group.
 
             !!! note
                 To use `auto_call_seq_ctx_nb`, should be of `CallSeqType.Default`.
-        active_mask (np.ndarray): Mask of whether a particular segment should be executed.
+        active_mask (array_like of bool): Mask of whether a particular segment should be executed.
 
             A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 

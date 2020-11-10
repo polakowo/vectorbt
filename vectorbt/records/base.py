@@ -272,17 +272,21 @@ class Records(Configured, PandasIndexer):
         idx_field (str): The name of the field corresponding to the index. Optional.
 
             Will be derived automatically if records contain field `'idx'`.
+        filter_ids (set): IDs of applied filters.
+
+            Prevents applying same filters again and calling contradictive attributes.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, records_arr, idx_field=None, **kwargs):
+    def __init__(self, wrapper, records_arr, idx_field=None, filter_ids=None, **kwargs):
         Configured.__init__(
             self,
             wrapper=wrapper,
             records_arr=records_arr,
             idx_field=idx_field,
+            filter_ids=filter_ids,
             **kwargs
         )
         checks.assert_type(wrapper, ArrayWrapper)
@@ -295,10 +299,13 @@ class Records(Configured, PandasIndexer):
         else:
             if 'idx' in records_arr.dtype.names:
                 idx_field = 'idx'
+        if filter_ids is None:
+            filter_ids = set()
 
         self._wrapper = wrapper
         self._records_arr = records_arr
         self._idx_field = idx_field
+        self._filter_ids = filter_ids
 
         PandasIndexer.__init__(self, records_indexing_func)
 
@@ -325,6 +332,11 @@ class Records(Configured, PandasIndexer):
         return self._idx_field
 
     @property
+    def filter_ids(self):
+        """IDs of applied filters."""
+        return self._filter_ids
+
+    @property
     def records(self):
         """Records."""
         return pd.DataFrame.from_records(self.records_arr)
@@ -338,13 +350,15 @@ class Records(Configured, PandasIndexer):
         """Column index for `Records.records`."""
         return nb.record_col_index_nb(self.records_arr, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask, group_by=None, **kwargs):
+    def filter_by_mask(self, mask, group_by=None, filter_id=None, **kwargs):
         """Return a new class instance, filtered by mask."""
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
             wrapper = self.wrapper
+        if filter_id in self.filter_ids:
+            raise ValueError(f"Filter \"{filter_id}\" already applied")
         if np.all(mask):
             logger.debug(f"Records already satisfy this mask")
         elif not np.any(mask):
@@ -352,6 +366,7 @@ class Records(Configured, PandasIndexer):
         return self.copy(
             wrapper=wrapper,
             records_arr=self.records_arr[mask],
+            filter_ids=self.filter_ids | {filter_id},
             **kwargs
         )
 
@@ -378,6 +393,7 @@ class Records(Configured, PandasIndexer):
             self.records_arr['col'],
             idx_arr=idx_arr,
             value_map=value_map,
+            filter_ids=self.filter_ids,
             **kwargs
         )
 
@@ -399,6 +415,7 @@ class Records(Configured, PandasIndexer):
             self.records_arr['col'],
             idx_arr=idx_arr,
             value_map=value_map,
+            filter_ids=self.filter_ids,
             **kwargs
         )
 
@@ -426,6 +443,7 @@ class Records(Configured, PandasIndexer):
             self.records_arr['col'],
             idx_arr=idx_arr,
             value_map=value_map,
+            filter_ids=self.filter_ids,
             **kwargs
         )
 

@@ -109,7 +109,7 @@ def tile(arg, n, axis=1):
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
+def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None, **kwargs):
     """Produce a broadcast index/columns.
 
     Args:
@@ -127,6 +127,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
+        ignore_sr_name (bool): Whether to ignore Series names.
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
@@ -137,11 +138,15 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
         with one column prior to broadcasting. If the name of a Series is not that important,
         better to drop it altogether by setting it to None.
     """
+    from vectorbt import defaults
+    
     index_str = 'columns' if axis == 1 else 'index'
     new_index = None
     if axis == 1 and len(to_shape) == 1:
         to_shape = (to_shape[0], 1)
     maxlen = to_shape[1] if axis == 1 else to_shape[0]
+    if ignore_sr_name is None:
+        ignore_sr_name = defaults.broadcasting['ignore_sr_name']
 
     if index_from is not None:
         if isinstance(index_from, int):
@@ -158,6 +163,9 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
                         index = index_fns.get_index(arg, axis)
                         if checks.is_default_index(index):
                             # ignore simple ranges without name
+                            continue
+                        if checks.is_series(arg) and ignore_sr_name:
+                            # ignore Series name
                             continue
                         if new_index is None:
                             new_index = index

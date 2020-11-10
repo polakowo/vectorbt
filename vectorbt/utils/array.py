@@ -68,12 +68,43 @@ def uniform_summing_to_one_nb(n):
     return rand_floats
 
 
-@njit(cache=True)
-def renormalize_nb(n, range1, range2):
-    """Convert from one range to another."""
-    delta1 = range1[1] - range1[0]
-    delta2 = range2[1] - range2[0]
-    return (delta2 * (n - range1[0]) / delta1) + range2[0]
+def renormalize(a, from_range, to_range):
+    """Renormalize `a` from one range to another."""
+    delta1 = from_range[1] - from_range[0]
+    delta2 = to_range[1] - to_range[0]
+    return (delta2 * (a - from_range[0]) / delta1) + to_range[0]
+
+
+renormalize_nb = njit(cache=True)(renormalize)
+"""Numba-compiled version of `renormalize`."""
+
+
+def min_rel_rescale(a, to_range):
+    """Rescale elements in `a` relatively to minimum."""
+    a_min = np.min(a)
+    a_max = np.max(a)
+    if a_max - a_min == 0:
+        return np.full(a.shape, to_range[0])
+    from_range = (a_min, a_max)
+    from_range_ratio = a_max / a_min
+    to_range_ratio = to_range[1] / to_range[0]
+    if from_range_ratio < to_range_ratio:
+        to_range = (to_range[0], to_range[0] * from_range_ratio)
+    return renormalize(a, from_range, to_range)
+
+
+def max_rel_rescale(a, to_range):
+    """Rescale elements in `a` relatively to maximum."""
+    a_min = np.min(a)
+    a_max = np.max(a)
+    if a_max - a_min == 0:
+        return np.full(a.shape, to_range[1])
+    from_range = (a_min, a_max)
+    from_range_ratio = a_max / a_min
+    to_range_ratio = to_range[1] / to_range[0]
+    if from_range_ratio < to_range_ratio:
+        to_range = (to_range[1] / from_range_ratio, to_range[1])
+    return renormalize(a, from_range, to_range)
 
 
 @njit(cache=True)
@@ -84,4 +115,3 @@ def rescale_float_to_int_nb(floats, int_range, total):
     for i in range(leftover):
         ints[np.random.choice(len(ints))] += 1
     return ints
-

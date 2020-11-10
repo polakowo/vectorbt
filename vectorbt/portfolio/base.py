@@ -25,7 +25,7 @@ This way, one can simulate and analyze his/her strategy in a couple of lines.
 ### Example
 
 The following example does something crazy: it checks candlestick data of 6 major cryptocurrencies
-in 2020 against every single pattern found in TA-Lib, and translates them into orders:
+in 2020 against every single pattern found in TA-Lib, and translates them into signals:
 
 ```python-repl
 >>> import numpy as np
@@ -211,9 +211,7 @@ simulation from the beginning to the end, you can turn on logging.
 Just as orders, logs are also records and thus can be easily analyzed:
 
 ```python-repl
->>> from vectorbt.portfolio.enums import OrderStatus
-
->>> portfolio.logs().map_field('res_status', value_map=OrderStatus).value_counts()
+>>> portfolio.logs().map_field('res_status', value_map=vbt.OrderStatus).value_counts()
          BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
 Filled       186      169      172      171      177      180
 Ignored       59       76       73       74       68       65
@@ -256,6 +254,7 @@ from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import convert_str_enum_value
 from vectorbt.utils.config import Configured, merge_kwargs
 from vectorbt.utils.random import set_seed
+from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -271,7 +270,6 @@ from vectorbt.portfolio.enums import (
     CallSeqType,
     SizeType,
     ConflictMode,
-    OrderStatus,
     Direction
 )
 
@@ -689,11 +687,9 @@ class Portfolio(Configured, PandasIndexer):
             dtype: float64
 
             >>> # Testing multiple parameters (via broadcasting)
-            >>> from vectorbt.portfolio.enums import Direction
-
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, direction=[list(Direction)],
-            ...     broadcast_kwargs=dict(columns_from=Direction._fields))
+            ...     close, entries, exits, direction=[list(vbt.Direction)],
+            ...     broadcast_kwargs=dict(columns_from=vbt.Direction._fields))
             >>> portfolio.share_flow()
                 Long  Short    All
             0  100.0 -100.0  100.0
@@ -859,7 +855,7 @@ class Portfolio(Configured, PandasIndexer):
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.broadcast_to(init_cash, (len(cs_group_lens),))
+        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -1197,7 +1193,7 @@ class Portfolio(Configured, PandasIndexer):
         target_shape_2d = (close.shape[0], close.shape[1] if close.ndim > 1 else 1)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.broadcast_to(init_cash, (len(cs_group_lens),))
+        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if checks.is_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
@@ -1515,7 +1511,7 @@ class Portfolio(Configured, PandasIndexer):
         close = broadcast(close, to_shape=target_shape, **broadcast_kwargs)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
-        init_cash = np.broadcast_to(init_cash, (len(cs_group_lens),))
+        init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
         if isinstance(active_mask, int):
             _active_mask = np.full((target_shape_2d[0], len(group_lens)), False)
@@ -1672,43 +1668,29 @@ class Portfolio(Configured, PandasIndexer):
 
     # ############# Records ############# #
 
-    @cached_method
-    def orders(self, group_by=None):
+    def orders(self, group_by=None):  # doesn't require caching
         """Get order records.
 
         See `vectorbt.portfolio.orders.Orders`."""
         return self._orders.regroup(group_by=group_by)
 
-    @cached_method
-    def logs(self, group_by=None):
+    def logs(self, group_by=None):  # doesn't require caching
         """Get log records.
 
         See `vectorbt.portfolio.logs.Logs`."""
         return self._logs.regroup(group_by=group_by)
 
-    @cached_method
-    def trades(self, group_by=None, incl_unrealized=None):
+    def trades(self, group_by=None):  # doesn't require caching
         """Get trade records.
 
         See `vectorbt.portfolio.events.Trades`."""
-        if incl_unrealized is None:
-            incl_unrealized = self.incl_unrealized
-        trades = self._trades.regroup(group_by=group_by)
-        if not incl_unrealized:
-            return trades.closed
-        return trades
+        return self._trades.regroup(group_by=group_by)
 
-    @cached_method
-    def positions(self, group_by=None, incl_unrealized=None):
+    def positions(self, group_by=None):  # doesn't require caching
         """Get position records.
 
         See `vectorbt.portfolio.events.Positions`."""
-        if incl_unrealized is None:
-            incl_unrealized = self.incl_unrealized
-        positions = self._positions.regroup(group_by=group_by)
-        if not incl_unrealized:
-            return positions.closed
-        return positions
+        return self._positions.regroup(group_by=group_by)
 
     @cached_method
     def drawdowns(self, **kwargs):
@@ -1837,7 +1819,7 @@ class Portfolio(Configured, PandasIndexer):
 
     @cached_method
     def cash(self, group_by=None, in_sim_order=False):
-        """Get cash series per column/group."""
+        """Get cash balance series per column/group."""
         if in_sim_order and not self.cash_sharing:
             raise ValueError("Cash sharing must be enabled for in_sim_order=True")
 
@@ -2001,7 +1983,11 @@ class Portfolio(Configured, PandasIndexer):
             Use `column` only if caching is enabled, otherwise it may re-compute the same
             objects multiple times."""
         # Pre-calculate
-        trades = self.trades(group_by=group_by, incl_unrealized=incl_unrealized)
+        trades = self.trades(group_by=group_by)
+        if incl_unrealized is None:
+            incl_unrealized = self.incl_unrealized
+        if not incl_unrealized:
+            trades = trades.closed
         drawdowns = self.drawdowns(group_by=group_by)
         if active_returns:
             returns = self.active_returns(group_by=group_by)
@@ -2046,3 +2032,470 @@ class Portfolio(Configured, PandasIndexer):
             agg_stats_sr.iloc[3:] = agg_func(stats_df.iloc[:, 3:])
             return agg_stats_sr
         return stats_df
+
+    def plot(self,
+             column=None,
+             plot_orders=True,
+             order_kwargs=None,
+             plot_trades=False,
+             trades_kwargs=None,
+             trade_type='trades',
+             plot_trade_pnl=True,
+             trade_pnl_kwargs=None,
+             plot_value=True,
+             value_kwargs=None,
+             plot_holding_value=True,
+             holding_value_kwargs=None,
+             plot_cash=True,
+             cash_kwargs=None,
+             plot_shares=True,
+             shares_kwargs=None,
+             plot_value_drawdowns=True,
+             value_drawdowns_kwargs=None,
+             plot_cum_returns=True,
+             cum_returns_kwargs=None,
+             zeroline_shape_kwargs=None,
+             plot_benchmark_value=True,
+             benchmark_value_kwargs=None,
+             plot_benchmark_cumret=True,
+             benchmark_cumret_kwargs=None,
+             benchmark='max_shares_long',
+             active_returns=False,
+             in_sim_order=False,
+             incl_unrealized=None,
+             fig=None,
+             vertical_spacing=0.02,
+             **layout_kwargs):  # pragma: no cover
+        """Plot trade PnL.
+
+        Args:
+            column (str): Name of the column to plot.
+            plot_orders (bool): Whether to plot orders.
+            order_kwargs (dict): Keyword arguments passed to `vectorbt.portfolio.orders.Orders.plot`.
+            plot_trades (bool): Whether to plot trades.
+            trades_kwargs (dict): Keyword arguments passed to `vectorbt.portfolio.trades.Trades.plot`.
+            trade_type (str): Pass `'trades'` for trades and `'positions'` for positions.
+            plot_trade_pnl (bool): Whether to plot PnL of trades/positions.
+            trade_pnl_kwargs (dict): Keyword arguments passed to `vectorbt.portfolio.trades.Trades.plot_pnl`.
+            plot_value (bool): Whether to plot portfolio value.
+            value_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            plot_holding_value (bool): Whether to plot holding value.
+            holding_value_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            plot_cash (bool): Whether to plot cash balance.
+            cash_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            plot_shares (bool): Whether to plot share balance.
+            shares_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            plot_value_drawdowns (bool): Whether to plot drawdowns of portfolio value.
+            value_drawdowns_kwargs (dict): Keyword arguments passed to `vectorbt.generic.drawdowns.Drawdowns.plot`.
+            plot_cum_returns (bool): Whether to plot cumulative returns of portfolio value.
+            cum_returns_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            zeroline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            plot_benchmark_value (bool): Whether to plot benchmark value.
+            benchmark_value_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            plot_benchmark_cumret (bool): Whether to plot cumulative returns of benchmark value.
+            benchmark_cumret_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot`.
+            benchmark (Portfolio, str or array_like): Benchmark to compare portfolio value against.
+
+                The following values are allowed:
+
+                * Instance of another `Portfolio`
+                * `'inf_long'`/`'inf_short'` to simulate longing/shorting shares for all
+                    initial capital of this portfolio
+                * `'max_shares_long'`/`'max_shares_short'` to simulate longing/shorting
+                    the maximum number of shares of this portfolio
+                * Array-like value series of the same shape
+            active_returns (bool): Whether to use active returns.
+            in_sim_order (bool): Whether to use portfolio value generated in simulation order.
+            incl_unrealized (bool): Whether to include unrealized P&L in statistics.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            vertical_spacing (float): Space between subplot rows in normalized plot coordinates.
+            **layout_kwargs: Keyword arguments for layout.
+        Example:
+            ```python-repl
+            >>> portfolio.plot()
+            ```
+
+            ![](/vectorbt/docs/img/portfolio.png)"""
+        from vectorbt.defaults import color_schema
+
+        if order_kwargs is None:
+            order_kwargs = {}
+        if trades_kwargs is None:
+            trades_kwargs = {}
+        if trade_pnl_kwargs is None:
+            trade_pnl_kwargs = {}
+        if value_kwargs is None:
+            value_kwargs = {}
+        if holding_value_kwargs is None:
+            holding_value_kwargs = {}
+        if cash_kwargs is None:
+            cash_kwargs = {}
+        if shares_kwargs is None:
+            shares_kwargs = {}
+        if value_drawdowns_kwargs is None:
+            value_drawdowns_kwargs = {}
+        if cum_returns_kwargs is None:
+            cum_returns_kwargs = {}
+        if benchmark_value_kwargs is None:
+            benchmark_value_kwargs = {}
+        if benchmark_cumret_kwargs is None:
+            benchmark_cumret_kwargs = {}
+        if zeroline_shape_kwargs is None:
+            zeroline_shape_kwargs = {}
+        if incl_unrealized is None:
+            incl_unrealized = self.incl_unrealized
+
+        def _select_column(portfolio, column):
+            """Select one column."""
+            if column is not None:
+                if self.wrapper.grouper.group_by is None:
+                    pcol = portfolio[column]
+                else:
+                    pcol = portfolio.regroup(None)[column]
+            else:
+                pcol = portfolio
+            if pcol.wrapper.ndim > 1:
+                raise TypeError("Select a column first. Use indexing or column argument.")
+            return pcol
+
+        self_col = _select_column(self, column)
+
+        if fig is None:
+            # Create new figure
+            fig = CustomFigureWidget()
+
+        if plot_trades or plot_trade_pnl:
+            # Extract trades/positions
+            checks.assert_in(trade_type, ['trades', 'positions'])
+            if trade_type == 'trades':
+                trades = self_col.trades()
+            else:
+                trades = self_col.positions()
+
+            if not incl_unrealized:
+                # Use closed trades only
+                trades = trades.closed
+        else:
+            trades = None
+
+        if plot_benchmark_value or plot_benchmark_cumret:
+            # Benchmark to compare value/cumulative returns against
+            if isinstance(benchmark, str):
+                # Simulate another portfolio
+                checks.assert_in(benchmark, ['inf_long', 'inf_short', 'max_shares_long', 'max_shares_short'])
+                order_size = self_col.wrapper.wrap(np.full(self_col.wrapper.shape[0], 0.))
+                if benchmark == 'inf_long':
+                    order_size[0] = np.inf
+                elif benchmark == 'inf_short':
+                    order_size[0] = -np.inf
+                elif benchmark == 'max_shares_long':
+                    order_size[0] = self_col.shares().abs().max()
+                elif benchmark == 'max_shares_short':
+                    order_size[0] = -self_col.shares().abs().max()
+                benchmark = Portfolio.from_orders(self_col.close, order_size, init_cash=self_col.init_cash())
+            if isinstance(benchmark, Portfolio):
+                # Query value from provided portfolio
+                benchmark = _select_column(benchmark, column)
+                benchmark_value = benchmark.value(in_sim_order=in_sim_order)
+            else:
+                # Provided benchmark is an array-like object
+                benchmark_value = self_col.wrapper.wrap(np.asarray(benchmark))
+        else:
+            benchmark_value = None
+
+        # Count Y axes
+        y1_active = plot_orders
+        y2_active = plot_trades
+        y3_active = plot_trade_pnl
+        y4_active = plot_value or plot_holding_value or plot_cash
+        y5_active = plot_shares  # not a subplot
+        y6_active = plot_value_drawdowns
+        y7_active = plot_cum_returns
+        num_y_axes = sum([y1_active, y2_active, y3_active, y4_active, y5_active, y6_active, y7_active])
+        if num_y_axes == 0:
+            raise ValueError("Nothing to plot")
+
+        # Y axes come in descending order
+        y_keys = []
+        yaxis_keys = []
+        for i in range(num_y_axes - 1, -1, -1):
+            y_keys.append('y' + str(i + 1) if i > 0 else 'y')
+            yaxis_keys.append('yaxis' + str(i + 1) if i > 0 else 'yaxis')
+
+        # Calculate domains
+        domains = []
+        num_subplots = num_y_axes - 1 if y5_active else num_y_axes
+        if num_subplots > 0:
+            for i in range(num_subplots - 1, -1, -1):
+                from_y = i / num_subplots
+                if i > 0:
+                    from_y += vertical_spacing / 2
+                to_y = (i + 1) / num_subplots
+                if i < num_subplots:
+                    to_y -= vertical_spacing / 2
+                domains.append([from_y, to_y])
+
+        # Plot traces
+        j = 0
+        yaxis_layout = {}
+        if y1_active:
+            # Plot orders
+            order_kwargs = merge_kwargs(dict(
+                close_trace_kwargs=dict(
+                    yaxis=y_keys[j],
+                    line_color=color_schema['blue'],
+                    name='Close' if self_col.close.name is None else self_col.close.name
+                ),
+                buy_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                sell_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                )
+            ), order_kwargs)
+            self_col.orders().plot(**order_kwargs, fig=fig)
+            yaxis_layout[yaxis_keys[j]] = dict(
+                title='Price',
+                domain=domains[j]
+            )
+            j += 1
+        if y2_active:
+            # Plot trades
+            trades_kwargs = merge_kwargs(dict(
+                close_trace_kwargs=dict(
+                    yaxis=y_keys[j],
+                    line_color=color_schema['blue'],
+                    name='Close' if self_col.close.name is None else self_col.close.name
+                ),
+                entry_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                exit_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                exit_profit_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                exit_loss_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                active_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                profit_shape_kwargs=dict(
+                    yref=y_keys[j]
+                ),
+                loss_shape_kwargs=dict(
+                    yref=y_keys[j]
+                )
+            ), trades_kwargs)
+            trades.plot(**trades_kwargs, fig=fig)
+            yaxis_layout[yaxis_keys[j]] = dict(
+                title='Price',
+                domain=domains[j]
+            )
+            j += 1
+        if y3_active:
+            # Plot trade PnL
+            trade_pnl_kwargs = merge_kwargs(dict(
+                profit_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                loss_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                zeroline_shape_kwargs=dict(
+                    yref=y_keys[j],
+                    **zeroline_shape_kwargs
+                )
+            ), trade_pnl_kwargs)
+            trades.plot_pnl(**trade_pnl_kwargs, fig=fig)
+            yaxis_layout[yaxis_keys[j]] = dict(
+                title='PnL',
+                domain=domains[j]
+            )
+            j += 1
+        if y4_active:
+            if plot_value:
+                # Plot portfolio and benchmark value
+                value_kwargs = merge_kwargs(dict(
+                    name='Value',
+                    trace_kwargs=dict(
+                        yaxis=y_keys[j],
+                        line_color=color_schema['purple']
+                    )
+                ), value_kwargs)
+                self_col.value(in_sim_order=in_sim_order).vbt.plot(**value_kwargs, fig=fig)
+                if plot_benchmark_value:
+                    benchmark_value_kwargs = merge_kwargs(dict(
+                        name='Benchmark Value',
+                        trace_kwargs=dict(
+                            yaxis=y_keys[j],
+                            line_color=color_schema['purple'],
+                            line_dash='dot'
+                        )
+                    ), benchmark_value_kwargs)
+                    benchmark_value.vbt.plot(**benchmark_value_kwargs, fig=fig)
+            if plot_holding_value:
+                # Plot holding value
+                holding_value_kwargs = merge_kwargs(dict(
+                    name='Holding Value',
+                    trace_kwargs=dict(
+                        yaxis=y_keys[j],
+                        line_color=color_schema['cyan']
+                    )
+                ), holding_value_kwargs)
+                self_col.holding_value().vbt.plot(**holding_value_kwargs, fig=fig)
+            if plot_cash:
+                # Plot cash
+                cash_kwargs = merge_kwargs(dict(
+                    name='Cash',
+                    trace_kwargs=dict(
+                        yaxis=y_keys[j],
+                        line_color=color_schema['green']
+                    )
+                ), cash_kwargs)
+                self_col.cash(in_sim_order=in_sim_order).vbt.plot(**cash_kwargs, fig=fig)
+            yaxis_layout[yaxis_keys[j]] = dict(
+                title='Value',
+                domain=domains[j]
+            )
+            j += 1
+        if y5_active:
+            # Plot shares
+            shares_kwargs = merge_kwargs(dict(
+                name='Shares',
+                trace_kwargs=dict(
+                    yaxis=y_keys[j],
+                    line_color=color_schema['brown']
+                )
+            ), shares_kwargs)
+            self_col.shares().vbt.plot(**shares_kwargs, fig=fig)
+            if y4_active:
+                yaxis_layout[yaxis_keys[j]] = dict(
+                    showgrid=False,
+                    overlaying=y_keys[j - 1],
+                    side="right",
+                    title='Shares'
+                )
+            else:
+                yaxis_layout[yaxis_keys[j]] = dict(
+                    title='Shares'
+                )
+            j += 1
+        if y6_active:
+            # Plot drawdowns of portfolio value
+            value_drawdowns_kwargs = merge_kwargs(dict(
+                ts_trace_kwargs=dict(
+                    yaxis=y_keys[j],
+                    line_color=color_schema['purple'],
+                    name='Close' if self_col.close.name is None else self_col.close.name
+                ),
+                peak_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                valley_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                recovery_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                active_trace_kwargs=dict(
+                    yaxis=y_keys[j]
+                ),
+                ptv_shape_kwargs=dict(
+                    y0=domains[j - y5_active][0],
+                    y1=domains[j - y5_active][1]
+                ),
+                vtr_shape_kwargs=dict(
+                    y0=domains[j - y5_active][0],
+                    y1=domains[j - y5_active][1]
+                ),
+                active_shape_kwargs=dict(
+                    y0=domains[j - y5_active][0],
+                    y1=domains[j - y5_active][1]
+                ),
+            ), value_drawdowns_kwargs)
+            self_col.drawdowns().plot(**value_drawdowns_kwargs, fig=fig)
+            yaxis_layout[yaxis_keys[j]] = dict(
+                title='Value',
+                domain=domains[j - y5_active]
+            )
+            j += 1
+        if y7_active:
+            # Plot cumulative returns of portfolio and benchmark value
+            cum_returns_kwargs = merge_kwargs(dict(
+                name='Cum. Returns',
+                trace_kwargs=dict(
+                    yaxis=y_keys[j],
+                    line_color=color_schema['orange']
+                )
+            ), cum_returns_kwargs)
+            if active_returns:
+                returns = self_col.active_returns()
+            else:
+                returns = self_col.returns(in_sim_order=in_sim_order)
+            cum_returns = returns.vbt.returns.cumulative(start_value=1.)
+            cum_returns.vbt.plot(**cum_returns_kwargs, fig=fig)
+            if plot_benchmark_cumret:
+                benchmark_cumret_kwargs = merge_kwargs(dict(
+                    name='Benchmark Cum. Returns',
+                    trace_kwargs=dict(
+                        yaxis=y_keys[j],
+                        line_color=color_schema['orange'],
+                        line_dash='dot'
+                    )
+                ), benchmark_cumret_kwargs)
+                benchmark_cumret = benchmark_value.pct_change().fillna(0.).vbt.returns.cumulative(start_value=1.)
+                benchmark_cumret.vbt.plot(**benchmark_cumret_kwargs, fig=fig)
+            # Plot zeroline
+            fig.add_shape(**merge_kwargs(dict(
+                xref="paper",
+                yref=y_keys[j],
+                x0=0,
+                y0=1,
+                x1=1,
+                y1=1,
+                line=dict(
+                    color="gray",
+                    dash="dashdot",
+                )
+            ), zeroline_shape_kwargs))
+            yaxis_layout[yaxis_keys[j]] = dict(
+                title='Cum. Returns',
+                domain=domains[j - y5_active]
+            )
+            j += 1
+
+        # Set up layout
+        fig.update_layout(dict(
+            autosize=True,
+            width=900,
+            height=250 * num_subplots,
+            margin=dict(b=40, t=20),
+            legend=dict(
+                font=dict(size=10),
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            hovermode="closest",
+            xaxis=dict(
+                title='Date',
+            )
+        ))
+        fig.update_layout(yaxis_layout)
+        fig.update_layout(layout_kwargs)
+
+        # Remove duplicate legend labels
+        found_names = set()
+        for trace in fig.data:
+            if 'name' in trace:
+                if trace['name'] in found_names:
+                    trace['showlegend'] = False
+                else:
+                    found_names |= {trace['name']}
+
+        return fig

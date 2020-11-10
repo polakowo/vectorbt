@@ -16,11 +16,11 @@ from vectorbt.portfolio.enums import order_dt, OrderSide
 def indexing_on_orders_meta(obj, pd_indexing_func):
     """Perform indexing on `Orders`."""
     new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
-    new_ref_price = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
+    new_close = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
         records_arr=new_records_arr,
-        close=new_ref_price
+        close=new_close
     ), group_idxs, col_idxs
 
 
@@ -131,7 +131,7 @@ class Orders(Records):
 
     def plot(self,
              column=None,
-             ref_price_trace_kwargs=None,
+             close_trace_kwargs=None,
              buy_trace_kwargs=None,
              sell_trace_kwargs=None,
              fig=None,
@@ -140,7 +140,7 @@ class Orders(Records):
 
         Args:
             column (str): Name of the column to plot.
-            ref_price_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for main price.
+            close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Orders.close`.
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -163,15 +163,15 @@ class Orders(Records):
         if self_col.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing or column argument.")
 
-        if ref_price_trace_kwargs is None:
-            ref_price_trace_kwargs = {}
+        if close_trace_kwargs is None:
+            close_trace_kwargs = {}
         if buy_trace_kwargs is None:
             buy_trace_kwargs = {}
         if sell_trace_kwargs is None:
             sell_trace_kwargs = {}
 
         # Plot main price
-        fig = self_col.close.vbt.plot(trace_kwargs=ref_price_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, fig=fig, **layout_kwargs)
 
         # Extract information
         idx = self_col.records_arr['idx']

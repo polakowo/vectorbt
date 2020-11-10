@@ -317,8 +317,7 @@ class Drawdowns(Records):
             active_shape_kwargs = {}
 
         fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
-
-        if self_col.records_arr.shape[0] == 0:
+        if len(self_col.records_arr) == 0:
             return fig
 
         # Extract information
@@ -342,23 +341,24 @@ class Drawdowns(Records):
 
         # Plot peak markers and zones
         peak_mask = start_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
-        peak_scatter = go.Scatter(
-            x=self_col.ts.index[start_idx[peak_mask]],
-            y=start_val[peak_mask],
-            mode='markers',
-            marker=dict(
-                symbol='circle',
-                color=contrast_color_schema['blue'],
-                size=7,
-                line=dict(
-                    width=1,
-                    color=adjust_lightness(contrast_color_schema['blue'])
-                )
-            ),
-            name='Peak'
-        )
-        peak_scatter.update(**peak_trace_kwargs)
-        fig.add_trace(peak_scatter)
+        if np.any(peak_mask):
+            peak_scatter = go.Scatter(
+                x=self_col.ts.index[start_idx[peak_mask]],
+                y=start_val[peak_mask],
+                mode='markers',
+                marker=dict(
+                    symbol='diamond',
+                    color=contrast_color_schema['blue'],
+                    size=7,
+                    line=dict(
+                        width=1,
+                        color=adjust_lightness(contrast_color_schema['blue'])
+                    )
+                ),
+                name='Peak'
+            )
+            peak_scatter.update(**peak_trace_kwargs)
+            fig.add_trace(peak_scatter)
 
         recovery_mask = status == DrawdownStatus.Recovered
         if np.any(recovery_mask):
@@ -371,7 +371,7 @@ class Drawdowns(Records):
                 y=valley_val[recovery_mask],
                 mode='markers',
                 marker=dict(
-                    symbol='circle',
+                    symbol='diamond',
                     color=contrast_color_schema['red'],
                     size=7,
                     line=dict(
@@ -410,7 +410,7 @@ class Drawdowns(Records):
                 y=end_val[recovery_mask],
                 mode='markers',
                 marker=dict(
-                    symbol='circle',
+                    symbol='diamond',
                     color=contrast_color_schema['green'],
                     size=7,
                     line=dict(
@@ -451,7 +451,7 @@ class Drawdowns(Records):
                 y=end_val[active_mask],
                 mode='markers',
                 marker=dict(
-                    symbol='circle',
+                    symbol='diamond',
                     color=contrast_color_schema['orange'],
                     size=7,
                     line=dict(

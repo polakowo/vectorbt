@@ -659,7 +659,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         Base_SRAccessor.__init__(self, obj, **kwargs)
         Generic_Accessor.__init__(self, obj, **kwargs)
 
-    def plot(self, name=None, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
@@ -673,17 +673,24 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             ```
 
             ![](/vectorbt/docs/img/sr_plot.png)"""
+        if trace_kwargs is None:
+            trace_kwargs = {}
         if fig is None:
             fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
         if name is None:
-            name = self._obj.name
+            if 'name' in trace_kwargs:
+                name = trace_kwargs.pop('name')
+            else:
+                name = self._obj.name
+        if name is not None:
+            name = str(name)
 
         scatter = go.Scatter(
             x=self.index,
             y=self._obj.values,
             mode='lines',
-            name=str(name),
+            name=name,
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
@@ -899,7 +906,7 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
         Base_DFAccessor.__init__(self, obj, **kwargs)
         Generic_Accessor.__init__(self, obj, **kwargs)
 
-    def plot(self, trace_kwargs={}, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:
@@ -912,7 +919,8 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             ```
 
             ![](/vectorbt/docs/img/df_plot.png)"""
-
+        if trace_kwargs is None:
+            trace_kwargs = {}
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.plot(
                 trace_kwargs=trace_kwargs,
