@@ -59,8 +59,11 @@ fig.show()
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
-```python-repl
->>> portfolio[(14, 38)].stats()
+```python
+portfolio[(14, 38)].stats()
+```
+
+```plaintext
 Start                            2014-09-17 00:00:00
 End                              2020-11-17 00:00:00
 Duration                          2254 days 00:00:00
@@ -86,11 +89,13 @@ Sharpe Ratio                                 1.70494
 Sortino Ratio                                2.67607
 Calmar Ratio                                 2.18027
 Name: (14, 38), dtype: object
+```
 
->>> fig = portfolio[(14, 38)].plot(template='plotly_dark')
->>> fig.update_traces(xaxis="x1")
->>> fig.update_xaxes(spikemode='across+marker')
->>> fig.show()
+```python
+fig = portfolio[(14, 38)].plot(template='plotly_dark')
+fig.update_traces(xaxis="x1")
+fig.update_xaxes(spikemode='across+marker')
+fig.show()
 ```
 
 ![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_portfolio.png)
