@@ -350,7 +350,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
     def plot_cum_returns(self, benchmark_rets=None, start_value=1, fill_to_benchmark=False,
                          main_kwargs=None, benchmark_kwargs=None, hline_shape_kwargs=None,
                          row=None, col=None, xref='x', yref='y',
-                         fig=None, **layout_kwargs):
+                         fig=None, **layout_kwargs):  # pragma: no cover
         """Plot cumulative returns.
 
         Args:

@@ -1985,7 +1985,7 @@ class Portfolio(Configured, PandasIndexer):
              group_id_labels=True,
              hline_shape_kwargs=None,
              make_subplots_kwargs=None,
-             **kwargs):
+             **kwargs):  # pragma: no cover
         """Plot various parts of this portfolio.
 
         Args:
@@ -2457,7 +2457,7 @@ class Portfolio(Configured, PandasIndexer):
                 fig.layout[xaxis]['title'] = 'Date'
                 fig.layout[yaxis]['title'] = 'Net Exposure'
 
-                # Remove duplicate legend labels
+        # Remove duplicate legend labels
         found_ids = dict()
         unique_idx = 0
         for trace in fig.data:
@@ -2521,5 +2521,6 @@ class Portfolio(Configured, PandasIndexer):
                         if col > 0:
                             fig.layout[yaxis]['title'] = None
                         i += 1
+
         fig.update_layout(kwargs)
         return fig

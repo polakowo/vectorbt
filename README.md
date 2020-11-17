@@ -93,7 +93,7 @@ Name: (14, 38), dtype: object
 
 ```python
 fig = portfolio[(14, 38)].plot(template='plotly_dark')
-fig.update_traces(xaxis="x1")
+fig.update_traces(xaxis="x3")
 fig.update_xaxes(spikemode='across+marker')
 fig.show()
 ```
