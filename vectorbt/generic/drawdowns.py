@@ -9,6 +9,7 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
+from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -54,12 +55,6 @@ class Drawdowns(Records):
         3    0         93          94       95       1
         4    0         98          99      100       1
 
-        >>> drawdowns.plot()
-        ```
-
-        ![](/vectorbt/docs/img/drawdowns_plot.png)
-
-        ```python-repl
         >>> drawdowns.drawdown
         <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
 
@@ -253,6 +248,8 @@ class Drawdowns(Records):
 
     def plot(self,
              column=None,
+             show_ts=True,
+             top_n=5,
              ts_trace_kwargs=None,
              peak_trace_kwargs=None,
              valley_trace_kwargs=None,
@@ -261,12 +258,16 @@ class Drawdowns(Records):
              ptv_shape_kwargs=None,
              vtr_shape_kwargs=None,
              active_shape_kwargs=None,
+             row=None, col=None,
+             xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot drawdowns over `Drawdowns.ts`.
 
         Args:
             column (str): Name of the column to plot.
+            show_ts (bool): Whether to show time series.
+            top_n (int): Filter top N drawdown records by maximum drawdown.
             ts_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for time series.
             peak_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for peak values.
             valley_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for valley values.
@@ -275,6 +276,10 @@ class Drawdowns(Records):
             ptv_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for PtV zones.
             vtr_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for VtR zones.
             active_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for active VtR zones.
+            row (int): Row position.
+            col (int): Column position.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -286,21 +291,18 @@ class Drawdowns(Records):
             >>> vbt.Drawdowns.from_ts(ts, freq='1 days').plot()
             ```
 
-            ![](/vectorbt/docs/img/drawdowns.png)"""
-        from vectorbt.defaults import contrast_color_schema
+            ![](/vectorbt/docs/img/drawdowns_plot.png)"""
+        from vectorbt.defaults import layout, contrast_color_schema
 
-        if column is not None:
-            if self.wrapper.grouper.group_by is None:
-                self_col = self[column]
-            else:
-                self_col = self.copy(wrapper=self.wrapper.copy(group_by=None))[column]
-        else:
-            self_col = self
-        if self_col.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing or column argument.")
+        self_col = self.force_select_column(column)
+        if top_n is not None:
+            self_col = self_col.filter_by_mask(self_col.drawdown.top_n_mask(top_n))
 
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
+        ts_trace_kwargs = merge_kwargs(dict(
+            line_color=layout['colorway'][0]
+        ), ts_trace_kwargs)
         if peak_trace_kwargs is None:
             peak_trace_kwargs = {}
         if valley_trace_kwargs is None:
@@ -316,169 +318,179 @@ class Drawdowns(Records):
         if active_shape_kwargs is None:
             active_shape_kwargs = {}
 
-        fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, fig=fig, **layout_kwargs)
-        if len(self_col.records_arr) == 0:
-            return fig
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
+        y_domain = [0, 1]
+        yaxis = 'yaxis' + yref[1:]
+        if yaxis in fig.layout:
+            if 'domain' in fig.layout[yaxis]:
+                if fig.layout[yaxis]['domain'] is not None:
+                    y_domain = fig.layout[yaxis]['domain']
 
-        # Extract information
-        start_idx = self_col.records_arr['start_idx']
-        valley_idx = self_col.records_arr['valley_idx']
-        end_idx = self_col.records_arr['end_idx']
-        status = self_col.records_arr['status']
+        if show_ts:
+            fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, row=row, col=col, fig=fig)
 
-        start_val = self_col.ts.values[start_idx]
-        valley_val = self_col.ts.values[valley_idx]
-        end_val = self_col.ts.values[end_idx]
+        if len(self_col.records_arr) > 0:
+            # Extract information
+            start_idx = self_col.records_arr['start_idx']
+            valley_idx = self_col.records_arr['valley_idx']
+            end_idx = self_col.records_arr['end_idx']
+            status = self_col.records_arr['status']
 
-        def get_duration_str(from_idx, to_idx):
-            if isinstance(self_col.wrapper.index, DatetimeTypes):
-                duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
-            elif self_col.wrapper.freq is not None:
-                duration = self_col.wrapper.to_time_units(to_idx - from_idx)
-            else:
-                duration = to_idx - from_idx
-            return np.vectorize(str)(duration)
+            start_val = self_col.ts.values[start_idx]
+            valley_val = self_col.ts.values[valley_idx]
+            end_val = self_col.ts.values[end_idx]
 
-        # Plot peak markers and zones
-        peak_mask = start_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
-        if np.any(peak_mask):
-            peak_scatter = go.Scatter(
-                x=self_col.ts.index[start_idx[peak_mask]],
-                y=start_val[peak_mask],
-                mode='markers',
-                marker=dict(
-                    symbol='diamond',
-                    color=contrast_color_schema['blue'],
-                    size=7,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(contrast_color_schema['blue'])
-                    )
-                ),
-                name='Peak'
-            )
-            peak_scatter.update(**peak_trace_kwargs)
-            fig.add_trace(peak_scatter)
+            def get_duration_str(from_idx, to_idx):
+                if isinstance(self_col.wrapper.index, DatetimeTypes):
+                    duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
+                elif self_col.wrapper.freq is not None:
+                    duration = self_col.wrapper.to_time_units(to_idx - from_idx)
+                else:
+                    duration = to_idx - from_idx
+                return np.vectorize(str)(duration)
 
-        recovery_mask = status == DrawdownStatus.Recovered
-        if np.any(recovery_mask):
-            # Plot valley markers and zones
-            valley_drawdown = (valley_val[recovery_mask] - start_val[recovery_mask]) / start_val[recovery_mask]
-            valley_duration = get_duration_str(start_idx[recovery_mask], valley_idx[recovery_mask])
-            valley_customdata = np.stack((valley_drawdown, valley_duration), axis=1)
-            valley_scatter = go.Scatter(
-                x=self_col.ts.index[valley_idx[recovery_mask]],
-                y=valley_val[recovery_mask],
-                mode='markers',
-                marker=dict(
-                    symbol='diamond',
-                    color=contrast_color_schema['red'],
-                    size=7,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(contrast_color_schema['red'])
-                    )
-                ),
-                name='Valley',
-                customdata=valley_customdata,
-                hovertemplate="(%{x}, %{y})<br>Drawdown: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
-            )
-            valley_scatter.update(**valley_trace_kwargs)
-            fig.add_trace(valley_scatter)
+            # Plot peak markers and zones
+            peak_mask = start_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
+            if np.any(peak_mask):
+                peak_scatter = go.Scatter(
+                    x=self_col.ts.index[start_idx[peak_mask]],
+                    y=start_val[peak_mask],
+                    mode='markers',
+                    marker=dict(
+                        symbol='diamond',
+                        color=contrast_color_schema['blue'],
+                        size=7,
+                        line=dict(
+                            width=1,
+                            color=adjust_lightness(contrast_color_schema['blue'])
+                        )
+                    ),
+                    name='Peak'
+                )
+                peak_scatter.update(**peak_trace_kwargs)
+                fig.add_trace(peak_scatter, row=row, col=col)
 
-            for i in np.flatnonzero(recovery_mask):
-                fig.add_shape(**merge_kwargs(dict(
-                    type="rect",
-                    xref="x",
-                    yref="paper",
-                    x0=self_col.ts.index[start_idx[i]],
-                    y0=0,
-                    x1=self_col.ts.index[valley_idx[i]],
-                    y1=1,
-                    fillcolor='red',
-                    opacity=0.15,
-                    layer="below",
-                    line_width=0,
-                ), ptv_shape_kwargs))
+            recovery_mask = status == DrawdownStatus.Recovered
+            if np.any(recovery_mask):
+                # Plot valley markers and zones
+                valley_drawdown = (valley_val[recovery_mask] - start_val[recovery_mask]) / start_val[recovery_mask]
+                valley_duration = get_duration_str(start_idx[recovery_mask], valley_idx[recovery_mask])
+                valley_customdata = np.stack((valley_drawdown, valley_duration), axis=1)
+                valley_scatter = go.Scatter(
+                    x=self_col.ts.index[valley_idx[recovery_mask]],
+                    y=valley_val[recovery_mask],
+                    mode='markers',
+                    marker=dict(
+                        symbol='diamond',
+                        color=contrast_color_schema['red'],
+                        size=7,
+                        line=dict(
+                            width=1,
+                            color=adjust_lightness(contrast_color_schema['red'])
+                        )
+                    ),
+                    name='Valley',
+                    customdata=valley_customdata,
+                    hovertemplate="(%{x}, %{y})<br>Drawdown: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
+                )
+                valley_scatter.update(**valley_trace_kwargs)
+                fig.add_trace(valley_scatter, row=row, col=col)
 
-            # Plot recovery markers and zones
-            recovery_return = (end_val[recovery_mask] - valley_val[recovery_mask]) / valley_val[recovery_mask]
-            recovery_duration = get_duration_str(valley_idx[recovery_mask], end_idx[recovery_mask])
-            recovery_customdata = np.stack((recovery_return, recovery_duration), axis=1)
-            recovery_scatter = go.Scatter(
-                x=self_col.ts.index[end_idx[recovery_mask]],
-                y=end_val[recovery_mask],
-                mode='markers',
-                marker=dict(
-                    symbol='diamond',
-                    color=contrast_color_schema['green'],
-                    size=7,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(contrast_color_schema['green'])
-                    )
-                ),
-                name='Recovery/Peak',
-                customdata=recovery_customdata,
-                hovertemplate="(%{x}, %{y})<br>Return: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
-            )
-            recovery_scatter.update(**recovery_trace_kwargs)
-            fig.add_trace(recovery_scatter)
+                for i in np.flatnonzero(recovery_mask):
+                    fig.add_shape(**merge_kwargs(dict(
+                        type="rect",
+                        xref=xref,
+                        yref="paper",
+                        x0=self_col.ts.index[start_idx[i]],
+                        y0=y_domain[0],
+                        x1=self_col.ts.index[valley_idx[i]],
+                        y1=y_domain[1],
+                        fillcolor='red',
+                        opacity=0.2,
+                        layer="below",
+                        line_width=0,
+                    ), ptv_shape_kwargs))
 
-            for i in np.flatnonzero(recovery_mask):
-                fig.add_shape(**merge_kwargs(dict(
-                    type="rect",
-                    xref="x",
-                    yref="paper",
-                    x0=self_col.ts.index[valley_idx[i]],
-                    y0=0,
-                    x1=self_col.ts.index[end_idx[i]],
-                    y1=1,
-                    fillcolor='green',
-                    opacity=0.15,
-                    layer="below",
-                    line_width=0,
-                ), vtr_shape_kwargs))
+                # Plot recovery markers and zones
+                recovery_return = (end_val[recovery_mask] - valley_val[recovery_mask]) / valley_val[recovery_mask]
+                recovery_duration = get_duration_str(valley_idx[recovery_mask], end_idx[recovery_mask])
+                recovery_customdata = np.stack((recovery_return, recovery_duration), axis=1)
+                recovery_scatter = go.Scatter(
+                    x=self_col.ts.index[end_idx[recovery_mask]],
+                    y=end_val[recovery_mask],
+                    mode='markers',
+                    marker=dict(
+                        symbol='diamond',
+                        color=contrast_color_schema['green'],
+                        size=7,
+                        line=dict(
+                            width=1,
+                            color=adjust_lightness(contrast_color_schema['green'])
+                        )
+                    ),
+                    name='Recovery/Peak',
+                    customdata=recovery_customdata,
+                    hovertemplate="(%{x}, %{y})<br>Return: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
+                )
+                recovery_scatter.update(**recovery_trace_kwargs)
+                fig.add_trace(recovery_scatter, row=row, col=col)
 
-        # Plot active markers and zones
-        active_mask = ~recovery_mask
-        if np.any(active_mask):
-            active_drawdown = (valley_val[active_mask] - start_val[active_mask]) / start_val[active_mask]
-            active_duration = get_duration_str(valley_idx[active_mask], end_idx[active_mask])
-            active_customdata = np.stack((active_drawdown, active_duration), axis=1)
-            active_scatter = go.Scatter(
-                x=self_col.ts.index[end_idx[active_mask]],
-                y=end_val[active_mask],
-                mode='markers',
-                marker=dict(
-                    symbol='diamond',
-                    color=contrast_color_schema['orange'],
-                    size=7,
-                    line=dict(
-                        width=1,
-                        color=adjust_lightness(contrast_color_schema['orange'])
-                    )
-                ),
-                name='Active',
-                customdata=active_customdata,
-                hovertemplate="(%{x}, %{y})<br>Drawdown: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
-            )
-            active_scatter.update(**active_trace_kwargs)
-            fig.add_trace(active_scatter)
+                for i in np.flatnonzero(recovery_mask):
+                    fig.add_shape(**merge_kwargs(dict(
+                        type="rect",
+                        xref=xref,
+                        yref="paper",
+                        x0=self_col.ts.index[valley_idx[i]],
+                        y0=y_domain[0],
+                        x1=self_col.ts.index[end_idx[i]],
+                        y1=y_domain[1],
+                        fillcolor='green',
+                        opacity=0.2,
+                        layer="below",
+                        line_width=0,
+                    ), vtr_shape_kwargs))
 
-            for i in np.flatnonzero(active_mask):
-                fig.add_shape(**merge_kwargs(dict(
-                    type="rect",
-                    xref="x",
-                    yref="paper",
-                    x0=self_col.ts.index[start_idx[i]],
-                    y0=0,
-                    x1=self_col.ts.index[end_idx[i]],
-                    y1=1,
-                    fillcolor='orange',
-                    opacity=0.15,
-                    layer="below",
-                    line_width=0,
-                ), active_shape_kwargs))
+            # Plot active markers and zones
+            active_mask = ~recovery_mask
+            if np.any(active_mask):
+                active_drawdown = (valley_val[active_mask] - start_val[active_mask]) / start_val[active_mask]
+                active_duration = get_duration_str(valley_idx[active_mask], end_idx[active_mask])
+                active_customdata = np.stack((active_drawdown, active_duration), axis=1)
+                active_scatter = go.Scatter(
+                    x=self_col.ts.index[end_idx[active_mask]],
+                    y=end_val[active_mask],
+                    mode='markers',
+                    marker=dict(
+                        symbol='diamond',
+                        color=contrast_color_schema['orange'],
+                        size=7,
+                        line=dict(
+                            width=1,
+                            color=adjust_lightness(contrast_color_schema['orange'])
+                        )
+                    ),
+                    name='Active',
+                    customdata=active_customdata,
+                    hovertemplate="(%{x}, %{y})<br>Drawdown: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
+                )
+                active_scatter.update(**active_trace_kwargs)
+                fig.add_trace(active_scatter, row=row, col=col)
+
+                for i in np.flatnonzero(active_mask):
+                    fig.add_shape(**merge_kwargs(dict(
+                        type="rect",
+                        xref=xref,
+                        yref="paper",
+                        x0=self_col.ts.index[start_idx[i]],
+                        y0=y_domain[0],
+                        x1=self_col.ts.index[end_idx[i]],
+                        y1=y_domain[1],
+                        fillcolor='orange',
+                        opacity=0.2,
+                        layer="below",
+                        line_width=0,
+                    ), active_shape_kwargs))
 
         return fig

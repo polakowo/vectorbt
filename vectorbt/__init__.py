@@ -287,7 +287,7 @@ Name: (10, 20, Open), Length: 366, dtype: bool
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
-0.6633185970977526
+0.663318597097753
 ```
 
 One strategy instance of DMAC produced one column in signals and one performance value.

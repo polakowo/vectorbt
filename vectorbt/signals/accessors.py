@@ -843,12 +843,16 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         Generic_SRAccessor.__init__(self, obj, **kwargs)
         Signals_Accessor.__init__(self, obj, **kwargs)
 
-    def plot(self, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, name=None, trace_kwargs=None, row=None, col=None, yref='y',
+             fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
             name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            row (int): Row position.
+            col (int): Column position.
+            yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -862,13 +866,13 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         # Set up figure
         if fig is None:
             fig = CustomFigureWidget()
-        fig.update_layout(
-            yaxis=dict(
-                tickmode='array',
-                tickvals=[0, 1],
-                ticktext=['false', 'true']
-            )
+        default_layout = dict()
+        default_layout['yaxis' + yref[1:]] = dict(
+            tickmode='array',
+            tickvals=[0, 1],
+            ticktext=['false', 'true']
         )
+        fig.update_layout(**default_layout)
         fig.update_layout(**layout_kwargs)
         if name is None:
             if 'name' in trace_kwargs:
@@ -886,11 +890,12 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
-        fig.add_trace(scatter)
+        fig.add_trace(scatter, row=row, col=col)
 
         return fig
 
-    def plot_as_markers(self, y=None, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot_as_markers(self, y=None, name=None, trace_kwargs=None, row=None, col=None,
+                        fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as markers.
 
         Args:
@@ -901,6 +906,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
             name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
@@ -948,7 +955,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
-        fig.add_trace(scatter)
+        fig.add_trace(scatter, row=row, col=col)
         return fig
 
     def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
@@ -1007,27 +1014,27 @@ class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
         Generic_DFAccessor.__init__(self, obj, **kwargs)
         Signals_Accessor.__init__(self, obj, **kwargs)
 
-    def plot(self, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, trace_kwargs=None, fig=None, **kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:
             trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Scatter`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **kwargs: Keyword arguments passed to `Signals_SRAccessor.plot`.
 
         Example:
             ```python-repl
             >>> sig[['a', 'c']].vbt.signals.plot()
             ```
 
-            ![](/vectorbt/docs/img/signals_signals_plot.png)"""
+            ![](/vectorbt/docs/img/signals_df_plot.png)"""
         if trace_kwargs is None:
             trace_kwargs = {}
         for col in range(self._obj.shape[1]):
             fig = self._obj.iloc[:, col].vbt.signals.plot(
                 trace_kwargs=trace_kwargs,
                 fig=fig,
-                **layout_kwargs
+                **kwargs
             )
 
         return fig

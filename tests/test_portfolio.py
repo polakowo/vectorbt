@@ -2624,21 +2624,21 @@ class TestPortfolio:
             result
         )
 
-    def test_buy_and_hold_return(self):
+    def test_total_market_return(self):
         result = pd.Series(
             np.array([1.5, 4.0, 3.0]),
             index=price_na.columns
         )
         pd.testing.assert_series_equal(
-            portfolio.buy_and_hold_return(),
+            portfolio.total_market_return(),
             result
         )
         pd.testing.assert_series_equal(
-            portfolio_grouped.buy_and_hold_return(group_by=False),
+            portfolio_grouped.total_market_return(group_by=False),
             result
         )
         pd.testing.assert_series_equal(
-            portfolio_shared.buy_and_hold_return(group_by=False),
+            portfolio_shared.total_market_return(group_by=False),
             result
         )
         result = pd.Series(
@@ -2646,15 +2646,15 @@ class TestPortfolio:
             index=pd.Index(['first', 'second'], dtype='object')
         )
         pd.testing.assert_series_equal(
-            portfolio.buy_and_hold_return(group_by=group_by),
+            portfolio.total_market_return(group_by=group_by),
             result
         )
         pd.testing.assert_series_equal(
-            portfolio_grouped.buy_and_hold_return(),
+            portfolio_grouped.total_market_return(),
             result
         )
         pd.testing.assert_series_equal(
-            portfolio_shared.buy_and_hold_return(),
+            portfolio_shared.total_market_return(),
             result
         )
 

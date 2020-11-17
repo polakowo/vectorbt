@@ -27,7 +27,7 @@ ret = ts.pct_change()
 
 defaults.returns['year_freq'] = '252 days'  # same as empyrical
 
-factor_returns = pd.DataFrame({
+benchmark_rets = pd.DataFrame({
     'a': ret['a'] * np.random.uniform(0.8, 1.2, ret.shape[0]),
     'b': ret['b'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 2,
     'c': ret['c'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 3
@@ -251,22 +251,22 @@ class TestAccessors:
         )
 
     def test_information_ratio(self):
-        res_a = empyrical.excess_sharpe(ret['a'], factor_returns['a'])
-        res_b = empyrical.excess_sharpe(ret['b'], factor_returns['b'])
-        res_c = empyrical.excess_sharpe(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.information_ratio(factor_returns['a']), res_a)
+        res_a = empyrical.excess_sharpe(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.excess_sharpe(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.excess_sharpe(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.information_ratio(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.information_ratio(factor_returns),
+            ret.vbt.returns.information_ratio(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
     def test_beta(self):
-        res_a = empyrical.beta(ret['a'], factor_returns['a'])
-        res_b = empyrical.beta(ret['b'], factor_returns['b'])
-        res_c = empyrical.beta(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.beta(factor_returns['a']), res_a)
+        res_a = empyrical.beta(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.beta(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.beta(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.beta(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.beta(factor_returns),
+            ret.vbt.returns.beta(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
@@ -275,12 +275,12 @@ class TestAccessors:
         [0.01, 0.02, 0.03],
     )
     def test_alpha(self, test_risk_free):
-        res_a = empyrical.alpha(ret['a'], factor_returns['a'], risk_free=test_risk_free)
-        res_b = empyrical.alpha(ret['b'], factor_returns['b'], risk_free=test_risk_free)
-        res_c = empyrical.alpha(ret['c'], factor_returns['c'], risk_free=test_risk_free)
-        assert isclose(ret['a'].vbt.returns.alpha(factor_returns['a'], risk_free=test_risk_free), res_a)
+        res_a = empyrical.alpha(ret['a'], benchmark_rets['a'], risk_free=test_risk_free)
+        res_b = empyrical.alpha(ret['b'], benchmark_rets['b'], risk_free=test_risk_free)
+        res_c = empyrical.alpha(ret['c'], benchmark_rets['c'], risk_free=test_risk_free)
+        assert isclose(ret['a'].vbt.returns.alpha(benchmark_rets['a'], risk_free=test_risk_free), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.alpha(factor_returns, risk_free=test_risk_free),
+            ret.vbt.returns.alpha(benchmark_rets, risk_free=test_risk_free),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
@@ -325,32 +325,32 @@ class TestAccessors:
         )
 
     def test_capture(self):
-        res_a = empyrical.capture(ret['a'], factor_returns['a'])
-        res_b = empyrical.capture(ret['b'], factor_returns['b'])
-        res_c = empyrical.capture(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.capture(factor_returns['a']), res_a)
+        res_a = empyrical.capture(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.capture(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.capture(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.capture(factor_returns),
+            ret.vbt.returns.capture(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
     def test_up_capture(self):
-        res_a = empyrical.up_capture(ret['a'], factor_returns['a'])
-        res_b = empyrical.up_capture(ret['b'], factor_returns['b'])
-        res_c = empyrical.up_capture(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.up_capture(factor_returns['a']), res_a)
+        res_a = empyrical.up_capture(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.up_capture(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.up_capture(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.up_capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.up_capture(factor_returns),
+            ret.vbt.returns.up_capture(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
     def test_down_capture(self):
-        res_a = empyrical.down_capture(ret['a'], factor_returns['a'])
-        res_b = empyrical.down_capture(ret['b'], factor_returns['b'])
-        res_c = empyrical.down_capture(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.down_capture(factor_returns['a']), res_a)
+        res_a = empyrical.down_capture(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.down_capture(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.down_capture(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.down_capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.down_capture(factor_returns),
+            ret.vbt.returns.down_capture(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 

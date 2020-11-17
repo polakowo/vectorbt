@@ -321,6 +321,19 @@ class Records(Configured, PandasIndexer):
             return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
         return self
 
+    def force_select_column(self, column=None):
+        """Force selection of one column."""
+        if column is not None:
+            if self.wrapper.grouper.group_by is None:
+                self_col = self[column]
+            else:
+                self_col = self.regroup(False)[column]
+        else:
+            self_col = self
+        if self_col.wrapper.ndim > 1:
+            raise TypeError("Only one column is allowed. Use indexing or column argument.")
+        return self_col
+
     @property
     def records_arr(self):
         """Records array."""
@@ -357,8 +370,11 @@ class Records(Configured, PandasIndexer):
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
             wrapper = self.wrapper
-        if filter_id in self.filter_ids:
-            raise ValueError(f"Filter \"{filter_id}\" already applied")
+        filter_ids = self.filter_ids.copy()
+        if filter_id is not None:
+            if filter_id in self.filter_ids:
+                raise ValueError(f"Filter \"{filter_id}\" already applied")
+            filter_ids |= {filter_id}
         if np.all(mask):
             logger.debug(f"Records already satisfy this mask")
         elif not np.any(mask):
@@ -366,7 +382,7 @@ class Records(Configured, PandasIndexer):
         return self.copy(
             wrapper=wrapper,
             records_arr=self.records_arr[mask],
-            filter_ids=self.filter_ids | {filter_id},
+            filter_ids=filter_ids,
             **kwargs
         )
 

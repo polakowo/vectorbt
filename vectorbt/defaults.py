@@ -62,13 +62,19 @@ layout = Config(
     frozen=False,  # you can change the keys
     autosize=False,
     width=700,
-    height=300,
+    height=350,
     margin=dict(
-        b=30,
-        t=30
+        t=30, b=30, l=30, r=30
     ),
     hovermode='closest',
-    colorway=list(color_schema.values())
+    colorway=list(color_schema.values()),
+    legend=dict(
+        orientation="h",
+        yanchor="bottom",
+        y=1.02,
+        xanchor="right",
+        x=1
+    ),
 )
 """_"""
 
@@ -170,7 +176,7 @@ portfolio = Config(
     accumulate=False,
     log=False,
     conflict_mode=ConflictMode.Ignore,
-    direction=Direction.All,
+    direction=Direction.LongOnly,
     cash_sharing=False,
     row_wise=False,
     seed=None,

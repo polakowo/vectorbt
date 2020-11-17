@@ -21,7 +21,7 @@ Date
 
 [185 rows x 5 columns]
 
->>> price['Close'].vbt.plot()
+>>> price.vbt.ohlcv.plot()
 ```
 ![](/vectorbt/docs/img/Indicators_price.png)"""
 
@@ -30,6 +30,7 @@ import plotly.graph_objects as go
 
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.docs import fix_class_for_docs
+from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.generic import nb as generic_nb
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators import nb
@@ -60,15 +61,20 @@ class MA(MA):
     Use `MA.run` or `MA.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              close_trace_kwargs=None,
              ma_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MA.ma` against `MA.close`.
 
         Args:
+            column (str): Name of the column to plot.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -77,18 +83,33 @@ class MA(MA):
             ```
 
             ![](/vectorbt/docs/img/MA.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         if ma_trace_kwargs is None:
             ma_trace_kwargs = {}
-        close_trace_kwargs = merge_kwargs(dict(name='Close'), close_trace_kwargs)
-        ma_trace_kwargs = merge_kwargs(dict(name='MA'), ma_trace_kwargs)
+        close_trace_kwargs = merge_kwargs(dict(
+            name='Close',
+            line_color=layout['colorway'][0]
+        ), close_trace_kwargs)
+        ma_trace_kwargs = merge_kwargs(dict(
+            name='MA',
+            line_color=layout['colorway'][1]
+        ), ma_trace_kwargs)
 
-        fig = self.close.vbt.plot(trace_kwargs=close_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.ma.vbt.plot(trace_kwargs=ma_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.close.vbt.plot(
+            trace_kwargs=close_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.ma.vbt.plot(
+            trace_kwargs=ma_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         return fig
 
@@ -119,13 +140,18 @@ class MSTD(MSTD):
     Use `MSTD.run` or `MSTD.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              mstd_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MSTD.mstd`.
 
         Args:
+            column (str): Name of the column to plot.
             mstd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSTD.mstd`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -134,14 +160,24 @@ class MSTD(MSTD):
             ```
 
             ![](/vectorbt/docs/img/MSTD.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
 
         if mstd_trace_kwargs is None:
             mstd_trace_kwargs = {}
-        mstd_trace_kwargs = merge_kwargs(dict(name='MSTD'), mstd_trace_kwargs)
+        mstd_trace_kwargs = merge_kwargs(dict(
+            name='MSTD',
+            line_color=layout['colorway'][0]
+        ), mstd_trace_kwargs)
 
-        fig = self.mstd.vbt.plot(trace_kwargs=mstd_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.mstd.vbt.plot(
+            trace_kwargs=mstd_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         return fig
 
@@ -183,20 +219,25 @@ class BBANDS(BBANDS):
     Use `BBANDS.run` or `BBANDS.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              close_trace_kwargs=None,
              middle_trace_kwargs=None,
              upper_trace_kwargs=None,
              lower_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
         `BBANDS.close`.
 
         Args:
+            column (str): Name of the column to plot.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.close`.
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
             lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.lower`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -205,10 +246,13 @@ class BBANDS(BBANDS):
             ```
 
             ![](/vectorbt/docs/img/BBANDS.png)"""
-        from vectorbt import defaults
+        from vectorbt.defaults import layout, color_schema
 
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
@@ -220,27 +264,35 @@ class BBANDS(BBANDS):
             lower_trace_kwargs = {}
         lower_trace_kwargs = merge_kwargs(dict(
             name='Lower Band',
-            line=dict(color='silver')
+            line_color=color_schema['gray'],
         ), lower_trace_kwargs)
         upper_trace_kwargs = merge_kwargs(dict(
             name='Upper Band',
-            line=dict(color='silver'),
+            line_color=color_schema['gray'],
             fill='tonexty',
-            fillcolor='rgba(128, 128, 128, 0.25)'
+            fillcolor='rgba(128, 128, 128, 0.2)'
         ), upper_trace_kwargs)  # default kwargs
         middle_trace_kwargs = merge_kwargs(dict(
             name='Middle Band',
-            line=dict(color=defaults.layout['colorway'][1])
+            line=dict(color=layout['colorway'][1])
         ), middle_trace_kwargs)
         close_trace_kwargs = merge_kwargs(dict(
             name='Close',
-            line=dict(color=defaults.layout['colorway'][0])
+            line=dict(color=layout['colorway'][0])
         ), close_trace_kwargs)
 
-        fig = self.lower.vbt.plot(trace_kwargs=lower_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.upper.vbt.plot(trace_kwargs=upper_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.middle.vbt.plot(trace_kwargs=middle_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.close.vbt.plot(trace_kwargs=close_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.lower.vbt.plot(
+            trace_kwargs=lower_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.upper.vbt.plot(
+            trace_kwargs=upper_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.middle.vbt.plot(
+            trace_kwargs=middle_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.close.vbt.plot(
+            trace_kwargs=close_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         return fig
 
@@ -276,15 +328,23 @@ class RSI(RSI):
     Use `RSI.run` or `RSI.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              levels=(30, 70),
              rsi_trace_kwargs=None,
+             row=None, col=None,
+             xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
+            column (str): Name of the column to plot.
             levels (tuple): Two extremes: bottom and top.
             rsi_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `RSI.rsi`.
+            row (int): Row position.
+            col (int): Column position.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -293,27 +353,39 @@ class RSI(RSI):
             ```
 
             ![](/vectorbt/docs/img/RSI.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        default_layout = dict()
+        default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
+        fig.update_layout(**default_layout)
+        fig.update_layout(**layout_kwargs)
 
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
-        rsi_trace_kwargs = merge_kwargs(dict(name='RSI'), rsi_trace_kwargs)
+        rsi_trace_kwargs = merge_kwargs(dict(
+            name='RSI',
+            line=dict(color=layout['colorway'][0])
+        ), rsi_trace_kwargs)
 
-        layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
-        fig = self.rsi.vbt.plot(trace_kwargs=rsi_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.rsi.vbt.plot(
+            trace_kwargs=rsi_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         # Fill void between levels
         fig.add_shape(
             type="rect",
-            xref="x",
-            yref="y",
-            x0=self.rsi.index[0],
+            xref=xref,
+            yref=yref,
+            x0=self_col.rsi.index[0],
             y0=levels[0],
-            x1=self.rsi.index[-1],
+            x1=self_col.rsi.index[-1],
             y1=levels[1],
             fillcolor="purple",
-            opacity=0.15,
+            opacity=0.2,
             layer="below",
             line_width=0,
         )
@@ -352,19 +424,27 @@ class STOCH(STOCH):
     Use `STOCH.run` or `STOCH.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              levels=(30, 70),
              percent_k_trace_kwargs=None,
              percent_d_trace_kwargs=None,
              shape_kwargs=None,
+             row=None, col=None,
+             xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `STOCH.percent_k` and `STOCH.percent_d`.
 
         Args:
+            column (str): Name of the column to plot.
             levels (tuple): Two extremes: bottom and top.
             percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
             percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
             shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zone between levels.
+            row (int): Row position.
+            col (int): Column position.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -373,8 +453,16 @@ class STOCH(STOCH):
             ```
 
             ![](/vectorbt/docs/img/STOCH.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        default_layout = dict()
+        default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
+        fig.update_layout(**default_layout)
+        fig.update_layout(**layout_kwargs)
 
         if percent_k_trace_kwargs is None:
             percent_k_trace_kwargs = {}
@@ -382,25 +470,34 @@ class STOCH(STOCH):
             percent_d_trace_kwargs = {}
         if shape_kwargs is None:
             shape_kwargs = {}
-        percent_k_trace_kwargs = merge_kwargs(dict(name='%K'), percent_k_trace_kwargs)
-        percent_d_trace_kwargs = merge_kwargs(dict(name='%D'), percent_d_trace_kwargs)
+        percent_k_trace_kwargs = merge_kwargs(dict(
+            name='%K',
+            line=dict(color=layout['colorway'][0])
+        ), percent_k_trace_kwargs)
+        percent_d_trace_kwargs = merge_kwargs(dict(
+            name='%D',
+            line=dict(color=layout['colorway'][1])
+        ), percent_d_trace_kwargs)
 
-        layout_kwargs = merge_kwargs(dict(yaxis=dict(range=[-5, 105])), layout_kwargs)
-        fig = self.percent_k.vbt.plot(trace_kwargs=percent_k_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.percent_d.vbt.plot(trace_kwargs=percent_d_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.percent_k.vbt.plot(
+            trace_kwargs=percent_k_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.percent_d.vbt.plot(
+            trace_kwargs=percent_d_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         # Plot levels
         # Fill void between levels
         shape_kwargs = merge_kwargs(dict(
             type="rect",
-            xref="x",
-            yref="y",
-            x0=self.percent_k.index[0],
+            xref=xref,
+            yref=yref,
+            x0=self_col.percent_k.index[0],
             y0=levels[0],
-            x1=self.percent_k.index[-1],
+            x1=self_col.percent_k.index[-1],
             y1=levels[1],
             fillcolor="purple",
-            opacity=0.15,
+            opacity=0.2,
             layer="below",
             line_width=0,
         ), shape_kwargs)
@@ -444,17 +541,22 @@ class MACD(MACD):
     Use `MACD.run` or `MACD.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              macd_trace_kwargs=None,
              signal_trace_kwargs=None,
              hist_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
 
         Args:
+            column (str): Name of the column to plot.
             macd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.macd`.
             signal_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.signal`.
             hist_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar` for `MACD.hist`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -463,8 +565,14 @@ class MACD(MACD):
             ```
 
             ![](/vectorbt/docs/img/MACD.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+            fig.update_layout(bargap=0)
+        fig.update_layout(**layout_kwargs)
 
         if macd_trace_kwargs is None:
             macd_trace_kwargs = {}
@@ -472,16 +580,25 @@ class MACD(MACD):
             signal_trace_kwargs = {}
         if hist_trace_kwargs is None:
             hist_trace_kwargs = {}
-        macd_trace_kwargs = merge_kwargs(dict(name='MACD'), macd_trace_kwargs)
-        signal_trace_kwargs = merge_kwargs(dict(name='Signal'), signal_trace_kwargs)
+        macd_trace_kwargs = merge_kwargs(dict(
+            name='MACD',
+            line=dict(color=layout['colorway'][0])
+        ), macd_trace_kwargs)
+        signal_trace_kwargs = merge_kwargs(dict(
+            name='Signal',
+            line=dict(color=layout['colorway'][1])
+        ), signal_trace_kwargs)
         hist_trace_kwargs = merge_kwargs(dict(name='Histogram'), hist_trace_kwargs)
 
-        layout_kwargs = merge_kwargs(dict(bargap=0), layout_kwargs)
-        fig = self.macd.vbt.plot(trace_kwargs=macd_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.signal.vbt.plot(trace_kwargs=signal_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.macd.vbt.plot(
+            trace_kwargs=macd_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.signal.vbt.plot(
+            trace_kwargs=signal_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         # Plot hist
-        hist = self.hist.values
+        hist = self_col.hist.values
         hist_diff = generic_nb.diff_1d_nb(hist)
         marker_colors = np.full(hist.shape, 'silver', dtype=np.object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
@@ -490,13 +607,13 @@ class MACD(MACD):
         marker_colors[(hist < 0) & (hist_diff >= 0)] = 'lightcoral'
 
         hist_bar = go.Bar(
-            x=self.hist.index,
-            y=self.hist.values,
+            x=self_col.hist.index,
+            y=self_col.hist.values,
             marker_color=marker_colors,
             marker_line_width=0
         )
         hist_bar.update(**hist_trace_kwargs)
-        fig.add_trace(hist_bar)
+        fig.add_trace(hist_bar, row=row, col=col)
 
         return fig
 
@@ -529,15 +646,20 @@ class ATR(ATR):
     Use `ATR.run` or `ATR.run_combs` to run the indicator."""
 
     def plot(self,
+             column=None,
              tr_trace_kwargs=None,
              atr_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
+            column (str): Name of the column to plot.
             tr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.tr`.
             atr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.atr`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -546,18 +668,33 @@ class ATR(ATR):
             ```
 
             ![](/vectorbt/docs/img/ATR.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
 
         if tr_trace_kwargs is None:
             tr_trace_kwargs = {}
         if atr_trace_kwargs is None:
             atr_trace_kwargs = {}
-        tr_trace_kwargs = merge_kwargs(dict(name='TR'), tr_trace_kwargs)
-        atr_trace_kwargs = merge_kwargs(dict(name='ATR'), atr_trace_kwargs)
+        tr_trace_kwargs = merge_kwargs(dict(
+            name='TR',
+            line=dict(color=layout['colorway'][0])
+        ), tr_trace_kwargs)
+        atr_trace_kwargs = merge_kwargs(dict(
+            name='ATR',
+            line=dict(color=layout['colorway'][1])
+        ), atr_trace_kwargs)
 
-        fig = self.tr.vbt.plot(trace_kwargs=tr_trace_kwargs, fig=fig, **layout_kwargs)
-        fig = self.atr.vbt.plot(trace_kwargs=atr_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.tr.vbt.plot(
+            trace_kwargs=tr_trace_kwargs,
+            row=row, col=col, fig=fig)
+        fig = self_col.atr.vbt.plot(
+            trace_kwargs=atr_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         return fig
 
@@ -586,13 +723,18 @@ class OBV(OBV):
     Use `OBV.run` to run the indicator."""
 
     def plot(self,
+             column=None,
              obv_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `OBV.obv`.
 
         Args:
+            column (str): Name of the column to plot.
             obv_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OBV.obv`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -601,14 +743,24 @@ class OBV(OBV):
             ```
 
             ![](/vectorbt/docs/img/OBV.png)"""
-        if self.wrapper.ndim > 1:
-            raise TypeError("Select a column first. Use indexing.")
+        from vectorbt.defaults import layout
+
+        self_col = self.force_select_column(column)
+
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
 
         if obv_trace_kwargs is None:
             obv_trace_kwargs = {}
-        obv_trace_kwargs = merge_kwargs(dict(name='OBV'), obv_trace_kwargs)
+        obv_trace_kwargs = merge_kwargs(dict(
+            name='OBV',
+            line=dict(color=layout['colorway'][0])
+        ), obv_trace_kwargs)
 
-        fig = self.obv.vbt.plot(trace_kwargs=obv_trace_kwargs, fig=fig, **layout_kwargs)
+        fig = self_col.obv.vbt.plot(
+            trace_kwargs=obv_trace_kwargs,
+            row=row, col=col, fig=fig)
 
         return fig
 

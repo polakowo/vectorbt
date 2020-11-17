@@ -27,7 +27,9 @@ __all__ = [
     'TradeDirection',
     'TradeStatus',
     'trade_dt',
-    'log_dt'
+    'log_dt',
+    'TradeType',
+    'BenchmarkSize'
 ]
 
 __pdoc__ = {}
@@ -592,4 +594,36 @@ __pdoc__['log_dt'] = f"""`np.dtype` of log records.
     list(map(lambda x: str(x[0]), dict(log_dt.fields).values()))
 )), indent=2)}
 ```
+"""
+
+TradeType = namedtuple('TradeType', [
+    'Trade',
+    'Position'
+])(*range(2))
+"""_"""
+
+__pdoc__['TradeType'] = f"""Trade type.
+
+```plaintext
+{json.dumps(dict(zip(TradeType._fields, TradeType)), indent=2)}
+```
+"""
+
+BenchmarkSize = namedtuple('BenchmarkSize', [
+    'InfLong',
+    'InfShort',
+    'Auto'
+])(*range(3))
+"""_"""
+
+__pdoc__['BenchmarkSize'] = f"""Benchmark size.
+
+```plaintext
+{json.dumps(dict(zip(BenchmarkSize._fields, BenchmarkSize)), indent=2)}
+```
+
+Attributes:
+    InfLong: Long shares for all initial cash.
+    InfShort: Short shares for all initial cash.
+    Auto: Determine the number of shares automatically.
 """

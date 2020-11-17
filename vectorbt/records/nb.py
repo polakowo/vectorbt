@@ -109,11 +109,56 @@ def select_mapped_cols_nb(col_arr, col_index, new_cols):
 def map_records_nb(records, map_func_nb, *args):
     """Map each record to a scalar value.
 
-    `map_func_nb` must accept a single record and `*args`, and return a scalar value."""
+    `map_func_nb` should accept a single record and `*args`, and return a scalar value."""
     out = np.empty(records.shape[0], dtype=np.float_)
     for r in range(records.shape[0]):
         out[r] = map_func_nb(records[r], *args)
     return out
+
+
+# ############# Mapping (mapped arrays) ############# #
+
+
+@njit
+def mapped_to_mask_nb(mapped_arr, col_arr, inout_map_func_nb, *args):
+    """Map mapped array to a mask.
+
+    Returns the same shape as `mapped_arr`.
+
+    `inout_map_func_nb` should accept an empty boolean array of the column that should be written,
+    index of the column, a mapped array of the column, and `*args`, and return nothing."""
+    in_out = np.full(mapped_arr.shape[0], False, dtype=np.bool_)
+    from_r = 0
+    prev_col = -1
+
+    for r in range(mapped_arr.shape[0]):
+        col = col_arr[r]
+        if col < prev_col:
+            raise ValueError("col_arr must be sorted")
+        if col != prev_col:
+            if prev_col != -1:
+                # At the beginning of second column do reduce on the first
+                inout_map_func_nb(in_out[from_r:r], prev_col, mapped_arr[from_r:r], *args)
+            from_r = r
+            prev_col = col
+        if r == len(mapped_arr) - 1:
+            inout_map_func_nb(in_out[from_r:r + 1], col, mapped_arr[from_r:r + 1], *args)
+    return in_out
+
+
+@njit(cache=True)
+def top_n_inout_map_nb(in_out, col, mapped_arr, n):
+    """`inout_map_func_nb` that returns mask of top N elements."""
+    # TODO: np.argpartition
+    top_n_idxs = np.argsort(mapped_arr)[:n]
+    in_out[top_n_idxs] = True
+
+
+@njit(cache=True)
+def bottom_n_inout_map_nb(in_out, col, mapped_arr, n):
+    """`inout_map_func_nb` that returns mask of bottom N elements."""
+    bottom_n_idxs = np.argsort(mapped_arr)[-n:]
+    in_out[bottom_n_idxs] = True
 
 
 # ############# Converting to matrix (mapped arrays) ############# #
@@ -154,7 +199,7 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
     Faster than `mapped_to_matrix_nb` and `vbt.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
-    `reduce_func_nb` must accept index of the column, mapped array and `*args`,
+    `reduce_func_nb` should accept index of the column, mapped array and `*args`,
     and return a scalar value."""
     out = np.full(n_cols, default_val, dtype=np.float_)
     from_r = 0
@@ -179,7 +224,7 @@ def reduce_mapped_nb(mapped_arr, col_arr, n_cols, default_val, reduce_func_nb, *
 def reduce_mapped_to_idx_nb(mapped_arr, col_arr, idx_arr, n_cols, default_val, reduce_func_nb, *args):
     """Reduce mapped array by column to an index.
 
-    Same as `reduce_mapped_nb` except `idx_arr` must be passed.
+    Same as `reduce_mapped_nb` except `idx_arr` should be passed.
 
     !!! note
         Must return integers or raise an exception."""
@@ -208,7 +253,7 @@ def reduce_mapped_to_idx_nb(mapped_arr, col_arr, idx_arr, n_cols, default_val, r
 def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, n_rows, default_val, reduce_func_nb, *args):
     """Reduce mapped array by column to an array.
 
-    `reduce_func_nb` same as for `reduce_mapped_nb` but must return an array."""
+    `reduce_func_nb` same as for `reduce_mapped_nb` but should return an array."""
     out = np.full((n_rows, n_cols), default_val, dtype=np.float_)
     from_r = 0
     prev_col = -1
@@ -232,7 +277,7 @@ def reduce_mapped_to_array_nb(mapped_arr, col_arr, n_cols, n_rows, default_val, 
 def reduce_mapped_to_idx_array_nb(mapped_arr, col_arr, idx_arr, n_cols, n_rows, default_val, reduce_func_nb, *args):
     """Reduce mapped array by column to an index array.
 
-    Same as `reduce_mapped_to_array_nb` except `idx_arr` must be passed.
+    Same as `reduce_mapped_to_array_nb` except `idx_arr` should be passed.
 
     !!! note
         Must return integers or raise an exception."""

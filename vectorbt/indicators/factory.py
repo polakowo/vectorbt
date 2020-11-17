@@ -1256,6 +1256,19 @@ class IndicatorFactory:
 
             self.CustomIndicator = CustomIndicator
 
+        # Add other methods
+        def force_select_column(_self, column=None):
+            """Force selection of one column."""
+            if column is not None:
+                self_col = _self[column]
+            else:
+                self_col = _self
+            if self_col.wrapper.ndim > 1:
+                raise TypeError("Only one column is allowed. Use indexing or column argument.")
+            return self_col
+
+        setattr(CustomIndicator, 'force_select_column', force_select_column)
+
     def from_custom_func(self,
                          custom_func,
                          param_settings=None,
@@ -1362,8 +1375,6 @@ class IndicatorFactory:
         if len(in_output_settings) > 0:
             checks.assert_dict_valid(in_output_settings, [in_output_names])
 
-        if hide_params is None:
-            hide_params = []
         for k, v in pipeline_kwargs.items():
             if k in param_names and not isinstance(v, Default):
                 pipeline_kwargs[k] = Default(v)  # track default params
@@ -1382,6 +1393,9 @@ class IndicatorFactory:
             _short_name = kwargs.pop('short_name', def_run_kwargs['short_name'])
             _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
             _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
+
+            if _hide_params is None:
+                _hide_params = []
 
             args = list(args)
 
@@ -1527,19 +1541,27 @@ class IndicatorFactory:
                 comb_func=itertools.combinations,
                 speed_up=True,
                 short_names=None,
+                hide_params=hide_params,
+                hide_default=hide_default,
                 **pipeline_kwargs
             )
 
             @classmethod
             def _run_combs(cls, *args, **kwargs):
-                r = kwargs.pop('r', def_run_combs_kwargs['r'])
-                param_product = kwargs.pop('param_product', def_run_combs_kwargs['param_product'])
-                comb_func = kwargs.pop('comb_func', def_run_combs_kwargs['comb_func'])
-                speed_up = kwargs.pop('speed_up', def_run_combs_kwargs['speed_up'])
-                short_names = kwargs.pop('short_names', def_run_combs_kwargs['short_names'])
+                _r = kwargs.pop('r', def_run_combs_kwargs['r'])
+                _param_product = kwargs.pop('param_product', def_run_combs_kwargs['param_product'])
+                _comb_func = kwargs.pop('comb_func', def_run_combs_kwargs['comb_func'])
+                _speed_up = kwargs.pop('speed_up', def_run_combs_kwargs['speed_up'])
+                _short_names = kwargs.pop('short_names', def_run_combs_kwargs['short_names'])
+                _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
+                _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
 
-                if short_names is None:
-                    short_names = [f'{short_name}_{str(i + 1)}' for i in range(r)]
+                if _hide_params is None:
+                    _hide_params = []
+                if _short_names is None:
+                    _short_names = [f'{short_name}_{str(i + 1)}' for i in range(_r)]
+
+                args = list(args)
 
                 # Extract inputs
                 input_list = args[:len(input_names)]
@@ -1548,7 +1570,11 @@ class IndicatorFactory:
 
                 # Extract params
                 param_list = args[:len(param_names)]
-                param_list = [params.value if isinstance(params, Default) else params for params in param_list]
+                for i, pname in enumerate(param_names):
+                    if _hide_default and isinstance(param_list[i], Default):
+                        if pname not in _hide_params:
+                            _hide_params.append(pname)
+                        param_list[i] = param_list[i].value
                 checks.assert_len_equal(param_list, param_names)
                 args = args[len(param_names):]
 
@@ -1566,7 +1592,7 @@ class IndicatorFactory:
                         param_list[i] = tuple(param_list[i])
                     else:
                         param_list[i] = (param_list[i],)
-                if param_product:
+                if _param_product:
                     param_list = create_param_product(param_list)
                 else:
                     param_list = broadcast_params(param_list)
@@ -1574,7 +1600,7 @@ class IndicatorFactory:
                     param_list = [param_list]
 
                 # Speed up by pre-calculating raw outputs
-                if speed_up:
+                if _speed_up:
                     raw_results = cls._run(
                         *input_list,
                         *param_list,
@@ -1586,16 +1612,18 @@ class IndicatorFactory:
 
                 # Generate indicator instances
                 instances = []
-                if comb_func == itertools.product:
-                    param_lists = zip(*comb_func(zip(*param_list), repeat=r))
+                if _comb_func == itertools.product:
+                    param_lists = zip(*_comb_func(zip(*param_list), repeat=_r))
                 else:
-                    param_lists = zip(*comb_func(zip(*param_list), r))
+                    param_lists = zip(*_comb_func(zip(*param_list), _r))
                 for i, param_list in enumerate(param_lists):
                     instances.append(cls._run(
                         *input_list,
                         *zip(*param_list),
                         *args,
-                        short_name=short_names[i],
+                        short_name=_short_names[i],
+                        hide_params=_hide_params,
+                        hide_default=_hide_default,
                         **kwargs
                     ))
                 return tuple(instances)

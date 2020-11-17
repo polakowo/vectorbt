@@ -164,7 +164,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None
                         if checks.is_default_index(index):
                             # ignore simple ranges without name
                             continue
-                        if checks.is_series(arg) and ignore_sr_name:
+                        if axis == 1 and checks.is_series(arg) and ignore_sr_name:
                             # ignore Series name
                             continue
                         if new_index is None:

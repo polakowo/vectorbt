@@ -38,10 +38,8 @@ import yfinance as yf
 close = yf.Ticker("BTC-USD").history(period="max")['Close']
 
 # Compute moving averages for all combinations of fast and slow windows
-fast_ma, slow_ma = vbt.MA.run_combs(
-    close, window=np.arange(2, 101), r=2, 
-    short_names=['fast', 'slow']
-)
+windows = np.arange(2, 101)
+fast_ma, slow_ma = vbt.MA.run_combs(close, window=windows, r=2, short_names=['fast', 'slow'])
 
 # Generate crossover signals for each combination
 entries = fast_ma.ma_above(slow_ma, crossed=True)
@@ -53,8 +51,7 @@ portfolio = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq='
 # Get total return, reshape to symmetric matrix, and plot the whole thing
 fig = portfolio.total_return().vbt.heatmap(
     x_level='fast_window', y_level='slow_window', symmetric=True,
-    trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%'))
-)
+    trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')))
 fig.show()
 ```
 
@@ -63,33 +60,40 @@ fig.show()
 Digging into each strategy configuration is as simple as indexing with pandas:
 
 ```python-repl
->>> portfolio[(13, 21)].stats()
-
+>>> portfolio[(14, 38)].stats()
 Start                            2014-09-17 00:00:00
-End                              2020-09-13 00:00:00
-Duration                          2188 days 00:00:00
-Holding Duration [%]                         56.9013
-Total Profit                                 12102.4
-Total Return [%]                             12102.4
-Buy & Hold Return [%]                         2156.3
-Max. Drawdown [%]                            47.8405
-Avg. Drawdown [%]                             8.3173
-Max. Drawdown Duration             510 days 00:00:00
-Avg. Drawdown Duration    35 days 01:37:37.627118644
-Num. Trades                                       54
-Win Rate [%]                                 53.7037
-Best Trade [%]                               279.692
-Worst Trade [%]                             -23.4948
-Avg. Trade [%]                               13.9273
-Max. Trade Duration                100 days 00:00:00
-Avg. Trade Duration                 23 days 01:20:00
-Expectancy                                   224.119
-SQN                                          2.25024
-Sharpe Ratio                                 1.81674
-Sortino Ratio                                2.87812
-Calmar Ratio                                 2.56841
-Name: (13, 21), dtype: object
+End                              2020-11-17 00:00:00
+Duration                          2254 days 00:00:00
+Total Profit                                 11203.3
+Total Return [%]                             11203.3
+Benchmark Return [%]                         3753.41
+Position Coverage [%]                        58.0302
+Max. Drawdown [%]                            52.7562
+Avg. Drawdown [%]                            8.35486
+Max. Drawdown Duration             513 days 00:00:00
+Avg. Drawdown Duration    36 days 00:24:24.406779661
+Num. Trades                                       30
+Win Rate [%]                                 56.6667
+Best Trade [%]                               247.337
+Worst Trade [%]                             -13.9102
+Avg. Trade [%]                               23.1471
+Max. Trade Duration                156 days 00:00:00
+Avg. Trade Duration                 42 days 04:48:00
+Expectancy                                   225.217
+SQN                                          1.45906
+Gross Exposure                              0.580302
+Sharpe Ratio                                 1.70494
+Sortino Ratio                                2.67607
+Calmar Ratio                                 2.18027
+Name: (14, 38), dtype: object
+
+>>> fig = portfolio[(14, 38)].plot(template='plotly_dark')
+>>> fig.update_traces(xaxis="x1")
+>>> fig.update_xaxes(spikemode='across+marker')
+>>> fig.show()
 ```
+
+![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_portfolio.png)
 
 ## Motivation
 
@@ -158,7 +162,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 ```
     
 - Helper functions for combining, transforming, and indexing NumPy and pandas objects
-- NumPy-like broadcasting for pandas, among other features
+    - NumPy-like broadcasting for pandas, among other features
     
 ```python-repl
 # pandas
@@ -190,7 +194,7 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 - Drawdown analysis
 
 ```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.drawdowns().plot()
+>>> pd.Series([2, 1, 3, 2]).vbt.drawdowns().plot().show()
 ```
 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
@@ -209,7 +213,7 @@ dtype: bool
 ```
     
 - Functions for working with returns
-    - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical) and more
+    - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
 
 ```python-repl
 >>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
@@ -218,6 +222,7 @@ dtype: bool
     
 - Class for modeling portfolios
     - Accepts signals, orders, and custom order function
+    - Supports long and short positions
     - Supports individual and multi-asset mixed portfolios
     - Provides metrics and tools for analyzing returns, orders, trades and positions
     
@@ -226,7 +231,7 @@ dtype: bool
 >>> entries = [True, False, True, False, False]
 >>> exits = [False, True, False, True, False]
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
->>> portfolio.trades().plot()
+>>> portfolio.trades().plot().show()
 ```
 
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)
@@ -262,7 +267,7 @@ sma_timeperiod    2    3
 
 ```python-repl
 >>> a = np.random.normal(0, 4, size=10000)
->>> pd.Series(a).vbt.box(horizontal=True, trace_kwargs=dict(boxmean='sd'))
+>>> pd.Series(a).vbt.box(horizontal=True, trace_kwargs=dict(boxmean='sd')).show()
 ``` 
 
 ![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/Box.png)

@@ -415,3 +415,4 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.Series(a[:, 0], index=index, name=name)
         # Array per column in a DataFrame
         return pd.DataFrame(a, index=index, columns=columns)
+

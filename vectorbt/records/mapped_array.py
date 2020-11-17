@@ -103,7 +103,7 @@ You can build histograms and boxplots of `MappedArray` directly:
 To use scatterplots or any other plots that require index, convert to matrix first:
 
 ```python-repl
->>> ma.to_matrix().vbt.scatter(trace_kwargs=dict(connectgaps=True))
+>>> ma.to_matrix().vbt.scatter().show_png()
 ```
 
 ![](/vectorbt/docs/img/mapped_scatter.png)
@@ -369,6 +369,19 @@ class MappedArray(Configured, PandasIndexer):
             return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
         return self
 
+    def force_select_column(self, column=None):
+        """Force selection of one column."""
+        if column is not None:
+            if self.wrapper.grouper.group_by is None:
+                self_col = self[column]
+            else:
+                self_col = self.regroup(False)[column]
+        else:
+            self_col = self
+        if self_col.wrapper.ndim > 1:
+            raise TypeError("Only one column is allowed. Use indexing or column argument.")
+        return self_col
+
     @property
     def mapped_arr(self):
         """Mapped array."""
@@ -411,8 +424,11 @@ class MappedArray(Configured, PandasIndexer):
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
             wrapper = self.wrapper
-        if filter_id in self.filter_ids:
-            raise ValueError(f"Filter \"{filter_id}\" already applied")
+        filter_ids = self.filter_ids.copy()
+        if filter_id is not None:
+            if filter_id in self.filter_ids:
+                raise ValueError(f"Filter \"{filter_id}\" already applied")
+            filter_ids |= {filter_id}
         if np.all(mask):
             logger.debug(f"Records already satisfy this mask")
         elif not np.any(mask):
@@ -423,9 +439,31 @@ class MappedArray(Configured, PandasIndexer):
             col_arr=self.col_arr[mask],
             idx_arr=idx_arr,
             value_map=value_map,
-            filter_ids=self.filter_ids | {filter_id},
+            filter_ids=filter_ids,
             **kwargs
         )
+
+    def map_to_mask(self, inout_map_func_nb, *args):
+        """Map mapped array to a mask.
+
+        See `vectorbt.records.nb.mapped_to_mask_nb`."""
+        return nb.mapped_to_mask_nb(self.mapped_arr, self.col_arr, inout_map_func_nb, *args)
+
+    def top_n_mask(self, n):
+        """Return mask of top N elements in each column."""
+        return self.map_to_mask(nb.top_n_inout_map_nb, n)
+
+    def bottom_n_mask(self, n):
+        """Return mask of bottom N elements in each column."""
+        return self.map_to_mask(nb.bottom_n_inout_map_nb, n)
+
+    def top_n(self, n, **kwargs):
+        """Filter top N elements from each column."""
+        return self.filter_by_mask(self.top_n_mask(n), **kwargs)
+
+    def bottom_n(self, n, **kwargs):
+        """Filter bottom N elements from each column."""
+        return self.filter_by_mask(self.top_n_mask(n), **kwargs)
 
     def to_matrix(self, idx_arr=None, default_val=np.nan):
         """Convert mapped array to the matrix form.

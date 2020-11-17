@@ -659,12 +659,14 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         Base_SRAccessor.__init__(self, obj, **kwargs)
         Generic_Accessor.__init__(self, obj, **kwargs)
 
-    def plot(self, name=None, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, name=None, trace_kwargs=None, row=None, col=None, fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
             name (str): Name of the trace.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            row (int): Row position.
+            col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         Example:
@@ -694,8 +696,128 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
-        fig.add_trace(scatter)
+        fig.add_trace(scatter, row=row, col=col)
 
+        return fig
+
+    def plot_against(self, other, name=None, other_name=None, trace_kwargs=None,
+                     other_trace_kwargs=None, pos_trace_kwargs=None, neg_trace_kwargs=None,
+                     hidden_trace_kwargs=None, row=None, col=None, fig=None, **layout_kwargs):  # pragma: no cover
+        """Plot Series as a line against another line.
+
+        Args:
+            name (str): Name of the trace.
+            other_name (str): Name of the trace for `other`.
+            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            other_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `other`.
+
+                Set to `'hidden'` to hide.
+            pos_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for positive line.
+            neg_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for negative line.
+            hidden_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for hidden lines.
+            row (int): Row position.
+            col (int): Column position.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+        Example:
+            ```python-repl
+            >>> df['a'].vbt.plot_against(df['b'])
+            ```
+
+            ![](/vectorbt/docs/img/sr_plot_against.png)"""
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if other_trace_kwargs is None:
+            other_trace_kwargs = {}
+        if pos_trace_kwargs is None:
+            pos_trace_kwargs = {}
+        if neg_trace_kwargs is None:
+            neg_trace_kwargs = {}
+        if hidden_trace_kwargs is None:
+            hidden_trace_kwargs = {}
+        other = reshape_fns.broadcast_to(other, self._obj)
+        if fig is None:
+            fig = CustomFigureWidget()
+        fig.update_layout(**layout_kwargs)
+
+        # TODO: Using masks feels hacky
+        pos_mask = self._obj > other
+        if pos_mask.any():
+            # Fill positive area
+            pos_obj = self._obj.copy()
+            pos_obj[~pos_mask] = other[~pos_mask]
+            other.vbt.plot(
+                trace_kwargs=merge_kwargs(dict(
+                    line_color='rgba(0, 0, 0, 0)',
+                    line_width=0,
+                    opacity=0,
+                    hoverinfo='skip',
+                    showlegend=False,
+                    name=None,
+                ), hidden_trace_kwargs),
+                row=row, col=col,
+                fig=fig
+            )
+            pos_obj.vbt.plot(
+                trace_kwargs=merge_kwargs(dict(
+                    fillcolor='rgba(0, 128, 0, 0.3)',
+                    line_color='rgba(0, 0, 0, 0)',
+                    line_width=0,
+                    opacity=0,
+                    fill='tonexty',
+                    connectgaps=False,
+                    hoverinfo='skip',
+                    showlegend=False,
+                    name=None
+                ), pos_trace_kwargs),
+                row=row, col=col,
+                fig=fig
+            )
+        neg_mask = self._obj < other
+        if neg_mask.any():
+            # Fill negative area
+            neg_obj = self._obj.copy()
+            neg_obj[~neg_mask] = other[~neg_mask]
+            other.vbt.plot(
+                trace_kwargs=merge_kwargs(dict(
+                    line_color='rgba(0, 0, 0, 0)',
+                    line_width=0,
+                    opacity=0,
+                    hoverinfo='skip',
+                    showlegend=False,
+                    name=None
+                ), hidden_trace_kwargs),
+                row=row, col=col,
+                fig=fig
+            )
+            neg_obj.vbt.plot(
+                trace_kwargs=merge_kwargs(dict(
+                    fillcolor='rgba(255, 0, 0, 0.3)',
+                    line_color='rgba(0, 0, 0, 0)',
+                    line_width=0,
+                    opacity=0,
+                    fill='tonexty',
+                    connectgaps=False,
+                    hoverinfo='skip',
+                    showlegend=False,
+                    name=None
+                ), neg_trace_kwargs),
+                row=row, col=col,
+                fig=fig
+            )
+
+        # Plot main traces
+        self.plot(name=name, trace_kwargs=trace_kwargs, row=row, col=col, fig=fig)
+        if other_trace_kwargs == 'hidden':
+            other_trace_kwargs = dict(
+                line_color='rgba(0, 0, 0, 0)',
+                line_width=0,
+                opacity=0.,
+                hoverinfo='skip',
+                showlegend=False,
+                name=None
+            )
+        other.vbt.plot(name=other_name, trace_kwargs=other_trace_kwargs, row=row, col=col, fig=fig)
         return fig
 
     def heatmap(self, x_level=None, y_level=None, symmetric=False, x_labels=None, y_labels=None,
@@ -906,13 +1028,13 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
         Base_DFAccessor.__init__(self, obj, **kwargs)
         Generic_Accessor.__init__(self, obj, **kwargs)
 
-    def plot(self, trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, trace_kwargs=None, fig=None, **kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
 
         Args:
             trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Scatter`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
+            **kwargs: Keyword arguments passed to `Generic_SRAccessor.plot`.
         Example:
             ```python-repl
             >>> df[['a', 'b']].vbt.plot()
@@ -925,7 +1047,7 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             fig = self._obj.iloc[:, col].vbt.plot(
                 trace_kwargs=trace_kwargs,
                 fig=fig,
-                **layout_kwargs
+                **kwargs
             )
 
         return fig

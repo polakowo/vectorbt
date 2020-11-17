@@ -77,7 +77,7 @@ class SignalFactory(IndicatorFactory):
                  entry_trace_kwargs=None,
                  exit_trace_kwargs=None,
                  fig=None,
-                 **layout_kwargs):  # pragma: no cover
+                 **kwargs):  # pragma: no cover
             if _self.wrapper.ndim > 1:
                 raise TypeError("Select a column first. Use indexing.")
 
@@ -101,9 +101,9 @@ class SignalFactory(IndicatorFactory):
                 entries = _self.entries
             exits = _self.exits
             fig = entries.vbt.signals.plot_as_entry_markers(
-                y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **layout_kwargs)
+                y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
             fig = exits.vbt.signals.plot_as_exit_markers(
-                y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **layout_kwargs)
+                y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
 
             return fig
 
@@ -119,7 +119,8 @@ class SignalFactory(IndicatorFactory):
             exit_trace_kwargs (dict): Keyword arguments passed to \
             `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_exit_markers` for `{0}.exits`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.""".format(
+            **kwargs: Keyword arguments passed to `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_markers`.
+        """.format(
             class_name, 'new_entries' if exit_only and iteratively else 'entries'
         )
 

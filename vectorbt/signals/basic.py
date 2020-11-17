@@ -442,6 +442,7 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
              ohlc_kwargs=None,
              entry_trace_kwargs=None,
              exit_trace_kwargs=None,
+             row=None, col=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         if self.wrapper.ndim > 1:
@@ -472,7 +473,7 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
             opacity=0.7
         )
         ohlc.update(**ohlc_kwargs)
-        fig.add_trace(ohlc)
+        fig.add_trace(ohlc, row=row, col=col)
 
         # Plot entry and exit markers
         base_cls.plot(
@@ -482,6 +483,7 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
             exit_types=self.stop_type_readable,
             entry_trace_kwargs=entry_trace_kwargs,
             exit_trace_kwargs=exit_trace_kwargs,
+            row=row, col=col,
             fig=fig
         )
         return fig
