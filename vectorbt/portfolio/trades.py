@@ -538,14 +538,14 @@ class Trades(Records):
             ```
 
             ![](/vectorbt/docs/img/trades_plot.png)"""
-        from vectorbt.defaults import layout, contrast_color_schema
+        from vectorbt.defaults import color_schema, contrast_color_schema
 
         self_col = self.force_select_column(column)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_kwargs(dict(
-            line_color=layout['colorway'][0],
+            line_color=color_schema['blue'],
             name='Close' if self_col.close.name is None else self_col.close.name
         ), close_trace_kwargs)
         if entry_trace_kwargs is None:

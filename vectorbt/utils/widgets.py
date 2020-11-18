@@ -13,6 +13,7 @@ class CustomFigure(go.Figure):
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
         self.update_layout(**defaults.layout)
+        self.update_layout(colorway=list(defaults.color_schema.values()))
         self.update_layout(**layout)
 
     def show_png(self):
@@ -30,6 +31,7 @@ class CustomFigureWidget(go.FigureWidget):
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
         self.update_layout(**defaults.layout)
+        self.update_layout(colorway=list(defaults.color_schema.values()))
         self.update_layout(**layout)
 
     def show_png(self):

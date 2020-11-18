@@ -380,7 +380,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
             ```
 
             ![](/vectorbt/docs/img/plot_cum_returns.png)"""
-        from vectorbt.defaults import layout, color_schema
+        from vectorbt.defaults import color_schema
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -413,9 +413,6 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         if main_kwargs is None:
             main_kwargs = {}
         main_kwargs = merge_kwargs(dict(
-            trace_kwargs=dict(
-                line_color=layout['colorway'][0]
-            ),
             other_trace_kwargs='hidden'
         ), main_kwargs)
         cumrets = self.cumulative(start_value=start_value)

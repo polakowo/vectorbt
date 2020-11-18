@@ -292,7 +292,7 @@ class Drawdowns(Records):
             ```
 
             ![](/vectorbt/docs/img/drawdowns_plot.png)"""
-        from vectorbt.defaults import layout, contrast_color_schema
+        from vectorbt.defaults import color_schema, contrast_color_schema
 
         self_col = self.force_select_column(column)
         if top_n is not None:
@@ -301,7 +301,7 @@ class Drawdowns(Records):
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
         ts_trace_kwargs = merge_kwargs(dict(
-            line_color=layout['colorway'][0]
+            line_color=color_schema['blue']
         ), ts_trace_kwargs)
         if peak_trace_kwargs is None:
             peak_trace_kwargs = {}

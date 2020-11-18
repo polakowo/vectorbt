@@ -20,6 +20,7 @@ __pdoc__ = {}
 
 # Color schema
 color_schema = Config(
+    frozen=False,  # you can change the keys
     blue="#1f77b4",
     orange="#ff7f0e",
     green="#2ca02c",
@@ -42,6 +43,7 @@ __pdoc__['color_schema'] = f"""Color schema.
 
 # Contrast color schema
 contrast_color_schema = Config(
+    frozen=False,  # you can change the keys
     blue='#4285F4',
     orange='#FFAA00',
     green='#37B13F',
@@ -67,7 +69,6 @@ layout = Config(
         t=30, b=30, l=30, r=30
     ),
     hovermode='closest',
-    colorway=list(color_schema.values()),
     legend=dict(
         orientation="h",
         yanchor="bottom",

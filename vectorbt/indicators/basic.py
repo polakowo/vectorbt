@@ -62,6 +62,7 @@ class MA(MA):
 
     def plot(self,
              column=None,
+             show_close=True,
              close_trace_kwargs=None,
              ma_trace_kwargs=None,
              row=None, col=None,
@@ -71,6 +72,7 @@ class MA(MA):
 
         Args:
             column (str): Name of the column to plot.
+            show_close (bool): Whether to show `MA.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
             row (int): Row position.
@@ -83,7 +85,7 @@ class MA(MA):
             ```
 
             ![](/vectorbt/docs/img/MA.png)"""
-        from vectorbt.defaults import layout
+        from vectorbt.defaults import color_schema
 
         self_col = self.force_select_column(column)
 
@@ -97,16 +99,16 @@ class MA(MA):
             ma_trace_kwargs = {}
         close_trace_kwargs = merge_kwargs(dict(
             name='Close',
-            line_color=layout['colorway'][0]
+            line_color=color_schema['blue']
         ), close_trace_kwargs)
         ma_trace_kwargs = merge_kwargs(dict(
-            name='MA',
-            line_color=layout['colorway'][1]
+            name='MA'
         ), ma_trace_kwargs)
 
-        fig = self_col.close.vbt.plot(
-            trace_kwargs=close_trace_kwargs,
-            row=row, col=col, fig=fig)
+        if show_close:
+            fig = self_col.close.vbt.plot(
+                trace_kwargs=close_trace_kwargs,
+                row=row, col=col, fig=fig)
         fig = self_col.ma.vbt.plot(
             trace_kwargs=ma_trace_kwargs,
             row=row, col=col, fig=fig)
@@ -160,8 +162,6 @@ class MSTD(MSTD):
             ```
 
             ![](/vectorbt/docs/img/MSTD.png)"""
-        from vectorbt.defaults import layout
-
         self_col = self.force_select_column(column)
 
         if fig is None:
@@ -171,8 +171,7 @@ class MSTD(MSTD):
         if mstd_trace_kwargs is None:
             mstd_trace_kwargs = {}
         mstd_trace_kwargs = merge_kwargs(dict(
-            name='MSTD',
-            line_color=layout['colorway'][0]
+            name='MSTD'
         ), mstd_trace_kwargs)
 
         fig = self_col.mstd.vbt.plot(
@@ -220,6 +219,7 @@ class BBANDS(BBANDS):
 
     def plot(self,
              column=None,
+             show_close=True,
              close_trace_kwargs=None,
              middle_trace_kwargs=None,
              upper_trace_kwargs=None,
@@ -232,6 +232,7 @@ class BBANDS(BBANDS):
 
         Args:
             column (str): Name of the column to plot.
+            show_close (bool): Whether to show `MA.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.close`.
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
@@ -246,7 +247,7 @@ class BBANDS(BBANDS):
             ```
 
             ![](/vectorbt/docs/img/BBANDS.png)"""
-        from vectorbt.defaults import layout, color_schema
+        from vectorbt.defaults import color_schema
 
         self_col = self.force_select_column(column)
 
@@ -273,12 +274,11 @@ class BBANDS(BBANDS):
             fillcolor='rgba(128, 128, 128, 0.2)'
         ), upper_trace_kwargs)  # default kwargs
         middle_trace_kwargs = merge_kwargs(dict(
-            name='Middle Band',
-            line=dict(color=layout['colorway'][1])
+            name='Middle Band'
         ), middle_trace_kwargs)
         close_trace_kwargs = merge_kwargs(dict(
             name='Close',
-            line=dict(color=layout['colorway'][0])
+            line=dict(color=color_schema['blue'])
         ), close_trace_kwargs)
 
         fig = self_col.lower.vbt.plot(
@@ -290,9 +290,10 @@ class BBANDS(BBANDS):
         fig = self_col.middle.vbt.plot(
             trace_kwargs=middle_trace_kwargs,
             row=row, col=col, fig=fig)
-        fig = self_col.close.vbt.plot(
-            trace_kwargs=close_trace_kwargs,
-            row=row, col=col, fig=fig)
+        if show_close:
+            fig = self_col.close.vbt.plot(
+                trace_kwargs=close_trace_kwargs,
+                row=row, col=col, fig=fig)
 
         return fig
 
@@ -353,8 +354,6 @@ class RSI(RSI):
             ```
 
             ![](/vectorbt/docs/img/RSI.png)"""
-        from vectorbt.defaults import layout
-
         self_col = self.force_select_column(column)
 
         if fig is None:
@@ -367,8 +366,7 @@ class RSI(RSI):
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
         rsi_trace_kwargs = merge_kwargs(dict(
-            name='RSI',
-            line=dict(color=layout['colorway'][0])
+            name='RSI'
         ), rsi_trace_kwargs)
 
         fig = self_col.rsi.vbt.plot(
@@ -453,8 +451,6 @@ class STOCH(STOCH):
             ```
 
             ![](/vectorbt/docs/img/STOCH.png)"""
-        from vectorbt.defaults import layout
-
         self_col = self.force_select_column(column)
 
         if fig is None:
@@ -471,12 +467,10 @@ class STOCH(STOCH):
         if shape_kwargs is None:
             shape_kwargs = {}
         percent_k_trace_kwargs = merge_kwargs(dict(
-            name='%K',
-            line=dict(color=layout['colorway'][0])
+            name='%K'
         ), percent_k_trace_kwargs)
         percent_d_trace_kwargs = merge_kwargs(dict(
-            name='%D',
-            line=dict(color=layout['colorway'][1])
+            name='%D'
         ), percent_d_trace_kwargs)
 
         fig = self_col.percent_k.vbt.plot(
@@ -565,8 +559,6 @@ class MACD(MACD):
             ```
 
             ![](/vectorbt/docs/img/MACD.png)"""
-        from vectorbt.defaults import layout
-
         self_col = self.force_select_column(column)
 
         if fig is None:
@@ -581,12 +573,10 @@ class MACD(MACD):
         if hist_trace_kwargs is None:
             hist_trace_kwargs = {}
         macd_trace_kwargs = merge_kwargs(dict(
-            name='MACD',
-            line=dict(color=layout['colorway'][0])
+            name='MACD'
         ), macd_trace_kwargs)
         signal_trace_kwargs = merge_kwargs(dict(
-            name='Signal',
-            line=dict(color=layout['colorway'][1])
+            name='Signal'
         ), signal_trace_kwargs)
         hist_trace_kwargs = merge_kwargs(dict(name='Histogram'), hist_trace_kwargs)
 
@@ -668,8 +658,6 @@ class ATR(ATR):
             ```
 
             ![](/vectorbt/docs/img/ATR.png)"""
-        from vectorbt.defaults import layout
-
         self_col = self.force_select_column(column)
 
         if fig is None:
@@ -681,12 +669,10 @@ class ATR(ATR):
         if atr_trace_kwargs is None:
             atr_trace_kwargs = {}
         tr_trace_kwargs = merge_kwargs(dict(
-            name='TR',
-            line=dict(color=layout['colorway'][0])
+            name='TR'
         ), tr_trace_kwargs)
         atr_trace_kwargs = merge_kwargs(dict(
-            name='ATR',
-            line=dict(color=layout['colorway'][1])
+            name='ATR'
         ), atr_trace_kwargs)
 
         fig = self_col.tr.vbt.plot(
@@ -743,8 +729,6 @@ class OBV(OBV):
             ```
 
             ![](/vectorbt/docs/img/OBV.png)"""
-        from vectorbt.defaults import layout
-
         self_col = self.force_select_column(column)
 
         if fig is None:
@@ -754,8 +738,7 @@ class OBV(OBV):
         if obv_trace_kwargs is None:
             obv_trace_kwargs = {}
         obv_trace_kwargs = merge_kwargs(dict(
-            name='OBV',
-            line=dict(color=layout['colorway'][0])
+            name='OBV'
         ), obv_trace_kwargs)
 
         fig = self_col.obv.vbt.plot(
