@@ -109,7 +109,7 @@ def tile(arg, n, axis=1):
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None, **kwargs):
+def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=None, **kwargs):
     """Produce a broadcast index/columns.
 
     Args:
@@ -119,15 +119,18 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None
 
             Accepts the following values:
 
-            * `'default'` - take the value from `vectorbt.defaults.broadcasting`
+            * 'default' - take the value from `vectorbt.defaults.broadcasting`
+            * 'strict' - ensure that all pandas objects have the same index/columns
+            * 'stack' - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
+            * 'ignore' - ignore any index/columns
+            * integer - use the index/columns of the i-nth object in `args`
             * None - use the original index/columns of the objects in `args`
-            * `int` - use the index/columns of the i-nth object in `args`
-            * `'strict'` - ensure that all pandas objects have the same index/columns
-            * `'stack'` - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
-        ignore_sr_name (bool): Whether to ignore Series names.
+        ignore_sr_names (bool): Whether to ignore Series names if they are in conflict.
+
+            Conflicting Series names are those that are different but not None.
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
     For defaults, see `vectorbt.defaults.broadcasting`.
@@ -139,14 +142,14 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None
         better to drop it altogether by setting it to None.
     """
     from vectorbt import defaults
-    
+
+    if ignore_sr_names is None:
+        ignore_sr_names = defaults.broadcasting['ignore_sr_names']
     index_str = 'columns' if axis == 1 else 'index'
+    to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
+    # maxlen stores the length of the longest index
+    maxlen = to_shape_2d[1] if axis == 1 else to_shape_2d[0]
     new_index = None
-    if axis == 1 and len(to_shape) == 1:
-        to_shape = (to_shape[0], 1)
-    maxlen = to_shape[1] if axis == 1 else to_shape[0]
-    if ignore_sr_name is None:
-        ignore_sr_name = defaults.broadcasting['ignore_sr_name']
 
     if index_from is not None:
         if isinstance(index_from, int):
@@ -155,41 +158,57 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None
                 raise TypeError(f"Argument under index {index_from} must be a pandas object")
             new_index = index_fns.get_index(args[index_from], axis)
         elif isinstance(index_from, str):
-            if index_from in ('stack', 'strict'):
-                # If pandas objects have different index/columns, stack them together
-                # maxlen stores the length of the longest index
+            if index_from == 'ignore':
+                # Ignore index/columns
+                new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
+            elif index_from in ('stack', 'strict'):
+                # Check whether all indexes/columns are equal
+                last_index = None  # of type pd.Index
+                index_conflict = False
                 for arg in args:
                     if checks.is_pandas(arg):
                         index = index_fns.get_index(arg, axis)
-                        if checks.is_default_index(index):
-                            # ignore simple ranges without name
-                            continue
-                        if axis == 1 and checks.is_series(arg) and ignore_sr_name:
-                            # ignore Series name
-                            continue
-                        if new_index is None:
-                            new_index = index
-                        else:
-                            if index_from == 'strict':
-                                # If pandas objects have different index/columns, raise an exception
-                                if not pd.Index.equals(index, new_index):
-                                    raise ValueError(
-                                        f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
-                            # Broadcasting index must follow the rules of a regular broadcasting operation
-                            # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
-                            # 1. rule: if indexes are of the same length, they are simply stacked
-                            # 2. rule: if index has one element, it gets repeated and then stacked
-
-                            if pd.Index.equals(index, new_index):
+                        if last_index is not None:
+                            if not pd.Index.equals(index, last_index):
+                                index_conflict = True
+                        last_index = index
+                        continue
+                if not index_conflict:
+                    new_index = last_index
+                else:
+                    # If pandas objects have different index/columns, stack them together
+                    for arg in args:
+                        if checks.is_pandas(arg):
+                            index = index_fns.get_index(arg, axis)
+                            if axis == 1 and checks.is_series(arg) and ignore_sr_names:
+                                # ignore Series name
                                 continue
-                            if len(index) != len(new_index):
-                                if len(index) > 1 and len(new_index) > 1:
-                                    raise ValueError("Indexes could not be broadcast together")
-                                if len(index) > len(new_index):
-                                    new_index = index_fns.repeat_index(new_index, len(index))
-                                elif len(index) < len(new_index):
-                                    index = index_fns.repeat_index(index, len(new_index))
-                            new_index = index_fns.stack_indexes(new_index, index, **kwargs)
+                            if checks.is_default_index(index):
+                                # ignore simple ranges without name
+                                continue
+                            if new_index is None:
+                                new_index = index
+                            else:
+                                if index_from == 'strict':
+                                    # If pandas objects have different index/columns, raise an exception
+                                    if not pd.Index.equals(index, new_index):
+                                        raise ValueError(
+                                            f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
+                                # Broadcasting index must follow the rules of a regular broadcasting operation
+                                # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
+                                # 1. rule: if indexes are of the same length, they are simply stacked
+                                # 2. rule: if index has one element, it gets repeated and then stacked
+
+                                if pd.Index.equals(index, new_index):
+                                    continue
+                                if len(index) != len(new_index):
+                                    if len(index) > 1 and len(new_index) > 1:
+                                        raise ValueError("Indexes could not be broadcast together")
+                                    if len(index) > len(new_index):
+                                        new_index = index_fns.repeat_index(new_index, len(index))
+                                    elif len(index) < len(new_index):
+                                        index = index_fns.repeat_index(index, len(new_index))
+                                new_index = index_fns.stack_indexes(new_index, index, **kwargs)
             else:
                 raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
         else:
@@ -203,6 +222,10 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_name=None
                 if maxlen > 1 and len(new_index) > 1:
                     raise ValueError("Indexes could not be broadcast together")
                 new_index = index_fns.repeat_index(new_index, maxlen)
+        elif index_from is not None:
+            # new_index=None can mean two things: 1) take original metadata or 2) reset index/columns
+            # In case when index_from is not None, we choose 2)
+            new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
     return new_index
 
 
@@ -819,3 +842,4 @@ def flex_select_auto_nb(i, col, a, flex_2d):
         Slower since it must call `flex_choose_i_and_col_nb` each time."""
     flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
     return flex_select_nb(i, col, a, flex_i, flex_col, flex_2d)
+

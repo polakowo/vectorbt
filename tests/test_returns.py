@@ -27,6 +27,9 @@ ret = ts.pct_change()
 
 defaults.returns['year_freq'] = '252 days'  # same as empyrical
 
+seed = 42
+
+np.random.seed(seed)
 benchmark_rets = pd.DataFrame({
     'a': ret['a'] * np.random.uniform(0.8, 1.2, ret.shape[0]),
     'b': ret['b'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 2,
@@ -403,4 +406,144 @@ class TestAccessors:
         pd.testing.assert_series_equal(
             ret.vbt.returns.drawdowns().max_drawdown(),
             ret.vbt.returns.max_drawdown()
+        )
+
+    def test_stats(self):
+        pd.testing.assert_series_equal(
+            ret['b'].vbt.returns.stats(
+                benchmark_rets['b'],
+                levy_alpha=2.,
+                risk_free=0.01,
+                required_return=0.1
+            ),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                -80.0,
+                -100.72986288899584,
+                -100.0,
+                208.74625745148103,
+                -39.93844058228336,
+                -1.25,
+                -80.0,
+                0.0,
+                -15.323368643952458,
+                -1.0653693625282994,
+                0.6452153997516223,
+                0.43684210526315786,
+                0.0,
+                -0.47500000000000003,
+                -0.9999978857530595,
+                0.4123019930790345
+            ], index=[
+                'Start',
+                'End',
+                'Duration',
+                'Total Return [%]',
+                'Benchmark Return [%]',
+                'Annual Return [%]',
+                'Annual Volatility [%]',
+                'Sharpe Ratio',
+                'Calmar Ratio',
+                'Max. Drawdown [%]',
+                'Omega Ratio',
+                'Sortino Ratio',
+                'Skew',
+                'Kurtosis',
+                'Tail Ratio',
+                'Common Sense Ratio',
+                'Value at Risk',
+                'Alpha',
+                'Beta'
+            ], name='b')
+        )
+        pd.testing.assert_frame_equal(
+            ret.vbt.returns.stats(
+                benchmark_rets,
+                levy_alpha=[1., 2., 3.],
+                risk_free=[0., 0.01, 0.02],
+                required_return=[0., 0.1, 0.2]
+            ),
+            pd.DataFrame([[
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                400.0,
+                451.8597134178033,
+                1.690784346944584e+37,
+                8465.370635713476,
+                24.612379624271007,
+                np.nan,
+                0.0,
+                np.inf,
+                np.inf,
+                1.4693345482106241,
+                2.030769230769236,
+                3.5238095238095237,
+                5.958001984471391e+35,
+                0.26249999999999996,
+                35691351.69391792,
+                0.7853755858374825
+            ], [
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                -80.0,
+                -100.72986288899584,
+                -100.0,
+                208.74625745148103,
+                -39.93844058228336,
+                -1.25,
+                -80.0,
+                0.0,
+                -15.323368643952458,
+                -1.0653693625282994,
+                0.6452153997516223,
+                0.43684210526315786,
+                0.0,
+                -0.47500000000000003,
+                -0.9999978857530595,
+                0.4123019930790345
+            ], [
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                0.0,
+                -143.81732886778948,
+                0.0,
+                446.63407039155584,
+                3.292658500361067,
+                0.0,
+                -66.66666666666667,
+                1.7951447662614517,
+                -1.2025797235076259,
+                0.3666479606152471,
+                -3.438271604938274,
+                1.947368421052631,
+                1.947368421052631,
+                -0.47500000000000003,
+                -0.9999999997371561,
+                0.30840682076341036
+            ]], columns=[
+                'Start',
+                'End',
+                'Duration',
+                'Total Return [%]',
+                'Benchmark Return [%]',
+                'Annual Return [%]',
+                'Annual Volatility [%]',
+                'Sharpe Ratio',
+                'Calmar Ratio',
+                'Max. Drawdown [%]',
+                'Omega Ratio',
+                'Sortino Ratio',
+                'Skew',
+                'Kurtosis',
+                'Tail Ratio',
+                'Common Sense Ratio',
+                'Value at Risk',
+                'Alpha',
+                'Beta'
+            ], index=ret.columns)
         )

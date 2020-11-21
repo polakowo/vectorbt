@@ -317,6 +317,8 @@ def pick_levels(index, required_levels=[], optional_levels=[]):
             checks.assert_type(level, (int, str))
             if isinstance(level, str):
                 level = index.names.index(level)
+            if level < 0:
+                level = index.nlevels + level
             levels_left.remove(level)
         _optional_levels.append(level)
 
@@ -327,6 +329,8 @@ def pick_levels(index, required_levels=[], optional_levels=[]):
             checks.assert_type(level, (int, str))
             if isinstance(level, str):
                 level = index.names.index(level)
+            if level < 0:
+                level = index.nlevels + level
             levels_left.remove(level)
         _required_levels.append(level)
     for i, level in enumerate(_required_levels):

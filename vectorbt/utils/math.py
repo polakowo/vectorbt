@@ -51,11 +51,3 @@ def add_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
     return a + b
 
 
-@njit(cache=True)
-def add_int_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
-    """Add two integers."""
-    if is_addition_zero_nb(a, b, rel_tol=rel_tol, abs_tol=abs_tol):
-        return 0
-    return a + b
-
-

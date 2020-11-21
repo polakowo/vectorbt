@@ -89,15 +89,6 @@ class Returns_Accessor(Generic_Accessor):
         """Total return."""
         return self.wrap_reduced(nb.cum_returns_final_nb(self.to_2d_array(), np.full(len(self.columns), 0.)))
 
-    def benchmark_total(self, benchmark_rets):
-        """Total benchmark return.
-
-        Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element."""
-        benchmark_rets = reshape_fns.broadcast_to(benchmark_rets, self._obj)
-        return benchmark_rets.vbt.returns.total()
-
     def annualized(self):
         """Mean annual growth rate of returns.
 
@@ -287,11 +278,13 @@ class Returns_Accessor(Generic_Accessor):
         """Total maximum drawdown (MDD)."""
         return self.wrap_reduced(nb.max_drawdown_nb(self.to_2d_array()))
 
-    def drawdowns(self, **kwargs):
+    def drawdowns(self, group_by=None, **kwargs):
         """Generate drawdown records of cumulative returns.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        return self.cumulative(start_value=1.).vbt(freq=self.freq).drawdowns(**kwargs)
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return self.cumulative(start_value=1.).vbt(freq=self.freq, group_by=group_by).drawdowns(**kwargs)
 
     def stats(self, benchmark_rets, levy_alpha=2.0, risk_free=0., required_return=0.):
         """Compute various statistics on these returns.
@@ -306,12 +299,13 @@ class Returns_Accessor(Generic_Accessor):
             required_return (float or array_like): Minimum acceptance return of the investor.
                 Will broadcast per column."""
         # Run stats
+        benchmark_rets = reshape_fns.broadcast_to(benchmark_rets, self._obj)
         stats_df = pd.DataFrame({
             'Start': self.index[0],
             'End': self.index[-1],
             'Duration': self.shape[0] * self.freq,
             'Total Return [%]': self.total() * 100,
-            'Benchmark Return [%]': self.benchmark_total(benchmark_rets) * 100,
+            'Benchmark Return [%]': benchmark_rets.vbt.returns.total() * 100,
             'Annual Return [%]': self.annualized() * 100,
             'Annual Volatility [%]': self.annualized_volatility(levy_alpha=levy_alpha) * 100,
             'Sharpe Ratio': self.sharpe_ratio(risk_free=risk_free),
@@ -329,7 +323,7 @@ class Returns_Accessor(Generic_Accessor):
         }, index=self.columns)
 
         # Select columns or reduce
-        if self.is_series:
+        if self.is_series():
             return self.wrap_reduced(stats_df.iloc[0], index=stats_df.columns)
         return stats_df
 
@@ -413,6 +407,9 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         if main_kwargs is None:
             main_kwargs = {}
         main_kwargs = merge_kwargs(dict(
+            trace_kwargs=dict(
+                line_color=color_schema['purple'],
+            ),
             other_trace_kwargs='hidden'
         ), main_kwargs)
         cumrets = self.cumulative(start_value=start_value)

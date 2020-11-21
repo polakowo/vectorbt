@@ -1317,7 +1317,8 @@ class TestReshapeFns:
             index_from='stack',
             columns_from='stack',
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_series_equal(
@@ -1329,7 +1330,7 @@ class TestReshapeFns:
                         ('x1', 'y2'),
                         ('x1', 'z2')
                     ], names=['i1', 'i2']),
-                    name=(sr1.name, sr2.name)
+                    name=None
                 )
             )
         # 2d
@@ -1346,7 +1347,8 @@ class TestReshapeFns:
             index_from='stack',
             columns_from='stack',
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_frame_equal(
@@ -1375,7 +1377,8 @@ class TestReshapeFns:
             index_from=None,
             columns_from=None,
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(4):
             pd.testing.assert_series_equal(
@@ -1404,7 +1407,8 @@ class TestReshapeFns:
             index_from=None,
             columns_from=None,
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(7):
             pd.testing.assert_frame_equal(
@@ -1481,7 +1485,8 @@ class TestReshapeFns:
             index_from=multi_i,
             columns_from=['name'],  # should translate to Series name
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_series_equal(
@@ -1497,7 +1502,8 @@ class TestReshapeFns:
             index_from=multi_i,
             columns_from=[0],  # should translate to None
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_series_equal(
@@ -1522,7 +1528,8 @@ class TestReshapeFns:
             index_from=multi_i,
             columns_from=multi_c,
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_frame_equal(
@@ -1543,7 +1550,8 @@ class TestReshapeFns:
             index_from=-1,
             columns_from=-1,  # should translate to Series name
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_series_equal(
@@ -1560,7 +1568,8 @@ class TestReshapeFns:
                 index_from=0,
                 columns_from=0,
                 drop_duplicates=True,
-                drop_redundant=True
+                drop_redundant=True,
+                ignore_sr_names=True
             )
         # 2d
         to_broadcast_a = 0, a1, a2, a3, a4, a5
@@ -1576,7 +1585,8 @@ class TestReshapeFns:
             index_from=-1,
             columns_from=-1,
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_frame_equal(
@@ -1597,7 +1607,8 @@ class TestReshapeFns:
                 index_from='strict',  # changing index not allowed
                 columns_from='stack',
                 drop_duplicates=True,
-                drop_redundant=True
+                drop_redundant=True,
+                ignore_sr_names=True
             )
         # 2d
         to_broadcast = df1, df2
@@ -1607,7 +1618,8 @@ class TestReshapeFns:
                 index_from='stack',
                 columns_from='strict',  # changing columns not allowed
                 drop_duplicates=True,
-                drop_redundant=True
+                drop_redundant=True,
+                ignore_sr_names=True
             )
 
     def test_broadcast_dirty(self):
@@ -1619,7 +1631,8 @@ class TestReshapeFns:
             index_from='stack',
             columns_from='stack',
             drop_duplicates=False,
-            drop_redundant=False
+            drop_redundant=False,
+            ignore_sr_names=False
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_series_equal(
@@ -1637,15 +1650,18 @@ class TestReshapeFns:
 
     def test_broadcast_to_shape(self):
         to_broadcast = 0, a1, a2, sr_none, sr1, sr2
-        broadcasted_arrs = [np.broadcast_to(x.to_frame() if isinstance(x, pd.Series) else x, (3, 3)) for x in
-                            to_broadcast]
+        broadcasted_arrs = [
+            np.broadcast_to(x.to_frame() if isinstance(x, pd.Series) else x, (3, 3))
+            for x in to_broadcast
+        ]
         broadcasted = reshape_fns.broadcast(
             *to_broadcast,
             to_shape=(3, 3),
             index_from='stack',
             columns_from='stack',
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             pd.testing.assert_frame_equal(
@@ -1657,11 +1673,7 @@ class TestReshapeFns:
                         ('x1', 'y2'),
                         ('x1', 'z2')
                     ], names=['i1', 'i2']),
-                    columns=pd.MultiIndex.from_tuples([
-                        ('a1', 'a2'),
-                        ('a1', 'a2'),
-                        ('a1', 'a2')
-                    ])
+                    columns=None
                 )
             )
 
@@ -1678,7 +1690,8 @@ class TestReshapeFns:
             index_from='stack',
             columns_from='stack',
             drop_duplicates=True,
-            drop_redundant=True
+            drop_redundant=True,
+            ignore_sr_names=True
         )
         for i in range(len(broadcasted)):
             np.testing.assert_array_equal(
@@ -1716,11 +1729,7 @@ class TestReshapeFns:
             ('y2', 'y4'),
             ('z2', 'z4')
         ], names=['i2', 'i4'])
-        test_columns = pd.MultiIndex.from_tuples([
-            ('a2', 'a4'),
-            ('a2', 'a4'),
-            ('a2', 'a4')
-        ], names=[None, 'c4'])
+        test_columns = pd.Index(['a4', 'a4', 'a4'], name='c4', dtype='object')
         pd.testing.assert_frame_equal(
             _0,
             pd.DataFrame(
@@ -2941,7 +2950,7 @@ class TestAccessors:
             pd.Series(
                 np.array([1111, 1112, 1113]),
                 index=pd.Index(['x2', 'y2', 'z2'], dtype='object', name='i2'),
-                name='a2'
+                name=sr2.name
             )
         )
         pd.testing.assert_series_equal(
@@ -2949,7 +2958,7 @@ class TestAccessors:
             pd.Series(
                 np.array([1111, 1112, 1113]),
                 index=pd.Index(['x2', 'y2', 'z2'], dtype='object', name='i2'),
-                name='a2'
+                name=sr2.name
             )
         )
 

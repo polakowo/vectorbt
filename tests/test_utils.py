@@ -10,6 +10,8 @@ from vectorbt.utils import checks, config, decorators, math, array, random, enum
 
 from tests.utils import hash
 
+seed = 42
+
 
 # ############# config.py ############# #
 
@@ -413,7 +415,8 @@ class TestChecks:
         columns = ['a', 'b', 'c']
         checks.assert_array_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
         checks.assert_array_equal(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
-        checks.assert_array_equal(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
+        checks.assert_array_equal(pd.DataFrame([[1, 2, 3]], columns=columns),
+                                  pd.DataFrame([[1, 2, 3]], columns=columns))
         with pytest.raises(Exception) as e_info:
             checks.assert_array_equal(np.array([1, 2]), np.array([1, 2, 3]))
 
@@ -528,6 +531,15 @@ class TestMath:
         assert math.is_addition_zero_nb(a, -b)
         assert not math.is_addition_zero_nb(-a, -b)
 
+    def test_add_nb(self):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        assert math.add_nb(a, b) == a + b
+        assert math.add_nb(-a, b) == 0
+        assert math.add_nb(a, -b) == 0
+        assert math.add_nb(-a, -b) == -(a + b)
+
 
 # ############# array.py ############# #
 
@@ -567,12 +579,81 @@ class TestArray:
             np.array([0, 1, 2, 3, 4, 5])
         )
 
+    def test_uniform_summing_to_one_nb(self):
+        @njit
+        def set_seed():
+            np.random.seed(seed)
+
+        set_seed()
+        np.testing.assert_array_almost_equal(
+            array.uniform_summing_to_one_nb(10),
+            np.array([
+                5.808361e-02, 9.791091e-02, 2.412011e-05, 2.185215e-01,
+                2.241184e-01, 2.456528e-03, 1.308789e-01, 1.341822e-01,
+                8.453816e-02, 4.928569e-02
+            ])
+        )
+        assert np.sum(array.uniform_summing_to_one_nb(10)) == 1
+
+    def test_renormalize(self):
+        assert array.renormalize(0, [0, 10], [0, 1]) == 0
+        assert array.renormalize(10, [0, 10], [0, 1]) == 1
+        np.testing.assert_array_equal(
+            array.renormalize(np.array([0, 2, 4, 6, 8, 10]), [0, 10], [0, 1]),
+            np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
+        )
+        np.testing.assert_array_equal(
+            array.renormalize_nb(np.array([0, 2, 4, 6, 8, 10]), [0, 10], [0, 1]),
+            np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
+        )
+
+    def test_min_rel_rescale(self):
+        np.testing.assert_array_equal(
+            array.min_rel_rescale(np.array([2, 4, 6]), [10, 20]),
+            np.array([10., 15., 20.])
+        )
+        np.testing.assert_array_equal(
+            array.min_rel_rescale(np.array([5, 6, 7]), [10, 20]),
+            np.array([10., 12., 14.])
+        )
+        np.testing.assert_array_equal(
+            array.min_rel_rescale(np.array([5, 5, 5]), [10, 20]),
+            np.array([10., 10., 10.])
+        )
+
+    def test_max_rel_rescale(self):
+        np.testing.assert_array_equal(
+            array.max_rel_rescale(np.array([2, 4, 6]), [10, 20]),
+            np.array([10., 15., 20.])
+        )
+        np.testing.assert_array_equal(
+            array.max_rel_rescale(np.array([5, 6, 7]), [10, 20]),
+            np.array([14.285714285714286, 17.142857142857142, 20.])
+        )
+        np.testing.assert_array_equal(
+            array.max_rel_rescale(np.array([5, 5, 5]), [10, 20]),
+            np.array([20., 20., 20.])
+        )
+
+    def test_rescale_float_to_int_nb(self):
+        @njit
+        def set_seed():
+            np.random.seed(seed)
+
+        set_seed()
+        np.testing.assert_array_equal(
+            array.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), [10, 20], 70),
+            np.array([17, 14, 22, 17])
+        )
+        assert np.sum(array.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), [10, 20], 70)) == 70
+
+
 # ############# random.py ############# #
 
 
 class TestRandom:
     def test_set_seed(self):
-        random.set_seed(42)
+        random.set_seed(seed)
 
         def test_seed():
             return np.random.uniform(0, 1)
@@ -590,6 +671,7 @@ class TestRandom:
 # ############# enum.py ############# #
 
 Enum = namedtuple('Enum', ['Attr1', 'Attr2'])(*range(2))
+
 
 class TestEnum:
     def test_caseins_getattr(self):
@@ -609,3 +691,5 @@ class TestEnum:
         assert enum.convert_str_enum_value(Enum, ('attr1', 'attr2')) == (0, 1)
         assert enum.convert_str_enum_value(Enum, [['attr1', 'attr2']]) == [[0, 1]]
 
+    def test_to_value_map(self):
+        assert enum.to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}

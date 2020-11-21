@@ -224,7 +224,6 @@ method/property. There is currently no way to disable caching for an entire clas
 
 import numpy as np
 import pandas as pd
-import logging
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
@@ -234,8 +233,6 @@ from vectorbt.base import reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
 from vectorbt.records import nb
 from vectorbt.records.mapped_array import MappedArray
-
-logger = logging.getLogger(__name__)
 
 
 def indexing_on_records_meta(obj, pd_indexing_func):
@@ -271,7 +268,7 @@ class Records(Configured, PandasIndexer):
             Must have the field `col` (column position in a matrix).
         idx_field (str): The name of the field corresponding to the index. Optional.
 
-            Will be derived automatically if records contain field `'idx'`.
+            Will be derived automatically if records contain field `idx`.
         filter_ids (set): IDs of applied filters.
 
             Prevents applying same filters again and calling contradictive attributes.
@@ -364,7 +361,9 @@ class Records(Configured, PandasIndexer):
         return nb.record_col_index_nb(self.records_arr, len(self.wrapper.columns))
 
     def filter_by_mask(self, mask, group_by=None, filter_id=None, **kwargs):
-        """Return a new class instance, filtered by mask."""
+        """Return a new class instance, filtered by mask.
+
+        To prohibit using the same filter or filter class on the filtered instance, provide `filter_id`."""
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
@@ -375,10 +374,6 @@ class Records(Configured, PandasIndexer):
             if filter_id in self.filter_ids:
                 raise ValueError(f"Filter \"{filter_id}\" already applied")
             filter_ids |= {filter_id}
-        if np.all(mask):
-            logger.debug(f"Records already satisfy this mask")
-        elif not np.any(mask):
-            logger.debug(f"No records satisfy this mask")
         return self.copy(
             wrapper=wrapper,
             records_arr=self.records_arr[mask],

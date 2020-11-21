@@ -165,7 +165,7 @@ class TestMappedArray:
             pd.Series(np.array([11., 13.333333333333334, 11., 0.]), index=wrapper.columns)
         )
         pd.testing.assert_series_equal(
-            mapped_array.reduce(mean_reduce_nb, default_val=0., cast=np.int_),
+            mapped_array.reduce(mean_reduce_nb, default_val=0., dtype=np.int_),
             pd.Series(np.array([11, 13, 11, 0]), index=wrapper.columns)
         )
         pd.testing.assert_series_equal(

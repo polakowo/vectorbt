@@ -43,15 +43,26 @@ class Base_Accessor(ArrayWrapper):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._obj = obj
+        self._wrapper = ArrayWrapper.from_obj(obj)
 
         # Initialize array wrapper
-        wrapper = ArrayWrapper.from_obj(obj)
-        ArrayWrapper.__init__(self, index=wrapper.index, columns=wrapper.columns, ndim=wrapper.ndim, **kwargs)
+        ArrayWrapper.__init__(
+            self,
+            index=self._wrapper.index,
+            columns=self._wrapper.columns,
+            ndim=self._wrapper.ndim,
+            **kwargs
+        )
 
     def __call__(self, *args, **kwargs):
         """Allows passing arguments to the initializer."""
 
         return self.__class__(self._obj, *args, **kwargs)
+
+    @property
+    def wrapper(self):
+        """Array wrapper (read-only)."""
+        return self._wrapper
 
     # ############# Creation ############# #
 

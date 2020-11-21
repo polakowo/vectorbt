@@ -369,7 +369,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
         return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
 
-    def wrap_reduced(self, a, index=None, columns=None, time_units=False, collapse=None, **kwargs):
+    def wrap_reduced(self, a, index=None, columns=None, time_units=False, collapse=None, dtype=None, **kwargs):
         """Wrap result of reduction.
 
         `index` can be set when reducing to an array of values (vs. one value) per column.
@@ -384,6 +384,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             collapse = group_by is not None and group_by is not False and self.grouped_ndim == 1
 
         a = np.asarray(a)
+        if dtype is not None:
+            try:
+                a = a.astype(dtype)
+            except Exception as e:
+                warnings.warn(repr(e), stacklevel=2)
         if time_units:
             a = self.to_time_units(a)
         if a.ndim == 0:
@@ -402,17 +407,17 @@ class ArrayWrapper(Configured, PandasIndexer):
                 name = columns[0]
                 if name == 0:  # was a Series before
                     name = None
-                return pd.Series(a, index=index, name=name)
+                return pd.Series(a, index=index, name=name, dtype=dtype)
             # Scalar per column in a DataFrame
             if index is None:
                 index = columns
-            return pd.Series(a, index=index)
+            return pd.Series(a, index=index, dtype=dtype)
         if self.ndim == 1:
             # Array per Series
             name = columns[0]
             if name == 0:  # was a Series before
                 name = None
-            return pd.Series(a[:, 0], index=index, name=name)
+            return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
         # Array per column in a DataFrame
-        return pd.DataFrame(a, index=index, columns=columns)
+        return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
 

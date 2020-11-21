@@ -1889,6 +1889,7 @@ class Portfolio(Configured, PandasIndexer):
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.wrapper.freq,
+            'Init. Cash': self.init_cash(),
             'Total Profit': self.total_profit(group_by=group_by),
             'Total Return [%]': self.total_return(group_by=group_by) * 100,
             'Benchmark Return [%]': self.total_market_return(group_by=group_by) * 100,
@@ -2073,7 +2074,7 @@ class Portfolio(Configured, PandasIndexer):
         from vectorbt.defaults import color_schema
 
         if subplots is None:
-            subplots = ['orders', 'trade_pnl', 'value']
+            subplots = ['orders', 'trade_pnl', 'cum_returns']
         if not isinstance(subplots, list):
             subplots = [subplots]
         if hline_shape_kwargs is None:

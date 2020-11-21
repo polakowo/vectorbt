@@ -896,10 +896,10 @@ def reduce_to_array_nb(a, reduce_func_nb, *args):
 
 @njit
 def reduce_grouped_nb(a, group_lens, reduce_func_nb, *args):
-    """Reduce each group of columns a single value using `reduce_func_nb`.
+    """Reduce each group of columns into a single value using `reduce_func_nb`.
 
-    `reduce_func_nb` should accept index of the row, index of the group,
-    the array, and `*args`. Should return a single value."""
+    `reduce_func_nb` should accept index of the group, the array, and `*args`.
+    Should return a single value."""
     out = np.empty(len(group_lens), dtype=np.float_)
     from_col = 0
     for group in range(len(group_lens)):
@@ -909,9 +909,73 @@ def reduce_grouped_nb(a, group_lens, reduce_func_nb, *args):
     return out
 
 
+@njit(cache=True)
+def flatten_forder_nb(a):
+    """Flatten `a` in F order."""
+    out = np.empty(a.shape[0] * a.shape[1], dtype=a.dtype)
+    for col in range(a.shape[1]):
+        out[col * a.shape[0]:(col + 1) * a.shape[0]] = a[:, col]
+    return out
+
+
 @njit
-def reduce_grouped_row_wise_nb(a, group_lens, reduce_func_nb, *args):
-    """Reduce each row in a group of columns into a single value using `reduce_func_nb`.
+def flat_reduce_grouped_nb(a, group_lens, in_c_order, reduce_func_nb, *args):
+    """Same as `reduce_grouped_nb` but passes flattened array."""
+    out = np.empty(len(group_lens), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        if in_c_order:
+            out[group] = reduce_func_nb(group, a[:, from_col:to_col].flatten(), *args)
+        else:
+            out[group] = reduce_func_nb(group, flatten_forder_nb(a[:, from_col:to_col]), *args)
+        from_col = to_col
+    return out
+
+
+@njit
+def reduce_grouped_to_array_nb(a, group_lens, reduce_func_nb, *args):
+    """Reduce each group of columns into an array of values using `reduce_func_nb`.
+
+    `reduce_func_nb` same as for `reduce_grouped_nb` but should return an array.
+
+    !!! note
+        Output of `reduce_func_nb` should be strictly homogeneous."""
+    out_inited = False
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        group_out = reduce_func_nb(group, a[:, from_col:to_col], *args)
+        if not out_inited:
+            out = np.full((group_out.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+            out_inited = True
+        out[:, group] = group_out
+        from_col = to_col
+    return out
+
+
+@njit
+def flat_reduce_grouped_to_array_nb(a, group_lens, in_c_order, reduce_func_nb, *args):
+    """Same as `reduce_grouped_to_array_nb` but passes flattened 1D array."""
+    out_inited = False
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        if in_c_order:
+            group_out = reduce_func_nb(group, a[:, from_col:to_col].flatten(), *args)
+        else:
+            group_out = reduce_func_nb(group, flatten_forder_nb(a[:, from_col:to_col]), *args)
+        if not out_inited:
+            out = np.full((group_out.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+            out_inited = True
+        out[:, group] = group_out
+        from_col = to_col
+    return out
+
+
+@njit
+def squeeze_grouped_nb(a, group_lens, reduce_func_nb, *args):
+    """Squeeze each group of columns into a single column using `reduce_func_nb`.
 
     `reduce_func_nb` should accept index of the row, index of the group,
     the array, and `*args`. Should return a single value."""
@@ -921,6 +985,25 @@ def reduce_grouped_row_wise_nb(a, group_lens, reduce_func_nb, *args):
         to_col = from_col + group_lens[group]
         for i in range(a.shape[0]):
             out[i, group] = reduce_func_nb(i, group, a[i, from_col:to_col], *args)
+        from_col = to_col
+    return out
+
+
+# ############# Reshaping ############# #
+
+@njit(cache=True)
+def flatten_grouped_nb(a, group_lens, in_c_order):
+    """Flatten each group of columns."""
+    out = np.full((a.shape[0] * np.max(group_lens), len(group_lens)), np.nan, dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        group_len = to_col - from_col
+        for k in range(group_len):
+            if in_c_order:
+                out[k::np.max(group_lens), group] = a[:, from_col + k]
+            else:
+                out[k * a.shape[0]:(k + 1) * a.shape[0], group] = a[:, from_col + k]
         from_col = to_col
     return out
 
@@ -979,25 +1062,6 @@ def std_reduce_nb(col, a, ddof, *args):
 
 
 @njit(cache=True)
-def describe_reduce_nb(col, a, perc, ddof, *args):
-    """Return descriptive statistics (ignores NaNs).
-
-    Numba equivalent to `pd.Series(a).describe(perc)`."""
-    a = a[~np.isnan(a)]
-    out = np.empty(5 + len(perc), dtype=np.float_)
-    out[0] = len(a)
-    if len(a) > 0:
-        out[1] = np.mean(a)
-        out[2] = nanstd_1d_nb(a, ddof=ddof)
-        out[3] = np.min(a)
-        out[4:-1] = np.percentile(a, perc * 100)
-        out[4 + len(perc)] = np.max(a)
-    else:
-        out[1:] = np.nan
-    return out
-
-
-@njit(cache=True)
 def argmin_reduce_nb(col, a, *args):
     """Return position of min."""
     a = np.copy(a)
@@ -1017,6 +1081,25 @@ def argmax_reduce_nb(col, a, *args):
         raise ValueError("All-NaN slice encountered")
     a[mask] = -np.inf
     return np.argmax(a)
+
+
+@njit(cache=True)
+def describe_reduce_nb(col, a, perc, ddof, *args):
+    """Return descriptive statistics (ignores NaNs).
+
+    Numba equivalent to `pd.Series(a).describe(perc)`."""
+    a = a[~np.isnan(a)]
+    out = np.empty(5 + len(perc), dtype=np.float_)
+    out[0] = len(a)
+    if len(a) > 0:
+        out[1] = np.mean(a)
+        out[2] = nanstd_1d_nb(a, ddof=ddof)
+        out[3] = np.min(a)
+        out[4:-1] = np.percentile(a, perc * 100)
+        out[4 + len(perc)] = np.max(a)
+    else:
+        out[1:] = np.nan
+    return out
 
 
 # ############# Drawdowns ############# #

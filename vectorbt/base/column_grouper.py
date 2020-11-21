@@ -174,7 +174,7 @@ class ColumnGrouper(Configured):
         return False
 
     def is_grouping_changed(self, group_by=None):
-        """Check whether column grouping has been changed."""
+        """Check whether column grouping has been changed in any way."""
         return self.is_grouping_enabled(group_by=group_by) \
             or self.is_grouping_disabled(group_by=group_by) \
             or self.is_grouping_modified(group_by=group_by)

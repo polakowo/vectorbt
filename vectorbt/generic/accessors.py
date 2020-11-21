@@ -4,6 +4,8 @@
     Input arrays can be of any type, but most output arrays are `np.float64`.
 
     Accessors do not utilize caching.
+
+    Grouping is only supported by the methods that accept the `group_by` argument.
     
 ```python-repl
 >>> import vectorbt as vbt
@@ -397,8 +399,19 @@ class Generic_Accessor(Base_Accessor):
         out = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, apply_args, reduce_func_nb, reduce_args)
         return self.wrap_reduced(out, **kwargs)
 
-    def reduce(self, reduce_func_nb, *args, **kwargs):
-        """See `vectorbt.generic.nb.reduce_nb`.
+    def reduce(self, reduce_func_nb, *args, to_array=False, to_idx=False, flatten=False,
+               order='C', idx_labeled=True, group_by=None, **kwargs):
+        """Reduce by column.
+
+        See `vectorbt.records.nb.flat_reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is True.
+        See `vectorbt.records.nb.flat_reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is True.
+        See `vectorbt.records.nb.reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is False.
+        See `vectorbt.records.nb.reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is False.
+        See `vectorbt.records.nb.reduce_to_array_nb` if not grouped and `to_array` is True.
+        See `vectorbt.records.nb.reduce_nb` if not grouped and `to_array` is False.
+
+        Set `to_idx` to True if values returned by `reduce_func_nb` are indices/positions.
+        Set `idx_labeled` to False to return raw positions instead of labels.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
 
@@ -410,55 +423,102 @@ class Generic_Accessor(Base_Accessor):
             b    3.0
             c    1.8
             dtype: float64
-            ```"""
-        checks.assert_numba_func(reduce_func_nb)
 
-        out = nb.reduce_nb(self.to_2d_array(), reduce_func_nb, *args)
-        return self.wrap_reduced(out, **kwargs)
+            >>> argmax_nb = njit(lambda col, a: np.argmax(a))
+            >>> df.vbt.reduce(argmax_nb, to_idx=True)
+            a   2020-01-05
+            b   2020-01-01
+            c   2020-01-03
+            dtype: datetime64[ns]
 
-    def reduce_to_array(self, reduce_func_nb, *args, **kwargs):
-        """See `vectorbt.generic.nb.reduce_to_array_nb`.
+            >>> argmax_nb = njit(lambda col, a: np.argmax(a))
+            >>> df.vbt.reduce(argmax_nb, to_idx=True, idx_labeled=False)
+            a    4
+            b    0
+            c    2
+            dtype: int64
 
-        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
-
-        Example:
-            ```python-repl
             >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-            >>> df.vbt.reduce_to_array(min_max_nb, index=['min', 'max'])
+            >>> df.vbt.reduce(min_max_nb, index=['min', 'max'], to_array=True)
                    a    b    c
             min  1.0  1.0  1.0
             max  5.0  5.0  3.0
+
+            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+            >>> df.vbt.reduce(mean_nb, group_by=group_by)
+            group
+            first     3.0
+            second    1.8
+            dtype: float64
+
+            >>> df.vbt.reduce(min_max_nb, index=['min', 'max'],
+            ...     to_array=True, group_by=group_by)
+            group  first  second
+            min      1.0     1.0
+            max      5.0     3.0
             ```"""
         checks.assert_numba_func(reduce_func_nb)
 
-        out = nb.reduce_to_array_nb(self.to_2d_array(), reduce_func_nb, *args)
-        return self.wrap_reduced(out, **kwargs)
+        if self.grouper.is_grouped(group_by=group_by):
+            group_lens = self.grouper.get_group_lens(group_by=group_by)
+            if flatten:
+                checks.assert_in(order.upper(), ['C', 'F'])
+                in_c_order = order.upper() == 'C'
+                if to_array:
+                    out = nb.flat_reduce_grouped_to_array_nb(
+                        self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
+                else:
+                    out = nb.flat_reduce_grouped_nb(
+                        self.to_2d_array(), group_lens, in_c_order, reduce_func_nb, *args)
+                if to_idx:
+                    if in_c_order:
+                        out //= group_lens  # flattened in C order
+                    else:
+                        out %= self.shape[0]  # flattened in F order
+            else:
+                if to_array:
+                    out = nb.reduce_grouped_to_array_nb(
+                        self.to_2d_array(), group_lens, reduce_func_nb, *args)
+                else:
+                    out = nb.reduce_grouped_nb(
+                        self.to_2d_array(), group_lens, reduce_func_nb, *args)
+        else:
+            if to_array:
+                out = nb.reduce_to_array_nb(
+                    self.to_2d_array(), reduce_func_nb, *args)
+            else:
+                out = nb.reduce_nb(
+                    self.to_2d_array(), reduce_func_nb, *args)
 
-    def reduce_grouped(self, reduce_func_nb, *args, group_by=None, row_wise=False, **kwargs):
-        """Reduce group of columns.
+        # Perform post-processing
+        if to_idx:
+            nan_mask = np.isnan(out)
+            if idx_labeled:
+                out = out.astype(np.object)
+                out[~nan_mask] = self.index[out[~nan_mask].astype(np.int_)]
+            else:
+                out[nan_mask] = -1
+                out = out.astype(np.int_)
+        return self.wrap_reduced(out, group_by=group_by, **kwargs)
 
-        If row_wise is True, see `vectorbt.generic.nb.reduce_grouped_row_wise_nb`.
-        Otherwise, see `vectorbt.generic.nb.reduce_grouped_nb`.
+    def squeeze_grouped(self, reduce_func_nb, *args, group_by=None, **kwargs):
+        """Squeeze each group of columns into a single column.
 
-        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
+        See `vectorbt.generic.nb.squeeze_grouped_nb`.
+
+        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
 
         Example:
             ```python-repl
-            >>> group_by = np.array([0, 0, 1])
-            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> df.vbt.reduce_grouped(mean_nb, group_by=group_by)
-            0    3.0
-            1    1.8
-            dtype: float64
-
-            >>> i_mean_nb = njit(lambda i, col, a: np.nanmean(a))
-            >>> df.vbt.reduce_grouped(i_mean_nb, group_by=group_by, row_wise=True)
-                 0    1
-            0  3.0  1.0
-            1  3.0  2.0
-            2  3.0  3.0
-            3  3.0  2.0
-            4  3.0  1.0
+            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+            >>> mean_nb = njit(lambda i, group, a: np.nanmean(a))
+            >>> df.vbt.squeeze_grouped(mean_nb, group_by=group_by)
+            group       first  second
+            2020-01-01    3.0     1.0
+            2020-01-02    3.0     2.0
+            2020-01-03    3.0     3.0
+            2020-01-04    3.0     2.0
+            2020-01-05    3.0     1.0
             ```
             """
         if not self.grouper.is_grouped(group_by=group_by):
@@ -466,14 +526,68 @@ class Generic_Accessor(Base_Accessor):
         checks.assert_numba_func(reduce_func_nb)
 
         group_lens = self.grouper.get_group_lens(group_by=group_by)
-        if row_wise:
-            out = nb.reduce_grouped_row_wise_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
-        else:
-            out = nb.reduce_grouped_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
-        return self.wrap_reduced(out, group_by=group_by, **kwargs)
+        out = nb.squeeze_grouped_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
+        return self.wrap(out, group_by=group_by, **kwargs)
 
-    def min(self, **kwargs):
+    def flatten_grouped(self, group_by=None, order='C', **kwargs):
+        """Flatten each group of columns.
+
+        See `vectorbt.generic.nb.flatten_grouped_nb`.
+
+        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
+
+        !!! warning
+            Make sure that the distribution of group lengths is close to uniform, otherwise
+            groups with less columns will be filled with NaN and needlessly occupy memory.
+
+        Example:
+            ```python-repl
+            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+            >>> df.vbt.flatten_grouped(group_by=group_by, order='C')
+            group       first  second
+            2020-01-01    1.0     1.0
+            2020-01-01    5.0     NaN
+            2020-01-02    2.0     2.0
+            2020-01-02    4.0     NaN
+            2020-01-03    3.0     3.0
+            2020-01-03    3.0     NaN
+            2020-01-04    4.0     2.0
+            2020-01-04    2.0     NaN
+            2020-01-05    5.0     1.0
+            2020-01-05    1.0     NaN
+
+            >>> df.vbt.flatten_grouped(group_by=group_by, order='F')
+            group       first  second
+            2020-01-01    1.0     1.0
+            2020-01-02    2.0     2.0
+            2020-01-03    3.0     3.0
+            2020-01-04    4.0     2.0
+            2020-01-05    5.0     1.0
+            2020-01-01    5.0     NaN
+            2020-01-02    4.0     NaN
+            2020-01-03    3.0     NaN
+            2020-01-04    2.0     NaN
+            2020-01-05    1.0     NaN
+            ```
+            """
+        if not self.grouper.is_grouped(group_by=group_by):
+            raise ValueError("Grouping required")
+        checks.assert_in(order.upper(), ['C', 'F'])
+
+        group_lens = self.grouper.get_group_lens(group_by=group_by)
+        if order.upper() == 'C':
+            out = nb.flatten_grouped_nb(self.to_2d_array(), group_lens, True)
+            new_index = index_fns.repeat_index(self.index, np.max(group_lens))
+        else:
+            out = nb.flatten_grouped_nb(self.to_2d_array(), group_lens, False)
+            new_index = index_fns.tile_index(self.index, np.max(group_lens))
+        return self.wrap(out, group_by=group_by, index=new_index, **kwargs)
+
+    def min(self, group_by=None, **kwargs):
         """Return min of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.min_reduce_nb, group_by=group_by, flatten=True)
+
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
@@ -482,8 +596,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmin = nanmin
         return self.wrap_reduced(_nanmin(arr, axis=0), **kwargs)
 
-    def max(self, **kwargs):
+    def max(self, group_by=None, **kwargs):
         """Return max of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.max_reduce_nb, group_by=group_by, flatten=True)
+
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
@@ -492,8 +609,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmax = nanmax
         return self.wrap_reduced(_nanmax(arr, axis=0), **kwargs)
 
-    def mean(self, **kwargs):
+    def mean(self, group_by=None, **kwargs):
         """Return mean of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.mean_reduce_nb, group_by=group_by, flatten=True)
+
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
@@ -502,8 +622,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmean = nanmean
         return self.wrap_reduced(_nanmean(arr, axis=0), **kwargs)
 
-    def median(self, **kwargs):
+    def median(self, group_by=None, **kwargs):
         """Return median of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.median_reduce_nb, group_by=group_by, flatten=True)
+
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
@@ -512,8 +635,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmedian = nanmedian
         return self.wrap_reduced(_nanmedian(arr, axis=0), **kwargs)
 
-    def std(self, ddof=1, **kwargs):
+    def std(self, ddof=1, group_by=None, **kwargs):
         """Return standard deviation of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.std_reduce_nb, ddof, group_by=group_by, flatten=True)
+
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
@@ -522,8 +648,11 @@ class Generic_Accessor(Base_Accessor):
             _nanstd = nanstd
         return self.wrap_reduced(_nanstd(arr, ddof=ddof, axis=0), **kwargs)
 
-    def sum(self, **kwargs):
+    def sum(self, group_by=None, **kwargs):
         """Return sum of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.sum_reduce_nb, group_by=group_by, flatten=True)
+
         arr = self.to_2d_array()
         if arr.dtype != int and arr.dtype != float:
             # bottleneck can't consume other than that
@@ -532,27 +661,48 @@ class Generic_Accessor(Base_Accessor):
             _nansum = nansum
         return self.wrap_reduced(_nansum(arr, axis=0), **kwargs)
 
-    def count(self, **kwargs):
+    def count(self, group_by=None, **kwargs):
         """Return count of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(nb.count_reduce_nb, group_by=group_by, flatten=True, dtype=np.int_)
+
         return self.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **kwargs)
 
-    def idxmin(self, **kwargs):
+    def idxmin(self, group_by=None, order='C', **kwargs):
         """Return labeled index of min of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(
+                nb.argmin_reduce_nb,
+                group_by=group_by,
+                flatten=True,
+                to_idx=True,
+                order=order
+            )
+
         obj = self.to_2d_array()
         out = np.full(obj.shape[1], np.nan, dtype=np.object)
         nan_mask = np.all(np.isnan(obj), axis=0)
         out[~nan_mask] = self.index[nanargmin(obj[:, ~nan_mask], axis=0)]
         return self.wrap_reduced(out, **kwargs)
 
-    def idxmax(self, **kwargs):
+    def idxmax(self, group_by=None, order='C', **kwargs):
         """Return labeled index of max of non-NaN elements."""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(
+                nb.argmax_reduce_nb,
+                group_by=group_by,
+                flatten=True,
+                to_idx=True,
+                order=order
+            )
+
         obj = self.to_2d_array()
         out = np.full(obj.shape[1], np.nan, dtype=np.object)
         nan_mask = np.all(np.isnan(obj), axis=0)
         out[~nan_mask] = self.index[nanargmax(obj[:, ~nan_mask], axis=0)]
         return self.wrap_reduced(out, **kwargs)
 
-    def describe(self, percentiles=None, ddof=1, **kwargs):
+    def describe(self, percentiles=None, ddof=1, group_by=None, **kwargs):
         """See `vectorbt.generic.nb.describe_reduce_nb`.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
@@ -582,22 +732,55 @@ class Generic_Accessor(Base_Accessor):
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
-        return self.reduce_to_array(nb.describe_reduce_nb, percentiles, ddof, index=index, **kwargs)
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.reduce(
+                nb.describe_reduce_nb, percentiles, ddof,
+                group_by=group_by, flatten=True, to_array=True,
+                index=index, **kwargs)
+        return self.reduce(
+            nb.describe_reduce_nb, percentiles, ddof,
+            to_array=True,
+            index=index, **kwargs)
 
     def drawdown(self):
         """Drawdown series."""
         return self.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
 
-    def drawdowns(self, **kwargs):
+    def drawdowns(self, group_by=None, **kwargs):
         """Generate drawdown records.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
-        return Drawdowns.from_ts(self._obj, freq=self.freq, **kwargs)
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return Drawdowns.from_ts(self._obj, freq=self.freq, group_by=group_by, **kwargs)
+
+    def to_mapped_array(self, dropna=True, group_by=None, **kwargs):
+        """Convert this object into an instance of `vectorbt.records.mapped_array.MappedArray`."""
+        from vectorbt.records.mapped_array import MappedArray
+
+        mapped_arr = reshape_fns.to_2d(self._obj, raw=True).flatten(order='F')
+        col_arr = np.repeat(np.arange(self.shape_2d[1]), self.shape_2d[0])
+        idx_arr = np.tile(np.arange(self.shape_2d[0]), self.shape_2d[1])
+        if dropna:
+            not_nan_mask = ~np.isnan(mapped_arr)
+            mapped_arr = mapped_arr[not_nan_mask]
+            col_arr = col_arr[not_nan_mask]
+            idx_arr = idx_arr[not_nan_mask]
+        if group_by is None:
+            group_by = self.grouper.group_by
+        return MappedArray(self.wrapper, mapped_arr, col_arr, idx_arr=idx_arr, **kwargs).regroup(group_by)
 
     # ############# Plotting ############# #
 
     def bar(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_bar`."""
+        """See `vectorbt.generic.plotting.create_bar`.
+
+        Example:
+            ```python-repl
+            >>> ts.vbt.bar()
+            ```
+
+            ![](/vectorbt/docs/img/df_bar.png)"""
         if x_labels is None:
             x_labels = self.index
         if trace_names is None:
@@ -611,7 +794,14 @@ class Generic_Accessor(Base_Accessor):
         )
 
     def scatter(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_scatter`."""
+        """See `vectorbt.generic.plotting.create_scatter`.
+
+        Example:
+            ```python-repl
+            >>> ts.vbt.scatter()
+            ```
+
+            ![](/vectorbt/docs/img/df_scatter.png)"""
         if x_labels is None:
             x_labels = self.index
         if trace_names is None:
@@ -624,8 +814,18 @@ class Generic_Accessor(Base_Accessor):
             **kwargs
         )
 
-    def hist(self, trace_names=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_hist`."""
+    def hist(self, trace_names=None, group_by=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_hist`.
+
+        Example:
+            ```python-repl
+            >>> ts.vbt.hist()
+            ```
+
+            ![](/vectorbt/docs/img/df_hist.png)"""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.flatten_grouped(group_by=group_by).vbt.hist(trace_names=trace_names, **kwargs)
+
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
                 trace_names = self.columns
@@ -635,8 +835,18 @@ class Generic_Accessor(Base_Accessor):
             **kwargs
         )
 
-    def box(self, trace_names=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_box`."""
+    def box(self, trace_names=None, group_by=None, **kwargs):  # pragma: no cover
+        """See `vectorbt.generic.plotting.create_box`.
+
+        Example:
+            ```python-repl
+            >>> ts.vbt.box()
+            ```
+
+            ![](/vectorbt/docs/img/df_box.png)"""
+        if self.grouper.is_grouped(group_by=group_by):
+            return self.flatten_grouped(group_by=group_by).vbt.box(trace_names=trace_names, **kwargs)
+
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
                 trace_names = self.columns
@@ -669,6 +879,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
+
         Example:
             ```python-repl
             >>> df['a'].vbt.plot()
@@ -711,7 +922,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
             other_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `other`.
 
-                Set to `'hidden'` to hide.
+                Set to 'hidden' to hide.
             pos_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for positive line.
             neg_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for negative line.
             hidden_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for hidden lines.
@@ -719,6 +930,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
+
         Example:
             ```python-repl
             >>> df['a'].vbt.plot_against(df['b'])
@@ -735,7 +947,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             neg_trace_kwargs = {}
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
-        other = reshape_fns.broadcast_to(other, self._obj)
+        obj, other = reshape_fns.broadcast(self._obj, other, columns_from=None)
         if fig is None:
             fig = CustomFigureWidget()
         fig.update_layout(**layout_kwargs)
@@ -821,14 +1033,59 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         return fig
 
     def heatmap(self, x_level=None, y_level=None, symmetric=False, x_labels=None, y_labels=None,
-                slider_level=None, slider_labels=None, **kwargs):  # pragma: no cover
+                slider_level=None, slider_labels=None, fig=None, **kwargs):  # pragma: no cover
         """Create a heatmap figure based on object's multi-index and values.
 
         If multi-index contains more than two levels or you want them in specific order,
         pass `x_level` and `y_level`, each (`int` if index or `str` if name) corresponding
         to an axis of the heatmap. Optionally, pass `slider_level` to use a level as a slider.
 
-        See `vectorbt.generic.plotting.create_heatmap` for other keyword arguments."""
+        See `vectorbt.generic.plotting.create_heatmap` for other keyword arguments.
+
+        Example:
+            ```python-repl
+            >>> multi_index = pd.MultiIndex.from_tuples([
+            ...     (1, 1),
+            ...     (2, 2),
+            ...     (3, 3)
+            ... ])
+            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+            >>> sr
+            1  1    0
+            2  2    1
+            3  3    2
+            dtype: int64
+
+            >>> sr.vbt.heatmap()
+            ```
+
+            ![](/vectorbt/docs/img/heatmap.png)
+
+            Using one level as a slider:
+
+            ```python-repl
+            >>> multi_index = pd.MultiIndex.from_tuples([
+            ...     (1, 1, 1),
+            ...     (1, 2, 2),
+            ...     (1, 3, 3),
+            ...     (2, 3, 3),
+            ...     (2, 2, 2),
+            ...     (2, 1, 1)
+            ... ])
+            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+            >>> sr
+            1  1  1    0
+               2  2    1
+               3  3    2
+            2  3  3    3
+               2  2    4
+               1  1    5
+            dtype: int64
+
+            >>> sr.vbt.heatmap(slider_level=0).show()
+            ```
+
+            ![](/vectorbt/docs/img/heatmap_slider.gif)"""
         (x_level, y_level), (slider_level,) = index_fns.pick_levels(
             self.index,
             required_levels=(x_level, y_level),
@@ -852,11 +1109,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         if slider_level is None:
             # No grouping
             df = self.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
-            fig = df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, **kwargs)
+            fig = df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, **kwargs)
         else:
             # Requires grouping
             # See https://plotly.com/python/sliders/
-            fig = None
             _slider_labels = []
             for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
                 if slider_labels is not None:
@@ -872,9 +1128,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                         name=str(name) if name is not None else None,
                         visible=False
                     ),
-                    width=600,
-                    height=520,
                 ), kwargs)
+                default_size = fig is None and 'height' not in _kwargs
                 fig = plotting.create_heatmap(
                     data=df.vbt.to_2d_array(),
                     x_labels=x_labels,
@@ -882,6 +1137,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     fig=fig,
                     **_kwargs
                 )
+                if default_size:
+                    fig.layout['height'] += 100  # slider takes up space
             fig.data[0].visible = True
             steps = []
             for i in range(len(fig.data)):
@@ -906,14 +1163,33 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         return fig
 
     def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None,
-               z_labels=None, slider_level=None, slider_labels=None, **kwargs):  # pragma: no cover
+               z_labels=None, slider_level=None, slider_labels=None, fig=None, **kwargs):  # pragma: no cover
         """Create a 3D volume figure based on object's multi-index and values.
 
         If multi-index contains more than three levels or you want them in specific order, pass
         `x_level`, `y_level`, and `z_level`, each (`int` if index or `str` if name) corresponding
         to an axis of the volume. Optionally, pass `slider_level` to use a level as a slider.
 
-        See `vectorbt.generic.plotting.create_volume` for other keyword arguments."""
+        See `vectorbt.generic.plotting.create_volume` for other keyword arguments.
+
+        Example:
+            ```python-repl
+            >>> multi_index = pd.MultiIndex.from_tuples([
+            ...     (1, 1, 1),
+            ...     (2, 2, 2),
+            ...     (3, 3, 3)
+            ... ])
+            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+            >>> sr
+            1  1  1    0
+            2  2  2    1
+            3  3  3    2
+            dtype: int64
+
+            >>> sr.vbt.volume()
+            ```
+
+            ![](/vectorbt/docs/img/volume.png)"""
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.index,
             required_levels=(x_level, y_level, z_level),
@@ -959,12 +1235,12 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 x_labels=x_labels,
                 y_labels=y_labels,
                 z_labels=z_labels,
+                fig=fig,
                 **kwargs
             )
         else:
             # Requires grouping
             # See https://plotly.com/python/sliders/
-            fig = None
             _slider_labels = []
             for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
                 if slider_labels is not None:
@@ -977,10 +1253,9 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     trace_kwargs=dict(
                         name=str(name) if name is not None else None,
                         visible=False
-                    ),
-                    width=700,
-                    height=520,
+                    )
                 ), kwargs)
+                default_size = fig is None and 'height' not in _kwargs
                 fig = plotting.create_volume(
                     data=v,
                     x_labels=x_labels,
@@ -989,6 +1264,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     fig=fig,
                     **_kwargs
                 )
+                if default_size:
+                    fig.layout['height'] += 100  # slider takes up space
             fig.data[0].visible = True
             steps = []
             for i in range(len(fig.data)):
@@ -1035,6 +1312,7 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Scatter`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **kwargs: Keyword arguments passed to `Generic_SRAccessor.plot`.
+
         Example:
             ```python-repl
             >>> df[['a', 'b']].vbt.plot()
@@ -1053,7 +1331,19 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
         return fig
 
     def heatmap(self, x_labels=None, y_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_heatmap`."""
+        """See `vectorbt.generic.plotting.create_heatmap`.
+
+        Example:
+            ```python-repl
+            >>> df = pd.DataFrame([
+            ...     [0, np.nan, np.nan],
+            ...     [np.nan, 1, np.nan],
+            ...     [np.nan, np.nan, 2]
+            ... ])
+            >>> df.vbt.heatmap()
+            ```
+
+            ![](/vectorbt/docs/img/heatmap.png)"""
         if x_labels is None:
             x_labels = self.columns
         if y_labels is None:

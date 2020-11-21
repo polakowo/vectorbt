@@ -23,30 +23,31 @@ An example of how to assess performance of a random strategy on Bitcoin:
 
 >>> portfolio.stats()
 Start                            2014-09-17 00:00:00
-End                              2020-11-17 00:00:00
-Duration                          2253 days 00:00:00
-Total Profit                                 2035.35
-Total Return [%]                             2035.35
-Benchmark Return [%]                         3551.03
-Position Coverage [%]                        48.7794
-Max. Drawdown [%]                            50.4779
-Avg. Drawdown [%]                            9.06616
-Max. Drawdown Duration             509 days 00:00:00
-Avg. Drawdown Duration    47 days 14:30:41.860465116
+End                              2020-11-20 00:00:00
+Duration                          2257 days 00:00:00
+Init. Cash                                       100
+Total Profit                                 1445.18
+Total Return [%]                             1445.18
+Benchmark Return [%]                          3949.4
+Position Coverage [%]                        44.1737
+Max. Drawdown [%]                            64.3272
+Avg. Drawdown [%]                            7.64067
+Max. Drawdown Duration            1070 days 00:00:00
+Avg. Drawdown Duration    51 days 18:27:41.538461538
 Num. Trades                                       10
 Win Rate [%]                                      70
-Best Trade [%]                               774.445
-Worst Trade [%]                             -36.6491
-Avg. Trade [%]                               95.8981
-Max. Trade Duration                448 days 00:00:00
-Avg. Trade Duration                109 days 21:36:00
-Expectancy                                   203.535
-SQN                                         0.699516
-Gross Exposure                              0.487794
-Sharpe Ratio                                 1.30793
-Sortino Ratio                                 2.0332
-Calmar Ratio                                 1.27191
-Name: Close, dtype: object
+Best Trade [%]                               427.383
+Worst Trade [%]                             -15.5047
+Avg. Trade [%]                               56.3168
+Max. Trade Duration                298 days 00:00:00
+Avg. Trade Duration                 99 days 16:48:00
+Expectancy                                   144.518
+SQN                                          1.59598
+Gross Exposure                              0.441737
+Sharpe Ratio                                 1.13649
+Sortino Ratio                                1.80862
+Calmar Ratio                                0.865842
+dtype: object
 ```
 
 ## Orders

@@ -26,73 +26,85 @@ With vectorbt you can
 
 ## Example
 
-Here a snippet for testing 4851 window combinations of a dual SMA crossover strategy on the whole Bitcoin history 
-in under 5 seconds (Note: compiling for the first time may take a while):
+Here a snippet for testing 10,000 window combinations of a dual SMA crossover strategy on BTC, USD and XRP
+from 2017 onwards, in under 5 seconds (Note: compiling for the first time with Numba may take a while):
 
 ```python
-import vectorbt as vbt
 import numpy as np
+import pandas as pd
 import yfinance as yf
+from datetime import datetime
+import vectorbt as vbt
 
-# Fetch daily price of Bitcoin
-close = yf.Ticker("BTC-USD").history(period="max")['Close']
+# Define your params
+assets = ["BTC-USD", "ETH-USD", "LTC-USD"]
+yf_kwargs = dict(start=datetime(2017, 1, 1))
+windows = np.arange(2, 101)
+portfolio_kwargs = dict(fees=0.001)
+
+# Fetch daily price
+price = {}
+for asset in assets:
+    price[asset] = yf.Ticker(asset).history(**yf_kwargs)['Close']
+price = pd.DataFrame(price)
+price.columns.name = 'asset'
 
 # Compute moving averages for all combinations of fast and slow windows
-windows = np.arange(2, 101)
-fast_ma, slow_ma = vbt.MA.run_combs(close, window=windows, r=2, short_names=['fast', 'slow'])
+fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=['fast', 'slow'])
 
 # Generate crossover signals for each combination
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
 # Run simulation
-portfolio = vbt.Portfolio.from_signals(close, entries, exits, fees=0.001, freq='1D')
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D', **portfolio_kwargs)
 
 # Get total return, reshape to symmetric matrix, and plot the whole thing
 fig = portfolio.total_return().vbt.heatmap(
-    x_level='fast_window', y_level='slow_window', symmetric=True,
+    x_level='fast_window', y_level='slow_window', slider_level='asset', symmetric=True,
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')))
 fig.show()
 ```
 
-![dmac_heatmap.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.png)
+![dmac_heatmap.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.gif)
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
 ```python
-portfolio[(14, 38)].stats()
+portfolio[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
-Start                            2014-09-17 00:00:00
-End                              2020-11-17 00:00:00
-Duration                          2254 days 00:00:00
-Total Profit                                 11203.3
-Total Return [%]                             11203.3
-Benchmark Return [%]                         3753.41
-Position Coverage [%]                        58.0302
-Max. Drawdown [%]                            52.7562
-Avg. Drawdown [%]                            8.35486
-Max. Drawdown Duration             513 days 00:00:00
-Avg. Drawdown Duration    36 days 00:24:24.406779661
-Num. Trades                                       30
-Win Rate [%]                                 56.6667
-Best Trade [%]                               247.337
-Worst Trade [%]                             -13.9102
-Avg. Trade [%]                               23.1471
-Max. Trade Duration                156 days 00:00:00
-Avg. Trade Duration                 42 days 04:48:00
-Expectancy                                   225.217
-SQN                                          1.45906
-Gross Exposure                              0.580302
-Sharpe Ratio                                 1.70494
-Sortino Ratio                                2.67607
-Calmar Ratio                                 2.18027
-Name: (14, 38), dtype: object
+Start                            2016-12-31 00:00:00
+End                              2020-11-20 00:00:00
+Duration                          1421 days 00:00:00
+Init. Cash                                       100
+Total Profit                                 42677.6
+Total Return [%]                             42677.6
+Benchmark Return [%]                         6289.46
+Position Coverage [%]                         55.665
+Max. Drawdown [%]                            70.7334
+Avg. Drawdown [%]                            9.70645
+Max. Drawdown Duration             760 days 00:00:00
+Avg. Drawdown Duration    30 days 14:43:38.181818182
+Num. Trades                                       33
+Win Rate [%]                                 57.5758
+Best Trade [%]                               477.295
+Worst Trade [%]                             -27.7724
+Avg. Trade [%]                               36.1783
+Max. Trade Duration                 79 days 00:00:00
+Avg. Trade Duration                 22 days 16:00:00
+Expectancy                                   929.696
+SQN                                           1.7616
+Gross Exposure                               0.55665
+Sharpe Ratio                                 2.27012
+Sortino Ratio                                4.10306
+Calmar Ratio                                 5.28868
+Name: (10, 20, ETH-USD), dtype: object
 ```
 
 ```python
-fig = portfolio[(14, 38)].plot(template='plotly_dark')
+fig = portfolio[(10, 20, 'ETH-USD')].plot()
 fig.update_traces(xaxis="x3")
 fig.update_xaxes(spikemode='across+marker')
 fig.show()

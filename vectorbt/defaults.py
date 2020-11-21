@@ -74,7 +74,8 @@ layout = Config(
         yanchor="bottom",
         y=1.02,
         xanchor="right",
-        x=1
+        x=1,
+        traceorder='normal'
     ),
 )
 """_"""
@@ -126,7 +127,7 @@ broadcasting = Config(
     align_columns=True,
     index_from='strict',
     columns_from='stack',
-    ignore_sr_name=True,
+    ignore_sr_names=True,
     drop_duplicates=True,
     keep='last',
     drop_redundant=True
