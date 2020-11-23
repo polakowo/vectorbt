@@ -53,8 +53,7 @@ Consider the following example:
 >>> import pandas as pd
 >>> from numba import njit
 >>> from collections import namedtuple
->>> from vectorbt.base.array_wrapper import ArrayWrapper
->>> from vectorbt.records import Records
+>>> import vectorbt as vbt
 
 >>> example_dt = np.dtype([
 ...     ('col', np.int64),
@@ -72,9 +71,9 @@ Consider the following example:
 ...     (2, 1, 17.),
 ...     (2, 2, 18.)
 ... ], dtype=example_dt)
->>> wrapper = ArrayWrapper(index=['x', 'y', 'z'],
+>>> wrapper = vbt.ArrayWrapper(index=['x', 'y', 'z'],
 ...     columns=['a', 'b', 'c'], ndim=2, freq='1 day')
->>> records = Records(wrapper, records_arr)
+>>> records = vbt.Records(wrapper, records_arr)
 
 >>> records.records
    col  idx  some_field
@@ -97,7 +96,7 @@ Consider the following example:
 >>> records.map_field('some_field')
 <vectorbt.records.mapped_array.MappedArray at 0x7ff49bd31a58>
 
->>> records.map_field('some_field').mapped_arr
+>>> records.map_field('some_field').values
 array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
 ```
 
@@ -111,7 +110,7 @@ array([10., 11., 12., 13., 14., 15., 16., 17., 18.])
 >>> records.map(power_map_nb, 2)
 <vectorbt.records.mapped_array.MappedArray at 0x7ff49c990cf8>
 
->>> records.map(power_map_nb, 2).mapped_arr
+>>> records.map(power_map_nb, 2).values
 array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 ```
 
@@ -121,7 +120,7 @@ array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 >>> records.map_array(records_arr['some_field'] ** 2)
 <vectorbt.records.mapped_array.MappedArray object at 0x7fe9bccf2978>
 
->>> records.map_array(records_arr['some_field'] ** 2).mapped_arr
+>>> records.map_array(records_arr['some_field'] ** 2).values
 array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 ```
 
@@ -138,7 +137,7 @@ There are multiple ways of define grouping:
 ```python-repl
 >>> group_by = np.array(['first', 'first', 'second'])
 >>> grouped_wrapper = wrapper.copy(group_by=group_by)
->>> grouped_records = Records(wrapper, records_arr)
+>>> grouped_records = vbt.Records(wrapper, records_arr)
 
 >>> grouped_records.map_field('some_field').mean()
 first     12.5
@@ -224,6 +223,7 @@ method/property. There is currently no way to disable caching for an entire clas
 
 import numpy as np
 import pandas as pd
+import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
@@ -240,7 +240,7 @@ def indexing_on_records_meta(obj, pd_indexing_func):
     new_wrapper, _, group_idxs, col_idxs = \
         indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
     new_records_arr = nb.select_record_cols_nb(
-        obj.records_arr,
+        obj.values,
         obj.col_index,
         reshape_fns.to_1d(col_idxs)
     )
@@ -269,26 +269,21 @@ class Records(Configured, PandasIndexer):
         idx_field (str): The name of the field corresponding to the index. Optional.
 
             Will be derived automatically if records contain field `idx`.
-        filter_ids (set): IDs of applied filters.
-
-            Prevents applying same filters again and calling contradictive attributes.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, records_arr, idx_field=None, filter_ids=None, **kwargs):
+    def __init__(self, wrapper, records_arr, idx_field=None, **kwargs):
         Configured.__init__(
             self,
             wrapper=wrapper,
             records_arr=records_arr,
             idx_field=idx_field,
-            filter_ids=filter_ids,
             **kwargs
         )
         checks.assert_type(wrapper, ArrayWrapper)
-        if not isinstance(records_arr, np.ndarray):
-            records_arr = np.asarray(records_arr)
+        records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
         checks.assert_in('col', records_arr.dtype.names)
         if idx_field is not None:
@@ -296,13 +291,10 @@ class Records(Configured, PandasIndexer):
         else:
             if 'idx' in records_arr.dtype.names:
                 idx_field = 'idx'
-        if filter_ids is None:
-            filter_ids = set()
 
         self._wrapper = wrapper
         self._records_arr = records_arr
         self._idx_field = idx_field
-        self._filter_ids = filter_ids
 
         PandasIndexer.__init__(self, records_indexing_func)
 
@@ -336,48 +328,40 @@ class Records(Configured, PandasIndexer):
         """Records array."""
         return self._records_arr
 
+    values = records_arr
+
+    def __len__(self):
+        return len(self.values)
+
     @property
     def idx_field(self):
         """Index field."""
         return self._idx_field
 
     @property
-    def filter_ids(self):
-        """IDs of applied filters."""
-        return self._filter_ids
-
-    @property
     def records(self):
         """Records."""
-        return pd.DataFrame.from_records(self.records_arr)
+        return pd.DataFrame.from_records(self.values)
 
     @property
     def recarray(self):
-        return self.records_arr.view(np.recarray)
+        return self.values.view(np.recarray)
 
     @cached_property
     def col_index(self):
         """Column index for `Records.records`."""
-        return nb.record_col_index_nb(self.records_arr, len(self.wrapper.columns))
+        return nb.record_col_index_nb(self.values, len(self.wrapper.columns))
 
-    def filter_by_mask(self, mask, group_by=None, filter_id=None, **kwargs):
-        """Return a new class instance, filtered by mask.
-
-        To prohibit using the same filter or filter class on the filtered instance, provide `filter_id`."""
+    def filter_by_mask(self, mask, group_by=None, **kwargs):
+        """Return a new class instance, filtered by mask."""
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
             wrapper = self.wrapper
-        filter_ids = self.filter_ids.copy()
-        if filter_id is not None:
-            if filter_id in self.filter_ids:
-                raise ValueError(f"Filter \"{filter_id}\" already applied")
-            filter_ids |= {filter_id}
         return self.copy(
             wrapper=wrapper,
-            records_arr=self.records_arr[mask],
-            filter_ids=filter_ids,
+            records_arr=self.values[mask],
             **kwargs
         )
 
@@ -387,10 +371,10 @@ class Records(Configured, PandasIndexer):
         See `vectorbt.records.nb.map_records_nb`."""
         checks.assert_numba_func(map_func_nb)
 
-        mapped_arr = nb.map_records_nb(self.records_arr, map_func_nb, *args)
+        mapped_arr = nb.map_records_nb(self.values, map_func_nb, *args)
         if idx_arr is None:
             if self.idx_field is not None:
-                idx_arr = self.records_arr[self.idx_field]
+                idx_arr = self.values[self.idx_field]
             else:
                 idx_arr = None
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
@@ -401,10 +385,9 @@ class Records(Configured, PandasIndexer):
         return MappedArray(
             wrapper,
             mapped_arr,
-            self.records_arr['col'],
+            self.values['col'],
             idx_arr=idx_arr,
             value_map=value_map,
-            filter_ids=self.filter_ids,
             **kwargs
         )
 
@@ -412,7 +395,7 @@ class Records(Configured, PandasIndexer):
         """Convert field to mapped array."""
         if idx_arr is None:
             if self.idx_field is not None:
-                idx_arr = self.records_arr[self.idx_field]
+                idx_arr = self.values[self.idx_field]
             else:
                 idx_arr = None
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
@@ -422,11 +405,10 @@ class Records(Configured, PandasIndexer):
             wrapper = self.wrapper
         return MappedArray(
             wrapper,
-            self.records_arr[field],
-            self.records_arr['col'],
+            self.values[field],
+            self.values['col'],
             idx_arr=idx_arr,
             value_map=value_map,
-            filter_ids=self.filter_ids,
             **kwargs
         )
 
@@ -436,11 +418,11 @@ class Records(Configured, PandasIndexer):
          The length of the array should match that of the records."""
         if not isinstance(a, np.ndarray):
             a = np.asarray(a)
-        checks.assert_shape_equal(a, self.records_arr)
+        checks.assert_shape_equal(a, self.values)
 
         if idx_arr is None:
             if self.idx_field is not None:
-                idx_arr = self.records_arr[self.idx_field]
+                idx_arr = self.values[self.idx_field]
             else:
                 idx_arr = None
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
@@ -451,10 +433,9 @@ class Records(Configured, PandasIndexer):
         return MappedArray(
             wrapper,
             a,
-            self.records_arr['col'],
+            self.values['col'],
             idx_arr=idx_arr,
             value_map=value_map,
-            filter_ids=self.filter_ids,
             **kwargs
         )
 

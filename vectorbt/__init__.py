@@ -510,6 +510,7 @@ import vectorbt.returns.accessors
 import vectorbt.ohlcv.accessors
 
 # Most important classes
+from vectorbt.base import *
 from vectorbt.generic import *
 from vectorbt.indicators import *
 from vectorbt.signals import *

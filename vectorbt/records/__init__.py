@@ -20,5 +20,10 @@ or plotting arrays mapped by the `vectorbt.records.base.Records` class.
 mapping, and reducing records. These only accept NumPy arrays and other Numba-compatible types.
 """
 
-from vectorbt.records.base import Records
 from vectorbt.records.mapped_array import MappedArray
+from vectorbt.records.base import Records
+
+__all__ = [
+    'MappedArray',
+    'Records'
+]

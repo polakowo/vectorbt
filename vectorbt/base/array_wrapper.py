@@ -365,9 +365,11 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if a.ndim == 1:
             return pd.Series(a, index=index, name=name, dtype=dtype)
-        if a.ndim == 2 and a.shape[1] == 1 and collapse:
-            return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
-        return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
+        if a.ndim == 2:
+            if a.shape[1] == 1 and collapse:
+                return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
+            return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
+        raise ValueError(f"{a.ndim}-d input is not supported")
 
     def wrap_reduced(self, a, index=None, columns=None, time_units=False, collapse=None, dtype=None, **kwargs):
         """Wrap result of reduction.
@@ -412,12 +414,19 @@ class ArrayWrapper(Configured, PandasIndexer):
             if index is None:
                 index = columns
             return pd.Series(a, index=index, dtype=dtype)
-        if self.ndim == 1:
-            # Array per Series
-            name = columns[0]
-            if name == 0:  # was a Series before
-                name = None
-            return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
-        # Array per column in a DataFrame
-        return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
+        if a.ndim == 2:
+            if self.ndim == 1 or (self.ndim == 2 and len(columns) == 1 and collapse):
+                # Array per Series
+                name = columns[0]
+                if name == 0:  # was a Series before
+                    name = None
+                return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
+            # Array per column in a DataFrame
+            return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
+        raise ValueError(f"{a.ndim}-d input is not supported")
+
+    def dummy(self, **kwargs):
+        """Create dummy Series/DataFrame."""
+        return self.wrap(np.empty(self.shape), **kwargs)
+
 

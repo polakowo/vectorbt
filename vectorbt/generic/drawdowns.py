@@ -165,52 +165,6 @@ class Drawdowns(Records):
         """Peak-to-valley (PtV) duration of each drawdown."""
         return self.map(nb.dd_ptv_duration_map_nb)
 
-    # ############# DrawdownStatus.Active ############# #
-
-    @cached_method
-    def current_drawdown(self, group_by=None, **kwargs):
-        """Current drawdown from peak.
-
-        Does not support `group_by`."""
-        curr_end_val = self.end_value.nst(-1, group_by=group_by)
-        curr_start_val = self.start_value.nst(-1, group_by=group_by)
-        curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
-        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
-
-    @cached_method
-    def current_duration(self, time_units=True, **kwargs):
-        """Current duration from peak.
-
-        Does not support `group_by`."""
-        return self.duration.nst(-1, time_units=time_units, **kwargs)
-
-    @cached_method
-    def current_return(self, **kwargs):
-        """Current return from valley.
-
-        Does not support `group_by`."""
-        recovery_return = self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
-        return recovery_return.nst(-1, **kwargs)
-
-    # ############# DrawdownStatus.Recovered ############# #
-
-    @cached_property
-    def recovery_return(self):
-        """Recovery return of each drawdown."""
-        return self.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
-
-    @cached_property
-    def vtr_duration(self):
-        """Valley-to-recovery (VtR) duration of each drawdown."""
-        return self.map(nb.dd_vtr_duration_map_nb)
-
-    @cached_property
-    def vtr_duration_ratio(self):
-        """Ratio of VtR duration to total duration of each drawdown.
-
-        The time from valley to recovery divided by the time from peak to valley."""
-        return self.map(nb.dd_vtr_duration_ratio_map_nb)
-
     # ############# DrawdownStatus ############# #
 
     @cached_property
@@ -221,7 +175,7 @@ class Drawdowns(Records):
     @cached_property
     def active(self):
         """Active drawdowns."""
-        filter_mask = self.records_arr['status'] == DrawdownStatus.Active
+        filter_mask = self.values['status'] == DrawdownStatus.Active
         return self.filter_by_mask(filter_mask)
 
     @cached_method
@@ -234,7 +188,7 @@ class Drawdowns(Records):
     @cached_property
     def recovered(self):
         """Recovered drawdowns."""
-        filter_mask = self.records_arr['status'] == DrawdownStatus.Recovered
+        filter_mask = self.values['status'] == DrawdownStatus.Recovered
         return self.filter_by_mask(filter_mask)
 
     @cached_method
@@ -243,6 +197,52 @@ class Drawdowns(Records):
         recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
         return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **kwargs)
+
+    # ############# DrawdownStatus.Active ############# #
+
+    @cached_method
+    def current_drawdown(self, group_by=None, **kwargs):
+        """Current drawdown from peak.
+
+        Does not support grouping."""
+        curr_end_val = self.active.end_value.nst(-1, group_by=group_by)
+        curr_start_val = self.active.start_value.nst(-1, group_by=group_by)
+        curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
+        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
+
+    @cached_method
+    def current_duration(self, time_units=True, **kwargs):
+        """Current duration from peak.
+
+        Does not support grouping."""
+        return self.active.duration.nst(-1, time_units=time_units, **kwargs)
+
+    @cached_method
+    def current_return(self, **kwargs):
+        """Current return from valley.
+
+        Does not support grouping."""
+        recovery_return = self.active.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+        return recovery_return.nst(-1, **kwargs)
+
+    # ############# DrawdownStatus.Recovered ############# #
+
+    @cached_property
+    def recovery_return(self):
+        """Recovery return of each drawdown."""
+        return self.recovered.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+
+    @cached_property
+    def vtr_duration(self):
+        """Valley-to-recovery (VtR) duration of each drawdown."""
+        return self.recovered.map(nb.dd_vtr_duration_map_nb)
+
+    @cached_property
+    def vtr_duration_ratio(self):
+        """Ratio of VtR duration to total duration of each drawdown.
+
+        The time from valley to recovery divided by the time from peak to valley."""
+        return self.recovered.map(nb.dd_vtr_duration_ratio_map_nb)
 
     # ############# Plotting ############# #
 
@@ -296,7 +296,8 @@ class Drawdowns(Records):
 
         self_col = self.force_select_column(column)
         if top_n is not None:
-            self_col = self_col.filter_by_mask(self_col.drawdown.top_n_mask(top_n))
+            # Drawdowns is negative, thus top_n becomes bottom_n
+            self_col = self_col.filter_by_mask(self_col.drawdown.bottom_n_mask(top_n))
 
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
@@ -331,12 +332,12 @@ class Drawdowns(Records):
         if show_ts:
             fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, row=row, col=col, fig=fig)
 
-        if len(self_col.records_arr) > 0:
+        if len(self_col.values) > 0:
             # Extract information
-            start_idx = self_col.records_arr['start_idx']
-            valley_idx = self_col.records_arr['valley_idx']
-            end_idx = self_col.records_arr['end_idx']
-            status = self_col.records_arr['status']
+            start_idx = self_col.values['start_idx']
+            valley_idx = self_col.values['valley_idx']
+            end_idx = self_col.values['end_idx']
+            status = self_col.values['status']
 
             start_val = self_col.ts.values[start_idx]
             valley_val = self_col.ts.values[valley_idx]

@@ -53,25 +53,25 @@ def get_group_lens_nb(groups):
     """Return count per group."""
     result = np.empty(groups.shape[0], dtype=np.int_)
     j = 0
-    prev_group = -1
-    run_count = 0
+    last_group = -1
+    group_len = 0
     for i in range(groups.shape[0]):
         cur_group = groups[i]
-        if cur_group < prev_group:
+        if cur_group < last_group:
             raise ValueError("Groups must be coherent and sorted")
-        if cur_group != prev_group:
-            if prev_group != -1:
+        if cur_group != last_group:
+            if last_group != -1:
                 # Process previous group
-                result[j] = run_count
+                result[j] = group_len
                 j += 1
-                run_count = 0
-            prev_group = cur_group
-        run_count += 1
+                group_len = 0
+            last_group = cur_group
+        group_len += 1
         if i == groups.shape[0] - 1:
             # Process last group
-            result[j] = run_count
+            result[j] = group_len
             j += 1
-            run_count = 0
+            group_len = 0
     return result[:j]
 
 

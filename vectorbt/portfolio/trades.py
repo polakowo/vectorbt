@@ -16,7 +16,7 @@ from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.indexing import PandasIndexer
-from vectorbt.base.reshape_fns import to_1d
+from vectorbt.base.reshape_fns import to_1d, broadcast_to
 from vectorbt.records.base import Records, indexing_on_records_meta
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, TradeType
 from vectorbt.portfolio import nb
@@ -147,7 +147,7 @@ class Trades(Records):
             close=close,
             **kwargs
         )
-        self.close = close
+        self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in trade_dt.names):
             raise ValueError("Records array must have all fields defined in trade_dt")
@@ -156,10 +156,15 @@ class Trades(Records):
 
     trade_type = TradeType.Trade
 
+    @property
+    def close(self):
+        """Reference price such as close."""
+        return self._close
+
     @classmethod
     def from_orders(cls, orders, **kwargs):
         """Build `Trades` from `vectorbt.portfolio.orders.Orders`."""
-        trade_records_arr = nb.orders_to_trades_nb(orders.close.vbt.to_2d_array(), orders.records_arr)
+        trade_records_arr = nb.orders_to_trades_nb(orders.close.vbt.to_2d_array(), orders.values)
         return cls(orders.wrapper, trade_records_arr, orders.close, **kwargs)
 
     @property  # no need for cached
@@ -207,8 +212,8 @@ class Trades(Records):
     @cached_property
     def winning(self):
         """Winning trades."""
-        filter_mask = self.records_arr['pnl'] > 0.
-        return self.filter_by_mask(filter_mask, filter_id='pnl')
+        filter_mask = self.values['pnl'] > 0.
+        return self.filter_by_mask(filter_mask)
 
     @cached_method
     def win_rate(self, group_by=None, **kwargs):
@@ -220,8 +225,8 @@ class Trades(Records):
     @cached_property
     def losing(self):
         """Losing trades."""
-        filter_mask = self.records_arr['pnl'] < 0.
-        return self.filter_by_mask(filter_mask, filter_id='pnl')
+        filter_mask = self.values['pnl'] < 0.
+        return self.filter_by_mask(filter_mask)
 
     @cached_method
     def loss_rate(self, group_by=None, **kwargs):
@@ -278,8 +283,8 @@ class Trades(Records):
     @cached_property
     def long(self):
         """Long trades."""
-        filter_mask = self.records_arr['direction'] == TradeDirection.Long
-        return self.filter_by_mask(filter_mask, filter_id='direction')
+        filter_mask = self.values['direction'] == TradeDirection.Long
+        return self.filter_by_mask(filter_mask)
 
     @cached_method
     def long_rate(self, group_by=None, **kwargs):
@@ -291,8 +296,8 @@ class Trades(Records):
     @cached_property
     def short(self):
         """Short trades."""
-        filter_mask = self.records_arr['direction'] == TradeDirection.Short
-        return self.filter_by_mask(filter_mask, filter_id='direction')
+        filter_mask = self.values['direction'] == TradeDirection.Short
+        return self.filter_by_mask(filter_mask)
 
     @cached_method
     def short_rate(self, group_by=None, **kwargs):
@@ -311,8 +316,8 @@ class Trades(Records):
     @cached_property
     def open(self):
         """Open trades."""
-        filter_mask = self.records_arr['status'] == TradeStatus.Open
-        return self.filter_by_mask(filter_mask, filter_id='status')
+        filter_mask = self.values['status'] == TradeStatus.Open
+        return self.filter_by_mask(filter_mask)
 
     @cached_method
     def open_rate(self, group_by=None, **kwargs):
@@ -324,8 +329,8 @@ class Trades(Records):
     @cached_property
     def closed(self):
         """Closed trades."""
-        filter_mask = self.records_arr['status'] == TradeStatus.Closed
-        return self.filter_by_mask(filter_mask, filter_id='status')
+        filter_mask = self.values['status'] == TradeStatus.Closed
+        return self.filter_by_mask(filter_mask)
 
     @cached_method
     def closed_rate(self, group_by=None, **kwargs):
@@ -392,12 +397,12 @@ class Trades(Records):
                 if fig.layout[xaxis]['domain'] is not None:
                     x_domain = fig.layout[xaxis]['domain']
 
-        if len(self_col.records_arr) > 0:
+        if len(self_col.values) > 0:
             # Extract information
-            exit_idx = self.records_arr['exit_idx']
-            pnl = self.records_arr['pnl']
-            returns = self.records_arr['return']
-            status = self.records_arr['status']
+            exit_idx = self.values['exit_idx']
+            pnl = self.values['pnl']
+            returns = self.values['return']
+            status = self.values['status']
 
             neutral_mask = pnl == 0
             profit_mask = pnl > 0
@@ -571,22 +576,22 @@ class Trades(Records):
         if show_close:
             fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, row=row, col=col, fig=fig)
 
-        if len(self_col.records_arr) > 0:
+        if len(self_col.values) > 0:
             # Extract information
-            size = self_col.records_arr['size']
-            entry_idx = self_col.records_arr['entry_idx']
-            entry_price = self_col.records_arr['entry_price']
-            entry_fees = self_col.records_arr['entry_fees']
-            exit_idx = self_col.records_arr['exit_idx']
-            exit_price = self_col.records_arr['exit_price']
-            exit_fees = self_col.records_arr['exit_fees']
-            pnl = self_col.records_arr['pnl']
-            ret = self_col.records_arr['return']
+            size = self_col.values['size']
+            entry_idx = self_col.values['entry_idx']
+            entry_price = self_col.values['entry_price']
+            entry_fees = self_col.values['entry_fees']
+            exit_idx = self_col.values['exit_idx']
+            exit_price = self_col.values['exit_price']
+            exit_fees = self_col.values['exit_fees']
+            pnl = self_col.values['pnl']
+            ret = self_col.values['return']
             direction_value_map = to_value_map(TradeDirection)
-            direction = self_col.records_arr['direction']
+            direction = self_col.values['direction']
             direction = np.vectorize(lambda x: str(direction_value_map[x]))(direction)
-            status = self_col.records_arr['status']
-            position_idx = self_col.records_arr['position_idx']
+            status = self_col.values['status']
+            position_idx = self_col.values['position_idx']
 
             def get_duration_str(from_idx, to_idx):
                 if isinstance(self_col.wrapper.index, DatetimeTypes):
@@ -809,7 +814,7 @@ class Positions(Trades):
     @classmethod
     def from_trades(cls, trades, **kwargs):
         """Build `Positions` from `Trades`."""
-        position_records_arr = nb.trades_to_positions_nb(trades.records_arr)
+        position_records_arr = nb.trades_to_positions_nb(trades.values)
         return cls(trades.wrapper, position_records_arr, trades.close, **kwargs)
 
     @cached_method

@@ -10,7 +10,7 @@ from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.base.indexing import PandasIndexer
-from vectorbt.base.reshape_fns import to_1d
+from vectorbt.base.reshape_fns import to_1d, broadcast_to
 from vectorbt.records.base import Records, indexing_on_records_meta
 from vectorbt.portfolio.enums import order_dt, OrderSide
 
@@ -59,12 +59,17 @@ class Orders(Records):
             close=close,
             **kwargs
         )
-        self.close = close
+        self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise ValueError("Records array must have all fields defined in order_dt")
 
         PandasIndexer.__init__(self, orders_indexing_func)
+
+    @property
+    def close(self):
+        """Reference price such as close."""
+        return self._close
 
     @property  # no need for cached
     def records_readable(self):
@@ -106,7 +111,7 @@ class Orders(Records):
     @cached_property
     def buy(self):
         """Buy operations."""
-        filter_mask = self.records_arr['side'] == OrderSide.Buy
+        filter_mask = self.values['side'] == OrderSide.Buy
         return self.filter_by_mask(filter_mask)
 
     @cached_method
@@ -119,7 +124,7 @@ class Orders(Records):
     @cached_property
     def sell(self):
         """Sell operations."""
-        filter_mask = self.records_arr['side'] == OrderSide.Sell
+        filter_mask = self.values['side'] == OrderSide.Sell
         return self.filter_by_mask(filter_mask)
 
     @cached_method
@@ -181,13 +186,13 @@ class Orders(Records):
         if show_close:
             fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, row=row, col=col, fig=fig)
 
-        if len(self_col.records_arr) > 0:
+        if len(self_col.values) > 0:
             # Extract information
-            idx = self_col.records_arr['idx']
-            size = self_col.records_arr['size']
-            price = self_col.records_arr['price']
-            fees = self_col.records_arr['fees']
-            side = self_col.records_arr['side']
+            idx = self_col.values['idx']
+            size = self_col.values['size']
+            price = self_col.values['price']
+            fees = self_col.values['fees']
+            side = self_col.values['side']
 
             # Plot Buy markers
             buy_mask = side == OrderSide.Buy

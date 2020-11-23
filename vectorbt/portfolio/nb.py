@@ -1870,7 +1870,7 @@ def orders_to_trades_nb(close, order_records):
         """
     records = np.empty(close.shape[0] * close.shape[1], dtype=trade_dt)
     ridx = 0
-    prev_col = -1
+    last_col = -1
     entry_size_sum = 0.
     entry_gross_sum = 0.
     entry_fees_sum = 0.
@@ -1880,7 +1880,7 @@ def orders_to_trades_nb(close, order_records):
 
     for r in range(order_records.shape[0]):
         col = int(order_records[r]['col'])
-        if col < prev_col:
+        if col < last_col:
             raise ValueError("order_records must be sorted")
         i = int(order_records[r]['idx'])
         order_size = order_records[r]['size']
@@ -1893,18 +1893,18 @@ def orders_to_trades_nb(close, order_records):
         if order_price <= 0.:
             raise ValueError(price_zero_neg_err)
 
-        if col != prev_col:
+        if col != last_col:
             # Column has changed
-            if prev_col != -1:
+            if last_col != -1:
                 if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
                     # Trade in the previous column hasn't been closed
                     exit_size = entry_size_sum
-                    exit_price = close[close.shape[0] - 1, prev_col]
+                    exit_price = close[close.shape[0] - 1, last_col]
                     exit_fees = 0.
                     exit_idx = close.shape[0] - 1
                     save_trade_nb(
                         records[ridx],
-                        prev_col,
+                        last_col,
                         entry_idx,
                         entry_size_sum,
                         entry_gross_sum,
@@ -1919,7 +1919,7 @@ def orders_to_trades_nb(close, order_records):
                     )
                     ridx += 1
 
-            prev_col = col
+            last_col = col
             entry_idx = -1
             direction = -1
             position_idx = -1
@@ -2117,18 +2117,18 @@ def trades_to_positions_nb(trade_records):
     """
     records = np.empty(trade_records.shape[0], dtype=trade_dt)
     ridx = 0
-    prev_col = -1
+    last_col = -1
     prev_position_idx = -1
     from_r = -1
 
     for r in range(trade_records.shape[0]):
         col = int(trade_records[r]['col'])
         position_idx = int(trade_records[r]['position_idx'])
-        if col < prev_col or (col == prev_col and position_idx < prev_position_idx):
+        if col < last_col or (col == last_col and position_idx < prev_position_idx):
             raise ValueError("trade_records must be sorted")
 
-        if col != prev_col or position_idx != prev_position_idx:
-            if prev_col != -1 and prev_position_idx != -1:
+        if col != last_col or position_idx != prev_position_idx:
+            if last_col != -1 and prev_position_idx != -1:
                 if r - from_r > 1:
                     save_position_nb(records[ridx], trade_records[from_r:r])
                 else:
@@ -2136,7 +2136,7 @@ def trades_to_positions_nb(trade_records):
                     records[ridx] = trade_records[from_r]
                 ridx += 1
             from_r = r
-            prev_col = col
+            last_col = col
             prev_position_idx = position_idx
         if r == trade_records.shape[0] - 1:
             if r - from_r > 0:
@@ -2180,7 +2180,7 @@ def get_short_size_nb(shares_now, new_shares_now):
 def share_flow_nb(target_shape, order_records, direction):
     """Get share flow series per column. Has opposite sign."""
     out = np.full(target_shape, 0., dtype=np.float_)
-    prev_col = -1
+    last_col = -1
     prev_i = -1
     shares_now = 0.
 
@@ -2191,11 +2191,11 @@ def share_flow_nb(target_shape, order_records, direction):
         side = record['side']
         size = record['size']
 
-        if col < prev_col:
+        if col < last_col:
             raise ValueError("Order records must be sorted")
-        if col != prev_col:
+        if col != last_col:
             prev_i = -1
-            prev_col = col
+            last_col = col
             shares_now = 0.
         if i < prev_i:
             raise ValueError("Order records must be sorted")
@@ -2257,7 +2257,7 @@ def pos_coverage_grouped_nb(pos_mask, group_lens):
 def cash_flow_nb(target_shape, order_records, short_cash):
     """Get cash flow series per column."""
     out = np.full(target_shape, 0., dtype=np.float_)
-    prev_col = -1
+    last_col = -1
     prev_i = -1
     shares_now = 0.
     debt_now = 0.
@@ -2272,11 +2272,11 @@ def cash_flow_nb(target_shape, order_records, short_cash):
         fees = record['fees']
         volume = size * price
 
-        if col < prev_col:
+        if col < last_col:
             raise ValueError("Order records must be sorted")
-        if col != prev_col:
+        if col != last_col:
             prev_i = -1
-            prev_col = col
+            last_col = col
             shares_now = 0.
             debt_now = 0.
         if i < prev_i:
@@ -2450,9 +2450,9 @@ def value_in_sim_order_nb(cash, holding_value, group_lens, call_seq):
             if j >= group_len:
                 prev_j = j - group_len
                 prev_i = prev_j // group_len
-                prev_col = from_col + call_seq[prev_i, from_col + prev_j % group_len]
-                if not np.isnan(holding_value[prev_i, prev_col]):
-                    curr_holding_value -= holding_value[prev_i, prev_col]
+                last_col = from_col + call_seq[prev_i, from_col + prev_j % group_len]
+                if not np.isnan(holding_value[prev_i, last_col]):
+                    curr_holding_value -= holding_value[prev_i, last_col]
             if np.isnan(holding_value[i, col]):
                 since_last_nan = 0
             else:
@@ -2481,16 +2481,16 @@ def total_profit_nb(target_shape, close, order_records, init_cash):
     shares = np.full(target_shape[1], 0., dtype=np.float_)
     cash = init_cash.copy()
 
-    prev_col = -1
+    last_col = -1
     prev_i = -1
     for r in range(order_records.shape[0]):
         record = order_records[r]
         col = record['col']
         i = record['idx']
 
-        if col < prev_col:
+        if col < last_col:
             raise ValueError("Order records must be sorted")
-        if col != prev_col:
+        if col != last_col:
             prev_i = -1
         if i < prev_i:
             raise ValueError("Order records must be sorted")

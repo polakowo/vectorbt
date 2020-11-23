@@ -66,3 +66,15 @@ from vectorbt.signals.basic import (
     ADVSTEX,
     IADVSTEX
 )
+
+__all__ = [
+    'SignalFactory',
+    'RAND',
+    'RPROB',
+    'RPROBEX',
+    'IRPROBEX',
+    'STEX',
+    'ISTEX',
+    'ADVSTEX',
+    'IADVSTEX'
+]

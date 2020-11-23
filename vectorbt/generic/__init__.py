@@ -44,7 +44,7 @@ drawdown records for any time series and analyze them right away.
 Moreover, all time series accessors have a method `drawdowns`:
 
 ```python-repl
->>> price.vbt.drawdowns().active.current_drawdown()
+>>> price.vbt.drawdowns().current_drawdown()
 -0.4473361334272673
 ```
 
@@ -69,3 +69,7 @@ array([nan, 1.5, 2.5, 3.5])
 
 from vectorbt.generic.enums import *
 from vectorbt.generic.drawdowns import Drawdowns
+
+__all__ = [
+    'Drawdowns'
+]

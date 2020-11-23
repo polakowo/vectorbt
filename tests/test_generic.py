@@ -21,7 +21,7 @@ df = pd.DataFrame({
     datetime(2018, 1, 4),
     datetime(2018, 1, 5)
 ]))
-group_by = np.array(['first', 'first', 'second'])
+group_by = np.array(['g1', 'g1', 'g2'])
 
 @njit
 def nanmean_nb(x):
@@ -527,7 +527,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by),
-            pd.Series([20.0, 6.0], index=['first', 'second'])
+            pd.Series([20.0, 6.0], index=['g1', 'g2'])
         )
 
         @njit
@@ -543,7 +543,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             df.vbt.reduce(argmax_nb, to_idx=True, flatten=True, group_by=group_by),
-            pd.Series(['2018-01-02', '2018-01-02'], dtype='datetime64[ns]', index=['first', 'second'])
+            pd.Series(['2018-01-02', '2018-01-02'], dtype='datetime64[ns]', index=['g1', 'g2'])
         )
 
         @njit
@@ -563,7 +563,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(min_and_max_nb, index=['min', 'max'], to_array=True, group_by=group_by),
-            pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=['min', 'max'], columns=['first', 'second'])
+            pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=['min', 'max'], columns=['g1', 'g2'])
         )
 
         @njit
@@ -590,13 +590,13 @@ class TestAccessors:
             df.vbt.reduce(argmin_and_argmax_nb, to_idx=True, to_array=True,
                           flatten=True, order='C', index=['idxmin', 'idxmax'], group_by=group_by),
             pd.DataFrame([['2018-01-01', '2018-01-01'], ['2018-01-02', '2018-01-02']],
-                         dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['first', 'second'])
+                         dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['g1', 'g2'])
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(argmin_and_argmax_nb, to_idx=True, to_array=True,
                           flatten=True, order='F', index=['idxmin', 'idxmax'], group_by=group_by),
             pd.DataFrame([['2018-01-01', '2018-01-01'], ['2018-01-04', '2018-01-02']],
-                         dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['first', 'second'])
+                         dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['g1', 'g2'])
         )
 
     def test_squeeze_grouped(self):
@@ -608,7 +608,7 @@ class TestAccessors:
                 [3.0, np.nan],
                 [3.0, 2.0],
                 [1.0, 1.0]
-            ], index=df.index, columns=['first', 'second'])
+            ], index=df.index, columns=['g1', 'g2'])
         )
 
     def test_flatten_grouped(self):
@@ -625,7 +625,7 @@ class TestAccessors:
                 [2.0, np.nan],
                 [np.nan, 1.0],
                 [1.0, np.nan]
-            ], index=np.repeat(df.index, 2), columns=['first', 'second'])
+            ], index=np.repeat(df.index, 2), columns=['g1', 'g2'])
         )
         pd.testing.assert_frame_equal(
             df.vbt.flatten_grouped(group_by=group_by, order='F'),
@@ -640,7 +640,7 @@ class TestAccessors:
                 [3.0, np.nan],
                 [2.0, np.nan],
                 [1.0, np.nan]
-            ], index=np.tile(df.index, 2), columns=['first', 'second'])
+            ], index=np.tile(df.index, 2), columns=['g1', 'g2'])
         )
 
     @pytest.mark.parametrize(
@@ -667,7 +667,7 @@ class TestAccessors:
             pd.Series([
                 test_func(df[['a', 'b']].stack()),
                 test_func(df['c'])
-            ], index=['first', 'second'])
+            ], index=['g1', 'g2'])
         )
         np.testing.assert_array_equal(test_func(df).values, test_func_nb(df.values))
         pd.testing.assert_series_equal(
@@ -704,7 +704,7 @@ class TestAccessors:
             pd.Series([
                 test_func(df[['a', 'b']].stack())[0],
                 test_func(df['c'])
-            ], index=['first', 'second'], dtype='datetime64[ns]')
+            ], index=['g1', 'g2'], dtype='datetime64[ns]')
         )
 
     def test_describe(self):
@@ -728,8 +728,8 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.describe(percentiles=np.arange(0, 1, 0.1), group_by=group_by),
             pd.DataFrame({
-                'first': df[['a', 'b']].stack().describe(percentiles=np.arange(0, 1, 0.1)).values,
-                'second': df['c'].describe(percentiles=np.arange(0, 1, 0.1)).values
+                'g1': df[['a', 'b']].stack().describe(percentiles=np.arange(0, 1, 0.1)).values,
+                'g2': df['c'].describe(percentiles=np.arange(0, 1, 0.1)).values
             }, index=test_against.index)
         )
 
@@ -751,7 +751,7 @@ class TestAccessors:
 
     def test_to_mapped_array(self):
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array().mapped_arr,
+            df.vbt.to_mapped_array().values,
             np.array([1., 2., 3., 4., 4., 3., 2., 1., 1., 2., 2., 1.])
         )
         np.testing.assert_array_equal(
@@ -763,7 +763,7 @@ class TestAccessors:
             np.array([0, 1, 2, 3, 1, 2, 3, 4, 0, 1, 3, 4])
         )
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array(dropna=False).mapped_arr,
+            df.vbt.to_mapped_array(dropna=False).values,
             np.array([1., 2., 3., 4., np.nan, np.nan, 4., 3., 2., 1., 1., 2., np.nan, 2., 1.])
         )
         np.testing.assert_array_equal(

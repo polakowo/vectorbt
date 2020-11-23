@@ -1326,8 +1326,8 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
     # Get returns
     incl_unrealized = 'incl_unrealized' in stats_options
     returns = main_portfolio.trades(incl_unrealized=incl_unrealized).returns
-    profit_mask = returns.mapped_arr > 0
-    loss_mask = returns.mapped_arr < 0
+    profit_mask = returns.values > 0
+    loss_mask = returns.values < 0
 
     figure = dict(
         data=[
@@ -1352,7 +1352,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             ),
             go.Scatter(
                 x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[profit_mask]]),
-                y=returns.mapped_arr[profit_mask],
+                y=returns.values[profit_mask],
                 marker_color='#2ca02c',
                 marker_size=8,
                 mode='markers',
@@ -1361,7 +1361,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             ),
             go.Scatter(
                 x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[loss_mask]]),
-                y=returns.mapped_arr[loss_mask],
+                y=returns.values[loss_mask],
                 marker_color='#d62728',
                 marker_size=8,
                 mode='markers',

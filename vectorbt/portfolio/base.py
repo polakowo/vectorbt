@@ -218,7 +218,9 @@ simulation from the beginning to the end, you can turn on logging.
 Just as orders, logs are also records and thus can be easily analyzed:
 
 ```python-repl
->>> portfolio.logs().map_field('res_status', value_map=vbt.OrderStatus).value_counts()
+>>> from vectorbt.portfolio.enums import OrderStatus
+
+>>> portfolio.logs().map_field('res_status', value_map=OrderStatus).value_counts()
           BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
 Filled        185      168      172      169      177      178
 Ignored        59       76       73       74       68       65
@@ -628,9 +630,11 @@ class Portfolio(Configured, PandasIndexer):
             dtype: float64
 
             >>> # Testing multiple parameters (via broadcasting)
+            >>> from vectorbt.portfolio.enums import Direction
+
             >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, direction=[list(vbt.Direction)],
-            ...     broadcast_kwargs=dict(columns_from=vbt.Direction._fields))
+            ...     close, entries, exits, direction=[list(Direction)],
+            ...     broadcast_kwargs=dict(columns_from=Direction._fields))
             >>> portfolio.share_flow()
                 Long  Short    All
             0  100.0 -100.0  100.0
@@ -1595,7 +1599,7 @@ class Portfolio(Configured, PandasIndexer):
     def share_flow(self, direction='all'):
         """Get share flow series per column."""
         direction = convert_str_enum_value(Direction, direction)
-        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self._orders.records_arr, direction)
+        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self._orders.values, direction)
         return self.wrapper.wrap(share_flow, group_by=False)
 
     @cached_method
@@ -1649,7 +1653,7 @@ class Portfolio(Configured, PandasIndexer):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             cash_flow = nb.cash_flow_grouped_nb(cash_flow, group_lens)
         else:
-            cash_flow = nb.cash_flow_nb(self.wrapper.shape_2d, self._orders.records_arr, short_cash)
+            cash_flow = nb.cash_flow_nb(self.wrapper.shape_2d, self._orders.values, short_cash)
         return self.wrapper.wrap(cash_flow, group_by=group_by)
 
     @cached_method
@@ -1760,7 +1764,7 @@ class Portfolio(Configured, PandasIndexer):
             total_profit = nb.total_profit_nb(
                 self.wrapper.shape_2d,
                 close,
-                self._orders.records_arr,
+                self._orders.values,
                 init_cash
             )
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by)

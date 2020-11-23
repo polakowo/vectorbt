@@ -158,3 +158,8 @@ and 2) the compuation with NumPy under the hood, which is mostly much faster tha
     You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
 """
 
+from vectorbt.base.array_wrapper import ArrayWrapper
+
+__all__ = [
+    'ArrayWrapper'
+]
