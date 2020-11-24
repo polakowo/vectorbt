@@ -1382,12 +1382,12 @@ class Portfolio(Configured, PandasIndexer):
         # Broadcast inputs
         target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
         if close.shape != target_shape:
-            if len(close.vbt.columns) <= target_shape_2d[1]:
-                if target_shape_2d[1] % len(close.vbt.columns) != 0:
+            if len(close.vbt.wrapper.columns) <= target_shape_2d[1]:
+                if target_shape_2d[1] % len(close.vbt.wrapper.columns) != 0:
                     raise ValueError("Cannot broadcast close to target_shape")
                 if keys is None:
                     keys = pd.Index(np.arange(target_shape_2d[1]), name='iteration_idx')
-                tile_times = target_shape_2d[1] // len(close.vbt.columns)
+                tile_times = target_shape_2d[1] // len(close.vbt.wrapper.columns)
                 close = close.vbt.tile(tile_times, keys=keys)
         close = broadcast(close, to_shape=target_shape, **broadcast_kwargs)
         wrapper = ArrayWrapper.from_obj(close, freq=freq, group_by=group_by, **wrapper_kwargs)
@@ -1528,7 +1528,7 @@ class Portfolio(Configured, PandasIndexer):
             return self.copy(orders=self._orders.regroup(group_by=group_by))
         return self
 
-    def force_select_column(self, column=None):
+    def _force_select_column(self, column=None):
         """Force selection of one column."""
         if column is not None:
             if self.wrapper.grouper.group_by is None:
@@ -2086,7 +2086,7 @@ class Portfolio(Configured, PandasIndexer):
         if make_subplots_kwargs is None:
             make_subplots_kwargs = {}
 
-        self_col = self.force_select_column(column)
+        self_col = self._force_select_column(column)
 
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))

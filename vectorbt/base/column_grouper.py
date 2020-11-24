@@ -162,8 +162,13 @@ class ColumnGrouper(Configured):
         """Check whether column grouping has been disabled."""
         return self.group_by is not None and not self.is_grouped(group_by=group_by)
 
+    @cached_method
     def is_grouping_modified(self, group_by=None):
-        """Check whether column grouping has been modified."""
+        """Check whether column grouping has been modified.
+
+        Doesn't care if grouping labels have been changed."""
+        if group_by is None or (group_by is False and self.group_by is None):
+            return False
         group_by = group_by_to_index(self.columns, group_by)
         if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
             if not pd.Index.equals(group_by, self.group_by):
@@ -171,71 +176,77 @@ class ColumnGrouper(Configured):
                 groups2 = get_groups_and_index(self.columns, self.group_by)[0]
                 if not np.array_equal(groups1, groups2):
                     return True
-        return False
+            return False
+        return True
 
+    @cached_method
     def is_grouping_changed(self, group_by=None):
-        """Check whether column grouping has been changed in any way."""
-        return self.is_grouping_enabled(group_by=group_by) \
-            or self.is_grouping_disabled(group_by=group_by) \
-            or self.is_grouping_modified(group_by=group_by)
+        """Check whether column grouping has changed in any way."""
+        if group_by is None or (group_by is False and self.group_by is None):
+            return False
+        if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
+            if pd.Index.equals(group_by, self.group_by):
+                return False
+        return True
 
-    def check_group_by(self, group_by=None, allow_enable=None, allow_disable=None, allow_modify=None):
+    def is_group_count_changed(self, group_by=None):
+        """Check whether the number of groups has changed."""
+        if group_by is None or (group_by is False and self.group_by is None):
+            return False
+        if isinstance(group_by, pd.Index) and isinstance(self.group_by, pd.Index):
+            return len(group_by) != len(self.group_by)
+        return True
+
+    def check_group_by(self, group_by=None):
         """Check passed `group_by` object against restrictions."""
-        if allow_enable is None:
-            allow_enable = self.allow_enable
-        if allow_disable is None:
-            allow_disable = self.allow_disable
-        if allow_modify is None:
-            allow_modify = self.allow_modify
-
-        if not allow_enable and self.is_grouping_enabled(group_by=group_by):
+        if not self.allow_enable and self.is_grouping_enabled(group_by=group_by):
             raise ValueError("Enabling grouping is not allowed")
-        if not allow_disable and self.is_grouping_disabled(group_by=group_by):
+        if not self.allow_disable and self.is_grouping_disabled(group_by=group_by):
             raise ValueError("Disabling grouping is not allowed")
-        if not allow_modify and self.is_grouping_modified(group_by=group_by):
+        if not self.allow_modify and self.is_grouping_modified(group_by=group_by):
             raise ValueError("Changing groups is not allowed")
 
-    def resolve_group_by(self, group_by=None, **kwargs):
+    def resolve_group_by(self, group_by=None):
         """Resolve `group_by` from either object variable or keyword argument."""
         if group_by is None:
             group_by = self.group_by
         if group_by is False and self.group_by is None:
             group_by = None
-        self.check_group_by(group_by=group_by, **kwargs)
+        self.check_group_by(group_by=group_by)
         return group_by_to_index(self.columns, group_by)
 
     @cached_method
-    def get_groups_and_columns(self, **kwargs):
+    def get_groups_and_columns(self, group_by=None):
         """See `get_groups_and_index`."""
-        group_by = self.resolve_group_by(**kwargs)
+        group_by = self.resolve_group_by(group_by=group_by)
         return get_groups_and_index(self.columns, group_by)
 
-    def get_groups(self, **kwargs):
+    def get_groups(self, group_by=None):
         """Return groups array."""
-        return self.get_groups_and_columns(**kwargs)[0]
+        return self.get_groups_and_columns(group_by=group_by)[0]
 
-    def get_columns(self, **kwargs):
+    def get_columns(self, group_by=None):
         """Return grouped columns."""
-        return self.get_groups_and_columns(**kwargs)[1]
+        return self.get_groups_and_columns(group_by=group_by)[1]
 
     @cached_method
-    def get_group_lens(self, **kwargs):
+    def get_group_lens(self, group_by=None):
         """See get_group_lens_nb."""
-        group_by = self.resolve_group_by(**kwargs)
+        group_by = self.resolve_group_by(group_by=group_by)
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.columns), 1)
-        groups = self.get_groups(**kwargs)
+        groups = self.get_groups(group_by=group_by)
         return get_group_lens_nb(groups)
 
     @cached_method
-    def get_group_count(self, **kwargs):
+    def get_group_count(self, group_by=None):
         """Get number of groups."""
-        return len(self.get_group_lens(**kwargs))
+        return len(self.get_group_lens(group_by=group_by))
 
     @cached_method
-    def get_group_start_idxs(self, **kwargs):
+    def get_group_start_idxs(self, group_by=None):
         """Get first index of each group as an array."""
-        group_lens = self.get_group_lens(**kwargs)
+        group_lens = self.get_group_lens(group_by=group_by)
         return np.cumsum(group_lens) - group_lens
 
     @cached_method

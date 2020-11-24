@@ -310,7 +310,7 @@ class Records(Configured, PandasIndexer):
             return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
         return self
 
-    def force_select_column(self, column=None):
+    def _force_select_column(self, column=None):
         """Force selection of one column."""
         if column is not None:
             if self.wrapper.grouper.group_by is None:

@@ -1380,6 +1380,7 @@ class TestFactory:
             '__subclasshook__',
             '__weakref__',
             '_config',
+            '_force_select_column',
             '_iloc',
             '_indexing_func',
             '_indexing_kwargs',

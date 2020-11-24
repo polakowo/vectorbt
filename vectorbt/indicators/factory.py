@@ -1257,7 +1257,7 @@ class IndicatorFactory:
             self.CustomIndicator = CustomIndicator
 
         # Add other methods
-        def force_select_column(_self, column=None):
+        def _force_select_column(_self, column=None):
             """Force selection of one column."""
             if column is not None:
                 self_col = _self[column]
@@ -1267,7 +1267,7 @@ class IndicatorFactory:
                 raise TypeError("Only one column is allowed. Use indexing or column argument.")
             return self_col
 
-        setattr(CustomIndicator, 'force_select_column', force_select_column)
+        setattr(CustomIndicator, '_force_select_column', _force_select_column)
 
     def from_custom_func(self,
                          custom_func,

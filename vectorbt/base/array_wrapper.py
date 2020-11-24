@@ -8,6 +8,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.config import Configured
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes, to_time_units
 from vectorbt.utils.array import get_ranges_arr
+from vectorbt.utils.decorators import cached_method
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
@@ -178,14 +179,17 @@ def array_wrapper_indexing_func(obj, pd_indexing_func, **kwargs):
 
 class ArrayWrapper(Configured, PandasIndexer):
     """Class that stores index, columns and shape metadata for wrapping NumPy arrays.
+    Tightly integrated with `vectorbt.base.column_grouper.ColumnGrouper`.
 
     If the underlying object is a Series, pass `[sr.name]` as `columns`.
+
+    `**kwargs` are passed to `vectorbt.base.column_grouper.ColumnGrouper`.
 
     !!! note
         This class is meant to be immutable. To change any attribute, use `ArrayWrapper.copy`."""
 
-    def __init__(self, index, columns, ndim, freq=None, column_only_select=None, group_select=None,
-                 grouped_ndim=None, group_by=None, allow_enable=True, allow_disable=True, allow_modify=True):
+    def __init__(self, index, columns, ndim, freq=None, column_only_select=None,
+                 group_select=None, grouped_ndim=None, **kwargs):
         Configured.__init__(
             self,
             index=index,
@@ -195,10 +199,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             column_only_select=column_only_select,
             group_select=group_select,
             grouped_ndim=grouped_ndim,
-            group_by=group_by,
-            allow_enable=allow_enable,
-            allow_disable=allow_disable,
-            allow_modify=allow_modify
+            **kwargs
         )
 
         checks.assert_not_none(index)
@@ -215,13 +216,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._freq = freq
         self._column_only_select = column_only_select
         self._group_select = group_select
-        self._grouper = ColumnGrouper(
-            columns,
-            group_by=group_by,
-            allow_enable=allow_enable,
-            allow_disable=allow_disable,
-            allow_modify=allow_modify
-        )
+        self._grouper = ColumnGrouper(columns, **kwargs)
         self._grouped_ndim = grouped_ndim
 
         PandasIndexer.__init__(
@@ -248,6 +243,10 @@ class ArrayWrapper(Configured, PandasIndexer):
     def columns(self):
         """Columns."""
         return self._columns
+    
+    def get_columns(self, group_by=None):
+        """Get group-aware `ArrayWrapper.columns`."""
+        return self.to_group_native(group_by=group_by).columns
 
     @property
     def name(self):
@@ -257,11 +256,19 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return None
             return self.columns[0]
         return None
+    
+    def get_name(self, group_by=None):
+        """Get group-aware `ArrayWrapper.name`."""
+        return self.to_group_native(group_by=group_by).name
 
     @property
     def ndim(self):
         """Number of dimensions."""
         return self._ndim
+    
+    def get_ndim(self, group_by=None):
+        """Get group-aware `ArrayWrapper.ndim`."""
+        return self.to_group_native(group_by=group_by).ndim
 
     @property
     def shape(self):
@@ -269,6 +276,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         if self.ndim == 1:
             return len(self.index),
         return len(self.index), len(self.columns)
+    
+    def get_shape(self, group_by=None):
+        """Get group-aware `ArrayWrapper.shape`."""
+        return self.to_group_native(group_by=group_by).shape
 
     @property
     def shape_2d(self):
@@ -276,6 +287,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         if self.ndim == 1:
             return self.shape[0], 1
         return self.shape
+    
+    def get_shape_2d(self, group_by=None):
+        """Get group-aware `ArrayWrapper.shape_2d`."""
+        return self.to_group_native(group_by=group_by).shape_2d
 
     @property
     def freq(self):
@@ -299,6 +314,12 @@ class ArrayWrapper(Configured, PandasIndexer):
                 except ValueError as e:
                     warnings.warn(repr(e), stacklevel=2)
         return freq
+
+    def to_time_units(self, a):
+        """Convert array to time units."""
+        if self.freq is None:
+            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
+        return to_time_units(a, self.freq)
 
     @property
     def column_only_select(self):
@@ -324,54 +345,63 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.ndim
         return self._grouped_ndim
 
-    def regroup(self, group_by):
+    def regroup(self, group_by=None, **kwargs):
         """Regroup this object."""
-        if self.grouper.is_grouping_changed(group_by=group_by):
-            self.grouper.check_group_by(group_by=group_by)
-            return self.copy(group_by=group_by)
-        return self
+        if group_by is None:
+            return self
+        self.grouper.check_group_by(group_by=group_by)
+        grouped_ndim = None
+        if self.grouper.is_grouped(group_by=group_by):
+            if not self.grouper.is_group_count_changed(group_by=group_by):
+                grouped_ndim = self.grouped_ndim
+        return self.copy(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
 
-    def to_time_units(self, a):
-        """Convert array to time units."""
-        if self.freq is None:
-            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
-        return to_time_units(a, self.freq)
+    @cached_method
+    def to_group_native(self, group_by=None, **kwargs):
+        """Replace columns and other metadata with groups.
 
-    def wrap(self, a, index=None, columns=None, dtype=None, collapse=None, **kwargs):
+        !!! note
+            Loses the ability to switch off grouping."""
+        _self = self.regroup(group_by=group_by)
+        return self.__class__(
+            _self.index,
+            _self.grouper.get_columns(),
+            _self.grouped_ndim,
+            freq=_self.freq,
+            column_only_select=_self.column_only_select,
+            **kwargs
+        )
+
+    def wrap(self, a, index=None, columns=None, dtype=None, group_by=None):
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
-        group_by = self.grouper.resolve_group_by(**kwargs)
-
+        _self = self.to_group_native(group_by=group_by)
+        
         a = np.asarray(a)
         a = reshape_fns.soft_to_ndim(a, self.ndim)
         if index is None:
-            index = self.index
+            index = _self.index
         if columns is None:
-            columns = self.grouper.get_columns(**kwargs)
-        if collapse is None:
-            collapse = group_by is not None and group_by is not False and self.grouped_ndim == 1
+            columns = _self.columns
         if columns is not None and len(columns) == 1:
             name = columns[0]
             if name == 0:  # was a Series before
                 name = None
         else:
             name = None
-
-        # Perform checks
         if index is not None:
             checks.assert_shape_equal(a, index, axis=(0, 0))
         if a.ndim == 2 and columns is not None:
             checks.assert_shape_equal(a, columns, axis=(1, 0))
-
         if a.ndim == 1:
             return pd.Series(a, index=index, name=name, dtype=dtype)
         if a.ndim == 2:
-            if a.shape[1] == 1 and collapse:
+            if a.shape[1] == 1 and _self.ndim == 1:
                 return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
             return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
         raise ValueError(f"{a.ndim}-d input is not supported")
 
-    def wrap_reduced(self, a, index=None, columns=None, time_units=False, collapse=None, dtype=None, **kwargs):
+    def wrap_reduced(self, a, index=None, columns=None, time_units=False, dtype=None, group_by=None):
         """Wrap result of reduction.
 
         `index` can be set when reducing to an array of values (vs. one value) per column.
@@ -379,12 +409,10 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         If `time_units` is set, calls `to_time_units`."""
         checks.assert_not_none(self.ndim)
-        group_by = self.grouper.resolve_group_by(**kwargs)
+        _self = self.to_group_native(group_by=group_by)
+        
         if columns is None:
-            columns = self.grouper.get_columns(**kwargs)
-        if collapse is None:
-            collapse = group_by is not None and group_by is not False and self.grouped_ndim == 1
-
+            columns = _self.columns
         a = np.asarray(a)
         if dtype is not None:
             try:
@@ -392,14 +420,14 @@ class ArrayWrapper(Configured, PandasIndexer):
             except Exception as e:
                 warnings.warn(repr(e), stacklevel=2)
         if time_units:
-            a = self.to_time_units(a)
+            a = _self.to_time_units(a)
         if a.ndim == 0:
             # Scalar per Series/DataFrame
             if time_units:
                 return pd.to_timedelta(a.item())
             return a.item()
         if a.ndim == 1:
-            if self.ndim == 1 or (self.ndim == 2 and len(columns) == 1 and collapse):
+            if _self.ndim == 1:
                 if a.shape[0] == 1:
                     # Scalar per Series/DataFrame with one column
                     if time_units:
@@ -415,7 +443,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 index = columns
             return pd.Series(a, index=index, dtype=dtype)
         if a.ndim == 2:
-            if self.ndim == 1 or (self.ndim == 2 and len(columns) == 1 and collapse):
+            if a.shape[1] == 1 and _self.ndim == 1:
                 # Array per Series
                 name = columns[0]
                 if name == 0:  # was a Series before
@@ -425,8 +453,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
         raise ValueError(f"{a.ndim}-d input is not supported")
 
-    def dummy(self, **kwargs):
+    def dummy(self, group_by=None, **kwargs):
         """Create dummy Series/DataFrame."""
-        return self.wrap(np.empty(self.shape), **kwargs)
+        _self = self.to_group_native(group_by=group_by)
+        return _self.wrap(np.empty(_self.shape), **kwargs)
 
 

@@ -165,7 +165,7 @@ class Orders(Records):
             ![](/vectorbt/docs/img/orders_plot.png)"""
         from vectorbt.defaults import color_schema, contrast_color_schema
 
-        self_col = self.force_select_column(column)
+        self_col = self._force_select_column(column)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}

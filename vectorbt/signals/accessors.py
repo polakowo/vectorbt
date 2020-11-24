@@ -240,7 +240,7 @@ class Signals_Accessor(Generic_Accessor):
             ```"""
         checks.assert_numba_func(exit_choice_func_nb)
 
-        return self.wrap(nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args))
+        return self.wrapper.wrap(nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args))
 
     # ############# Random ############# #
 
@@ -410,9 +410,9 @@ class Signals_Accessor(Generic_Accessor):
             ```"""
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self._obj, prob, keep_raw=[False, True])
-            return obj.vbt.wrap(nb.generate_rand_ex_by_prob_nb(
+            return obj.vbt.wrapper.wrap(nb.generate_rand_ex_by_prob_nb(
                 obj.vbt.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed))
-        return self.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed))
+        return self.wrapper.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed))
 
     def generate_stop_exits(self, ts, stop, trailing=False, entry_wait=1, exit_wait=1,
                             first=True, iteratively=False, broadcast_kwargs=None):
@@ -459,11 +459,11 @@ class Signals_Accessor(Generic_Accessor):
         if iteratively:
             new_entries, exits = nb.generate_stop_ex_iter_nb(
                 entries.vbt.to_2d_array(), ts, stop, trailing, entry_wait, exit_wait, entries.ndim == 2)
-            return entries.vbt.wrap(new_entries), entries.vbt.wrap(exits)
+            return entries.vbt.wrapper.wrap(new_entries), entries.vbt.wrapper.wrap(exits)
         else:
             exits = nb.generate_stop_ex_nb(
                 entries.vbt.to_2d_array(), ts, stop, trailing, exit_wait, first, entries.ndim == 2)
-            return entries.vbt.wrap(exits)
+            return entries.vbt.wrapper.wrap(exits)
 
     def generate_adv_stop_exits(self, open, high=None, low=None, close=None, is_open_safe=True,
                                 out_dict=None, sl_stop=0., ts_stop=0., tp_stop=0., entry_wait=1,
@@ -569,17 +569,17 @@ class Signals_Accessor(Generic_Accessor):
                 entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
                 stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
                 exit_wait, first, entries.ndim == 2)
-            out_dict['hit_price'] = entries.vbt.wrap(hit_price_out)
-            out_dict['stop_type'] = entries.vbt.wrap(stop_type_out)
-            return entries.vbt.wrap(new_entries), entries.vbt.wrap(exits)
+            out_dict['hit_price'] = entries.vbt.wrapper.wrap(hit_price_out)
+            out_dict['stop_type'] = entries.vbt.wrapper.wrap(stop_type_out)
+            return entries.vbt.wrapper.wrap(new_entries), entries.vbt.wrapper.wrap(exits)
         else:
             exits = nb.generate_adv_stop_ex_nb(
                 entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
                 stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait,
                 first, entries.ndim == 2)
-            out_dict['hit_price'] = entries.vbt.wrap(hit_price_out)
-            out_dict['stop_type'] = entries.vbt.wrap(stop_type_out)
-            return entries.vbt.wrap(exits)
+            out_dict['hit_price'] = entries.vbt.wrapper.wrap(hit_price_out)
+            out_dict['stop_type'] = entries.vbt.wrapper.wrap(stop_type_out)
+            return entries.vbt.wrapper.wrap(exits)
 
     # ############# Map and reduce ############# #
 
@@ -627,7 +627,7 @@ class Signals_Accessor(Generic_Accessor):
             )
             if isinstance(self._obj, pd.Series):
                 return result[0]
-            return pd.Series(result, index=self.columns)
+            return pd.Series(result, index=self.wrapper.columns)
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
@@ -638,7 +638,7 @@ class Signals_Accessor(Generic_Accessor):
                 map_func_nb, map_args,
                 reduce_func_nb, reduce_args
             )
-            return obj.vbt.wrap_reduced(result)
+            return obj.vbt.wrapper.wrap_reduced(result)
 
     def map_reduce_partitions(self, map_func_nb=None, map_args=None,
                               reduce_func_nb=None, reduce_args=None):
@@ -672,7 +672,7 @@ class Signals_Accessor(Generic_Accessor):
             map_func_nb, map_args,
             reduce_func_nb, reduce_args
         )
-        return self.wrap_reduced(result)
+        return self.wrapper.wrap_reduced(result)
 
     def num_signals(self):
         """Sum up True values."""
@@ -738,7 +738,7 @@ class Signals_Accessor(Generic_Accessor):
             reset_by=reset_by,
             after_false=after_false,
             allow_gaps=allow_gaps)
-        return obj.vbt.wrap(ranked)
+        return obj.vbt.wrapper.wrap(ranked)
 
     def rank_partitions(self, reset_by=None, after_false=False, broadcast_kwargs=None):
         """See `vectorbt.signals.nb.rank_partitions_nb`.
@@ -779,19 +779,19 @@ class Signals_Accessor(Generic_Accessor):
             obj.vbt.to_2d_array(),
             reset_by=reset_by,
             after_false=after_false)
-        return obj.vbt.wrap(ranked)
+        return obj.vbt.wrapper.wrap(ranked)
 
     def first(self, **kwargs):
         """`vectorbt.signals.nb.rank_nb` == 1."""
-        return self.wrap(self.rank(**kwargs).values == 1)
+        return self.wrapper.wrap(self.rank(**kwargs).values == 1)
 
     def nst(self, n, **kwargs):
         """`vectorbt.signals.nb.rank_nb` == n."""
-        return self.wrap(self.rank(**kwargs).values == n)
+        return self.wrapper.wrap(self.rank(**kwargs).values == n)
 
     def from_nst(self, n, **kwargs):
         """`vectorbt.signals.nb.rank_nb` >= n."""
-        return self.wrap(self.rank(**kwargs).values >= n)
+        return self.wrapper.wrap(self.rank(**kwargs).values >= n)
 
     # ############# Logical operations ############# #
 
@@ -883,7 +883,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             name = str(name)
 
         scatter = go.Scatter(
-            x=self.index,
+            x=self.wrapper.index,
             y=self._obj.values,
             mode='lines',
             name=name,
@@ -939,7 +939,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         # Plot markers
         _y = 1 if y is None else y
         scatter = go.Scatter(
-            x=self.index,
+            x=self.wrapper.index,
             y=np.where(self._obj, _y, np.nan),
             mode='markers',
             marker=dict(

@@ -102,19 +102,19 @@ class Generic_Accessor(Base_Accessor):
 
     def rolling_std(self, window, minp=1, ddof=1):  # pragma: no cover
         """See `vectorbt.generic.nb.rolling_std_nb`."""
-        return self.wrap(nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof))
+        return self.wrapper.wrap(nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof))
 
     def expanding_std(self, minp=1, ddof=1):  # pragma: no cover
         """See `vectorbt.generic.nb.expanding_std_nb`."""
-        return self.wrap(nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof))
+        return self.wrapper.wrap(nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof))
 
     def ewm_mean(self, span, minp=0, adjust=True):  # pragma: no cover
         """See `vectorbt.generic.nb.ewm_mean_nb`."""
-        return self.wrap(nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust))
+        return self.wrapper.wrap(nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust))
 
     def ewm_std(self, span, minp=0, adjust=True, ddof=1):  # pragma: no cover
         """See `vectorbt.generic.nb.ewm_std_nb`."""
-        return self.wrap(nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof))
+        return self.wrapper.wrap(nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof))
 
     def split_into_ranges(self, n=None, range_len=None, start_idxs=None, end_idxs=None):
         """Either split into `n` ranges each `range_len` long, or split into ranges between
@@ -173,18 +173,18 @@ class Generic_Accessor(Base_Accessor):
             if range_len is None and n is None:
                 raise ValueError("At least range_len, n, or start_idxs and end_idxs must be set")
             if range_len is None:
-                range_len = len(self.index) // n
-            start_idxs = np.arange(len(self.index) - range_len + 1)
-            end_idxs = np.arange(range_len, len(self.index) + 1)
+                range_len = len(self.wrapper.index) // n
+            start_idxs = np.arange(len(self.wrapper.index) - range_len + 1)
+            end_idxs = np.arange(range_len, len(self.wrapper.index) + 1)
         elif start_idxs is None or end_idxs is None:
             raise ValueError("Both start_idxs and end_idxs must be set")
         else:
             if isinstance(start_idxs, pd.Index):
-                start_idxs = np.where(self.index.isin(start_idxs))[0]
+                start_idxs = np.where(self.wrapper.index.isin(start_idxs))[0]
             else:
                 start_idxs = np.asarray(start_idxs)
             if isinstance(end_idxs, pd.Index):
-                end_idxs = np.where(self.index.isin(end_idxs))[0] + 1
+                end_idxs = np.where(self.wrapper.index.isin(end_idxs))[0] + 1
             else:
                 end_idxs = np.asarray(end_idxs)
 
@@ -198,10 +198,10 @@ class Generic_Accessor(Base_Accessor):
             start_idxs = start_idxs[idxs]
             end_idxs = end_idxs[idxs]
         matrix = nb.concat_ranges_nb(self.to_2d_array(), start_idxs, end_idxs)
-        range_starts = pd.Index(self.index[start_idxs], name='range_start')
-        range_ends = pd.Index(self.index[end_idxs - 1], name='range_end')
+        range_starts = pd.Index(self.wrapper.index[start_idxs], name='range_start')
+        range_ends = pd.Index(self.wrapper.index[end_idxs - 1], name='range_end')
         range_columns = index_fns.stack_indexes(range_starts, range_ends)
-        new_columns = index_fns.combine_indexes(self.columns, range_columns)
+        new_columns = index_fns.combine_indexes(self.wrapper.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
     def rolling_apply(self, window, apply_func_nb, *args, on_matrix=False):
@@ -233,7 +233,7 @@ class Generic_Accessor(Base_Accessor):
             out = nb.rolling_apply_matrix_nb(self.to_2d_array(), window, apply_func_nb, *args)
         else:
             out = nb.rolling_apply_nb(self.to_2d_array(), window, apply_func_nb, *args)
-        return self.wrap(out)
+        return self.wrapper.wrap(out)
 
     def expanding_apply(self, apply_func_nb, *args, on_matrix=False):
         """See `vectorbt.generic.nb.expanding_apply_nb` and
@@ -264,7 +264,7 @@ class Generic_Accessor(Base_Accessor):
             out = nb.expanding_apply_matrix_nb(self.to_2d_array(), apply_func_nb, *args)
         else:
             out = nb.expanding_apply_nb(self.to_2d_array(), apply_func_nb, *args)
-        return self.wrap(out)
+        return self.wrapper.wrap(out)
 
     def groupby_apply(self, by, apply_func_nb, *args, on_matrix=False, **kwargs):
         """See `vectorbt.generic.nb.groupby_apply_nb` and
@@ -297,7 +297,7 @@ class Generic_Accessor(Base_Accessor):
             out = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        return self.wrap_reduced(out, index=list(regrouped.indices.keys()))
+        return self.wrapper.wrap_reduced(out, index=list(regrouped.indices.keys()))
 
     def resample_apply(self, freq, apply_func_nb, *args, on_matrix=False, **kwargs):
         """See `vectorbt.generic.nb.groupby_apply_nb` and
@@ -330,9 +330,9 @@ class Generic_Accessor(Base_Accessor):
             out = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
-        out_obj = self.wrap(out, index=list(resampled.indices.keys()))
+        out_obj = self.wrapper.wrap(out, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
-        resampled_obj = self.wrap(resampled_arr, index=pd.Index(list(resampled.groups.keys()), freq=freq))
+        resampled_obj = self.wrapper.wrap(resampled_arr, index=pd.Index(list(resampled.groups.keys()), freq=freq))
         resampled_obj.loc[out_obj.index] = out_obj.values
         return resampled_obj
 
@@ -353,7 +353,7 @@ class Generic_Accessor(Base_Accessor):
         checks.assert_numba_func(apply_func_nb)
 
         out = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
-        return self.wrap(out)
+        return self.wrapper.wrap(out)
 
     def filter(self, filter_func_nb, *args):
         """See `vectorbt.generic.nb.filter_nb`.
@@ -372,7 +372,7 @@ class Generic_Accessor(Base_Accessor):
         checks.assert_numba_func(filter_func_nb)
 
         out = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
-        return self.wrap(out)
+        return self.wrapper.wrap(out)
 
     def apply_and_reduce(self, apply_func_nb, reduce_func_nb, apply_args=None, reduce_args=None, **kwargs):
         """See `vectorbt.generic.nb.apply_and_reduce_nb`.
@@ -397,7 +397,7 @@ class Generic_Accessor(Base_Accessor):
             reduce_args = ()
 
         out = nb.apply_and_reduce_nb(self.to_2d_array(), apply_func_nb, apply_args, reduce_func_nb, reduce_args)
-        return self.wrap_reduced(out, **kwargs)
+        return self.wrapper.wrap_reduced(out, **kwargs)
 
     def reduce(self, reduce_func_nb, *args, to_array=False, to_idx=False, flatten=False,
                order='C', idx_labeled=True, group_by=None, **kwargs):
@@ -459,8 +459,8 @@ class Generic_Accessor(Base_Accessor):
             ```"""
         checks.assert_numba_func(reduce_func_nb)
 
-        if self.grouper.is_grouped(group_by=group_by):
-            group_lens = self.grouper.get_group_lens(group_by=group_by)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             if flatten:
                 checks.assert_in(order.upper(), ['C', 'F'])
                 in_c_order = order.upper() == 'C'
@@ -474,7 +474,7 @@ class Generic_Accessor(Base_Accessor):
                     if in_c_order:
                         out //= group_lens  # flattened in C order
                     else:
-                        out %= self.shape[0]  # flattened in F order
+                        out %= self.wrapper.shape[0]  # flattened in F order
             else:
                 if to_array:
                     out = nb.reduce_grouped_to_array_nb(
@@ -495,11 +495,11 @@ class Generic_Accessor(Base_Accessor):
             nan_mask = np.isnan(out)
             if idx_labeled:
                 out = out.astype(np.object)
-                out[~nan_mask] = self.index[out[~nan_mask].astype(np.int_)]
+                out[~nan_mask] = self.wrapper.index[out[~nan_mask].astype(np.int_)]
             else:
                 out[nan_mask] = -1
                 out = out.astype(np.int_)
-        return self.wrap_reduced(out, group_by=group_by, **kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=group_by, **kwargs)
 
     def squeeze_grouped(self, reduce_func_nb, *args, group_by=None, **kwargs):
         """Squeeze each group of columns into a single column.
@@ -521,13 +521,13 @@ class Generic_Accessor(Base_Accessor):
             2020-01-05    3.0     1.0
             ```
             """
-        if not self.grouper.is_grouped(group_by=group_by):
+        if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
         checks.assert_numba_func(reduce_func_nb)
 
-        group_lens = self.grouper.get_group_lens(group_by=group_by)
+        group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
         out = nb.squeeze_grouped_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
-        return self.wrap(out, group_by=group_by, **kwargs)
+        return self.wrapper.wrap(out, group_by=group_by, **kwargs)
 
     def flatten_grouped(self, group_by=None, order='C', **kwargs):
         """Flatten each group of columns.
@@ -570,22 +570,22 @@ class Generic_Accessor(Base_Accessor):
             2020-01-05    1.0     NaN
             ```
             """
-        if not self.grouper.is_grouped(group_by=group_by):
+        if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
         checks.assert_in(order.upper(), ['C', 'F'])
 
-        group_lens = self.grouper.get_group_lens(group_by=group_by)
+        group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
         if order.upper() == 'C':
             out = nb.flatten_grouped_nb(self.to_2d_array(), group_lens, True)
-            new_index = index_fns.repeat_index(self.index, np.max(group_lens))
+            new_index = index_fns.repeat_index(self.wrapper.index, np.max(group_lens))
         else:
             out = nb.flatten_grouped_nb(self.to_2d_array(), group_lens, False)
-            new_index = index_fns.tile_index(self.index, np.max(group_lens))
-        return self.wrap(out, group_by=group_by, index=new_index, **kwargs)
+            new_index = index_fns.tile_index(self.wrapper.index, np.max(group_lens))
+        return self.wrapper.wrap(out, group_by=group_by, index=new_index, **kwargs)
 
     def min(self, group_by=None, **kwargs):
         """Return min of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.min_reduce_nb, group_by=group_by, flatten=True)
 
         arr = self.to_2d_array()
@@ -594,11 +594,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmin = np.nanmin
         else:
             _nanmin = nanmin
-        return self.wrap_reduced(_nanmin(arr, axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(_nanmin(arr, axis=0), **kwargs)
 
     def max(self, group_by=None, **kwargs):
         """Return max of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.max_reduce_nb, group_by=group_by, flatten=True)
 
         arr = self.to_2d_array()
@@ -607,11 +607,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmax = np.nanmax
         else:
             _nanmax = nanmax
-        return self.wrap_reduced(_nanmax(arr, axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(_nanmax(arr, axis=0), **kwargs)
 
     def mean(self, group_by=None, **kwargs):
         """Return mean of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.mean_reduce_nb, group_by=group_by, flatten=True)
 
         arr = self.to_2d_array()
@@ -620,11 +620,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmean = np.nanmean
         else:
             _nanmean = nanmean
-        return self.wrap_reduced(_nanmean(arr, axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(_nanmean(arr, axis=0), **kwargs)
 
     def median(self, group_by=None, **kwargs):
         """Return median of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.median_reduce_nb, group_by=group_by, flatten=True)
 
         arr = self.to_2d_array()
@@ -633,11 +633,11 @@ class Generic_Accessor(Base_Accessor):
             _nanmedian = np.nanmedian
         else:
             _nanmedian = nanmedian
-        return self.wrap_reduced(_nanmedian(arr, axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(_nanmedian(arr, axis=0), **kwargs)
 
     def std(self, ddof=1, group_by=None, **kwargs):
         """Return standard deviation of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.std_reduce_nb, ddof, group_by=group_by, flatten=True)
 
         arr = self.to_2d_array()
@@ -646,11 +646,11 @@ class Generic_Accessor(Base_Accessor):
             _nanstd = np.nanstd
         else:
             _nanstd = nanstd
-        return self.wrap_reduced(_nanstd(arr, ddof=ddof, axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(_nanstd(arr, ddof=ddof, axis=0), **kwargs)
 
     def sum(self, group_by=None, **kwargs):
         """Return sum of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.sum_reduce_nb, group_by=group_by, flatten=True)
 
         arr = self.to_2d_array()
@@ -659,18 +659,18 @@ class Generic_Accessor(Base_Accessor):
             _nansum = np.nansum
         else:
             _nansum = nansum
-        return self.wrap_reduced(_nansum(arr, axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(_nansum(arr, axis=0), **kwargs)
 
     def count(self, group_by=None, **kwargs):
         """Return count of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(nb.count_reduce_nb, group_by=group_by, flatten=True, dtype=np.int_)
 
-        return self.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **kwargs)
+        return self.wrapper.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **kwargs)
 
     def idxmin(self, group_by=None, order='C', **kwargs):
         """Return labeled index of min of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 nb.argmin_reduce_nb,
                 group_by=group_by,
@@ -682,12 +682,12 @@ class Generic_Accessor(Base_Accessor):
         obj = self.to_2d_array()
         out = np.full(obj.shape[1], np.nan, dtype=np.object)
         nan_mask = np.all(np.isnan(obj), axis=0)
-        out[~nan_mask] = self.index[nanargmin(obj[:, ~nan_mask], axis=0)]
-        return self.wrap_reduced(out, **kwargs)
+        out[~nan_mask] = self.wrapper.index[nanargmin(obj[:, ~nan_mask], axis=0)]
+        return self.wrapper.wrap_reduced(out, **kwargs)
 
     def idxmax(self, group_by=None, order='C', **kwargs):
         """Return labeled index of max of non-NaN elements."""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 nb.argmax_reduce_nb,
                 group_by=group_by,
@@ -699,8 +699,8 @@ class Generic_Accessor(Base_Accessor):
         obj = self.to_2d_array()
         out = np.full(obj.shape[1], np.nan, dtype=np.object)
         nan_mask = np.all(np.isnan(obj), axis=0)
-        out[~nan_mask] = self.index[nanargmax(obj[:, ~nan_mask], axis=0)]
-        return self.wrap_reduced(out, **kwargs)
+        out[~nan_mask] = self.wrapper.index[nanargmax(obj[:, ~nan_mask], axis=0)]
+        return self.wrapper.wrap_reduced(out, **kwargs)
 
     def describe(self, percentiles=None, ddof=1, group_by=None, **kwargs):
         """See `vectorbt.generic.nb.describe_reduce_nb`.
@@ -732,7 +732,7 @@ class Generic_Accessor(Base_Accessor):
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.reduce(
                 nb.describe_reduce_nb, percentiles, ddof,
                 group_by=group_by, flatten=True, to_array=True,
@@ -744,30 +744,30 @@ class Generic_Accessor(Base_Accessor):
 
     def drawdown(self):
         """Drawdown series."""
-        return self.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
+        return self.wrapper.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
 
     def drawdowns(self, group_by=None, **kwargs):
         """Generate drawdown records.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         if group_by is None:
-            group_by = self.grouper.group_by
-        return Drawdowns.from_ts(self._obj, freq=self.freq, group_by=group_by, **kwargs)
+            group_by = self.wrapper.grouper.group_by
+        return Drawdowns.from_ts(self._obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
 
     def to_mapped_array(self, dropna=True, group_by=None, **kwargs):
         """Convert this object into an instance of `vectorbt.records.mapped_array.MappedArray`."""
         from vectorbt.records.mapped_array import MappedArray
 
         mapped_arr = reshape_fns.to_2d(self._obj, raw=True).flatten(order='F')
-        col_arr = np.repeat(np.arange(self.shape_2d[1]), self.shape_2d[0])
-        idx_arr = np.tile(np.arange(self.shape_2d[0]), self.shape_2d[1])
+        col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
+        idx_arr = np.tile(np.arange(self.wrapper.shape_2d[0]), self.wrapper.shape_2d[1])
         if dropna:
             not_nan_mask = ~np.isnan(mapped_arr)
             mapped_arr = mapped_arr[not_nan_mask]
             col_arr = col_arr[not_nan_mask]
             idx_arr = idx_arr[not_nan_mask]
         if group_by is None:
-            group_by = self.grouper.group_by
+            group_by = self.wrapper.grouper.group_by
         return MappedArray(self.wrapper, mapped_arr, col_arr, idx_arr=idx_arr, **kwargs).regroup(group_by)
 
     # ############# Plotting ############# #
@@ -782,10 +782,10 @@ class Generic_Accessor(Base_Accessor):
 
             ![](/vectorbt/docs/img/df_bar.png)"""
         if x_labels is None:
-            x_labels = self.index
+            x_labels = self.wrapper.index
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
+                trace_names = self.wrapper.columns
         return plotting.create_bar(
             data=self.to_2d_array(),
             trace_names=trace_names,
@@ -803,10 +803,10 @@ class Generic_Accessor(Base_Accessor):
 
             ![](/vectorbt/docs/img/df_scatter.png)"""
         if x_labels is None:
-            x_labels = self.index
+            x_labels = self.wrapper.index
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
+                trace_names = self.wrapper.columns
         return plotting.create_scatter(
             data=self.to_2d_array(),
             trace_names=trace_names,
@@ -823,12 +823,12 @@ class Generic_Accessor(Base_Accessor):
             ```
 
             ![](/vectorbt/docs/img/df_hist.png)"""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.hist(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
+                trace_names = self.wrapper.columns
         return plotting.create_hist(
             data=self.to_2d_array(),
             trace_names=trace_names,
@@ -844,12 +844,12 @@ class Generic_Accessor(Base_Accessor):
             ```
 
             ![](/vectorbt/docs/img/df_box.png)"""
-        if self.grouper.is_grouped(group_by=group_by):
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.box(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.name is not None):
-                trace_names = self.columns
+                trace_names = self.wrapper.columns
         return plotting.create_box(
             data=self.to_2d_array(),
             trace_names=trace_names,
@@ -900,7 +900,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             name = str(name)
 
         scatter = go.Scatter(
-            x=self.index,
+            x=self.wrapper.index,
             y=self._obj.values,
             mode='lines',
             name=name,
@@ -1087,13 +1087,13 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
             ![](/vectorbt/docs/img/heatmap_slider.gif)"""
         (x_level, y_level), (slider_level,) = index_fns.pick_levels(
-            self.index,
+            self.wrapper.index,
             required_levels=(x_level, y_level),
             optional_levels=(slider_level,)
         )
 
-        x_level_vals = self.index.get_level_values(x_level)
-        y_level_vals = self.index.get_level_values(y_level)
+        x_level_vals = self.wrapper.index.get_level_values(x_level)
+        y_level_vals = self.wrapper.index.get_level_values(y_level)
         x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
         y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
         kwargs = merge_kwargs(dict(
@@ -1149,7 +1149,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 )
                 step["args"][0]["visible"][i] = True
                 steps.append(step)
-            prefix = f'{self.index.names[slider_level]}: ' if self.index.names[slider_level] is not None else None
+            prefix = f'{self.wrapper.index.names[slider_level]}: ' \
+                if self.wrapper.index.names[slider_level] is not None else None
             sliders = [dict(
                 active=0,
                 currentvalue={"prefix": prefix},
@@ -1191,14 +1192,14 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
             ![](/vectorbt/docs/img/volume.png)"""
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
-            self.index,
+            self.wrapper.index,
             required_levels=(x_level, y_level, z_level),
             optional_levels=(slider_level,)
         )
 
-        x_level_vals = self.index.get_level_values(x_level)
-        y_level_vals = self.index.get_level_values(y_level)
-        z_level_vals = self.index.get_level_values(z_level)
+        x_level_vals = self.wrapper.index.get_level_values(x_level)
+        y_level_vals = self.wrapper.index.get_level_values(y_level)
+        z_level_vals = self.wrapper.index.get_level_values(z_level)
         # Labels are just unique level values
         if x_labels is None:
             x_labels = np.unique(x_level_vals)
@@ -1276,7 +1277,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 )
                 step["args"][0]["visible"][i] = True
                 steps.append(step)
-            prefix = f'{self.index.names[slider_level]}: ' if self.index.names[slider_level] is not None else None
+            prefix = f'{self.wrapper.index.names[slider_level]}: ' \
+                if self.wrapper.index.names[slider_level] is not None else None
             sliders = [dict(
                 active=0,
                 currentvalue={"prefix": prefix},
@@ -1345,9 +1347,9 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
 
             ![](/vectorbt/docs/img/heatmap.png)"""
         if x_labels is None:
-            x_labels = self.columns
+            x_labels = self.wrapper.columns
         if y_labels is None:
-            y_labels = self.index
+            y_labels = self.wrapper.index
         return plotting.create_heatmap(
             data=self.to_2d_array(),
             x_labels=x_labels,

@@ -28,31 +28,22 @@ from vectorbt.base.common import (
     unary_magic_methods,
     lambda self, np_func: self.apply(apply_func=np_func)
 )
-class Base_Accessor(ArrayWrapper):
+class Base_Accessor:
     """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
 
-    You can call the accessor and specify index frequency if your index isn't datetime-like.
-
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
-    by using `Base_Accessor.wrap`, we will convert the 2-dim output back to a Series."""
+    by using `Base_Accessor.wrapper`, we will convert the 2-dim output back to a Series.
+
+    `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def __init__(self, obj, **kwargs):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._obj = obj
-        self._wrapper = ArrayWrapper.from_obj(obj)
-
-        # Initialize array wrapper
-        ArrayWrapper.__init__(
-            self,
-            index=self._wrapper.index,
-            columns=self._wrapper.columns,
-            ndim=self._wrapper.ndim,
-            **kwargs
-        )
+        self._wrapper = ArrayWrapper.from_obj(obj, **kwargs)
 
     def __call__(self, *args, **kwargs):
         """Allows passing arguments to the initializer."""
@@ -90,9 +81,9 @@ class Base_Accessor(ArrayWrapper):
         checks.assert_in(axis, (0, 1))
 
         if axis == 1:
-            obj_index = self.columns
+            obj_index = self.wrapper.columns
         else:
-            obj_index = self.index
+            obj_index = self.wrapper.index
         obj_index = apply_func(obj_index, *args, **kwargs)
         if inplace:
             if axis == 1:
@@ -194,11 +185,11 @@ class Base_Accessor(ArrayWrapper):
         tiled = reshape_fns.tile(self._obj, n, axis=axis)
         if keys is not None:
             if axis == 1:
-                new_columns = index_fns.combine_indexes(keys, self.columns)
-                return tiled.vbt.wrap(tiled.values, columns=new_columns)
+                new_columns = index_fns.combine_indexes(keys, self.wrapper.columns)
+                return tiled.vbt.wrapper.wrap(tiled.values, columns=new_columns)
             else:
-                new_index = index_fns.combine_indexes(keys, self.index)
-                return tiled.vbt.wrap(tiled.values, index=new_index)
+                new_index = index_fns.combine_indexes(keys, self.wrapper.index)
+                return tiled.vbt.wrapper.wrap(tiled.values, index=new_index)
         return tiled
 
     def repeat(self, n, keys=None, axis=1):
@@ -209,11 +200,11 @@ class Base_Accessor(ArrayWrapper):
         repeated = reshape_fns.repeat(self._obj, n, axis=axis)
         if keys is not None:
             if axis == 1:
-                new_columns = index_fns.combine_indexes(self.columns, keys)
-                return repeated.vbt.wrap(repeated.values, columns=new_columns)
+                new_columns = index_fns.combine_indexes(self.wrapper.columns, keys)
+                return repeated.vbt.wrapper.wrap(repeated.values, columns=new_columns)
             else:
-                new_index = index_fns.combine_indexes(self.index, keys)
-                return repeated.vbt.wrap(repeated.values, index=new_index)
+                new_index = index_fns.combine_indexes(self.wrapper.index, keys)
+                return repeated.vbt.wrapper.wrap(repeated.values, index=new_index)
         return repeated
 
     def align_to(self, other):
@@ -250,7 +241,7 @@ class Base_Accessor(ArrayWrapper):
         aligned_index = index_fns.align_index_to(obj.index, other.index)
         aligned_columns = index_fns.align_index_to(obj.columns, other.columns)
         obj = obj.iloc[aligned_index, aligned_columns]
-        return self.wrap(obj.values, index=other.index, columns=other.columns, group_by=False)
+        return self.wrapper.wrap(obj.values, index=other.index, columns=other.columns, group_by=False)
 
     @class_or_instancemethod
     def broadcast(self_or_cls, *others, **kwargs):
@@ -309,7 +300,7 @@ class Base_Accessor(ArrayWrapper):
         else:
             obj = np.asarray(self._obj)
         result = apply_func(obj, *args, **kwargs)
-        return self.wrap(result, group_by=False)
+        return self.wrapper.wrap(result, group_by=False)
 
     @class_or_instancemethod
     def concat(self_or_cls, *others, keys=None, broadcast_kwargs={}):
@@ -379,11 +370,11 @@ class Base_Accessor(ArrayWrapper):
             result = combine_fns.apply_and_concat_one(ntimes, apply_func, obj_arr, *args, **kwargs)
         # Build column hierarchy
         if keys is not None:
-            new_columns = index_fns.combine_indexes(keys, self.columns)
+            new_columns = index_fns.combine_indexes(keys, self.wrapper.columns)
         else:
             top_columns = pd.Index(np.arange(ntimes), name='apply_idx')
-            new_columns = index_fns.combine_indexes(top_columns, self.columns)
-        return self.wrap(result, columns=new_columns, group_by=False)
+            new_columns = index_fns.combine_indexes(top_columns, self.wrapper.columns)
+        return self.wrapper.wrap(result, columns=new_columns, group_by=False)
 
     def combine_with(self, other, *args, combine_func=None, to_2d=False, broadcast_kwargs={}, **kwargs):
         """Combine both using `combine_func` into a Series/DataFrame of the same shape.
@@ -424,7 +415,7 @@ class Base_Accessor(ArrayWrapper):
             new_obj_arr = np.asarray(new_obj)
             new_other_arr = np.asarray(new_other)
         result = combine_func(new_obj_arr, new_other_arr, *args, **kwargs)
-        return new_obj.vbt.wrap(result)
+        return new_obj.vbt.wrapper.wrap(result)
 
     def combine_with_multiple(self, others, *args, combine_func=None, to_2d=False,
                               concat=False, broadcast_kwargs={}, keys=None, **kwargs):
@@ -491,13 +482,13 @@ class Base_Accessor(ArrayWrapper):
                 result = combine_fns.combine_and_concat_nb(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_and_concat(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
-            columns = new_obj.vbt.columns
+            columns = new_obj.vbt.wrapper.columns
             if keys is not None:
                 new_columns = index_fns.combine_indexes(keys, columns)
             else:
                 top_columns = pd.Index(np.arange(len(new_others)), name='combine_idx')
                 new_columns = index_fns.combine_indexes(top_columns, columns)
-            return new_obj.vbt.wrap(result, columns=new_columns)
+            return new_obj.vbt.wrapper.wrap(result, columns=new_columns)
         else:
             # Combine arguments pairwise into one object
             if checks.is_numba_func(combine_func):
@@ -506,7 +497,7 @@ class Base_Accessor(ArrayWrapper):
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)
             else:
                 result = combine_fns.combine_multiple(bc_arrays, combine_func, *args, **kwargs)
-            return new_obj.vbt.wrap(result)
+            return new_obj.vbt.wrapper.wrap(result)
 
 
 class Base_SRAccessor(Base_Accessor):

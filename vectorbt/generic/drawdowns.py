@@ -205,25 +205,31 @@ class Drawdowns(Records):
         """Current drawdown from peak.
 
         Does not support grouping."""
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            raise ValueError("Grouping is not supported by this method")
         curr_end_val = self.active.end_value.nst(-1, group_by=group_by)
         curr_start_val = self.active.start_value.nst(-1, group_by=group_by)
         curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
         return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
 
     @cached_method
-    def current_duration(self, time_units=True, **kwargs):
+    def current_duration(self, time_units=True, group_by=None, **kwargs):
         """Current duration from peak.
 
         Does not support grouping."""
-        return self.active.duration.nst(-1, time_units=time_units, **kwargs)
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            raise ValueError("Grouping is not supported by this method")
+        return self.active.duration.nst(-1, time_units=time_units, group_by=group_by, **kwargs)
 
     @cached_method
-    def current_return(self, **kwargs):
+    def current_return(self, group_by=None, **kwargs):
         """Current return from valley.
 
         Does not support grouping."""
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            raise ValueError("Grouping is not supported by this method")
         recovery_return = self.active.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
-        return recovery_return.nst(-1, **kwargs)
+        return recovery_return.nst(-1, group_by=group_by, **kwargs)
 
     # ############# DrawdownStatus.Recovered ############# #
 
@@ -294,7 +300,7 @@ class Drawdowns(Records):
             ![](/vectorbt/docs/img/drawdowns_plot.png)"""
         from vectorbt.defaults import color_schema, contrast_color_schema
 
-        self_col = self.force_select_column(column)
+        self_col = self._force_select_column(column)
         if top_n is not None:
             # Drawdowns is negative, thus top_n becomes bottom_n
             self_col = self_col.filter_by_mask(self_col.drawdown.bottom_n_mask(top_n))

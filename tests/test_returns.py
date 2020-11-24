@@ -42,13 +42,13 @@ benchmark_rets = pd.DataFrame({
 
 class TestAccessors:
     def test_freq(self):
-        assert ret.vbt.returns.freq == day_dt
-        assert ret['a'].vbt.returns.freq == day_dt
-        assert ret.vbt.returns(freq='2D').freq == day_dt * 2
-        assert ret['a'].vbt.returns(freq='2D').freq == day_dt * 2
-        assert pd.Series([1, 2, 3]).vbt.returns.freq is None
-        assert pd.Series([1, 2, 3]).vbt.returns(freq='3D').freq == day_dt * 3
-        assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).freq == day_dt * 4
+        assert ret.vbt.returns.wrapper.freq == day_dt
+        assert ret['a'].vbt.returns.wrapper.freq == day_dt
+        assert ret.vbt.returns(freq='2D').wrapper.freq == day_dt * 2
+        assert ret['a'].vbt.returns(freq='2D').wrapper.freq == day_dt * 2
+        assert pd.Series([1, 2, 3]).vbt.returns.wrapper.freq is None
+        assert pd.Series([1, 2, 3]).vbt.returns(freq='3D').wrapper.freq == day_dt * 3
+        assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
     def test_year_freq(self):
         assert ret.vbt.returns.year_freq == pd.to_timedelta(defaults.returns['year_freq'])
@@ -399,7 +399,7 @@ class TestAccessors:
 
     def test_drawdowns(self):
         assert type(ret['a'].vbt.returns.drawdowns()) is Drawdowns
-        assert ret['a'].vbt.returns.drawdowns().wrapper.freq == ret['a'].vbt.returns.freq
+        assert ret['a'].vbt.returns.drawdowns().wrapper.freq == ret['a'].vbt.wrapper.freq
         assert ret['a'].vbt.returns.drawdowns().wrapper.ndim == ret['a'].ndim
         assert ret.vbt.returns.drawdowns().wrapper.ndim == ret.ndim
         assert isclose(ret['a'].vbt.returns.drawdowns().max_drawdown(), ret['a'].vbt.returns.max_drawdown())

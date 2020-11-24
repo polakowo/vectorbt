@@ -62,17 +62,17 @@ class TestMappedArray:
 
     def test_force_select_column(self):
         with pytest.raises(Exception) as e_info:
-            _ = mapped_array.force_select_column().wrapper.columns
+            _ = mapped_array._force_select_column().wrapper.columns
         pd.testing.assert_index_equal(
-            mapped_array['a'].force_select_column().wrapper.columns,
+            mapped_array['a']._force_select_column().wrapper.columns,
             mapped_array['a'].wrapper.columns
         )
         pd.testing.assert_index_equal(
-            mapped_array.force_select_column(column='a').wrapper.columns,
+            mapped_array._force_select_column(column='a').wrapper.columns,
             mapped_array['a'].wrapper.columns
         )
         pd.testing.assert_index_equal(
-            mapped_array_grouped.force_select_column(column='a').wrapper.columns,
+            mapped_array_grouped._force_select_column(column='a').wrapper.columns,
             mapped_array['a'].wrapper.columns
         )
 
@@ -125,21 +125,21 @@ class TestMappedArray:
 
     def test_group_arr(self):
         np.testing.assert_array_equal(
-            mapped_array.ga_col_arr(),
+            mapped_array.get_col_arr(),
             np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
         )
         np.testing.assert_array_equal(
-            mapped_array_grouped['g1'].ga_col_arr(),
+            mapped_array_grouped['g1'].get_col_arr(),
             np.array([0, 0, 0, 0, 0, 0])
         )
         np.testing.assert_array_equal(
-            mapped_array_grouped.ga_col_arr(),
+            mapped_array_grouped.get_col_arr(),
             np.array([0, 0, 0, 0, 0, 0, 1, 1, 1])
         )
 
     def test_group_index(self):
         np.testing.assert_array_equal(
-            mapped_array.ga_col_index(),
+            mapped_array.get_col_index(),
             np.array([
                 [0, 3],
                 [3, 6],
@@ -148,13 +148,13 @@ class TestMappedArray:
             ])
         )
         np.testing.assert_array_equal(
-            mapped_array_grouped['g1'].ga_col_index(),
+            mapped_array_grouped['g1'].get_col_index(),
             np.array([
                 [0, 6]
             ])
         )
         np.testing.assert_array_equal(
-            mapped_array_grouped.ga_col_index(),
+            mapped_array_grouped.get_col_index(),
             np.array([
                 [0, 6],
                 [6, 9]
@@ -447,11 +447,9 @@ class TestMappedArray:
         )
         with pytest.raises(Exception) as e_info:
             _ = mapped_array.nst(10)
-        with pytest.raises(Exception) as e_info:
-            _ = mapped_array_grouped.nst(0)
         pd.testing.assert_series_equal(
-            mapped_array_grouped.nst(0, group_by=False),
-            pd.Series(np.array([10., 13., 12., np.nan]), index=wrapper.columns)
+            mapped_array_grouped.nst(0),
+            pd.Series(np.array([10., 12.]), index=pd.Index(['g1', 'g2'], dtype='object'))
         )
 
     def test_min(self):
@@ -846,17 +844,17 @@ class TestRecords:
 
     def test_force_select_column(self):
         with pytest.raises(Exception) as e_info:
-            _ = records.force_select_column().wrapper.columns
+            _ = records._force_select_column().wrapper.columns
         pd.testing.assert_index_equal(
-            records['a'].force_select_column().wrapper.columns,
+            records['a']._force_select_column().wrapper.columns,
             records['a'].wrapper.columns
         )
         pd.testing.assert_index_equal(
-            records.force_select_column(column='a').wrapper.columns,
+            records._force_select_column(column='a').wrapper.columns,
             records['a'].wrapper.columns
         )
         pd.testing.assert_index_equal(
-            records.force_select_column(column='a').wrapper.columns,
+            records._force_select_column(column='a').wrapper.columns,
             records['a'].wrapper.columns
         )
 

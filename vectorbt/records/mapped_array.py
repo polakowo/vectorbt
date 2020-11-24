@@ -355,7 +355,7 @@ class MappedArray(Configured, PandasIndexer):
             return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
         return self
 
-    def force_select_column(self, column=None):
+    def _force_select_column(self, column=None):
         """Force selection of one column."""
         if column is not None:
             if self.wrapper.grouper.group_by is None:
@@ -399,22 +399,22 @@ class MappedArray(Configured, PandasIndexer):
         return nb.mapped_col_index_nb(self.values, self.col_arr, len(self.wrapper.columns))
 
     @cached_method
-    def ga_col_arr(self, group_by=None):
+    def get_col_arr(self, group_by=None):
         """Group-aware column array."""
-        group_arr, columns = self.wrapper.grouper.get_groups_and_columns(group_by=group_by)
+        group_arr = self.wrapper.grouper.get_groups(group_by=group_by)
         if group_arr is not None:
-            ga_col_arr = group_arr[self.col_arr]
+            col_arr = group_arr[self.col_arr]
         else:
-            ga_col_arr = self.col_arr
-        return ga_col_arr
+            col_arr = self.col_arr
+        return col_arr
 
     @cached_method
-    def ga_col_index(self, group_by=None):
+    def get_col_index(self, group_by=None):
         """Group-aware column index for `MappedArray.values`."""
-        col_arr = self.ga_col_arr(group_by=group_by)
-        columns = self.wrapper.grouper.get_columns(group_by=group_by)
-        ga_col_index = nb.mapped_col_index_nb(self.values, col_arr, len(columns))
-        return ga_col_index
+        col_arr = self.get_col_arr(group_by=group_by)
+        columns = self.wrapper.get_columns(group_by=group_by)
+        col_index = nb.mapped_col_index_nb(self.values, col_arr, len(columns))
+        return col_index
 
     def filter_by_mask(self, mask, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
@@ -425,6 +425,7 @@ class MappedArray(Configured, PandasIndexer):
         if value_map is None:
             value_map = self.value_map
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
+            self.wrapper.grouper.check_group_by(group_by=group_by)
             wrapper = self.wrapper.copy(group_by=group_by)
         else:
             wrapper = self.wrapper
@@ -441,7 +442,7 @@ class MappedArray(Configured, PandasIndexer):
         """Map mapped array to a mask.
 
         See `vectorbt.records.nb.mapped_to_mask_nb`."""
-        col_arr = self.ga_col_arr(group_by=group_by)
+        col_arr = self.get_col_arr(group_by=group_by)
         return nb.mapped_to_mask_nb(self.values, col_arr, inout_map_func_nb, *args)
 
     def top_n_mask(self, n, **kwargs):
@@ -460,7 +461,7 @@ class MappedArray(Configured, PandasIndexer):
         """Filter bottom N elements from each column."""
         return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
 
-    def to_matrix(self, idx_arr=None, default_val=np.nan):
+    def to_matrix(self, idx_arr=None, default_val=np.nan, group_by=None, **kwargs):
         """Convert mapped array to the matrix form.
 
         See `vectorbt.records.nb.mapped_to_matrix_nb`.
@@ -472,9 +473,11 @@ class MappedArray(Configured, PandasIndexer):
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
-        target_shape = (len(self.wrapper.index), len(self.wrapper.columns))
-        out = nb.mapped_to_matrix_nb(self.values, self.col_arr, idx_arr, target_shape, default_val)
-        return self.wrapper.wrap(out, group_by=False)
+        col_arr = self.get_col_arr(group_by=group_by)
+        columns = self.wrapper.get_columns(group_by=group_by)
+        target_shape = (len(self.wrapper.index), len(columns))
+        out = nb.mapped_to_matrix_nb(self.values, col_arr, idx_arr, target_shape, default_val)
+        return self.wrapper.wrap(out, group_by=group_by, **kwargs)
 
     def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False, to_idx=False,
                idx_labeled=True, default_val=np.nan, group_by=None, **kwargs):
@@ -498,8 +501,8 @@ class MappedArray(Configured, PandasIndexer):
             idx_arr = self.idx_arr
 
         # Perform main computation
-        col_arr = self.ga_col_arr(group_by=group_by)
-        columns = self.wrapper.grouper.get_columns(group_by=group_by)
+        col_arr = self.get_col_arr(group_by=group_by)
+        columns = self.wrapper.get_columns(group_by=group_by)
         if not to_array:
             if not to_idx:
                 out = nb.reduce_mapped_nb(
@@ -553,11 +556,9 @@ class MappedArray(Configured, PandasIndexer):
         return self.wrapper.wrap_reduced(out, group_by=group_by, **kwargs)
 
     @cached_method
-    def nst(self, n, group_by=None, **kwargs):
+    def nst(self, n, **kwargs):
         """Return nst element of each column."""
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            raise ValueError("MappedArray.nst() does not support grouping. Set group_by to False.")
-        return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, group_by=False, **kwargs)
+        return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def min(self, **kwargs):
@@ -650,8 +651,8 @@ class MappedArray(Configured, PandasIndexer):
     def value_counts(self, group_by=None, value_map=None):
         """Return a pandas object containing counts of unique values."""
         mapped_codes, mapped_uniques = pd.factorize(self.values)
-        col_arr = self.ga_col_arr(group_by=group_by)
-        columns = self.wrapper.grouper.get_columns(group_by=group_by)
+        col_arr = self.get_col_arr(group_by=group_by)
+        columns = self.wrapper.get_columns(group_by=group_by)
         value_counts = nb.mapped_value_counts_nb(mapped_codes, col_arr, len(columns))
         value_counts_df = self.wrapper.wrap(value_counts, index=mapped_uniques, columns=columns)
         if value_map is None:
@@ -669,9 +670,9 @@ class MappedArray(Configured, PandasIndexer):
         Will lose index information and fill missing values with `default_val`."""
         if self.wrapper.ndim == 1:
             return self.wrapper.wrap(self.values, index=np.arange(len(self.values)))
-        col_arr = self.ga_col_arr(group_by=group_by)
-        columns = self.wrapper.grouper.get_columns(group_by=group_by)
-        col_index = self.ga_col_index(group_by=group_by)
+        col_arr = self.get_col_arr(group_by=group_by)
+        columns = self.wrapper.get_columns(group_by=group_by)
+        col_index = self.get_col_index(group_by=group_by)
         stacked = nb.stack_mapped_nb(self.values, col_arr, len(columns), col_index, default_val)
         return self.wrapper.wrap(stacked, index=np.arange(stacked.shape[0]), columns=columns)
 
