@@ -14,7 +14,11 @@ from vectorbt.portfolio.enums import (
 
 
 class Logs(Records):
-    """Extends `Records` for working with log records."""
+    """Extends `Records` for working with log records.
+
+    !!! note
+        Some features require the log records to be sorted prior to the processing.
+        Use the `vectorbt.records.base.Records.sort` method."""
 
     def __init__(self, wrapper, records_arr, idx_field='idx', **kwargs):
         Records.__init__(
@@ -47,12 +51,13 @@ class Logs(Records):
             ('Order', 'Fees'),
             ('Order', 'Fixed Fees'),
             ('Order', 'Slippage'),
-            ('Order', 'Minimum Size'),
-            ('Order', 'Maximum Size'),
+            ('Order', 'Min. Size'),
+            ('Order', 'Max. Size'),
             ('Order', 'Rejection Prob.'),
             ('Order', 'Close First?'),
             ('Order', 'Allow Partial?'),
             ('Order', 'Raise Rejection?'),
+            ('Order', 'Log?'),
             ('Result', 'New Cash'),
             ('Result', 'New Shares'),
             ('Result', 'Size'),
@@ -66,33 +71,33 @@ class Logs(Records):
         def map_enum(sr, enum):
             return sr.map(lambda x: enum._fields[x] if x != -1 else None)
 
-        out[('Context', 'Date')] = records_df['idx'].map(lambda x: self.wrapper.index[x])
-        out[('Context', 'Column')] = records_df['col'].map(lambda x: self.wrapper.columns[x])
-        groups = self.wrapper.grouper.get_columns()
-        out[('Context', 'Group')] = records_df['group'].map(lambda x: groups[x])
-        out[('Context', 'Cash')] = records_df['cash_now']
-        out[('Context', 'Shares')] = records_df['shares_now']
-        out[('Context', 'Val. Price')] = records_df['val_price_now']
-        out[('Context', 'Value')] = records_df['value_now']
-        out[('Order', 'Size')] = records_df['size']
-        out[('Order', 'Size Type')] = map_enum(records_df['size_type'], SizeType)
-        out[('Order', 'Direction')] = map_enum(records_df['direction'], Direction)
-        out[('Order', 'Price')] = records_df['price']
-        out[('Order', 'Fees')] = records_df['fees']
-        out[('Order', 'Fixed Fees')] = records_df['fixed_fees']
-        out[('Order', 'Slippage')] = records_df['slippage']
-        out[('Order', 'Minimum Size')] = records_df['min_size']
-        out[('Order', 'Maximum Size')] = records_df['max_size']
-        out[('Order', 'Rejection Prob.')] = records_df['reject_prob']
-        out[('Order', 'Close First?')] = records_df['close_first']
-        out[('Order', 'Allow Partial?')] = records_df['allow_partial']
-        out[('Order', 'Raise Rejection?')] = records_df['raise_reject']
-        out[('Result', 'New Cash')] = records_df['new_cash']
-        out[('Result', 'New Shares')] = records_df['new_shares']
-        out[('Result', 'Size')] = records_df['res_size']
-        out[('Result', 'Price')] = records_df['res_price']
-        out[('Result', 'Fees')] = records_df['res_fees']
-        out[('Result', 'Side')] = map_enum(records_df['res_side'], OrderSide)
-        out[('Result', 'Status')] = map_enum(records_df['res_status'], OrderStatus)
-        out[('Result', 'Status Info')] = map_enum(records_df['res_status_info'], StatusInfo)
+        out.iloc[:, 0] = records_df['idx'].map(lambda x: self.wrapper.index[x])
+        out.iloc[:, 1] = records_df['col'].map(lambda x: self.wrapper.columns[x])
+        out.iloc[:, 2] = records_df['group']
+        out.iloc[:, 3] = records_df['cash_now']
+        out.iloc[:, 4] = records_df['shares_now']
+        out.iloc[:, 5] = records_df['val_price_now']
+        out.iloc[:, 6] = records_df['value_now']
+        out.iloc[:, 7] = records_df['size']
+        out.iloc[:, 8] = map_enum(records_df['size_type'], SizeType)
+        out.iloc[:, 9] = map_enum(records_df['direction'], Direction)
+        out.iloc[:, 10] = records_df['price']
+        out.iloc[:, 11] = records_df['fees']
+        out.iloc[:, 12] = records_df['fixed_fees']
+        out.iloc[:, 13] = records_df['slippage']
+        out.iloc[:, 14] = records_df['min_size']
+        out.iloc[:, 15] = records_df['max_size']
+        out.iloc[:, 16] = records_df['reject_prob']
+        out.iloc[:, 17] = records_df['close_first']
+        out.iloc[:, 18] = records_df['allow_partial']
+        out.iloc[:, 19] = records_df['raise_reject']
+        out.iloc[:, 20] = records_df['log']
+        out.iloc[:, 21] = records_df['new_cash']
+        out.iloc[:, 22] = records_df['new_shares']
+        out.iloc[:, 23] = records_df['res_size']
+        out.iloc[:, 24] = records_df['res_price']
+        out.iloc[:, 25] = records_df['res_fees']
+        out.iloc[:, 26] = map_enum(records_df['res_side'], OrderSide)
+        out.iloc[:, 27] = map_enum(records_df['res_status'], OrderStatus)
+        out.iloc[:, 28] = map_enum(records_df['res_status_info'], StatusInfo)
         return out

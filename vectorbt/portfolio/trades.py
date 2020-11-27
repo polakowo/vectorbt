@@ -15,16 +15,15 @@ from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
-from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.reshape_fns import to_1d, broadcast_to
-from vectorbt.records.base import Records, indexing_on_records_meta
+from vectorbt.records.base import Records, records_indexing_func_meta
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, TradeType
 from vectorbt.portfolio import nb
 
 
-def indexing_on_trades_meta(obj, pd_indexing_func):
+def trades_indexing_func_meta(obj, pd_indexing_func):
     """Perform indexing on `Trades` and also return metadata."""
-    new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
+    new_wrapper, new_records_arr, group_idxs, col_idxs = records_indexing_func_meta(obj, pd_indexing_func)
     new_close = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
@@ -35,7 +34,7 @@ def indexing_on_trades_meta(obj, pd_indexing_func):
 
 def trades_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Trades`."""
-    return indexing_on_trades_meta(obj, pd_indexing_func)[0]
+    return trades_indexing_func_meta(obj, pd_indexing_func)[0]
 
 
 # ############# Trades ############# #
@@ -138,21 +137,22 @@ class Trades(Records):
         ```
     """
 
-    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx', **kwargs):
+    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx', indexing_func=None, **kwargs):
+        if indexing_func is None:
+            indexing_func = trades_indexing_func
         Records.__init__(
             self,
             wrapper,
             records_arr,
             idx_field=idx_field,
             close=close,
+            indexing_func=indexing_func,
             **kwargs
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in trade_dt.names):
             raise ValueError("Records array must have all fields defined in trade_dt")
-
-        PandasIndexer.__init__(self, trades_indexing_func)
 
     trade_type = TradeType.Trade
 

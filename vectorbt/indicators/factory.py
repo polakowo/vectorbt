@@ -286,8 +286,8 @@ from vectorbt.utils.decorators import classproperty, cached_property
 from vectorbt.utils.config import merge_kwargs, Configured
 from vectorbt.utils.random import set_seed
 from vectorbt.base import index_fns, reshape_fns, combine_fns
-from vectorbt.base.indexing import PandasIndexer, ParamIndexerFactory
-from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
+from vectorbt.base.indexing import ParamIndexerFactory
+from vectorbt.base.array_wrapper import ArrayWrapper, wrapper_indexing_func_meta, Wrapping
 
 
 def flatten_param_tuples(param_tuples):
@@ -996,8 +996,8 @@ class IndicatorFactory:
         self.attr_settings = attr_settings
 
         # Add indexing methods
-        def indexing_func(obj, pd_indexing_func):
-            new_wrapper, idx_idxs, _, col_idxs = indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func)
+        def indicator_indexing_func(obj, pd_indexing_func):
+            new_wrapper, idx_idxs, _, col_idxs = wrapper_indexing_func_meta(obj.wrapper, pd_indexing_func)
             idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
             col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
             if np.array_equal(idx_idxs_arr, np.arange(obj.wrapper.shape_2d[0])):
@@ -1022,21 +1022,19 @@ class IndicatorFactory:
                 # Tuple mapper is a list because of its complex data type
                 mapper_list.append(getattr(obj, f'_{param_name}_mapper')[col_idxs_arr])
 
-            return obj.__class__(
-                new_wrapper,
-                input_list,
-                input_mapper,
-                output_list,
-                param_list,
-                mapper_list,
-                obj.short_name,
-                obj.level_names
+            return obj.copy(
+                wrapper=new_wrapper,
+                input_list=input_list,
+                input_mapper=input_mapper,
+                output_list=output_list,
+                param_list=param_list,
+                mapper_list=mapper_list
             )
 
         # Set up class
 
         ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
-        CustomIndicator = type(self.class_name, (PandasIndexer, ParamIndexer, Configured), {})
+        CustomIndicator = type(self.class_name, (Wrapping, ParamIndexer), {})
         CustomIndicator.__module__ = self.module_name
         CustomIndicator.__doc__ = self.class_docstring
 
@@ -1099,7 +1097,7 @@ class IndicatorFactory:
 
         # Add __init__ method
         def __init__(_self, wrapper, input_list, input_mapper, output_list, param_list,
-                     mapper_list, short_name, level_names):
+                     mapper_list, short_name, level_names, indexing_func=None):
             perform_init_checks(
                 wrapper,
                 input_list,
@@ -1110,9 +1108,12 @@ class IndicatorFactory:
                 short_name,
                 level_names
             )
-            Configured.__init__(
+            if indexing_func is None:
+                indexing_func = indicator_indexing_func
+            Wrapping.__init__(
                 _self,
-                wrapper=wrapper,
+                wrapper,
+                indexing_func=indexing_func,
                 input_list=input_list,
                 input_mapper=input_mapper,
                 output_list=output_list,
@@ -1122,7 +1123,6 @@ class IndicatorFactory:
                 level_names=level_names
             )
 
-            _self.wrapper = wrapper
             for i, ts_name in enumerate(input_names):
                 setattr(_self, f'_{ts_name}', input_list[i])
             setattr(_self, '_input_mapper', input_mapper)
@@ -1140,7 +1140,6 @@ class IndicatorFactory:
             setattr(_self, '_level_names', level_names)
 
             # Initialize indexers
-            PandasIndexer.__init__(_self, indexing_func)
             mapper_sr_list = []
             for i, m in enumerate(mapper_list):
                 mapper_sr_list.append(pd.Series(m, index=wrapper.columns))
@@ -1255,19 +1254,6 @@ class IndicatorFactory:
                 assign_bool_method('xor', np.logical_xor)
 
             self.CustomIndicator = CustomIndicator
-
-        # Add other methods
-        def _force_select_column(_self, column=None):
-            """Force selection of one column."""
-            if column is not None:
-                self_col = _self[column]
-            else:
-                self_col = _self
-            if self_col.wrapper.ndim > 1:
-                raise TypeError("Only one column is allowed. Use indexing or column argument.")
-            return self_col
-
-        setattr(CustomIndicator, '_force_select_column', _force_select_column)
 
     def from_custom_func(self,
                          custom_func,

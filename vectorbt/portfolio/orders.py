@@ -9,15 +9,14 @@ from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.utils.config import merge_kwargs
-from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.reshape_fns import to_1d, broadcast_to
-from vectorbt.records.base import Records, indexing_on_records_meta
+from vectorbt.records.base import Records, records_indexing_func_meta
 from vectorbt.portfolio.enums import order_dt, OrderSide
 
 
-def indexing_on_orders_meta(obj, pd_indexing_func):
-    """Perform indexing on `Orders`."""
-    new_wrapper, new_records_arr, group_idxs, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
+def orders_indexing_func_meta(obj, pd_indexing_func):
+    """Perform indexing on `Orders` and return metadata."""
+    new_wrapper, new_records_arr, group_idxs, col_idxs = records_indexing_func_meta(obj, pd_indexing_func)
     new_close = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
@@ -27,8 +26,8 @@ def indexing_on_orders_meta(obj, pd_indexing_func):
 
 
 def orders_indexing_func(obj, pd_indexing_func):
-    """See `indexing_on_orders`."""
-    return indexing_on_orders_meta(obj, pd_indexing_func)[0]
+    """Perform indexing on `Orders`."""
+    return orders_indexing_func_meta(obj, pd_indexing_func)[0]
 
 
 class Orders(Records):
@@ -50,21 +49,22 @@ class Orders(Records):
         1
         ```"""
 
-    def __init__(self, wrapper, records_arr, close, idx_field='idx', **kwargs):
+    def __init__(self, wrapper, records_arr, close, idx_field='idx', indexing_func=None, **kwargs):
+        if indexing_func is None:
+            indexing_func = orders_indexing_func
         Records.__init__(
             self,
             wrapper,
             records_arr,
             idx_field=idx_field,
             close=close,
+            indexing_func=indexing_func,
             **kwargs
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise ValueError("Records array must have all fields defined in order_dt")
-
-        PandasIndexer.__init__(self, orders_indexing_func)
 
     @property
     def close(self):

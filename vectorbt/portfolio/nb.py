@@ -1202,6 +1202,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
         active_mask,
         order_records,
         record_mask,
+        log_records,
         last_cash,
         last_shares,
         last_val_price

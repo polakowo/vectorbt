@@ -784,7 +784,7 @@ class Generic_Accessor(Base_Accessor):
         if x_labels is None:
             x_labels = self.wrapper.index
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
+            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
         return plotting.create_bar(
             data=self.to_2d_array(),
@@ -805,7 +805,7 @@ class Generic_Accessor(Base_Accessor):
         if x_labels is None:
             x_labels = self.wrapper.index
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
+            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
         return plotting.create_scatter(
             data=self.to_2d_array(),
@@ -827,7 +827,7 @@ class Generic_Accessor(Base_Accessor):
             return self.flatten_grouped(group_by=group_by).vbt.hist(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
+            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
         return plotting.create_hist(
             data=self.to_2d_array(),
@@ -848,7 +848,7 @@ class Generic_Accessor(Base_Accessor):
             return self.flatten_grouped(group_by=group_by).vbt.box(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.name is not None):
+            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
         return plotting.create_box(
             data=self.to_2d_array(),
@@ -1290,8 +1290,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             )
 
         if contains_nans:
-            warnings.warn("Data contains NaNs. In case of visualization issues, "
-                          "use .show() method on the widget.", stacklevel=2)
+            warnings.warn("Data contains NaNs. Use `show` method in case of visualization issues.", stacklevel=2)
         return fig
 
 

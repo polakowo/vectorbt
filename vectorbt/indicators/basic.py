@@ -87,7 +87,7 @@ class MA(MA):
             ![](/vectorbt/docs/img/MA.png)"""
         from vectorbt.defaults import color_schema
 
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -162,7 +162,7 @@ class MSTD(MSTD):
             ```
 
             ![](/vectorbt/docs/img/MSTD.png)"""
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -249,7 +249,7 @@ class BBANDS(BBANDS):
             ![](/vectorbt/docs/img/BBANDS.png)"""
         from vectorbt.defaults import color_schema
 
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -354,7 +354,7 @@ class RSI(RSI):
             ```
 
             ![](/vectorbt/docs/img/RSI.png)"""
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -451,7 +451,7 @@ class STOCH(STOCH):
             ```
 
             ![](/vectorbt/docs/img/STOCH.png)"""
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -559,7 +559,7 @@ class MACD(MACD):
             ```
 
             ![](/vectorbt/docs/img/MACD.png)"""
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -658,7 +658,7 @@ class ATR(ATR):
             ```
 
             ![](/vectorbt/docs/img/ATR.png)"""
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()
@@ -729,7 +729,7 @@ class OBV(OBV):
             ```
 
             ![](/vectorbt/docs/img/OBV.png)"""
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if fig is None:
             fig = CustomFigureWidget()

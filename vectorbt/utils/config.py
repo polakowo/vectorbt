@@ -3,8 +3,6 @@
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import checks
-
 
 def merge_kwargs(*dicts):
     """Merge dictionaries `dicts`."""

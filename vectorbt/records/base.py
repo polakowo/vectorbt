@@ -208,7 +208,7 @@ to each `__init__` argument with index:
 
 ## Caching
 
-`Records` supports caching. If a method or a property requires heavy computation, it's wrapped
+`Records` supports caching. If a method or a property requires heavy computation, it's Wrapping
 with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
 respectively. Caching can be disabled globally via `vectorbt.defaults` or locally via the
 method/property. There is currently no way to disable caching for an entire class.
@@ -227,36 +227,35 @@ import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import Configured
-from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base import reshape_fns
-from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
+from vectorbt.base.array_wrapper import ArrayWrapper, wrapper_indexing_func_meta, Wrapping
 from vectorbt.records import nb
 from vectorbt.records.mapped_array import MappedArray
 
 
-def indexing_on_records_meta(obj, pd_indexing_func):
+def records_indexing_func_meta(obj, pd_indexing_func):
     """Perform indexing on `Records` and return metadata."""
     new_wrapper, _, group_idxs, col_idxs = \
-        indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
-    new_records_arr = nb.select_record_cols_nb(
-        obj.values,
-        obj.col_index,
-        reshape_fns.to_1d(col_idxs)
-    )
+        wrapper_indexing_func_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
+    if obj.is_sorted():
+        new_records_arr = nb.record_col_range_select_nb(obj.values, obj.col_range, reshape_fns.to_1d(col_idxs))
+    else:
+        warnings.warn(f"Records of type '{obj.__class__.__name__}' are not sorted. "
+                      f"Indexing will disrupt the current order and sort the array.")
+        new_records_arr = nb.record_col_map_select_nb(obj.values, obj.col_map, reshape_fns.to_1d(col_idxs))
     return new_wrapper, new_records_arr, group_idxs, col_idxs
 
 
 def records_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Records`."""
-    new_wrapper, new_records_arr, _, _ = indexing_on_records_meta(obj, pd_indexing_func)
+    new_wrapper, new_records_arr, _, _ = records_indexing_func_meta(obj, pd_indexing_func)
     return obj.copy(
         wrapper=new_wrapper,
         records_arr=new_records_arr
     )
 
 
-class Records(Configured, PandasIndexer):
+class Records(Wrapping):
     """Exposes methods and properties for working with records.
 
     Args:
@@ -268,60 +267,36 @@ class Records(Configured, PandasIndexer):
             Must have the field `col` (column position in a matrix).
         idx_field (str): The name of the field corresponding to the index. Optional.
 
-            Will be derived automatically if records contain field `idx`.
+            Searches for a field with name 'idx' if `idx_field` is 'auto'.
+            Throws an error if the name was provided explicitly and the field cannot be found.
+        indexing_func (callable): Indexing function. Defaults to `records_indexing_func`.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, records_arr, idx_field=None, **kwargs):
-        Configured.__init__(
+    def __init__(self, wrapper, records_arr, idx_field='auto', indexing_func=None, **kwargs):
+        if indexing_func is None:
+            indexing_func = records_indexing_func
+        Wrapping.__init__(
             self,
-            wrapper=wrapper,
+            wrapper,
+            indexing_func=indexing_func,
             records_arr=records_arr,
             idx_field=idx_field,
             **kwargs
         )
-        checks.assert_type(wrapper, ArrayWrapper)
         records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
         checks.assert_in('col', records_arr.dtype.names)
-        if idx_field is not None:
-            checks.assert_in(idx_field, records_arr.dtype.names)
-        else:
+        if idx_field == 'auto':
             if 'idx' in records_arr.dtype.names:
                 idx_field = 'idx'
+        elif idx_field is not None:
+            checks.assert_in(idx_field, records_arr.dtype.names)
 
-        self._wrapper = wrapper
         self._records_arr = records_arr
         self._idx_field = idx_field
-
-        PandasIndexer.__init__(self, records_indexing_func)
-
-    @property
-    def wrapper(self):
-        """Array wrapper."""
-        return self._wrapper
-
-    def regroup(self, group_by):
-        """Regroup this object."""
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
-        return self
-
-    def _force_select_column(self, column=None):
-        """Force selection of one column."""
-        if column is not None:
-            if self.wrapper.grouper.group_by is None:
-                self_col = self[column]
-            else:
-                self_col = self.regroup(False)[column]
-        else:
-            self_col = self
-        if self_col.wrapper.ndim > 1:
-            raise TypeError("Only one column is allowed. Use indexing or column argument.")
-        return self_col
 
     @property
     def records_arr(self):
@@ -348,22 +323,41 @@ class Records(Configured, PandasIndexer):
         return self.values.view(np.recarray)
 
     @cached_property
-    def col_index(self):
-        """Column index for `Records.records`."""
-        return nb.record_col_index_nb(self.values, len(self.wrapper.columns))
+    def col_range(self):
+        """Column range for `Records.values`."""
+        if not self.is_sorted(col_only=True):
+            raise ValueError("Sorting is required prior to this operation. Use `sort` method.")
+        return nb.col_range_nb(self.values['col'], len(self.wrapper.columns))
+
+    @cached_property
+    def col_map(self):
+        """Column map for `Records.values`."""
+        return nb.col_map_nb(self.values['col'], len(self.wrapper.columns))
+
+    @cached_method
+    def is_sorted(self, idx_arr=None, sort_idx=False):
+        """Check whether records are sorted."""
+        if sort_idx:
+            if self.idx_field is None:
+                raise ValueError("Must set idx_field")
+            return nb.is_col_idx_sorted_nb(self.values['col'], self.values[self.idx_field])
+        return nb.is_col_sorted_nb(self.values['col'])
+
+    def sort(self, idx_arr=None, sort_idx=False, group_by=None, **kwargs):
+        """Sort records."""
+        if self.is_sorted():
+            return self.copy(**kwargs).regroup(group_by)
+        if sort_idx:
+            if self.idx_field is None:
+                raise ValueError("Must set idx_field")
+            ind = np.lexsort((self.values[self.idx_field], self.values['col']))  # expensive!
+        else:
+            ind = np.argsort(self.values['col'])
+        return self.copy(records_arr=self.values[ind], **kwargs).regroup(group_by)
 
     def filter_by_mask(self, mask, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            wrapper = self.wrapper.copy(group_by=group_by)
-        else:
-            wrapper = self.wrapper
-        return self.copy(
-            wrapper=wrapper,
-            records_arr=self.values[mask],
-            **kwargs
-        )
+        return self.copy(records_arr=self.values[mask], **kwargs).regroup(group_by)
 
     def map(self, map_func_nb, *args, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Map each record to a scalar value. Returns mapped array.
@@ -377,19 +371,14 @@ class Records(Configured, PandasIndexer):
                 idx_arr = self.values[self.idx_field]
             else:
                 idx_arr = None
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            wrapper = self.wrapper.copy(group_by=group_by)
-        else:
-            wrapper = self.wrapper
         return MappedArray(
-            wrapper,
+            self.wrapper,
             mapped_arr,
             self.values['col'],
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
-        )
+        ).regroup(group_by)
 
     def map_field(self, field, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Convert field to mapped array."""
@@ -398,19 +387,14 @@ class Records(Configured, PandasIndexer):
                 idx_arr = self.values[self.idx_field]
             else:
                 idx_arr = None
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            wrapper = self.wrapper.copy(group_by=group_by)
-        else:
-            wrapper = self.wrapper
         return MappedArray(
-            wrapper,
+            self.wrapper,
             self.values[field],
             self.values['col'],
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
-        )
+        ).regroup(group_by)
 
     def map_array(self, a, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Convert array to mapped array.
@@ -425,19 +409,14 @@ class Records(Configured, PandasIndexer):
                 idx_arr = self.values[self.idx_field]
             else:
                 idx_arr = None
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            wrapper = self.wrapper.copy(group_by=group_by)
-        else:
-            wrapper = self.wrapper
         return MappedArray(
-            wrapper,
+            self.wrapper,
             a,
             self.values['col'],
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
-        )
+        ).regroup(group_by)
 
     @cached_method
     def count(self, **kwargs):

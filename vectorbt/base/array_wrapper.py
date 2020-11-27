@@ -14,8 +14,8 @@ from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
 
 
-def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
-                             column_only_select=None, group_select=None):
+def wrapper_indexing_func_meta(obj, pd_indexing_func, index=None, columns=None,
+                               column_only_select=None, group_select=None):
     """Perform indexing on `ArrayWrapper` and also return indexing metadata.
 
     Takes into account column grouping.
@@ -172,9 +172,9 @@ def indexing_on_wrapper_meta(obj, pd_indexing_func, index=None, columns=None,
     ), idx_idxs, col_idxs, col_idxs
 
 
-def array_wrapper_indexing_func(obj, pd_indexing_func, **kwargs):
+def wrapper_indexing_func(obj, pd_indexing_func, **kwargs):
     """Perform indexing on `ArrayWrapper`"""
-    return indexing_on_wrapper_meta(obj, pd_indexing_func, **kwargs)[0]
+    return wrapper_indexing_func_meta(obj, pd_indexing_func, **kwargs)[0]
 
 
 class ArrayWrapper(Configured, PandasIndexer):
@@ -221,7 +221,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         PandasIndexer.__init__(
             self,
-            array_wrapper_indexing_func,
+            wrapper_indexing_func,
             column_only_select=column_only_select,
             group_select=group_select
         )
@@ -363,12 +363,13 @@ class ArrayWrapper(Configured, PandasIndexer):
         !!! note
             Loses the ability to switch off grouping."""
         _self = self.regroup(group_by=group_by)
+        column_only_select = kwargs.pop('column_only_select', _self.column_only_select)
         return self.__class__(
             _self.index,
             _self.grouper.get_columns(),
             _self.grouped_ndim,
             freq=_self.freq,
-            column_only_select=_self.column_only_select,
+            column_only_select=column_only_select,
             **kwargs
         )
 
@@ -458,4 +459,48 @@ class ArrayWrapper(Configured, PandasIndexer):
         _self = self.to_group_native(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
 
+
+def wrapping_indexing_func(obj, pd_indexing_func, **kwargs):
+    """Perform indexing on `Wrapping`"""
+    new_wrapper = wrapper_indexing_func(obj.wrapper, pd_indexing_func, **kwargs)
+    return obj.copy(wrapper=new_wrapper)
+
+
+class Wrapping(Configured, PandasIndexer):
+    """Class that uses `ArrayWrapper` globally."""
+    def __init__(self, wrapper, indexing_func=None, **kwargs):
+        checks.assert_type(wrapper, ArrayWrapper)
+        self._wrapper = wrapper
+        if indexing_func is None:
+            indexing_func = wrapping_indexing_func
+
+        Configured.__init__(self, wrapper=wrapper, indexing_func=indexing_func, **kwargs)
+        PandasIndexer.__init__(self, indexing_func)
+
+    @property
+    def wrapper(self):
+        """Array wrapper."""
+        return self._wrapper
+
+    def regroup(self, group_by):
+        """Regroup this object."""
+        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
+            self.wrapper.grouper.check_group_by(group_by=group_by)
+            return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+        return self
+
+    def select_series(self, column=None, group=None, group_by=None, column_only=False):
+        """Select one column/group."""
+        if column is not None:
+            return self.regroup(False)[column]
+        if self.wrapper.ndim == 1:
+            return self
+        if not column_only and self.wrapper.grouper.is_grouped(group_by=group_by):
+            _self = self.regroup(group_by)
+            if group is not None:
+                return _self[group]
+            if _self.wrapper.grouped_ndim == 1:
+                return _self
+            raise TypeError("Only one column/group is allowed. Use indexing or column/group argument.")
+        raise TypeError("Only one column is allowed. Use indexing or column argument.")
 

@@ -7,7 +7,7 @@ import pytest
 
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.enums import drawdown_dt
-from vectorbt.portfolio.enums import order_dt, trade_dt
+from vectorbt.portfolio.enums import order_dt, trade_dt, log_dt
 
 from tests.utils import record_arrays_close
 
@@ -46,36 +46,17 @@ wrapper_grouped = wrapper.copy(group_by=group_by)
 
 records = vbt.records.Records(wrapper, records_arr)
 records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
+records_nosort = records.copy(records_arr=records.records_arr[::-1])
 
 mapped_array = records.map_field('some_field1')
 mapped_array_grouped = records_grouped.map_field('some_field1')
+mapped_array_nosort = mapped_array.copy(
+    col_arr=mapped_array.col_arr[::-1],
+    idx_arr=mapped_array.idx_arr[::-1]
+)
 
 
 class TestMappedArray:
-    def test_regroup(self):
-        pd.testing.assert_index_equal(
-            mapped_array.regroup(group_by=group_by).wrapper.grouper.group_by,
-            mapped_array_grouped.wrapper.grouper.group_by
-        )
-        assert mapped_array_grouped.regroup(group_by=False).wrapper.grouper.group_by == \
-               mapped_array.wrapper.grouper.group_by
-
-    def test_force_select_column(self):
-        with pytest.raises(Exception) as e_info:
-            _ = mapped_array._force_select_column().wrapper.columns
-        pd.testing.assert_index_equal(
-            mapped_array['a']._force_select_column().wrapper.columns,
-            mapped_array['a'].wrapper.columns
-        )
-        pd.testing.assert_index_equal(
-            mapped_array._force_select_column(column='a').wrapper.columns,
-            mapped_array['a'].wrapper.columns
-        )
-        pd.testing.assert_index_equal(
-            mapped_array_grouped._force_select_column(column='a').wrapper.columns,
-            mapped_array['a'].wrapper.columns
-        )
-
     def test_mapped_arr(self):
         np.testing.assert_array_equal(
             mapped_array['a'].values,
@@ -106,15 +87,15 @@ class TestMappedArray:
             np.array([0, 1, 2, 0, 1, 2, 0, 1, 2])
         )
 
-    def test_col_index(self):
+    def test_col_range(self):
         np.testing.assert_array_equal(
-            mapped_array['a'].col_index,
+            mapped_array['a'].col_range,
             np.array([
                 [0, 3]
             ])
         )
         np.testing.assert_array_equal(
-            mapped_array.col_index,
+            mapped_array.col_range,
             np.array([
                 [0, 3],
                 [3, 6],
@@ -123,7 +104,7 @@ class TestMappedArray:
             ])
         )
 
-    def test_group_arr(self):
+    def test_get_col_arr(self):
         np.testing.assert_array_equal(
             mapped_array.get_col_arr(),
             np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
@@ -137,9 +118,9 @@ class TestMappedArray:
             np.array([0, 0, 0, 0, 0, 0, 1, 1, 1])
         )
 
-    def test_group_index(self):
+    def test_get_col_range(self):
         np.testing.assert_array_equal(
-            mapped_array.get_col_index(),
+            mapped_array.get_col_range(),
             np.array([
                 [0, 3],
                 [3, 6],
@@ -148,18 +129,30 @@ class TestMappedArray:
             ])
         )
         np.testing.assert_array_equal(
-            mapped_array_grouped['g1'].get_col_index(),
+            mapped_array_grouped['g1'].get_col_range(),
             np.array([
                 [0, 6]
             ])
         )
         np.testing.assert_array_equal(
-            mapped_array_grouped.get_col_index(),
+            mapped_array_grouped.get_col_range(),
             np.array([
                 [0, 6],
                 [6, 9]
             ])
         )
+
+    def test_is_sorted(self):
+        assert mapped_array.is_sorted()
+        assert mapped_array.copy(idx_arr=None).is_sorted()
+        assert not mapped_array_nosort.is_sorted()
+        assert not mapped_array_nosort.copy(idx_arr=None).is_sorted()
+
+    def test_sort(self):
+        assert mapped_array.sort().is_sorted()
+        assert mapped_array.copy(idx_arr=None).sort().is_sorted()
+        assert mapped_array_nosort.sort().is_sorted()
+        assert mapped_array_nosort.copy(idx_arr=None).sort().is_sorted()
 
     def test_filter_by_mask(self):
         mask_a = mapped_array['a'].values >= mapped_array['a'].values.mean()
@@ -834,30 +827,6 @@ class TestMappedArray:
 
 
 class TestRecords:
-    def test_regroup(self):
-        pd.testing.assert_index_equal(
-            records.regroup(group_by=group_by).wrapper.grouper.group_by,
-            records_grouped.wrapper.grouper.group_by
-        )
-        assert records_grouped.regroup(group_by=False).wrapper.grouper.group_by == \
-               records.wrapper.grouper.group_by
-
-    def test_force_select_column(self):
-        with pytest.raises(Exception) as e_info:
-            _ = records._force_select_column().wrapper.columns
-        pd.testing.assert_index_equal(
-            records['a']._force_select_column().wrapper.columns,
-            records['a'].wrapper.columns
-        )
-        pd.testing.assert_index_equal(
-            records._force_select_column(column='a').wrapper.columns,
-            records['a'].wrapper.columns
-        )
-        pd.testing.assert_index_equal(
-            records._force_select_column(column='a').wrapper.columns,
-            records['a'].wrapper.columns
-        )
-
     def test_records(self):
         pd.testing.assert_frame_equal(
             records.records,
@@ -868,7 +837,7 @@ class TestRecords:
         np.testing.assert_array_equal(records['a'].recarray.some_field1, records['a'].values['some_field1'])
         np.testing.assert_array_equal(records.recarray.some_field1, records.values['some_field1'])
 
-    def test_col_index(self):
+    def test_col_range(self):
         target = np.array([
             [0, 3],
             [3, 6],
@@ -876,13 +845,25 @@ class TestRecords:
             [-1, -1]
         ])
         np.testing.assert_array_equal(
-            records['a'].col_index,
+            records['a'].col_range,
             target[0:1]
         )
         np.testing.assert_array_equal(
-            records.col_index,
+            records.col_range,
             target
         )
+
+    def test_is_sorted(self):
+        assert records.is_sorted()
+        assert records.copy(idx_field=None).is_sorted()
+        assert not records_nosort.is_sorted()
+        assert not records_nosort.copy(idx_field=None).is_sorted()
+
+    def test_sort(self):
+        assert records.sort().is_sorted()
+        assert records.copy(idx_field=None).sort().is_sorted()
+        assert records_nosort.sort().is_sorted()
+        assert records_nosort.copy(idx_field=None).sort().is_sorted()
 
     def test_filter_by_mask(self):
         mask_a = records['a'].values['some_field1'] >= records['a'].values['some_field1'].mean()
@@ -1083,7 +1064,7 @@ class TestRecords:
             np.array([(0, 0, 10., 21.), (2, 2, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records.col_index,
+            filtered_records.col_range,
             np.array([
                 [0, 1],
                 [-1, -1],
@@ -1097,7 +1078,7 @@ class TestRecords:
             np.array([(0, 0, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records['a'].col_index,
+            filtered_records['a'].col_range,
             np.array([[0, 1]])
         )
         np.testing.assert_array_equal(
@@ -1112,7 +1093,7 @@ class TestRecords:
             np.array([], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records['b'].col_index,
+            filtered_records['b'].col_range,
             np.array([[-1, -1]])
         )
         np.testing.assert_array_equal(
@@ -1127,7 +1108,7 @@ class TestRecords:
             np.array([(0, 2, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records['c'].col_index,
+            filtered_records['c'].col_range,
             np.array([[0, 1]])
         )
         np.testing.assert_array_equal(
@@ -1142,7 +1123,7 @@ class TestRecords:
             np.array([], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records['d'].col_index,
+            filtered_records['d'].col_range,
             np.array([[-1, -1]])
         )
         np.testing.assert_array_equal(
@@ -1272,7 +1253,8 @@ class TestDrawdowns:
         )
         pd.testing.assert_series_equal(
             drawdowns_grouped.avg_drawdown(),
-            pd.Series(np.array([-0.6166666666666666, -0.6666666666666666]), index=pd.Index(['g1', 'g2'], dtype='object'))
+            pd.Series(np.array([-0.6166666666666666, -0.6666666666666666]),
+                      index=pd.Index(['g1', 'g2'], dtype='object'))
         )
 
     def test_max_drawdown(self):
@@ -2102,3 +2084,111 @@ class TestPositions:
             positions_grouped.coverage(),
             pd.Series(np.array([0.5, 0.3125]), index=pd.Index(['g1', 'g2'], dtype='object'))
         )
+
+
+# ############# logs.py ############# #
+
+logs_records_arr = np.asarray([
+    (0, 1, 0, 100., 0., 5., 100., 1., 0, 2, 5., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 94.95, 1., 1., 5., 0.05, 0, 0, -1),
+    (0, 0, 0, 94.95, 0., 1., 100., 1., 0, 2, 1., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 93.94, 1., 1., 1., 0.01, 0, 0, -1),
+    (1, 0, 0, 93.94, 1., 2., 99.94, 1., 0, 2, 2., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 91.92, 2., 1., 2., 0.02, 0, 0, -1),
+    (1, 1, 0, 91.92, 1., 4., 99.94, 1., 0, 2, 4., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 87.88, 2., 1., 4., 0.04, 0, 0, -1),
+    (2, 1, 0, 87.88, 2., 3., 99.88, 1., 0, 2, 3., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 84.85, 3., 1., 3., 0.03, 0, 0, -1),
+    (2, 0, 0, 84.85, 2., 3., 99.88, 1., 0, 2, 3., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 81.82, 3., 1., 3., 0.03, 0, 0, -1),
+    (3, 1, 0, 81.82, 3., 2., 99.82, 1., 0, 2, 2., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 79.8, 4., 1., 2., 0.02, 0, 0, -1),
+    (3, 0, 0, 79.8, 3., 4., 99.82, 1., 0, 2, 4., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 75.76, 4., 1., 4., 0.04, 0, 0, -1),
+    (4, 1, 0, 75.76, 4., 1., 99.76, 1., 0, 2, 1., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 74.75, 5., 1., 1., 0.01, 0, 0, -1),
+    (4, 0, 0, 74.75, 4., 5., 99.76, 1., 0, 2, 5., 0.01, 0., 0., 1e-08, np.inf, 0.,
+     False, True, False, True, 69.7, 5., 1., 5., 0.05, 0, 0, -1)
+], dtype=log_dt)
+
+logs_wrapper = vbt.ArrayWrapper([
+    datetime(2020, 1, 1),
+    datetime(2020, 1, 2),
+    datetime(2020, 1, 3),
+    datetime(2020, 1, 4),
+    datetime(2020, 1, 5),
+    datetime(2020, 1, 6)
+], ['a', 'b'], 2)
+logs = vbt.Logs(logs_wrapper, logs_records_arr)
+logs_grouped = vbt.Logs(logs_wrapper.regroup(True), logs_records_arr)
+
+
+class TestLogs:
+    def test_records_readable(self):
+        df = pd.DataFrame(columns=pd.MultiIndex.from_tuples([
+            ('Context', 'Date'),
+            ('Context', 'Column'),
+            ('Context', 'Group'),
+            ('Context', 'Cash'),
+            ('Context', 'Shares'),
+            ('Context', 'Val. Price'),
+            ('Context', 'Value'),
+            ('Order', 'Size'),
+            ('Order', 'Size Type'),
+            ('Order', 'Direction'),
+            ('Order', 'Price'),
+            ('Order', 'Fees'),
+            ('Order', 'Fixed Fees'),
+            ('Order', 'Slippage'),
+            ('Order', 'Min. Size'),
+            ('Order', 'Max. Size'),
+            ('Order', 'Rejection Prob.'),
+            ('Order', 'Close First?'),
+            ('Order', 'Allow Partial?'),
+            ('Order', 'Raise Rejection?'),
+            ('Order', 'Log?'),
+            ('Result', 'New Cash'),
+            ('Result', 'New Shares'),
+            ('Result', 'Size'),
+            ('Result', 'Price'),
+            ('Result', 'Fees'),
+            ('Result', 'Side'),
+            ('Result', 'Status'),
+            ('Result', 'Status Info')
+        ]))
+        df.iloc[:, 0] = [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
+                         pd.Timestamp('2020-01-02 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
+                         pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-03 00:00:00'),
+                         pd.Timestamp('2020-01-04 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
+                         pd.Timestamp('2020-01-05 00:00:00'), pd.Timestamp('2020-01-05 00:00:00')]
+        df.iloc[:, 1] = ['b', 'a', 'a', 'b', 'b', 'a', 'b', 'a', 'b', 'a']
+        df.iloc[:, 2] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        df.iloc[:, 3] = [100.0, 94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75]
+        df.iloc[:, 4] = [0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0]
+        df.iloc[:, 5] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
+        df.iloc[:, 6] = [100.0, 100.0, 99.94, 99.94, 99.88, 99.88, 99.82, 99.82, 99.76, 99.76]
+        df.iloc[:, 7] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        df.iloc[:, 8] = ['Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
+                         'Shares', 'Shares', 'Shares', 'Shares']
+        df.iloc[:, 9] = ['All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All']
+        df.iloc[:, 10] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
+        df.iloc[:, 11] = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+        df.iloc[:, 12] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        df.iloc[:, 13] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        df.iloc[:, 14] = [1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08]
+        df.iloc[:, 15] = [np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]
+        df.iloc[:, 16] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        df.iloc[:, 17] = [False, False, False, False, False, False, False, False, False, False]
+        df.iloc[:, 18] = [True, True, True, True, True, True, True, True, True, True]
+        df.iloc[:, 19] = [False, False, False, False, False, False, False, False, False, False]
+        df.iloc[:, 20] = [True, True, True, True, True, True, True, True, True, True]
+        df.iloc[:, 21] = [94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75, 69.7]
+        df.iloc[:, 22] = [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0]
+        df.iloc[:, 23] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        df.iloc[:, 24] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
+        df.iloc[:, 25] = [0.05, 0.01, 0.02, 0.04, 0.03, 0.03, 0.02, 0.04, 0.01, 0.05]
+        df.iloc[:, 26] = ['Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy']
+        df.iloc[:, 27] = ['Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
+                          'Filled', 'Filled', 'Filled', 'Filled']
+        df.iloc[:, 28] = [None, None, None, None, None, None, None, None, None, None]
+        pd.testing.assert_frame_equal(logs.records_readable, df)

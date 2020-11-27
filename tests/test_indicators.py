@@ -1231,7 +1231,7 @@ class TestFactory:
         )
 
     def test_numeric_method(self):
-        obj = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])\
+        obj = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out']) \
             .from_apply_func(lambda ts, p: ts * p).run(ts, 1)
 
         pd.testing.assert_frame_equal(obj.out_above(2), obj.out > 2)
@@ -1288,7 +1288,7 @@ class TestFactory:
     def test_bool_method(self):
         obj = vbt.IndicatorFactory(
             input_names=['ts'], param_names=['p'], output_names=['out'],
-            attr_settings=dict(out=dict(dtype=np.bool_)))\
+            attr_settings=dict(out=dict(dtype=np.bool_))) \
             .from_apply_func(lambda ts, p: ts > p).run(ts, 2)
 
         pd.testing.assert_frame_equal(obj.out_and(True), obj.out)
@@ -1328,7 +1328,7 @@ class TestFactory:
         TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
         obj = vbt.IndicatorFactory(
             output_names=['out'],
-            attr_settings=dict(out=dict(dtype=TestEnum)))\
+            attr_settings=dict(out=dict(dtype=TestEnum))) \
             .from_apply_func(lambda: np.array([[0, 1], [1, -1]])).run()
 
         pd.testing.assert_frame_equal(
@@ -1380,7 +1380,6 @@ class TestFactory:
             '__subclasshook__',
             '__weakref__',
             '_config',
-            '_force_select_column',
             '_iloc',
             '_indexing_func',
             '_indexing_kwargs',
@@ -1393,6 +1392,7 @@ class TestFactory:
             '_short_name',
             '_ts',
             '_ts_out',
+            '_wrapper',
             'config',
             'copy',
             'iloc',
@@ -1410,7 +1410,9 @@ class TestFactory:
             'output_flags',
             'output_names',
             'param_names',
+            'regroup',
             'run',
+            'select_series',
             'short_name',
             'ts',
             'ts_above',

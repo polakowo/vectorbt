@@ -263,18 +263,17 @@ from plotly.subplots import make_subplots
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import convert_str_enum_value
-from vectorbt.utils.config import Configured, merge_kwargs
+from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.widgets import CustomFigureWidget
-from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast
-from vectorbt.base.indexing import PandasIndexer
-from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
+from vectorbt.base.array_wrapper import ArrayWrapper, wrapper_indexing_func_meta, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.records.base import records_indexing_func
 from vectorbt.portfolio import nb
-from vectorbt.portfolio.orders import Orders, indexing_on_orders_meta
+from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import (
@@ -282,16 +281,16 @@ from vectorbt.portfolio.enums import (
     CallSeqType,
     SizeType,
     ConflictMode,
-    Direction,
-    TradeType,
-    BenchmarkSize
+    Direction
 )
 
 
 def portfolio_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Portfolio`."""
-    new_orders, group_idxs, col_idxs = indexing_on_orders_meta(obj._orders, pd_indexing_func)
-    new_logs = records_indexing_func(obj._logs, pd_indexing_func)
+    new_wrapper, _, group_idxs, col_idxs = \
+        wrapper_indexing_func_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
+    new_order_records_arr = records_indexing_func(obj.orders(), pd_indexing_func).values
+    new_logs_records_arr = records_indexing_func(obj.logs(), pd_indexing_func).values
     if isinstance(obj._init_cash, int):
         new_init_cash = obj._init_cash
     else:
@@ -380,12 +379,15 @@ def add_returns_methods(func_names):
     'drawdown',
     'max_drawdown'
 ])
-class Portfolio(Configured, PandasIndexer):
+class Portfolio(Wrapping):
     """Class for modeling portfolio and measuring its performance.
 
     Args:
-        orders (Orders): Order records of type `vectorbt.portfolio.orders.Orders`.
-        logs (Logs): Log records of type `vectorbt.portfolio.logs.Logs`.
+        wrapper (ArrayWrapper): Array wrapper.
+
+            See `vectorbt.base.array_wrapper.ArrayWrapper`.
+        order_records (array_like): A structured NumPy array of order records.
+        log_records (array_like): A structured NumPy array of log records.
         init_cash (InitCashMode, float or array_like of float): Initial capital.
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (array_like of int): Sequence of calls per row and group.
@@ -398,11 +400,17 @@ class Portfolio(Configured, PandasIndexer):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
-    def __init__(self, orders, logs, init_cash, cash_sharing, call_seq, incl_unrealized=None):
-        Configured.__init__(
+    def __init__(self, wrapper, close, order_records, log_records, init_cash,
+                 cash_sharing, call_seq, incl_unrealized=None, indexing_func=None):
+        if indexing_func is None:
+            indexing_func = portfolio_indexing_func
+        Wrapping.__init__(
             self,
-            orders=orders,
-            logs=logs,
+            wrapper,
+            indexing_func=indexing_func,
+            close=close,
+            order_records=order_records,
+            log_records=log_records,
             init_cash=init_cash,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
@@ -414,21 +422,14 @@ class Portfolio(Configured, PandasIndexer):
         if incl_unrealized is None:
             incl_unrealized = defaults.portfolio['incl_unrealized']
 
-        # Perform checks
-        checks.assert_type(orders, Orders)
-        checks.assert_type(logs, Logs)
-
         # Store passed arguments
-        self._close = orders.close
-        self._orders = orders
-        self._logs = logs
+        self._close = broadcast_to(close, wrapper.dummy(group_by=False))
+        self._order_records = order_records
+        self._log_records = log_records
         self._init_cash = init_cash
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
         self._incl_unrealized = incl_unrealized
-
-        # Supercharge
-        PandasIndexer.__init__(self, portfolio_indexing_func)
 
     # ############# Class methods ############# #
 
@@ -755,11 +756,10 @@ class Portfolio(Configured, PandasIndexer):
         )
 
         # Create an instance
-        orders = Orders(wrapper, order_records, close)
-        logs = Logs(wrapper, log_records)
         return cls(
-            orders,
-            logs,
+            wrapper,
+            order_records,
+            log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
@@ -1093,11 +1093,10 @@ class Portfolio(Configured, PandasIndexer):
         )
 
         # Create an instance
-        orders = Orders(wrapper, order_records, close)
-        logs = Logs(wrapper, log_records)
         return cls(
-            orders,
-            logs,
+            wrapper,
+            order_records,
+            log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
@@ -1467,11 +1466,10 @@ class Portfolio(Configured, PandasIndexer):
             )
 
         # Create an instance
-        orders = Orders(wrapper, order_records, close)
-        logs = Logs(wrapper, log_records)
         return cls(
-            orders,
-            logs,
+            wrapper,
+            order_records,
+            log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
             cash_sharing,
             call_seq,
@@ -1483,12 +1481,20 @@ class Portfolio(Configured, PandasIndexer):
     @property
     def wrapper(self):
         """Array wrapper."""
-        # Wrapper in orders and here can be different
-        wrapper = self._orders.wrapper
-        if self.cash_sharing and wrapper.grouper.allow_modify:
-            # Cannot change groups if columns within them are dependent
-            return wrapper.copy(allow_modify=False)
-        return wrapper.copy()
+        if self.cash_sharing:
+            # Allow only disabling grouping when needed (but not globally, see regroup)
+            return self._wrapper.copy(
+                allow_enable=False,
+                allow_modify=False
+            )
+        return self._wrapper
+
+    def regroup(self, group_by):
+        """Regroup this object."""
+        if self.cash_sharing:
+            if self.wrapper.grouper.is_grouping_modified(group_by=group_by):
+                raise ValueError("Cannot modify grouping globally when cash_sharing=True")
+        return Wrapping.regroup(self, group_by)
 
     @property
     def cash_sharing(self):
@@ -1505,11 +1511,43 @@ class Portfolio(Configured, PandasIndexer):
         """Whether to include unrealized trade P&L in statistics."""
         return self._incl_unrealized
 
+    # ############# Records ############# #
+
+    @property  # lazy property
+    def _orders(self):
+        _orders = Orders(self.wrapper, self._order_records, self.close)
+        self.__dict__['_orders'] = _orders
+        return _orders
+
+    def orders(self, group_by=None):  # doesn't require caching
+        """Get order records.
+
+        See `vectorbt.portfolio.orders.Orders`."""
+        return self._orders.regroup(group_by=group_by)
+
+    @property  # lazy property
+    def _logs(self):
+        _logs = Logs(self.wrapper, self._log_records)
+        self.__dict__['_logs'] = _logs
+        return _logs
+
+    def logs(self, group_by=None):  # doesn't require caching
+        """Get log records.
+
+        See `vectorbt.portfolio.logs.Logs`."""
+        return self._logs.regroup(group_by=group_by)
+
     @property  # lazy property
     def _trades(self):
         _trades = Trades.from_orders(self._orders)
         self.__dict__['_trades'] = _trades
         return _trades
+
+    def trades(self, group_by=None):  # doesn't require caching
+        """Get trade records.
+
+        See `vectorbt.portfolio.events.Trades`."""
+        return self._trades.regroup(group_by=group_by)
 
     @property  # lazy property
     def _positions(self):
@@ -1517,29 +1555,18 @@ class Portfolio(Configured, PandasIndexer):
         self.__dict__['_positions'] = _positions
         return _positions
 
-    # ############# Regrouping ############# #
+    def positions(self, group_by=None):  # doesn't require caching
+        """Get position records.
 
-    def regroup(self, group_by):
-        """Regroup this object."""
-        if self.cash_sharing:
-            raise ValueError("Cannot change grouping globally when cash sharing is enabled")
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(orders=self._orders.regroup(group_by=group_by))
-        return self
+        See `vectorbt.portfolio.events.Positions`."""
+        return self._positions.regroup(group_by=group_by)
 
-    def _force_select_column(self, column=None):
-        """Force selection of one column."""
-        if column is not None:
-            if self.wrapper.grouper.group_by is None:
-                self_col = self[column]
-            else:
-                self_col = self.regroup(False)[column]
-        else:
-            self_col = self
-        if self_col.wrapper.ndim > 1:
-            raise TypeError("Only one column is allowed. Use indexing or column argument.")
-        return self_col
+    @cached_method
+    def drawdowns(self, **kwargs):
+        """Get drawdown records from `Portfolio.value`.
+
+        See `vectorbt.generic.drawdowns.Drawdowns`."""
+        return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
     # ############# Reference price ############# #
 
@@ -1559,39 +1586,6 @@ class Portfolio(Configured, PandasIndexer):
         if bfill and np.any(np.isnan(close[0, :])):
             close = generic_nb.ffill_nb(close[::-1, :])[::-1, :]
         return self.wrapper.wrap(close, group_by=False)
-
-    # ############# Records ############# #
-
-    def orders(self, group_by=None):  # doesn't require caching
-        """Get order records.
-
-        See `vectorbt.portfolio.orders.Orders`."""
-        return self._orders.regroup(group_by=group_by)
-
-    def logs(self, group_by=None):  # doesn't require caching
-        """Get log records.
-
-        See `vectorbt.portfolio.logs.Logs`."""
-        return self._logs.regroup(group_by=group_by)
-
-    def trades(self, group_by=None):  # doesn't require caching
-        """Get trade records.
-
-        See `vectorbt.portfolio.events.Trades`."""
-        return self._trades.regroup(group_by=group_by)
-
-    def positions(self, group_by=None):  # doesn't require caching
-        """Get position records.
-
-        See `vectorbt.portfolio.events.Positions`."""
-        return self._positions.regroup(group_by=group_by)
-
-    @cached_method
-    def drawdowns(self, **kwargs):
-        """Get drawdown records from `Portfolio.value`.
-
-        See `vectorbt.generic.drawdowns.Drawdowns`."""
-        return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
     # ############# Shares ############# #
 
@@ -1985,6 +1979,8 @@ class Portfolio(Configured, PandasIndexer):
     def plot(self,
              subplots=None,
              column=None,
+             group=None,
+             group_by=None,
              show_titles=True,
              hide_id_labels=True,
              group_id_labels=True,
@@ -2004,6 +2000,17 @@ class Portfolio(Configured, PandasIndexer):
                     selected) and optionally other keyword arguments. Will pass `row`, `col`, and
                     other subplot-dependent arguments if they can be found in the signature.
             column (str): Name of the column to plot.
+
+                Takes effect if portfolio contains multiple columns.
+            group (str): Name of the group to plot.
+
+                Takes effect if portfolio is grouped and `column` was not specified.
+
+                !!! note
+                    Only a subset of subplots accept groups.
+            group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+
+                Used to select `group`.
             show_titles (bool): Whether to show the title in the top left corner of each subplot.
             hide_id_labels (bool): Whether to hide identical legend labels.
 
@@ -2077,16 +2084,20 @@ class Portfolio(Configured, PandasIndexer):
         """
         from vectorbt.defaults import color_schema
 
+        # Select one column/group
+        self_col = self.select_series(column=column, group=group, group_by=group_by)
+
         if subplots is None:
-            subplots = ['orders', 'trade_pnl', 'cum_returns']
+            if self_col.wrapper.grouper.is_grouped():
+                subplots = ['cum_returns']
+            else:
+                subplots = ['orders', 'trade_pnl', 'cum_returns']
         if not isinstance(subplots, list):
             subplots = [subplots]
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
         if make_subplots_kwargs is None:
             make_subplots_kwargs = {}
-
-        self_col = self._force_select_column(column)
 
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))
@@ -2113,7 +2124,7 @@ class Portfolio(Configured, PandasIndexer):
                 if isinstance(name, tuple):
                     _subplot_titles.append(name[1])
                 else:
-                    _subplot_titles.append(self.supported_subplots[name])
+                    _subplot_titles.append(self_col.supported_subplots[name])
         else:
             _subplot_titles = None
         fig = CustomFigureWidget(make_subplots(

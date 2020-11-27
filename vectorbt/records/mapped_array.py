@@ -217,7 +217,7 @@ array([10., 11., 12., 13., 14., 15.])
 
 ## Caching
 
-`MappedArray` supports caching. If a method or a property requires heavy computation, it's wrapped
+`MappedArray` supports caching. If a method or a property requires heavy computation, it's Wrapping
 with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
 respectively. Caching can be disabled globally via `vectorbt.defaults` or locally via the
 method/property. There is currently no way to disable caching for an entire class.
@@ -235,9 +235,7 @@ import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import Configured
 from vectorbt.utils.enum import to_value_map
-from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base import reshape_fns
 from vectorbt.base.common import (
     add_binary_magic_methods,
@@ -245,20 +243,21 @@ from vectorbt.base.common import (
     binary_magic_methods,
     unary_magic_methods
 )
-from vectorbt.base.array_wrapper import ArrayWrapper, indexing_on_wrapper_meta
+from vectorbt.base.array_wrapper import ArrayWrapper, wrapper_indexing_func_meta, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.records import nb
 
 
-def indexing_on_mapped_array_meta(obj, pd_indexing_func):
+def mapped_indexing_func_meta(obj, pd_indexing_func):
     """Perform indexing on `MappedArray` and return metadata."""
     new_wrapper, _, group_idxs, col_idxs = \
-        indexing_on_wrapper_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
-    new_indices, new_col_arr = nb.select_mapped_cols_nb(
-        obj.col_arr,
-        obj.col_index,
-        reshape_fns.to_1d(col_idxs)
-    )
+        wrapper_indexing_func_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
+    if obj.is_sorted():
+        new_indices, new_col_arr = nb.mapped_col_range_select_nb(obj.col_range, reshape_fns.to_1d(col_idxs))
+    else:
+        warnings.warn(f"Mapped array of type '{obj.__class__.__name__}' is not sorted. "
+                      f"Indexing will disrupt the current order and sort the array.")
+        new_indices, new_col_arr = nb.mapped_col_map_select_nb(obj.col_map, reshape_fns.to_1d(col_idxs))
     new_mapped_arr = obj.values[new_indices]
     if obj.idx_arr is not None:
         new_idx_arr = obj.idx_arr[new_indices]
@@ -267,10 +266,10 @@ def indexing_on_mapped_array_meta(obj, pd_indexing_func):
     return new_wrapper, new_mapped_arr, new_col_arr, new_idx_arr, group_idxs, col_idxs
 
 
-def _mapped_array_indexing_func(obj, pd_indexing_func):
+def mapped_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `MappedArray`."""
     new_wrapper, new_mapped_arr, new_col_arr, new_idx_arr, _, _ = \
-        indexing_on_mapped_array_meta(obj, pd_indexing_func)
+        mapped_indexing_func_meta(obj, pd_indexing_func)
     return obj.copy(
         wrapper=new_wrapper,
         mapped_arr=new_mapped_arr,
@@ -279,22 +278,22 @@ def _mapped_array_indexing_func(obj, pd_indexing_func):
     )
 
 
-def _mapped_binary_translate_func(self, other, np_func):
-    """Perform operation between two instances of `MappedArray`."""
-    if isinstance(other, self.__class__):
+def combine_mapped_with_other(self, other, np_func):
+    """Combine `MappedArray` with other compatible object."""
+    if isinstance(other, MappedArray):
         other = other.values
     return self.copy(mapped_arr=np_func(self.values, other))
 
 
 @add_binary_magic_methods(
     binary_magic_methods,
-    _mapped_binary_translate_func
+    combine_mapped_with_other
 )
 @add_unary_magic_methods(
     unary_magic_methods,
     lambda self, np_func: self.copy(mapped_arr=np_func(self.values))
 )
-class MappedArray(Configured, PandasIndexer):
+class MappedArray(Wrapping):
     """Exposes methods and properties for working with records.
 
     Args:
@@ -309,22 +308,26 @@ class MappedArray(Configured, PandasIndexer):
 
             Must be of the same size as `mapped_arr`.
         value_map (namedtuple, dict or callable): Value map.
+        indexing_func (callable): Indexing function. Defaults to `mapped_indexing_func`.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None, value_map=None, **kwargs):
-        Configured.__init__(
+    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None, value_map=None, 
+                 indexing_func=None, **kwargs):
+        if indexing_func is None:
+            indexing_func = mapped_indexing_func
+        Wrapping.__init__(
             self,
-            wrapper=wrapper,
+            wrapper,
+            indexing_func=indexing_func,
             mapped_arr=mapped_arr,
             col_arr=col_arr,
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
         )
-        checks.assert_type(wrapper, ArrayWrapper)
         mapped_arr = np.asarray(mapped_arr)
         col_arr = np.asarray(col_arr)
         checks.assert_shape_equal(mapped_arr, col_arr, axis=0)
@@ -335,38 +338,10 @@ class MappedArray(Configured, PandasIndexer):
             if checks.is_namedtuple(value_map):
                 value_map = to_value_map(value_map)
 
-        self._wrapper = wrapper
         self._mapped_arr = mapped_arr
         self._col_arr = col_arr
         self._idx_arr = idx_arr
         self._value_map = value_map
-
-        PandasIndexer.__init__(self, _mapped_array_indexing_func)
-
-    @property
-    def wrapper(self):
-        """Array wrapper."""
-        return self._wrapper
-
-    def regroup(self, group_by):
-        """Regroup this object."""
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
-        return self
-
-    def _force_select_column(self, column=None):
-        """Force selection of one column."""
-        if column is not None:
-            if self.wrapper.grouper.group_by is None:
-                self_col = self[column]
-            else:
-                self_col = self.regroup(False)[column]
-        else:
-            self_col = self
-        if self_col.wrapper.ndim > 1:
-            raise TypeError("Only one column is allowed. Use indexing or column argument.")
-        return self_col
 
     @property
     def mapped_arr(self):
@@ -394,9 +369,16 @@ class MappedArray(Configured, PandasIndexer):
         return self._value_map
 
     @cached_property
-    def col_index(self):
+    def col_range(self):
         """Column index for `MappedArray.values`."""
-        return nb.mapped_col_index_nb(self.values, self.col_arr, len(self.wrapper.columns))
+        if not self.is_sorted(sort_idx=False):
+            raise ValueError("Sorting is required prior to this operation. Use `sort` method.")
+        return nb.col_range_nb(self.col_arr, len(self.wrapper.columns))
+
+    @cached_property
+    def col_map(self):
+        """Column map for `MappedArray.values`."""
+        return nb.col_map_nb(self.col_arr, len(self.wrapper.columns))
 
     @cached_method
     def get_col_arr(self, group_by=None):
@@ -409,62 +391,120 @@ class MappedArray(Configured, PandasIndexer):
         return col_arr
 
     @cached_method
-    def get_col_index(self, group_by=None):
-        """Group-aware column index for `MappedArray.values`."""
+    def get_col_range(self, group_by=None):
+        """Group-aware column range for `MappedArray.values`."""
+        if not self.is_sorted(sort_idx=False):
+            raise ValueError("Sorting is required prior to this operation. Use `sort` method.")
         col_arr = self.get_col_arr(group_by=group_by)
         columns = self.wrapper.get_columns(group_by=group_by)
-        col_index = nb.mapped_col_index_nb(self.values, col_arr, len(columns))
-        return col_index
+        return nb.col_range_nb(col_arr, len(columns))
+
+    @cached_method
+    def get_col_map(self, group_by=None):
+        """Group-aware column map for `MappedArray.values`."""
+        col_arr = self.get_col_arr(group_by=group_by)
+        columns = self.wrapper.get_columns(group_by=group_by)
+        return nb.col_map_nb(col_arr, len(columns))
+
+    @cached_method
+    def is_sorted(self, idx_arr=None, sort_idx=False):
+        """Check whether mapped array is sorted."""
+        if idx_arr is None:
+            idx_arr = self.idx_arr
+        if sort_idx:
+            if idx_arr is None:
+                raise ValueError("Must pass idx_arr")
+            return nb.is_col_idx_sorted_nb(self.col_arr, idx_arr)
+        return nb.is_col_sorted_nb(self.col_arr)
+
+    def sort(self, idx_arr=None, sort_idx=False, value_map=None, group_by=None, **kwargs):
+        """Sort mapped array by column array (primary) and index array (secondary, optional).
+
+        !!! note
+            Sorting is expensive. A better approach is to append records already in the correct order."""
+        if idx_arr is None:
+            idx_arr = self.idx_arr
+        if value_map is None:
+            value_map = self.value_map
+        if self.is_sorted(idx_arr=idx_arr, sort_idx=sort_idx):
+            return self.copy(
+                idx_arr=idx_arr,
+                value_map=value_map,
+                **kwargs
+            ).regroup(group_by)
+        if sort_idx:
+            if idx_arr is None:
+                raise ValueError("Must pass idx_arr")
+            ind = np.lexsort((idx_arr, self.col_arr))  # expensive!
+        else:
+            ind = np.argsort(self.col_arr)
+        return self.copy(
+            mapped_arr=self.values[ind],
+            col_arr=self.col_arr[ind],
+            idx_arr=idx_arr[ind] if idx_arr is not None else idx_arr,
+            value_map=value_map,
+            **kwargs
+        ).regroup(group_by)
 
     def filter_by_mask(self, mask, idx_arr=None, value_map=None, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
         if idx_arr is None:
             idx_arr = self.idx_arr
-        if idx_arr is not None:
-            idx_arr = self.idx_arr[mask]
         if value_map is None:
             value_map = self.value_map
-        if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
-            self.wrapper.grouper.check_group_by(group_by=group_by)
-            wrapper = self.wrapper.copy(group_by=group_by)
-        else:
-            wrapper = self.wrapper
         return self.copy(
-            wrapper=wrapper,
             mapped_arr=self.values[mask],
             col_arr=self.col_arr[mask],
-            idx_arr=idx_arr,
+            idx_arr=self.idx_arr[mask] if idx_arr is not None else idx_arr,
             value_map=value_map,
             **kwargs
-        )
+        ).regroup(group_by)
 
     def map_to_mask(self, inout_map_func_nb, *args, group_by=None):
         """Map mapped array to a mask.
 
         See `vectorbt.records.nb.mapped_to_mask_nb`."""
-        col_arr = self.get_col_arr(group_by=group_by)
-        return nb.mapped_to_mask_nb(self.values, col_arr, inout_map_func_nb, *args)
+        col_range = self.get_col_range(group_by=group_by)
+        return nb.mapped_to_mask_nb(self.values, col_range, inout_map_func_nb, *args)
 
+    @cached_method
     def top_n_mask(self, n, **kwargs):
         """Return mask of top N elements in each column."""
         return self.map_to_mask(nb.top_n_inout_map_nb, n, **kwargs)
 
+    @cached_method
     def bottom_n_mask(self, n, **kwargs):
         """Return mask of bottom N elements in each column."""
         return self.map_to_mask(nb.bottom_n_inout_map_nb, n, **kwargs)
 
+    @cached_method
     def top_n(self, n, **kwargs):
         """Filter top N elements from each column."""
         return self.filter_by_mask(self.top_n_mask(n), **kwargs)
 
+    @cached_method
     def bottom_n(self, n, **kwargs):
         """Filter bottom N elements from each column."""
         return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
+
+    @cached_method
+    def is_matrix_compatible(self, idx_arr=None, group_by=None):
+        """See `vectorbt.records.nb.mapped_matrix_compatible_nb`."""
+        if idx_arr is None:
+            if self.idx_arr is None:
+                raise ValueError("Must pass idx_arr")
+            idx_arr = self.idx_arr
+        col_arr = self.get_col_arr(group_by=group_by)
+        target_shape = self.wrapper.get_shape_2d(group_by=group_by)
+        return nb.mapped_matrix_compatible_nb(col_arr, idx_arr, target_shape)
 
     def to_matrix(self, idx_arr=None, default_val=np.nan, group_by=None, **kwargs):
         """Convert mapped array to the matrix form.
 
         See `vectorbt.records.nb.mapped_to_matrix_nb`.
+
+        !!! note
+            Will raise an error if there are multiple values pointing to the same matrix element.
 
         !!! warning
             Mapped arrays represent information in the most memory-friendly format.
@@ -473,9 +513,10 @@ class MappedArray(Configured, PandasIndexer):
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
+        if not self.is_matrix_compatible(idx_arr=idx_arr, group_by=group_by):
+            raise ValueError("Multiple values are pointing to the same matrix element")
         col_arr = self.get_col_arr(group_by=group_by)
-        columns = self.wrapper.get_columns(group_by=group_by)
-        target_shape = (len(self.wrapper.index), len(columns))
+        target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         out = nb.mapped_to_matrix_nb(self.values, col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(out, group_by=group_by, **kwargs)
 
@@ -501,14 +542,12 @@ class MappedArray(Configured, PandasIndexer):
             idx_arr = self.idx_arr
 
         # Perform main computation
-        col_arr = self.get_col_arr(group_by=group_by)
-        columns = self.wrapper.get_columns(group_by=group_by)
+        col_range = self.get_col_range(group_by=group_by)
         if not to_array:
             if not to_idx:
                 out = nb.reduce_mapped_nb(
                     self.values,
-                    col_arr,
-                    len(columns),
+                    col_range,
                     default_val,
                     reduce_func_nb,
                     *args
@@ -516,9 +555,8 @@ class MappedArray(Configured, PandasIndexer):
             else:
                 out = nb.reduce_mapped_to_idx_nb(
                     self.values,
-                    col_arr,
+                    col_range,
                     idx_arr,
-                    len(columns),
                     default_val,
                     reduce_func_nb,
                     *args
@@ -527,8 +565,7 @@ class MappedArray(Configured, PandasIndexer):
             if not to_idx:
                 out = nb.reduce_mapped_to_array_nb(
                     self.values,
-                    col_arr,
-                    len(columns),
+                    col_range,
                     default_val,
                     reduce_func_nb,
                     *args
@@ -536,9 +573,8 @@ class MappedArray(Configured, PandasIndexer):
             else:
                 out = nb.reduce_mapped_to_idx_array_nb(
                     self.values,
-                    col_arr,
+                    col_range,
                     idx_arr,
-                    len(columns),
                     default_val,
                     reduce_func_nb,
                     *args
@@ -648,13 +684,12 @@ class MappedArray(Configured, PandasIndexer):
         return out
 
     @cached_method
-    def value_counts(self, group_by=None, value_map=None):
+    def value_counts(self, group_by=None, value_map=None, **kwargs):
         """Return a pandas object containing counts of unique values."""
         mapped_codes, mapped_uniques = pd.factorize(self.values)
-        col_arr = self.get_col_arr(group_by=group_by)
-        columns = self.wrapper.get_columns(group_by=group_by)
-        value_counts = nb.mapped_value_counts_nb(mapped_codes, col_arr, len(columns))
-        value_counts_df = self.wrapper.wrap(value_counts, index=mapped_uniques, columns=columns)
+        col_range = self.get_col_range(group_by=group_by)
+        value_counts = nb.mapped_value_counts_nb(mapped_codes, col_range)
+        value_counts_df = self.wrapper.wrap(value_counts, index=mapped_uniques, group_by=group_by, **kwargs)
         if value_map is None:
             value_map = self.value_map
         if value_map is not None:
@@ -663,18 +698,15 @@ class MappedArray(Configured, PandasIndexer):
             value_counts_df.index = value_counts_df.index.map(value_map)
         return value_counts_df
 
-    @cached_method
-    def stack(self, group_by=None, default_val=np.nan):
+    def stack(self, group_by=None, default_val=np.nan, **kwargs):
         """Stack into a matrix.
 
         Will lose index information and fill missing values with `default_val`."""
         if self.wrapper.ndim == 1:
-            return self.wrapper.wrap(self.values, index=np.arange(len(self.values)))
-        col_arr = self.get_col_arr(group_by=group_by)
-        columns = self.wrapper.get_columns(group_by=group_by)
-        col_index = self.get_col_index(group_by=group_by)
-        stacked = nb.stack_mapped_nb(self.values, col_arr, len(columns), col_index, default_val)
-        return self.wrapper.wrap(stacked, index=np.arange(stacked.shape[0]), columns=columns)
+            return self.wrapper.wrap(self.values, index=np.arange(len(self.values)), group_by=group_by, **kwargs)
+        col_range = self.get_col_range(group_by=group_by)
+        out = nb.stack_mapped_nb(self.values, col_range, default_val)
+        return self.wrapper.wrap(out, index=np.arange(out.shape[0]), group_by=group_by, **kwargs)
 
     def hist(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot histogram by column."""

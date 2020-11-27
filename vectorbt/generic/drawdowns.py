@@ -11,16 +11,15 @@ from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base.reshape_fns import to_1d
-from vectorbt.base.indexing import PandasIndexer
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
-from vectorbt.records.base import Records, indexing_on_records_meta
+from vectorbt.records.base import Records, records_indexing_func_meta
 
 
 def drawdowns_indexing_func(obj, pd_indexing_func):
     """Perform indexing on `Drawdowns`."""
-    new_wrapper, new_records_arr, _, col_idxs = indexing_on_records_meta(obj, pd_indexing_func)
+    new_wrapper, new_records_arr, _, col_idxs = records_indexing_func_meta(obj, pd_indexing_func)
     new_ts = new_wrapper.wrap(obj.ts.values[:, col_idxs], group_by=False)
     return obj.copy(
         wrapper=new_wrapper,
@@ -66,21 +65,22 @@ class Drawdowns(Records):
 
         ![](/vectorbt/docs/img/drawdowns_drawdown_hist.png)"""
 
-    def __init__(self, wrapper, records_arr, ts, idx_field='end_idx', **kwargs):
+    def __init__(self, wrapper, records_arr, ts, idx_field='end_idx', indexing_func=None, **kwargs):
+        if indexing_func is None:
+            indexing_func = drawdowns_indexing_func
         Records.__init__(
             self,
             wrapper,
             records_arr,
             idx_field=idx_field,
             ts=ts,
+            indexing_func=indexing_func,
             **kwargs
         )
         self._ts = ts
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
             raise ValueError("Records array must have all fields defined in drawdown_dt")
-
-        PandasIndexer.__init__(self, drawdowns_indexing_func)
 
     @classmethod
     def from_ts(cls, ts, idx_field='end_idx', **kwargs):
