@@ -141,11 +141,19 @@ __pdoc__['broadcasting'] = f"""Broadcasting rules for index and columns.
 ```
 """
 
-# Cache
-caching = True
-"""If True, will cache properties and methods decorated accordingly.
+# Caching
+caching = Config(
+    properties=True,
+    methods=True
+)
+"""_"""
 
-Disable for performance tests."""
+__pdoc__['caching'] = f"""Parameters for caching.
+
+```plaintext
+{json.dumps(caching, indent=2)}
+```
+"""
 
 # Returns
 returns = Config(

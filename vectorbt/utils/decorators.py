@@ -71,11 +71,12 @@ _NOT_FOUND = object()
 class cached_property(custom_property):
     """Extends `custom_property` with caching.
 
-    Similar to `functools.cached_property`, but without changing the original attribute.
+    Similar to `functools.cached_property`, but without replacing the original attribute
+    to be able to re-compute whenever needed.
     
     Disables caching if 
     
-    * `vectorbt.defaults.caching` is False, or
+    * `vectorbt.defaults.caching['properties']` is False, or
     * `disabled` attribute is to True."""
 
     def __init__(self, func, disabled=False, **kwargs):
@@ -97,7 +98,7 @@ class cached_property(custom_property):
 
         if instance is None:
             return self
-        if not defaults.caching or self.disabled:  # you can manually disable cache here
+        if not defaults.caching['properties'] or self.disabled:  # you can manually disable cache here
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         val = cache.get(self.attrname, _NOT_FOUND)
@@ -155,7 +156,7 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
 
     Disables caching if
 
-    * `vectorbt.defaults.caching` is False,
+    * `vectorbt.defaults.caching['methods']` is False,
     * `disabled` attribute is to True, or
     * a non-hashable object was passed as positional or keyword argument.
 
@@ -174,7 +175,7 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)
 
-            if not defaults.caching or wrapper.disabled:  # you can manually disable cache here
+            if not defaults.caching['methods'] or wrapper.disabled:  # you can manually disable cache here
                 return func(instance, *args, **kwargs)
             cache = instance.__dict__
             cached_func = cache.get(wrapper.attrname, _NOT_FOUND)

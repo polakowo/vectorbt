@@ -51,7 +51,6 @@ multi_i = pd.MultiIndex.from_arrays([['x7', 'y7', 'z7'], ['x8', 'y8', 'z8']], na
 multi_c = pd.MultiIndex.from_arrays([['a7', 'b7', 'c7'], ['a8', 'b8', 'c8']], names=['c7', 'c8'])
 df5 = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]], index=multi_i, columns=multi_c)
 
-
 # ############# column_grouper.py ############# #
 
 
@@ -109,7 +108,8 @@ class TestColumnGrouper:
             pd.Int64Index([3, 2, 1, 1, 1, 0, 0, 0], dtype='int64')
         )
         pd.testing.assert_index_equal(
-            column_grouper.group_by_to_index(grouped_columns, group_by=pd.Index([3, 2, 1, 1, 1, 0, 0, 0], name='fourth')),
+            column_grouper.group_by_to_index(grouped_columns,
+                                             group_by=pd.Index([3, 2, 1, 1, 1, 0, 0, 0], name='fourth')),
             pd.Int64Index([3, 2, 1, 1, 1, 0, 0, 0], dtype='int64', name='fourth')
         )
 
@@ -198,7 +198,7 @@ class TestColumnGrouper:
         assert column_grouper.ColumnGrouper(grouped_columns).is_grouping_modified(group_by=0)
         assert column_grouper.ColumnGrouper(grouped_columns).is_grouping_modified(group_by=True)
         assert not column_grouper.ColumnGrouper(grouped_columns).is_grouping_modified(group_by=False)
-        assert not column_grouper.ColumnGrouper(grouped_columns, group_by=0)\
+        assert not column_grouper.ColumnGrouper(grouped_columns, group_by=0) \
             .is_grouping_modified(group_by=grouped_columns.get_level_values(0) + 1)  # only labels
 
     def test_is_grouping_changed(self):
@@ -231,7 +231,8 @@ class TestColumnGrouper:
             column_grouper.ColumnGrouper(grouped_columns, group_by=None, allow_enable=False).check_group_by(group_by=0)
         column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_disable=True).check_group_by(group_by=False)
         with pytest.raises(Exception) as e_info:
-            column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_disable=False).check_group_by(group_by=False)
+            column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_disable=False).check_group_by(
+                group_by=False)
         column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_modify=True).check_group_by(group_by=1)
         column_grouper.ColumnGrouper(grouped_columns, group_by=0, allow_modify=False).check_group_by(
             group_by=np.array([2, 2, 2, 2, 3, 3, 3, 3]))
@@ -308,7 +309,8 @@ class TestColumnGrouper:
         assert column_grouper.ColumnGrouper(grouped_columns, group_by=0) == column_grouper.ColumnGrouper(
             grouped_columns, group_by=0)
         assert column_grouper.ColumnGrouper(grouped_columns) != 0
-        assert column_grouper.ColumnGrouper(grouped_columns) != column_grouper.ColumnGrouper(grouped_columns, group_by=0)
+        assert column_grouper.ColumnGrouper(grouped_columns) != column_grouper.ColumnGrouper(grouped_columns,
+                                                                                             group_by=0)
         assert column_grouper.ColumnGrouper(grouped_columns) != column_grouper.ColumnGrouper(pd.Index([0]))
         assert column_grouper.ColumnGrouper(grouped_columns) != column_grouper.ColumnGrouper(
             grouped_columns, allow_enable=False)
@@ -339,87 +341,87 @@ class TestArrayWrapper:
 
     def test_indexing_on_wrapper_meta(self):
         # not grouped
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(sr2_wrapper, lambda x: x.iloc[:2])[1:]
+        a, b, c = sr2_wrapper._indexing_func_meta(lambda x: x.iloc[:2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         assert b == 0
         assert c == 0
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper, lambda x: x.iloc[0, :2])[1:]
+        a, b, c = df4_wrapper._indexing_func_meta(lambda x: x.iloc[0, :2])[1:]
         assert a == 0
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper, lambda x: x.iloc[:2, 0])[1:]
+        a, b, c = df4_wrapper._indexing_func_meta(lambda x: x.iloc[:2, 0])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         assert b == 0
         assert c == 0
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper, lambda x: x.iloc[:2, [0]])[1:]
+        a, b, c = df4_wrapper._indexing_func_meta(lambda x: x.iloc[:2, [0]])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         np.testing.assert_array_equal(b, np.array([0]))
         np.testing.assert_array_equal(c, np.array([0]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper, lambda x: x.iloc[:2, :2])[1:]
+        a, b, c = df4_wrapper._indexing_func_meta(lambda x: x.iloc[:2, :2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1]))
         with pytest.raises(Exception) as e_info:
-            _ = array_wrapper.wrapper_indexing_func_meta(df4_wrapper, lambda x: x.iloc[0, 0])[1:]
+            _ = df4_wrapper._indexing_func_meta(lambda x: x.iloc[0, 0])[1:]
         with pytest.raises(Exception) as e_info:
-            _ = array_wrapper.wrapper_indexing_func_meta(df4_wrapper, lambda x: x.iloc[[0], 0])[1:]
+            _ = df4_wrapper._indexing_func_meta(lambda x: x.iloc[[0], 0])[1:]
 
         # not grouped, column only
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper_co, lambda x: x.iloc[0])[1:]
+        a, b, c = df4_wrapper_co._indexing_func_meta(lambda x: x.iloc[0])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         assert b == 0
         assert c == 0
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper_co, lambda x: x.iloc[[0]])[1:]
+        a, b, c = df4_wrapper_co._indexing_func_meta(lambda x: x.iloc[[0]])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         np.testing.assert_array_equal(b, np.array([0]))
         np.testing.assert_array_equal(c, np.array([0]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_wrapper_co, lambda x: x.iloc[:2])[1:]
+        a, b, c = df4_wrapper_co._indexing_func_meta(lambda x: x.iloc[:2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1]))
         with pytest.raises(Exception) as e_info:
-            _ = array_wrapper.wrapper_indexing_func_meta(sr2_wrapper_co, lambda x: x.iloc[:2])[1:]
+            _ = sr2_wrapper_co._indexing_func_meta(lambda x: x.iloc[:2])[1:]
         with pytest.raises(Exception) as e_info:
-            _ = array_wrapper.wrapper_indexing_func_meta(df4_wrapper_co, lambda x: x.iloc[:, :2])[1:]
+            _ = df4_wrapper_co._indexing_func_meta(lambda x: x.iloc[:, :2])[1:]
 
         # grouped
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(sr2_grouped_wrapper, lambda x: x.iloc[:2])[1:]
+        a, b, c = sr2_grouped_wrapper._indexing_func_meta(lambda x: x.iloc[:2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         assert b == 0
         assert c == 0
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper, lambda x: x.iloc[:2, 0])[1:]
+        a, b, c = df4_grouped_wrapper._indexing_func_meta(lambda x: x.iloc[:2, 0])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         assert b == 0
         np.testing.assert_array_equal(c, np.array([0, 1]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper, lambda x: x.iloc[:2, 1])[1:]
+        a, b, c = df4_grouped_wrapper._indexing_func_meta(lambda x: x.iloc[:2, 1])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         assert b == 1
         assert c == 2
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper, lambda x: x.iloc[:2, [1]])[1:]
+        a, b, c = df4_grouped_wrapper._indexing_func_meta(lambda x: x.iloc[:2, [1]])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         np.testing.assert_array_equal(b, np.array([1]))
         np.testing.assert_array_equal(c, np.array([2]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper, lambda x: x.iloc[:2, :2])[1:]
+        a, b, c = df4_grouped_wrapper._indexing_func_meta(lambda x: x.iloc[:2, :2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1, 2]))
         with pytest.raises(Exception) as e_info:
-            _ = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper, lambda x: x.iloc[0, :2])[1:]
+            _ = df4_grouped_wrapper._indexing_func_meta(lambda x: x.iloc[0, :2])[1:]
 
         # grouped, column only
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper_co, lambda x: x.iloc[0])[1:]
+        a, b, c = df4_grouped_wrapper_co._indexing_func_meta(lambda x: x.iloc[0])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         assert b == 0
         np.testing.assert_array_equal(c, np.array([0, 1]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper_co, lambda x: x.iloc[1])[1:]
+        a, b, c = df4_grouped_wrapper_co._indexing_func_meta(lambda x: x.iloc[1])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         assert b == 1
         assert c == 2
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper_co, lambda x: x.iloc[[1]])[1:]
+        a, b, c = df4_grouped_wrapper_co._indexing_func_meta(lambda x: x.iloc[[1]])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         np.testing.assert_array_equal(b, np.array([1]))
         np.testing.assert_array_equal(c, np.array([2]))
-        a, b, c = array_wrapper.wrapper_indexing_func_meta(df4_grouped_wrapper_co, lambda x: x.iloc[:2])[1:]
+        a, b, c = df4_grouped_wrapper_co._indexing_func_meta(lambda x: x.iloc[:2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1, 2]))
         np.testing.assert_array_equal(b, np.array([0, 1]))
         np.testing.assert_array_equal(c, np.array([0, 1, 2]))
@@ -928,6 +930,7 @@ class TestWrapping:
             df4_grouped_wrapping.select_series()
         with pytest.raises(Exception) as e_info:
             df4_grouped_wrapping.select_series(group='g1', column_only=True)
+
 
 # ############# index_fns.py ############# #
 
@@ -2167,16 +2170,8 @@ class TestReshapeFns:
 
 # ############# indexing.py ############# #
 
+
 called_dict = {}
-
-
-def indexing_func(obj, pd_indexing_func, calling=None):
-    # As soon as you call iloc etc., performs it on each dataframe and mapper and returns a new class instance
-    called_dict[calling] = True
-    param1_mapper = indexing.indexing_on_mapper(obj._param1_mapper, obj.a, pd_indexing_func)
-    param2_mapper = indexing.indexing_on_mapper(obj._param2_mapper, obj.a, pd_indexing_func)
-    tuple_mapper = indexing.indexing_on_mapper(obj._tuple_mapper, obj.a, pd_indexing_func)
-    return H(pd_indexing_func(obj.a), param1_mapper, param2_mapper, tuple_mapper, obj._level_names)
 
 
 PandasIndexer = indexing.PandasIndexer
@@ -2192,10 +2187,21 @@ class H(PandasIndexer, ParamIndexer):
         self._tuple_mapper = tuple_mapper
         self._level_names = level_names
 
-        PandasIndexer.__init__(self, indexing_func, calling='PandasIndexer')
+        PandasIndexer.__init__(self, calling='PandasIndexer')
         ParamIndexer.__init__(
-            self, [param1_mapper, param2_mapper, tuple_mapper],
-            indexing_func, level_names=[level_names[0], level_names[1], level_names], calling='ParamIndexer')
+            self,
+            [param1_mapper, param2_mapper, tuple_mapper],
+            level_names=[level_names[0], level_names[1], level_names],
+            calling='ParamIndexer'
+        )
+
+    def _indexing_func(self, pd_indexing_func, calling=None):
+        # As soon as you call iloc etc., performs it on each dataframe and mapper and returns a new class instance
+        called_dict[calling] = True
+        param1_mapper = indexing.indexing_on_mapper(self._param1_mapper, self.a, pd_indexing_func)
+        param2_mapper = indexing.indexing_on_mapper(self._param2_mapper, self.a, pd_indexing_func)
+        tuple_mapper = indexing.indexing_on_mapper(self._tuple_mapper, self.a, pd_indexing_func)
+        return H(pd_indexing_func(self.a), param1_mapper, param2_mapper, tuple_mapper, self._level_names)
 
     @classmethod
     def run(cls, a, params1, params2, level_names=('p1', 'p2')):

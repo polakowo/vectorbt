@@ -47,7 +47,6 @@ SimulationContext = namedtuple('SimulationContext', [
     'call_seq',
     'active_mask',
     'order_records',
-    'record_mask',
     'log_records',
     'last_cash',
     'last_shares',
@@ -88,24 +87,8 @@ A segment is simply a sequence of `order_func_nb` calls under the same group and
 
 Has shape `(target_shape[0], group_lens.shape[0])`.
 """
-__pdoc__['SimulationContext.order_records'] = """Order records.
-
-Order records are not filled incrementally, but based on their position in the matrix. 
-To get index of a record, use `col * target_shape[0] + i`.
-
-!!! warning
-    Initially, all records are empty. Accessing empty records will not raise any errors or warnings, 
-    but provide you with arbitrary data (see [np.empty](https://numpy.org/doc/stable/reference/generated/numpy.empty.html)).
-    To check if a record is set, use `record_mask`.
-"""
-__pdoc__['SimulationContext.record_mask'] = """Mask of records that have been set.
-
-Has the same length as `order_records`.
-"""
-__pdoc__['SimulationContext.log_records'] = """Log records.
-
-In contrast to order records, log records are filled incrementally.
-For example, to get the latest filled log record, use `log_records[num_logs - 1]`."""
+__pdoc__['SimulationContext.order_records'] = "Order records filled up to this point."
+__pdoc__['SimulationContext.log_records'] = "Log records filled up to this point."
 __pdoc__['SimulationContext.last_cash'] = """Last cash per column, or per group if cash sharing is enabled.
 
 Has the same shape as `init_cash`.
@@ -126,9 +109,7 @@ GroupContext = namedtuple('GroupContext', [
     'group',
     'group_len',
     'from_col',
-    'to_col',
-    'num_records',
-    'num_logs'
+    'to_col'
 ])
 
 __pdoc__['GroupContext'] = "A named tuple representing context of the group."
@@ -152,14 +133,10 @@ Has range `[1, target_shape[1] + 1)`.
 
 If columns are not grouped, equals `from_col + 1`.
 """
-__pdoc__['GroupContext.num_records'] = "Number of order records filled up to this point."
-__pdoc__['GroupContext.num_logs'] = "Number of log records filled up to this point."
 
 RowContext = namedtuple('RowContext', [
     *SimulationContext._fields,
-    'i',
-    'num_records',
-    'num_logs'
+    'i'
 ])
 __pdoc__['RowContext'] = "A named tuple representing context of the row."
 for field in SimulationContext._fields:
@@ -168,8 +145,6 @@ __pdoc__['RowContext.i'] = """Current row (time axis).
 
 Has range `[0, target_shape[0])`.
 """
-__pdoc__['RowContext.num_records'] = "See `GroupContext.num_records`."
-__pdoc__['RowContext.num_logs'] = "See `GroupContext.num_logs`."
 
 SegmentContext = namedtuple('SegmentContext', [
     *SimulationContext._fields,
@@ -178,8 +153,6 @@ SegmentContext = namedtuple('SegmentContext', [
     'group_len',
     'from_col',
     'to_col',
-    'num_records',
-    'num_logs',
     'call_seq_now'
 ])
 __pdoc__['SegmentContext'] = "A named tuple representing context of the segment."
@@ -190,8 +163,6 @@ __pdoc__['SegmentContext.group'] = "See `GroupContext.group`."
 __pdoc__['SegmentContext.group_len'] = "See `GroupContext.group_len`."
 __pdoc__['SegmentContext.from_col'] = "See `GroupContext.from_col`."
 __pdoc__['SegmentContext.to_col'] = "See `GroupContext.to_col`."
-__pdoc__['SegmentContext.num_records'] = "See `GroupContext.num_records`."
-__pdoc__['SegmentContext.num_logs'] = "See `GroupContext.num_logs`."
 __pdoc__['SegmentContext.call_seq_now'] = """Current sequence of calls.
 
 Has shape `(group_len,)`. 

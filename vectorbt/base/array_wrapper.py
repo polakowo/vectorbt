@@ -14,169 +14,6 @@ from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
 
 
-def wrapper_indexing_func_meta(obj, pd_indexing_func, index=None, columns=None,
-                               column_only_select=None, group_select=None):
-    """Perform indexing on `ArrayWrapper` and also return indexing metadata.
-
-    Takes into account column grouping.
-
-    Set `column_only_select` to True to index the array wrapper as a Series of columns.
-    This way, selection of index (axis 0) can be avoided. Set `group_select` to True
-    to select groups rather than columns. Takes effect only if grouping is enabled.
-
-    !!! note
-        If `column_only_select` is True, make sure to index the array wrapper
-        as a Series of columns rather than a DataFrame. For example, the operation
-        `.iloc[:, :2]` should become `.iloc[:2]`. Operations are not allowed if the
-        object is already a Series and thus has only one column/group."""
-    from vectorbt import defaults
-
-    if column_only_select is None:
-        column_only_select = obj.column_only_select
-    if column_only_select is None:
-        column_only_select = defaults.array_wrapper['column_only_select']
-    if group_select is None:
-        group_select = obj.group_select
-    if group_select is None:
-        group_select = defaults.array_wrapper['group_select']
-    if index is None:
-        index = obj.index
-    if columns is None:
-        if group_select:
-            columns = obj.grouper.get_columns()
-        else:
-            columns = obj.columns
-    if group_select:
-        # Groups as columns
-        i_wrapper = ArrayWrapper(index, columns, obj.grouped_ndim)
-    else:
-        # Columns as columns
-        i_wrapper = ArrayWrapper(index, columns, obj.ndim)
-    n_rows = len(index)
-    n_cols = len(columns)
-
-    if column_only_select:
-        if i_wrapper.ndim == 1:
-            raise IndexingError("Columns only: One column already selected")
-        col_mapper = i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns)
-        try:
-            col_mapper = pd_indexing_func(col_mapper)
-        except pd.core.indexing.IndexingError as err:
-            warnings.warn("Columns only: Make sure to treat this object "
-                          "as a Series of columns rather than a DataFrame", stacklevel=2)
-            raise err
-        if checks.is_series(col_mapper):
-            new_columns = col_mapper.index
-            col_idxs = col_mapper.values
-            new_ndim = 2
-        else:
-            new_columns = columns[[col_mapper]]
-            col_idxs = col_mapper
-            new_ndim = 1
-        new_index = index
-        idx_idxs = np.arange(len(index))
-    else:
-        idx_mapper = i_wrapper.wrap(
-            np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
-            index=index,
-            columns=columns
-        )
-        idx_mapper = pd_indexing_func(idx_mapper)
-        if i_wrapper.ndim == 1:
-            if not checks.is_series(idx_mapper):
-                raise IndexingError("Selection of a scalar is not allowed")
-            idx_idxs = idx_mapper.values
-            col_idxs = 0
-        else:
-            col_mapper = i_wrapper.wrap(
-                np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)), 
-                index=index, 
-                columns=columns
-            )
-            col_mapper = pd_indexing_func(col_mapper)
-            if checks.is_frame(idx_mapper):
-                idx_idxs = idx_mapper.values[:, 0]
-                col_idxs = col_mapper.values[0]
-            elif checks.is_series(idx_mapper):
-                one_col = np.all(col_mapper.values == col_mapper.values.item(0))
-                one_idx = np.all(idx_mapper.values == idx_mapper.values.item(0))
-                if one_col and one_idx:
-                    # One index and one column selected, multiple times
-                    raise IndexingError("Must select at least two unique indices in one of both axes")
-                elif one_col:
-                    # One column selected
-                    idx_idxs = idx_mapper.values
-                    col_idxs = col_mapper.values[0]
-                elif one_idx:
-                    # One index selected
-                    idx_idxs = idx_mapper.values[0]
-                    col_idxs = col_mapper.values
-            else:
-                raise IndexingError("Selection of a scalar is not allowed")
-        new_index = index_fns.get_index(idx_mapper, 0)
-        new_columns = index_fns.get_index(idx_mapper, 1)
-        new_ndim = idx_mapper.ndim
-
-    if obj.grouper.group_by is not None:
-        # Grouping enabled
-        if np.asarray(idx_idxs).ndim == 0:
-            raise IndexingError("Flipping index and columns is not allowed")
-
-        if group_select:
-            # Selection based on groups
-            # Get indices of columns corresponding to selected groups
-            group_idxs = col_idxs
-            group_idxs_arr = reshape_fns.to_1d(group_idxs)
-            group_start_idxs = obj.grouper.get_group_start_idxs()[group_idxs_arr]
-            group_end_idxs = obj.grouper.get_group_end_idxs()[group_idxs_arr]
-            ungrouped_col_idxs = get_ranges_arr(group_start_idxs, group_end_idxs)
-            ungrouped_columns = obj.columns[ungrouped_col_idxs]
-            if new_ndim == 1 and len(ungrouped_columns) == 1:
-                ungrouped_ndim = 1
-                ungrouped_col_idxs = ungrouped_col_idxs[0]
-            else:
-                ungrouped_ndim = 2
-
-            # Get indices of selected groups corresponding to the new columns
-            # We could do obj.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
-            group_lens = obj.grouper.get_group_lens()[group_idxs_arr]
-            ungrouped_group_idxs = np.full(len(ungrouped_columns), 0)
-            ungrouped_group_idxs[group_lens[:-1]] = 1
-            ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
-
-            return obj.copy(
-                index=new_index,
-                columns=ungrouped_columns,
-                ndim=ungrouped_ndim,
-                grouped_ndim=new_ndim,
-                group_by=new_columns[ungrouped_group_idxs]
-            ), idx_idxs, group_idxs, ungrouped_col_idxs
-
-        # Selection based on columns
-        col_idxs_arr = reshape_fns.to_1d(col_idxs)
-        return obj.copy(
-            index=new_index,
-            columns=new_columns,
-            ndim=new_ndim,
-            grouped_ndim=None,
-            group_by=obj.grouper.group_by[col_idxs_arr]
-        ), idx_idxs, col_idxs, col_idxs
-
-    # Grouping disabled
-    return obj.copy(
-        index=new_index,
-        columns=new_columns,
-        ndim=new_ndim,
-        grouped_ndim=None,
-        group_by=None
-    ), idx_idxs, col_idxs, col_idxs
-
-
-def wrapper_indexing_func(obj, pd_indexing_func, **kwargs):
-    """Perform indexing on `ArrayWrapper`"""
-    return wrapper_indexing_func_meta(obj, pd_indexing_func, **kwargs)[0]
-
-
 class ArrayWrapper(Configured, PandasIndexer):
     """Class that stores index, columns and shape metadata for wrapping NumPy arrays.
     Tightly integrated with `vectorbt.base.column_grouper.ColumnGrouper`.
@@ -186,7 +23,9 @@ class ArrayWrapper(Configured, PandasIndexer):
     `**kwargs` are passed to `vectorbt.base.column_grouper.ColumnGrouper`.
 
     !!! note
-        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.copy`."""
+        This class is meant to be immutable. To change any attribute, use `ArrayWrapper.copy`.
+
+        Use methods that begin with `get_` to get group-aware results."""
 
     def __init__(self, index, columns, ndim, freq=None, column_only_select=None,
                  group_select=None, grouped_ndim=None, **kwargs):
@@ -219,12 +58,172 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._grouper = ColumnGrouper(columns, **kwargs)
         self._grouped_ndim = grouped_ndim
 
-        PandasIndexer.__init__(
-            self,
-            wrapper_indexing_func,
-            column_only_select=column_only_select,
-            group_select=group_select
-        )
+        PandasIndexer.__init__(self)
+
+    def _indexing_func_meta(self, pd_indexing_func, index=None, columns=None,
+                            column_only_select=None, group_select=None, group_by=None):
+        """Perform indexing on `ArrayWrapper` and also return indexing metadata.
+
+        Takes into account column grouping.
+
+        Set `column_only_select` to True to index the array wrapper as a Series of columns.
+        This way, selection of index (axis 0) can be avoided. Set `group_select` to True
+        to select groups rather than columns. Takes effect only if grouping is enabled.
+
+        !!! note
+            If `column_only_select` is True, make sure to index the array wrapper
+            as a Series of columns rather than a DataFrame. For example, the operation
+            `.iloc[:, :2]` should become `.iloc[:2]`. Operations are not allowed if the
+            object is already a Series and thus has only one column/group."""
+        from vectorbt import defaults
+
+        if column_only_select is None:
+            column_only_select = self.column_only_select
+        if column_only_select is None:
+            column_only_select = defaults.array_wrapper['column_only_select']
+        if group_select is None:
+            group_select = self.group_select
+        if group_select is None:
+            group_select = defaults.array_wrapper['group_select']
+        self = self.regroup(group_by)
+        group_select = group_select and self.grouper.is_grouped()
+        if index is None:
+            index = self.index
+        if columns is None:
+            if group_select:
+                columns = self.grouper.get_columns()
+            else:
+                columns = self.columns
+        if group_select:
+            # Groups as columns
+            i_wrapper = ArrayWrapper(index, columns, self.get_ndim())
+        else:
+            # Columns as columns
+            i_wrapper = ArrayWrapper(index, columns, self.ndim)
+        n_rows = len(index)
+        n_cols = len(columns)
+
+        if column_only_select:
+            if i_wrapper.ndim == 1:
+                raise IndexingError("Columns only: Attempting to select a column on a Series")
+            col_mapper = i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns)
+            try:
+                col_mapper = pd_indexing_func(col_mapper)
+            except pd.core.indexing.IndexingError as e:
+                warnings.warn("Columns only: Make sure to treat this object "
+                              "as a Series of columns rather than a DataFrame", stacklevel=2)
+                raise e
+            if checks.is_series(col_mapper):
+                new_columns = col_mapper.index
+                col_idxs = col_mapper.values
+                new_ndim = 2
+            else:
+                new_columns = columns[[col_mapper]]
+                col_idxs = col_mapper
+                new_ndim = 1
+            new_index = index
+            idx_idxs = np.arange(len(index))
+        else:
+            idx_mapper = i_wrapper.wrap(
+                np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
+                index=index,
+                columns=columns
+            )
+            idx_mapper = pd_indexing_func(idx_mapper)
+            if i_wrapper.ndim == 1:
+                if not checks.is_series(idx_mapper):
+                    raise IndexingError("Selection of a scalar is not allowed")
+                idx_idxs = idx_mapper.values
+                col_idxs = 0
+            else:
+                col_mapper = i_wrapper.wrap(
+                    np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)),
+                    index=index,
+                    columns=columns
+                )
+                col_mapper = pd_indexing_func(col_mapper)
+                if checks.is_frame(idx_mapper):
+                    idx_idxs = idx_mapper.values[:, 0]
+                    col_idxs = col_mapper.values[0]
+                elif checks.is_series(idx_mapper):
+                    one_col = np.all(col_mapper.values == col_mapper.values.item(0))
+                    one_idx = np.all(idx_mapper.values == idx_mapper.values.item(0))
+                    if one_col and one_idx:
+                        # One index and one column selected, multiple times
+                        raise IndexingError("Must select at least two unique indices in one of both axes")
+                    elif one_col:
+                        # One column selected
+                        idx_idxs = idx_mapper.values
+                        col_idxs = col_mapper.values[0]
+                    elif one_idx:
+                        # One index selected
+                        idx_idxs = idx_mapper.values[0]
+                        col_idxs = col_mapper.values
+                    else:
+                        raise IndexingError
+                else:
+                    raise IndexingError("Selection of a scalar is not allowed")
+            new_index = index_fns.get_index(idx_mapper, 0)
+            new_columns = index_fns.get_index(idx_mapper, 1)
+            new_ndim = idx_mapper.ndim
+
+        if self.grouper.group_by is not None:
+            # Grouping enabled
+            if np.asarray(idx_idxs).ndim == 0:
+                raise IndexingError("Flipping index and columns is not allowed")
+
+            if group_select:
+                # Selection based on groups
+                # Get indices of columns corresponding to selected groups
+                group_idxs = col_idxs
+                group_idxs_arr = reshape_fns.to_1d(group_idxs)
+                group_start_idxs = self.grouper.get_group_start_idxs()[group_idxs_arr]
+                group_end_idxs = self.grouper.get_group_end_idxs()[group_idxs_arr]
+                ungrouped_col_idxs = get_ranges_arr(group_start_idxs, group_end_idxs)
+                ungrouped_columns = self.columns[ungrouped_col_idxs]
+                if new_ndim == 1 and len(ungrouped_columns) == 1:
+                    ungrouped_ndim = 1
+                    ungrouped_col_idxs = ungrouped_col_idxs[0]
+                else:
+                    ungrouped_ndim = 2
+
+                # Get indices of selected groups corresponding to the new columns
+                # We could do self.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
+                group_lens = self.grouper.get_group_lens()[group_idxs_arr]
+                ungrouped_group_idxs = np.full(len(ungrouped_columns), 0)
+                ungrouped_group_idxs[group_lens[:-1]] = 1
+                ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
+
+                return self.copy(
+                    index=new_index,
+                    columns=ungrouped_columns,
+                    ndim=ungrouped_ndim,
+                    grouped_ndim=new_ndim,
+                    group_by=new_columns[ungrouped_group_idxs]
+                ), idx_idxs, group_idxs, ungrouped_col_idxs
+
+            # Selection based on columns
+            col_idxs_arr = reshape_fns.to_1d(col_idxs)
+            return self.copy(
+                index=new_index,
+                columns=new_columns,
+                ndim=new_ndim,
+                grouped_ndim=None,
+                group_by=self.grouper.group_by[col_idxs_arr]
+            ), idx_idxs, col_idxs, col_idxs
+
+        # Grouping disabled
+        return self.copy(
+            index=new_index,
+            columns=new_columns,
+            ndim=new_ndim,
+            grouped_ndim=None,
+            group_by=None
+        ), idx_idxs, col_idxs, col_idxs
+
+    def _indexing_func(self, pd_indexing_func, **kwargs):
+        """Perform indexing on `ArrayWrapper`"""
+        return self._indexing_func_meta(pd_indexing_func, **kwargs)[0]
 
     @classmethod
     def from_obj(cls, obj, *args, **kwargs):
@@ -246,7 +245,7 @@ class ArrayWrapper(Configured, PandasIndexer):
     
     def get_columns(self, group_by=None):
         """Get group-aware `ArrayWrapper.columns`."""
-        return self.to_group_native(group_by=group_by).columns
+        return self.displace(group_by=group_by).columns
 
     @property
     def name(self):
@@ -256,19 +255,19 @@ class ArrayWrapper(Configured, PandasIndexer):
                 return None
             return self.columns[0]
         return None
-    
+
     def get_name(self, group_by=None):
         """Get group-aware `ArrayWrapper.name`."""
-        return self.to_group_native(group_by=group_by).name
+        return self.displace(group_by=group_by).name
 
     @property
     def ndim(self):
         """Number of dimensions."""
         return self._ndim
-    
+
     def get_ndim(self, group_by=None):
         """Get group-aware `ArrayWrapper.ndim`."""
-        return self.to_group_native(group_by=group_by).ndim
+        return self.displace(group_by=group_by).ndim
 
     @property
     def shape(self):
@@ -276,10 +275,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         if self.ndim == 1:
             return len(self.index),
         return len(self.index), len(self.columns)
-    
+
     def get_shape(self, group_by=None):
         """Get group-aware `ArrayWrapper.shape`."""
-        return self.to_group_native(group_by=group_by).shape
+        return self.displace(group_by=group_by).shape
 
     @property
     def shape_2d(self):
@@ -287,10 +286,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         if self.ndim == 1:
             return self.shape[0], 1
         return self.shape
-    
+
     def get_shape_2d(self, group_by=None):
         """Get group-aware `ArrayWrapper.shape_2d`."""
-        return self.to_group_native(group_by=group_by).shape_2d
+        return self.displace(group_by=group_by).shape_2d
 
     @property
     def freq(self):
@@ -345,39 +344,37 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.ndim
         return self._grouped_ndim
 
-    def regroup(self, group_by=None, **kwargs):
-        """Regroup this object."""
-        if group_by is None:
-            return self
-        self.grouper.check_group_by(group_by=group_by)
-        grouped_ndim = None
-        if self.grouper.is_grouped(group_by=group_by):
-            if not self.grouper.is_group_count_changed(group_by=group_by):
-                grouped_ndim = self.grouped_ndim
-        return self.copy(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
+    def regroup(self, group_by, **kwargs):
+        """Regroup this object.
+
+        Only creates a new instance if grouping has changed, otherwise returns itself."""
+        if self.grouper.is_grouping_changed(group_by=group_by):
+            self.grouper.check_group_by(group_by=group_by)
+            grouped_ndim = None
+            if self.grouper.is_grouped(group_by=group_by):
+                if not self.grouper.is_group_count_changed(group_by=group_by):
+                    grouped_ndim = self.grouped_ndim
+            return self.copy(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
+        return self
 
     @cached_method
-    def to_group_native(self, group_by=None, **kwargs):
-        """Replace columns and other metadata with groups.
-
-        !!! note
-            Loses the ability to switch off grouping."""
+    def displace(self, group_by=None, **kwargs):
+        """Displace columns and other metadata with groups."""
         _self = self.regroup(group_by=group_by)
-        column_only_select = kwargs.pop('column_only_select', _self.column_only_select)
-        return self.__class__(
-            _self.index,
-            _self.grouper.get_columns(),
-            _self.grouped_ndim,
-            freq=_self.freq,
-            column_only_select=column_only_select,
-            **kwargs
-        )
+        if _self.grouper.is_grouped():
+            return _self.copy(
+                columns=_self.grouper.get_columns(),
+                ndim=_self.grouped_ndim,
+                group_by=None,
+                **kwargs
+            )
+        return _self
 
     def wrap(self, a, index=None, columns=None, dtype=None, group_by=None):
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
-        _self = self.to_group_native(group_by=group_by)
-        
+        _self = self.displace(group_by=group_by)
+
         a = np.asarray(a)
         a = reshape_fns.soft_to_ndim(a, self.ndim)
         if index is None:
@@ -410,8 +407,8 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         If `time_units` is set, calls `to_time_units`."""
         checks.assert_not_none(self.ndim)
-        _self = self.to_group_native(group_by=group_by)
-        
+        _self = self.displace(group_by=group_by)
+
         if columns is None:
             columns = _self.columns
         a = np.asarray(a)
@@ -455,48 +452,48 @@ class ArrayWrapper(Configured, PandasIndexer):
         raise ValueError(f"{a.ndim}-d input is not supported")
 
     def dummy(self, group_by=None, **kwargs):
-        """Create dummy Series/DataFrame."""
-        _self = self.to_group_native(group_by=group_by)
+        """Create a dummy Series/DataFrame."""
+        _self = self.displace(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
-
-
-def wrapping_indexing_func(obj, pd_indexing_func, **kwargs):
-    """Perform indexing on `Wrapping`"""
-    new_wrapper = wrapper_indexing_func(obj.wrapper, pd_indexing_func, **kwargs)
-    return obj.copy(wrapper=new_wrapper)
 
 
 class Wrapping(Configured, PandasIndexer):
     """Class that uses `ArrayWrapper` globally."""
-    def __init__(self, wrapper, indexing_func=None, **kwargs):
+    def __init__(self, wrapper, **kwargs):
         checks.assert_type(wrapper, ArrayWrapper)
         self._wrapper = wrapper
-        if indexing_func is None:
-            indexing_func = wrapping_indexing_func
 
-        Configured.__init__(self, wrapper=wrapper, indexing_func=indexing_func, **kwargs)
-        PandasIndexer.__init__(self, indexing_func)
+        Configured.__init__(self, wrapper=wrapper, **kwargs)
+        PandasIndexer.__init__(self)
+
+    def _indexing_func(self, pd_indexing_func, **kwargs):
+        """Perform indexing on `Wrapping`"""
+        return self.copy(wrapper=self.wrapper._indexing_func(pd_indexing_func, **kwargs))
 
     @property
     def wrapper(self):
         """Array wrapper."""
         return self._wrapper
 
-    def regroup(self, group_by):
-        """Regroup this object."""
+    def regroup(self, group_by, **kwargs):
+        """Regroup this object.
+
+        Only creates a new instance if grouping has changed, otherwise returns itself.
+
+        `**kwargs` will be passed to `ArrayWrapper.regroup`."""
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
-            return self.copy(wrapper=self.wrapper.copy(group_by=group_by))
+            return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self
 
-    def select_series(self, column=None, group=None, group_by=None, column_only=False):
+    def select_series(self, column=None, group=None, group_by=None, column_only=False, **kwargs):
         """Select one column/group."""
         if column is not None:
-            return self.regroup(False)[column]
+            return self.regroup(False, **kwargs)[column]
         if self.wrapper.ndim == 1:
             return self
         if not column_only and self.wrapper.grouper.is_grouped(group_by=group_by):
-            _self = self.regroup(group_by)
+            _self = self.regroup(group_by, **kwargs)
             if group is not None:
                 return _self[group]
             if _self.wrapper.grouped_ndim == 1:

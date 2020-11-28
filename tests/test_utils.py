@@ -123,11 +123,11 @@ class TestDecorators:
         G.cache_me.disabled = False
 
         # disabled globally
-        defaults.caching = False
+        defaults.caching['properties'] = False
         cached_number4 = g.cache_me
         assert cached_number4 != cached_number3
         assert g.cache_me != cached_number4
-        defaults.caching = True
+        defaults.caching.reset()
 
     def test_cached_method(self):
         class G:
@@ -161,11 +161,11 @@ class TestDecorators:
         G.cache_me.disabled = False
 
         # disabled globally
-        defaults.caching = False
+        defaults.caching['methods'] = False
         cached_number4 = g.cache_me()
         assert cached_number4 != cached_number3
         assert g.cache_me() != cached_number4
-        defaults.caching = True
+        defaults.caching.reset()
 
         # disabled by non-hashable args
         cached_number5 = g.cache_me(b=np.zeros(1))

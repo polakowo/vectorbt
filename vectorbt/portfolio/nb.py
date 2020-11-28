@@ -921,7 +921,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                     running order 1 at column 2
                     running order 2 at column 1
 
-        >>> pd.DataFrame.from_records(order_records)  # sorted
+        >>> pd.DataFrame.from_records(order_records)
            col  idx       size     price      fees  side
         0    0    0   7.626262  4.375232  1.033367     0
         1    0    2   5.210115  1.524275  1.007942     0
@@ -956,7 +956,6 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
-    record_mask = np.full(target_shape[0] * target_shape[1], False)
     ridx = 0
     log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
     lidx = 0
@@ -974,7 +973,6 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         call_seq,
         active_mask,
         order_records,
-        record_mask,
         log_records,
         last_cash,
         last_shares,
@@ -998,18 +996,15 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                 cash_sharing,
                 call_seq,
                 active_mask,
-                order_records,
-                record_mask,
-                log_records,
+                order_records[:ridx],
+                log_records[:lidx],
                 last_cash,
                 last_shares,
                 last_val_price,
                 group,
                 group_len,
                 from_col,
-                to_col,
-                ridx,
-                lidx
+                to_col
             )
             group_prep_out = group_prep_func_nb(gc, *prep_out, *group_prep_args)
 
@@ -1031,9 +1026,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                         cash_sharing,
                         call_seq,
                         active_mask,
-                        order_records,
-                        record_mask,
-                        log_records,
+                        order_records[:ridx],
+                        log_records[:lidx],
                         last_cash,
                         last_shares,
                         last_val_price,
@@ -1042,8 +1036,6 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                         group_len,
                         from_col,
                         to_col,
-                        ridx,
-                        lidx,
                         call_seq_now
                     )
                     segment_prep_out = segment_prep_func_nb(sc, *group_prep_out, *segment_prep_args)
@@ -1077,9 +1069,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                             cash_sharing,
                             call_seq,
                             active_mask,
-                            order_records,
-                            record_mask,
-                            log_records,
+                            order_records[:ridx],
+                            log_records[:lidx],
                             last_cash,
                             last_shares,
                             last_val_price,
@@ -1088,8 +1079,6 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                             group_len,
                             from_col,
                             to_col,
-                            ridx,
-                            lidx,
                             call_seq_now,
                             col,
                             k,
@@ -1110,14 +1099,12 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
                         if order_result.status == OrderStatus.Filled:
                             # Add a new record
-                            r = get_record_idx_nb(target_shape, i, col)
-                            order_records[r]['col'] = col
-                            order_records[r]['idx'] = i
-                            order_records[r]['size'] = order_result.size
-                            order_records[r]['price'] = order_result.price
-                            order_records[r]['fees'] = order_result.fees
-                            order_records[r]['side'] = order_result.side
-                            record_mask[r] = True
+                            order_records[ridx]['col'] = col
+                            order_records[ridx]['idx'] = i
+                            order_records[ridx]['size'] = order_result.size
+                            order_records[ridx]['price'] = order_result.price
+                            order_records[ridx]['fees'] = order_result.fees
+                            order_records[ridx]['side'] = order_result.side
                             ridx += 1
 
                         # Now becomes last
@@ -1129,8 +1116,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
             from_col = to_col
 
-    # Order records are not sorted yet
-    return order_records[record_mask], log_records[:lidx]
+    return order_records[:ridx], log_records[:lidx]
 
 
 @njit
@@ -1183,7 +1169,6 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
-    record_mask = np.full(target_shape[0] * target_shape[1], False)
     ridx = 0
     log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
     lidx = 0
@@ -1201,7 +1186,6 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
         call_seq,
         active_mask,
         order_records,
-        record_mask,
         log_records,
         last_cash,
         last_shares,
@@ -1226,15 +1210,12 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                 cash_sharing,
                 call_seq,
                 active_mask,
-                order_records,
-                record_mask,
-                log_records,
+                order_records[:ridx],
+                log_records[:lidx],
                 last_cash,
                 last_shares,
                 last_val_price,
-                i,
-                ridx,
-                lidx
+                i
             )
             row_prep_out = row_prep_func_nb(rc, *prep_out, *row_prep_args)
 
@@ -1255,9 +1236,8 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                         cash_sharing,
                         call_seq,
                         active_mask,
-                        order_records,
-                        record_mask,
-                        log_records,
+                        order_records[:ridx],
+                        log_records[:lidx],
                         last_cash,
                         last_shares,
                         last_val_price,
@@ -1266,8 +1246,6 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                         group_len,
                         from_col,
                         to_col,
-                        ridx,
-                        lidx,
                         call_seq_now
                     )
                     segment_prep_out = segment_prep_func_nb(sc, *row_prep_out, *segment_prep_args)
@@ -1301,9 +1279,8 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                             cash_sharing,
                             call_seq,
                             active_mask,
-                            order_records,
-                            record_mask,
-                            log_records,
+                            order_records[:ridx],
+                            log_records[:lidx],
                             last_cash,
                             last_shares,
                             last_val_price,
@@ -1312,8 +1289,6 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                             group_len,
                             from_col,
                             to_col,
-                            ridx,
-                            lidx,
                             call_seq_now,
                             col,
                             k,
@@ -1334,14 +1309,12 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 
                         if order_result.status == OrderStatus.Filled:
                             # Add a new record
-                            r = get_record_idx_nb(target_shape, i, col)
-                            order_records[r]['col'] = col
-                            order_records[r]['idx'] = i
-                            order_records[r]['size'] = order_result.size
-                            order_records[r]['price'] = order_result.price
-                            order_records[r]['fees'] = order_result.fees
-                            order_records[r]['side'] = order_result.side
-                            record_mask[r] = True
+                            order_records[ridx]['col'] = col
+                            order_records[ridx]['idx'] = i
+                            order_records[ridx]['size'] = order_result.size
+                            order_records[ridx]['price'] = order_result.price
+                            order_records[ridx]['fees'] = order_result.fees
+                            order_records[ridx]['side'] = order_result.side
                             ridx += 1
 
                         # Now becomes last
@@ -1353,8 +1326,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 
                     from_col = to_col
 
-    # Order records are not sorted yet
-    return order_records[record_mask], log_records
+    return order_records[:ridx], log_records[:lidx]
 
 
 @njit(cache=True)
@@ -1375,7 +1347,6 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
-    record_mask = np.full(target_shape[0] * target_shape[1], False)
     ridx = 0
     log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
     lidx = 0
@@ -1465,18 +1436,12 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
 
                 if order_result.status == OrderStatus.Filled:
                     # Add a new record
-                    if cash_sharing:
-                        r = get_record_idx_nb(target_shape, i, col)
-                    else:
-                        r = ridx
-                    order_records[r]['col'] = col
-                    order_records[r]['idx'] = i
-                    order_records[r]['size'] = order_result.size
-                    order_records[r]['price'] = order_result.price
-                    order_records[r]['fees'] = order_result.fees
-                    order_records[r]['side'] = order_result.side
-                    if cash_sharing:
-                        record_mask[r] = True
+                    order_records[ridx]['col'] = col
+                    order_records[ridx]['idx'] = i
+                    order_records[ridx]['size'] = order_result.size
+                    order_records[ridx]['price'] = order_result.price
+                    order_records[ridx]['fees'] = order_result.fees
+                    order_records[ridx]['side'] = order_result.side
                     ridx += 1
 
                 # Now becomes last
@@ -1488,9 +1453,6 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
 
         from_col = to_col
 
-    # Order records are not sorted yet
-    if cash_sharing:
-        return order_records[record_mask], log_records[:lidx]
     return order_records[:ridx], log_records[:lidx]
 
 
@@ -1589,7 +1551,6 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
-    record_mask = np.full(target_shape[0] * target_shape[1], False)
     ridx = 0
     log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
     lidx = 0
@@ -1698,18 +1659,12 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
 
                     if order_result.status == OrderStatus.Filled:
                         # Add a new record
-                        if cash_sharing:
-                            r = get_record_idx_nb(target_shape, i, col)
-                        else:
-                            r = ridx
-                        order_records[r]['col'] = col
-                        order_records[r]['idx'] = i
-                        order_records[r]['size'] = order_result.size
-                        order_records[r]['price'] = order_result.price
-                        order_records[r]['fees'] = order_result.fees
-                        order_records[r]['side'] = order_result.side
-                        if cash_sharing:
-                            record_mask[r] = True
+                        order_records[ridx]['col'] = col
+                        order_records[ridx]['idx'] = i
+                        order_records[ridx]['size'] = order_result.size
+                        order_records[ridx]['price'] = order_result.price
+                        order_records[ridx]['fees'] = order_result.fees
+                        order_records[ridx]['side'] = order_result.side
                         ridx += 1
 
                 # Now becomes last
@@ -1721,9 +1676,6 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
 
         from_col = to_col
 
-    # Order records are not sorted yet
-    if cash_sharing:
-        return order_records[record_mask], log_records[:lidx]
     return order_records[:ridx], log_records[:lidx]
 
 
@@ -1793,7 +1745,7 @@ def save_trade_nb(record, col,
 
 
 @njit(cache=True)
-def orders_to_trades_nb(close, order_records):
+def orders_to_trades_nb(close, order_records, col_map):
     """Find trades and store their information as records to an array.
 
     Example:
@@ -1802,6 +1754,7 @@ def orders_to_trades_nb(close, order_records):
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
+        >>> from vectorbt.records.nb import col_map_nb
         >>> from vectorbt.portfolio.nb import (
         ...     simulate_nb,
         ...     create_order_nb,
@@ -1810,10 +1763,11 @@ def orders_to_trades_nb(close, order_records):
         ... )
 
         >>> @njit
-        ... def order_func_nb(order_context, order_size, order_price):
-        ...     i = order_context.i
-        ...     col = order_context.col
-        ...     return create_order_nb(size=order_size[i, col], price=order_price[i, col])
+        ... def order_func_nb(oc, order_size, order_price):
+        ...     return create_order_nb(
+        ...         size=order_size[oc.i, oc.col],
+        ...         price=order_price[oc.i, oc.col]
+        ...         )
 
         >>> order_size = np.asarray([
         ...     [1, -1],
@@ -1846,7 +1800,8 @@ def orders_to_trades_nb(close, order_records):
         ...     empty_prep_nb, (),
         ...     order_func_nb, (order_size, order_price))
 
-        >>> trade_records = orders_to_trades_nb(close, order_records)
+        >>> col_map = col_map_nb(order_records['col'], target_shape[1])
+        >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
         >>> pd.DataFrame.from_records(trade_records)
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
         0    0   1.0          0     1.090909         0.0         2         3.0
@@ -1869,43 +1824,74 @@ def orders_to_trades_nb(close, order_records):
         7        0.0  0.000000  0.000000          0       0             2
         ```
         """
+    col_idxs, col_ns = col_map
     records = np.empty(close.shape[0] * close.shape[1], dtype=trade_dt)
     ridx = 0
-    last_col = -1
     entry_size_sum = 0.
     entry_gross_sum = 0.
     entry_fees_sum = 0.
-    entry_idx = -1
-    direction = -1
-    position_idx = -1
 
-    for r in range(order_records.shape[0]):
-        col = int(order_records[r]['col'])
-        if col < last_col:
-            raise ValueError("order_records must be sorted")
-        i = int(order_records[r]['idx'])
-        order_size = order_records[r]['size']
-        order_price = order_records[r]['price']
-        order_fees = order_records[r]['fees']
-        order_side = order_records[r]['side']
+    for col in range(col_idxs.shape[0]):
+        n = col_ns[col]
+        if n == 0:
+            continue
+        entry_idx = -1
+        direction = -1
+        position_idx = -1
+        last_i = -1
 
-        if order_size <= 0.:
-            raise ValueError(size_zero_neg_err)
-        if order_price <= 0.:
-            raise ValueError(price_zero_neg_err)
+        for i in range(n):
+            r = col_idxs[col][i]
+            record = order_records[r]
 
-        if col != last_col:
-            # Column has changed
-            if last_col != -1:
-                if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
-                    # Trade in the previous column hasn't been closed
-                    exit_size = entry_size_sum
-                    exit_price = close[close.shape[0] - 1, last_col]
-                    exit_fees = 0.
-                    exit_idx = close.shape[0] - 1
+            i = int(record['idx'])
+            if i < last_i:
+                raise ValueError("idx must be sorted for each column")
+            order_size = record['size']
+            order_price = record['price']
+            order_fees = record['fees']
+            order_side = record['side']
+
+            if order_size <= 0.:
+                raise ValueError(size_zero_neg_err)
+            if order_price <= 0.:
+                raise ValueError(price_zero_neg_err)
+
+            if entry_idx == -1:
+                # Trade opened
+                entry_idx = i
+                if order_side == OrderSide.Buy:
+                    direction = TradeDirection.Long
+                else:
+                    direction = TradeDirection.Short
+                position_idx += 1
+
+                # Reset running vars for a new position
+                entry_size_sum = 0.
+                entry_gross_sum = 0.
+                entry_fees_sum = 0.
+
+            if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
+                    or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
+                # Position increased
+                entry_size_sum += order_size
+                entry_gross_sum += order_size * order_price
+                entry_fees_sum += order_fees
+
+            elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
+                    or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
+                if is_close_or_less_nb(order_size, entry_size_sum):
+                    # Trade closed
+                    if is_close_nb(order_size, entry_size_sum):
+                        exit_size = entry_size_sum
+                    else:
+                        exit_size = order_size
+                    exit_price = order_price
+                    exit_fees = order_fees
+                    exit_idx = i
                     save_trade_nb(
                         records[ridx],
-                        last_col,
+                        col,
                         entry_idx,
                         entry_size_sum,
                         entry_gross_sum,
@@ -1915,135 +1901,78 @@ def orders_to_trades_nb(close, order_records):
                         exit_price,
                         exit_fees,
                         direction,
-                        TradeStatus.Open,
+                        TradeStatus.Closed,
                         position_idx
                     )
                     ridx += 1
 
-            last_col = col
-            entry_idx = -1
-            direction = -1
-            position_idx = -1
-
-        if entry_idx == -1:
-            # Trade opened
-            entry_idx = i
-            if order_side == OrderSide.Buy:
-                direction = TradeDirection.Long
-            else:
-                direction = TradeDirection.Short
-            position_idx += 1
-
-            # Reset running vars for a new position
-            entry_size_sum = 0.
-            entry_gross_sum = 0.
-            entry_fees_sum = 0.
-
-        if (direction == TradeDirection.Long and order_side == OrderSide.Buy) \
-                or (direction == TradeDirection.Short and order_side == OrderSide.Sell):
-            # Position increased
-            entry_size_sum += order_size
-            entry_gross_sum += order_size * order_price
-            entry_fees_sum += order_fees
-
-        elif (direction == TradeDirection.Long and order_side == OrderSide.Sell) \
-                or (direction == TradeDirection.Short and order_side == OrderSide.Buy):
-            if is_close_or_less_nb(order_size, entry_size_sum):
-                # Trade closed
-                if is_close_nb(order_size, entry_size_sum):
-                    exit_size = entry_size_sum
+                    if is_close_nb(order_size, entry_size_sum):
+                        # Position closed
+                        entry_idx = -1
+                        direction = -1
+                    else:
+                        # Position decreased, previous orders have now less impact
+                        size_fraction = (entry_size_sum - order_size) / entry_size_sum
+                        entry_size_sum *= size_fraction
+                        entry_gross_sum *= size_fraction
+                        entry_fees_sum *= size_fraction
                 else:
-                    exit_size = order_size
-                exit_price = order_price
-                exit_fees = order_fees
-                exit_idx = i
-                save_trade_nb(
-                    records[ridx],
-                    col,
-                    entry_idx,
-                    entry_size_sum,
-                    entry_gross_sum,
-                    entry_fees_sum,
-                    exit_idx,
-                    exit_size,
-                    exit_price,
-                    exit_fees,
-                    direction,
-                    TradeStatus.Closed,
-                    position_idx
-                )
-                ridx += 1
+                    # Trade reversed
+                    # Close current trade
+                    cl_exit_size = entry_size_sum
+                    cl_exit_price = order_price
+                    cl_exit_fees = cl_exit_size / order_size * order_fees
+                    cl_exit_idx = i
+                    save_trade_nb(
+                        records[ridx],
+                        col,
+                        entry_idx,
+                        entry_size_sum,
+                        entry_gross_sum,
+                        entry_fees_sum,
+                        cl_exit_idx,
+                        cl_exit_size,
+                        cl_exit_price,
+                        cl_exit_fees,
+                        direction,
+                        TradeStatus.Closed,
+                        position_idx
+                    )
+                    ridx += 1
 
-                if is_close_nb(order_size, entry_size_sum):
-                    # Position closed
-                    entry_idx = -1
-                    direction = -1
-                else:
-                    # Position decreased, previous orders have now less impact
-                    size_fraction = (entry_size_sum - order_size) / entry_size_sum
-                    entry_size_sum *= size_fraction
-                    entry_gross_sum *= size_fraction
-                    entry_fees_sum *= size_fraction
-            else:
-                # Trade reversed
-                # Close current trade
-                cl_exit_size = entry_size_sum
-                cl_exit_price = order_price
-                cl_exit_fees = cl_exit_size / order_size * order_fees
-                cl_exit_idx = i
-                save_trade_nb(
-                    records[ridx],
-                    col,
-                    entry_idx,
-                    entry_size_sum,
-                    entry_gross_sum,
-                    entry_fees_sum,
-                    cl_exit_idx,
-                    cl_exit_size,
-                    cl_exit_price,
-                    cl_exit_fees,
-                    direction,
-                    TradeStatus.Closed,
-                    position_idx
-                )
-                ridx += 1
+                    # Open a new trade
+                    entry_size_sum = order_size - cl_exit_size
+                    entry_gross_sum = entry_size_sum * order_price
+                    entry_fees_sum = order_fees - cl_exit_fees
+                    entry_idx = i
+                    if direction == TradeDirection.Long:
+                        direction = TradeDirection.Short
+                    else:
+                        direction = TradeDirection.Long
+                    position_idx += 1
 
-                # Open a new trade
-                entry_size_sum = order_size - cl_exit_size
-                entry_gross_sum = entry_size_sum * order_price
-                entry_fees_sum = order_fees - cl_exit_fees
-                entry_idx = i
-                if direction == TradeDirection.Long:
-                    direction = TradeDirection.Short
-                else:
-                    direction = TradeDirection.Long
-                position_idx += 1
-
-        if r == order_records.shape[0] - 1:
-            if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
-                # Trade in the current column hasn't been closed
-                exit_size = entry_size_sum
-                exit_price = close[close.shape[0] - 1, col]
-                exit_fees = 0.
-                exit_idx = close.shape[0] - 1
-                save_trade_nb(
-                    records[ridx],
-                    col,
-                    entry_idx,
-                    entry_size_sum,
-                    entry_gross_sum,
-                    entry_fees_sum,
-                    exit_idx,
-                    exit_size,
-                    exit_price,
-                    exit_fees,
-                    direction,
-                    TradeStatus.Open,
-                    position_idx
-                )
-                ridx += 1
-                entry_idx = -1
-                direction = -1
+        if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
+            # Trade in the previous column hasn't been closed
+            exit_size = entry_size_sum
+            exit_price = close[close.shape[0] - 1, col]
+            exit_fees = 0.
+            exit_idx = close.shape[0] - 1
+            save_trade_nb(
+                records[ridx],
+                col,
+                entry_idx,
+                entry_size_sum,
+                entry_gross_sum,
+                entry_fees_sum,
+                exit_idx,
+                exit_size,
+                exit_price,
+                exit_fees,
+                direction,
+                TradeStatus.Open,
+                position_idx
+            )
+            ridx += 1
 
     return records[:ridx]
 
@@ -2091,13 +2020,16 @@ def save_position_nb(record, trade_records):
 
 
 @njit(cache=True)
-def trades_to_positions_nb(trade_records):
+def trades_to_positions_nb(trade_records, col_map):
     """Find positions and store their information as records to an array.
 
     Example:
         Building upon the example in `orders_to_trades_nb`, convert trades to positions:
         ```python-repl
-        >>> position_records = trades_to_positions_nb(trade_records)
+        >>> from vectorbt.portfolio.nb import trades_to_positions_nb
+
+        >>> col_map = col_map_nb(trade_records['col'], target_shape[1])
+        >>> position_records = trades_to_positions_nb(trade_records, col_map)
         >>> pd.DataFrame.from_records(position_records)
            col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
         0    0   1.1          0     1.090909         0.0         3    3.090909
@@ -2116,31 +2048,36 @@ def trades_to_positions_nb(trade_records):
         5        0.0  0.0  0.000000          0       0             2
         ```
     """
+    col_idxs, col_ns = col_map
     records = np.empty(trade_records.shape[0], dtype=trade_dt)
     ridx = 0
-    last_col = -1
-    prev_position_idx = -1
     from_r = -1
 
-    for r in range(trade_records.shape[0]):
-        col = int(trade_records[r]['col'])
-        position_idx = int(trade_records[r]['position_idx'])
-        if col < last_col or (col == last_col and position_idx < prev_position_idx):
-            raise ValueError("trade_records must be sorted")
+    for col in range(col_idxs.shape[0]):
+        n = col_ns[col]
+        if n == 0:
+            continue
+        last_position_idx = -1
 
-        if col != last_col or position_idx != prev_position_idx:
-            if last_col != -1 and prev_position_idx != -1:
-                if r - from_r > 1:
-                    save_position_nb(records[ridx], trade_records[from_r:r])
-                else:
-                    # Speed up
-                    records[ridx] = trade_records[from_r]
-                ridx += 1
-            from_r = r
-            last_col = col
-            prev_position_idx = position_idx
-        if r == trade_records.shape[0] - 1:
-            if r - from_r > 0:
+        for i in range(n):
+            r = col_idxs[col][i]
+            position_idx = int(trade_records[r]['position_idx'])
+            if position_idx < last_position_idx:
+                raise ValueError("position_idx must be sorted for each column")
+
+            if position_idx != last_position_idx:
+                if last_position_idx != -1:
+                    if r - from_r > 1:
+                        save_position_nb(records[ridx], trade_records[from_r:r])
+                    else:
+                        # Speed up
+                        records[ridx] = trade_records[from_r]
+                    ridx += 1
+                from_r = r
+                last_position_idx = position_idx
+
+        if last_position_idx != -1:
+            if r - from_r > 1:
                 save_position_nb(records[ridx], trade_records[from_r:r + 1])
             else:
                 # Speed up
@@ -2178,39 +2115,39 @@ def get_short_size_nb(shares_now, new_shares_now):
 
 
 @njit(cache=True)
-def share_flow_nb(target_shape, order_records, direction):
+def share_flow_nb(target_shape, order_records, col_map, direction):
     """Get share flow series per column. Has opposite sign."""
+    col_idxs, col_ns = col_map
     out = np.full(target_shape, 0., dtype=np.float_)
-    last_col = -1
-    prev_i = -1
-    shares_now = 0.
 
-    for r in range(order_records.shape[0]):
-        record = order_records[r]
-        col = record['col']
-        i = record['idx']
-        side = record['side']
-        size = record['size']
+    for col in range(col_idxs.shape[0]):
+        n = col_ns[col]
+        if n == 0:
+            continue
+        last_i = -1
+        shares_now = 0.
 
-        if col < last_col:
-            raise ValueError("Order records must be sorted")
-        if col != last_col:
-            prev_i = -1
-            last_col = col
-            shares_now = 0.
-        if i < prev_i:
-            raise ValueError("Order records must be sorted")
+        for i in range(n):
+            r = col_idxs[col][i]
+            record = order_records[r]
 
-        if side == OrderSide.Sell:
-            size *= -1
-        new_shares_now = add_nb(shares_now, size)
-        if direction == Direction.LongOnly:
-            out[i, col] += get_long_size_nb(shares_now, new_shares_now)
-        elif direction == Direction.ShortOnly:
-            out[i, col] += get_short_size_nb(shares_now, new_shares_now)
-        else:
-            out[i, col] += size
-        shares_now = new_shares_now
+            i = int(record['idx'])
+            if i < last_i:
+                raise ValueError("idx must be sorted for each column")
+
+            side = record['side']
+            size = record['size']
+
+            if side == OrderSide.Sell:
+                size *= -1
+            new_shares_now = add_nb(shares_now, size)
+            if direction == Direction.LongOnly:
+                out[i, col] += get_long_size_nb(shares_now, new_shares_now)
+            elif direction == Direction.ShortOnly:
+                out[i, col] += get_short_size_nb(shares_now, new_shares_now)
+            else:
+                out[i, col] += size
+            shares_now = new_shares_now
     return out
 
 
@@ -2236,7 +2173,7 @@ def i_group_any_reduce_nb(i, group, a):
 @njit
 def pos_mask_grouped_nb(pos_mask, group_lens):
     """Get number of columns in position for each row and group."""
-    return generic_nb.reduce_grouped_row_wise_nb(pos_mask, group_lens, i_group_any_reduce_nb)
+    return generic_nb.squeeze_grouped_nb(pos_mask, group_lens, i_group_any_reduce_nb).astype(np.bool_)
 
 
 @njit(cache=True)
@@ -2255,59 +2192,58 @@ def pos_coverage_grouped_nb(pos_mask, group_lens):
 
 
 @njit(cache=True)
-def cash_flow_nb(target_shape, order_records, short_cash):
+def cash_flow_nb(target_shape, order_records, col_map, short_cash):
     """Get cash flow series per column."""
+    col_idxs, col_ns = col_map
     out = np.full(target_shape, 0., dtype=np.float_)
-    last_col = -1
-    prev_i = -1
-    shares_now = 0.
-    debt_now = 0.
 
-    for r in range(order_records.shape[0]):
-        record = order_records[r]
-        col = record['col']
-        i = record['idx']
-        side = record['side']
-        size = record['size']
-        price = record['price']
-        fees = record['fees']
-        volume = size * price
+    for col in range(col_idxs.shape[0]):
+        n = col_ns[col]
+        if n == 0:
+            continue
+        last_i = -1
+        shares_now = 0.
+        debt_now = 0.
 
-        if col < last_col:
-            raise ValueError("Order records must be sorted")
-        if col != last_col:
-            prev_i = -1
-            last_col = col
-            shares_now = 0.
-            debt_now = 0.
-        if i < prev_i:
-            raise ValueError("Order records must be sorted")
+        for i in range(n):
+            r = col_idxs[col][i]
+            record = order_records[r]
 
-        if side == OrderSide.Sell:
-            size *= -1
-        new_shares_now = add_nb(shares_now, size)
-        shorted_size = get_short_size_nb(shares_now, new_shares_now)
+            i = int(record['idx'])
+            if i < last_i:
+                raise ValueError("idx must be sorted for each column")
 
-        if not short_cash and shorted_size != 0:
-            if shorted_size > 0:
-                debt_now += shorted_size * price
-                out[i, col] += add_nb(volume, -2 * shorted_size * price)
+            side = record['side']
+            size = record['size']
+            price = record['price']
+            fees = record['fees']
+            volume = size * price
+
+            if side == OrderSide.Sell:
+                size *= -1
+            new_shares_now = add_nb(shares_now, size)
+            shorted_size = get_short_size_nb(shares_now, new_shares_now)
+
+            if not short_cash and shorted_size != 0:
+                if shorted_size > 0:
+                    debt_now += shorted_size * price
+                    out[i, col] += add_nb(volume, -2 * shorted_size * price)
+                else:
+                    if is_close_nb(volume, debt_now):
+                        volume = debt_now
+                    if volume >= debt_now:
+                        out[i, col] += add_nb(2 * debt_now, -volume)
+                        debt_now = 0.
+                    else:
+                        out[i, col] += volume
+                        debt_now -= volume
             else:
-                if is_close_nb(volume, debt_now):
-                    volume = debt_now
-                if volume >= debt_now:
-                    out[i, col] += add_nb(2 * debt_now, -volume)
-                    debt_now = 0.
+                if side == OrderSide.Buy:
+                    out[i, col] -= volume
                 else:
                     out[i, col] += volume
-                    debt_now -= volume
-        else:
-            if side == OrderSide.Buy:
-                out[i, col] -= volume
-            else:
-                out[i, col] += volume
-        out[i, col] -= fees
-        shares_now = new_shares_now
+            out[i, col] -= fees
+            shares_now = new_shares_now
     return out
 
 
@@ -2449,11 +2385,11 @@ def value_in_sim_order_nb(cash, holding_value, group_lens, call_seq):
             i = j // group_len
             col = from_col + call_seq[i, from_col + j % group_len]
             if j >= group_len:
-                prev_j = j - group_len
-                prev_i = prev_j // group_len
-                last_col = from_col + call_seq[prev_i, from_col + prev_j % group_len]
-                if not np.isnan(holding_value[prev_i, last_col]):
-                    curr_holding_value -= holding_value[prev_i, last_col]
+                last_j = j - group_len
+                last_i = last_j // group_len
+                last_col = from_col + call_seq[last_i, from_col + last_j % group_len]
+                if not np.isnan(holding_value[last_i, last_col]):
+                    curr_holding_value -= holding_value[last_i, last_col]
             if np.isnan(holding_value[i, col]):
                 since_last_nan = 0
             else:
@@ -2475,42 +2411,43 @@ def value_nb(cash, holding_value):
 
 
 @njit(cache=True)
-def total_profit_nb(target_shape, close, order_records, init_cash):
+def total_profit_nb(target_shape, close, order_records, col_map, init_cash):
     """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
+    col_idxs, col_ns = col_map
     shares = np.full(target_shape[1], 0., dtype=np.float_)
     cash = init_cash.copy()
 
-    last_col = -1
-    prev_i = -1
-    for r in range(order_records.shape[0]):
-        record = order_records[r]
-        col = record['col']
-        i = record['idx']
+    for col in range(col_idxs.shape[0]):
+        n = col_ns[col]
+        if n == 0:
+            continue
+        last_i = -1
 
-        if col < last_col:
-            raise ValueError("Order records must be sorted")
-        if col != last_col:
-            prev_i = -1
-        if i < prev_i:
-            raise ValueError("Order records must be sorted")
+        for i in range(n):
+            r = col_idxs[col][i]
+            record = order_records[r]
 
-        # Fill shares
-        if record['side'] == OrderSide.Buy:
-            order_size = record['size']
-            shares[col] = add_nb(shares[col], order_size)
-        else:
-            order_size = record['size']
-            shares[col] = add_nb(shares[col], -order_size)
+            i = int(record['idx'])
+            if i < last_i:
+                raise ValueError("idx must be sorted for each column")
 
-        # Fill cash
-        if record['side'] == OrderSide.Buy:
-            order_cash = record['size'] * record['price'] + record['fees']
-            cash[col] = add_nb(cash[col], -order_cash)
-        else:
-            order_cash = record['size'] * record['price'] - record['fees']
-            cash[col] = add_nb(cash[col], order_cash)
+            # Fill shares
+            if record['side'] == OrderSide.Buy:
+                order_size = record['size']
+                shares[col] = add_nb(shares[col], order_size)
+            else:
+                order_size = record['size']
+                shares[col] = add_nb(shares[col], -order_size)
+
+            # Fill cash
+            if record['side'] == OrderSide.Buy:
+                order_cash = record['size'] * record['price'] + record['fees']
+                cash[col] = add_nb(cash[col], -order_cash)
+            else:
+                order_cash = record['size'] * record['price'] - record['fees']
+                cash[col] = add_nb(cash[col], order_cash)
 
     return cash + shares * close[-1, :] - init_cash
 
@@ -2611,14 +2548,14 @@ def market_value_grouped_nb(close, group_lens, init_cash_grouped):
     """Get market value per group."""
     check_group_lens(group_lens, close.shape[1])
 
-    out = np.empty(len(group_lens), dtype=np.float_)
+    out = np.empty((close.shape[0], len(group_lens)), dtype=np.float_)
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
         group_len = to_col - from_col
         col_init_cash = init_cash_grouped[group] / group_len
         close_norm = close[:, from_col:to_col] / close[0, from_col:to_col]
-        out[group] = col_init_cash * np.sum(close_norm)
+        out[:, group] = col_init_cash * np.sum(close_norm, axis=1)
         from_col = to_col
     return out
 

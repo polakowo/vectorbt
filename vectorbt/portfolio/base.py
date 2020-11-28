@@ -258,20 +258,20 @@ There is currently no way to disable caching for an entire class.
 import numpy as np
 import pandas as pd
 from inspect import signature
+from collections import OrderedDict
 from plotly.subplots import make_subplots
 
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import convert_str_enum_value
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
-from vectorbt.base.array_wrapper import ArrayWrapper, wrapper_indexing_func_meta, Wrapping
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.records.base import records_indexing_func
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
@@ -283,26 +283,6 @@ from vectorbt.portfolio.enums import (
     ConflictMode,
     Direction
 )
-
-
-def portfolio_indexing_func(obj, pd_indexing_func):
-    """Perform indexing on `Portfolio`."""
-    new_wrapper, _, group_idxs, col_idxs = \
-        wrapper_indexing_func_meta(obj.wrapper, pd_indexing_func, column_only_select=True)
-    new_order_records_arr = records_indexing_func(obj.orders(), pd_indexing_func).values
-    new_logs_records_arr = records_indexing_func(obj.logs(), pd_indexing_func).values
-    if isinstance(obj._init_cash, int):
-        new_init_cash = obj._init_cash
-    else:
-        new_init_cash = to_1d(obj._init_cash, raw=True)[group_idxs if obj.cash_sharing else col_idxs]
-    new_call_seq = obj.call_seq.values[:, col_idxs]
-
-    return obj.copy(
-        orders=new_orders,
-        logs=new_logs,
-        init_cash=new_init_cash,
-        call_seq=new_call_seq
-    )
 
 
 def add_returns_methods(func_names):
@@ -401,13 +381,10 @@ class Portfolio(Wrapping):
         This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
     def __init__(self, wrapper, close, order_records, log_records, init_cash,
-                 cash_sharing, call_seq, incl_unrealized=None, indexing_func=None):
-        if indexing_func is None:
-            indexing_func = portfolio_indexing_func
+                 cash_sharing, call_seq, incl_unrealized=None):
         Wrapping.__init__(
             self,
             wrapper,
-            indexing_func=indexing_func,
             close=close,
             order_records=order_records,
             log_records=log_records,
@@ -430,6 +407,28 @@ class Portfolio(Wrapping):
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
         self._incl_unrealized = incl_unrealized
+
+    def _indexing_func(self, pd_indexing_func):
+        """Perform indexing on `Portfolio`."""
+        new_wrapper, _, group_idxs, col_idxs = \
+            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True)
+        new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
+        new_order_records = self._orders._col_idxs_records(col_idxs)
+        new_log_records = self._logs._col_idxs_records(col_idxs)
+        if isinstance(self._init_cash, int):
+            new_init_cash = self._init_cash
+        else:
+            new_init_cash = to_1d(self._init_cash, raw=True)[group_idxs if self.cash_sharing else col_idxs]
+        new_call_seq = self.call_seq.values[:, col_idxs]
+
+        return self.copy(
+            wrapper=new_wrapper,
+            close=new_close,
+            order_records=new_order_records,
+            log_records=new_log_records,
+            init_cash=new_init_cash,
+            call_seq=new_call_seq
+        )
 
     # ############# Class methods ############# #
 
@@ -758,6 +757,7 @@ class Portfolio(Wrapping):
         # Create an instance
         return cls(
             wrapper,
+            close,
             order_records,
             log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
@@ -1095,6 +1095,7 @@ class Portfolio(Wrapping):
         # Create an instance
         return cls(
             wrapper,
+            close,
             order_records,
             log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
@@ -1468,6 +1469,7 @@ class Portfolio(Wrapping):
         # Create an instance
         return cls(
             wrapper,
+            close,
             order_records,
             log_records,
             init_cash if init_cash_mode is None else init_cash_mode,
@@ -1489,12 +1491,14 @@ class Portfolio(Wrapping):
             )
         return self._wrapper
 
-    def regroup(self, group_by):
-        """Regroup this object."""
+    def regroup(self, group_by, force=False, **kwargs):
+        """Regroup this object.
+
+        See `vectorbt.base.array_wrapper.Wrapping.regroup`."""
         if self.cash_sharing:
-            if self.wrapper.grouper.is_grouping_modified(group_by=group_by):
+            if self.wrapper.grouper.is_grouping_modified(group_by=group_by) and not force:
                 raise ValueError("Cannot modify grouping globally when cash_sharing=True")
-        return Wrapping.regroup(self, group_by)
+        return Wrapping.regroup(self, group_by, **kwargs)
 
     @property
     def cash_sharing(self):
@@ -1513,49 +1517,41 @@ class Portfolio(Wrapping):
 
     # ############# Records ############# #
 
-    @property  # lazy property
+    @cached_property
     def _orders(self):
-        _orders = Orders(self.wrapper, self._order_records, self.close)
-        self.__dict__['_orders'] = _orders
-        return _orders
+        return Orders(self.wrapper, self._order_records, self.close)
 
-    def orders(self, group_by=None):  # doesn't require caching
+    def orders(self, group_by=None):
         """Get order records.
 
         See `vectorbt.portfolio.orders.Orders`."""
         return self._orders.regroup(group_by=group_by)
 
-    @property  # lazy property
+    @cached_property
     def _logs(self):
-        _logs = Logs(self.wrapper, self._log_records)
-        self.__dict__['_logs'] = _logs
-        return _logs
+        return Logs(self.wrapper, self._log_records)
 
-    def logs(self, group_by=None):  # doesn't require caching
+    def logs(self, group_by=None):
         """Get log records.
 
         See `vectorbt.portfolio.logs.Logs`."""
         return self._logs.regroup(group_by=group_by)
 
-    @property  # lazy property
+    @cached_property
     def _trades(self):
-        _trades = Trades.from_orders(self._orders)
-        self.__dict__['_trades'] = _trades
-        return _trades
+        return Trades.from_orders(self._orders)
 
-    def trades(self, group_by=None):  # doesn't require caching
+    def trades(self, group_by=None):
         """Get trade records.
 
         See `vectorbt.portfolio.events.Trades`."""
         return self._trades.regroup(group_by=group_by)
 
-    @property  # lazy property
+    @cached_property
     def _positions(self):
-        _positions = Positions.from_trades(self._trades)
-        self.__dict__['_positions'] = _positions
-        return _positions
+        return Positions.from_trades(self._trades)
 
-    def positions(self, group_by=None):  # doesn't require caching
+    def positions(self, group_by=None):
         """Get position records.
 
         See `vectorbt.portfolio.events.Positions`."""
@@ -1593,7 +1589,12 @@ class Portfolio(Wrapping):
     def share_flow(self, direction='all'):
         """Get share flow series per column."""
         direction = convert_str_enum_value(Direction, direction)
-        share_flow = nb.share_flow_nb(self.wrapper.shape_2d, self._orders.values, direction)
+        share_flow = nb.share_flow_nb(
+            self.wrapper.shape_2d,
+            self._orders.values,
+            self._orders.col_mapper.col_map,
+            direction
+        )
         return self.wrapper.wrap(share_flow, group_by=False)
 
     @cached_method
@@ -1647,7 +1648,12 @@ class Portfolio(Wrapping):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             cash_flow = nb.cash_flow_grouped_nb(cash_flow, group_lens)
         else:
-            cash_flow = nb.cash_flow_nb(self.wrapper.shape_2d, self._orders.values, short_cash)
+            cash_flow = nb.cash_flow_nb(
+                self.wrapper.shape_2d,
+                self._orders.values,
+                self._orders.col_mapper.col_map,
+                short_cash
+            )
         return self.wrapper.wrap(cash_flow, group_by=group_by)
 
     @cached_method
@@ -1692,11 +1698,12 @@ class Portfolio(Wrapping):
             )
         else:
             group_lens = self.wrapper.grouper.get_group_lens()
-            init_cash = to_1d(self.init_cash(group_by=in_sim_order), raw=True)
             if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
+                init_cash = to_1d(self.init_cash(), raw=True)
                 call_seq = to_2d(self.call_seq, raw=True)
                 cash = nb.cash_in_sim_order_nb(cash_flow, group_lens, init_cash, call_seq)
             else:
+                init_cash = to_1d(self.init_cash(group_by=False), raw=True)
                 cash = nb.cash_nb(cash_flow, group_lens, init_cash)
         return self.wrapper.wrap(cash, group_by=group_by)
 
@@ -1716,6 +1723,22 @@ class Portfolio(Wrapping):
         else:
             holding_value = nb.holding_value_nb(close, shares)
         return self.wrapper.wrap(holding_value, group_by=group_by)
+
+    @cached_method
+    def gross_exposure(self, direction='all', group_by=None):
+        """Get gross exposure."""
+        holding_value = to_2d(self.holding_value(group_by=group_by, direction=direction), raw=True)
+        cash = to_2d(self.cash(group_by=group_by, short_cash=False), raw=True)
+        gross_exposure = nb.gross_exposure_nb(holding_value, cash)
+        return self.wrapper.wrap(gross_exposure, group_by=group_by)
+
+    @cached_method
+    def net_exposure(self, group_by=None):
+        """Get net exposure."""
+        long_exposure = to_2d(self.gross_exposure(direction='longonly', group_by=group_by), raw=True)
+        short_exposure = to_2d(self.gross_exposure(direction='shortonly', group_by=group_by), raw=True)
+        net_exposure = long_exposure - short_exposure
+        return self.wrapper.wrap(net_exposure, group_by=group_by)
 
     @cached_method
     def value(self, group_by=None, in_sim_order=False):
@@ -1759,6 +1782,7 @@ class Portfolio(Wrapping):
                 self.wrapper.shape_2d,
                 close,
                 self._orders.values,
+                self._orders.col_mapper.col_map,
                 init_cash
             )
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by)
@@ -1840,22 +1864,6 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(total_market_return, group_by=group_by)
 
     @cached_method
-    def gross_exposure(self, direction='all', group_by=None):
-        """Get gross exposure."""
-        holding_value = to_2d(self.holding_value(group_by=group_by, direction=direction), raw=True)
-        cash = to_2d(self.cash(group_by=group_by, short_cash=False), raw=True)
-        gross_exposure = nb.gross_exposure_nb(holding_value, cash)
-        return self.wrapper.wrap(gross_exposure, group_by=group_by)
-
-    @cached_method
-    def net_exposure(self, group_by=None):
-        """Get net exposure."""
-        long_exposure = to_2d(self.gross_exposure(direction='longonly', group_by=group_by), raw=True)
-        short_exposure = to_2d(self.gross_exposure(direction='shortonly', group_by=group_by), raw=True)
-        net_exposure = long_exposure - short_exposure
-        return self.wrapper.wrap(net_exposure, group_by=group_by)
-
-    @cached_method
     def stats(self, column=None, group_by=None, incl_unrealized=None, active_returns=False,
               in_sim_order=False, agg_func=lambda x: x.mean(axis=0), **kwargs):
         """Compute various statistics on this portfolio.
@@ -1887,7 +1895,7 @@ class Portfolio(Wrapping):
             'Start': self.wrapper.index[0],
             'End': self.wrapper.index[-1],
             'Duration': self.wrapper.shape[0] * self.wrapper.freq,
-            'Init. Cash': self.init_cash(),
+            'Init. Cash': self.init_cash(group_by=group_by),
             'Total Profit': self.total_profit(group_by=group_by),
             'Total Return [%]': self.total_return(group_by=group_by) * 100,
             'Benchmark Return [%]': self.total_market_return(group_by=group_by) * 100,
@@ -1956,29 +1964,68 @@ class Portfolio(Wrapping):
 
     # ############# Plotting ############# #
 
-    supported_subplots = {
-        'orders': "Orders",
-        'trades': "Trades",
-        'positions': "Positions",
-        'trade_pnl': "Trade PnL",
-        'position_pnl': "Position PnL",
-        'cum_returns': "Cumulative Returns",
-        'drawdowns': "Drawdowns",
-        'underwater': "Underwater",
-        'share_flow': "Share Flow",
-        'cash_flow': "Cash Flow",
-        'shares': "Shares",
-        'cash': "Cash",
-        'holding_value': "Holding Value",
-        'value': "Value",
-        'gross_exposure': "Gross Exposure",
-        'net_exposure': "Net Exposure"
-    }
-    """List of subplots supported by `Portfolio.plot`."""
+    subplot_settings = OrderedDict(
+        orders=dict(
+            title="Orders",
+            can_plot_groups=False
+        ),
+        trades=dict(
+            title="Trades",
+            can_plot_groups=False
+        ),
+        positions=dict(
+            title="Positions",
+            can_plot_groups=False
+        ),
+        trade_pnl=dict(
+            title="Trade PnL",
+            can_plot_groups=False
+        ),
+        position_pnl=dict(
+            title="Position PnL",
+            can_plot_groups=False
+        ),
+        cum_returns=dict(
+            title="Cumulative Returns"
+        ),
+        drawdowns=dict(
+            title="Drawdowns"
+        ),
+        underwater=dict(
+            title="Underwater"
+        ),
+        share_flow=dict(
+            title="Share Flow",
+            can_plot_groups=False
+        ),
+        cash_flow=dict(
+            title="Cash Flow"
+        ),
+        shares=dict(
+            title="Shares",
+            can_plot_groups=False
+        ),
+        cash=dict(
+            title="Cash"
+        ),
+        holding_value=dict(
+            title="Holding Value"
+        ),
+        value=dict(
+            title="Value"
+        ),
+        gross_exposure=dict(
+            title="Gross Exposure"
+        ),
+        net_exposure=dict(
+            title="Net Exposure"
+        )
+    )
+    """Settings of subplots supported by `Portfolio.plot`."""
 
-    def plot(self,
-             subplots=None,
+    def plot(self, *,
              column=None,
+             subplots=None,
              group=None,
              group_by=None,
              show_titles=True,
@@ -1994,11 +2041,12 @@ class Portfolio(Wrapping):
 
                 Each element can be either:
 
-                * a subplot name, as listed in `supported_subplots`
-                * a tuple of a subplot name, a title, and optionally a plot function.
-                    A plot function should accept current portfolio object (with column already
-                    selected) and optionally other keyword arguments. Will pass `row`, `col`, and
-                    other subplot-dependent arguments if they can be found in the signature.
+                * a subplot name, as listed in `Portfolio.subplot_settings`
+                * a tuple of a subplot name and a dict as in `Portfolio.subplot_settings` but with an
+                    additional optional key `plot_func`. The plot function should accept current portfolio
+                    object (with column already selected) and optionally other keyword arguments.
+                    Will pass `row`, `col`, and other subplot-dependent arguments if they can be found
+                    in the function's signature.
             column (str): Name of the column to plot.
 
                 Takes effect if portfolio contains multiple columns.
@@ -2074,7 +2122,7 @@ class Portfolio(Wrapping):
 
             >>> fig = portfolio.plot(subplots=[
             ...     'orders',
-            ...     ('order_size', 'Order Size')  # placeholder
+            ...     ('order_size', dict(title='Order Size', can_plot_groups=False))  # placeholder
             ... ])
 
             >>> size.vbt.plot(name='Order Size', row=2, col=1, fig=fig)
@@ -2085,13 +2133,19 @@ class Portfolio(Wrapping):
         from vectorbt.defaults import color_schema
 
         # Select one column/group
-        self_col = self.select_series(column=column, group=group, group_by=group_by)
+        self_col = self.select_series(column=column, group=group, group_by=group_by, force=True)
 
         if subplots is None:
             if self_col.wrapper.grouper.is_grouped():
                 subplots = ['cum_returns']
             else:
                 subplots = ['orders', 'trade_pnl', 'cum_returns']
+        elif subplots == 'all':
+            if self_col.wrapper.grouper.is_grouped():
+                supported_subplots = filter(lambda x: x[1].get('can_plot_groups', True), self.subplot_settings.items())
+            else:
+                supported_subplots = self.subplot_settings.items()
+            subplots = list(list(zip(*supported_subplots))[0])
         if not isinstance(subplots, list):
             subplots = [subplots]
         if hline_shape_kwargs is None:
@@ -2103,7 +2157,7 @@ class Portfolio(Wrapping):
         rows = make_subplots_kwargs.pop('rows', len(subplots))
         cols = make_subplots_kwargs.pop('cols', 1)
         width = kwargs.get('width', 800)
-        height = kwargs.get('height', 300 * rows)
+        height = kwargs.get('height', 300 * rows if rows > 1 else 350)
         specs = make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
         for row, row_spec in enumerate(specs):
@@ -2122,9 +2176,9 @@ class Portfolio(Wrapping):
             _subplot_titles = []
             for name in subplots:
                 if isinstance(name, tuple):
-                    _subplot_titles.append(name[1])
+                    _subplot_titles.append(name[1].get('title', None))
                 else:
-                    _subplot_titles.append(self_col.supported_subplots[name])
+                    _subplot_titles.append(self_col.subplot_settings[name]['title'])
         else:
             _subplot_titles = None
         fig = CustomFigureWidget(make_subplots(
@@ -2191,13 +2245,14 @@ class Portfolio(Wrapping):
             y_domain = fig.layout[yaxis]['domain']
 
             if isinstance(name, tuple):
-                if len(name) == 2:
-                    _name, title = name
-                    func = None
-                else:
-                    _name, title, func = name
-                if func is not None:
-                    arg_names = _get_arg_names(func)
+                _name, settings = name
+                can_plot_groups = settings.get('can_plot_groups', True)
+                if self_col.wrapper.grouper.is_grouped() and not can_plot_groups:
+                    raise TypeError(f"Group is not supported by custom subplot with name '{_name}'")
+                plot_func = settings.get('plot_func', None)
+
+                if plot_func is not None:
+                    arg_names = _get_arg_names(plot_func)
                     custom_kwargs = dict()
                     if 'row' in arg_names:
                         custom_kwargs['row'] = row
@@ -2216,262 +2271,268 @@ class Portfolio(Wrapping):
                     if 'y_domain' in arg_names:
                         custom_kwargs['y_domain'] = y_domain
                     custom_kwargs = merge_kwargs(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
-                    func(self_col, **custom_kwargs, fig=fig)
+                    plot_func(self_col, **custom_kwargs, fig=fig)
+                    
+            else:
+                settings = self.subplot_settings[name]
+                can_plot_groups = settings.get('can_plot_groups', True)
+                if self_col.wrapper.grouper.is_grouped() and not can_plot_groups:
+                    raise TypeError(f"Group is not supported by subplot with name '{name}'")
 
-            elif name == 'orders':
-                orders_kwargs = kwargs.pop('orders_kwargs', {})
-                method_kwargs = _extract_method_kwargs(self_col.orders, orders_kwargs)
-                self_col.orders(**method_kwargs).plot(
-                    **orders_kwargs,
-                    row=row, col=col, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Price'
-
-            elif name == 'trades':
-                trades_kwargs = kwargs.pop('trades_kwargs', {})
-                method_kwargs = _extract_method_kwargs(self_col.trades, trades_kwargs)
-                self_col.trades(**method_kwargs).plot(
-                    **trades_kwargs,
-                    row=row, col=col, xref=xref, yref=yref, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Price'
-
-            elif name == 'positions':
-                positions_kwargs = kwargs.pop('positions_kwargs', {})
-                method_kwargs = _extract_method_kwargs(self_col.positions, positions_kwargs)
-                self_col.positions(**method_kwargs).plot(
-                    **positions_kwargs,
-                    row=row, col=col, xref=xref, yref=yref, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Price'
-
-            elif name == 'trade_pnl':
-                trade_pnl_kwargs = kwargs.pop('trade_pnl_kwargs', {})
-                method_kwargs = _extract_method_kwargs(self_col.trades, trade_pnl_kwargs)
-                self_col.trades(**method_kwargs).plot_pnl(
-                    **trade_pnl_kwargs,
-                    row=row, col=col, xref=xref, yref=yref, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'PnL'
-
-            elif name == 'position_pnl':
-                position_pnl_kwargs = kwargs.pop('position_pnl_kwargs', {})
-                method_kwargs = _extract_method_kwargs(self_col.positions, position_pnl_kwargs)
-                self_col.positions(**method_kwargs).plot_pnl(
-                    **position_pnl_kwargs,
-                    row=row, col=col, xref=xref, yref=yref, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'PnL'
-
-            elif name == 'cum_returns':
-                cum_returns_kwargs = merge_kwargs(dict(
-                    benchmark_rets=self_col.market_returns(),
-                    main_kwargs=dict(
+                if name == 'orders':
+                    orders_kwargs = kwargs.pop('orders_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.orders, orders_kwargs)
+                    self_col.orders(**method_kwargs).plot(
+                        **orders_kwargs,
+                        row=row, col=col, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Price'
+    
+                elif name == 'trades':
+                    trades_kwargs = kwargs.pop('trades_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.trades, trades_kwargs)
+                    self_col.trades(**method_kwargs).plot(
+                        **trades_kwargs,
+                        row=row, col=col, xref=xref, yref=yref, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Price'
+    
+                elif name == 'positions':
+                    positions_kwargs = kwargs.pop('positions_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.positions, positions_kwargs)
+                    self_col.positions(**method_kwargs).plot(
+                        **positions_kwargs,
+                        row=row, col=col, xref=xref, yref=yref, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Price'
+    
+                elif name == 'trade_pnl':
+                    trade_pnl_kwargs = kwargs.pop('trade_pnl_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.trades, trade_pnl_kwargs)
+                    self_col.trades(**method_kwargs).plot_pnl(
+                        **trade_pnl_kwargs,
+                        row=row, col=col, xref=xref, yref=yref, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'PnL'
+    
+                elif name == 'position_pnl':
+                    position_pnl_kwargs = kwargs.pop('position_pnl_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.positions, position_pnl_kwargs)
+                    self_col.positions(**method_kwargs).plot_pnl(
+                        **position_pnl_kwargs,
+                        row=row, col=col, xref=xref, yref=yref, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'PnL'
+    
+                elif name == 'cum_returns':
+                    cum_returns_kwargs = merge_kwargs(dict(
+                        benchmark_rets=self_col.market_returns(),
+                        main_kwargs=dict(
+                            trace_kwargs=dict(
+                                line_color=color_schema['purple'],
+                                name='Value'
+                            )
+                        )
+                    ), kwargs.pop('cum_returns_kwargs', {}))
+                    active_returns = cum_returns_kwargs.pop('active_returns', False)
+                    in_sim_order = cum_returns_kwargs.pop('in_sim_order', False)
+                    if active_returns:
+                        returns = self_col.active_returns()
+                    else:
+                        returns = self_col.returns(in_sim_order=in_sim_order)
+                    returns.vbt.returns.plot_cum_returns(
+                        **cum_returns_kwargs,
+                        row=row, col=col, xref=xref, yref=yref, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Cumulative Returns'
+    
+                elif name == 'drawdowns':
+                    drawdowns_kwargs = merge_kwargs(dict(
+                        ts_trace_kwargs=dict(
+                            line_color=color_schema['purple'],
+                            name='Value'
+                        )
+                    ), kwargs.pop('drawdowns_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.drawdowns, drawdowns_kwargs)
+                    self_col.drawdowns(**method_kwargs).plot(
+                        **drawdowns_kwargs,
+                        row=row, col=col, xref=xref, yref=yref, fig=fig)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Value'
+    
+                elif name == 'underwater':
+                    underwater_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['red'],
+                            fillcolor=adjust_opacity(color_schema['red'], 0.3),
+                            fill='tozeroy',
+                            name='Drawdown'
+                        )
+                    ), kwargs.pop('underwater_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.drawdown, underwater_kwargs)
+                    self_col.drawdown(**method_kwargs).vbt.plot(
+                        **underwater_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(0, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Drawdown'
+                    fig.layout[yaxis]['tickformat'] = '%'
+    
+                elif name == 'share_flow':
+                    share_flow_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['brown'],
+                            name='Shares'
+                        )
+                    ), kwargs.pop('share_flow_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.share_flow, share_flow_kwargs)
+                    self_col.share_flow(**method_kwargs).vbt.plot(
+                        **share_flow_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(0, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Share Flow'
+    
+                elif name == 'cash_flow':
+                    cash_flow_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['green'],
+                            name='Cash'
+                        )
+                    ), kwargs.pop('cash_flow_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.cash_flow, cash_flow_kwargs)
+                    self_col.cash_flow(**method_kwargs).vbt.plot(
+                        **cash_flow_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(0, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Cash Flow'
+    
+                elif name == 'shares':
+                    shares_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['brown'],
+                            name='Shares'
+                        ),
+                        pos_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['brown'], 0.3)
+                        ),
+                        neg_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                        ),
+                        other_trace_kwargs='hidden'
+                    ), kwargs.pop('shares_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.shares, shares_kwargs)
+                    self_col.shares(**method_kwargs).vbt.plot_against(
+                        0, **shares_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(0, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Shares'
+    
+                elif name == 'cash':
+                    cash_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['green'],
+                            name='Cash'
+                        ),
+                        pos_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['green'], 0.3)
+                        ),
+                        neg_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['red'], 0.3)
+                        ),
+                        other_trace_kwargs='hidden'
+                    ), kwargs.pop('cash_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.cash, cash_kwargs)
+                    self_col.cash(**method_kwargs).vbt.plot_against(
+                        0, **cash_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(self_col.init_cash(), x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Cash'
+    
+                elif name == 'holding_value':
+                    holding_value_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['cyan'],
+                            name='Holding Value'
+                        ),
+                        pos_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['cyan'], 0.3)
+                        ),
+                        neg_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                        ),
+                        other_trace_kwargs='hidden'
+                    ), kwargs.pop('holding_value_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.holding_value, holding_value_kwargs)
+                    self_col.holding_value(**method_kwargs).vbt.plot_against(
+                        0, **holding_value_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(0, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Holding Value'
+    
+                elif name == 'value':
+                    value_kwargs = merge_kwargs(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['purple'],
-                            name='Cum. Returns'
-                        )
-                    )
-                ), kwargs.pop('cum_returns_kwargs', {}))
-                active_returns = cum_returns_kwargs.pop('active_returns', False)
-                in_sim_order = cum_returns_kwargs.pop('in_sim_order', False)
-                if active_returns:
-                    returns = self_col.active_returns()
-                else:
-                    returns = self_col.returns(in_sim_order=in_sim_order)
-                returns.vbt.returns.plot_cum_returns(
-                    **cum_returns_kwargs,
-                    row=row, col=col, xref=xref, yref=yref, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Cumulative Returns'
-
-            elif name == 'drawdowns':
-                drawdowns_kwargs = merge_kwargs(dict(
-                    ts_trace_kwargs=dict(
-                        line_color=color_schema['purple'],
-                        name='Value'
-                    )
-                ), kwargs.pop('drawdowns_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.drawdowns, drawdowns_kwargs)
-                self_col.drawdowns(**method_kwargs).plot(
-                    **drawdowns_kwargs,
-                    row=row, col=col, xref=xref, yref=yref, fig=fig)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Value'
-
-            elif name == 'underwater':
-                underwater_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['red'],
-                        fillcolor=adjust_opacity(color_schema['red'], 0.3),
-                        fill='tozeroy',
-                        name='Drawdown'
-                    )
-                ), kwargs.pop('underwater_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.drawdown, underwater_kwargs)
-                self_col.drawdown(**method_kwargs).vbt.plot(
-                    **underwater_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(0, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Drawdown'
-                fig.layout[yaxis]['tickformat'] = '%'
-
-            elif name == 'share_flow':
-                share_flow_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['brown'],
-                        name='Shares'
-                    )
-                ), kwargs.pop('share_flow_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.share_flow, share_flow_kwargs)
-                self_col.share_flow(**method_kwargs).vbt.plot(
-                    **share_flow_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(0, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Share Flow'
-
-            elif name == 'cash_flow':
-                cash_flow_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['green'],
-                        name='Cash'
-                    )
-                ), kwargs.pop('cash_flow_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.cash_flow, cash_flow_kwargs)
-                self_col.cash_flow(**method_kwargs).vbt.plot(
-                    **cash_flow_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(0, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Cash Flow'
-
-            elif name == 'shares':
-                shares_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['brown'],
-                        name='Shares'
-                    ),
-                    pos_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['brown'], 0.3)
-                    ),
-                    neg_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['orange'], 0.3)
-                    ),
-                    other_trace_kwargs='hidden'
-                ), kwargs.pop('shares_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.shares, shares_kwargs)
-                self_col.shares(**method_kwargs).vbt.plot_against(
-                    0, **shares_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(0, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Shares'
-
-            elif name == 'cash':
-                cash_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['green'],
-                        name='Cash'
-                    ),
-                    pos_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['green'], 0.3)
-                    ),
-                    neg_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['red'], 0.3)
-                    ),
-                    other_trace_kwargs='hidden'
-                ), kwargs.pop('cash_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.cash, cash_kwargs)
-                self_col.cash(**method_kwargs).vbt.plot_against(
-                    0, **cash_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(self_col.init_cash(), x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Cash'
-
-            elif name == 'holding_value':
-                holding_value_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['cyan'],
-                        name='Holding Value'
-                    ),
-                    pos_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['cyan'], 0.3)
-                    ),
-                    neg_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['orange'], 0.3)
-                    ),
-                    other_trace_kwargs='hidden'
-                ), kwargs.pop('holding_value_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.holding_value, holding_value_kwargs)
-                self_col.holding_value(**method_kwargs).vbt.plot_against(
-                    0, **holding_value_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(0, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Holding Value'
-
-            elif name == 'value':
-                value_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['purple'],
-                        name='Value'
-                    ),
-                    other_trace_kwargs='hidden'
-                ), kwargs.pop('value_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.value, value_kwargs)
-                self_col.value(**method_kwargs).vbt.plot_against(
-                    self_col.init_cash(), **value_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(self_col.init_cash(), x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Value'
-
-            elif name == 'gross_exposure':
-                gross_exposure_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['pink'],
-                        name='Exposure'
-                    ),
-                    pos_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['orange'], 0.3)
-                    ),
-                    neg_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['pink'], 0.3)
-                    ),
-                    other_trace_kwargs='hidden'
-                ), kwargs.pop('gross_exposure_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.gross_exposure, gross_exposure_kwargs)
-                self_col.gross_exposure(**method_kwargs).vbt.plot_against(
-                    1, **gross_exposure_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(1, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Gross Exposure'
-
-            elif name == 'net_exposure':
-                net_exposure_kwargs = merge_kwargs(dict(
-                    trace_kwargs=dict(
-                        line_color=color_schema['pink'],
-                        name='Exposure'
-                    ),
-                    pos_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['pink'], 0.3)
-                    ),
-                    neg_trace_kwargs=dict(
-                        fillcolor=adjust_opacity(color_schema['orange'], 0.3)
-                    ),
-                    other_trace_kwargs='hidden'
-                ), kwargs.pop('net_exposure_kwargs', {}))
-                method_kwargs = _extract_method_kwargs(self_col.net_exposure, net_exposure_kwargs)
-                self_col.net_exposure(**method_kwargs).vbt.plot_against(
-                    0, **net_exposure_kwargs,
-                    row=row, col=col, fig=fig)
-                _add_hline(0, x_domain, yref)
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = 'Net Exposure'
+                            name='Value'
+                        ),
+                        other_trace_kwargs='hidden'
+                    ), kwargs.pop('value_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.value, value_kwargs)
+                    self_col.value(**method_kwargs).vbt.plot_against(
+                        self_col.init_cash(), **value_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(self_col.init_cash(), x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Value'
+    
+                elif name == 'gross_exposure':
+                    gross_exposure_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['pink'],
+                            name='Exposure'
+                        ),
+                        pos_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                        ),
+                        neg_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['pink'], 0.3)
+                        ),
+                        other_trace_kwargs='hidden'
+                    ), kwargs.pop('gross_exposure_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.gross_exposure, gross_exposure_kwargs)
+                    self_col.gross_exposure(**method_kwargs).vbt.plot_against(
+                        1, **gross_exposure_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(1, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Gross Exposure'
+    
+                elif name == 'net_exposure':
+                    net_exposure_kwargs = merge_kwargs(dict(
+                        trace_kwargs=dict(
+                            line_color=color_schema['pink'],
+                            name='Exposure'
+                        ),
+                        pos_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['pink'], 0.3)
+                        ),
+                        neg_trace_kwargs=dict(
+                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                        ),
+                        other_trace_kwargs='hidden'
+                    ), kwargs.pop('net_exposure_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.net_exposure, net_exposure_kwargs)
+                    self_col.net_exposure(**method_kwargs).vbt.plot_against(
+                        0, **net_exposure_kwargs,
+                        row=row, col=col, fig=fig)
+                    _add_hline(0, x_domain, yref)
+                    fig.layout[xaxis]['title'] = 'Date'
+                    fig.layout[yaxis]['title'] = 'Net Exposure'
 
         # Remove duplicate legend labels
         found_ids = dict()

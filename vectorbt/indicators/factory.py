@@ -287,7 +287,7 @@ from vectorbt.utils.config import merge_kwargs, Configured
 from vectorbt.utils.random import set_seed
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import ParamIndexerFactory
-from vectorbt.base.array_wrapper import ArrayWrapper, wrapper_indexing_func_meta, Wrapping
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 
 
 def flatten_param_tuples(param_tuples):
@@ -995,9 +995,15 @@ class IndicatorFactory:
             checks.assert_dict_valid(attr_settings, [all_attr_names])
         self.attr_settings = attr_settings
 
+        # Set up class
+        ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
+        CustomIndicator = type(self.class_name, (Wrapping, ParamIndexer), {})
+        CustomIndicator.__module__ = self.module_name
+        CustomIndicator.__doc__ = self.class_docstring
+
         # Add indexing methods
-        def indicator_indexing_func(obj, pd_indexing_func):
-            new_wrapper, idx_idxs, _, col_idxs = wrapper_indexing_func_meta(obj.wrapper, pd_indexing_func)
+        def _indexing_func(obj, pd_indexing_func):
+            new_wrapper, idx_idxs, _, col_idxs = obj.wrapper._indexing_func_meta(pd_indexing_func)
             idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
             col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
             if np.array_equal(idx_idxs_arr, np.arange(obj.wrapper.shape_2d[0])):
@@ -1031,12 +1037,7 @@ class IndicatorFactory:
                 mapper_list=mapper_list
             )
 
-        # Set up class
-
-        ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
-        CustomIndicator = type(self.class_name, (Wrapping, ParamIndexer), {})
-        CustomIndicator.__module__ = self.module_name
-        CustomIndicator.__doc__ = self.class_docstring
+        setattr(CustomIndicator, '_indexing_func', _indexing_func)
 
         # Create read-only properties
         prop = property(lambda _self: _self._short_name)
@@ -1097,7 +1098,7 @@ class IndicatorFactory:
 
         # Add __init__ method
         def __init__(_self, wrapper, input_list, input_mapper, output_list, param_list,
-                     mapper_list, short_name, level_names, indexing_func=None):
+                     mapper_list, short_name, level_names):
             perform_init_checks(
                 wrapper,
                 input_list,
@@ -1108,12 +1109,9 @@ class IndicatorFactory:
                 short_name,
                 level_names
             )
-            if indexing_func is None:
-                indexing_func = indicator_indexing_func
             Wrapping.__init__(
                 _self,
                 wrapper,
-                indexing_func=indexing_func,
                 input_list=input_list,
                 input_mapper=input_mapper,
                 output_list=output_list,
@@ -1146,7 +1144,7 @@ class IndicatorFactory:
             if tuple_mapper is not None:
                 mapper_sr_list.append(pd.Series(tuple_mapper, index=wrapper.columns))
             ParamIndexer.__init__(
-                _self, mapper_sr_list, indexing_func,
+                _self, mapper_sr_list,
                 level_names=[*level_names, tuple(level_names)]
             )
 

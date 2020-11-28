@@ -13,8 +13,6 @@ from tests.utils import record_arrays_close
 
 day_dt = np.timedelta64(86400000000000)
 
-# ############# base.py ############# #
-
 example_dt = np.dtype([
     ('col', np.int64),
     ('idx', np.int64),
@@ -47,6 +45,125 @@ wrapper_grouped = wrapper.copy(group_by=group_by)
 records = vbt.records.Records(wrapper, records_arr)
 records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
 records_nosort = records.copy(records_arr=records.records_arr[::-1])
+
+# ############# col_mapper.py ############# #
+
+
+class TestColumnMapper:
+    def test_col_arr(self):
+        np.testing.assert_array_equal(
+            records['a'].col_mapper.col_arr,
+            np.array([0, 0, 0])
+        )
+        np.testing.assert_array_equal(
+            records.col_mapper.col_arr,
+            np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
+        )
+
+    def test_get_col_arr(self):
+        np.testing.assert_array_equal(
+            records.col_mapper.get_col_arr(),
+            records.col_mapper.col_arr
+        )
+        np.testing.assert_array_equal(
+            records_grouped['g1'].col_mapper.get_col_arr(),
+            np.array([0, 0, 0, 0, 0, 0])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.col_mapper.get_col_arr(),
+            np.array([0, 0, 0, 0, 0, 0, 1, 1, 1])
+        )
+
+    def test_col_range(self):
+        np.testing.assert_array_equal(
+            records['a'].col_mapper.col_range,
+            np.array([
+                [0, 3]
+            ])
+        )
+        np.testing.assert_array_equal(
+            records.col_mapper.col_range,
+            np.array([
+                [0, 3],
+                [3, 6],
+                [6, 9],
+                [-1, -1]
+            ])
+        )
+
+    def test_get_col_range(self):
+        np.testing.assert_array_equal(
+            records.col_mapper.get_col_range(),
+            np.array([
+                [0, 3],
+                [3, 6],
+                [6, 9],
+                [-1, -1]
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_grouped['g1'].col_mapper.get_col_range(),
+            np.array([[0, 6]])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.col_mapper.get_col_range(),
+            np.array([[0, 6], [6, 9]])
+        )
+
+    def test_col_map(self):
+        np.testing.assert_array_equal(
+            records['a'].col_mapper.col_map[0],
+            np.array([[0, 1, 2]])
+        )
+        np.testing.assert_array_equal(
+            records['a'].col_mapper.col_map[1],
+            np.array([3])
+        )
+        np.testing.assert_array_equal(
+            records.col_mapper.col_map[0][:3],
+            np.array([[0, 1, 2], [3, 4, 5], [6, 7, 8]])
+        )
+        np.testing.assert_array_equal(
+            records.col_mapper.col_map[1],
+            np.array([3, 3, 3, 0])
+        )
+
+    def test_get_col_map(self):
+        np.testing.assert_array_equal(
+            records.col_mapper.get_col_map()[0],
+            records.col_mapper.col_map[0]
+        )
+        np.testing.assert_array_equal(
+            records.col_mapper.get_col_map()[1],
+            records.col_mapper.col_map[1]
+        )
+        np.testing.assert_array_equal(
+            records_grouped['g1'].col_mapper.get_col_map()[0],
+            np.array([[0, 1, 2, 3, 4, 5]])
+        )
+        np.testing.assert_array_equal(
+            records_grouped['g1'].col_mapper.get_col_map()[1],
+            np.array([6])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.col_mapper.get_col_map()[0][0],
+            np.array([0, 1, 2, 3, 4, 5])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.col_mapper.get_col_map()[0][1, :3],
+            np.array([6, 7, 8])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.col_mapper.get_col_map()[1],
+            np.array([6, 3])
+        )
+
+    def test_is_sorted(self):
+        assert records.col_mapper.is_sorted()
+        assert not records_nosort.col_mapper.is_sorted()
+
+
+# ############# mapped_array.py ############# #
 
 mapped_array = records.map_field('some_field1')
 mapped_array_grouped = records_grouped.map_field('some_field1')
@@ -87,72 +204,27 @@ class TestMappedArray:
             np.array([0, 1, 2, 0, 1, 2, 0, 1, 2])
         )
 
-    def test_col_range(self):
-        np.testing.assert_array_equal(
-            mapped_array['a'].col_range,
-            np.array([
-                [0, 3]
-            ])
-        )
-        np.testing.assert_array_equal(
-            mapped_array.col_range,
-            np.array([
-                [0, 3],
-                [3, 6],
-                [6, 9],
-                [-1, -1]
-            ])
-        )
-
-    def test_get_col_arr(self):
-        np.testing.assert_array_equal(
-            mapped_array.get_col_arr(),
-            np.array([0, 0, 0, 1, 1, 1, 2, 2, 2])
-        )
-        np.testing.assert_array_equal(
-            mapped_array_grouped['g1'].get_col_arr(),
-            np.array([0, 0, 0, 0, 0, 0])
-        )
-        np.testing.assert_array_equal(
-            mapped_array_grouped.get_col_arr(),
-            np.array([0, 0, 0, 0, 0, 0, 1, 1, 1])
-        )
-
-    def test_get_col_range(self):
-        np.testing.assert_array_equal(
-            mapped_array.get_col_range(),
-            np.array([
-                [0, 3],
-                [3, 6],
-                [6, 9],
-                [-1, -1]
-            ])
-        )
-        np.testing.assert_array_equal(
-            mapped_array_grouped['g1'].get_col_range(),
-            np.array([
-                [0, 6]
-            ])
-        )
-        np.testing.assert_array_equal(
-            mapped_array_grouped.get_col_range(),
-            np.array([
-                [0, 6],
-                [6, 9]
-            ])
-        )
-
     def test_is_sorted(self):
         assert mapped_array.is_sorted()
-        assert mapped_array.copy(idx_arr=None).is_sorted()
+        assert mapped_array.is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            mapped_array.copy(idx_arr=None).is_sorted(incl_idx=True)
         assert not mapped_array_nosort.is_sorted()
-        assert not mapped_array_nosort.copy(idx_arr=None).is_sorted()
+        assert not mapped_array_nosort.is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            mapped_array_nosort.copy(idx_arr=None).is_sorted(incl_idx=True)
 
     def test_sort(self):
         assert mapped_array.sort().is_sorted()
-        assert mapped_array.copy(idx_arr=None).sort().is_sorted()
+        assert mapped_array.sort().is_sorted(incl_idx=True)
+        assert mapped_array.sort(incl_idx=True).is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            mapped_array.copy(idx_arr=None).sort(incl_idx=True)
         assert mapped_array_nosort.sort().is_sorted()
-        assert mapped_array_nosort.copy(idx_arr=None).sort().is_sorted()
+        assert not mapped_array_nosort.sort().is_sorted(incl_idx=True)
+        assert mapped_array_nosort.sort(incl_idx=True).is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            mapped_array_nosort.copy(idx_arr=None).sort(incl_idx=True)
 
     def test_filter_by_mask(self):
         mask_a = mapped_array['a'].values >= mapped_array['a'].values.mean()
@@ -173,8 +245,8 @@ class TestMappedArray:
 
     def test_map_to_mask(self):
         @njit
-        def every_2_nb(in_out, col, mapped_arr):
-            in_out[0::2] = True
+        def every_2_nb(inout, idxs, col, mapped_arr):
+            inout[idxs[::2]] = True
 
         np.testing.assert_array_equal(
             mapped_array.map_to_mask(every_2_nb),
@@ -826,6 +898,8 @@ class TestMappedArray:
         np.testing.assert_array_equal((abs(-a)).values, abs((-a.values)))
 
 
+# ############# base.py ############# #
+
 class TestRecords:
     def test_records(self):
         pd.testing.assert_frame_equal(
@@ -837,33 +911,27 @@ class TestRecords:
         np.testing.assert_array_equal(records['a'].recarray.some_field1, records['a'].values['some_field1'])
         np.testing.assert_array_equal(records.recarray.some_field1, records.values['some_field1'])
 
-    def test_col_range(self):
-        target = np.array([
-            [0, 3],
-            [3, 6],
-            [6, 9],
-            [-1, -1]
-        ])
-        np.testing.assert_array_equal(
-            records['a'].col_range,
-            target[0:1]
-        )
-        np.testing.assert_array_equal(
-            records.col_range,
-            target
-        )
-
     def test_is_sorted(self):
         assert records.is_sorted()
-        assert records.copy(idx_field=None).is_sorted()
+        assert records.is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            records.copy(idx_field=None).is_sorted(incl_idx=True)
         assert not records_nosort.is_sorted()
-        assert not records_nosort.copy(idx_field=None).is_sorted()
+        assert not records_nosort.is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            records_nosort.copy(idx_field=None).is_sorted(incl_idx=True)
 
     def test_sort(self):
         assert records.sort().is_sorted()
-        assert records.copy(idx_field=None).sort().is_sorted()
+        assert records.sort().is_sorted(incl_idx=True)
+        assert records.sort(incl_idx=True).is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            records.copy(idx_field=None).sort(incl_idx=True)
         assert records_nosort.sort().is_sorted()
-        assert records_nosort.copy(idx_field=None).sort().is_sorted()
+        assert not records_nosort.sort().is_sorted(incl_idx=True)
+        assert records_nosort.sort(incl_idx=True).is_sorted(incl_idx=True)
+        with pytest.raises(Exception) as e_info:
+            records_nosort.copy(idx_field=None).sort(incl_idx=True)
 
     def test_filter_by_mask(self):
         mask_a = records['a'].values['some_field1'] >= records['a'].values['some_field1'].mean()
@@ -898,8 +966,8 @@ class TestRecords:
             np.array([10., 11., 12., 13., 14., 13., 12., 11., 10.])
         )
         np.testing.assert_array_equal(
-            records.map_field('some_field1', idx_arr=records_arr['idx'] * 2).idx_arr,
-            records_arr['idx'] * 2
+            records.map_field('some_field1', idx_field='col').idx_arr,
+            records_arr['col']
         )
         assert records_grouped.map_field('some_field1').wrapper == records_grouped.wrapper
         assert records_grouped.map_field('some_field1', group_by=False).wrapper.grouper.group_by is None
@@ -918,8 +986,8 @@ class TestRecords:
             np.array([31., 31., 31., 31., 31., 31., 31., 31., 31.])
         )
         np.testing.assert_array_equal(
-            records.map(map_func_nb, idx_arr=records_arr['idx'] * 2).idx_arr,
-            records_arr['idx'] * 2
+            records.map(map_func_nb, idx_field='col').idx_arr,
+            records_arr['col']
         )
         assert records_grouped.map(map_func_nb).wrapper == records_grouped.wrapper
         assert records_grouped.map(map_func_nb, group_by=False).wrapper.grouper.group_by is None
@@ -935,8 +1003,8 @@ class TestRecords:
             np.array([31., 31., 31., 31., 31., 31., 31., 31., 31.])
         )
         np.testing.assert_array_equal(
-            records.map_array(arr, idx_arr=records_arr['idx'] * 2).idx_arr,
-            records_arr['idx'] * 2
+            records.map_array(arr, idx_field='col').idx_arr,
+            records_arr['col']
         )
         assert records_grouped.map_array(arr).wrapper == records_grouped.wrapper
         assert records_grouped.map_array(arr, group_by=False).wrapper.grouper.group_by is None
@@ -1063,23 +1131,10 @@ class TestRecords:
             filtered_records.values,
             np.array([(0, 0, 10., 21.), (2, 2, 10., 21.)], dtype=example_dt)
         )
-        np.testing.assert_array_equal(
-            filtered_records.col_range,
-            np.array([
-                [0, 1],
-                [-1, -1],
-                [1, 2],
-                [-1, -1]
-            ])
-        )
         # a
         record_arrays_close(
             filtered_records['a'].values,
             np.array([(0, 0, 10., 21.)], dtype=example_dt)
-        )
-        np.testing.assert_array_equal(
-            filtered_records['a'].col_range,
-            np.array([[0, 1]])
         )
         np.testing.assert_array_equal(
             filtered_records['a'].map_field('some_field1').values,
@@ -1093,10 +1148,6 @@ class TestRecords:
             np.array([], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records['b'].col_range,
-            np.array([[-1, -1]])
-        )
-        np.testing.assert_array_equal(
             filtered_records['b'].map_field('some_field1').values,
             np.array([])
         )
@@ -1108,10 +1159,6 @@ class TestRecords:
             np.array([(0, 2, 10., 21.)], dtype=example_dt)
         )
         np.testing.assert_array_equal(
-            filtered_records['c'].col_range,
-            np.array([[0, 1]])
-        )
-        np.testing.assert_array_equal(
             filtered_records['c'].map_field('some_field1').values,
             np.array([10.])
         )
@@ -1121,10 +1168,6 @@ class TestRecords:
         record_arrays_close(
             filtered_records['d'].values,
             np.array([], dtype=example_dt)
-        )
-        np.testing.assert_array_equal(
-            filtered_records['d'].col_range,
-            np.array([[-1, -1]])
         )
         np.testing.assert_array_equal(
             filtered_records['d'].map_field('some_field1').values,
@@ -1680,6 +1723,15 @@ class TestTrades:
                 (2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0, 3)
             ], dtype=trade_dt)
         )
+        reversed_col_orders = orders.copy(records_arr=np.concatenate((
+            orders.values[orders.values['col'] == 2],
+            orders.values[orders.values['col'] == 1],
+            orders.values[orders.values['col'] == 0]
+        )))
+        record_arrays_close(
+            vbt.Trades.from_orders(reversed_col_orders).values,
+            trades.values
+        )
 
     def test_records_readable(self):
         pd.testing.assert_frame_equal(
@@ -2072,6 +2124,15 @@ class TestPositions:
                 (2, 1., 6, 7., 0.07, 7, 8., 0.08, -1.15, -0.16428571, 1, 1, 2),
                 (2, 1., 7, 8., 0.08, 7, 8., 0., -0.08, -0.01, 0, 0, 3)
             ], dtype=trade_dt)
+        )
+        reversed_col_trades = trades.copy(records_arr=np.concatenate((
+            trades.values[trades.values['col'] == 2],
+            trades.values[trades.values['col'] == 1],
+            trades.values[trades.values['col'] == 0]
+        )))
+        record_arrays_close(
+            vbt.Positions.from_trades(reversed_col_trades).values,
+            positions.values
         )
 
     def test_coverage(self):

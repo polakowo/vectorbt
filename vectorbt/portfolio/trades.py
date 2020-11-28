@@ -15,26 +15,10 @@ from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
-from vectorbt.base.reshape_fns import to_1d, broadcast_to
-from vectorbt.records.base import Records, records_indexing_func_meta
+from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
+from vectorbt.records.base import Records
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, TradeType
 from vectorbt.portfolio import nb
-
-
-def trades_indexing_func_meta(obj, pd_indexing_func):
-    """Perform indexing on `Trades` and also return metadata."""
-    new_wrapper, new_records_arr, group_idxs, col_idxs = records_indexing_func_meta(obj, pd_indexing_func)
-    new_close = new_wrapper.wrap(obj.close.values[:, col_idxs], group_by=False)
-    return obj.copy(
-        wrapper=new_wrapper,
-        records_arr=new_records_arr,
-        close=new_close
-    ), group_idxs, col_idxs
-
-
-def trades_indexing_func(obj, pd_indexing_func):
-    """Perform indexing on `Trades`."""
-    return trades_indexing_func_meta(obj, pd_indexing_func)[0]
 
 
 # ############# Trades ############# #
@@ -137,22 +121,34 @@ class Trades(Records):
         ```
     """
 
-    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx', indexing_func=None, **kwargs):
-        if indexing_func is None:
-            indexing_func = trades_indexing_func
+    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx', **kwargs):
         Records.__init__(
             self,
             wrapper,
             records_arr,
             idx_field=idx_field,
             close=close,
-            indexing_func=indexing_func,
             **kwargs
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in trade_dt.names):
             raise ValueError("Records array must have all fields defined in trade_dt")
+
+    def _indexing_func_meta(self, pd_indexing_func):
+        """Perform indexing on `Trades` and also return metadata."""
+        new_wrapper, new_records_arr, group_idxs, col_idxs = \
+            Records._indexing_func_meta(self, pd_indexing_func)
+        new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
+        return self.copy(
+            wrapper=new_wrapper,
+            records_arr=new_records_arr,
+            close=new_close
+        ), group_idxs, col_idxs
+
+    def _indexing_func(self, pd_indexing_func):
+        """Perform indexing on `Trades`."""
+        return self._indexing_func_meta(pd_indexing_func)[0]
 
     trade_type = TradeType.Trade
 
@@ -164,7 +160,11 @@ class Trades(Records):
     @classmethod
     def from_orders(cls, orders, **kwargs):
         """Build `Trades` from `vectorbt.portfolio.orders.Orders`."""
-        trade_records_arr = nb.orders_to_trades_nb(orders.close.vbt.to_2d_array(), orders.values)
+        trade_records_arr = nb.orders_to_trades_nb(
+            orders.close.vbt.to_2d_array(),
+            orders.values,
+            orders.col_mapper.col_map
+        )
         return cls(orders.wrapper, trade_records_arr, orders.close, **kwargs)
 
     @property  # no need for cached
@@ -375,7 +375,7 @@ class Trades(Records):
             ![](/vectorbt/docs/img/trades_plot_pnl.png)"""
         from vectorbt.defaults import contrast_color_schema
 
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}
@@ -545,13 +545,13 @@ class Trades(Records):
             ![](/vectorbt/docs/img/trades_plot.png)"""
         from vectorbt.defaults import color_schema, contrast_color_schema
 
-        self_col = self._force_select_column(column)
+        self_col = self.select_series(column=column)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_kwargs(dict(
             line_color=color_schema['blue'],
-            name='Close' if self_col.close.name is None else self_col.close.name
+            name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
         ), close_trace_kwargs)
         if entry_trace_kwargs is None:
             entry_trace_kwargs = {}
@@ -814,7 +814,7 @@ class Positions(Trades):
     @classmethod
     def from_trades(cls, trades, **kwargs):
         """Build `Positions` from `Trades`."""
-        position_records_arr = nb.trades_to_positions_nb(trades.values)
+        position_records_arr = nb.trades_to_positions_nb(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, trades.close, **kwargs)
 
     @cached_method
