@@ -78,3 +78,5 @@ __all__ = [
     'ADVSTEX',
     'IADVSTEX'
 ]
+
+__pdoc__ = {k: False for k in __all__}

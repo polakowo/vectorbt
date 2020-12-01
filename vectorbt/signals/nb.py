@@ -28,23 +28,25 @@ def generate_nb(shape, choice_func_nb, *args):
     index of the end of the range `to_i`, index of the column `col`, and `*args`.
     It should return an array of indices from `[from_i, to_i)` (can be empty).
 
-    Example:
-        ```python-repl
-        >>> from numba import njit
-        >>> import numpy as np
-        >>> from vectorbt.signals.nb import generate_nb
+    ## Example
 
-        >>> @njit
-        ... def choice_func_nb(from_i, to_i, col):
-        ...     return np.array([from_i + col])
+    ```python-repl
+    >>> from numba import njit
+    >>> import numpy as np
+    >>> from vectorbt.signals.nb import generate_nb
 
-        >>> generate_nb((5, 3), choice_func_nb)
-        [[ True False False]
-         [False  True False]
-         [False False  True]
-         [False False False]
-         [False False False]]
-        ```"""
+    >>> @njit
+    ... def choice_func_nb(from_i, to_i, col):
+    ...     return np.array([from_i + col])
+
+    >>> generate_nb((5, 3), choice_func_nb)
+    [[ True False False]
+     [False  True False]
+     [False False  True]
+     [False False False]
+     [False False False]]
+    ```
+    """
     out = np.full(shape, False, dtype=np.bool_)
 
     for col in range(out.shape[1]):
@@ -444,29 +446,31 @@ def stop_choice_nb(from_i, to_i, col, ts, stop, trailing, wait, first, temp_idx_
 def generate_stop_ex_nb(entries, ts, stop, trailing, wait, first, flex_2d):
     """Generate using `generate_ex_nb` and `stop_choice_nb`.
 
-    Example:
-        Generate trailing stop loss and take profit signals for 10%.
-        ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.signals.nb import generate_stop_ex_nb
+    ## Example
 
-        >>> entries = np.asarray([False, True, False, False, False])[:, None]
-        >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
+    Generate trailing stop loss and take profit signals for 10%.
+    ```python-repl
+    >>> import numpy as np
+    >>> from vectorbt.signals.nb import generate_stop_ex_nb
 
-        >>> generate_stop_ex_nb(entries, ts, -0.1, True, 1, True, True)
-        array([[False],
-               [False],
-               [False],
-               [ True],
-               [False]])
+    >>> entries = np.asarray([False, True, False, False, False])[:, None]
+    >>> ts = np.asarray([1, 2, 3, 2, 1])[:, None]
 
-        >>> generate_stop_ex_nb(entries, ts, 0.1, False, 1, True, True)
-        array([[False],
-               [False],
-               [ True],
-               [False],
-               [False]])
-        ```"""
+    >>> generate_stop_ex_nb(entries, ts, -0.1, True, 1, True, True)
+    array([[False],
+           [False],
+           [False],
+           [ True],
+           [False]])
+
+    >>> generate_stop_ex_nb(entries, ts, 0.1, False, 1, True, True)
+    array([[False],
+           [False],
+           [ True],
+           [False],
+           [False]])
+    ```
+    """
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_ex_nb(entries, wait, stop_choice_nb, ts, stop, trailing, wait, first, temp_idx_arr, flex_2d)
 
@@ -600,50 +604,54 @@ def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop
                             sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, flex_2d):
     """Generate using `generate_ex_nb` and `adv_stop_choice_nb`.
 
-    Example:
-        Generate trailing stop loss and take profit signals for 10%.
-        Illustrates how exit signal can be generated within the same tick as entry.
-        ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.signals.nb import generate_adv_stop_ex_nb
+    ## Example
 
-        >>> entries = np.asarray([True, False, False, False, False])[:, None]
-        >>> open_p = np.asarray([10, 11, 12, 11, 10])[:, None]
-        >>> high_p = open_p + 1
-        >>> low_p = open_p - 1
-        >>> close_p = open_p
-        >>> hit_p_out = np.empty_like(entries, dtype=np.float_)
-        >>> stop_type_out = np.empty_like(entries, dtype=np.int_)
-        >>> sl_stop = 0.1
-        >>> ts_stop = 0.1
-        >>> tp_stop = 0.1
-        >>> is_entry_p_safe = True
-        >>> first = True
-        >>> flex_2d = True
+    Generate trailing stop loss and take profit signals for 10%.
+    Illustrates how exit signal can be generated within the same tick as entry.
+    ```python-repl
+    >>> import numpy as np
+    >>> from vectorbt.signals.nb import generate_adv_stop_ex_nb
 
-        >>> generate_adv_stop_ex_nb(
-        ...     entries, open_p, high_p, low_p, close_p,
-        ...     hit_p_out, stop_type_out, sl_stop, tp_stop, tp_stop,
-        ...     is_entry_p_safe, 0, first, flex_2d
-        ... )
-        array([[ True],  <<< exit
-               [False],
-               [False],
-               [False],
-               [False]])
-        >>> hit_p_out
-        array([[9.0e+000],  <<< exit
-               [5.4e-323],
-               [5.9e-323],
-               [5.4e-323],
-               [4.9e-323]])
-        >>> stop_type_out
-        array([[ 0],  <<< exit
-               [11],
-               [12],
-               [11],
-               [10]])
-        ```"""
+    >>> entries = np.asarray([True, False, False, False, False])[:, None]
+    >>> open_p = np.asarray([10, 11, 12, 11, 10])[:, None]
+    >>> high_p = open_p + 1
+    >>> low_p = open_p - 1
+    >>> close_p = open_p
+    >>> hit_p_out = np.empty_like(entries, dtype=np.float_)
+    >>> stop_type_out = np.empty_like(entries, dtype=np.int_)
+    >>> sl_stop = 0.1
+    >>> ts_stop = 0.1
+    >>> tp_stop = 0.1
+    >>> is_entry_p_safe = True
+    >>> first = True
+    >>> flex_2d = True
+
+    >>> generate_adv_stop_ex_nb(
+    ...     entries, open_p, high_p, low_p, close_p,
+    ...     hit_p_out, stop_type_out, sl_stop, tp_stop, tp_stop,
+    ...     is_entry_p_safe, 0, first, flex_2d
+    ... )
+    array([[ True],  <<< exit
+           [False],
+           [False],
+           [False],
+           [False]])
+
+    >>> hit_p_out
+    array([[9.0e+000],  <<< exit
+           [5.4e-323],
+           [5.9e-323],
+           [5.4e-323],
+           [4.9e-323]])
+
+    >>> stop_type_out
+    array([[ 0],  <<< exit
+           [11],
+           [12],
+           [11],
+           [10]])
+    ```
+    """
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_ex_nb(
         entries, wait, adv_stop_choice_nb,
@@ -685,23 +693,25 @@ def map_reduce_between_nb(a, map_func_nb, map_args, reduce_func_nb, reduce_args)
     Applies `reduce_func_nb` on all mapper results in a column. Must accept index of the column,
     the array of results from `map_func_nb` for that column, and `*reduce_args`.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> from numba import njit
-        >>> from vectorbt.signals.nb import map_reduce_between_nb
+    ## Example
 
-        >>> @njit
-        ... def map_func_nb(from_i, to_i, col):
-        ...     return to_i - from_i
-        >>> @njit
-        ... def reduce_func_nb(col, map_res):
-        ...     return np.nanmean(map_res)
-        >>> a = np.asarray([False, True, True, False, True])[:, None]
+    ```python-repl
+    >>> import numpy as np
+    >>> from numba import njit
+    >>> from vectorbt.signals.nb import map_reduce_between_nb
 
-        >>> map_reduce_between_nb(a, map_func_nb, (), reduce_func_nb, ())
-        array([1.5])
-        ```"""
+    >>> @njit
+    ... def map_func_nb(from_i, to_i, col):
+    ...     return to_i - from_i
+    >>> @njit
+    ... def reduce_func_nb(col, map_res):
+    ...     return np.nanmean(map_res)
+    >>> a = np.asarray([False, True, True, False, True])[:, None]
+
+    >>> map_reduce_between_nb(a, map_func_nb, (), reduce_func_nb, ())
+    array([1.5])
+    ```
+    """
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
@@ -802,23 +812,28 @@ def rank_1d_nb(a, reset_by=None, after_false=False, allow_gaps=False):
     `reset_by` (should have the same shape). If `after_false` is True, the first partition should
     come after at least one False value. If `allow_gaps` is True, ignores gaps between partitions.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.signals.nb import rank_1d_nb
+    ## Example
 
-        >>> signals = np.asarray([True, True, False, True, True])
-        >>> reset_by = np.asarray([False, True, False, False, True])
+    ```python-repl
+    >>> import numpy as np
+    >>> from vectorbt.signals.nb import rank_1d_nb
 
-        >>> rank_1d_nb(signals)
-        [1 2 0 1 2]
-        >>> rank_1d_nb(signals, after_false=True)
-        [0 0 0 1 2]
-        >>> rank_1d_nb(signals, allow_gaps=True)
-        [1 2 0 3 4]
-        >>> rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by)
-        [1 1 0 2 1]
-        ```"""
+    >>> signals = np.asarray([True, True, False, True, True])
+    >>> reset_by = np.asarray([False, True, False, False, True])
+
+    >>> rank_1d_nb(signals)
+    [1 2 0 1 2]
+
+    >>> rank_1d_nb(signals, after_false=True)
+    [0 0 0 1 2]
+
+    >>> rank_1d_nb(signals, allow_gaps=True)
+    [1 2 0 3 4]
+
+    >>> rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by)
+    [1 1 0 2 1]
+    ```
+    """
     out = np.zeros(a.shape, dtype=np.int_)
 
     false_seen = not after_false
@@ -861,21 +876,25 @@ def rank_partitions_1d_nb(a, reset_by=None, after_false=False):
 
     For keyword arguments, see `rank_nb`.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.signals.nb import rank_partitions_1d_nb
+    ## Example
 
-        >>> signals = np.asarray([True, True, False, True, True])
-        >>> reset_by = np.asarray([False, True, False, False, True])
+    ```python-repl
+    >>> import numpy as np
+    >>> from vectorbt.signals.nb import rank_partitions_1d_nb
 
-        >>> rank_partitions_1d_nb(signals)
-        [1 1 0 2 2]
-        >>> rank_partitions_1d_nb(signals, after_false=True)
-        [0 0 0 1 1]
-        >>> rank_partitions_1d_nb(signals, reset_by=reset_by)
-        [1 1 0 2 1]
-        ```"""
+    >>> signals = np.asarray([True, True, False, True, True])
+    >>> reset_by = np.asarray([False, True, False, False, True])
+
+    >>> rank_partitions_1d_nb(signals)
+    [1 1 0 2 2]
+
+    >>> rank_partitions_1d_nb(signals, after_false=True)
+    [0 0 0 1 1]
+
+    >>> rank_partitions_1d_nb(signals, reset_by=reset_by)
+    [1 1 0 2 1]
+    ```
+    """
     out = np.zeros(a.shape, dtype=np.int_)
 
     false_seen = not after_false

@@ -79,12 +79,15 @@ class MA(MA):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.MA.run(price['Close'], 10).plot()
-            ```
 
-            ![](/vectorbt/docs/img/MA.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.MA.run(price['Close'], 10).plot()
+        ```
+
+        ![](/vectorbt/docs/img/MA.png)
+        """
         from vectorbt.defaults import color_schema
 
         self_col = self.select_series(column=column)
@@ -156,12 +159,15 @@ class MSTD(MSTD):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.MSTD.run(price['Close'], 10).plot()
-            ```
 
-            ![](/vectorbt/docs/img/MSTD.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.MSTD.run(price['Close'], 10).plot()
+        ```
+
+        ![](/vectorbt/docs/img/MSTD.png)
+        """
         self_col = self.select_series(column=column)
 
         if fig is None:
@@ -241,12 +247,15 @@ class BBANDS(BBANDS):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.BBANDS.run(price['Close']).plot()
-            ```
 
-            ![](/vectorbt/docs/img/BBANDS.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.BBANDS.run(price['Close']).plot()
+        ```
+
+        ![](/vectorbt/docs/img/BBANDS.png)
+        """
         from vectorbt.defaults import color_schema
 
         self_col = self.select_series(column=column)
@@ -348,12 +357,15 @@ class RSI(RSI):
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.RSI.run(price['Close']).plot()
-            ```
 
-            ![](/vectorbt/docs/img/RSI.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.RSI.run(price['Close']).plot()
+        ```
+
+        ![](/vectorbt/docs/img/RSI.png)
+        """
         self_col = self.select_series(column=column)
 
         if fig is None:
@@ -445,12 +457,15 @@ class STOCH(STOCH):
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.STOCH.run(price['High'], price['Low'], price['Close']).plot()
-            ```
 
-            ![](/vectorbt/docs/img/STOCH.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.STOCH.run(price['High'], price['Low'], price['Close']).plot()
+        ```
+
+        ![](/vectorbt/docs/img/STOCH.png)
+        """
         self_col = self.select_series(column=column)
 
         if fig is None:
@@ -553,12 +568,14 @@ class MACD(MACD):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.MACD.run(price['Close']).plot()
-            ```
 
-            ![](/vectorbt/docs/img/MACD.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.MACD.run(price['Close']).plot()
+        ```
+
+        ![](/vectorbt/docs/img/MACD.png)"""
         self_col = self.select_series(column=column)
 
         if fig is None:
@@ -652,12 +669,15 @@ class ATR(ATR):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> vbt.ATR.run(price['High'], price['Low'], price['Close'], 10).plot()
-            ```
 
-            ![](/vectorbt/docs/img/ATR.png)"""
+        ## Example
+
+        ```python-repl
+        >>> vbt.ATR.run(price['High'], price['Low'], price['Close'], 10).plot()
+        ```
+
+        ![](/vectorbt/docs/img/ATR.png)
+        """
         self_col = self.select_series(column=column)
 
         if fig is None:
@@ -723,12 +743,15 @@ class OBV(OBV):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```py
-            >>> vbt.OBV.run(price['Close'], price['Volume']).plot()
-            ```
 
-            ![](/vectorbt/docs/img/OBV.png)"""
+        ## Example
+
+        ```py
+        >>> vbt.OBV.run(price['Close'], price['Volume']).plot()
+        ```
+
+        ![](/vectorbt/docs/img/OBV.png)
+        """
         self_col = self.select_series(column=column)
 
         if fig is None:

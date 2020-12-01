@@ -22,37 +22,39 @@ class Drawdowns(Records):
 
     Requires `records_arr` to have all fields defined in `vectorbt.generic.enums.drawdown_dt`.
 
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> import yfinance as yf
-        >>> from datetime import datetime
+    ## Example
 
-        >>> start = datetime(2019, 1, 1)
-        >>> end = datetime(2020, 1, 1)
-        >>> price = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
-        >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> import yfinance as yf
+    >>> from datetime import datetime
 
-        >>> drawdowns.records.head()
-           col  start_idx  valley_idx  end_idx  status
-        0    0          2           3        6       1
-        1    0          6          38       54       1
-        2    0         54          63       91       1
-        3    0         93          94       95       1
-        4    0         98          99      100       1
+    >>> start = datetime(2019, 1, 1)
+    >>> end = datetime(2020, 1, 1)
+    >>> price = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
+    >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
 
-        >>> drawdowns.drawdown
-        <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
+    >>> drawdowns.records.head()
+       col  start_idx  valley_idx  end_idx  status
+    0    0          2           3        6       1
+    1    0          6          38       54       1
+    2    0         54          63       91       1
+    3    0         93          94       95       1
+    4    0         98          99      100       1
 
-        >>> drawdowns.drawdown.min()
-        -0.48982769972565016
+    >>> drawdowns.drawdown
+    <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
 
-        >>> drawdowns.drawdown.hist(trace_kwargs=dict(nbinsx=50))
-        ```
+    >>> drawdowns.drawdown.min()
+    -0.48982769972565016
 
-        ![](/vectorbt/docs/img/drawdowns_drawdown_hist.png)"""
+    >>> drawdowns.drawdown.hist(trace_kwargs=dict(nbinsx=50))
+    ```
+
+    ![](/vectorbt/docs/img/drawdowns_drawdown_hist.png)
+    """
 
     def __init__(self, wrapper, records_arr, ts, idx_field='end_idx', **kwargs):
         Records.__init__(
@@ -285,16 +287,19 @@ class Drawdowns(Records):
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
 
-            >>> ts = pd.Series([1, 2, 1, 2, 3, 2, 1, 2])
-            >>> vbt.Drawdowns.from_ts(ts, freq='1 days').plot()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/drawdowns_plot.png)"""
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
+        >>> ts = pd.Series([1, 2, 1, 2, 3, 2, 1, 2])
+        >>> vbt.Drawdowns.from_ts(ts, freq='1 days').plot()
+        ```
+
+        ![](/vectorbt/docs/img/drawdowns_plot.png)
+        """
         from vectorbt.defaults import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)

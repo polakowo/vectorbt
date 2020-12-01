@@ -16,16 +16,18 @@ You can access methods listed in `vectorbt.returns.accessors` as follows:
 >>> import vectorbt as vbt
 
 >>> # vectorbt.returns.accessors.Returns_Accessor.total
->>> pd.Series([0.2, 0.1, 0, -0.1, -0.2]).vbt.returns.total()
--0.049599999999999866
+>>> price = pd.Series([1.1, 1.2, 1.3, 1.2, 1.1])
+>>> returns = price.pct_change()
+>>> returns.vbt.returns.total()
+0.0
 ```
 
 The accessors extend `vectorbt.generic.accessors`.
 
 ```python-repl
 >>> # inherited from Generic_Accessor
->>> pd.Series([0.2, 0.1, 0, -0.1, -0.2]).vbt.returns.max()
-0.2
+>>> returns.vbt.returns.max()
+0.09090909090909083
 ```
 
 !!! note
@@ -38,7 +40,7 @@ and for measuring portfolio performance. These only accept NumPy arrays and othe
 
 ```python-repl
 >>> # vectorbt.returns.nb.cum_returns_1d_nb
->>> vbt.returns.nb.cum_returns_1d_nb(np.array([0.2, 0.1, 0, -0.1, -0.2]))
-array([0.2, 0.32, 0.32, 0.188, -0.0496])
+>>> vbt.returns.nb.cum_returns_1d_nb(returns.values)
+array([0., 0.09090909, 0.18181818, 0.09090909, 0.])
 ```"""
 

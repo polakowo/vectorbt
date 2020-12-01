@@ -210,30 +210,33 @@ class Base_Accessor:
     def align_to(self, other):
         """Align to `other` on their axes.
 
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
-            >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
-            >>> df1
-               a  b
-            x  1  2
-            y  3  4
+        ## Example
 
-            >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
-            ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
-            >>> df2
-                   1       2
-               a   b   a   b
-            x  5   6   7   8
-            y  9  10  11  12
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
 
-            >>> df1.vbt.align_to(df2)
-                  1     2   
-               a  b  a  b
-            x  1  2  1  2
-            y  3  4  3  4
-            ```"""
+        >>> df1 = pd.DataFrame([[1, 2], [3, 4]], index=['x', 'y'], columns=['a', 'b'])
+        >>> df1
+           a  b
+        x  1  2
+        y  3  4
+
+        >>> df2 = pd.DataFrame([[5, 6, 7, 8], [9, 10, 11, 12]], index=['x', 'y'],
+        ...     columns=pd.MultiIndex.from_arrays([[1, 1, 2, 2], ['a', 'b', 'a', 'b']]))
+        >>> df2
+               1       2
+           a   b   a   b
+        x  5   6   7   8
+        y  9  10  11  12
+
+        >>> df1.vbt.align_to(df2)
+              1     2
+           a  b  a  b
+        x  1  2  1  2
+        y  3  4  3  4
+        ```
+        """
         checks.assert_type(other, (pd.Series, pd.DataFrame))
         obj = reshape_fns.to_2d(self._obj)
         other = reshape_fns.to_2d(other)
@@ -280,19 +283,21 @@ class Base_Accessor:
         !!! note
             The resulted array must have the same shape as the original array.
 
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
-            >>> sr = pd.Series([1, 2], index=['x', 'y'])
+        ## Example
 
-            >>> sr2.vbt.apply(apply_func=lambda x: x ** 2)
-            i2
-            x2    1
-            y2    4
-            z2    9
-            Name: a2, dtype: int64
-            ```"""
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
+        >>> sr = pd.Series([1, 2], index=['x', 'y'])
+        >>> sr2.vbt.apply(apply_func=lambda x: x ** 2)
+        i2
+        x2    1
+        y2    4
+        z2    9
+        Name: a2, dtype: int64
+        ```
+        """
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
         if to_2d:
@@ -309,19 +314,21 @@ class Base_Accessor:
         All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`. Use `keys` as the outermost level.
 
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
-            >>> sr = pd.Series([1, 2], index=['x', 'y'])
-            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        ## Example
 
-            >>> sr.vbt.concat(df, keys=['c', 'd'])
-                  c     d
-               a  b  a  b
-            x  1  1  3  4
-            y  2  2  5  6
-            ```"""
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
+        >>> sr = pd.Series([1, 2], index=['x', 'y'])
+        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        >>> sr.vbt.concat(df, keys=['c', 'd'])
+              c     d
+           a  b  a  b
+        x  1  1  3  4
+        y  2  2  5  6
+        ```
+        """
         others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
         if isinstance(self_or_cls, type):
             objs = others
@@ -345,19 +352,21 @@ class Base_Accessor:
         !!! note
             The resulted arrays to be concatenated must have the same shape as broadcast input arrays.
 
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
-            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        ## Example
 
-            >>> df.vbt.apply_and_concat(3, [1, 2, 3],
-            ...     apply_func=lambda i, a, b: a * b[i], keys=['c', 'd', 'e'])
-                  c       d       e    
-               a  b   a   b   a   b
-            x  3  4   6   8   9  12
-            y  5  6  10  12  15  18
-            ```"""
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
+        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        >>> df.vbt.apply_and_concat(3, [1, 2, 3],
+        ...     apply_func=lambda i, a, b: a * b[i], keys=['c', 'd', 'e'])
+              c       d       e
+           a  b   a   b   a   b
+        x  3  4   6   8   9  12
+        y  5  6  10  12  15  18
+        ```
+        """
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
         if to_2d:
@@ -388,18 +397,20 @@ class Base_Accessor:
         !!! note
             The resulted array must have the same shape as broadcast input arrays.
 
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
-            >>> sr = pd.Series([1, 2], index=['x', 'y'])
-            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        ## Example
 
-            >>> sr.vbt.combine_with(df, combine_func=lambda x, y: x + y)
-               a  b
-            x  4  5
-            y  7  8
-            ```"""
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
+
+        >>> sr = pd.Series([1, 2], index=['x', 'y'])
+        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        >>> sr.vbt.combine_with(df, combine_func=lambda x, y: x + y)
+           a  b
+        x  4  5
+        y  7  8
+        ```
+        """
         if isinstance(other, Base_Accessor):
             other = other._obj
         checks.assert_not_none(combine_func)
@@ -440,26 +451,29 @@ class Base_Accessor:
 
             Also remember to bring each in `*args` to a Numba-compatible format.
 
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import pandas as pd
-            >>> sr = pd.Series([1, 2], index=['x', 'y'])
-            >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+        ## Example
 
-            >>> sr.vbt.combine_with_multiple([df, df*2],
-            ...     combine_func=lambda x, y: x + y)
-                a   b
-            x  10  13
-            y  17  20
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import pandas as pd
 
-            >>> sr.vbt.combine_with_multiple([df, df*2],
-            ...     combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd'])
-                  c       d    
-               a  b   a   b
-            x  4  5   7   9
-            y  7  8  12  14
-            ```"""
+        >>> sr = pd.Series([1, 2], index=['x', 'y'])
+        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+
+        >>> sr.vbt.combine_with_multiple([df, df*2],
+        ...     combine_func=lambda x, y: x + y)
+            a   b
+        x  10  13
+        y  17  20
+
+        >>> sr.vbt.combine_with_multiple([df, df*2],
+        ...     combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd'])
+              c       d
+           a  b   a   b
+        x  4  5   7   9
+        y  7  8  12  14
+        ```
+        """
         others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
         checks.assert_not_none(combine_func)
         checks.assert_type(others, Iterable)

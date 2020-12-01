@@ -726,7 +726,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     order. If unsuccessful due to insufficient cash/shares, always orders the available fraction.
     Updates then the current cash and shares balance.
 
-    Returns order records of layout `vectorbt.portfolio.enums.order_dt` and log records of layout `vectorbt.enums.log_dt`.
+    Returns order records of layout `vectorbt.portfolio.enums.order_dt` and log records of layout
+    `vectorbt.portfolio.enums.log_dt`.
 
     As opposed to `simulate_row_wise_nb`, order processing happens in row-major order, that is,
     from top to bottom slower (along time axis) and from left to right faster (along asset axis).
@@ -817,142 +818,143 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         not been processed yet and thus empty. Accessing them will not trigger any errors or warnings,
         but provide you with arbitrary data (see [np.empty](https://numpy.org/doc/stable/reference/generated/numpy.empty.html)).
 
-    Example:
-        Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
-        that rebalances every second tick, all without leaving Numba:
+    ## Example
 
-        ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from numba import njit
-        >>> from vectorbt.generic.plotting import create_scatter
-        >>> from vectorbt.records.nb import col_map_nb
-        >>> from vectorbt.portfolio.enums import SizeType, Direction
-        >>> from vectorbt.portfolio.nb import (
-        ...     create_order_nb,
-        ...     simulate_nb,
-        ...     build_call_seq,
-        ...     auto_call_seq_ctx_nb,
-        ...     share_flow_nb,
-        ...     shares_nb,
-        ...     holding_value_nb
-        ... )
+    Create a group of three assets together sharing 100$ and simulate an equal-weighted portfolio
+    that rebalances every second tick, all without leaving Numba:
 
-        >>> @njit
-        ... def prep_func_nb(simc):  # do nothing
-        ...     print('preparing simulation')
-        ...     return ()
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from numba import njit
+    >>> from vectorbt.generic.plotting import create_scatter
+    >>> from vectorbt.records.nb import col_map_nb
+    >>> from vectorbt.portfolio.enums import SizeType, Direction
+    >>> from vectorbt.portfolio.nb import (
+    ...     create_order_nb,
+    ...     simulate_nb,
+    ...     build_call_seq,
+    ...     auto_call_seq_ctx_nb,
+    ...     share_flow_nb,
+    ...     shares_nb,
+    ...     holding_value_nb
+    ... )
 
-        >>> @njit
-        ... def group_prep_func_nb(gc):
-        ...     '''Define empty arrays for each group.'''
-        ...     print('\\tpreparing group', gc.group)
-        ...     # Try to create new arrays as rarely as possible
-        ...     size = np.empty(gc.group_len, dtype=np.float_)
-        ...     size_type = np.empty(gc.group_len, dtype=np.int_)
-        ...     direction = np.empty(gc.group_len, dtype=np.int_)
-        ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
-        ...     return size, size_type, direction, temp_float_arr
+    >>> @njit
+    ... def prep_func_nb(simc):  # do nothing
+    ...     print('preparing simulation')
+    ...     return ()
 
-        >>> @njit
-        ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
-        ...     '''Perform rebalancing at each segment.'''
-        ...     print('\\t\\tpreparing segment', sc.i, '(row)')
-        ...     for k in range(sc.group_len):
-        ...         col = sc.from_col + k
-        ...         size[k] = 1 / sc.group_len
-        ...         size_type[k] = SizeType.TargetPercent
-        ...         direction[k] = Direction.LongOnly  # long positions only
-        ...         # Here we use order price instead of previous close to valuate the assets
-        ...         sc.last_val_price[col] = sc.close[sc.i, col]
-        ...     # Reorder call sequence such that selling orders come first and buying last
-        ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
-        ...     return size, size_type, direction
+    >>> @njit
+    ... def group_prep_func_nb(gc):
+    ...     '''Define empty arrays for each group.'''
+    ...     print('\\tpreparing group', gc.group)
+    ...     # Try to create new arrays as rarely as possible
+    ...     size = np.empty(gc.group_len, dtype=np.float_)
+    ...     size_type = np.empty(gc.group_len, dtype=np.int_)
+    ...     direction = np.empty(gc.group_len, dtype=np.int_)
+    ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
+    ...     return size, size_type, direction, temp_float_arr
 
-        >>> @njit
-        ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
-        ...     '''Place an order.'''
-        ...     print('\\t\\t\\trunning order', oc.call_idx, 'at column', oc.col)
-        ...     col_i = oc.call_seq_now[oc.call_idx]  # or col - from_col
-        ...     return create_order_nb(
-        ...         size=size[col_i],
-        ...         size_type=size_type[col_i],
-        ...         direction=direction[col_i],
-        ...         price=oc.close[oc.i, oc.col],
-        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage
-        ...     )
+    >>> @njit
+    ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
+    ...     '''Perform rebalancing at each segment.'''
+    ...     print('\\t\\tpreparing segment', sc.i, '(row)')
+    ...     for k in range(sc.group_len):
+    ...         col = sc.from_col + k
+    ...         size[k] = 1 / sc.group_len
+    ...         size_type[k] = SizeType.TargetPercent
+    ...         direction[k] = Direction.LongOnly  # long positions only
+    ...         # Here we use order price instead of previous close to valuate the assets
+    ...         sc.last_val_price[col] = sc.close[sc.i, col]
+    ...     # Reorder call sequence such that selling orders come first and buying last
+    ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
+    ...     return size, size_type, direction
 
-        >>> target_shape = (5, 3)
-        >>> np.random.seed(42)
-        >>> close = np.random.uniform(1, 10, size=target_shape)
-        >>> group_lens = np.array([3])  # one group of three columns
-        >>> init_cash = np.array([100.])  # one capital per group
-        >>> cash_sharing = True
-        >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
-        >>> active_mask = np.array([True, False, True, False, True])[:, None]
-        >>> active_mask = np.copy(np.broadcast_to(active_mask, target_shape))
-        >>> fees = 0.001
-        >>> fixed_fees = 1.
-        >>> slippage = 0.001
+    >>> @njit
+    ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
+    ...     '''Place an order.'''
+    ...     print('\\t\\t\\trunning order', oc.call_idx, 'at column', oc.col)
+    ...     col_i = oc.call_seq_now[oc.call_idx]  # or col - from_col
+    ...     return create_order_nb(
+    ...         size=size[col_i],
+    ...         size_type=size_type[col_i],
+    ...         direction=direction[col_i],
+    ...         price=oc.close[oc.i, oc.col],
+    ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage
+    ...     )
 
-        >>> order_records, log_records = simulate_nb(
-        ...     target_shape,
-        ...     close,
-        ...     group_lens,
-        ...     init_cash,
-        ...     cash_sharing,
-        ...     call_seq,
-        ...     active_mask,
-        ...     prep_func_nb, (),
-        ...     group_prep_func_nb, (),
-        ...     segment_prep_func_nb, (),
-        ...     order_func_nb, (fees, fixed_fees, slippage))
-        preparing simulation
-            preparing group 0
-                preparing segment 0 (row)
-                    running order 0 at column 0
-                    running order 1 at column 1
-                    running order 2 at column 2
-                preparing segment 2 (row)
-                    running order 0 at column 1
-                    running order 1 at column 2
-                    running order 2 at column 0
-                preparing segment 4 (row)
-                    running order 0 at column 0
-                    running order 1 at column 2
-                    running order 2 at column 1
+    >>> target_shape = (5, 3)
+    >>> np.random.seed(42)
+    >>> close = np.random.uniform(1, 10, size=target_shape)
+    >>> group_lens = np.array([3])  # one group of three columns
+    >>> init_cash = np.array([100.])  # one capital per group
+    >>> cash_sharing = True
+    >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
+    >>> active_mask = np.array([True, False, True, False, True])[:, None]
+    >>> active_mask = np.copy(np.broadcast_to(active_mask, target_shape))
+    >>> fees = 0.001
+    >>> fixed_fees = 1.
+    >>> slippage = 0.001
 
-        >>> pd.DataFrame.from_records(order_records)
-           col  idx       size     price      fees  side
-        0    0    0   7.626262  4.375232  1.033367     0
-        1    0    2   5.210115  1.524275  1.007942     0
-        2    0    4   7.899568  8.483492  1.067016     1
-        3    1    0   3.488053  9.565985  1.033367     0
-        4    1    2   0.920352  8.786790  1.008087     1
-        5    1    4  10.713236  2.913963  1.031218     0
-        6    2    0   3.972040  7.595533  1.030170     0
-        7    2    2   0.448747  6.403625  1.002874     1
-        8    2    4  12.378281  2.639061  1.032667     0
+    >>> order_records, log_records = simulate_nb(
+    ...     target_shape,
+    ...     close,
+    ...     group_lens,
+    ...     init_cash,
+    ...     cash_sharing,
+    ...     call_seq,
+    ...     active_mask,
+    ...     prep_func_nb, (),
+    ...     group_prep_func_nb, (),
+    ...     segment_prep_func_nb, (),
+    ...     order_func_nb, (fees, fixed_fees, slippage))
+    preparing simulation
+        preparing group 0
+            preparing segment 0 (row)
+                running order 0 at column 0
+                running order 1 at column 1
+                running order 2 at column 2
+            preparing segment 2 (row)
+                running order 0 at column 1
+                running order 1 at column 2
+                running order 2 at column 0
+            preparing segment 4 (row)
+                running order 0 at column 0
+                running order 1 at column 2
+                running order 2 at column 1
 
-        >>> call_seq
-        array([[0, 1, 2],
-               [0, 1, 2],
-               [1, 2, 0],
-               [0, 1, 2],
-               [0, 2, 1]])
+    >>> pd.DataFrame.from_records(order_records)
+       col  idx       size     price      fees  side
+    0    0    0   7.626262  4.375232  1.033367     0
+    1    0    2   5.210115  1.524275  1.007942     0
+    2    0    4   7.899568  8.483492  1.067016     1
+    3    1    0   3.488053  9.565985  1.033367     0
+    4    1    2   0.920352  8.786790  1.008087     1
+    5    1    4  10.713236  2.913963  1.031218     0
+    6    2    0   3.972040  7.595533  1.030170     0
+    7    2    2   0.448747  6.403625  1.002874     1
+    8    2    4  12.378281  2.639061  1.032667     0
 
-        >>> col_map = col_map_nb(order_records['col'], target_shape[1])
-        >>> share_flow = share_flow_nb(target_shape, order_records, col_map, Direction.All)
-        >>> shares = shares_nb(share_flow)
-        >>> holding_value = holding_value_nb(close, shares)
-        >>> create_scatter(data=holding_value)
-        ```
+    >>> call_seq
+    array([[0, 1, 2],
+           [0, 1, 2],
+           [1, 2, 0],
+           [0, 1, 2],
+           [0, 2, 1]])
 
-        ![](/vectorbt/docs/img/simulate_nb.png)
+    >>> col_map = col_map_nb(order_records['col'], target_shape[1])
+    >>> share_flow = share_flow_nb(target_shape, order_records, col_map, Direction.All)
+    >>> shares = shares_nb(share_flow)
+    >>> holding_value = holding_value_nb(close, shares)
+    >>> create_scatter(data=holding_value)
+    ```
 
-        Note that the last order in a group with cash sharing is always disadvantaged
-        as it has a bit less funds than the previous orders due to costs, which are not
-        included when valuating the group.
+    ![](/vectorbt/docs/img/simulate_nb.png)
+
+    Note that the last order in a group with cash sharing is always disadvantaged
+    as it has a bit less funds than the previous orders due to costs, which are not
+    included when valuating the group.
     """
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
@@ -1141,31 +1143,32 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
         You can only safely access data points that are to the left of the current group and
         rows that are to the top of the current row.
 
-    Example:
-        Running the same example as in `simulate_nb` but replacing `group_prep_func_nb` for
-        `row_prep_func_nb` gives the same results but now the following call hierarchy:
-        ```plaintext
-        preparing simulation
-            preparing row 0
-                preparing segment 0 (group)
-                    running order 0 at column 0
-                    running order 1 at column 1
-                    running order 2 at column 2
-            preparing row 2
-                preparing segment 0 (group)
-                    running order 0 at column 1
-                    running order 1 at column 2
-                    running order 2 at column 0
-            preparing row 4
-                preparing segment 0 (group)
-                    running order 0 at column 0
-                    running order 1 at column 2
-                    running order 2 at column 1
-        ```
+    ## Example
 
-        Note, however, that we cannot create NumPy arrays per group anymore as there is no
-        `group_prep_func_nb`, so you would need to move this part to `prep_func_nb`,
-        make arrays wider, and use only the part of the array that corresponds to the current group.
+    Running the same example as in `simulate_nb` but replacing `group_prep_func_nb` for
+    `row_prep_func_nb` gives the same results but now the following call hierarchy:
+    ```python-repl
+    preparing simulation
+        preparing row 0
+            preparing segment 0 (group)
+                running order 0 at column 0
+                running order 1 at column 1
+                running order 2 at column 2
+        preparing row 2
+            preparing segment 0 (group)
+                running order 0 at column 1
+                running order 1 at column 2
+                running order 2 at column 0
+        preparing row 4
+            preparing segment 0 (group)
+                running order 0 at column 0
+                running order 1 at column 2
+                running order 2 at column 1
+    ```
+
+    Note, however, that we cannot create NumPy arrays per group anymore as there is no
+    `group_prep_func_nb`, so you would need to move this part to `prep_func_nb`,
+    make arrays wider, and use only the part of the array that corresponds to the current group.
     """
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
@@ -1750,82 +1753,83 @@ def save_trade_nb(record, col,
 def orders_to_trades_nb(close, order_records, col_map):
     """Find trades and store their information as records to an array.
 
-    Example:
-        Simulate a strategy and find all trades in generated orders:
-        ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from numba import njit
-        >>> from vectorbt.records.nb import col_map_nb
-        >>> from vectorbt.portfolio.nb import (
-        ...     simulate_nb,
-        ...     create_order_nb,
-        ...     empty_prep_nb,
-        ...     orders_to_trades_nb
-        ... )
+    ## Example
 
-        >>> @njit
-        ... def order_func_nb(oc, order_size, order_price):
-        ...     return create_order_nb(
-        ...         size=order_size[oc.i, oc.col],
-        ...         price=order_price[oc.i, oc.col]
-        ...         )
+    Simulate a strategy and find all trades in generated orders:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from numba import njit
+    >>> from vectorbt.records.nb import col_map_nb
+    >>> from vectorbt.portfolio.nb import (
+    ...     simulate_nb,
+    ...     create_order_nb,
+    ...     empty_prep_nb,
+    ...     orders_to_trades_nb
+    ... )
 
-        >>> order_size = np.asarray([
-        ...     [1, -1],
-        ...     [0.1, -0.1],
-        ...     [-1, 1],
-        ...     [-0.1, 0.1],
-        ...     [1, -1],
-        ...     [-2, 2]
-        ... ])
-        >>> close = order_price = np.array([
-        ...     [1, 6],
-        ...     [2, 5],
-        ...     [3, 4],
-        ...     [4, 3],
-        ...     [5, 2],
-        ...     [6, 1]
-        ... ])
-        >>> target_shape = order_size.shape
-        >>> group_lens = np.full(target_shape[1], 1)
-        >>> init_cash = np.full(target_shape[1], 100)
-        >>> cash_sharing = False
-        >>> call_seq = np.full(target_shape, 0)
-        >>> active_mask = np.full(target_shape, True)
+    >>> @njit
+    ... def order_func_nb(oc, order_size, order_price):
+    ...     return create_order_nb(
+    ...         size=order_size[oc.i, oc.col],
+    ...         price=order_price[oc.i, oc.col]
+    ...         )
 
-        >>> order_records, log_records = simulate_nb(
-        ...     target_shape, close, group_lens,
-        ...     init_cash, cash_sharing, call_seq, active_mask,
-        ...     empty_prep_nb, (),
-        ...     empty_prep_nb, (),
-        ...     empty_prep_nb, (),
-        ...     order_func_nb, (order_size, order_price))
+    >>> order_size = np.asarray([
+    ...     [1, -1],
+    ...     [0.1, -0.1],
+    ...     [-1, 1],
+    ...     [-0.1, 0.1],
+    ...     [1, -1],
+    ...     [-2, 2]
+    ... ])
+    >>> close = order_price = np.array([
+    ...     [1, 6],
+    ...     [2, 5],
+    ...     [3, 4],
+    ...     [4, 3],
+    ...     [5, 2],
+    ...     [6, 1]
+    ... ])
+    >>> target_shape = order_size.shape
+    >>> group_lens = np.full(target_shape[1], 1)
+    >>> init_cash = np.full(target_shape[1], 100)
+    >>> cash_sharing = False
+    >>> call_seq = np.full(target_shape, 0)
+    >>> active_mask = np.full(target_shape, True)
 
-        >>> col_map = col_map_nb(order_records['col'], target_shape[1])
-        >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
-        >>> pd.DataFrame.from_records(trade_records)
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
-        0    0   1.0          0     1.090909         0.0         2         3.0
-        1    0   0.1          0     1.090909         0.0         3         4.0
-        2    0   1.0          4     5.000000         0.0         5         6.0
-        3    0   1.0          5     6.000000         0.0         5         6.0
-        4    1   1.0          0     5.909091         0.0         2         4.0
-        5    1   0.1          0     5.909091         0.0         3         3.0
-        6    1   1.0          4     2.000000         0.0         5         1.0
-        7    1   1.0          5     1.000000         0.0         5         1.0
+    >>> order_records, log_records = simulate_nb(
+    ...     target_shape, close, group_lens,
+    ...     init_cash, cash_sharing, call_seq, active_mask,
+    ...     empty_prep_nb, (),
+    ...     empty_prep_nb, (),
+    ...     empty_prep_nb, (),
+    ...     order_func_nb, (order_size, order_price))
 
-           exit_fees       pnl    return  direction  status  position_idx
-        0        0.0  1.909091  1.750000          0       1             0
-        1        0.0  0.290909  2.666667          0       1             0
-        2        0.0  1.000000  0.200000          0       1             1
-        3        0.0  0.000000  0.000000          1       0             2
-        4        0.0  1.909091  0.323077          1       1             0
-        5        0.0  0.290909  0.492308          1       1             0
-        6        0.0  1.000000  0.500000          1       1             1
-        7        0.0  0.000000  0.000000          0       0             2
-        ```
-        """
+    >>> col_map = col_map_nb(order_records['col'], target_shape[1])
+    >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
+    >>> pd.DataFrame.from_records(trade_records)
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   1.0          0     1.090909         0.0         2         3.0
+    1    0   0.1          0     1.090909         0.0         3         4.0
+    2    0   1.0          4     5.000000         0.0         5         6.0
+    3    0   1.0          5     6.000000         0.0         5         6.0
+    4    1   1.0          0     5.909091         0.0         2         4.0
+    5    1   0.1          0     5.909091         0.0         3         3.0
+    6    1   1.0          4     2.000000         0.0         5         1.0
+    7    1   1.0          5     1.000000         0.0         5         1.0
+
+       exit_fees       pnl    return  direction  status  position_idx
+    0        0.0  1.909091  1.750000          0       1             0
+    1        0.0  0.290909  2.666667          0       1             0
+    2        0.0  1.000000  0.200000          0       1             1
+    3        0.0  0.000000  0.000000          1       0             2
+    4        0.0  1.909091  0.323077          1       1             0
+    5        0.0  0.290909  0.492308          1       1             0
+    6        0.0  1.000000  0.500000          1       1             1
+    7        0.0  0.000000  0.000000          0       0             2
+    ```
+    """
     col_idxs, col_ns = col_map
     records = np.empty(close.shape[0] * close.shape[1], dtype=trade_dt)
     ridx = 0
@@ -2025,30 +2029,31 @@ def save_position_nb(record, trade_records):
 def trades_to_positions_nb(trade_records, col_map):
     """Find positions and store their information as records to an array.
 
-    Example:
-        Building upon the example in `orders_to_trades_nb`, convert trades to positions:
-        ```python-repl
-        >>> from vectorbt.portfolio.nb import trades_to_positions_nb
+    ## Example
 
-        >>> col_map = col_map_nb(trade_records['col'], target_shape[1])
-        >>> position_records = trades_to_positions_nb(trade_records, col_map)
-        >>> pd.DataFrame.from_records(position_records)
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
-        0    0   1.1          0     1.090909         0.0         3    3.090909
-        1    0   1.0          4     5.000000         0.0         5    6.000000
-        2    0   1.0          5     6.000000         0.0         5    6.000000
-        3    1   1.1          0     5.909091         0.0         3    3.909091
-        4    1   1.0          4     2.000000         0.0         5    1.000000
-        5    1   1.0          5     1.000000         0.0         5    1.000000
+    Building upon the example in `orders_to_trades_nb`, convert trades to positions:
+    ```python-repl
+    >>> from vectorbt.portfolio.nb import trades_to_positions_nb
 
-           exit_fees  pnl    return  direction  status  position_idx
-        0        0.0  2.2  1.833333          0       1             0
-        1        0.0  1.0  0.200000          0       1             1
-        2        0.0  0.0  0.000000          1       0             2
-        3        0.0  2.2  0.338462          1       1             0
-        4        0.0  1.0  0.500000          1       1             1
-        5        0.0  0.0  0.000000          0       0             2
-        ```
+    >>> col_map = col_map_nb(trade_records['col'], target_shape[1])
+    >>> position_records = trades_to_positions_nb(trade_records, col_map)
+    >>> pd.DataFrame.from_records(position_records)
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   1.1          0     1.090909         0.0         3    3.090909
+    1    0   1.0          4     5.000000         0.0         5    6.000000
+    2    0   1.0          5     6.000000         0.0         5    6.000000
+    3    1   1.1          0     5.909091         0.0         3    3.909091
+    4    1   1.0          4     2.000000         0.0         5    1.000000
+    5    1   1.0          5     1.000000         0.0         5    1.000000
+
+       exit_fees  pnl    return  direction  status  position_idx
+    0        0.0  2.2  1.833333          0       1             0
+    1        0.0  1.0  0.200000          0       1             1
+    2        0.0  0.0  0.000000          1       0             2
+    3        0.0  2.2  0.338462          1       1             0
+    4        0.0  1.0  0.500000          1       1             1
+    5        0.0  0.0  0.000000          0       0             2
+    ```
     """
     col_idxs, col_ns = col_map
     records = np.empty(trade_records.shape[0], dtype=trade_dt)

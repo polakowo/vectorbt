@@ -33,7 +33,7 @@ class ColumnMapper:
 
     @cached_method
     def get_col_arr(self, group_by=None):
-        """Group-aware column array."""
+        """Get group-aware column array."""
         group_arr = self.wrapper.grouper.get_groups(group_by=group_by)
         if group_arr is not None:
             col_arr = group_arr[self.col_arr]
@@ -51,7 +51,7 @@ class ColumnMapper:
 
     @cached_method
     def get_col_range(self, group_by=None):
-        """Group-aware column range."""
+        """Get group-aware column range."""
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.col_range
         col_arr = self.get_col_arr(group_by=group_by)
@@ -68,7 +68,7 @@ class ColumnMapper:
 
     @cached_method
     def get_col_map(self, group_by=None):
-        """Group-aware column map."""
+        """Get group-aware column map."""
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.col_map
         col_arr = self.get_col_arr(group_by=group_by)

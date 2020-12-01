@@ -97,18 +97,11 @@ h2[id^="header-"] {
 }
 
 pre code {
-    background: #f8f8f8;
-    line-height: 1.4em;
+    background: #f8f8f8
 }
 
-code {
-    background: #f2f2f1;
-    padding: 1px 4px;
-    overflow-wrap: break-word;
-}
-
-h1 code {
-    background: transparent
+.hljs {
+    padding: 1.25rem 1.5rem;
 }
 
 pre {
@@ -117,7 +110,17 @@ pre {
     border-top: 1px solid #ccc;
     border-bottom: 1px solid #ccc;
     margin: 1em 0;
-    padding: 1ex;
+}
+
+code {
+    background: #f2f2f1;
+    padding: 1px 4px;
+    overflow-wrap: break-word;
+    font-size: 95%;
+}
+
+h1 code {
+    background: transparent
 }
 
 #http-server-module-list {

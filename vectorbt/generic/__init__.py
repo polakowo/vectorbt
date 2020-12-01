@@ -73,3 +73,5 @@ from vectorbt.generic.drawdowns import Drawdowns
 __all__ = [
     'Drawdowns'
 ]
+
+__pdoc__ = {k: False for k in __all__}

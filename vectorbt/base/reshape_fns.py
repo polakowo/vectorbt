@@ -289,117 +289,118 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
 
     For defaults, see `vectorbt.defaults.broadcasting`.
 
-    Example:
-        Without broadcasting index and columns:
-        ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import broadcast
+    ## Example
 
-        >>> v = 0
-        >>> a = np.array([1, 2, 3])
-        >>> sr = pd.Series([1, 2, 3], index=pd.Index(['x', 'y', 'z']), name='a')
-        >>> df = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
-        ...     index=pd.Index(['x2', 'y2', 'z2']), 
-        ...     columns=pd.Index(['a2', 'b2', 'c2']))
+    Without broadcasting index and columns:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import broadcast
 
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from=None,
-        ...     columns_from=None,
-        ... ): print(i)
-           0  1  2
-        0  0  0  0
-        1  0  0  0
-        2  0  0  0
-           0  1  2
-        0  1  2  3
-        1  1  2  3
-        2  1  2  3
-           a  a  a
-        x  1  1  1
-        y  2  2  2
-        z  3  3  3
-            a2  b2  c2
-        x2   1   2   3
-        y2   4   5   6
-        z2   7   8   9
-        ```
+    >>> v = 0
+    >>> a = np.array([1, 2, 3])
+    >>> sr = pd.Series([1, 2, 3], index=pd.Index(['x', 'y', 'z']), name='a')
+    >>> df = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+    ...     index=pd.Index(['x2', 'y2', 'z2']),
+    ...     columns=pd.Index(['a2', 'b2', 'c2']))
 
-        Taking new index and columns from position:
-        ```python-repl
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from=2,
-        ...     columns_from=3
-        ... ): print(i)
-           a2  b2  c2
-        x   0   0   0
-        y   0   0   0
-        z   0   0   0
-           a2  b2  c2
-        x   1   2   3
-        y   1   2   3
-        z   1   2   3
-           a2  b2  c2
-        x   1   1   1
-        y   2   2   2
-        z   3   3   3
-           a2  b2  c2
-        x   1   2   3
-        y   4   5   6
-        z   7   8   9
-        ```
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from=None,
+    ...     columns_from=None,
+    ... ): print(i)
+       0  1  2
+    0  0  0  0
+    1  0  0  0
+    2  0  0  0
+       0  1  2
+    0  1  2  3
+    1  1  2  3
+    2  1  2  3
+       a  a  a
+    x  1  1  1
+    y  2  2  2
+    z  3  3  3
+        a2  b2  c2
+    x2   1   2   3
+    y2   4   5   6
+    z2   7   8   9
+    ```
 
-        Broadcasting index and columns through stacking:
-        ```python-repl
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from='stack',
-        ...     columns_from='stack'
-        ... ): print(i)
-              a2  b2  c2
-        x x2   0   0   0
-        y y2   0   0   0
-        z z2   0   0   0
-              a2  b2  c2
-        x x2   1   2   3
-        y y2   1   2   3
-        z z2   1   2   3
-              a2  b2  c2
-        x x2   1   1   1
-        y y2   2   2   2
-        z z2   3   3   3
-              a2  b2  c2
-        x x2   1   2   3
-        y y2   4   5   6
-        z z2   7   8   9
-        ```
+    Taking new index and columns from position:
+    ```python-repl
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from=2,
+    ...     columns_from=3
+    ... ): print(i)
+       a2  b2  c2
+    x   0   0   0
+    y   0   0   0
+    z   0   0   0
+       a2  b2  c2
+    x   1   2   3
+    y   1   2   3
+    z   1   2   3
+       a2  b2  c2
+    x   1   1   1
+    y   2   2   2
+    z   3   3   3
+       a2  b2  c2
+    x   1   2   3
+    y   4   5   6
+    z   7   8   9
+    ```
 
-        Setting index and columns manually:
-        ```python-repl
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from=['a', 'b', 'c'],
-        ...     columns_from=['d', 'e', 'f']
-        ... ): print(i)
-           d  e  f
-        a  0  0  0
-        b  0  0  0
-        c  0  0  0
-           d  e  f
-        a  1  2  3
-        b  1  2  3
-        c  1  2  3
-           d  e  f
-        a  1  1  1
-        b  2  2  2
-        c  3  3  3
-           d  e  f
-        a  1  2  3
-        b  4  5  6
-        c  7  8  9
-        ```
+    Broadcasting index and columns through stacking:
+    ```python-repl
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from='stack',
+    ...     columns_from='stack'
+    ... ): print(i)
+          a2  b2  c2
+    x x2   0   0   0
+    y y2   0   0   0
+    z z2   0   0   0
+          a2  b2  c2
+    x x2   1   2   3
+    y y2   1   2   3
+    z z2   1   2   3
+          a2  b2  c2
+    x x2   1   1   1
+    y y2   2   2   2
+    z z2   3   3   3
+          a2  b2  c2
+    x x2   1   2   3
+    y y2   4   5   6
+    z z2   7   8   9
+    ```
+
+    Setting index and columns manually:
+    ```python-repl
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from=['a', 'b', 'c'],
+    ...     columns_from=['d', 'e', 'f']
+    ... ): print(i)
+       d  e  f
+    a  0  0  0
+    b  0  0  0
+    c  0  0  0
+       d  e  f
+    a  1  2  3
+    b  1  2  3
+    c  1  2  3
+       d  e  f
+    a  1  1  1
+    b  2  2  2
+    c  3  3  3
+       d  e  f
+    a  1  2  3
+    b  4  5  6
+    c  7  8  9
+    ```
     """
     from vectorbt import defaults
 
@@ -542,24 +543,26 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
 
     Keyword arguments `**kwargs` are passed to `broadcast`.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import broadcast_to
+    ## Example
 
-        >>> a = np.array([1, 2, 3])
-        >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import broadcast_to
 
-        >>> broadcast_to(a, sr)
-        x    1
-        y    2
-        z    3
-        Name: a, dtype: int64
+    >>> a = np.array([1, 2, 3])
+    >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
 
-        >>> broadcast_to(sr, a)
-        array([4, 5, 6])
-        ```"""
+    >>> broadcast_to(a, sr)
+    x    1
+    y    2
+    z    3
+    Name: a, dtype: int64
+
+    >>> broadcast_to(sr, a)
+    array([4, 5, 6])
+    ```
+    """
     if not checks.is_array(arg1):
         arg1 = np.asarray(arg1)
     if not checks.is_array(arg2):
@@ -580,18 +583,20 @@ def broadcast_to_array_of(arg1, arg2):
 
     `arg1` must be either a scalar, a 1-dim array, or have 1 dimension more than `arg2`.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
+    ## Example
 
-        >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
-        [[[0.1 0.1]
-          [0.1 0.1]]
+    ```python-repl
+    >>> import numpy as np
+    >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
 
-         [[0.2 0.2]
-          [0.2 0.2]]]
-        ```"""
+    >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
+    [[[0.1 0.1]
+      [0.1 0.1]]
+
+     [[0.2 0.2]
+      [0.2 0.2]]]
+    ```
+    """
     arg1 = np.asarray(arg1)
     arg2 = np.asarray(arg2)
     if arg1.ndim == arg2.ndim + 1:
@@ -631,31 +636,33 @@ def unstack_to_array(arg, levels=None):
 
     Use `levels` to specify what index levels to unstack and in which order.
 
-    Example:
-        ```python-repl
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import unstack_to_array
+    ## Example
 
-        >>> index = pd.MultiIndex.from_arrays(
-        ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
-        >>> sr = pd.Series([1, 2, 3, 4], index=index)
+    ```python-repl
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import unstack_to_array
 
-        >>> unstack_to_array(sr).shape
-        (2, 2, 4)
+    >>> index = pd.MultiIndex.from_arrays(
+    ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
+    >>> sr = pd.Series([1, 2, 3, 4], index=index)
 
-        >>> unstack_to_array(sr)
-        [[[ 1. nan nan nan]
-         [nan  2. nan nan]]
+    >>> unstack_to_array(sr).shape
+    (2, 2, 4)
 
-         [[nan nan  3. nan]
-        [nan nan nan  4.]]]
+    >>> unstack_to_array(sr)
+    [[[ 1. nan nan nan]
+     [nan  2. nan nan]]
 
-        >>> unstack_to_array(sr, levels=(2, 0))
-        [[ 1. nan]
-         [ 2. nan]
-         [nan  3.]
-         [nan  4.]]
-        ```"""
+     [[nan nan  3. nan]
+    [nan nan nan  4.]]]
+
+    >>> unstack_to_array(sr, levels=(2, 0))
+    [[ 1. nan]
+     [ 2. nan]
+     [nan  3.]
+     [nan  4.]]
+    ```
+    """
     checks.assert_type(arg, pd.Series)
     checks.assert_type(arg.index, pd.MultiIndex)
 
@@ -683,20 +690,22 @@ def make_symmetric(arg):
 
     Requires the index and columns to have the same number of levels.
 
-    Example:
-        ```python-repl
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import make_symmetric
+    ## Example
 
-        >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
+    ```python-repl
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import make_symmetric
 
-        >>> make_symmetric(df)
-             a    b    c    d
-        a  NaN  NaN  1.0  2.0
-        b  NaN  NaN  3.0  4.0
-        c  1.0  3.0  NaN  NaN
-        d  2.0  4.0  NaN  NaN
-        ```"""
+    >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
+
+    >>> make_symmetric(df)
+         a    b    c    d
+    a  NaN  NaN  1.0  2.0
+    b  NaN  NaN  3.0  4.0
+    c  1.0  3.0  NaN  NaN
+    d  2.0  4.0  NaN  NaN
+    ```
+    """
     checks.assert_type(arg, (pd.Series, pd.DataFrame))
     arg = to_2d(arg)
     if isinstance(arg.index, pd.MultiIndex) or isinstance(arg.columns, pd.MultiIndex):
@@ -736,24 +745,26 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     Use `index_levels` to specify what index levels will form new index, and `column_levels` 
     for new columns. Set `symmetric` to True to make DataFrame symmetric.
 
-    Example:
-        ```python-repl
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import unstack_to_df
+    ## Example
 
-        >>> index = pd.MultiIndex.from_arrays(
-        ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']], 
-        ...     names=['x', 'y', 'z'])
-        >>> sr = pd.Series([1, 2, 3, 4], index=index)
+    ```python-repl
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import unstack_to_df
 
-        >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
-        z      a    b    c    d
-        x y                    
-        1 3  1.0  NaN  NaN  NaN
-        1 4  NaN  2.0  NaN  NaN
-        2 3  NaN  NaN  3.0  NaN
-        2 4  NaN  NaN  NaN  4.0
-        ```"""
+    >>> index = pd.MultiIndex.from_arrays(
+    ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']],
+    ...     names=['x', 'y', 'z'])
+    >>> sr = pd.Series([1, 2, 3, 4], index=index)
+
+    >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
+    z      a    b    c    d
+    x y
+    1 3  1.0  NaN  NaN  NaN
+    1 4  NaN  2.0  NaN  NaN
+    2 3  NaN  NaN  3.0  NaN
+    2 4  NaN  NaN  NaN  4.0
+    ```
+    """
     # Perform checks
     checks.assert_type(arg, (pd.Series, pd.DataFrame))
     if checks.is_frame(arg):

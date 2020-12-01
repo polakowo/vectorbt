@@ -1108,28 +1108,30 @@ def describe_reduce_nb(col, a, perc, ddof, *args):
 def find_drawdowns_nb(ts):
     """Find drawdows and store their information as records to an array.
 
-        Example:
-            Find drawdowns in time series:
-            ```python-repl
-            >>> import numpy as np
-            >>> import pandas as pd
-            >>> from vectorbt.generic.nb import find_drawdowns_nb
+    ## Example
 
-            >>> ts = np.asarray([
-            ...     [1, 5, 1, 3],
-            ...     [2, 4, 2, 2],
-            ...     [3, 3, 3, 1],
-            ...     [4, 2, 2, 2],
-            ...     [5, 1, 1, 3]
-            ... ])
-            >>> records = find_drawdowns_nb(ts)
+    Find drawdowns in time series:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.generic.nb import find_drawdowns_nb
 
-            >>> pd.DataFrame.from_records(records)
-               col  start_idx  valley_idx  end_idx  status
-            0    1          0           4        4       0
-            1    2          2           4        4       0
-            2    3          0           2        4       1
-            ```"""
+    >>> ts = np.asarray([
+    ...     [1, 5, 1, 3],
+    ...     [2, 4, 2, 2],
+    ...     [3, 3, 3, 1],
+    ...     [4, 2, 2, 2],
+    ...     [5, 1, 1, 3]
+    ... ])
+    >>> records = find_drawdowns_nb(ts)
+
+    >>> pd.DataFrame.from_records(records)
+       col  start_idx  valley_idx  end_idx  status
+    0    1          0           4        4       0
+    1    2          2           4        4       0
+    2    3          0           2        4       1
+    ```
+    """
     out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
     j = 0
 

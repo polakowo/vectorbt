@@ -361,23 +361,6 @@ __pdoc__['OrderSide'] = f"""Order side.
 ```
 """
 
-status_info_desc = [
-    "Size is NaN",
-    "Price is NaN",
-    "Asset valuation price is NaN",
-    "Asset/group value is NaN",
-    "Asset/group value is zero or negative",
-    "Size is zero",
-    "Not enough cash to short",
-    "Not enough cash to long",
-    "No open position to reduce/close",
-    "Size is greater than maximum allowed",
-    "Random event happened",
-    "Not enough cash to cover fees",
-    "Final size is less than minimum allowed",
-    "Final size is less than requested"
-]
-
 StatusInfo = namedtuple('StatusInfo', [
     'SizeNaN',
     'PriceNaN',
@@ -399,7 +382,32 @@ StatusInfo = namedtuple('StatusInfo', [
 __pdoc__['StatusInfo'] = f"""Order status information.
 
 ```plaintext
-{json.dumps(dict(zip(StatusInfo._fields, zip(StatusInfo, status_info_desc))), indent=2)}
+{json.dumps(dict(zip(StatusInfo._fields, StatusInfo)), indent=2)}
+```
+"""
+
+status_info_desc = [
+    "Size is NaN",
+    "Price is NaN",
+    "Asset valuation price is NaN",
+    "Asset/group value is NaN",
+    "Asset/group value is zero or negative",
+    "Size is zero",
+    "Not enough cash to short",
+    "Not enough cash to long",
+    "No open position to reduce/close",
+    "Size is greater than maximum allowed",
+    "Random event happened",
+    "Not enough cash to cover fees",
+    "Final size is less than minimum allowed",
+    "Final size is less than requested"
+]
+"""_"""
+
+__pdoc__['status_info_desc'] = f"""Order status description.
+
+```plaintext
+{json.dumps(status_info_desc, indent=2)}
 ```
 """
 

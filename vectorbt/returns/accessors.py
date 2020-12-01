@@ -298,7 +298,43 @@ class Returns_Accessor(Generic_Accessor):
             risk_free (float or array_like): Constant risk-free return throughout the period.
                 Will broadcast per column.
             required_return (float or array_like): Minimum acceptance return of the investor.
-                Will broadcast per column."""
+                Will broadcast per column.
+
+        ## Example
+
+        ```python-repl
+        >>> import pandas as pd
+        >>> from datetime import datetime
+        >>> import yfinance as yf
+        >>> import vectorbt as vbt
+
+        >>> btc_price = yf.Ticker("BTC-USD").history()['Close']
+        >>> spy_price = yf.Ticker("SPY").history()['Close']
+        >>> price_df = pd.concat([btc_price, spy_price], axis=1, keys=("BTC-USD", "SPY"))
+        >>> returns_df = price_df.pct_change()
+        >>> returns_df["BTC-USD"].vbt.returns.stats(returns_df["SPY"])
+        Start                    2020-11-01 00:00:00
+        End                      2020-12-01 00:00:00
+        Duration                    31 days 00:00:00
+        Total Return [%]                     37.9835
+        Benchmark Return [%]                 10.7935
+        Annual Return [%]                    4329.46
+        Annual Volatility [%]                71.5084
+        Sharpe Ratio                         5.84964
+        Calmar Ratio                         413.819
+        Max. Drawdown [%]                   -10.4622
+        Omega Ratio                          2.36607
+        Sortino Ratio                        11.0962
+        Skew                                0.036609
+        Kurtosis                             1.04302
+        Tail Ratio                           1.66878
+        Common Sense Ratio                   73.9178
+        Value at Risk                     -0.0412519
+        Alpha                                43.0408
+        Beta                                0.531022
+        Name: BTC-USD, dtype: object
+        ```
+        """
         # Run stats
         benchmark_rets = reshape_fns.broadcast_to(benchmark_rets, self._obj)
         stats_df = pd.DataFrame({
@@ -363,18 +399,20 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        Example:
-            ```python-repl
-            >>> import pandas as pd
-            >>> import numpy as np
+        ## Example
 
-            >>> np.random.seed(20)
-            >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-            >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-            >>> rets.vbt.returns.plot_cum_returns(rets, benchmark_rets=benchmark_rets)
-            ```
+        ```python-repl
+        >>> import pandas as pd
+        >>> import numpy as np
 
-            ![](/vectorbt/docs/img/plot_cum_returns.png)"""
+        >>> np.random.seed(20)
+        >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+        >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
+        >>> rets.vbt.returns.plot_cum_returns(rets, benchmark_rets=benchmark_rets)
+        ```
+
+        ![](/vectorbt/docs/img/plot_cum_returns.png)
+        """
         from vectorbt.defaults import color_schema
 
         if fig is None:

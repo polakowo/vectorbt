@@ -41,15 +41,18 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             bar_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> import vectorbt as vbt
-            >>> import yfinance as yf
 
-            >>> yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/ohlcv.png)"""
+        ```python-repl
+        >>> import vectorbt as vbt
+        >>> import yfinance as yf
+
+        >>> yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
+        ```
+
+        ![](/vectorbt/docs/img/ohlcv.png)
+        """
         from vectorbt import defaults
 
         column_names = defaults.ohlcv['column_names'] if self._column_names is None else self._column_names

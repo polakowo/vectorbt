@@ -38,87 +38,88 @@ class Trades(Records):
     price being a size-weighted average over all purchase prices, and opening size and fees being
     the sum over all sizes and fees.
 
-    Example:
-        Increasing position:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
+    ## Example
 
-        >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1., 2., 3., 4., 5.]),
-        ...     pd.Series([1., 1., 1., 1., -4.]),
-        ...     fixed_fees=1.).trades().records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0    0   4.0          0          2.5         4.0         4         5.0
+    Increasing position:
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import pandas as pd
 
-           exit_fees  pnl  return  direction  status  position_idx
-        0        1.0  5.0     0.5          0       1             0
-        ```
+    >>> vbt.Portfolio.from_orders(
+    ...     pd.Series([1., 2., 3., 4., 5.]),
+    ...     pd.Series([1., 1., 1., 1., -4.]),
+    ...     fixed_fees=1.).trades().records
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   4.0          0          2.5         4.0         4         5.0
 
-        Decreasing position:
-        ```python-repl
-        >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1., 2., 3., 4., 5.]),
-        ...     pd.Series([4., -1., -1., -1., -1.]),
-        ...     fixed_fees=1.).trades().records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0    0   1.0          0          1.0        0.25         1         2.0
-        1    0   1.0          0          1.0        0.25         2         3.0
-        2    0   1.0          0          1.0        0.25         3         4.0
-        3    0   1.0          0          1.0        0.25         4         5.0
+       exit_fees  pnl  return  direction  status  position_idx
+    0        1.0  5.0     0.5          0       1             0
+    ```
 
-           exit_fees   pnl  return  direction  status  position_idx
-        0        1.0 -0.25   -0.25          0       1             0
-        1        1.0  0.75    0.75          0       1             0
-        2        1.0  1.75    1.75          0       1             0
-        3        1.0  2.75    2.75          0       1             0
-        ```
+    Decreasing position:
+    ```python-repl
+    >>> vbt.Portfolio.from_orders(
+    ...     pd.Series([1., 2., 3., 4., 5.]),
+    ...     pd.Series([4., -1., -1., -1., -1.]),
+    ...     fixed_fees=1.).trades().records
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   1.0          0          1.0        0.25         1         2.0
+    1    0   1.0          0          1.0        0.25         2         3.0
+    2    0   1.0          0          1.0        0.25         3         4.0
+    3    0   1.0          0          1.0        0.25         4         5.0
 
-        Multiple reversing positions:
-        ```python-repl
-        >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1., 2., 3., 4., 5.]),
-        ...     pd.Series([1., -2., 2., -2., 1.]),
-        ...     fixed_fees=1.).trades().records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0    0   1.0          0          1.0         1.0         1         2.0
-        1    0   1.0          1          2.0         0.5         2         3.0
-        2    0   1.0          2          3.0         0.5         3         4.0
-        3    0   1.0          3          4.0         0.5         4         5.0
+       exit_fees   pnl  return  direction  status  position_idx
+    0        1.0 -0.25   -0.25          0       1             0
+    1        1.0  0.75    0.75          0       1             0
+    2        1.0  1.75    1.75          0       1             0
+    3        1.0  2.75    2.75          0       1             0
+    ```
 
-           exit_fees  pnl  return  direction  status  position_idx
-        0        0.5 -0.5  -0.500          0       1             0
-        1        0.5 -2.0  -1.000          1       1             1
-        2        0.5  0.0   0.000          0       1             2
-        3        1.0 -2.5  -0.625          1       1             3
-        ```
+    Multiple reversing positions:
+    ```python-repl
+    >>> vbt.Portfolio.from_orders(
+    ...     pd.Series([1., 2., 3., 4., 5.]),
+    ...     pd.Series([1., -2., 2., -2., 1.]),
+    ...     fixed_fees=1.).trades().records
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   1.0          0          1.0         1.0         1         2.0
+    1    0   1.0          1          2.0         0.5         2         3.0
+    2    0   1.0          2          3.0         0.5         3         4.0
+    3    0   1.0          3          4.0         0.5         4         5.0
 
-        Get count and PnL of trades:
-        ```python-repl
-        >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
-        >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-        >>> portfolio = vbt.Portfolio.from_orders(price, orders)
+       exit_fees  pnl  return  direction  status  position_idx
+    0        0.5 -0.5  -0.500          0       1             0
+    1        0.5 -2.0  -1.000          1       1             1
+    2        0.5  0.0   0.000          0       1             2
+    3        1.0 -2.5  -0.625          1       1             3
+    ```
 
-        >>> trades = vbt.Trades.from_orders(portfolio.orders())
-        >>> trades.count()
-        6
-        >>> trades.pnl.sum()
-        -3.0
-        >>> trades.winning.count()
-        2
-        >>> trades.winning.pnl.sum()
-        1.5
-        ```
+    Get count and PnL of trades:
+    ```python-repl
+    >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
+    >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
+    >>> portfolio = vbt.Portfolio.from_orders(price, orders)
 
-        Get count and PnL of trades with duration of more than 2 days:
-        ```python-repl
-        >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
-        >>> trades_filtered = trades.filter_by_mask(mask)
-        >>> trades_filtered.count()
-        2
-        >>> trades_filtered.pnl.sum()
-        -3.0
-        ```
+    >>> trades = vbt.Trades.from_orders(portfolio.orders())
+    >>> trades.count()
+    6
+    >>> trades.pnl.sum()
+    -3.0
+    >>> trades.winning.count()
+    2
+    >>> trades.winning.pnl.sum()
+    1.5
+    ```
+
+    Get count and PnL of trades with duration of more than 2 days:
+    ```python-repl
+    >>> mask = (trades.records['exit_idx'] - trades.records['entry_idx']) > 2
+    >>> trades_filtered = trades.filter_by_mask(mask)
+    >>> trades_filtered.count()
+    2
+    >>> trades_filtered.pnl.sum()
+    -3.0
+    ```
     """
 
     def __init__(self, wrapper, records_arr, close, idx_field='exit_idx', **kwargs):
@@ -367,12 +368,15 @@ class Trades(Records):
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> trades.plot_pnl()
-            ```
 
-            ![](/vectorbt/docs/img/trades_plot_pnl.png)"""
+        ## Example
+
+        ```python-repl
+        >>> trades.plot_pnl()
+        ```
+
+        ![](/vectorbt/docs/img/trades_plot_pnl.png)
+        """
         from vectorbt.defaults import contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
@@ -537,12 +541,14 @@ class Trades(Records):
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> trades.plot()
-            ```
 
-            ![](/vectorbt/docs/img/trades_plot.png)"""
+        ## Example
+
+        ```python-repl
+        >>> trades.plot()
+        ```
+
+        ![](/vectorbt/docs/img/trades_plot.png)"""
         from vectorbt.defaults import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
@@ -755,54 +761,55 @@ class Positions(Trades):
     In vectorbt, a position aggregates one or multiple trades sharing the same column
     and position index. It has the same layout as a trade.
 
-    Example:
-        Increasing position:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
+    ## Example
 
-        >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1., 2., 3., 4., 5.]),
-        ...     pd.Series([1., 1., 1., 1., -4.]),
-        ...     fixed_fees=1.).positions().records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0    0   4.0          0          2.5         4.0         4         5.0
+    Increasing position:
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import pandas as pd
 
-           exit_fees  pnl  return  direction  status  position_idx
-        0        1.0  5.0     0.5          0       1             0
-        ```
+    >>> vbt.Portfolio.from_orders(
+    ...     pd.Series([1., 2., 3., 4., 5.]),
+    ...     pd.Series([1., 1., 1., 1., -4.]),
+    ...     fixed_fees=1.).positions().records
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   4.0          0          2.5         4.0         4         5.0
 
-        Decreasing position:
-        ```python-repl
-        >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1., 2., 3., 4., 5.]),
-        ...     pd.Series([4., -1., -1., -1., -1.]),
-        ...     fixed_fees=1.).positions().records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0    0   4.0          0          1.0         1.0         4         3.5
+       exit_fees  pnl  return  direction  status  position_idx
+    0        1.0  5.0     0.5          0       1             0
+    ```
 
-           exit_fees  pnl  return  direction  status  position_idx
-        0        4.0  5.0    1.25          0       1             0
-        ```
+    Decreasing position:
+    ```python-repl
+    >>> vbt.Portfolio.from_orders(
+    ...     pd.Series([1., 2., 3., 4., 5.]),
+    ...     pd.Series([4., -1., -1., -1., -1.]),
+    ...     fixed_fees=1.).positions().records
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   4.0          0          1.0         1.0         4         3.5
 
-        Multiple positions:
-        ```python-repl
-        >>> vbt.Portfolio.from_orders(
-        ...     pd.Series([1., 2., 3., 4., 5.]),
-        ...     pd.Series([1., -2., 2., -2., 1.]),
-        ...     fixed_fees=1.).positions().records
-           col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-        0    0   1.0          0          1.0         1.0         1         2.0
-        1    0   1.0          1          2.0         0.5         2         3.0
-        2    0   1.0          2          3.0         0.5         3         4.0
-        3    0   1.0          3          4.0         0.5         4         5.0
+       exit_fees  pnl  return  direction  status  position_idx
+    0        4.0  5.0    1.25          0       1             0
+    ```
 
-           exit_fees  pnl  return  direction  status  position_idx
-        0        0.5 -0.5  -0.500          0       1             0
-        1        0.5 -2.0  -1.000          1       1             1
-        2        0.5  0.0   0.000          0       1             2
-        3        1.0 -2.5  -0.625          1       1             3
-        ```
+    Multiple positions:
+    ```python-repl
+    >>> vbt.Portfolio.from_orders(
+    ...     pd.Series([1., 2., 3., 4., 5.]),
+    ...     pd.Series([1., -2., 2., -2., 1.]),
+    ...     fixed_fees=1.).positions().records
+       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0    0   1.0          0          1.0         1.0         1         2.0
+    1    0   1.0          1          2.0         0.5         2         3.0
+    2    0   1.0          2          3.0         0.5         3         4.0
+    3    0   1.0          3          4.0         0.5         4         5.0
+
+       exit_fees  pnl  return  direction  status  position_idx
+    0        0.5 -0.5  -0.500          0       1             0
+    1        0.5 -2.0  -1.000          1       1             1
+    2        0.5  0.0   0.000          0       1             2
+    3        1.0 -2.5  -0.625          1       1             3
+    ```
     """
 
     trade_type = TradeType.Position

@@ -69,63 +69,69 @@ class RAND(RAND):
         Parameter `n` can be either a single value (per frame) or a NumPy array (per column).
         To generate multiple combinations, pass it as a list.
 
-    Example:
-        Test three different `n` values:
-        ```python-repl
-        >>> import vectorbt as vbt
+    ## Example
 
-        >>> rand = vbt.RAND.run(
-        ...     n=[1, 2, 3], input_shape=(6,), seed=42
-        ... )
-        >>> rand.entries
-        rand_n      1      2      3
-        0        True   True   True
-        1       False  False  False
-        2       False   True   True
-        3       False  False  False
-        4       False  False   True
-        5       False  False  False
-        >>> rand.exits
-        rand_n      1      2      3
-        0       False  False  False
-        1        True   True   True
-        2       False  False  False
-        3       False   True   True
-        4       False  False  False
-        5       False  False   True
-        ```
+    Test three different `n` values:
+    ```python-repl
+    >>> import vectorbt as vbt
 
-        `n` can also be set per column:
-        ```python-repl
-        >>> import numpy as np
+    >>> rand = vbt.RAND.run(
+    ...     n=[1, 2, 3], input_shape=(6,), seed=42
+    ... )
 
-        >>> rand = vbt.RAND.run(
-        ...     n=[np.array([1, 2]), np.array([3, 4])],
-        ...     input_shape=(8, 2), seed=42
-        ... )
-        >>> rand.entries
-        rand_n         mix_0         mix_1
-                    0      1      0      1
-        0       False   True   True   True
-        1        True  False  False  False
-        2       False  False  False   True
-        3       False  False   True  False
-        4       False   True  False   True
-        5       False  False   True  False
-        6       False  False  False   True
-        7       False  False  False  False
-        >>> rand.exits
-        rand_n         mix_0         mix_1
-                    0      1      0      1
-        0       False  False  False  False
-        1       False  False   True   True
-        2       False  False  False  False
-        3       False   True  False   True
-        4       False  False   True  False
-        5        True  False  False   True
-        6       False  False   True  False
-        7       False   True  False   True
-        ```"""
+    >>> rand.entries
+    rand_n      1      2      3
+    0        True   True   True
+    1       False  False  False
+    2       False   True   True
+    3       False  False  False
+    4       False  False   True
+    5       False  False  False
+
+    >>> rand.exits
+    rand_n      1      2      3
+    0       False  False  False
+    1        True   True   True
+    2       False  False  False
+    3       False   True   True
+    4       False  False  False
+    5       False  False   True
+    ```
+
+    `n` can also be set per column:
+    ```python-repl
+    >>> import numpy as np
+
+    >>> rand = vbt.RAND.run(
+    ...     n=[np.array([1, 2]), np.array([3, 4])],
+    ...     input_shape=(8, 2), seed=42
+    ... )
+
+    >>> rand.entries
+    rand_n         mix_0         mix_1
+                0      1      0      1
+    0       False   True   True   True
+    1        True  False  False  False
+    2       False  False  False   True
+    3       False  False   True  False
+    4       False   True  False   True
+    5       False  False   True  False
+    6       False  False  False   True
+    7       False  False  False  False
+
+    >>> rand.exits
+    rand_n         mix_0         mix_1
+                0      1      0      1
+    0       False  False  False  False
+    1       False  False   True   True
+    2       False  False  False  False
+    3       False   True  False   True
+    4       False  False   True  False
+    5        True  False  False   True
+    6       False  False   True  False
+    7       False   True  False   True
+    ```
+    """
     pass
 
 
@@ -165,62 +171,66 @@ class RPROB(RPROB):
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists.
 
-    Example:
-        Test all probability combinations:
-        ```python-repl
-        >>> import vectorbt as vbt
+    ## Example
 
-        >>> rprob = vbt.RPROB.run(
-        ...     entry_prob=[0.5, 1.], exit_prob=[0.5, 1.],
-        ...     input_shape=(5,), param_product=True, seed=42
-        ... )
+    Test all probability combinations:
+    ```python-repl
+    >>> import vectorbt as vbt
 
-        >>> rprob.entries
-        rprob_entry_prob           0.5           1.0
-        rprob_exit_prob     0.5    1.0    0.5    1.0
-        0                  True   True   True   True
-        1                 False  False  False  False
-        2                 False  False  False   True
-        3                 False  False  False  False
-        4                 False  False   True   True
-        >>> rprob.exits
-        rprob_entry_prob           0.5           1.0
-        rprob_exit_prob     0.5    1.0    0.5    1.0
-        0                 False  False  False  False
-        1                 False   True  False   True
-        2                 False  False  False  False
-        3                 False  False   True   True
-        4                  True  False  False  False
-        ```
+    >>> rprob = vbt.RPROB.run(
+    ...     entry_prob=[0.5, 1.], exit_prob=[0.5, 1.],
+    ...     input_shape=(5,), param_product=True, seed=42
+    ... )
 
-        `entry_prob` and `exit_prob` can also be set per row, column, or element:
-        ```python-repl
-        >>> import numpy as np
+    >>> rprob.entries
+    rprob_entry_prob           0.5           1.0
+    rprob_exit_prob     0.5    1.0    0.5    1.0
+    0                  True   True   True   True
+    1                 False  False  False  False
+    2                 False  False  False   True
+    3                 False  False  False  False
+    4                 False  False   True   True
 
-        >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
-        >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
-        >>> rprob = vbt.RPROB.run(
-        ...     entry_prob=[entry_prob1, entry_prob2], exit_prob=1.,
-        ...     input_shape=(5,), seed=42
-        ... )
+    >>> rprob.exits
+    rprob_entry_prob           0.5           1.0
+    rprob_exit_prob     0.5    1.0    0.5    1.0
+    0                 False  False  False  False
+    1                 False   True  False   True
+    2                 False  False  False  False
+    3                 False  False   True   True
+    4                  True  False  False  False
+    ```
 
-        >>> rprob.entries
-        rprob_entry_prob  mix_0  mix_1
-        rprob_exit_prob     1.0    1.0
-        0                  True  False
-        1                 False   True
-        2                  True  False
-        3                 False   True
-        4                  True  False
-        >>> rprob.exits
-        rprob_entry_prob  mix_0  mix_1
-        rprob_exit_prob     1.0    1.0
-        0                 False  False
-        1                  True  False
-        2                 False   True
-        3                  True  False
-        4                 False   True
-        ```"""
+    `entry_prob` and `exit_prob` can also be set per row, column, or element:
+    ```python-repl
+    >>> import numpy as np
+
+    >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
+    >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
+    >>> rprob = vbt.RPROB.run(
+    ...     entry_prob=[entry_prob1, entry_prob2], exit_prob=1.,
+    ...     input_shape=(5,), seed=42
+    ... )
+
+    >>> rprob.entries
+    rprob_entry_prob  mix_0  mix_1
+    rprob_exit_prob     1.0    1.0
+    0                  True  False
+    1                 False   True
+    2                  True  False
+    3                 False   True
+    4                  True  False
+
+    >>> rprob.exits
+    rprob_entry_prob  mix_0  mix_1
+    rprob_exit_prob     1.0    1.0
+    0                 False  False
+    1                  True  False
+    2                 False   True
+    3                  True  False
+    4                 False   True
+    ```
+    """
     pass
 
 
@@ -502,12 +512,14 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
 
     if entries_attr == 'entries':
         plot.__doc__ += """
-    Example:
-        ```python-repl
-        >>> advstex.iloc[:, 0].plot()
-        ```
+    ## Example
         
-        ![](/vectorbt/docs/img/advstex.png)"""
+    ```python-repl
+    >>> advstex.iloc[:, 0].plot()
+    ```
+    
+    ![](/vectorbt/docs/img/advstex.png)
+    """
     return plot
 
 
@@ -520,61 +532,66 @@ class ADVSTEX(ADVSTEX):
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
         or element). To generate multiple combinations, pass them as lists.
 
-    Example:
-        Test each stop type individually:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
+    ## Example
 
-        >>> entries = pd.Series([True, False, False, False, False])
-        >>> price = pd.DataFrame({
-        ...     'open': [10, 11, 12, 11, 10],
-        ...     'high': [11, 12, 13, 12, 11],
-        ...     'low': [9, 10, 11, 10, 9],
-        ...     'close': [10, 11, 12, 11, 10]
-        ... })
-        >>> advstex = vbt.ADVSTEX.run(
-        ...     entries, price['open'], price['high'], price['low'], price['close'],
-        ...     sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
-        ... )
+    Test each stop type individually:
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import pandas as pd
 
-        >>> advstex.entries
-        advstex_sl_stop    0.1    0.0    0.0
-        advstex_ts_stop    0.0    0.1    0.0
-        advstex_tp_stop    0.0    0.0    0.1
-        0                 True   True   True
-        1                False  False  False
-        2                False  False  False
-        3                False  False  False
-        4                False  False  False
-        >>> advstex.exits
-        advstex_sl_stop    0.1    0.0    0.0
-        advstex_ts_stop    0.0    0.1    0.0
-        advstex_tp_stop    0.0    0.0    0.1
-        0                False  False  False
-        1                False  False   True
-        2                False  False  False
-        3                False   True  False
-        4                 True  False  False
-        >>> advstex.hit_price
-        advstex_sl_stop  0.1   0.0   0.0
-        advstex_ts_stop  0.0   0.1   0.0
-        advstex_tp_stop  0.0   0.0   0.1
-        0                NaN   NaN   NaN
-        1                NaN   NaN  11.0
-        2                NaN   NaN   NaN
-        3                NaN  11.7   NaN
-        4                9.0   NaN   NaN
-        >>> advstex.stop_type_readable
-        advstex_sl_stop       0.1        0.0         0.0
-        advstex_ts_stop       0.0        0.1         0.0
-        advstex_tp_stop       0.0        0.0         0.1
-        0
-        1                                     TakeProfit
-        2
-        3                          TrailStop
-        4                StopLoss
-        ```"""
+    >>> entries = pd.Series([True, False, False, False, False])
+    >>> price = pd.DataFrame({
+    ...     'open': [10, 11, 12, 11, 10],
+    ...     'high': [11, 12, 13, 12, 11],
+    ...     'low': [9, 10, 11, 10, 9],
+    ...     'close': [10, 11, 12, 11, 10]
+    ... })
+    >>> advstex = vbt.ADVSTEX.run(
+    ...     entries, price['open'], price['high'], price['low'], price['close'],
+    ...     sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
+    ... )
+
+    >>> advstex.entries
+    advstex_sl_stop    0.1    0.0    0.0
+    advstex_ts_stop    0.0    0.1    0.0
+    advstex_tp_stop    0.0    0.0    0.1
+    0                 True   True   True
+    1                False  False  False
+    2                False  False  False
+    3                False  False  False
+    4                False  False  False
+
+    >>> advstex.exits
+    advstex_sl_stop    0.1    0.0    0.0
+    advstex_ts_stop    0.0    0.1    0.0
+    advstex_tp_stop    0.0    0.0    0.1
+    0                False  False  False
+    1                False  False   True
+    2                False  False  False
+    3                False   True  False
+    4                 True  False  False
+
+    >>> advstex.hit_price
+    advstex_sl_stop  0.1   0.0   0.0
+    advstex_ts_stop  0.0   0.1   0.0
+    advstex_tp_stop  0.0   0.0   0.1
+    0                NaN   NaN   NaN
+    1                NaN   NaN  11.0
+    2                NaN   NaN   NaN
+    3                NaN  11.7   NaN
+    4                9.0   NaN   NaN
+
+    >>> advstex.stop_type_readable
+    advstex_sl_stop       0.1        0.0         0.0
+    advstex_ts_stop       0.0        0.1         0.0
+    advstex_tp_stop       0.0        0.0         0.1
+    0
+    1                                     TakeProfit
+    2
+    3                          TrailStop
+    4                StopLoss
+    ```
+    """
 
     plot = _generate_advstex_plot(ADVSTEX, 'entries')
 

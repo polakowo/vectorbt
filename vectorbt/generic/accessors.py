@@ -135,40 +135,45 @@ class Generic_Accessor(Base_Accessor):
             The datetime-like format of the index will be lost as result of this operation.
             Make sure to store the index metadata such as frequency information beforehand.
 
-        Example:
-            ```python-repl
-            >>> df.vbt.split_into_ranges(n=2)
-                                            a                     b                     c
-            range_start 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
-            range_end   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
-            0                  1.0        4.0        5.0        2.0        1.0        2.0
-            1                  2.0        5.0        4.0        1.0        2.0        1.0
-            >>> df.vbt.split_into_ranges(range_len=4)
-                                            a                     b                     c
-            range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
-            range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
-            0                  1.0        2.0        5.0        4.0        1.0        2.0
-            1                  2.0        3.0        4.0        3.0        2.0        3.0
-            2                  3.0        4.0        3.0        2.0        3.0        2.0
-            3                  4.0        5.0        2.0        1.0        2.0        1.0
-            >>> df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[4, 5])
-                                            a                     b                     c
-            range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
-            range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
-            0                    1          2          5          4          1          2
-            1                    2          3          4          3          2          3
-            2                    3          4          3          2          3          2
-            3                    4          5          2          1          2          1
-            >>> df.vbt.split_into_ranges(
-            ...     start_idxs=pd.Index(['2020-01-01', '2020-01-03']),
-            ...     end_idxs=pd.Index(['2020-01-02', '2020-01-04'])
-            ... )
-                                            a                     b                     c
-            range_start 2020-01-01 2020-01-03 2020-01-01 2020-01-03 2020-01-01 2020-01-03
-            range_end   2020-01-02 2020-01-04 2020-01-02 2020-01-04 2020-01-02 2020-01-04
-            0                    1          3          5          3          1          3
-            1                    2          4          4          2          2          2
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> df.vbt.split_into_ranges(n=2)
+                                        a                     b                     c
+        range_start 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
+        range_end   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
+        0                  1.0        4.0        5.0        2.0        1.0        2.0
+        1                  2.0        5.0        4.0        1.0        2.0        1.0
+
+        >>> df.vbt.split_into_ranges(range_len=4)
+                                        a                     b                     c
+        range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
+        range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
+        0                  1.0        2.0        5.0        4.0        1.0        2.0
+        1                  2.0        3.0        4.0        3.0        2.0        3.0
+        2                  3.0        4.0        3.0        2.0        3.0        2.0
+        3                  4.0        5.0        2.0        1.0        2.0        1.0
+
+        >>> df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[4, 5])
+                                        a                     b                     c
+        range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
+        range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
+        0                    1          2          5          4          1          2
+        1                    2          3          4          3          2          3
+        2                    3          4          3          2          3          2
+        3                    4          5          2          1          2          1
+
+        >>> df.vbt.split_into_ranges(
+        ...     start_idxs=pd.Index(['2020-01-01', '2020-01-03']),
+        ...     end_idxs=pd.Index(['2020-01-02', '2020-01-04'])
+        ... )
+                                        a                     b                     c
+        range_start 2020-01-01 2020-01-03 2020-01-01 2020-01-03 2020-01-01 2020-01-03
+        range_end   2020-01-02 2020-01-04 2020-01-02 2020-01-04 2020-01-02 2020-01-04
+        0                    1          3          5          3          1          3
+        1                    2          4          4          2          2          2
+        ```
+        """
         if start_idxs is None and end_idxs is None:
             if range_len is None and n is None:
                 raise ValueError("At least range_len, n, or start_idxs and end_idxs must be set")
@@ -208,25 +213,28 @@ class Generic_Accessor(Base_Accessor):
         """See `vectorbt.generic.nb.rolling_apply_nb` and
         `vectorbt.generic.nb.rolling_apply_matrix_nb` for `on_matrix=True`.
 
-        Example:
-            ```python-repl
-            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-            >>> df.vbt.rolling_apply(3, mean_nb)
-                          a    b         c
-            2020-01-01  1.0  5.0  1.000000
-            2020-01-02  1.5  4.5  1.500000
-            2020-01-03  2.0  4.0  2.000000
-            2020-01-04  3.0  3.0  2.333333
-            2020-01-05  4.0  2.0  2.000000
-            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True)
-                               a         b         c
-            2020-01-01  2.333333  2.333333  2.333333
-            2020-01-02  2.500000  2.500000  2.500000
-            2020-01-03  2.666667  2.666667  2.666667
-            2020-01-04  2.777778  2.777778  2.777778
-            2020-01-05  2.666667  2.666667  2.666667
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+        >>> df.vbt.rolling_apply(3, mean_nb)
+                      a    b         c
+        2020-01-01  1.0  5.0  1.000000
+        2020-01-02  1.5  4.5  1.500000
+        2020-01-03  2.0  4.0  2.000000
+        2020-01-04  3.0  3.0  2.333333
+        2020-01-05  4.0  2.0  2.000000
+
+        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+        >>> df.vbt.rolling_apply(3, mean_matrix_nb, on_matrix=True)
+                           a         b         c
+        2020-01-01  2.333333  2.333333  2.333333
+        2020-01-02  2.500000  2.500000  2.500000
+        2020-01-03  2.666667  2.666667  2.666667
+        2020-01-04  2.777778  2.777778  2.777778
+        2020-01-05  2.666667  2.666667  2.666667
+        ```
+        """
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
@@ -239,25 +247,28 @@ class Generic_Accessor(Base_Accessor):
         """See `vectorbt.generic.nb.expanding_apply_nb` and
         `vectorbt.generic.nb.expanding_apply_matrix_nb` for `on_matrix=True`.
 
-        Example:
-            ```python-repl
-            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-            >>> df.vbt.expanding_apply(mean_nb)
-                          a    b    c
-            2020-01-01  1.0  5.0  1.0
-            2020-01-02  1.5  4.5  1.5
-            2020-01-03  2.0  4.0  2.0
-            2020-01-04  2.5  3.5  2.0
-            2020-01-05  3.0  3.0  1.8
-            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True)
-                               a         b         c
-            2020-01-01  2.333333  2.333333  2.333333
-            2020-01-02  2.500000  2.500000  2.500000
-            2020-01-03  2.666667  2.666667  2.666667
-            2020-01-04  2.666667  2.666667  2.666667
-            2020-01-05  2.600000  2.600000  2.600000
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+        >>> df.vbt.expanding_apply(mean_nb)
+                      a    b    c
+        2020-01-01  1.0  5.0  1.0
+        2020-01-02  1.5  4.5  1.5
+        2020-01-03  2.0  4.0  2.0
+        2020-01-04  2.5  3.5  2.0
+        2020-01-05  3.0  3.0  1.8
+
+        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+        >>> df.vbt.expanding_apply(mean_matrix_nb, on_matrix=True)
+                           a         b         c
+        2020-01-01  2.333333  2.333333  2.333333
+        2020-01-02  2.500000  2.500000  2.500000
+        2020-01-03  2.666667  2.666667  2.666667
+        2020-01-04  2.666667  2.666667  2.666667
+        2020-01-05  2.600000  2.600000  2.600000
+        ```
+        """
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
@@ -272,21 +283,24 @@ class Generic_Accessor(Base_Accessor):
 
         For `by`, see `pd.DataFrame.groupby`.
 
-        Example:
-            ```python-repl
-            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-            >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb)
-                 a    b    c
-            1  1.5  4.5  1.5
-            2  3.5  2.5  2.5
-            3  5.0  1.0  1.0
-            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_matrix_nb, on_matrix=True)
-                      a         b         c
-            1  2.500000  2.500000  2.500000
-            2  2.833333  2.833333  2.833333
-            3  2.333333  2.333333  2.333333
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+        >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_nb)
+             a    b    c
+        1  1.5  4.5  1.5
+        2  3.5  2.5  2.5
+        3  5.0  1.0  1.0
+
+        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+        >>> df.vbt.groupby_apply([1, 1, 2, 2, 3], mean_matrix_nb, on_matrix=True)
+                  a         b         c
+        1  2.500000  2.500000  2.500000
+        2  2.833333  2.833333  2.833333
+        3  2.333333  2.333333  2.333333
+        ```
+        """
         checks.assert_numba_func(apply_func_nb)
 
         regrouped = self._obj.groupby(by, axis=0, **kwargs)
@@ -305,21 +319,24 @@ class Generic_Accessor(Base_Accessor):
 
         For `freq`, see `pd.DataFrame.resample`.
 
-        Example:
-            ```python-repl
-            >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
-            >>> df.vbt.resample_apply('2d', mean_nb)
-                          a    b    c
-            2020-01-01  1.5  4.5  1.5
-            2020-01-03  3.5  2.5  2.5
-            2020-01-05  5.0  1.0  1.0
-            >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
-            >>> df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True)
-                               a         b         c
-            2020-01-01  2.500000  2.500000  2.500000
-            2020-01-03  2.833333  2.833333  2.833333
-            2020-01-05  2.333333  2.333333  2.333333
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> mean_nb = njit(lambda i, col, a: np.nanmean(a))
+        >>> df.vbt.resample_apply('2d', mean_nb)
+                      a    b    c
+        2020-01-01  1.5  4.5  1.5
+        2020-01-03  3.5  2.5  2.5
+        2020-01-05  5.0  1.0  1.0
+
+        >>> mean_matrix_nb = njit(lambda i, a: np.nanmean(a))
+        >>> df.vbt.resample_apply('2d', mean_matrix_nb, on_matrix=True)
+                           a         b         c
+        2020-01-01  2.500000  2.500000  2.500000
+        2020-01-03  2.833333  2.833333  2.833333
+        2020-01-05  2.333333  2.333333  2.333333
+        ```
+        """
         checks.assert_numba_func(apply_func_nb)
 
         resampled = self._obj.resample(freq, axis=0, **kwargs)
@@ -339,17 +356,19 @@ class Generic_Accessor(Base_Accessor):
     def applymap(self, apply_func_nb, *args):
         """See `vectorbt.generic.nb.applymap_nb`.
 
-        Example:
-            ```python-repl
-            >>> multiply_nb = njit(lambda i, col, a: a ** 2)
-            >>> df.vbt.applymap(multiply_nb)
-                           a     b    c
-            2020-01-01   1.0  25.0  1.0
-            2020-01-02   4.0  16.0  4.0
-            2020-01-03   9.0   9.0  9.0
-            2020-01-04  16.0   4.0  4.0
-            2020-01-05  25.0   1.0  1.0
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> multiply_nb = njit(lambda i, col, a: a ** 2)
+        >>> df.vbt.applymap(multiply_nb)
+                       a     b    c
+        2020-01-01   1.0  25.0  1.0
+        2020-01-02   4.0  16.0  4.0
+        2020-01-03   9.0   9.0  9.0
+        2020-01-04  16.0   4.0  4.0
+        2020-01-05  25.0   1.0  1.0
+        ```
+        """
         checks.assert_numba_func(apply_func_nb)
 
         out = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
@@ -358,17 +377,19 @@ class Generic_Accessor(Base_Accessor):
     def filter(self, filter_func_nb, *args):
         """See `vectorbt.generic.nb.filter_nb`.
 
-        Example:
-            ```python-repl
-            >>> greater_nb = njit(lambda i, col, a: a > 2)
-            >>> df.vbt.filter(greater_nb)
-                          a    b    c
-            2020-01-01  NaN  5.0  NaN
-            2020-01-02  NaN  4.0  NaN
-            2020-01-03  3.0  3.0  3.0
-            2020-01-04  4.0  NaN  NaN
-            2020-01-05  5.0  NaN  NaN
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> greater_nb = njit(lambda i, col, a: a > 2)
+        >>> df.vbt.filter(greater_nb)
+                      a    b    c
+        2020-01-01  NaN  5.0  NaN
+        2020-01-02  NaN  4.0  NaN
+        2020-01-03  3.0  3.0  3.0
+        2020-01-04  4.0  NaN  NaN
+        2020-01-05  5.0  NaN  NaN
+        ```
+        """
         checks.assert_numba_func(filter_func_nb)
 
         out = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
@@ -379,16 +400,18 @@ class Generic_Accessor(Base_Accessor):
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
 
-        Example:
-            ```python-repl
-            >>> greater_nb = njit(lambda col, a: a[a > 2])
-            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> df.vbt.apply_and_reduce(greater_nb, mean_nb)
-            a    4.0
-            b    4.0
-            c    3.0
-            dtype: float64
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> greater_nb = njit(lambda col, a: a[a > 2])
+        >>> mean_nb = njit(lambda col, a: np.nanmean(a))
+        >>> df.vbt.apply_and_reduce(greater_nb, mean_nb)
+        a    4.0
+        b    4.0
+        c    3.0
+        dtype: float64
+        ```
+        """
         checks.assert_numba_func(apply_func_nb)
         checks.assert_numba_func(reduce_func_nb)
         if apply_args is None:
@@ -403,60 +426,62 @@ class Generic_Accessor(Base_Accessor):
                order='C', idx_labeled=True, group_by=None, **kwargs):
         """Reduce by column.
 
-        See `vectorbt.records.nb.flat_reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is True.
-        See `vectorbt.records.nb.flat_reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is True.
-        See `vectorbt.records.nb.reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is False.
-        See `vectorbt.records.nb.reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is False.
-        See `vectorbt.records.nb.reduce_to_array_nb` if not grouped and `to_array` is True.
-        See `vectorbt.records.nb.reduce_nb` if not grouped and `to_array` is False.
+        See `vectorbt.generic.nb.flat_reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is True.
+        See `vectorbt.generic.nb.flat_reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is True.
+        See `vectorbt.generic.nb.reduce_grouped_to_array_nb` if grouped, `to_array` is True and `flatten` is False.
+        See `vectorbt.generic.nb.reduce_grouped_nb` if grouped, `to_array` is False and `flatten` is False.
+        See `vectorbt.generic.nb.reduce_to_array_nb` if not grouped and `to_array` is True.
+        See `vectorbt.generic.nb.reduce_nb` if not grouped and `to_array` is False.
 
         Set `to_idx` to True if values returned by `reduce_func_nb` are indices/positions.
         Set `idx_labeled` to False to return raw positions instead of labels.
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`.
 
-        Example:
-            ```python-repl
-            >>> mean_nb = njit(lambda col, a: np.nanmean(a))
-            >>> df.vbt.reduce(mean_nb)
-            a    3.0
-            b    3.0
-            c    1.8
-            dtype: float64
+        ## Example
 
-            >>> argmax_nb = njit(lambda col, a: np.argmax(a))
-            >>> df.vbt.reduce(argmax_nb, to_idx=True)
-            a   2020-01-05
-            b   2020-01-01
-            c   2020-01-03
-            dtype: datetime64[ns]
+        ```python-repl
+        >>> mean_nb = njit(lambda col, a: np.nanmean(a))
+        >>> df.vbt.reduce(mean_nb)
+        a    3.0
+        b    3.0
+        c    1.8
+        dtype: float64
 
-            >>> argmax_nb = njit(lambda col, a: np.argmax(a))
-            >>> df.vbt.reduce(argmax_nb, to_idx=True, idx_labeled=False)
-            a    4
-            b    0
-            c    2
-            dtype: int64
+        >>> argmax_nb = njit(lambda col, a: np.argmax(a))
+        >>> df.vbt.reduce(argmax_nb, to_idx=True)
+        a   2020-01-05
+        b   2020-01-01
+        c   2020-01-03
+        dtype: datetime64[ns]
 
-            >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-            >>> df.vbt.reduce(min_max_nb, index=['min', 'max'], to_array=True)
-                   a    b    c
-            min  1.0  1.0  1.0
-            max  5.0  5.0  3.0
+        >>> argmax_nb = njit(lambda col, a: np.argmax(a))
+        >>> df.vbt.reduce(argmax_nb, to_idx=True, idx_labeled=False)
+        a    4
+        b    0
+        c    2
+        dtype: int64
 
-            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-            >>> df.vbt.reduce(mean_nb, group_by=group_by)
-            group
-            first     3.0
-            second    1.8
-            dtype: float64
+        >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
+        >>> df.vbt.reduce(min_max_nb, index=['min', 'max'], to_array=True)
+               a    b    c
+        min  1.0  1.0  1.0
+        max  5.0  5.0  3.0
 
-            >>> df.vbt.reduce(min_max_nb, index=['min', 'max'],
-            ...     to_array=True, group_by=group_by)
-            group  first  second
-            min      1.0     1.0
-            max      5.0     3.0
-            ```"""
+        >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+        >>> df.vbt.reduce(mean_nb, group_by=group_by)
+        group
+        first     3.0
+        second    1.8
+        dtype: float64
+
+        >>> df.vbt.reduce(min_max_nb, index=['min', 'max'],
+        ...     to_array=True, group_by=group_by)
+        group  first  second
+        min      1.0     1.0
+        max      5.0     3.0
+        ```
+        """
         checks.assert_numba_func(reduce_func_nb)
 
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -508,19 +533,20 @@ class Generic_Accessor(Base_Accessor):
 
         `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
 
-        Example:
-            ```python-repl
-            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-            >>> mean_nb = njit(lambda i, group, a: np.nanmean(a))
-            >>> df.vbt.squeeze_grouped(mean_nb, group_by=group_by)
-            group       first  second
-            2020-01-01    3.0     1.0
-            2020-01-02    3.0     2.0
-            2020-01-03    3.0     3.0
-            2020-01-04    3.0     2.0
-            2020-01-05    3.0     1.0
-            ```
-            """
+        ## Example
+
+        ```python-repl
+        >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+        >>> mean_nb = njit(lambda i, group, a: np.nanmean(a))
+        >>> df.vbt.squeeze_grouped(mean_nb, group_by=group_by)
+        group       first  second
+        2020-01-01    3.0     1.0
+        2020-01-02    3.0     2.0
+        2020-01-03    3.0     3.0
+        2020-01-04    3.0     2.0
+        2020-01-05    3.0     1.0
+        ```
+        """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
         checks.assert_numba_func(reduce_func_nb)
@@ -540,36 +566,37 @@ class Generic_Accessor(Base_Accessor):
             Make sure that the distribution of group lengths is close to uniform, otherwise
             groups with less columns will be filled with NaN and needlessly occupy memory.
 
-        Example:
-            ```python-repl
-            >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-            >>> df.vbt.flatten_grouped(group_by=group_by, order='C')
-            group       first  second
-            2020-01-01    1.0     1.0
-            2020-01-01    5.0     NaN
-            2020-01-02    2.0     2.0
-            2020-01-02    4.0     NaN
-            2020-01-03    3.0     3.0
-            2020-01-03    3.0     NaN
-            2020-01-04    4.0     2.0
-            2020-01-04    2.0     NaN
-            2020-01-05    5.0     1.0
-            2020-01-05    1.0     NaN
+        ## Example
 
-            >>> df.vbt.flatten_grouped(group_by=group_by, order='F')
-            group       first  second
-            2020-01-01    1.0     1.0
-            2020-01-02    2.0     2.0
-            2020-01-03    3.0     3.0
-            2020-01-04    4.0     2.0
-            2020-01-05    5.0     1.0
-            2020-01-01    5.0     NaN
-            2020-01-02    4.0     NaN
-            2020-01-03    3.0     NaN
-            2020-01-04    2.0     NaN
-            2020-01-05    1.0     NaN
-            ```
-            """
+        ```python-repl
+        >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
+        >>> df.vbt.flatten_grouped(group_by=group_by, order='C')
+        group       first  second
+        2020-01-01    1.0     1.0
+        2020-01-01    5.0     NaN
+        2020-01-02    2.0     2.0
+        2020-01-02    4.0     NaN
+        2020-01-03    3.0     3.0
+        2020-01-03    3.0     NaN
+        2020-01-04    4.0     2.0
+        2020-01-04    2.0     NaN
+        2020-01-05    5.0     1.0
+        2020-01-05    1.0     NaN
+
+        >>> df.vbt.flatten_grouped(group_by=group_by, order='F')
+        group       first  second
+        2020-01-01    1.0     1.0
+        2020-01-02    2.0     2.0
+        2020-01-03    3.0     3.0
+        2020-01-04    4.0     2.0
+        2020-01-05    5.0     1.0
+        2020-01-01    5.0     NaN
+        2020-01-02    4.0     NaN
+        2020-01-03    3.0     NaN
+        2020-01-04    2.0     NaN
+        2020-01-05    1.0     NaN
+        ```
+        """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
         checks.assert_in(order.upper(), ['C', 'F'])
@@ -709,19 +736,21 @@ class Generic_Accessor(Base_Accessor):
 
         For `percentiles`, see `pd.DataFrame.describe`.
 
-        Example:
-            ```python-repl
-            >>> df.vbt.describe()
-                          a         b        c
-            count  5.000000  5.000000  5.00000
-            mean   3.000000  3.000000  1.80000
-            std    1.581139  1.581139  0.83666
-            min    1.000000  1.000000  1.00000
-            25%    2.000000  2.000000  1.00000
-            50%    3.000000  3.000000  2.00000
-            75%    4.000000  4.000000  2.00000
-            max    5.000000  5.000000  3.00000
-            ```"""
+        ## Example
+
+        ```python-repl
+        >>> df.vbt.describe()
+                      a         b        c
+        count  5.000000  5.000000  5.00000
+        mean   3.000000  3.000000  1.80000
+        std    1.581139  1.581139  0.83666
+        min    1.000000  1.000000  1.00000
+        25%    2.000000  2.000000  1.00000
+        50%    3.000000  3.000000  2.00000
+        75%    4.000000  4.000000  2.00000
+        max    5.000000  5.000000  3.00000
+        ```
+        """
         if percentiles is not None:
             percentiles = reshape_fns.to_1d(percentiles, raw=True)
         else:
@@ -775,12 +804,14 @@ class Generic_Accessor(Base_Accessor):
     def bar(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
         """See `vectorbt.generic.plotting.create_bar`.
 
-        Example:
-            ```python-repl
-            >>> ts.vbt.bar()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/df_bar.png)"""
+        ```python-repl
+        >>> ts.vbt.bar()
+        ```
+
+        ![](/vectorbt/docs/img/df_bar.png)
+        """
         if x_labels is None:
             x_labels = self.wrapper.index
         if trace_names is None:
@@ -796,12 +827,14 @@ class Generic_Accessor(Base_Accessor):
     def scatter(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
         """See `vectorbt.generic.plotting.create_scatter`.
 
-        Example:
-            ```python-repl
-            >>> ts.vbt.scatter()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/df_scatter.png)"""
+        ```python-repl
+        >>> ts.vbt.scatter()
+        ```
+
+        ![](/vectorbt/docs/img/df_scatter.png)
+        """
         if x_labels is None:
             x_labels = self.wrapper.index
         if trace_names is None:
@@ -817,12 +850,14 @@ class Generic_Accessor(Base_Accessor):
     def hist(self, trace_names=None, group_by=None, **kwargs):  # pragma: no cover
         """See `vectorbt.generic.plotting.create_hist`.
 
-        Example:
-            ```python-repl
-            >>> ts.vbt.hist()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/df_hist.png)"""
+        ```python-repl
+        >>> ts.vbt.hist()
+        ```
+
+        ![](/vectorbt/docs/img/df_hist.png)
+        """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.hist(trace_names=trace_names, **kwargs)
 
@@ -838,12 +873,14 @@ class Generic_Accessor(Base_Accessor):
     def box(self, trace_names=None, group_by=None, **kwargs):  # pragma: no cover
         """See `vectorbt.generic.plotting.create_box`.
 
-        Example:
-            ```python-repl
-            >>> ts.vbt.box()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/df_box.png)"""
+        ```python-repl
+        >>> ts.vbt.box()
+        ```
+
+        ![](/vectorbt/docs/img/df_box.png)
+        """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.box(trace_names=trace_names, **kwargs)
 
@@ -880,12 +917,14 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        Example:
-            ```python-repl
-            >>> df['a'].vbt.plot()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/sr_plot.png)"""
+        ```python-repl
+        >>> df['a'].vbt.plot()
+        ```
+
+        ![](/vectorbt/docs/img/sr_plot.png)
+        """
         if trace_kwargs is None:
             trace_kwargs = {}
         if fig is None:
@@ -931,12 +970,14 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
-        Example:
-            ```python-repl
-            >>> df['a'].vbt.plot_against(df['b'])
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/sr_plot_against.png)"""
+        ```python-repl
+        >>> df['a'].vbt.plot_against(df['b'])
+        ```
+
+        ![](/vectorbt/docs/img/sr_plot_against.png)
+        """
         if trace_kwargs is None:
             trace_kwargs = {}
         if other_trace_kwargs is None:
@@ -1042,50 +1083,52 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
         See `vectorbt.generic.plotting.create_heatmap` for other keyword arguments.
 
-        Example:
-            ```python-repl
-            >>> multi_index = pd.MultiIndex.from_tuples([
-            ...     (1, 1),
-            ...     (2, 2),
-            ...     (3, 3)
-            ... ])
-            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
-            >>> sr
-            1  1    0
-            2  2    1
-            3  3    2
-            dtype: int64
+        ## Example
 
-            >>> sr.vbt.heatmap()
-            ```
+        ```python-repl
+        >>> multi_index = pd.MultiIndex.from_tuples([
+        ...     (1, 1),
+        ...     (2, 2),
+        ...     (3, 3)
+        ... ])
+        >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+        >>> sr
+        1  1    0
+        2  2    1
+        3  3    2
+        dtype: int64
 
-            ![](/vectorbt/docs/img/heatmap.png)
+        >>> sr.vbt.heatmap()
+        ```
 
-            Using one level as a slider:
+        ![](/vectorbt/docs/img/heatmap.png)
 
-            ```python-repl
-            >>> multi_index = pd.MultiIndex.from_tuples([
-            ...     (1, 1, 1),
-            ...     (1, 2, 2),
-            ...     (1, 3, 3),
-            ...     (2, 3, 3),
-            ...     (2, 2, 2),
-            ...     (2, 1, 1)
-            ... ])
-            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
-            >>> sr
-            1  1  1    0
-               2  2    1
-               3  3    2
-            2  3  3    3
-               2  2    4
-               1  1    5
-            dtype: int64
+        Using one level as a slider:
 
-            >>> sr.vbt.heatmap(slider_level=0).show()
-            ```
+        ```python-repl
+        >>> multi_index = pd.MultiIndex.from_tuples([
+        ...     (1, 1, 1),
+        ...     (1, 2, 2),
+        ...     (1, 3, 3),
+        ...     (2, 3, 3),
+        ...     (2, 2, 2),
+        ...     (2, 1, 1)
+        ... ])
+        >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+        >>> sr
+        1  1  1    0
+           2  2    1
+           3  3    2
+        2  3  3    3
+           2  2    4
+           1  1    5
+        dtype: int64
 
-            ![](/vectorbt/docs/img/heatmap_slider.gif)"""
+        >>> sr.vbt.heatmap(slider_level=0).show()
+        ```
+
+        ![](/vectorbt/docs/img/heatmap_slider.gif)
+        """
         (x_level, y_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
             required_levels=(x_level, y_level),
@@ -1173,24 +1216,26 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
         See `vectorbt.generic.plotting.create_volume` for other keyword arguments.
 
-        Example:
-            ```python-repl
-            >>> multi_index = pd.MultiIndex.from_tuples([
-            ...     (1, 1, 1),
-            ...     (2, 2, 2),
-            ...     (3, 3, 3)
-            ... ])
-            >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
-            >>> sr
-            1  1  1    0
-            2  2  2    1
-            3  3  3    2
-            dtype: int64
+        ## Example
 
-            >>> sr.vbt.volume()
-            ```
+        ```python-repl
+        >>> multi_index = pd.MultiIndex.from_tuples([
+        ...     (1, 1, 1),
+        ...     (2, 2, 2),
+        ...     (3, 3, 3)
+        ... ])
+        >>> sr = pd.Series(np.arange(len(multi_index)), index=multi_index)
+        >>> sr
+        1  1  1    0
+        2  2  2    1
+        3  3  3    2
+        dtype: int64
 
-            ![](/vectorbt/docs/img/volume.png)"""
+        >>> sr.vbt.volume()
+        ```
+
+        ![](/vectorbt/docs/img/volume.png)
+        """
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
             required_levels=(x_level, y_level, z_level),
@@ -1314,12 +1359,14 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **kwargs: Keyword arguments passed to `Generic_SRAccessor.plot`.
 
-        Example:
-            ```python-repl
-            >>> df[['a', 'b']].vbt.plot()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/df_plot.png)"""
+        ```python-repl
+        >>> df[['a', 'b']].vbt.plot()
+        ```
+
+        ![](/vectorbt/docs/img/df_plot.png)
+        """
         if trace_kwargs is None:
             trace_kwargs = {}
         for col in range(self._obj.shape[1]):
@@ -1334,17 +1381,19 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
     def heatmap(self, x_labels=None, y_labels=None, **kwargs):  # pragma: no cover
         """See `vectorbt.generic.plotting.create_heatmap`.
 
-        Example:
-            ```python-repl
-            >>> df = pd.DataFrame([
-            ...     [0, np.nan, np.nan],
-            ...     [np.nan, 1, np.nan],
-            ...     [np.nan, np.nan, 2]
-            ... ])
-            >>> df.vbt.heatmap()
-            ```
+        ## Example
 
-            ![](/vectorbt/docs/img/heatmap.png)"""
+        ```python-repl
+        >>> df = pd.DataFrame([
+        ...     [0, np.nan, np.nan],
+        ...     [np.nan, 1, np.nan],
+        ...     [np.nan, np.nan, 2]
+        ... ])
+        >>> df.vbt.heatmap()
+        ```
+
+        ![](/vectorbt/docs/img/heatmap.png)
+        """
         if x_labels is None:
             x_labels = self.wrapper.columns
         if y_labels is None:

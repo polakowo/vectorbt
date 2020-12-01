@@ -546,103 +546,104 @@ class Portfolio(Wrapping):
             
         Also see notes and hints for `Portfolio.from_orders`.
 
-        Example:
-            Some of the ways of how signals are interpreted:
+        ## Example
 
-            ```python-repl
-            >>> import pandas as pd
-            >>> import vectorbt as vbt
+        Some of the ways of how signals are interpreted:
 
-            >>> close = pd.Series([1, 2, 3, 4, 5])
-            >>> entries = pd.Series([True, True, True, False, False])
-            >>> exits = pd.Series([False, False, True, True, True])
+        ```python-repl
+        >>> import pandas as pd
+        >>> import vectorbt as vbt
 
-            >>> # Entry opens long, exit closes long
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='longonly')
-            >>> portfolio.share_flow()
-            0    1.0
-            1    0.0
-            2    0.0
-            3   -1.0
-            4    0.0
-            dtype: float64
+        >>> close = pd.Series([1, 2, 3, 4, 5])
+        >>> entries = pd.Series([True, True, True, False, False])
+        >>> exits = pd.Series([False, False, True, True, True])
 
-            >>> # Entry opens short, exit closes short
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='shortonly')
-            >>> portfolio.share_flow()
-            0   -1.0
-            1    0.0
-            2    0.0
-            3    1.0
-            4    0.0
-            dtype: float64
+        >>> # Entry opens long, exit closes long
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='longonly')
+        >>> portfolio.share_flow()
+        0    1.0
+        1    0.0
+        2    0.0
+        3   -1.0
+        4    0.0
+        dtype: float64
 
-            >>> # Entry opens long and closes short, exit closes long and opens short
-            >>> # Reversal within one tick
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='all')
-            >>> portfolio.share_flow()
-            0    1.0
-            1    0.0
-            2    0.0
-            3   -2.0
-            4    0.0
-            dtype: float64
+        >>> # Entry opens short, exit closes short
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='shortonly')
+        >>> portfolio.share_flow()
+        0   -1.0
+        1    0.0
+        2    0.0
+        3    1.0
+        4    0.0
+        dtype: float64
 
-            >>> # Reversal within two ticks
-            >>> # First signal closes position, second signal opens the opposite one
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='all',
-            ...     close_first=True)
-            >>> portfolio.share_flow()
-            0    1.0
-            1    0.0
-            2    0.0
-            3   -1.0
-            4   -1.0
-            dtype: float64
+        >>> # Entry opens long and closes short, exit closes long and opens short
+        >>> # Reversal within one tick
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='all')
+        >>> portfolio.share_flow()
+        0    1.0
+        1    0.0
+        2    0.0
+        3   -2.0
+        4    0.0
+        dtype: float64
 
-            >>> # If entry and exit, chooses exit
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='all',
-            ...     close_first=True, conflict_mode='exit')
-            >>> portfolio.share_flow()
-            0    1.0
-            1    0.0
-            2   -1.0
-            3   -1.0
-            4    0.0
-            dtype: float64
+        >>> # Reversal within two ticks
+        >>> # First signal closes position, second signal opens the opposite one
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='all',
+        ...     close_first=True)
+        >>> portfolio.share_flow()
+        0    1.0
+        1    0.0
+        2    0.0
+        3   -1.0
+        4   -1.0
+        dtype: float64
 
-            >>> # Entry means long order, exit means short order
-            >>> # Acts similar to `from_orders`
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, size=1., direction='all',
-            ...     accumulate=True)
-            >>> portfolio.share_flow()
-            0    1.0
-            1    1.0
-            2    0.0
-            3   -1.0
-            4   -1.0
-            dtype: float64
+        >>> # If entry and exit, chooses exit
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='all',
+        ...     close_first=True, conflict_mode='exit')
+        >>> portfolio.share_flow()
+        0    1.0
+        1    0.0
+        2   -1.0
+        3   -1.0
+        4    0.0
+        dtype: float64
 
-            >>> # Testing multiple parameters (via broadcasting)
-            >>> from vectorbt.portfolio.enums import Direction
+        >>> # Entry means long order, exit means short order
+        >>> # Acts similar to `from_orders`
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='all',
+        ...     accumulate=True)
+        >>> portfolio.share_flow()
+        0    1.0
+        1    1.0
+        2    0.0
+        3   -1.0
+        4   -1.0
+        dtype: float64
 
-            >>> portfolio = vbt.Portfolio.from_signals(
-            ...     close, entries, exits, direction=[list(Direction)],
-            ...     broadcast_kwargs=dict(columns_from=Direction._fields))
-            >>> portfolio.share_flow()
-                Long  Short    All
-            0  100.0 -100.0  100.0
-            1    0.0    0.0    0.0
-            2    0.0    0.0    0.0
-            3 -100.0   50.0 -200.0
-            4    0.0    0.0    0.0
-            ```
+        >>> # Testing multiple parameters (via broadcasting)
+        >>> from vectorbt.portfolio.enums import Direction
+
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, direction=[list(Direction)],
+        ...     broadcast_kwargs=dict(columns_from=Direction._fields))
+        >>> portfolio.share_flow()
+            Long  Short    All
+        0  100.0 -100.0  100.0
+        1    0.0    0.0    0.0
+        2    0.0    0.0    0.0
+        3 -100.0   50.0 -200.0
+        4    0.0    0.0    0.0
+        ```
         """
         # Get defaults
         from vectorbt import defaults
@@ -906,78 +907,79 @@ class Portfolio(Wrapping):
         !!! hint
             All broadcastable arguments can be set per frame, series, row, column, or element.
 
-        Example:
-            Buy 10 shares each tick:
-            ```python-repl
-            >>> import pandas as pd
-            >>> import vectorbt as vbt
+        ## Example
 
-            >>> close = pd.Series([1, 2, 3, 4, 5])
-            >>> portfolio = vbt.Portfolio.from_orders(close, 10)
+        Buy 10 shares each tick:
+        ```python-repl
+        >>> import pandas as pd
+        >>> import vectorbt as vbt
 
-            >>> portfolio.shares()
-            0    10.0
-            1    20.0
-            2    30.0
-            3    40.0
-            4    40.0
-            dtype: float64
-            >>> portfolio.cash()
-            0    90.0
-            1    70.0
-            2    40.0
-            3     0.0
-            4     0.0
-            dtype: float64
-            ```
+        >>> close = pd.Series([1, 2, 3, 4, 5])
+        >>> portfolio = vbt.Portfolio.from_orders(close, 10)
 
-            Reverse each position by first closing it:
-            ```python-repl
-            >>> import numpy as np
+        >>> portfolio.shares()
+        0    10.0
+        1    20.0
+        2    30.0
+        3    40.0
+        4    40.0
+        dtype: float64
+        >>> portfolio.cash()
+        0    90.0
+        1    70.0
+        2    40.0
+        3     0.0
+        4     0.0
+        dtype: float64
+        ```
 
-            >>> size = [np.inf, -np.inf, -np.inf, np.inf, np.inf]
-            >>> portfolio = vbt.Portfolio.from_orders(
-            ...     close, size, close_first=True, direction='all')
+        Reverse each position by first closing it:
+        ```python-repl
+        >>> import numpy as np
 
-            >>> portfolio.shares()
-            0    100.000000
-            1      0.000000
-            2    -66.666667
-            3      0.000000
-            4     26.666667
-            dtype: float64
-            >>> portfolio.cash()
-            0      0.000000
-            1    200.000000
-            2    400.000000
-            3    133.333333
-            4      0.000000
-            dtype: float64
-            ```
+        >>> size = [np.inf, -np.inf, -np.inf, np.inf, np.inf]
+        >>> portfolio = vbt.Portfolio.from_orders(
+        ...     close, size, close_first=True, direction='all')
 
-            Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
-            It's more compact but has less control over execution:
+        >>> portfolio.shares()
+        0    100.000000
+        1      0.000000
+        2    -66.666667
+        3      0.000000
+        4     26.666667
+        dtype: float64
+        >>> portfolio.cash()
+        0      0.000000
+        1    200.000000
+        2    400.000000
+        3    133.333333
+        4      0.000000
+        dtype: float64
+        ```
 
-            ```python-repl
-            >>> np.random.seed(42)
-            >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
-            >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
-            >>> size[1::2] = np.nan  # skip every second tick
+        Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+        It's more compact but has less control over execution:
 
-            >>> portfolio = vbt.Portfolio.from_orders(
-            ...     close,  # acts both as reference and order price here
-            ...     size,
-            ...     size_type='targetpercent',
-            ...     call_seq='auto',  # first sell then buy
-            ...     group_by=True,  # one group
-            ...     cash_sharing=True,  # assets share the same cash
-            ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
-            ... )
+        ```python-repl
+        >>> np.random.seed(42)
+        >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
+        >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
+        >>> size[1::2] = np.nan  # skip every second tick
 
-            >>> portfolio.holding_value(group_by=False).vbt.scatter()
-            ```
+        >>> portfolio = vbt.Portfolio.from_orders(
+        ...     close,  # acts both as reference and order price here
+        ...     size,
+        ...     size_type='targetpercent',
+        ...     call_seq='auto',  # first sell then buy
+        ...     group_by=True,  # one group
+        ...     cash_sharing=True,  # assets share the same cash
+        ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
+        ... )
 
-            ![](/vectorbt/docs/img/simulate_nb.png)
+        >>> portfolio.holding_value(group_by=False).vbt.scatter()
+        ```
+
+        ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
         from vectorbt import defaults
@@ -1200,139 +1202,140 @@ class Portfolio(Wrapping):
 
             Also see notes on `Portfolio.from_orders`.
 
-        Example:
-            Buy 10 shares each tick:
-            ```python-repl
-            >>> import pandas as pd
-            >>> from numba import njit
-            >>> import vectorbt as vbt
-            >>> from vectorbt.portfolio.nb import create_order_nb
+        ## Example
 
-            >>> @njit
-            ... def order_func_nb(oc, size):
-            ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
+        Buy 10 shares each tick:
+        ```python-repl
+        >>> import pandas as pd
+        >>> from numba import njit
+        >>> import vectorbt as vbt
+        >>> from vectorbt.portfolio.nb import create_order_nb
 
-            >>> close = pd.Series([1, 2, 3, 4, 5])
-            >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
+        >>> @njit
+        ... def order_func_nb(oc, size):
+        ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
 
-            >>> portfolio.shares()
-            0    10.0
-            1    20.0
-            2    30.0
-            3    40.0
-            4    40.0
-            dtype: float64
-            >>> portfolio.cash()
-            0    90.0
-            1    70.0
-            2    40.0
-            3     0.0
-            4     0.0
-            dtype: float64
-            ```
+        >>> close = pd.Series([1, 2, 3, 4, 5])
+        >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
 
-            Reverse each position by first closing it. Keep state of last position to determine
-            which position to open next (just as an example, there are easier ways to do this):
-            ```python-repl
-            >>> import numpy as np
+        >>> portfolio.shares()
+        0    10.0
+        1    20.0
+        2    30.0
+        3    40.0
+        4    40.0
+        dtype: float64
+        >>> portfolio.cash()
+        0    90.0
+        1    70.0
+        2    40.0
+        3     0.0
+        4     0.0
+        dtype: float64
+        ```
 
-            >>> @njit
-            ... def group_prep_func_nb(gc):
-            ...     last_pos_state = np.array([-1])
-            ...     return (last_pos_state,)
+        Reverse each position by first closing it. Keep state of last position to determine
+        which position to open next (just as an example, there are easier ways to do this):
+        ```python-repl
+        >>> import numpy as np
 
-            >>> @njit
-            ... def order_func_nb(oc, last_pos_state):
-            ...     if oc.shares_now > 0:
-            ...         size = -oc.shares_now  # close long
-            ...     elif oc.shares_now < 0:
-            ...         size = -oc.shares_now  # close short
-            ...     else:
-            ...         if last_pos_state[0] == 1:
-            ...             size = -np.inf  # open short
-            ...             last_pos_state[0] = -1
-            ...         else:
-            ...             size = np.inf  # open long
-            ...             last_pos_state[0] = 1
-            ...
-            ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
+        >>> @njit
+        ... def group_prep_func_nb(gc):
+        ...     last_pos_state = np.array([-1])
+        ...     return (last_pos_state,)
 
-            >>> portfolio = vbt.Portfolio.from_order_func(
-            ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
+        >>> @njit
+        ... def order_func_nb(oc, last_pos_state):
+        ...     if oc.shares_now > 0:
+        ...         size = -oc.shares_now  # close long
+        ...     elif oc.shares_now < 0:
+        ...         size = -oc.shares_now  # close short
+        ...     else:
+        ...         if last_pos_state[0] == 1:
+        ...             size = -np.inf  # open short
+        ...             last_pos_state[0] = -1
+        ...         else:
+        ...             size = np.inf  # open long
+        ...             last_pos_state[0] = 1
+        ...
+        ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
 
-            >>> portfolio.shares()
-            0    100.0
-            1      0.0
-            2   -100.0
-            3      0.0
-            4     20.0
-            dtype: float64
-            >>> portfolio.cash()
-            0      0.0
-            1    200.0
-            2    500.0
-            3    100.0
-            4      0.0
-            dtype: float64
-            ```
+        >>> portfolio = vbt.Portfolio.from_order_func(
+        ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
 
-            Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
-            ```python-repl
-            >>> from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
-            >>> from vectorbt.portfolio.enums import SizeType, Direction
+        >>> portfolio.shares()
+        0    100.0
+        1      0.0
+        2   -100.0
+        3      0.0
+        4     20.0
+        dtype: float64
+        >>> portfolio.cash()
+        0      0.0
+        1    200.0
+        2    500.0
+        3    100.0
+        4      0.0
+        dtype: float64
+        ```
 
-            >>> @njit
-            ... def group_prep_func_nb(gc):
-            ...     '''Define empty arrays for each group.'''
-            ...     size = np.empty(gc.group_len, dtype=np.float_)
-            ...     size_type = np.empty(gc.group_len, dtype=np.int_)
-            ...     direction = np.empty(gc.group_len, dtype=np.int_)
-            ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
-            ...     return size, size_type, direction, temp_float_arr
+        Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+        ```python-repl
+        >>> from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
+        >>> from vectorbt.portfolio.enums import SizeType, Direction
 
-            >>> @njit
-            ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
-            ...     '''Perform rebalancing at each segment.'''
-            ...     for k in range(sc.group_len):
-            ...         col = sc.from_col + k
-            ...         size[k] = 1 / sc.group_len
-            ...         size_type[k] = SizeType.TargetPercent
-            ...         direction[k] = Direction.LongOnly
-            ...         sc.last_val_price[col] = sc.close[sc.i, col]
-            ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
-            ...     return size, size_type, direction
+        >>> @njit
+        ... def group_prep_func_nb(gc):
+        ...     '''Define empty arrays for each group.'''
+        ...     size = np.empty(gc.group_len, dtype=np.float_)
+        ...     size_type = np.empty(gc.group_len, dtype=np.int_)
+        ...     direction = np.empty(gc.group_len, dtype=np.int_)
+        ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
+        ...     return size, size_type, direction, temp_float_arr
 
-            >>> @njit
-            ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
-            ...     '''Place an order.'''
-            ...     col_i = oc.call_seq_now[oc.call_idx]
-            ...     return create_order_nb(
-            ...         size=size[col_i],
-            ...         size_type=size_type[col_i],
-            ...         price=oc.close[oc.i, oc.col],
-            ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage,
-            ...         direction=direction[col_i]
-            ...     )
+        >>> @njit
+        ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
+        ...     '''Perform rebalancing at each segment.'''
+        ...     for k in range(sc.group_len):
+        ...         col = sc.from_col + k
+        ...         size[k] = 1 / sc.group_len
+        ...         size_type[k] = SizeType.TargetPercent
+        ...         direction[k] = Direction.LongOnly
+        ...         sc.last_val_price[col] = sc.close[sc.i, col]
+        ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
+        ...     return size, size_type, direction
 
-            >>> np.random.seed(42)
-            >>> close = np.random.uniform(1, 10, size=(5, 3))
-            >>> fees = 0.001
-            >>> fixed_fees = 1.
-            >>> slippage = 0.001
+        >>> @njit
+        ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
+        ...     '''Place an order.'''
+        ...     col_i = oc.call_seq_now[oc.call_idx]
+        ...     return create_order_nb(
+        ...         size=size[col_i],
+        ...         size_type=size_type[col_i],
+        ...         price=oc.close[oc.i, oc.col],
+        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage,
+        ...         direction=direction[col_i]
+        ...     )
 
-            >>> portfolio = vbt.Portfolio.from_order_func(
-            ...     close,  # acts both as reference and order price here
-            ...     order_func_nb, fees, fixed_fees, slippage,  # order_args as *args
-            ...     active_mask=2,  # rebalance every second tick
-            ...     group_prep_func_nb=group_prep_func_nb,
-            ...     segment_prep_func_nb=segment_prep_func_nb,
-            ...     cash_sharing=True, group_by=True,  # one group with cash sharing
-            ... )
+        >>> np.random.seed(42)
+        >>> close = np.random.uniform(1, 10, size=(5, 3))
+        >>> fees = 0.001
+        >>> fixed_fees = 1.
+        >>> slippage = 0.001
 
-            >>> portfolio.holding_value(group_by=False).vbt.scatter()
-            ```
+        >>> portfolio = vbt.Portfolio.from_order_func(
+        ...     close,  # acts both as reference and order price here
+        ...     order_func_nb, fees, fixed_fees, slippage,  # order_args as *args
+        ...     active_mask=2,  # rebalance every second tick
+        ...     group_prep_func_nb=group_prep_func_nb,
+        ...     segment_prep_func_nb=segment_prep_func_nb,
+        ...     cash_sharing=True, group_by=True,  # one group with cash sharing
+        ... )
 
-            ![](/vectorbt/docs/img/simulate_nb.png)
+        >>> portfolio.holding_value(group_by=False).vbt.scatter()
+        ```
+
+        ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
         from vectorbt import defaults
@@ -1554,7 +1557,7 @@ class Portfolio(Wrapping):
     def trades(self, group_by=None):
         """Get trade records.
 
-        See `vectorbt.portfolio.events.Trades`."""
+        See `vectorbt.portfolio.trades.Trades`."""
         return self._trades.regroup(group_by=group_by)
 
     @cached_property
@@ -1564,7 +1567,7 @@ class Portfolio(Wrapping):
     def positions(self, group_by=None):
         """Get position records.
 
-        See `vectorbt.portfolio.events.Positions`."""
+        See `vectorbt.portfolio.trades.Positions`."""
         return self._positions.regroup(group_by=group_by)
 
     @cached_method
@@ -2036,7 +2039,6 @@ class Portfolio(Wrapping):
     def plot(self, *,
              column=None,
              subplots=None,
-             group=None,
              group_by=None,
              show_titles=True,
              hide_id_labels=True,
@@ -2057,15 +2059,9 @@ class Portfolio(Wrapping):
                     object (with column already selected) and optionally other keyword arguments.
                     Will pass `row`, `col`, and other subplot-dependent arguments if they can be found
                     in the function's signature.
-            column (str): Name of the column to plot.
+            column (str): Name of the column/group to plot.
 
                 Takes effect if portfolio contains multiple columns.
-            group (str): Name of the group to plot.
-
-                Takes effect if portfolio is grouped and `column` was not specified.
-
-                !!! note
-                    Only a subset of subplots accept groups.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
 
                 Used to select `group`.
@@ -2080,65 +2076,67 @@ class Portfolio(Wrapping):
 
                 Can contain keyword arguments for each subplot, each specified as `{subplot_name}_kwargs`.
                 Other keyword arguments are used to update layout of the figure.
-        Example:
-            Plot portfolio of a random strategy:
-            ```python-repl
-            >>> import numpy as np
-            >>> import pandas as pd
-            >>> import yfinance as yf
-            >>> from datetime import datetime
-            >>> import vectorbt as vbt
 
-            >>> start = datetime(2020, 1, 1)
-            >>> end = datetime(2020, 9, 1)
-            >>> close = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
+        ## Example
 
-            >>> np.random.seed(42)
-            >>> size = pd.Series.vbt.empty_like(close, fill_value=0.)
-            >>> n_orders = 20
-            >>> rand_idxs = np.random.randint(0, len(size), size=n_orders)
-            >>> size.iloc[rand_idxs] = np.random.uniform(-1, 1, size=n_orders)
-            >>> portfolio = vbt.Portfolio.from_orders(
-            ...     close, size, init_cash='auto', freq='1D')
-            >>> portfolio.plot()
-            ```
+        Plot portfolio of a random strategy:
+        ```python-repl
+        >>> import numpy as np
+        >>> import pandas as pd
+        >>> import yfinance as yf
+        >>> from datetime import datetime
+        >>> import vectorbt as vbt
 
-            ![](/vectorbt/docs/img/portfolio_plot.png)
+        >>> start = datetime(2020, 1, 1)
+        >>> end = datetime(2020, 9, 1)
+        >>> close = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
 
-            You can choose any of the subplots in `Portfolio.supported_subplots`, in any order:
+        >>> np.random.seed(42)
+        >>> size = pd.Series.vbt.empty_like(close, fill_value=0.)
+        >>> n_orders = 20
+        >>> rand_idxs = np.random.randint(0, len(size), size=n_orders)
+        >>> size.iloc[rand_idxs] = np.random.uniform(-1, 1, size=n_orders)
+        >>> portfolio = vbt.Portfolio.from_orders(
+        ...     close, size, init_cash='auto', freq='1D')
+        >>> portfolio.plot()
+        ```
 
-            ```python-repl
-            >>> from vectorbt.utils.colors import adjust_opacity
+        ![](/vectorbt/docs/img/portfolio_plot.png)
 
-            >>> portfolio.plot(
-            ...     subplots=['drawdowns', 'underwater'],
-            ...     drawdowns_kwargs=dict(top_n=3),
-            ...     underwater_kwargs=dict(
-            ...         trace_kwargs=dict(
-            ...             line_color='#FF6F00',
-            ...             fillcolor=adjust_opacity('#FF6F00', 0.3)
-            ...         )
-            ...     )
-            ... )
-            ```
+        You can choose any of the subplots in `Portfolio.subplot_settings`, in any order:
 
-            ![](/vectorbt/docs/img/portfolio_plot_drawdowns.png)
+        ```python-repl
+        >>> from vectorbt.utils.colors import adjust_opacity
 
-            You can also create a custom subplot, either by providing a function or
-            by creating a placeholder that can be written later:
+        >>> portfolio.plot(
+        ...     subplots=['drawdowns', 'underwater'],
+        ...     drawdowns_kwargs=dict(top_n=3),
+        ...     underwater_kwargs=dict(
+        ...         trace_kwargs=dict(
+        ...             line_color='#FF6F00',
+        ...             fillcolor=adjust_opacity('#FF6F00', 0.3)
+        ...         )
+        ...     )
+        ... )
+        ```
 
-            ```python-repl
-            >>> from vectorbt.defaults import color_schema
+        ![](/vectorbt/docs/img/portfolio_plot_drawdowns.png)
 
-            >>> fig = portfolio.plot(subplots=[
-            ...     'orders',
-            ...     ('order_size', dict(title='Order Size', can_plot_groups=False))  # placeholder
-            ... ])
+        You can also create a custom subplot, either by providing a function or
+        by creating a placeholder that can be written later:
 
-            >>> size.vbt.plot(name='Order Size', row=2, col=1, fig=fig)
-            ```
+        ```python-repl
+        >>> from vectorbt.defaults import color_schema
 
-            ![](/vectorbt/docs/img/portfolio_plot_custom.png)
+        >>> fig = portfolio.plot(subplots=[
+        ...     'orders',
+        ...     ('order_size', dict(title='Order Size', can_plot_groups=False))  # placeholder
+        ... ])
+
+        >>> size.vbt.plot(name='Order Size', row=2, col=1, fig=fig)
+        ```
+
+        ![](/vectorbt/docs/img/portfolio_plot_custom.png)
         """
         from vectorbt.defaults import color_schema
 

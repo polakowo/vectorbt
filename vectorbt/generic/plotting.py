@@ -45,18 +45,20 @@ def create_indicator(value=None, label=None, value_range=None, cmap_name='Spectr
         col (int): Column position.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
 
-        >>> vbt.plotting.create_indicator(
-        ...     value=2,
-        ...     value_range=(1, 3),
-        ...     label='My Indicator'
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_indicator.png)
-        """
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> vbt.plotting.create_indicator(
+    ...     value=2,
+    ...     value_range=(1, 3),
+    ...     label='My Indicator'
+    ... )
+    ```
+    ![](/vectorbt/docs/img/create_indicator.png)
+    """
     from vectorbt.defaults import layout
 
     if trace_kwargs is None:
@@ -135,18 +137,20 @@ def create_bar(data=None, trace_names=None, x_labels=None, trace_kwargs=None,
         col (int): Column position.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
 
-        >>> vbt.plotting.create_bar(
-        ...     data=[[1, 2], [3, 4]],
-        ...     trace_names=['a', 'b'],
-        ...     x_labels=['x', 'y']
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_bar.png)
-        """
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> vbt.plotting.create_bar(
+    ...     data=[[1, 2], [3, 4]],
+    ...     trace_names=['a', 'b'],
+    ...     x_labels=['x', 'y']
+    ... )
+    ```
+    ![](/vectorbt/docs/img/create_bar.png)
+    """
     if trace_kwargs is None:
         trace_kwargs = {}
     if data is None:
@@ -185,11 +189,13 @@ def update_bar_data(fig, data, trace_idx=None):
     For keyword arguments, see `create_bar`.
     Optionally, specify one or multiple trace indices `trace_idx` to update.
 
-    Example:
-        ```python-repl
-        >>> vbt.plotting.update_bar_data(fig, [[2, 1], [4, 3]])
-        ```
-        ![](/vectorbt/docs/img/update_bar_data.png)"""
+    ## Example
+
+    ```python-repl
+    >>> vbt.plotting.update_bar_data(fig, [[2, 1], [4, 3]])
+    ```
+    ![](/vectorbt/docs/img/update_bar_data.png)
+    """
     data = reshape_fns.to_2d(np.array(data))
     if trace_idx is None:
         if data.shape[1] < len(fig.data):
@@ -229,18 +235,20 @@ def create_scatter(data=None, trace_names=None, x_labels=None, trace_kwargs=None
         col (int): Column position.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
 
-        >>> vbt.plotting.create_scatter(
-        ...     data=[[1, 2], [3, 4]],
-        ...     trace_names=['a', 'b'],
-        ...     x_labels=['x', 'y']
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_scatter.png)
-        """
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> vbt.plotting.create_scatter(
+    ...     data=[[1, 2], [3, 4]],
+    ...     trace_names=['a', 'b'],
+    ...     x_labels=['x', 'y']
+    ... )
+    ```
+    ![](/vectorbt/docs/img/create_scatter.png)
+    """
     if trace_kwargs is None:
         trace_kwargs = {}
     if data is None:
@@ -316,17 +324,19 @@ def create_hist(data=None, trace_names=None, horizontal=False, remove_nan=True, 
         col (int): Column position.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
 
-        >>> vbt.plotting.create_hist(
-        ...     data=[[1, 2], [3, 4], [2, 1]],
-        ...     trace_names=['a', 'b']
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_hist.png)
-        """
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> vbt.plotting.create_hist(
+    ...     data=[[1, 2], [3, 4], [2, 1]],
+    ...     trace_names=['a', 'b']
+    ... )
+    ```
+    ![](/vectorbt/docs/img/create_hist.png)
+    """
     if trace_kwargs is None:
         trace_kwargs = {}
     if data is None:
@@ -410,17 +420,19 @@ def create_box(data=None, trace_names=None, horizontal=False, remove_nan=True, t
         col (int): Column position.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
 
-        >>> vbt.plotting.create_box(
-        ...     data=[[1, 2], [3, 4], [2, 1]],
-        ...     trace_names=['a', 'b']
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_box.png)
-        """
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> vbt.plotting.create_box(
+    ...     data=[[1, 2], [3, 4], [2, 1]],
+    ...     trace_names=['a', 'b']
+    ... )
+    ```
+    ![](/vectorbt/docs/img/create_box.png)
+    """
     if trace_kwargs is None:
         trace_kwargs = {}
     if data is None:
@@ -503,18 +515,20 @@ def create_heatmap(data=None, x_labels=None, y_labels=None, horizontal=False, tr
         col (int): Column position.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
 
-        >>> vbt.plotting.create_heatmap(
-        ...     data=[[1, 2], [3, 4]],
-        ...     x_labels=['a', 'b'],
-        ...     y_labels=['x', 'y']
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_heatmap.png)
-        """
+    ## Example
+
+    ```python-repl
+    >>> import vectorbt as vbt
+
+    >>> vbt.plotting.create_heatmap(
+    ...     data=[[1, 2], [3, 4]],
+    ...     x_labels=['a', 'b'],
+    ...     y_labels=['x', 'y']
+    ... )
+    ```
+    ![](/vectorbt/docs/img/create_heatmap.png)
+    """
     from vectorbt.defaults import layout
 
     if trace_kwargs is None:
@@ -620,20 +634,22 @@ def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False, trace
         Figure widgets have currently problems displaying NaNs.
         Use `.show()` method for rendering.
 
-    Example:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import numpy as np
+    ## Example
 
-        >>> vbt.plotting.create_volume(
-        ...     data=np.random.randint(1, 10, size=(3, 3, 3)),
-        ...     x_labels=['a', 'b', 'c'],
-        ...     y_labels=['d', 'e', 'f'],
-        ...     z_labels=['g', 'h', 'i']
-        ... )
-        ```
-        ![](/vectorbt/docs/img/create_volume.png)
-        """
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import numpy as np
+
+    >>> vbt.plotting.create_volume(
+    ...     data=np.random.randint(1, 10, size=(3, 3, 3)),
+    ...     x_labels=['a', 'b', 'c'],
+    ...     y_labels=['d', 'e', 'f'],
+    ...     z_labels=['g', 'h', 'i']
+    ... )
+    ```
+
+    ![](/vectorbt/docs/img/create_volume.png)
+    """
     from vectorbt.defaults import layout
 
     if trace_kwargs is None:

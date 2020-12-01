@@ -17,21 +17,23 @@ from vectorbt.portfolio.enums import order_dt, OrderSide
 class Orders(Records):
     """Extends `Records` for working with order records.
 
-    Example:
-        Get the total number of buy and sell operations:
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
+    ## Example
 
-        >>> price = pd.Series([1., 2., 3., 2., 1.])
-        >>> size = pd.Series([1., 1., 1., 1., -1.])
-        >>> orders = vbt.Portfolio.from_orders(price, size).orders()
+    Get the total number of buy and sell operations:
+    ```python-repl
+    >>> import vectorbt as vbt
+    >>> import pandas as pd
 
-        >>> orders.buy.count()
-        4
-        >>> orders.sell.count()
-        1
-        ```"""
+    >>> price = pd.Series([1., 2., 3., 2., 1.])
+    >>> size = pd.Series([1., 1., 1., 1., -1.])
+    >>> orders = vbt.Portfolio.from_orders(price, size).orders()
+
+    >>> orders.buy.count()
+    4
+    >>> orders.sell.count()
+    1
+    ```
+    """
 
     def __init__(self, wrapper, records_arr, close, idx_field='idx', **kwargs):
         Records.__init__(
@@ -153,12 +155,14 @@ class Orders(Records):
             col (int): Column position.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-        Example:
-            ```python-repl
-            >>> orders.plot()
-            ```
 
-            ![](/vectorbt/docs/img/orders_plot.png)"""
+        ## Example
+
+        ```python-repl
+        >>> orders.plot()
+        ```
+
+        ![](/vectorbt/docs/img/orders_plot.png)"""
         from vectorbt.defaults import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)

@@ -419,7 +419,7 @@
 </main>
 
 % if syntax_highlighting:
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.0.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.4.0/highlight.min.js"></script>
     <script>hljs.initHighlightingOnLoad()</script>
 % endif
 

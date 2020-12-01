@@ -310,16 +310,17 @@ def create_param_combs(op_tree, depth=0):
     The first element of each tuple should a function that takes remaining elements as arguments.
     If one of the elements is a tuple, it will be unfolded in the same way.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> from itertools import combinations, product
+    ## Example
 
-        >>> create_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
-        [(0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2),
-         (1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3),
-         (4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5)]
-        ```
+    ```python-repl
+    >>> import numpy as np
+    >>> from itertools import combinations, product
+
+    >>> create_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
+    [(0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2),
+     (1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3),
+     (4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5)]
+    ```
     """
     checks.assert_type(op_tree, tuple)
     new_op_tree = (op_tree[0],)
@@ -534,99 +535,100 @@ def run_pipeline(
         (`np.ndarray`), list of parameter arrays (`np.ndarray`), list of parameter mappers (`np.ndarray`),
         list of outputs that are outside of `num_ret_outputs`.
 
-    Explanation:
-        Does the following:
+    ## Explanation
 
-        * Takes one or multiple time series objects in `input_list` and broadcasts them. For example:
+    Does the following:
 
-        ```python-repl
-        >>> sr = pd.Series([1, 2], index=['x', 'y'])
-        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-        >>> input_list = [sr, df]
+    * Takes one or multiple time series objects in `input_list` and broadcasts them. For example:
 
-        >>> input_list = vbt.base.reshape_fns.broadcast(*input_list)
-        >>> input_list[0]
-           a  b
-        x  1  1
-        y  2  2
-        >>> input_list[1]
-           a  b
-        x  3  4
-        y  5  6
-        ```
+    ```python-repl
+    >>> sr = pd.Series([1, 2], index=['x', 'y'])
+    >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
+    >>> input_list = [sr, df]
 
-        * Takes one or multiple parameters in `param_list`, converts them to NumPy arrays and 
-            broadcasts them. For example:
+    >>> input_list = vbt.base.reshape_fns.broadcast(*input_list)
+    >>> input_list[0]
+       a  b
+    x  1  1
+    y  2  2
+    >>> input_list[1]
+       a  b
+    x  3  4
+    y  5  6
+    ```
 
-        ```python-repl
-        >>> p1, p2, p3 = 1, [2, 3, 4], [False]
-        >>> param_list = [p1, p2, p3]
+    * Takes one or multiple parameters in `param_list`, converts them to NumPy arrays and
+        broadcasts them. For example:
 
-        >>> param_list = vbt.base.reshape_fns.broadcast(*param_list)
-        >>> param_list[0]
-        array([1, 1, 1])
-        >>> param_list[1]
-        array([2, 3, 4])
-        >>> param_list[2]
-        array([False, False, False])
-        ```
+    ```python-repl
+    >>> p1, p2, p3 = 1, [2, 3, 4], [False]
+    >>> param_list = [p1, p2, p3]
 
-        * Performs calculation using `custom_func` to build output arrays (`output_list`) and 
-            other objects (`other_list`, optionally). For example:
+    >>> param_list = vbt.base.reshape_fns.broadcast(*param_list)
+    >>> param_list[0]
+    array([1, 1, 1])
+    >>> param_list[1]
+    array([2, 3, 4])
+    >>> param_list[2]
+    array([False, False, False])
+    ```
 
-        ```python-repl
-        >>> def custom_func(ts1, ts2, p1, p2, p3, *args, **kwargs):
-        ...     return np.hstack((
-        ...         ts1 + ts2 + p1[0] * p2[0],
-        ...         ts1 + ts2 + p1[1] * p2[1],
-        ...         ts1 + ts2 + p1[2] * p2[2],
-        ...     ))
+    * Performs calculation using `custom_func` to build output arrays (`output_list`) and
+        other objects (`other_list`, optionally). For example:
 
-        >>> output = custom_func(*input_list, *param_list)
-        >>> output
-        array([[ 6,  7,  7,  8,  8,  9],
-               [ 9, 10, 10, 11, 11, 12]])
-        ```
+    ```python-repl
+    >>> def custom_func(ts1, ts2, p1, p2, p3, *args, **kwargs):
+    ...     return np.hstack((
+    ...         ts1 + ts2 + p1[0] * p2[0],
+    ...         ts1 + ts2 + p1[1] * p2[1],
+    ...         ts1 + ts2 + p1[2] * p2[2],
+    ...     ))
 
-        * Creates new column hierarchy based on parameters and level names. For example:
+    >>> output = custom_func(*input_list, *param_list)
+    >>> output
+    array([[ 6,  7,  7,  8,  8,  9],
+           [ 9, 10, 10, 11, 11, 12]])
+    ```
 
-        ```python-repl
-        >>> p1_columns = pd.Index(param_list[0], name='p1')
-        >>> p2_columns = pd.Index(param_list[1], name='p2')
-        >>> p3_columns = pd.Index(param_list[2], name='p3')
-        >>> p_columns = vbt.base.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
-        >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, input_list[0].columns)
+    * Creates new column hierarchy based on parameters and level names. For example:
 
-        >>> output_df = pd.DataFrame(output, columns=new_columns)
-        >>> output_df
-        p1                                         1                        
-        p2             2             3             4    
-        p3  False  False  False  False  False  False    
-                a      b      a      b      a      b
-        0       6      7      7      8      8      9
-        1       9     10     10     11     11     12
-        ```
+    ```python-repl
+    >>> p1_columns = pd.Index(param_list[0], name='p1')
+    >>> p2_columns = pd.Index(param_list[1], name='p2')
+    >>> p3_columns = pd.Index(param_list[2], name='p3')
+    >>> p_columns = vbt.base.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
+    >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, input_list[0].columns)
 
-        * Broadcasts objects in `input_list` to match the shape of objects in `output_list` through tiling.
-            This is done to be able to compare them and generate signals, since you cannot compare NumPy 
-            arrays that have totally different shapes, such as (2, 2) and (2, 6). For example:
+    >>> output_df = pd.DataFrame(output, columns=new_columns)
+    >>> output_df
+    p1                                         1
+    p2             2             3             4
+    p3  False  False  False  False  False  False
+            a      b      a      b      a      b
+    0       6      7      7      8      8      9
+    1       9     10     10     11     11     12
+    ```
 
-        ```python-repl
-        >>> new_input_list = [
-        ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
-        ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
-        ... ]
-        >>> new_input_list[0]
-        p1                                         1                        
-        p2             2             3             4    
-        p3  False  False  False  False  False  False     
-                a      b      a      b      a      b
-        0       1      1      1      1      1      1
-        1       2      2      2      2      2      2
-        ```
+    * Broadcasts objects in `input_list` to match the shape of objects in `output_list` through tiling.
+        This is done to be able to compare them and generate signals, since you cannot compare NumPy
+        arrays that have totally different shapes, such as (2, 2) and (2, 6). For example:
 
-        * Builds parameter mappers that will link parameters from `param_list` to columns in 
-            `input_list` and `output_list`. This is done to enable column indexing using parameter values.
+    ```python-repl
+    >>> new_input_list = [
+    ...     input_list[0].vbt.tile(len(param_list[0]), keys=p_columns),
+    ...     input_list[1].vbt.tile(len(param_list[0]), keys=p_columns)
+    ... ]
+    >>> new_input_list[0]
+    p1                                         1
+    p2             2             3             4
+    p3  False  False  False  False  False  False
+            a      b      a      b      a      b
+    0       1      1      1      1      1      1
+    1       2      2      2      2      2      2
+    ```
+
+    * Builds parameter mappers that will link parameters from `param_list` to columns in
+        `input_list` and `output_list`. This is done to enable column indexing using parameter values.
     """
     if input_list is None:
         input_list = []
@@ -1301,48 +1303,51 @@ class IndicatorFactory:
 
                 !!! note
                     Default parameters should be on the right in `param_names`.
+
         Returns:
             `CustomIndicator`, and optionally other objects that are returned by `custom_func`
             and exceed `output_names`.
-        Example:
-            The following example does the same as the example in `IndicatorFactory.from_apply_func`.
 
-            ```python-repl
-            >>> @njit
-            >>> def apply_func_nb(i, ts1, ts2, p1, p2, arg1):
-            ...     return ts1 * p1[i] + arg1, ts2 * p2[i] + arg1
+        ## Example
 
-            >>> @njit
-            ... def custom_func(ts1, ts2, p1, p2, *args):
-            ...     return vbt.base.combine_fns.apply_and_concat_multiple_nb(
-            ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, *args)
+        The following example does the same as the example in `IndicatorFactory.from_apply_func`.
 
-            >>> MyInd = vbt.IndicatorFactory(
-            ...     input_names=['ts1', 'ts2'],
-            ...     param_names=['p1', 'p2'],
-            ...     output_names=['o1', 'o2']
-            ... ).from_custom_func(custom_func)
+        ```python-repl
+        >>> @njit
+        >>> def apply_func_nb(i, ts1, ts2, p1, p2, arg1):
+        ...     return ts1 * p1[i] + arg1, ts2 * p2[i] + arg1
 
-            >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
-            >>> myInd.o1
-            custom_p1              1             2
-            custom_p2              3             4
-                            a      b      a      b
-            2020-01-01  101.0  105.0  102.0  110.0
-            2020-01-02  102.0  104.0  104.0  108.0
-            2020-01-03  103.0  103.0  106.0  106.0
-            2020-01-04  104.0  102.0  108.0  104.0
-            2020-01-05  105.0  101.0  110.0  102.0
-            >>> myInd.o2
-            custom_p1              1             2
-            custom_p2              3             4
-                            a      b      a      b
-            2020-01-01  106.0  130.0  108.0  140.0
-            2020-01-02  112.0  124.0  116.0  132.0
-            2020-01-03  118.0  118.0  124.0  124.0
-            2020-01-04  124.0  112.0  132.0  116.0
-            2020-01-05  130.0  106.0  140.0  108.0
-            ```
+        >>> @njit
+        ... def custom_func(ts1, ts2, p1, p2, *args):
+        ...     return vbt.base.combine_fns.apply_and_concat_multiple_nb(
+        ...         len(p1), apply_func_nb, ts1, ts2, p1, p2, *args)
+
+        >>> MyInd = vbt.IndicatorFactory(
+        ...     input_names=['ts1', 'ts2'],
+        ...     param_names=['p1', 'p2'],
+        ...     output_names=['o1', 'o2']
+        ... ).from_custom_func(custom_func)
+
+        >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
+        >>> myInd.o1
+        custom_p1              1             2
+        custom_p2              3             4
+                        a      b      a      b
+        2020-01-01  101.0  105.0  102.0  110.0
+        2020-01-02  102.0  104.0  104.0  108.0
+        2020-01-03  103.0  103.0  106.0  106.0
+        2020-01-04  104.0  102.0  108.0  104.0
+        2020-01-05  105.0  101.0  110.0  102.0
+        >>> myInd.o2
+        custom_p1              1             2
+        custom_p2              3             4
+                        a      b      a      b
+        2020-01-01  106.0  130.0  108.0  140.0
+        2020-01-02  112.0  124.0  116.0  132.0
+        2020-01-03  118.0  118.0  124.0  124.0
+        2020-01-04  124.0  112.0  132.0  116.0
+        2020-01-05  130.0  106.0  140.0  108.0
+        ```
         """
         CustomIndicator = self.CustomIndicator
 
@@ -1696,40 +1701,43 @@ class IndicatorFactory:
                 * `flex_2d`: See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.
                     Default is provided by the pipeline if `forward_flex_2d` is True.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
+
         Returns:
             CustomIndicator
-        Example:
-            ```python-repl
-            >>> @njit
-            ... def apply_func_nb(ts1, ts2, p1, p2, arg1):
-            ...     return ts1 * p1 + arg1, ts2 * p2 + arg1
 
-            >>> MyInd = vbt.IndicatorFactory(
-            ...     input_names=['ts1', 'ts2'],
-            ...     param_names=['p1', 'p2'],
-            ...     output_names=['o1', 'o2']
-            ... ).from_apply_func(apply_func_nb)
+        ## Example
 
-            >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
-            >>> myInd.o1
-            custom_p1              1             2
-            custom_p2              3             4
-                            a      b      a      b
-            2020-01-01  101.0  105.0  102.0  110.0
-            2020-01-02  102.0  104.0  104.0  108.0
-            2020-01-03  103.0  103.0  106.0  106.0
-            2020-01-04  104.0  102.0  108.0  104.0
-            2020-01-05  105.0  101.0  110.0  102.0
-            >>> myInd.o2
-            custom_p1              1             2
-            custom_p2              3             4
-                            a      b      a      b
-            2020-01-01  106.0  130.0  108.0  140.0
-            2020-01-02  112.0  124.0  116.0  132.0
-            2020-01-03  118.0  118.0  124.0  124.0
-            2020-01-04  124.0  112.0  132.0  116.0
-            2020-01-05  130.0  106.0  140.0  108.0
-            ```
+        ```python-repl
+        >>> @njit
+        ... def apply_func_nb(ts1, ts2, p1, p2, arg1):
+        ...     return ts1 * p1 + arg1, ts2 * p2 + arg1
+
+        >>> MyInd = vbt.IndicatorFactory(
+        ...     input_names=['ts1', 'ts2'],
+        ...     param_names=['p1', 'p2'],
+        ...     output_names=['o1', 'o2']
+        ... ).from_apply_func(apply_func_nb)
+
+        >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
+        >>> myInd.o1
+        custom_p1              1             2
+        custom_p2              3             4
+                        a      b      a      b
+        2020-01-01  101.0  105.0  102.0  110.0
+        2020-01-02  102.0  104.0  104.0  108.0
+        2020-01-03  103.0  103.0  106.0  106.0
+        2020-01-04  104.0  102.0  108.0  104.0
+        2020-01-05  105.0  101.0  110.0  102.0
+        >>> myInd.o2
+        custom_p1              1             2
+        custom_p2              3             4
+                        a      b      a      b
+        2020-01-01  106.0  130.0  108.0  140.0
+        2020-01-02  112.0  124.0  116.0  132.0
+        2020-01-03  118.0  118.0  124.0  124.0
+        2020-01-04  124.0  112.0  132.0  116.0
+        2020-01-05  130.0  106.0  140.0  108.0
+        ```
         """
         if pass_kwargs is None:
             pass_kwargs = []
@@ -1827,38 +1835,41 @@ class IndicatorFactory:
         Args:
             func_name (str): Function name.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
+
         Returns:
             CustomIndicator
-        Example:
-            ```python-repl
-            >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
 
-            >>> sma = SMA.run(price, timeperiod=[2, 3])
-            >>> sma.real
-            sma_timeperiod         2         3
-                              a    b    a    b
-            2020-01-01      NaN  NaN  NaN  NaN
-            2020-01-02      1.5  4.5  NaN  NaN
-            2020-01-03      2.5  3.5  2.0  4.0
-            2020-01-04      3.5  2.5  3.0  3.0
-            2020-01-05      4.5  1.5  4.0  2.0
-            ```
+        ## Example
 
-            To get help on a function, use the `help` command:
+        ```python-repl
+        >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
 
-            ```python-repl
-            >>> help(SMA.run)
-            Help on method run:
+        >>> sma = SMA.run(price, timeperiod=[2, 3])
+        >>> sma.real
+        sma_timeperiod         2         3
+                          a    b    a    b
+        2020-01-01      NaN  NaN  NaN  NaN
+        2020-01-02      1.5  4.5  NaN  NaN
+        2020-01-03      2.5  3.5  2.0  4.0
+        2020-01-04      3.5  2.5  3.0  3.0
+        2020-01-05      4.5  1.5  4.0  2.0
+        ```
 
-            run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
-                Run the SMA indicator using input time series `close`, and parameters `timeperiod`, to
-                produce output time series `real`.
+        To get help on a function, use the `help` command:
 
-                Pass a list of parameter names `hide_params` to hide their column levels.
-                Set `hide_default` to False to show column levels of parameters with the default value passed.
+        ```python-repl
+        >>> help(SMA.run)
+        Help on method run:
 
-                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
-            ```
+        run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+            Run the SMA indicator using input time series `close`, and parameters `timeperiod`, to
+            produce output time series `real`.
+
+            Pass a list of parameter names `hide_params` to hide their column levels.
+            Set `hide_default` to False to show column levels of parameters with the default value passed.
+
+            Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
+        ```
         """
         import talib
         from talib import abstract

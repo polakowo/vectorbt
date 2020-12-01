@@ -32,3 +32,5 @@ __all__ = [
     'MappedArray',
     'Records'
 ]
+
+__pdoc__ = {k: False for k in __all__}
