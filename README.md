@@ -27,7 +27,7 @@ With vectorbt you can
 ## Example
 
 Here a snippet for testing 10,000 window combinations of a dual SMA crossover strategy on BTC, USD and XRP
-from 2017 onwards, in under 5 seconds (Note: compiling for the first time with Numba may take a while):
+from 2017 onwards, in under 5 seconds (Note: first time compiling with Numba may take a while):
 
 ```python
 import numpy as np

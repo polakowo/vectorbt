@@ -173,17 +173,17 @@ def create_bar(data=None, trace_names=None, x_labels=None, trace_kwargs=None,
 
     trace_idxs = list(range(len(fig.data) - len(trace_names), len(fig.data)))
     if data is not None:
-        update_bar_data(fig, data, trace_idxs=trace_idxs)
+        update_bar_data(fig, data, trace_idx=trace_idxs)
     if return_trace_idxs:
         return fig, trace_idxs
     return fig
 
 
-def update_bar_data(fig, data, trace_idxs=None):
+def update_bar_data(fig, data, trace_idx=None):
     """Update the bar data.
 
     For keyword arguments, see `create_bar`.
-    Optionally, specify one or multiple trace indices `trace_idxs` to update.
+    Optionally, specify one or multiple trace indices `trace_idx` to update.
 
     Example:
         ```python-repl
@@ -191,20 +191,20 @@ def update_bar_data(fig, data, trace_idxs=None):
         ```
         ![](/vectorbt/docs/img/update_bar_data.png)"""
     data = reshape_fns.to_2d(np.array(data))
-    if trace_idxs is None:
+    if trace_idx is None:
         if data.shape[1] < len(fig.data):
-            raise ValueError("Figure contains more traces than data. Must pass trace_idxs.")
-        trace_idxs = range(len(fig.data))
-    if not isinstance(trace_idxs, Iterable):
-        trace_idxs = [trace_idxs]
-    if data.shape[1] > len(trace_idxs):
-        raise ValueError("Data contains more traces than trace_idxs")
+            raise ValueError("Figure contains more traces than data. Must pass trace_idx.")
+        trace_idx = range(len(fig.data))
+    if not isinstance(trace_idx, Iterable):
+        trace_idx = [trace_idx]
+    if data.shape[1] > len(trace_idx):
+        raise ValueError("Data contains more traces than trace_idx")
 
     with fig.batch_update():
-        for i, trace_idx in enumerate(trace_idxs):
-            bar = fig.data[trace_idx]
+        for i, _trace_idx in enumerate(trace_idx):
+            bar = fig.data[_trace_idx]
             if bar.type != 'bar':
-                raise ValueError(f'Trace at index {trace_idx} is not a bar')
+                raise ValueError(f'Trace at index {_trace_idx} is not a bar')
             bar.y = data[:, i]
             if bar.marker.colorscale is not None:
                 bar.marker.color = data[:, i]
@@ -267,32 +267,32 @@ def create_scatter(data=None, trace_names=None, x_labels=None, trace_kwargs=None
 
     trace_idxs = list(range(len(fig.data) - len(trace_names), len(fig.data)))
     if data is not None:
-        update_scatter_data(fig, data, trace_idxs=trace_idxs)
+        update_scatter_data(fig, data, trace_idx=trace_idxs)
     if return_trace_idxs:
         return fig, trace_idxs
     return fig
 
 
-def update_scatter_data(fig, data, trace_idxs=None):
+def update_scatter_data(fig, data, trace_idx=None):
     """Update the scatter data.
 
     For keyword arguments, see `create_scatter`.
-    Optionally, specify one or multiple trace indices `trace_idxs` to update."""
+    Optionally, specify one or multiple trace indices `trace_idx` to update."""
     data = reshape_fns.to_2d(np.array(data))
-    if trace_idxs is None:
+    if trace_idx is None:
         if data.shape[1] < len(fig.data):
-            raise ValueError("Figure contains more traces than data. Must pass trace_idxs.")
-        trace_idxs = range(len(fig.data))
-    if not isinstance(trace_idxs, Iterable):
-        trace_idxs = [trace_idxs]
-    if data.shape[1] > len(trace_idxs):
-        raise ValueError("Data contains more traces than trace_idxs")
+            raise ValueError("Figure contains more traces than data. Must pass trace_idx.")
+        trace_idx = range(len(fig.data))
+    if not isinstance(trace_idx, Iterable):
+        trace_idx = [trace_idx]
+    if data.shape[1] > len(trace_idx):
+        raise ValueError("Data contains more traces than trace_idx")
 
     with fig.batch_update():
-        for i, trace_idx in enumerate(trace_idxs):
-            scatter = fig.data[trace_idx]
+        for i, _trace_idx in enumerate(trace_idx):
+            scatter = fig.data[_trace_idx]
             if scatter.type != 'scatter':
-                raise ValueError(f'Trace at index {trace_idx} is not a scatter')
+                raise ValueError(f'Trace at index {_trace_idx} is not a scatter')
             scatter.y = data[:, i]
 
 
@@ -354,32 +354,32 @@ def create_hist(data=None, trace_names=None, horizontal=False, remove_nan=True, 
 
     trace_idxs = list(range(len(fig.data) - len(trace_names), len(fig.data)))
     if data is not None:
-        update_hist_data(fig, data, horizontal=horizontal, trace_idxs=trace_idxs, remove_nan=remove_nan)
+        update_hist_data(fig, data, horizontal=horizontal, trace_idx=trace_idxs, remove_nan=remove_nan)
     if return_trace_idxs:
         return fig, trace_idxs
     return fig
 
 
-def update_hist_data(fig, data, horizontal=False, trace_idxs=None, remove_nan=True):
+def update_hist_data(fig, data, horizontal=False, trace_idx=None, remove_nan=True):
     """Update the histogram data.
 
     For keyword arguments, see `create_hist`.
-    Optionally, specify one or multiple trace indices `trace_idxs` to update."""
+    Optionally, specify one or multiple trace indices `trace_idx` to update."""
     data = reshape_fns.to_2d(np.array(data))
-    if trace_idxs is None:
+    if trace_idx is None:
         if data.shape[1] < len(fig.data):
-            raise ValueError("Figure contains more traces than data. Must pass trace_idxs.")
-        trace_idxs = range(len(fig.data))
-    if not isinstance(trace_idxs, Iterable):
-        trace_idxs = [trace_idxs]
-    if data.shape[1] > len(trace_idxs):
-        raise ValueError("Data contains more traces than trace_idxs")
+            raise ValueError("Figure contains more traces than data. Must pass trace_idx.")
+        trace_idx = range(len(fig.data))
+    if not isinstance(trace_idx, Iterable):
+        trace_idx = [trace_idx]
+    if data.shape[1] > len(trace_idx):
+        raise ValueError("Data contains more traces than trace_idx")
 
     with fig.batch_update():
-        for i, trace_idx in enumerate(trace_idxs):
-            hist = fig.data[trace_idx]
+        for i, _trace_idx in enumerate(trace_idx):
+            hist = fig.data[_trace_idx]
             if hist.type != 'histogram':
-                raise ValueError(f'Trace at index {trace_idx} is not a histogram')
+                raise ValueError(f'Trace at index {_trace_idx} is not a histogram')
             d = data[:, i]
             if remove_nan:
                 d = d[~np.isnan(d)]
@@ -447,32 +447,32 @@ def create_box(data=None, trace_names=None, horizontal=False, remove_nan=True, t
 
     trace_idxs = list(range(len(fig.data) - len(trace_names), len(fig.data)))
     if data is not None:
-        update_box_data(fig, data, horizontal=horizontal, trace_idxs=trace_idxs, remove_nan=remove_nan)
+        update_box_data(fig, data, horizontal=horizontal, trace_idx=trace_idxs, remove_nan=remove_nan)
     if return_trace_idxs:
         return fig, trace_idxs
     return fig
 
 
-def update_box_data(fig, data, horizontal=False, trace_idxs=None, remove_nan=True):
+def update_box_data(fig, data, horizontal=False, trace_idx=None, remove_nan=True):
     """Update the box data.
 
     For keyword arguments, see `create_box`.
-    Optionally, specify one or multiple trace indices `trace_idxs` to update."""
+    Optionally, specify one or multiple trace indices `trace_idx` to update."""
     data = reshape_fns.to_2d(np.array(data))
-    if trace_idxs is None:
+    if trace_idx is None:
         if data.shape[1] < len(fig.data):
-            raise ValueError("Figure contains more traces than data. Must pass trace_idxs.")
-        trace_idxs = range(len(fig.data))
-    if not isinstance(trace_idxs, Iterable):
-        trace_idxs = [trace_idxs]
-    if data.shape[1] > len(trace_idxs):
-        raise ValueError("Data contains more traces than trace_idxs")
+            raise ValueError("Figure contains more traces than data. Must pass trace_idx.")
+        trace_idx = range(len(fig.data))
+    if not isinstance(trace_idx, Iterable):
+        trace_idx = [trace_idx]
+    if data.shape[1] > len(trace_idx):
+        raise ValueError("Data contains more traces than trace_idx")
 
     with fig.batch_update():
-        for i, trace_idx in enumerate(trace_idxs):
-            box = fig.data[trace_idx]
+        for i, _trace_idx in enumerate(trace_idx):
+            box = fig.data[_trace_idx]
             if box.type != 'box':
-                raise ValueError(f'Trace at index {trace_idx} is not a box')
+                raise ValueError(f'Trace at index {_trace_idx} is not a box')
             d = data[:, i]
             if remove_nan:
                 d = d[~np.isnan(d)]

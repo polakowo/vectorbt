@@ -47,7 +47,7 @@ such as input, parameter and output names.
 
 ## Basic
 
-`vectorbt.indicators.basic` provides a collection of basic technical indicators, such as
+Module `vectorbt.indicators.basic` provides a collection of basic technical indicators, such as
 Bollinger Bands, all built with `vectorbt.indicators.factory.IndicatorFactory`.
 
 You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
@@ -68,7 +68,7 @@ have plotting methods.
 
 ## Numba-compiled functions
 
-`vectorbt.indicators.nb` provides an arsenal of Numba-compiled functions that are used by indicator
+Module `vectorbt.indicators.nb` provides an arsenal of Numba-compiled functions that are used by indicator
 classes. These only accept NumPy arrays and other Numba-compatible types.
 """
 

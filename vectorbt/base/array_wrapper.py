@@ -5,7 +5,7 @@ import pandas as pd
 import warnings
 
 from vectorbt.utils import checks
-from vectorbt.utils.config import Configured
+from vectorbt.utils.config import Configured, merge_kwargs
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes, to_time_units
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
@@ -29,8 +29,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def __init__(self, index, columns, ndim, freq=None, column_only_select=None,
                  group_select=None, grouped_ndim=None, **kwargs):
-        Configured.__init__(
-            self,
+        config = dict(
             index=index,
             columns=columns,
             ndim=ndim,
@@ -38,7 +37,6 @@ class ArrayWrapper(Configured, PandasIndexer):
             column_only_select=column_only_select,
             group_select=group_select,
             grouped_ndim=grouped_ndim,
-            **kwargs
         )
 
         checks.assert_not_none(index)
@@ -59,7 +57,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._grouped_ndim = grouped_ndim
 
         PandasIndexer.__init__(self)
+        Configured.__init__(self, **merge_kwargs(config, self._grouper._config))
 
+    @cached_method
     def _indexing_func_meta(self, pd_indexing_func, index=None, columns=None,
                             column_only_select=None, group_select=None, group_by=None):
         """Perform indexing on `ArrayWrapper` and also return indexing metadata.
@@ -85,21 +85,21 @@ class ArrayWrapper(Configured, PandasIndexer):
             group_select = self.group_select
         if group_select is None:
             group_select = defaults.array_wrapper['group_select']
-        self = self.regroup(group_by)
-        group_select = group_select and self.grouper.is_grouped()
+        _self = self.regroup(group_by)
+        group_select = group_select and _self.grouper.is_grouped()
         if index is None:
-            index = self.index
+            index = _self.index
         if columns is None:
             if group_select:
-                columns = self.grouper.get_columns()
+                columns = _self.grouper.get_columns()
             else:
-                columns = self.columns
+                columns = _self.columns
         if group_select:
             # Groups as columns
-            i_wrapper = ArrayWrapper(index, columns, self.get_ndim())
+            i_wrapper = ArrayWrapper(index, columns, _self.get_ndim())
         else:
             # Columns as columns
-            i_wrapper = ArrayWrapper(index, columns, self.ndim)
+            i_wrapper = ArrayWrapper(index, columns, _self.ndim)
         n_rows = len(index)
         n_cols = len(columns)
 
@@ -164,10 +164,17 @@ class ArrayWrapper(Configured, PandasIndexer):
                 else:
                     raise IndexingError("Selection of a scalar is not allowed")
             new_index = index_fns.get_index(idx_mapper, 0)
-            new_columns = index_fns.get_index(idx_mapper, 1)
+            if not isinstance(idx_idxs, np.ndarray):
+                # One index selected
+                new_columns = index[[idx_idxs]]
+            elif not isinstance(col_idxs, np.ndarray):
+                # One column selected
+                new_columns = columns[[col_idxs]]
+            else:
+                new_columns = index_fns.get_index(idx_mapper, 1)
             new_ndim = idx_mapper.ndim
 
-        if self.grouper.group_by is not None:
+        if _self.grouper.is_grouped():
             # Grouping enabled
             if np.asarray(idx_idxs).ndim == 0:
                 raise IndexingError("Flipping index and columns is not allowed")
@@ -177,10 +184,10 @@ class ArrayWrapper(Configured, PandasIndexer):
                 # Get indices of columns corresponding to selected groups
                 group_idxs = col_idxs
                 group_idxs_arr = reshape_fns.to_1d(group_idxs)
-                group_start_idxs = self.grouper.get_group_start_idxs()[group_idxs_arr]
-                group_end_idxs = self.grouper.get_group_end_idxs()[group_idxs_arr]
+                group_start_idxs = _self.grouper.get_group_start_idxs()[group_idxs_arr]
+                group_end_idxs = _self.grouper.get_group_end_idxs()[group_idxs_arr]
                 ungrouped_col_idxs = get_ranges_arr(group_start_idxs, group_end_idxs)
-                ungrouped_columns = self.columns[ungrouped_col_idxs]
+                ungrouped_columns = _self.columns[ungrouped_col_idxs]
                 if new_ndim == 1 and len(ungrouped_columns) == 1:
                     ungrouped_ndim = 1
                     ungrouped_col_idxs = ungrouped_col_idxs[0]
@@ -188,13 +195,13 @@ class ArrayWrapper(Configured, PandasIndexer):
                     ungrouped_ndim = 2
 
                 # Get indices of selected groups corresponding to the new columns
-                # We could do self.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
-                group_lens = self.grouper.get_group_lens()[group_idxs_arr]
+                # We could do _self.group_by[ungrouped_col_idxs] but indexing operation may have changed the labels
+                group_lens = _self.grouper.get_group_lens()[group_idxs_arr]
                 ungrouped_group_idxs = np.full(len(ungrouped_columns), 0)
                 ungrouped_group_idxs[group_lens[:-1]] = 1
                 ungrouped_group_idxs = np.cumsum(ungrouped_group_idxs)
 
-                return self.copy(
+                return _self.copy(
                     index=new_index,
                     columns=ungrouped_columns,
                     ndim=ungrouped_ndim,
@@ -204,16 +211,16 @@ class ArrayWrapper(Configured, PandasIndexer):
 
             # Selection based on columns
             col_idxs_arr = reshape_fns.to_1d(col_idxs)
-            return self.copy(
+            return _self.copy(
                 index=new_index,
                 columns=new_columns,
                 ndim=new_ndim,
                 grouped_ndim=None,
-                group_by=self.grouper.group_by[col_idxs_arr]
+                group_by=_self.grouper.group_by[col_idxs_arr]
             ), idx_idxs, col_idxs, col_idxs
 
         # Grouping disabled
-        return self.copy(
+        return _self.copy(
             index=new_index,
             columns=new_columns,
             ndim=new_ndim,
@@ -242,10 +249,10 @@ class ArrayWrapper(Configured, PandasIndexer):
     def columns(self):
         """Columns."""
         return self._columns
-    
+
     def get_columns(self, group_by=None):
         """Get group-aware `ArrayWrapper.columns`."""
-        return self.displace(group_by=group_by).columns
+        return self.resolve(group_by=group_by).columns
 
     @property
     def name(self):
@@ -258,7 +265,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def get_name(self, group_by=None):
         """Get group-aware `ArrayWrapper.name`."""
-        return self.displace(group_by=group_by).name
+        return self.resolve(group_by=group_by).name
 
     @property
     def ndim(self):
@@ -267,7 +274,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def get_ndim(self, group_by=None):
         """Get group-aware `ArrayWrapper.ndim`."""
-        return self.displace(group_by=group_by).ndim
+        return self.resolve(group_by=group_by).ndim
 
     @property
     def shape(self):
@@ -278,7 +285,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def get_shape(self, group_by=None):
         """Get group-aware `ArrayWrapper.shape`."""
-        return self.displace(group_by=group_by).shape
+        return self.resolve(group_by=group_by).shape
 
     @property
     def shape_2d(self):
@@ -289,7 +296,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def get_shape_2d(self, group_by=None):
         """Get group-aware `ArrayWrapper.shape_2d`."""
-        return self.displace(group_by=group_by).shape_2d
+        return self.resolve(group_by=group_by).shape_2d
 
     @property
     def freq(self):
@@ -355,25 +362,27 @@ class ArrayWrapper(Configured, PandasIndexer):
                 if not self.grouper.is_group_count_changed(group_by=group_by):
                     grouped_ndim = self.grouped_ndim
             return self.copy(grouped_ndim=grouped_ndim, group_by=group_by, **kwargs)
-        return self
+        return self  # important for keeping cache
 
     @cached_method
-    def displace(self, group_by=None, **kwargs):
-        """Displace columns and other metadata with groups."""
-        _self = self.regroup(group_by=group_by)
+    def resolve(self, group_by=None, **kwargs):
+        """Resolve this object.
+
+        Replaces columns and other metadata with groups."""
+        _self = self.regroup(group_by=group_by, **kwargs)
         if _self.grouper.is_grouped():
             return _self.copy(
                 columns=_self.grouper.get_columns(),
                 ndim=_self.grouped_ndim,
-                group_by=None,
-                **kwargs
+                grouped_ndim=None,
+                group_by=None
             )
-        return _self
+        return _self  # important for keeping cache
 
     def wrap(self, a, index=None, columns=None, dtype=None, group_by=None):
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
-        _self = self.displace(group_by=group_by)
+        _self = self.resolve(group_by=group_by)
 
         a = np.asarray(a)
         a = reshape_fns.soft_to_ndim(a, self.ndim)
@@ -407,7 +416,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         If `time_units` is set, calls `to_time_units`."""
         checks.assert_not_none(self.ndim)
-        _self = self.displace(group_by=group_by)
+        _self = self.resolve(group_by=group_by)
 
         if columns is None:
             columns = _self.columns
@@ -453,12 +462,13 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     def dummy(self, group_by=None, **kwargs):
         """Create a dummy Series/DataFrame."""
-        _self = self.displace(group_by=group_by)
+        _self = self.resolve(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
 
 
 class Wrapping(Configured, PandasIndexer):
     """Class that uses `ArrayWrapper` globally."""
+
     def __init__(self, wrapper, **kwargs):
         checks.assert_type(wrapper, ArrayWrapper)
         self._wrapper = wrapper
@@ -484,20 +494,17 @@ class Wrapping(Configured, PandasIndexer):
         if self.wrapper.grouper.is_grouping_changed(group_by=group_by):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
-        return self
+        return self  # important for keeping cache
 
-    def select_series(self, column=None, group=None, group_by=None, column_only=False, **kwargs):
+    def select_series(self, column=None, group_by=None, **kwargs):
         """Select one column/group."""
+        _self = self.regroup(group_by, **kwargs)
         if column is not None:
-            return self.regroup(False, **kwargs)[column]
-        if self.wrapper.ndim == 1:
-            return self
-        if not column_only and self.wrapper.grouper.is_grouped(group_by=group_by):
-            _self = self.regroup(group_by, **kwargs)
-            if group is not None:
-                return _self[group]
-            if _self.wrapper.grouped_ndim == 1:
+            return _self[column]
+        if not _self.wrapper.grouper.is_grouped():
+            if _self.wrapper.ndim == 1:
                 return _self
-            raise TypeError("Only one column/group is allowed. Use indexing or column/group argument.")
-        raise TypeError("Only one column is allowed. Use indexing or column argument.")
-
+            raise TypeError("Only one column is allowed. Use indexing or column argument.")
+        if _self.wrapper.grouped_ndim == 1:
+            return _self
+        raise TypeError("Only one group is allowed. Use indexing or column argument.")

@@ -297,7 +297,7 @@ class Drawdowns(Records):
             ![](/vectorbt/docs/img/drawdowns_plot.png)"""
         from vectorbt.defaults import color_schema, contrast_color_schema
 
-        self_col = self.select_series(column=column)
+        self_col = self.select_series(column=column, group_by=False)
         if top_n is not None:
             # Drawdowns is negative, thus top_n becomes bottom_n
             self_col = self_col.filter_by_mask(self_col.drawdown.bottom_n_mask(top_n))

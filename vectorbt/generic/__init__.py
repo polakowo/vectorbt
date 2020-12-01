@@ -28,7 +28,7 @@ specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.return
 
 ## Plotting
 
-`vectorbt.generic.plotting` provides functions for visualizing data in an efficient and convenient way.
+Module `vectorbt.generic.plotting` provides functions for visualizing data in an efficient and convenient way.
 Each creates a figure widget that is compatible with ipywidgets and enables interactive data visualization
 in Jupyter Notebook and JupyterLab environments. For more details on using Plotly, see
 [Getting Started with Plotly in Python](https://plotly.com/python/getting-started/).
@@ -37,7 +37,7 @@ The module can be accessed directly via `vbt.plotting`.
 
 ## Drawdowns
 
-`vectorbt.generic.drawdowns.Drawdowns` class accepts drawdown records and the corresponding time series
+Class `vectorbt.generic.drawdowns.Drawdowns` accepts drawdown records and the corresponding time series
 to analyze the periods of drawdown. Using `vectorbt.generic.drawdowns.Drawdowns.from_ts`, you can generate
 drawdown records for any time series and analyze them right away.
 
@@ -50,7 +50,7 @@ Moreover, all time series accessors have a method `drawdowns`:
 
 ## Numba-compiled functions
 
-`vectorbt.generic.nb` provides an arsenal of Numba-compiled functions that are used by accessors
+Module `vectorbt.generic.nb` provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
@@ -64,7 +64,7 @@ array([nan, 1.5, 2.5, 3.5])
 
 ## Enums
 
-`vectorbt.generic.enums` defines enums and other schemas for `vectorbt.generic`.
+Module `vectorbt.generic.enums` defines enums and other schemas for `vectorbt.generic`.
 """
 
 from vectorbt.generic.enums import *

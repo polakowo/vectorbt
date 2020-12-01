@@ -1259,6 +1259,8 @@ class IndicatorFactory:
                          in_output_settings=None,
                          hide_params=None,
                          hide_default=True,
+                         variable_args=False,
+                         keyword_only_args=False,
                          **pipeline_kwargs):
         """Build indicator class around a custom calculation function.
 
@@ -1290,6 +1292,8 @@ class IndicatorFactory:
                 See `run_pipeline` for keys.
             hide_params (list): Parameter names to hide column levels for.
             hide_default (bool): Whether to hide column levels of parameters with default value.
+            variable_args (bool): Whether `run` and `run_combs` should use starred expression.
+            keyword_only_args (bool): Whether `run` and `run_combs` should accept keyword-only arguments.
             **pipeline_kwargs: Keyword arguments passed to `run_pipeline`.
 
                 Can be default values for `param_names` and `in_output_names`, but also custom keyword
@@ -1352,12 +1356,13 @@ class IndicatorFactory:
         if param_settings is None:
             param_settings = {}
         checks.assert_type(param_settings, dict)
-
         if in_output_settings is None:
             in_output_settings = {}
         checks.assert_type(in_output_settings, dict)
         if len(in_output_settings) > 0:
             checks.assert_dict_valid(in_output_settings, [in_output_names])
+        if variable_args and keyword_only_args:
+            raise ValueError("variable_args and keyword_only_args cannot be used together")
 
         for k, v in pipeline_kwargs.items():
             if k in param_names and not isinstance(v, Default):
@@ -1397,6 +1402,9 @@ class IndicatorFactory:
             in_output_list = args[:len(in_output_names)]
             checks.assert_len_equal(in_output_list, in_output_names)
             args = args[len(in_output_names):]
+            if not variable_args and len(args) > 0:
+                raise TypeError("Variable length arguments are not supported by this function "
+                                "(variable_args is set to False)")
 
             # Prepare column levels
             level_names = []
@@ -1464,19 +1472,23 @@ class IndicatorFactory:
                 if k not in pos_names and k not in main_kw_names:
                     other_kw_names.append(k)
 
-            first_arg = pos_names
-            first_arg = ', '.join(first_arg) + ', ' if len(first_arg) > 0 else ''
-            second_arg = ['{}={}'.format(k, k) for k in main_kw_names + other_kw_names]
-            second_arg = ', '.join(second_arg) + ', ' if len(second_arg) > 0 else ''
-            fourth_arg = input_names + param_names + in_output_names
-            fourth_arg = ', '.join(fourth_arg) + ', ' if len(fourth_arg) > 0 else ''
-            fifth_arg = ['{}={}'.format(k, k) for k in other_kw_names]
-            fifth_arg = ', '.join(fifth_arg) + ', ' if len(fifth_arg) > 0 else ''
+            _0 = func_name
+            _1 = '*, ' if keyword_only_args else ''
+            _2 = pos_names
+            _2 = ', '.join(_2) + ', ' if len(_2) > 0 else ''
+            _3 = '*args, ' if variable_args else ''
+            _4 = ['{}={}'.format(k, k) for k in main_kw_names + other_kw_names]
+            _4 = ', '.join(_4) + ', ' if len(_4) > 0 else ''
+            _5 = docstring
+            _6 = input_names + param_names + in_output_names
+            _6 = ', '.join(_6) + ', ' if len(_6) > 0 else ''
+            _7 = ['{}={}'.format(k, k) for k in other_kw_names]
+            _7 = ', '.join(_7) + ', ' if len(_7) > 0 else ''
             func_str = "@classmethod\n" \
-                "def {0}(cls, {1}*args, {2}**kwargs):\n" \
-                "    \"\"\"{3}\"\"\"\n" \
-                "    return cls._{0}({4}*args, {5}**kwargs)".format(
-                    func_name, first_arg, second_arg, docstring, fourth_arg, fifth_arg
+                "def {0}(cls, {1}{2}{3}{4}**kwargs):\n" \
+                "    \"\"\"{5}\"\"\"\n" \
+                "    return cls._{0}({6}{3}{7}**kwargs)".format(
+                _0, _1, _2, _3, _4, _5, _6, _7
             )
             scope = {**dict(Default=Default), **default_kwargs}
             filename = inspect.getfile(lambda: None)
@@ -1561,6 +1573,9 @@ class IndicatorFactory:
                         param_list[i] = param_list[i].value
                 checks.assert_len_equal(param_list, param_names)
                 args = args[len(param_names):]
+                if not variable_args and len(args) > 0:
+                    raise TypeError("Variable length arguments are not supported by this function "
+                                    "(variable_args is set to False)")
 
                 # Prepare params
                 param_settings_list = [param_settings.get(n, {}) for n in param_names]
@@ -1827,6 +1842,22 @@ class IndicatorFactory:
             2020-01-03      2.5  3.5  2.0  4.0
             2020-01-04      3.5  2.5  3.0  3.0
             2020-01-05      4.5  1.5  4.0  2.0
+            ```
+
+            To get help on a function, use the `help` command:
+
+            ```python-repl
+            >>> help(SMA.run)
+            Help on method run:
+
+            run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+                Run the SMA indicator using input time series `close`, and parameters `timeperiod`, to
+                produce output time series `real`.
+
+                Pass a list of parameter names `hide_params` to hide their column levels.
+                Set `hide_default` to False to show column levels of parameters with the default value passed.
+
+                Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
             ```
         """
         import talib

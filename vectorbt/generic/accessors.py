@@ -45,7 +45,7 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
-from vectorbt.base.common import add_nb_methods
+from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
 

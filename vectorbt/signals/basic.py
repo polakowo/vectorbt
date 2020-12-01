@@ -556,7 +556,7 @@ class ADVSTEX(ADVSTEX):
         2                False  False  False
         3                False   True  False
         4                 True  False  False
-        >>> advstex.hit_price_filled
+        >>> advstex.hit_price
         advstex_sl_stop  0.1   0.0   0.0
         advstex_ts_stop  0.0   0.1   0.0
         advstex_tp_stop  0.0   0.0   0.1

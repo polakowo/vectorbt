@@ -44,7 +44,7 @@ from vectorbt.utils.config import merge_kwargs
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base import reshape_fns
-from vectorbt.base.common import add_nb_methods
+from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
 from vectorbt.signals import nb
 

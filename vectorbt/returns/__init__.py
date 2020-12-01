@@ -28,9 +28,12 @@ The accessors extend `vectorbt.generic.accessors`.
 0.2
 ```
 
+!!! note
+    The underlying Series/DataFrame must already be a return series.
+
 ## Numba-compiled functions
 
-`vectorbt.returns.nb` provides an arsenal of Numba-compiled functions that are used by accessors
+Module `vectorbt.returns.nb` provides an arsenal of Numba-compiled functions that are used by accessors
 and for measuring portfolio performance. These only accept NumPy arrays and other Numba-compatible types.
 
 ```python-repl

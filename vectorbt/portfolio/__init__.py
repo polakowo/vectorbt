@@ -2,10 +2,10 @@
 
 ## Base class
 
-`vectorbt.portfolio.base` provides the class `vectorbt.portfolio.base.Portfolio` for modeling portfolio
-performance and calculating various risk and performance metrics. It uses Numba-compiled
+Module `vectorbt.portfolio.base` provides the class `vectorbt.portfolio.base.Portfolio` for modeling
+portfolio performance and calculating various risk and performance metrics. It uses Numba-compiled
 functions from `vectorbt.portfolio.nb` for most computations and record classes based on
-`vectorbt.records.base.Records` for evaluating events such as orders, trades and positions.
+`vectorbt.records.base.Records` for evaluating events such as orders, logs, trades, positions and drawdowns.
 
 An example of how to assess performance of a random strategy on Bitcoin:
 
@@ -50,32 +50,35 @@ Calmar Ratio                                0.865842
 dtype: object
 ```
 
-## Orders
+## Orders class
 
-`vectorbt.portfolio.orders.Orders` class accepts order records and the corresponding time series
+Class `vectorbt.portfolio.orders.Orders` wraps order records and the corresponding time series
 (such as open or close) to analyze orders. Orders are mainly populated when simulating a portfolio
-with the `vectorbt.portfolio.base.Portfolio` class. They can be accessed by`vectorbt.portfolio.base.Portfolio.orders`.
+and can be accessed as `vectorbt.portfolio.base.Portfolio.orders`.
 
-### Trades
+## Logs class
 
-`vectorbt.portfolio.trades.Trades` class accepts trade records and the corresponding time series
+Class `vectorbt.portfolio.logs.Logs` class wraps log records to analyze logs. Logs are mainly populated when
+simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio.logs`.
+
+### Trades and Positions classes
+
+Class `vectorbt.portfolio.trades.Trades` wraps trade records and the corresponding time series
 (such as open or close) to analyze trades. Use `vectorbt.portfolio.trades.Trades.from_orders`
 to generate trade records from order records. This is done automatically in the
 `vectorbt.portfolio.base.Portfolio` class, available as `vectorbt.portfolio.base.Portfolio.trades`.
 
-### Positions
-
-`vectorbt.portfolio.positions.Positions` class has the same properties as trades and is also
-natively supported by `vectorbt.portfolio.base.Portfolio`.
+Class `vectorbt.portfolio.trades.Positions` has the same properties as trades and is also
+provided by `vectorbt.portfolio.base.Portfolio` as `vectorbt.portfolio.base.Portfolio.positions`.
 
 ## Numba-compiled functions
 
-`vectorbt.portfolio.nb` provides an arsenal of Numba-compiled functions that are used for portfolio
+Module `vectorbt.portfolio.nb` provides an arsenal of Numba-compiled functions that are used for portfolio
 modeling, such as generating and filling orders. These only accept NumPy arrays and other Numba-compatible types.
 
 ## Enums
 
-`vectorbt.portfolio.enums` defines enums and other schemas for `vectorbt.portfolio`.
+Module `vectorbt.portfolio.enums` defines enums and other schemas for `vectorbt.portfolio`.
 """
 
 from vectorbt.portfolio.enums import *

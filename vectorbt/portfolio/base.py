@@ -1232,7 +1232,7 @@ class Portfolio(Wrapping):
             ```
 
             Reverse each position by first closing it. Keep state of last position to determine
-            which position to open next (just for example, there are easier ways to do this):
+            which position to open next (just as an example, there are easier ways to do this):
             ```python-repl
             >>> import numpy as np
 
@@ -1491,12 +1491,12 @@ class Portfolio(Wrapping):
             )
         return self._wrapper
 
-    def regroup(self, group_by, force=False, **kwargs):
+    def regroup(self, group_by, **kwargs):
         """Regroup this object.
 
         See `vectorbt.base.array_wrapper.Wrapping.regroup`."""
         if self.cash_sharing:
-            if self.wrapper.grouper.is_grouping_modified(group_by=group_by) and not force:
+            if self.wrapper.grouper.is_grouping_modified(group_by=group_by):
                 raise ValueError("Cannot modify grouping globally when cash_sharing=True")
         return Wrapping.regroup(self, group_by, **kwargs)
 
@@ -1517,9 +1517,14 @@ class Portfolio(Wrapping):
 
     # ############# Records ############# #
 
+    @property
+    def order_records(self):
+        """A structured NumPy array of order records."""
+        return self._order_records
+
     @cached_property
     def _orders(self):
-        return Orders(self.wrapper, self._order_records, self.close)
+        return Orders(self.wrapper, self.order_records, self.close)
 
     def orders(self, group_by=None):
         """Get order records.
@@ -1527,9 +1532,14 @@ class Portfolio(Wrapping):
         See `vectorbt.portfolio.orders.Orders`."""
         return self._orders.regroup(group_by=group_by)
 
+    @property
+    def log_records(self):
+        """A structured NumPy array of log records."""
+        return self._log_records
+
     @cached_property
     def _logs(self):
-        return Logs(self.wrapper, self._log_records)
+        return Logs(self.wrapper, self.log_records)
 
     def logs(self, group_by=None):
         """Get log records.
@@ -2133,7 +2143,7 @@ class Portfolio(Wrapping):
         from vectorbt.defaults import color_schema
 
         # Select one column/group
-        self_col = self.select_series(column=column, group=group, group_by=group_by, force=True)
+        self_col = self.select_series(column=column, group_by=group_by)
 
         if subplots is None:
             if self_col.wrapper.grouper.is_grouped():

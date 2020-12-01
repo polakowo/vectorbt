@@ -51,7 +51,7 @@ array([0, 1, 2, 3, 0])
 
 ## Enums
 
-`vectorbt.signals.enums` defines enums and other schemas for `vectorbt.signals`.
+Module `vectorbt.signals.enums` defines enums and other schemas for `vectorbt.signals`.
 """
 
 from vectorbt.signals.enums import *

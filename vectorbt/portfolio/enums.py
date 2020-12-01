@@ -373,7 +373,7 @@ status_info_desc = [
     "No open position to reduce/close",
     "Size is greater than maximum allowed",
     "Random event happened",
-    "Fees cannot be covered",
+    "Not enough cash to cover fees",
     "Final size is less than minimum allowed",
     "Final size is less than requested"
 ]

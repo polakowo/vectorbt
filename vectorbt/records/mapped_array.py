@@ -236,7 +236,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import to_value_map
 from vectorbt.base.reshape_fns import to_1d
-from vectorbt.base.common import (
+from vectorbt.base.class_helpers import (
     add_binary_magic_methods,
     add_unary_magic_methods,
     binary_magic_methods,

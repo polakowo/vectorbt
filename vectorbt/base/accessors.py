@@ -12,7 +12,7 @@ from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.config import merge_kwargs
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
-from vectorbt.base.common import (
+from vectorbt.base.class_helpers import (
     add_binary_magic_methods,
     add_unary_magic_methods,
     binary_magic_methods,

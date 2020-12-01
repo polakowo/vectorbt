@@ -101,10 +101,19 @@ class Configured:
                 except:
                     return False
             elif isinstance(v, np.ndarray) or isinstance(other_v, np.ndarray):
-                try:
-                    np.testing.assert_array_equal(v, other_v)
-                except:
-                    return False
+                if v.dtype.fields is not None and other_v.dtype.fields is not None:  # records
+                    if v.dtype.fields != other_v.dtype.fields:
+                        return False
+                    for field in v.dtype.names:
+                        try:
+                            np.testing.assert_array_equal(v[field], other_v[field])
+                        except:
+                            return False
+                else:
+                    try:
+                        np.testing.assert_array_equal(v, other_v)
+                    except:
+                        return False
             else:
                 if v != other_v:
                     return False

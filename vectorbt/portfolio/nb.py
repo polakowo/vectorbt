@@ -160,7 +160,7 @@ def buy_shares_nb(cash_now, shares_now, size, direction, price, fees, fixed_fees
         if is_close_or_less_nb(cash_now, fixed_fees):
             # Can't fill
             if raise_reject:
-                raise RejectedOrderError("Order rejected: Fees cannot be covered")
+                raise RejectedOrderError("Order rejected: Not enough cash to cover fees")
             return order_not_filled_nb(
                 cash_now, shares_now,
                 OrderStatus.Rejected, StatusInfo.CantCoverFees,
@@ -825,6 +825,9 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         >>> import numpy as np
         >>> import pandas as pd
         >>> from numba import njit
+        >>> from vectorbt.generic.plotting import create_scatter
+        >>> from vectorbt.records.nb import col_map_nb
+        >>> from vectorbt.portfolio.enums import SizeType, Direction
         >>> from vectorbt.portfolio.nb import (
         ...     create_order_nb,
         ...     simulate_nb,
@@ -834,8 +837,6 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
         ...     shares_nb,
         ...     holding_value_nb
         ... )
-        >>> from vectorbt.generic.plotting import create_scatter
-        >>> from vectorbt.portfolio.enums import SizeType, Direction
 
         >>> @njit
         ... def prep_func_nb(simc):  # do nothing
@@ -940,7 +941,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                [0, 1, 2],
                [0, 2, 1]])
 
-        >>> share_flow = share_flow_nb(target_shape, order_records, Direction.All)
+        >>> col_map = col_map_nb(order_records['col'], target_shape[1])
+        >>> share_flow = share_flow_nb(target_shape, order_records, col_map, Direction.All)
         >>> shares = shares_nb(share_flow)
         >>> holding_value = holding_value_nb(close, shares)
         >>> create_scatter(data=holding_value)

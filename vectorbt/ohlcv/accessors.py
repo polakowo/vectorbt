@@ -74,7 +74,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
         if bar_kwargs is None:
             bar_kwargs = {}
         ohlc = plot_type(
-            x=self.index,
+            x=self.wrapper.index,
             open=open,
             high=high,
             low=low,
@@ -95,7 +95,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             marker_colors[(close.values - open.values) == 0] = 'lightgrey'
             marker_colors[(close.values - open.values) < 0] = '#d95f02'
             bar = go.Bar(
-                x=self.index,
+                x=self.wrapper.index,
                 y=volume,
                 marker_color=marker_colors,
                 marker_line_width=0,

@@ -10,7 +10,7 @@ from vectorbt.base import (
     array_wrapper,
     column_grouper,
     combine_fns,
-    common,
+    class_helpers,
     index_fns,
     indexing,
     reshape_fns
@@ -339,7 +339,7 @@ df4_grouped_wrapper_co = df4_grouped_wrapper.copy(column_only_select=True, group
 
 class TestArrayWrapper:
 
-    def test_indexing_on_wrapper_meta(self):
+    def test_indexing_func_meta(self):
         # not grouped
         a, b, c = sr2_wrapper._indexing_func_meta(lambda x: x.iloc[:2])[1:]
         np.testing.assert_array_equal(a, np.array([0, 1]))
@@ -440,14 +440,14 @@ class TestArrayWrapper:
             pd.Index(['a6', 'b6'], dtype='object', name='c6'))
         pd.testing.assert_index_equal(
             df4_wrapper.iloc[0, :2].columns,
-            pd.Index(['x6'], dtype='object'))
+            pd.Index(['x6'], dtype='object', name='i6'))
         assert df4_wrapper.iloc[0, :2].ndim == 1
         pd.testing.assert_index_equal(
             df4_wrapper.iloc[:2, 0].index,
             pd.Index(['x6', 'y6'], dtype='object', name='i6'))
         pd.testing.assert_index_equal(
             df4_wrapper.iloc[:2, 0].columns,
-            pd.Index(['a6'], dtype='object'))
+            pd.Index(['a6'], dtype='object', name='c6'))
         assert df4_wrapper.iloc[:2, 0].ndim == 1
         pd.testing.assert_index_equal(
             df4_wrapper.iloc[:2, [0]].index,
@@ -914,22 +914,16 @@ class TestWrapping:
         assert sr2_grouped_wrapping.select_series() == sr2_grouped_wrapping
         pd.testing.assert_index_equal(
             df4_wrapping.select_series(column='a6').wrapper.get_columns(),
-            pd.Index(['a6'], dtype='object')
+            pd.Index(['a6'], dtype='object', name='c6')
         )
         pd.testing.assert_index_equal(
-            df4_grouped_wrapping.select_series(column='a6').wrapper.get_columns(),
-            pd.Index(['a6'], dtype='object')
-        )
-        pd.testing.assert_index_equal(
-            df4_grouped_wrapping.select_series(group='g1').wrapper.get_columns(),
+            df4_grouped_wrapping.select_series(column='g1').wrapper.get_columns(),
             pd.Index(['g1'], dtype='object')
         )
         with pytest.raises(Exception) as e_info:
             df4_wrapping.select_series()
         with pytest.raises(Exception) as e_info:
             df4_grouped_wrapping.select_series()
-        with pytest.raises(Exception) as e_info:
-            df4_grouped_wrapping.select_series(group='g1', column_only=True)
 
 
 # ############# index_fns.py ############# #
@@ -2563,7 +2557,7 @@ class TestCommon:
         @njit
         def reduced_dim1_1d_nb(a): return np.zeros(a.shape[0] - 1)
 
-        @common.add_nb_methods([
+        @class_helpers.add_nb_methods([
             same_shape_1d_nb,
             wkw_1d_nb,
             reduced_dim0_1d_nb,
@@ -2597,7 +2591,7 @@ class TestCommon:
         @njit
         def reduced_dim2_nb(a): return np.zeros((a.shape[0] - 1, a.shape[1]))
 
-        @common.add_nb_methods([
+        @class_helpers.add_nb_methods([
             same_shape_nb,
             wkw_nb,
             reduced_dim0_nb,

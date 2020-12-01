@@ -1,4 +1,4 @@
-"""Common functions and classes."""
+"""Class decorators and other helpers."""
 
 import numpy as np
 import inspect
