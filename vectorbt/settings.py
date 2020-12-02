@@ -4,8 +4,8 @@ For example, you can change default width and height of each plot:
 ```python-repl
 >>> import vectorbt as vbt
 
->>> vbt.defaults.layout['width'] = 800
->>> vbt.defaults.layout['height'] = 400
+>>> vbt.settings.layout['width'] = 800
+>>> vbt.settings.layout['height'] = 400
 ```
 
 Changes take effect immediately."""
@@ -143,8 +143,9 @@ __pdoc__['broadcasting'] = f"""Broadcasting rules for index and columns.
 
 # Caching
 caching = Config(
-    properties=True,
-    methods=True
+    enabled=True,
+    whiteset=set(),
+    blackset=set()
 )
 """_"""
 

@@ -237,7 +237,7 @@ variables it's specified per order and can broadcast automatically.
 
 This class supports caching. If a method or a property requires heavy computation, it's wrapped
 with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property` respectively.
-Caching can be disabled globally via `vectorbt.defaults` or locally via the method/property.
+Caching can be disabled globally via `vectorbt.settings` or locally via the method/property.
 There is currently no way to disable caching for an entire class.
 
 !!! note
@@ -394,10 +394,10 @@ class Portfolio(Wrapping):
             incl_unrealized=incl_unrealized
         )
         # Get defaults
-        from vectorbt import defaults
+        from vectorbt import settings
 
         if incl_unrealized is None:
-            incl_unrealized = defaults.portfolio['incl_unrealized']
+            incl_unrealized = settings.portfolio['incl_unrealized']
 
         # Store passed arguments
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
@@ -532,7 +532,7 @@ class Portfolio(Wrapping):
         All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
-        For defaults, see `vectorbt.defaults.portfolio`.
+        For defaults, see `vectorbt.settings.portfolio`.
 
         !!! note
             Only `SizeType.Shares` is supported. Other modes such as target percentage are not
@@ -646,39 +646,39 @@ class Portfolio(Wrapping):
         ```
         """
         # Get defaults
-        from vectorbt import defaults
+        from vectorbt import settings
 
         if size is None:
-            size = defaults.portfolio['size']
+            size = settings.portfolio['size']
         if price is None:
             price = close
         if fees is None:
-            fees = defaults.portfolio['fees']
+            fees = settings.portfolio['fees']
         if fixed_fees is None:
-            fixed_fees = defaults.portfolio['fixed_fees']
+            fixed_fees = settings.portfolio['fixed_fees']
         if slippage is None:
-            slippage = defaults.portfolio['slippage']
+            slippage = settings.portfolio['slippage']
         if min_size is None:
-            min_size = defaults.portfolio['min_size']
+            min_size = settings.portfolio['min_size']
         if max_size is None:
-            max_size = defaults.portfolio['max_size']
+            max_size = settings.portfolio['max_size']
         if reject_prob is None:
-            reject_prob = defaults.portfolio['reject_prob']
+            reject_prob = settings.portfolio['reject_prob']
         if close_first is None:
-            close_first = defaults.portfolio['close_first']
+            close_first = settings.portfolio['close_first']
         if allow_partial is None:
-            allow_partial = defaults.portfolio['allow_partial']
+            allow_partial = settings.portfolio['allow_partial']
         if raise_reject is None:
-            raise_reject = defaults.portfolio['raise_reject']
+            raise_reject = settings.portfolio['raise_reject']
         if log is None:
-            log = defaults.portfolio['log']
+            log = settings.portfolio['log']
         if accumulate is None:
-            accumulate = defaults.portfolio['accumulate']
+            accumulate = settings.portfolio['accumulate']
         if conflict_mode is None:
-            conflict_mode = defaults.portfolio['conflict_mode']
+            conflict_mode = settings.portfolio['conflict_mode']
         conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
         if direction is None:
-            direction = defaults.portfolio['direction']
+            direction = settings.portfolio['direction']
         direction = convert_str_enum_value(Direction, direction)
         if val_price is None:
             if price is None:
@@ -691,7 +691,7 @@ class Portfolio(Wrapping):
             else:
                 val_price = price
         if init_cash is None:
-            init_cash = defaults.portfolio['init_cash']
+            init_cash = settings.portfolio['init_cash']
         init_cash = convert_str_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
@@ -699,9 +699,9 @@ class Portfolio(Wrapping):
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = defaults.portfolio['cash_sharing']
+            cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
-            call_seq = defaults.portfolio['call_seq']
+            call_seq = settings.portfolio['call_seq']
         call_seq = convert_str_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
@@ -709,11 +709,11 @@ class Portfolio(Wrapping):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if seed is None:
-            seed = defaults.portfolio['seed']
+            seed = settings.portfolio['seed']
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = defaults.portfolio['freq']
+            freq = settings.portfolio['freq']
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if wrapper_kwargs is None:
@@ -892,7 +892,7 @@ class Portfolio(Wrapping):
         All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
-        For defaults, see `vectorbt.defaults.portfolio`.
+        For defaults, see `vectorbt.settings.portfolio`.
 
         !!! note
             When `call_seq` is not `CallSeqType.Auto`, at each timestamp, processing of the assets in
@@ -982,42 +982,42 @@ class Portfolio(Wrapping):
         ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
-        from vectorbt import defaults
+        from vectorbt import settings
 
         if size is None:
-            size = defaults.portfolio['size']
+            size = settings.portfolio['size']
         if size_type is None:
-            size_type = defaults.portfolio['size_type']
+            size_type = settings.portfolio['size_type']
         size_type = convert_str_enum_value(SizeType, size_type)
         if direction is None:
-            direction = defaults.portfolio['direction']
+            direction = settings.portfolio['direction']
         direction = convert_str_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
-            fees = defaults.portfolio['fees']
+            fees = settings.portfolio['fees']
         if fixed_fees is None:
-            fixed_fees = defaults.portfolio['fixed_fees']
+            fixed_fees = settings.portfolio['fixed_fees']
         if slippage is None:
-            slippage = defaults.portfolio['slippage']
+            slippage = settings.portfolio['slippage']
         if min_size is None:
-            min_size = defaults.portfolio['min_size']
+            min_size = settings.portfolio['min_size']
         if max_size is None:
-            max_size = defaults.portfolio['max_size']
+            max_size = settings.portfolio['max_size']
         if reject_prob is None:
-            reject_prob = defaults.portfolio['reject_prob']
+            reject_prob = settings.portfolio['reject_prob']
         if close_first is None:
-            close_first = defaults.portfolio['close_first']
+            close_first = settings.portfolio['close_first']
         if allow_partial is None:
-            allow_partial = defaults.portfolio['allow_partial']
+            allow_partial = settings.portfolio['allow_partial']
         if raise_reject is None:
-            raise_reject = defaults.portfolio['raise_reject']
+            raise_reject = settings.portfolio['raise_reject']
         if log is None:
-            log = defaults.portfolio['log']
+            log = settings.portfolio['log']
         if val_price is None:
             val_price = price
         if init_cash is None:
-            init_cash = defaults.portfolio['init_cash']
+            init_cash = settings.portfolio['init_cash']
         init_cash = convert_str_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
@@ -1025,9 +1025,9 @@ class Portfolio(Wrapping):
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = defaults.portfolio['cash_sharing']
+            cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
-            call_seq = defaults.portfolio['call_seq']
+            call_seq = settings.portfolio['call_seq']
         call_seq = convert_str_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
@@ -1035,11 +1035,11 @@ class Portfolio(Wrapping):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if seed is None:
-            seed = defaults.portfolio['seed']
+            seed = settings.portfolio['seed']
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = defaults.portfolio['freq']
+            freq = settings.portfolio['freq']
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if wrapper_kwargs is None:
@@ -1192,7 +1192,7 @@ class Portfolio(Wrapping):
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        For defaults, see `vectorbt.defaults.portfolio`.
+        For defaults, see `vectorbt.settings.portfolio`.
 
         !!! note
             All passed functions should be Numba-compiled.
@@ -1338,7 +1338,7 @@ class Portfolio(Wrapping):
         ![](/vectorbt/docs/img/simulate_nb.png)
         """
         # Get defaults
-        from vectorbt import defaults
+        from vectorbt import settings
 
         if not checks.is_pandas(close):
             if not checks.is_array(close):
@@ -1347,7 +1347,7 @@ class Portfolio(Wrapping):
         if target_shape is None:
             target_shape = close.shape
         if init_cash is None:
-            init_cash = defaults.portfolio['init_cash']
+            init_cash = settings.portfolio['init_cash']
         init_cash = convert_str_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
@@ -1355,9 +1355,9 @@ class Portfolio(Wrapping):
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = defaults.portfolio['cash_sharing']
+            cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
-            call_seq = defaults.portfolio['call_seq']
+            call_seq = settings.portfolio['call_seq']
         call_seq = convert_str_enum_value(CallSeqType, call_seq)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1366,13 +1366,13 @@ class Portfolio(Wrapping):
         if active_mask is None:
             active_mask = True
         if row_wise is None:
-            row_wise = defaults.portfolio['row_wise']
+            row_wise = settings.portfolio['row_wise']
         if seed is None:
-            seed = defaults.portfolio['seed']
+            seed = settings.portfolio['seed']
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = defaults.portfolio['freq']
+            freq = settings.portfolio['freq']
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         require_kwargs = dict(require_kwargs=dict(requirements='W'))
@@ -2126,7 +2126,7 @@ class Portfolio(Wrapping):
         by creating a placeholder that can be written later:
 
         ```python-repl
-        >>> from vectorbt.defaults import color_schema
+        >>> from vectorbt.settings import color_schema
 
         >>> fig = portfolio.plot(subplots=[
         ...     'orders',
@@ -2138,7 +2138,7 @@ class Portfolio(Wrapping):
 
         ![](/vectorbt/docs/img/portfolio_plot_custom.png)
         """
-        from vectorbt.defaults import color_schema
+        from vectorbt.settings import color_schema
 
         # Select one column/group
         self_col = self.select_series(column=column, group_by=group_by)

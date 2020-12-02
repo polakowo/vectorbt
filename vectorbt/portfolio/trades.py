@@ -377,7 +377,7 @@ class Trades(Records):
 
         ![](/vectorbt/docs/img/trades_plot_pnl.png)
         """
-        from vectorbt.defaults import contrast_color_schema
+        from vectorbt.settings import contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
 
@@ -549,7 +549,7 @@ class Trades(Records):
         ```
 
         ![](/vectorbt/docs/img/trades_plot.png)"""
-        from vectorbt.defaults import color_schema, contrast_color_schema
+        from vectorbt.settings import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
 

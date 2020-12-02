@@ -116,7 +116,7 @@ code {
     background: #f2f2f1;
     padding: 1px 4px;
     overflow-wrap: break-word;
-    font-size: 95%;
+    font-size: 0.95em;
 }
 
 h1 code {

@@ -46,11 +46,11 @@ class Returns_Accessor(Generic_Accessor):
     @property
     def year_freq(self):
         """Year frequency."""
-        from vectorbt import defaults
+        from vectorbt import settings
 
         year_freq = self._year_freq
         if year_freq is None:
-            year_freq = defaults.returns['year_freq']
+            year_freq = settings.returns['year_freq']
         return freq_delta(year_freq)
 
     @property
@@ -413,7 +413,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
 
         ![](/vectorbt/docs/img/plot_cum_returns.png)
         """
-        from vectorbt.defaults import color_schema
+        from vectorbt.settings import color_schema
 
         if fig is None:
             fig = CustomFigureWidget()

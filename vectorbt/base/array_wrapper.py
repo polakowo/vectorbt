@@ -75,16 +75,16 @@ class ArrayWrapper(Configured, PandasIndexer):
             as a Series of columns rather than a DataFrame. For example, the operation
             `.iloc[:, :2]` should become `.iloc[:2]`. Operations are not allowed if the
             object is already a Series and thus has only one column/group."""
-        from vectorbt import defaults
+        from vectorbt import settings
 
         if column_only_select is None:
             column_only_select = self.column_only_select
         if column_only_select is None:
-            column_only_select = defaults.array_wrapper['column_only_select']
+            column_only_select = settings.array_wrapper['column_only_select']
         if group_select is None:
             group_select = self.group_select
         if group_select is None:
-            group_select = defaults.array_wrapper['group_select']
+            group_select = settings.array_wrapper['group_select']
         _self = self.regroup(group_by)
         group_select = group_select and _self.grouper.is_grouped()
         if index is None:
@@ -301,11 +301,11 @@ class ArrayWrapper(Configured, PandasIndexer):
     @property
     def freq(self):
         """Index frequency."""
-        from vectorbt import defaults
+        from vectorbt import settings
 
         freq = self._freq
         if freq is None:
-            freq = defaults.array_wrapper['freq']
+            freq = settings.array_wrapper['freq']
         if freq is not None:
             return freq_delta(freq)
         if isinstance(self.index, DatetimeTypes):

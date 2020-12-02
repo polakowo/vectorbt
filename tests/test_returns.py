@@ -4,7 +4,7 @@ from datetime import datetime
 import pytest
 import empyrical
 
-from vectorbt import defaults
+from vectorbt import settings
 from vectorbt.generic.drawdowns import Drawdowns
 
 from tests.utils import isclose
@@ -25,7 +25,7 @@ ts = pd.DataFrame({
 }, index=index)
 ret = ts.pct_change()
 
-defaults.returns['year_freq'] = '252 days'  # same as empyrical
+settings.returns['year_freq'] = '252 days'  # same as empyrical
 
 seed = 42
 
@@ -51,8 +51,8 @@ class TestAccessors:
         assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
     def test_year_freq(self):
-        assert ret.vbt.returns.year_freq == pd.to_timedelta(defaults.returns['year_freq'])
-        assert ret['a'].vbt.returns.year_freq == pd.to_timedelta(defaults.returns['year_freq'])
+        assert ret.vbt.returns.year_freq == pd.to_timedelta(settings.returns['year_freq'])
+        assert ret['a'].vbt.returns.year_freq == pd.to_timedelta(settings.returns['year_freq'])
         assert ret['a'].vbt.returns(year_freq='365 days').year_freq == pd.to_timedelta('365 days')
         assert ret.vbt.returns(year_freq='365 days').year_freq == pd.to_timedelta('365 days')
 

@@ -163,7 +163,7 @@ class Orders(Records):
         ```
 
         ![](/vectorbt/docs/img/orders_plot.png)"""
-        from vectorbt.defaults import color_schema, contrast_color_schema
+        from vectorbt.settings import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
 

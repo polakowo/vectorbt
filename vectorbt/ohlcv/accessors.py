@@ -53,9 +53,9 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
 
         ![](/vectorbt/docs/img/ohlcv.png)
         """
-        from vectorbt import defaults
+        from vectorbt import settings
 
-        column_names = defaults.ohlcv['column_names'] if self._column_names is None else self._column_names
+        column_names = settings.ohlcv['column_names'] if self._column_names is None else self._column_names
         open = self._obj[column_names['open']]
         high = self._obj[column_names['high']]
         low = self._obj[column_names['low']]

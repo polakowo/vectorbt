@@ -210,7 +210,7 @@ to each `__init__` argument with index:
 
 `Records` supports caching. If a method or a property requires heavy computation, it's Wrapping
 with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
-respectively. Caching can be disabled globally via `vectorbt.defaults` or locally via the
+respectively. Caching can be disabled globally via `vectorbt.settings` or locally via the
 method/property. There is currently no way to disable caching for an entire class.
 
 !!! note

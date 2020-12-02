@@ -965,7 +965,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         ![](/vectorbt/docs/img/signals_plot_as_markers.png)
         """
-        from vectorbt.defaults import contrast_color_schema
+        from vectorbt.settings import contrast_color_schema
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1007,7 +1007,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         """Plot signals as entry markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
-        from vectorbt.defaults import contrast_color_schema
+        from vectorbt.settings import contrast_color_schema
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1028,7 +1028,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         """Plot signals as exit markers.
 
         See `Signals_SRAccessor.plot_as_markers`."""
-        from vectorbt.defaults import contrast_color_schema
+        from vectorbt.settings import contrast_color_schema
 
         if trace_kwargs is None:
             trace_kwargs = {}

@@ -53,6 +53,7 @@ class custom_property():
 
     def __init__(self, func, **kwargs):
         self.func = func
+        self.name = func.__name__
         self.kwargs = kwargs
         self.__doc__ = getattr(func, '__doc__')
 
@@ -63,6 +64,55 @@ class custom_property():
 
     def __set__(self, obj, value):
         raise AttributeError("can't set attribute")
+
+
+def is_caching_enabled(disabled, name, instance, kwargs):
+    """Check whether caching is enabled against a range of conditions.
+
+    Conditions have the following priority:
+
+    ```plaintext
+    1) is caching disabled locally?
+    2) is name (case-sensitive) in whiteset/blackset?
+    3) is instance, its class, or class name (case-sensitive) in whiteset/blackset?
+    4) is subset of kwargs in whiteset/blackset?
+    5) is caching disabled globally?
+    ```"""
+    from vectorbt import settings
+
+    if disabled:
+        return False
+    if not settings.caching['enabled']:
+        if len(settings.caching['whiteset']) > 0:
+            if instance in settings.caching['whiteset']:
+                return True
+            if name in settings.caching['whiteset']:
+                return True
+            if hasattr(instance, '__class__'):
+                if instance.__class__ in settings.caching['whiteset']:
+                    return True
+                if instance.__class__.__name__ in settings.caching['whiteset']:
+                    return True
+            for dct in settings.caching['whiteset']:
+                if isinstance(dct, dict):
+                    if dct.items() <= kwargs.items():
+                        return True
+        return False
+    if len(settings.caching['blackset']) > 0:
+        if instance in settings.caching['blackset']:
+            return False
+        if name in settings.caching['blackset']:
+            return False
+        if hasattr(instance, '__class__'):
+            if instance.__class__ in settings.caching['blackset']:
+                return False
+            if instance.__class__.__name__ in settings.caching['blackset']:
+                return False
+        for dct in settings.caching['blackset']:
+            if isinstance(dct, dict):
+                if dct.items() <= kwargs.items():
+                    return False
+    return True
 
 
 _NOT_FOUND = object()
@@ -81,7 +131,6 @@ class cached_property(custom_property):
 
     def __init__(self, func, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
-        self.attrname = '__cached_' + func.__name__
         self.lock = RLock()
         self.disabled = disabled
 
@@ -90,15 +139,18 @@ class cached_property(custom_property):
         if hasattr(instance, self.attrname):
             delattr(instance, self.attrname)
 
+    @property
+    def attrname(self):
+        """Get name of cached attribute."""
+        return '__cached_' + self.name
+
     def __set_name__(self, owner, name):
-        self.attrname = '__cached_' + name  # here is the difference
+        self.name = name
 
     def __get__(self, instance, owner=None):
-        from vectorbt import defaults
-
         if instance is None:
             return self
-        if not defaults.caching['properties'] or self.disabled:  # you can manually disable cache here
+        if not is_caching_enabled(self, instance):
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         val = cache.get(self.attrname, _NOT_FOUND)
@@ -169,13 +221,13 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
     def decorator(func):
         @wraps(func)
         def wrapper(instance, *args, **kwargs):
-            from vectorbt import defaults
+            from vectorbt import settings
 
             def partial_func(*args, **kwargs):
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)
 
-            if not defaults.caching['methods'] or wrapper.disabled:  # you can manually disable cache here
+            if not is_caching_enabled(wrapper, instance):
                 return func(instance, *args, **kwargs)
             cache = instance.__dict__
             cached_func = cache.get(wrapper.attrname, _NOT_FOUND)
@@ -205,6 +257,7 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
         wrapper.func = func
         wrapper.maxsize = maxsize
         wrapper.typed = typed
+        wrapper.name = func.__name__
         wrapper.attrname = '__cached_' + func.__name__
         wrapper.lock = RLock()
         wrapper.disabled = disabled

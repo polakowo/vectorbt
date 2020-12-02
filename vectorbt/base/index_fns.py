@@ -62,12 +62,12 @@ def tile_index(index, n):
 
 def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None):
     """Stack each index in `indexes` on top of each other, from top to bottom."""
-    from vectorbt import defaults
+    from vectorbt import settings
 
     if drop_duplicates is None:
-        drop_duplicates = defaults.broadcasting['drop_duplicates']
+        drop_duplicates = settings.broadcasting['drop_duplicates']
     if drop_redundant is None:
-        drop_redundant = defaults.broadcasting['drop_redundant']
+        drop_redundant = settings.broadcasting['drop_redundant']
 
     levels = []
     for i in range(len(indexes)):
@@ -181,10 +181,10 @@ def drop_duplicate_levels(index, keep=None):
     """Drop levels in `index` with the same name and values.
 
     Set `keep` to 'last' to keep last levels, otherwise 'first'."""
-    from vectorbt import defaults
+    from vectorbt import settings
 
     if keep is None:
-        keep = defaults.broadcasting['keep']
+        keep = settings.broadcasting['keep']
     if not isinstance(index, pd.MultiIndex):
         return index
 

@@ -8,7 +8,7 @@ import pytest
 import vectorbt as vbt
 from vectorbt.portfolio.enums import *
 from vectorbt.generic.enums import drawdown_dt
-from vectorbt import defaults
+from vectorbt import settings
 from vectorbt.utils.random import set_seed
 from vectorbt.portfolio import nb
 
@@ -18,7 +18,7 @@ seed = 42
 
 day_dt = np.timedelta64(86400000000000)
 
-defaults.returns['year_freq'] = '252 days'  # same as empyrical
+settings.returns['year_freq'] = '252 days'  # same as empyrical
 
 price = pd.Series([1., 2., 3., 4., 5.], index=pd.Index([
     datetime(2020, 1, 1),

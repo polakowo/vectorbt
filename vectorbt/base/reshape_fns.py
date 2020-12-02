@@ -119,7 +119,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=Non
 
             Accepts the following values:
 
-            * 'default' - take the value from `vectorbt.defaults.broadcasting`
+            * 'default' - take the value from `vectorbt.settings.broadcasting`
             * 'strict' - ensure that all pandas objects have the same index/columns
             * 'stack' - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
             * 'ignore' - ignore any index/columns
@@ -133,7 +133,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=Non
             Conflicting Series names are those that are different but not None.
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
-    For defaults, see `vectorbt.defaults.broadcasting`.
+    For defaults, see `vectorbt.settings.broadcasting`.
 
     !!! note
         Series names are treated as columns with a single element but without a name.
@@ -141,10 +141,10 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=Non
         with one column prior to broadcasting. If the name of a Series is not that important,
         better to drop it altogether by setting it to None.
     """
-    from vectorbt import defaults
+    from vectorbt import settings
 
     if ignore_sr_names is None:
-        ignore_sr_names = defaults.broadcasting['ignore_sr_names']
+        ignore_sr_names = settings.broadcasting['ignore_sr_names']
     index_str = 'columns' if axis == 1 else 'index'
     to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
     # maxlen stores the length of the longest index
@@ -287,7 +287,7 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
         return_meta (bool): If True, will also return new shape, index and columns.
         **kwargs: Keyword arguments passed to `broadcast_index`.
 
-    For defaults, see `vectorbt.defaults.broadcasting`.
+    For defaults, see `vectorbt.settings.broadcasting`.
 
     ## Example
 
@@ -402,7 +402,7 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
     c  7  8  9
     ```
     """
-    from vectorbt import defaults
+    from vectorbt import settings
 
     is_pd = False
     is_2d = False
@@ -410,13 +410,13 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
     if require_kwargs is None:
         require_kwargs = {}
     if align_index is None:
-        align_index = defaults.broadcasting['align_index']
+        align_index = settings.broadcasting['align_index']
     if align_columns is None:
-        align_columns = defaults.broadcasting['align_columns']
+        align_columns = settings.broadcasting['align_columns']
     if isinstance(index_from, str) and index_from == 'default':
-        index_from = defaults.broadcasting['index_from']
+        index_from = settings.broadcasting['index_from']
     if isinstance(columns_from, str) and columns_from == 'default':
-        columns_from = defaults.broadcasting['columns_from']
+        columns_from = settings.broadcasting['columns_from']
 
     # Convert to np.ndarray object if not numpy or pandas
     # Also check whether we broadcast to pandas and whether work on 2-dim data

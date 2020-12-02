@@ -59,7 +59,7 @@ def create_indicator(value=None, label=None, value_range=None, cmap_name='Spectr
     ```
     ![](/vectorbt/docs/img/create_indicator.png)
     """
-    from vectorbt.defaults import layout
+    from vectorbt.settings import layout
 
     if trace_kwargs is None:
         trace_kwargs = {}
@@ -529,7 +529,7 @@ def create_heatmap(data=None, x_labels=None, y_labels=None, horizontal=False, tr
     ```
     ![](/vectorbt/docs/img/create_heatmap.png)
     """
-    from vectorbt.defaults import layout
+    from vectorbt.settings import layout
 
     if trace_kwargs is None:
         trace_kwargs = {}
@@ -650,7 +650,7 @@ def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False, trace
 
     ![](/vectorbt/docs/img/create_volume.png)
     """
-    from vectorbt.defaults import layout
+    from vectorbt.settings import layout
 
     if trace_kwargs is None:
         trace_kwargs = {}

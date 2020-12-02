@@ -4,7 +4,7 @@ from numba import njit
 import pytest
 from datetime import datetime
 
-from vectorbt import defaults
+from vectorbt import settings
 from vectorbt.base import (
     accessors,
     array_wrapper,
@@ -16,8 +16,8 @@ from vectorbt.base import (
     reshape_fns
 )
 
-defaults.broadcasting['index_from'] = 'stack'
-defaults.broadcasting['columns_from'] = 'stack'
+settings.broadcasting['index_from'] = 'stack'
+settings.broadcasting['columns_from'] = 'stack'
 
 day_dt = np.timedelta64(86400000000000)
 

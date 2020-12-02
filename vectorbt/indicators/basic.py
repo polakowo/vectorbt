@@ -88,7 +88,7 @@ class MA(MA):
 
         ![](/vectorbt/docs/img/MA.png)
         """
-        from vectorbt.defaults import color_schema
+        from vectorbt.settings import color_schema
 
         self_col = self.select_series(column=column)
 
@@ -256,7 +256,7 @@ class BBANDS(BBANDS):
 
         ![](/vectorbt/docs/img/BBANDS.png)
         """
-        from vectorbt.defaults import color_schema
+        from vectorbt.settings import color_schema
 
         self_col = self.select_series(column=column)
 
