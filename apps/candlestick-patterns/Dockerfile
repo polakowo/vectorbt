@@ -1,10 +1,10 @@
 FROM python:3.8-slim
 
-RUN apt-get -y update && apt-get -y install gcc curl make
+RUN apt-get -y update && apt-get -y install gcc curl make git
 
 RUN pip install --upgrade pip
 # Required by TA-Lib and numba
-RUN pip install numpy
+RUN pip install numpy==1.19.4
 
 RUN curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz \
     && tar -xzf ta-lib-0.4.0-src.tar.gz \
@@ -16,6 +16,7 @@ RUN curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install git+https://github.com/polakowo/vectorbt.git@shorting
 
 # Clean up APT when done.
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

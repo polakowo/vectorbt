@@ -27,7 +27,6 @@ from talib._ta_lib import (
 )
 import vectorbt as vbt
 from vectorbt.utils.config import merge_dicts
-from vectorbt.portfolio.enums import InitCashMode, AccumulationMode
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
@@ -160,7 +159,7 @@ default_candle_settings = pd.DataFrame({
 })
 default_entry_dates = []
 default_exit_dates = []
-default_sim_options = ['allow_inc_position', 'allow_dec_position']
+default_sim_options = ['allow_accumulate']
 default_n_random_strat = 50
 default_stats_options = ['incl_unrealized']
 default_layout = dict(
@@ -742,11 +741,8 @@ app.layout = html.Div(
                                         dcc.Checklist(
                                             id="sim_checklist",
                                             options=[{
-                                                "label": "Allow increasing position",
-                                                "value": "allow_inc_position"
-                                            }, {
-                                                "label": "Allow decreasing position",
-                                                "value": "allow_dec_position"
+                                                "label": "Allow signal accumulation",
+                                                "value": "allow_accumulate"
                                             }],
                                             value=default_sim_options,
                                             style={
@@ -1229,19 +1225,14 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
         rand_size[1:, :] = np.where(entry_signals, 1., 0.) - np.where(exit_signals, 1., 0.)
 
     # Simulate portfolio
-    def _simulate_portfolio(size, init_cash):
-        accumulate = 'allow_inc_position' in sim_options
-        accumulate_exit_mode = AccumulationMode.Reduce \
-            if 'allow_dec_position' in sim_options else AccumulationMode.Close
+    def _simulate_portfolio(size, init_cash='autoalign'):
         return vbt.Portfolio.from_signals(
             close=df['Close'],
             entries=size > 0,
             exits=size < 0,
-            entry_price=df['Open'],
-            exit_price=df['Open'],
+            price=df['Open'],
             size=np.abs(size),
-            accumulate=accumulate,
-            accumulate_exit_mode=accumulate_exit_mode,
+            accumulate='allow_accumulate' in sim_options,
             init_cash=init_cash,
             fees=float(fees) / 100,
             fixed_fees=float(fixed_fees),
@@ -1250,7 +1241,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
         )
 
     # Align initial cash across main and random strategies
-    aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)), InitCashMode.AutoAlign)
+    aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)))
     # Fixate initial cash for indexing
     aligned_portfolio = aligned_portfolio.copy(
         init_cash=aligned_portfolio.init_cash()
@@ -1260,7 +1251,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     rand_portfolio = aligned_portfolio.iloc[1:]
 
     # Simulate buy & hold portfolio
-    hold_portfolio = _simulate_portfolio(hold_size, main_portfolio.init_cash())
+    hold_portfolio = _simulate_portfolio(hold_size, init_cash=main_portfolio.init_cash())
 
     return main_portfolio, hold_portfolio, rand_portfolio
 
@@ -1324,8 +1315,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
     ))
 
     # Get returns
-    incl_unrealized = 'incl_unrealized' in stats_options
-    returns = main_portfolio.trades(incl_unrealized=incl_unrealized).returns
+    returns = main_portfolio.trades().returns
     profit_mask = returns.values > 0
     loss_mask = returns.values < 0
 
@@ -1415,6 +1405,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             return str(_chop_microseconds(x))
         return str(x)
 
+    incl_unrealized = 'incl_unrealized' in stats_options
     main_stats = main_portfolio.stats(incl_unrealized=incl_unrealized)
     hold_stats = hold_portfolio.stats(incl_unrealized=True)
     rand_stats = rand_portfolio.stats(incl_unrealized=incl_unrealized, agg_func=None)

@@ -252,8 +252,6 @@ be cached. For example, you can blacklist the entire `Portfolio` class except a 
 methods such as `Portfolio.cash_flow` and `Portfolio.share_flow`:
 
 ```python-repl
->>> import vectorbt as vbt
-
 >>> vbt.settings.caching['blacklist'].append('Portfolio')
 >>> vbt.settings.caching['whitelist'].extend([
 ...     'Portfolio.cash_flow',

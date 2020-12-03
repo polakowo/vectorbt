@@ -107,6 +107,11 @@ pre code {
     border: 1px solid #eee;
     border-radius: 6px;
     background: #282c34 !important;
+    color: #9da29e !important;
+}
+
+.python {
+    color: #c5c8c6 !important;
 }
 
 code {

@@ -44,7 +44,7 @@ class Config(dict):
         super().__init__(*args, **kwargs)
         self._frozen = frozen
         self._read_only = read_only
-        self._init_config = copy_dict(self)
+        self._init_config = copy_dict(self) if read_only else None
 
     @property
     def frozen(self):
@@ -107,6 +107,8 @@ class Config(dict):
 
     def reset(self):
         """Reset config to initial config."""
+        if self.read_only:
+            raise ValueError("Config is read-only")
         self.update(copy_dict(self.init_config), force_update=True)
 
 
