@@ -24,7 +24,28 @@ With vectorbt you can
 * Test machine learning models
 * Build interactive charts/dashboards without leaving Jupyter
 
-## Example
+## Basic example
+
+We hate boilerplate code, that's why in vectorbt you can start with as little as a couple of lines.
+Here is how much profit we would have made if we bought 10 Netflix shares back in 2002:
+
+```python
+import yfinance as yf
+import pandas as pd
+import vectorbt as vbt
+
+price = yf.Ticker('NFLX').history(period='max')['Close']
+size = pd.Series.vbt.empty_like(price, 0.)
+size.iloc[0] = 1.
+portfolio = vbt.Portfolio.from_orders(price, size, init_cash='auto')
+portfolio.total_profit()
+```
+
+```plaintext
+5021.8
+```
+
+## Advanced example
 
 Here a snippet for testing 10,000 window combinations of a dual SMA crossover strategy on BTC, USD and XRP
 from 2017 onwards, in under 5 seconds (Note: first time compiling with Numba may take a while):
@@ -120,12 +141,12 @@ complex phenomena in trading. With it you can traverse a huge number of strategy
 instruments in little time, to explore where your strategy performs best and to uncover hidden patterns in data.
 
 Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Moving_average_crossover) strategy 
-for example. By calculating the performance of each reasonable window combination and plotting the whole thing 
-as a heatmap (as we do above), you can analyze how performance depends upon window size. If you additionally 
-compute the same heatmap over multiple time periods, you may figure out how performance varies with downtrends 
+as example. By calculating the performance of each reasonable window combination and plotting the whole thing 
+as a heatmap (as we do above), we can analyze how performance depends upon window size. If we additionally 
+compute the same heatmap over multiple time periods, we may observe how performance varies with downtrends 
 and uptrends. Finally, by running the same pipeline over other strategies such as holding and trading randomly, 
-you can compare them and decide whether your strategy is worth executing. With vectorbt, this analysis can 
-be done in minutes and save you time and cost of getting the same insights elsewhere.
+we can compare them and decide whether our strategy is worth executing. With vectorbt, this analysis can 
+be done in minutes and save time and cost of getting the same insights elsewhere.
 
 ## How it works?
 
@@ -152,14 +173,12 @@ This way, it is often much faster than pandas alone:
 In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
 (think of an array for price, an array for signals, etc.), vectorbt is optimized for working with 
 2-dimensional data: it treats index of a DataFrame as time axis and columns as distinct features
-that should be backtest, and performs any calculation on the entire matrix at once. This way, user can 
-construct huge matrices with thousands of columns and calculate the performance for each one with a single 
-matrix operation, without any "Pythonic" loops.
+that should be backtest, and performs computations on the entire matrix at once, without "Pythonic" loops.
 
 To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
-This way, user can easily switch between native pandas functionality and highly-efficient vectorbt 
-methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
+This way, user can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt 
+method is flexible towards inputs and can work on both Series and DataFrames.
 
 ## Features
 
@@ -217,8 +236,8 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
 
 - Functions for working with signals
-    - Entry, exit and random signal generation, ranking and distance functions
-    - Signal factory for building iterative signal generators with ease
+    - Entry, exit and random signal generation
+    - Ranking and distance functions
     
 ```python-repl
 >>> pd.Series([False, True, True, True]).vbt.signals.first()
@@ -227,6 +246,29 @@ methods. Moreover, each vectorbt method is flexible and can work on both Series 
 2    False
 3    False
 dtype: bool
+```
+
+- Signal factory for building iterative signal generators
+    - Also includes a range of basic generators such for random signals
+
+```python-repl
+>>> rand = vbt.RAND.run(n=[0, 1, 2], input_shape=(6,), seed=42)
+>>> rand.entries
+rand_n      0      1      2
+0       False   True   True
+1       False  False  False
+2       False  False  False
+3       False  False   True
+4       False  False  False
+5       False  False  False
+>>> rand.exits
+rand_n      0      1      2
+0       False  False  False
+1       False  False   True
+2       False  False  False
+3       False   True  False
+4       False  False   True
+5       False  False  False
 ```
     
 - Functions for working with returns
@@ -253,8 +295,8 @@ dtype: bool
 
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)
     
-- Technical indicators with full Numba support
-    - Moving average, Bollinger Bands, RSI, Stochastic Oscillator, MACD, and more
+- A range of basic technical indicators with full Numba support
+    - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
     - Each offers methods for generating signals and plotting
     - Each allows arbitrary parameter combinations, from arrays to Cartesian products
     
