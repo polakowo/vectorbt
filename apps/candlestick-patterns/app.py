@@ -26,7 +26,7 @@ from talib._ta_lib import (
     _ta_set_candle_settings
 )
 import vectorbt as vbt
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.portfolio.enums import InitCashMode, AccumulationMode
 
 USE_CACHING = os.environ.get(
@@ -1112,7 +1112,7 @@ def update_ohlcv(df_json, date_range, entry_patterns, exit_patterns, _1,
                 xaxis="x"
             )
         ],
-        layout=merge_kwargs(
+        layout=merge_dicts(
             default_layout,
             dict(
                 margin=dict(r=40),
@@ -1371,7 +1371,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             buy_trace,
             sell_trace
         ],
-        layout=merge_kwargs(
+        layout=merge_dicts(
             default_layout,
             dict(
                 hovermode="closest",
@@ -1521,7 +1521,7 @@ def update_metric_stats(stats_json, metric):
                 ),
             ),
         ],
-        layout=merge_kwargs(
+        layout=merge_dicts(
             default_layout,
             dict(
                 showlegend=False,

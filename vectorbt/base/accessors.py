@@ -9,7 +9,7 @@ from collections.abc import Iterable
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.base import combine_fns, index_fns, reshape_fns
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.class_helpers import (
@@ -416,7 +416,7 @@ class Base_Accessor:
         checks.assert_not_none(combine_func)
         if checks.is_numba_func(combine_func):
             # Numba requires writable arrays
-            broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         new_obj, new_other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
         # Optionally cast to 2d array
         if to_2d:
@@ -481,7 +481,7 @@ class Base_Accessor:
         if checks.is_numba_func(combine_func):
             # Numba requires writeable arrays
             # Plus all of our arrays must be in the same order
-            broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements=['W', 'C'])), broadcast_kwargs)
+            broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements=['W', 'C'])), broadcast_kwargs)
         new_obj, *new_others = reshape_fns.broadcast(self._obj, *others, **broadcast_kwargs)
         # Optionally cast to 2d array
         if to_2d:

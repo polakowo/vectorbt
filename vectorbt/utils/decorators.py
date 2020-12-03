@@ -66,53 +66,71 @@ class custom_property():
         raise AttributeError("can't set attribute")
 
 
-def is_caching_enabled(disabled, name, instance, kwargs):
-    """Check whether caching is enabled against a range of conditions.
+def is_caching_enabled(disabled, name, instance, func=None, **kwargs):
+    """Check whether caching is enabled for a cacheable property/function.
 
     Conditions have the following priority:
 
     ```plaintext
     1) is caching disabled locally?
-    2) is name (case-sensitive) in whiteset/blackset?
-    3) is instance, its class, or class name (case-sensitive) in whiteset/blackset?
-    4) is subset of kwargs in whiteset/blackset?
-    5) is caching disabled globally?
+    2) is function in whitelist/blacklist? (properties are not supported)
+    3) is (instance, function name) in whitelist/blacklist?
+    4) is function name in whitelist/blacklist?
+    5) is instance, its class, or class name in whitelist/blacklist?
+    6) is subset of kwargs in whitelist/blacklist?
+    7) is caching disabled globally?
+
+    All names are case-sensitive.
     ```"""
     from vectorbt import settings
 
     if disabled:
         return False
-    if not settings.caching['enabled']:
-        if len(settings.caching['whiteset']) > 0:
-            if instance in settings.caching['whiteset']:
+    if len(settings.caching['whitelist']) > 0:
+        if func is not None and func in settings.caching['whitelist']:
+            return True
+        if (instance, name) in settings.caching['whitelist']:
+            return True
+        if name in settings.caching['whitelist']:
+            return True
+        if instance in settings.caching['whitelist']:
+            return True
+        if hasattr(instance, '__class__'):
+            if (instance.__class__, name) in settings.caching['whitelist']:
                 return True
-            if name in settings.caching['whiteset']:
+            if instance.__class__ in settings.caching['whitelist']:
                 return True
-            if hasattr(instance, '__class__'):
-                if instance.__class__ in settings.caching['whiteset']:
+            if (instance.__class__.__name__ + '.' + name) in settings.caching['whitelist']:
+                return True
+            if instance.__class__.__name__ in settings.caching['whitelist']:
+                return True
+        for dct in settings.caching['whitelist']:
+            if isinstance(dct, dict):
+                if dct.items() <= kwargs.items():
                     return True
-                if instance.__class__.__name__ in settings.caching['whiteset']:
-                    return True
-            for dct in settings.caching['whiteset']:
-                if isinstance(dct, dict):
-                    if dct.items() <= kwargs.items():
-                        return True
-        return False
-    if len(settings.caching['blackset']) > 0:
-        if instance in settings.caching['blackset']:
+    if len(settings.caching['blacklist']) > 0:
+        if func is not None and func in settings.caching['blacklist']:
             return False
-        if name in settings.caching['blackset']:
+        if (instance, name) in settings.caching['blacklist']:
+            return False
+        if name in settings.caching['blacklist']:
+            return False
+        if instance in settings.caching['blacklist']:
             return False
         if hasattr(instance, '__class__'):
-            if instance.__class__ in settings.caching['blackset']:
+            if (instance.__class__, name) in settings.caching['blacklist']:
                 return False
-            if instance.__class__.__name__ in settings.caching['blackset']:
+            if instance.__class__ in settings.caching['blacklist']:
                 return False
-        for dct in settings.caching['blackset']:
+            if (instance.__class__.__name__ + '.' + name) in settings.caching['blacklist']:
+                return False
+            if instance.__class__.__name__ in settings.caching['blacklist']:
+                return False
+        for dct in settings.caching['blacklist']:
             if isinstance(dct, dict):
                 if dct.items() <= kwargs.items():
                     return False
-    return True
+    return settings.caching['enabled']
 
 
 _NOT_FOUND = object()
@@ -123,11 +141,14 @@ class cached_property(custom_property):
 
     Similar to `functools.cached_property`, but without replacing the original attribute
     to be able to re-compute whenever needed.
-    
-    Disables caching if 
-    
-    * `vectorbt.defaults.caching['properties']` is False, or
-    * `disabled` attribute is to True."""
+
+    Disables caching if `is_caching_enabled` yields False.
+
+    Cache can be cleared by calling `clear_cache` with instance as argument.
+
+    !!! note:
+        Assumes that the instance (provided as `self`) won't change. If calculation depends
+        upon object attributes that can be changed, it won't notice the change."""
 
     def __init__(self, func, disabled=False, **kwargs):
         super().__init__(func, **kwargs)
@@ -150,7 +171,7 @@ class cached_property(custom_property):
     def __get__(self, instance, owner=None):
         if instance is None:
             return self
-        if not is_caching_enabled(self, instance):
+        if not is_caching_enabled(self.disabled, self.name, instance, **self.kwargs):
             return super().__get__(instance, owner=owner)
         cache = instance.__dict__
         val = cache.get(self.attrname, _NOT_FOUND)
@@ -170,18 +191,16 @@ def custom_method(*args, **kwargs):
     Stores `**kwargs` as attributes of the wrapper function.
 
     Can be called both as
-    ```plaintext
-    @cached_method
-    def user_function...
+    ```python-repl
+    >>> @cached_method
+    ... def user_function(): pass
     ```
     and
-    ```plaintext
-    @cached_method(maxsize=128, typed=False, disabled=False, **kwargs)
-    def user_function...
+    ```python-repl
+    >>> @cached_method(maxsize=128, typed=False, disabled=False, **kwargs)
+    ... def user_function(): pass
     ```
-
-    !!! note:
-        We cannot use a class here since pdoc will treat the method as an instance variable."""
+    """
 
     def decorator(func):
         @wraps(func)
@@ -206,17 +225,10 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
 
     Internally uses `functools.lru_cache`.
 
-    Disables caching if
+    Disables caching if `is_caching_enabled` yields False or a non-hashable object
+    as argument has been passed.
 
-    * `vectorbt.defaults.caching['methods']` is False,
-    * `disabled` attribute is to True, or
-    * a non-hashable object was passed as positional or keyword argument.
-
-    Cache can be cleared by calling `clear_cache` with instance as argument.
-
-    !!! note:
-        Assumes that the instance (provided as `self`) won't change. If calculation depends
-        upon object attributes that can be changed, it won't notice the change."""
+    See notes on `cached_property`."""
 
     def decorator(func):
         @wraps(func)
@@ -227,7 +239,10 @@ def cached_method(*args, maxsize=128, typed=False, disabled=False, **kwargs):
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)
 
-            if not is_caching_enabled(wrapper, instance):
+            _func = None
+            if hasattr(instance, wrapper.name):
+                _func = getattr(instance, wrapper.name)
+            if not is_caching_enabled(wrapper.disabled, wrapper.name, instance, func=_func, **wrapper.kwargs):
                 return func(instance, *args, **kwargs)
             cache = instance.__dict__
             cached_func = cache.get(wrapper.attrname, _NOT_FOUND)

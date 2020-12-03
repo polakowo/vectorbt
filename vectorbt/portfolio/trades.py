@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
@@ -493,7 +493,7 @@ class Trades(Records):
                 fig.add_trace(active_scatter, row=row, col=col)
 
         # Plot zeroline
-        fig.add_shape(**merge_kwargs(dict(
+        fig.add_shape(**merge_dicts(dict(
             xref="paper",
             yref=yref,
             x0=x_domain[0],
@@ -555,7 +555,7 @@ class Trades(Records):
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
-        close_trace_kwargs = merge_kwargs(dict(
+        close_trace_kwargs = merge_dicts(dict(
             line_color=color_schema['blue'],
             name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
         ), close_trace_kwargs)
@@ -717,7 +717,7 @@ class Trades(Records):
             if np.any(profit_mask):
                 # Plot profit zones
                 for i in np.flatnonzero(profit_mask):
-                    fig.add_shape(**merge_kwargs(dict(
+                    fig.add_shape(**merge_dicts(dict(
                         type="rect",
                         xref=xref,
                         yref=yref,
@@ -735,7 +735,7 @@ class Trades(Records):
             if np.any(loss_mask):
                 # Plot loss zones
                 for i in np.flatnonzero(loss_mask):
-                    fig.add_shape(**merge_kwargs(dict(
+                    fig.add_shape(**merge_dicts(dict(
                         type="rect",
                         xref=xref,
                         yref=yref,

@@ -28,7 +28,7 @@ Date
 import numpy as np
 import plotly.graph_objects as go
 
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.generic import nb as generic_nb
@@ -100,11 +100,11 @@ class MA(MA):
             close_trace_kwargs = {}
         if ma_trace_kwargs is None:
             ma_trace_kwargs = {}
-        close_trace_kwargs = merge_kwargs(dict(
+        close_trace_kwargs = merge_dicts(dict(
             name='Close',
             line_color=color_schema['blue']
         ), close_trace_kwargs)
-        ma_trace_kwargs = merge_kwargs(dict(
+        ma_trace_kwargs = merge_dicts(dict(
             name='MA'
         ), ma_trace_kwargs)
 
@@ -176,7 +176,7 @@ class MSTD(MSTD):
 
         if mstd_trace_kwargs is None:
             mstd_trace_kwargs = {}
-        mstd_trace_kwargs = merge_kwargs(dict(
+        mstd_trace_kwargs = merge_dicts(dict(
             name='MSTD'
         ), mstd_trace_kwargs)
 
@@ -272,20 +272,20 @@ class BBANDS(BBANDS):
             upper_trace_kwargs = {}
         if lower_trace_kwargs is None:
             lower_trace_kwargs = {}
-        lower_trace_kwargs = merge_kwargs(dict(
+        lower_trace_kwargs = merge_dicts(dict(
             name='Lower Band',
             line_color=color_schema['gray'],
         ), lower_trace_kwargs)
-        upper_trace_kwargs = merge_kwargs(dict(
+        upper_trace_kwargs = merge_dicts(dict(
             name='Upper Band',
             line_color=color_schema['gray'],
             fill='tonexty',
             fillcolor='rgba(128, 128, 128, 0.2)'
         ), upper_trace_kwargs)  # default kwargs
-        middle_trace_kwargs = merge_kwargs(dict(
+        middle_trace_kwargs = merge_dicts(dict(
             name='Middle Band'
         ), middle_trace_kwargs)
-        close_trace_kwargs = merge_kwargs(dict(
+        close_trace_kwargs = merge_dicts(dict(
             name='Close',
             line=dict(color=color_schema['blue'])
         ), close_trace_kwargs)
@@ -377,7 +377,7 @@ class RSI(RSI):
 
         if rsi_trace_kwargs is None:
             rsi_trace_kwargs = {}
-        rsi_trace_kwargs = merge_kwargs(dict(
+        rsi_trace_kwargs = merge_dicts(dict(
             name='RSI'
         ), rsi_trace_kwargs)
 
@@ -481,10 +481,10 @@ class STOCH(STOCH):
             percent_d_trace_kwargs = {}
         if shape_kwargs is None:
             shape_kwargs = {}
-        percent_k_trace_kwargs = merge_kwargs(dict(
+        percent_k_trace_kwargs = merge_dicts(dict(
             name='%K'
         ), percent_k_trace_kwargs)
-        percent_d_trace_kwargs = merge_kwargs(dict(
+        percent_d_trace_kwargs = merge_dicts(dict(
             name='%D'
         ), percent_d_trace_kwargs)
 
@@ -497,7 +497,7 @@ class STOCH(STOCH):
 
         # Plot levels
         # Fill void between levels
-        shape_kwargs = merge_kwargs(dict(
+        shape_kwargs = merge_dicts(dict(
             type="rect",
             xref=xref,
             yref=yref,
@@ -589,13 +589,13 @@ class MACD(MACD):
             signal_trace_kwargs = {}
         if hist_trace_kwargs is None:
             hist_trace_kwargs = {}
-        macd_trace_kwargs = merge_kwargs(dict(
+        macd_trace_kwargs = merge_dicts(dict(
             name='MACD'
         ), macd_trace_kwargs)
-        signal_trace_kwargs = merge_kwargs(dict(
+        signal_trace_kwargs = merge_dicts(dict(
             name='Signal'
         ), signal_trace_kwargs)
-        hist_trace_kwargs = merge_kwargs(dict(name='Histogram'), hist_trace_kwargs)
+        hist_trace_kwargs = merge_dicts(dict(name='Histogram'), hist_trace_kwargs)
 
         fig = self_col.macd.vbt.plot(
             trace_kwargs=macd_trace_kwargs,
@@ -688,10 +688,10 @@ class ATR(ATR):
             tr_trace_kwargs = {}
         if atr_trace_kwargs is None:
             atr_trace_kwargs = {}
-        tr_trace_kwargs = merge_kwargs(dict(
+        tr_trace_kwargs = merge_dicts(dict(
             name='TR'
         ), tr_trace_kwargs)
-        atr_trace_kwargs = merge_kwargs(dict(
+        atr_trace_kwargs = merge_dicts(dict(
             name='ATR'
         ), atr_trace_kwargs)
 
@@ -760,7 +760,7 @@ class OBV(OBV):
 
         if obv_trace_kwargs is None:
             obv_trace_kwargs = {}
-        obv_trace_kwargs = merge_kwargs(dict(
+        obv_trace_kwargs = merge_dicts(dict(
             name='OBV'
         ), obv_trace_kwargs)
 

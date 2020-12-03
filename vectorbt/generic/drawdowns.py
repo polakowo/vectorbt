@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
@@ -309,7 +309,7 @@ class Drawdowns(Records):
 
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
-        ts_trace_kwargs = merge_kwargs(dict(
+        ts_trace_kwargs = merge_dicts(dict(
             line_color=color_schema['blue']
         ), ts_trace_kwargs)
         if peak_trace_kwargs is None:
@@ -408,7 +408,7 @@ class Drawdowns(Records):
                 fig.add_trace(valley_scatter, row=row, col=col)
 
                 for i in np.flatnonzero(recovery_mask):
-                    fig.add_shape(**merge_kwargs(dict(
+                    fig.add_shape(**merge_dicts(dict(
                         type="rect",
                         xref=xref,
                         yref="paper",
@@ -447,7 +447,7 @@ class Drawdowns(Records):
                 fig.add_trace(recovery_scatter, row=row, col=col)
 
                 for i in np.flatnonzero(recovery_mask):
-                    fig.add_shape(**merge_kwargs(dict(
+                    fig.add_shape(**merge_dicts(dict(
                         type="rect",
                         xref=xref,
                         yref="paper",
@@ -488,7 +488,7 @@ class Drawdowns(Records):
                 fig.add_trace(active_scatter, row=row, col=col)
 
                 for i in np.flatnonzero(active_mask):
-                    fig.add_shape(**merge_kwargs(dict(
+                    fig.add_shape(**merge_dicts(dict(
                         type="rect",
                         xref=xref,
                         yref="paper",

@@ -41,7 +41,7 @@ from numba.typed import Dict
 import warnings
 
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
@@ -1000,7 +1000,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             pos_obj = self._obj.copy()
             pos_obj[~pos_mask] = other[~pos_mask]
             other.vbt.plot(
-                trace_kwargs=merge_kwargs(dict(
+                trace_kwargs=merge_dicts(dict(
                     line_color='rgba(0, 0, 0, 0)',
                     line_width=0,
                     opacity=0,
@@ -1012,7 +1012,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 fig=fig
             )
             pos_obj.vbt.plot(
-                trace_kwargs=merge_kwargs(dict(
+                trace_kwargs=merge_dicts(dict(
                     fillcolor='rgba(0, 128, 0, 0.3)',
                     line_color='rgba(0, 0, 0, 0)',
                     line_width=0,
@@ -1032,7 +1032,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             neg_obj = self._obj.copy()
             neg_obj[~neg_mask] = other[~neg_mask]
             other.vbt.plot(
-                trace_kwargs=merge_kwargs(dict(
+                trace_kwargs=merge_dicts(dict(
                     line_color='rgba(0, 0, 0, 0)',
                     line_width=0,
                     opacity=0,
@@ -1044,7 +1044,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 fig=fig
             )
             neg_obj.vbt.plot(
-                trace_kwargs=merge_kwargs(dict(
+                trace_kwargs=merge_dicts(dict(
                     fillcolor='rgba(255, 0, 0, 0.3)',
                     line_color='rgba(0, 0, 0, 0)',
                     line_width=0,
@@ -1139,7 +1139,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         y_level_vals = self.wrapper.index.get_level_values(y_level)
         x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
         y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
-        kwargs = merge_kwargs(dict(
+        kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 hovertemplate=f"{x_name}: %{{x}}<br>" +
                               f"{y_name}: %{{y}}<br>" +
@@ -1166,7 +1166,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     x_labels = df.columns
                 if y_labels is None:
                     y_labels = df.index
-                _kwargs = merge_kwargs(dict(
+                _kwargs = merge_dicts(dict(
                     trace_kwargs=dict(
                         name=str(name) if name is not None else None,
                         visible=False
@@ -1256,7 +1256,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
         y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
         z_name = z_level_vals.name if z_level_vals.name is not None else 'z'
-        kwargs = merge_kwargs(dict(
+        kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 hovertemplate=f"{x_name}: %{{x}}<br>" +
                               f"{y_name}: %{{y}}<br>" +
@@ -1295,7 +1295,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 v = group.vbt.unstack_to_array(levels=(x_level, y_level, z_level))
                 if np.isnan(v).any():
                     contains_nans = True
-                _kwargs = merge_kwargs(dict(
+                _kwargs = merge_dicts(dict(
                     trace_kwargs=dict(
                         name=str(name) if name is not None else None,
                         visible=False

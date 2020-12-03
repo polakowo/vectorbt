@@ -283,7 +283,7 @@ from collections import OrderedDict
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
-from vectorbt.utils.config import merge_kwargs, Configured
+from vectorbt.utils.config import merge_dicts, Configured
 from vectorbt.utils.random import set_seed
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import ParamIndexerFactory
@@ -664,7 +664,7 @@ def run_pipeline(
             input_index = 'default'
         if input_columns is None:
             input_columns = 'default'
-        broadcast_kwargs = merge_kwargs(dict(
+        broadcast_kwargs = merge_dicts(dict(
             to_shape=input_shape,
             index_from=input_index,
             columns_from=input_columns
@@ -746,7 +746,7 @@ def run_pipeline(
             if input_shape is None:
                 raise ValueError("Cannot determine flex_2d without inputs")
             func_kwargs['flex_2d'] = len(input_shape) == 2
-        func_kwargs = merge_kwargs(func_kwargs, kwargs)
+        func_kwargs = merge_dicts(func_kwargs, kwargs)
 
         # Set seed
         if seed is not None:
@@ -1372,7 +1372,7 @@ class IndicatorFactory:
         for k, v in pipeline_kwargs.items():
             if k in param_names and not isinstance(v, Default):
                 pipeline_kwargs[k] = Default(v)  # track default params
-        pipeline_kwargs = merge_kwargs({k: None for k in in_output_names}, pipeline_kwargs)
+        pipeline_kwargs = merge_dicts({k: None for k in in_output_names}, pipeline_kwargs)
 
         # Add private run method
         def_run_kwargs = dict(

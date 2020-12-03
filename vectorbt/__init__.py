@@ -509,10 +509,14 @@ import vectorbt.signals.accessors
 import vectorbt.returns.accessors
 import vectorbt.ohlcv.accessors
 
+# Most important modules
+from vectorbt.generic import nb, plotting
+from vectorbt import settings
+
 # Most important classes
+from vectorbt.utils import *
 from vectorbt.base import *
 from vectorbt.generic import *
-from vectorbt.generic import nb, plotting
 from vectorbt.indicators import *
 from vectorbt.signals import *
 from vectorbt.records import *

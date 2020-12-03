@@ -8,7 +8,7 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import CustomFigureWidget
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.records.base import Records
 from vectorbt.portfolio.enums import order_dt, OrderSide
@@ -169,7 +169,7 @@ class Orders(Records):
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
-        close_trace_kwargs = merge_kwargs(dict(
+        close_trace_kwargs = merge_dicts(dict(
             line_color=color_schema['blue'],
             name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
         ), close_trace_kwargs)

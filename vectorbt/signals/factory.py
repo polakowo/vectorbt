@@ -5,7 +5,7 @@ from numba import njit
 from numba.typed import List
 
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.signals.nb import generate_ex_nb, generate_enex_nb, first_choice_nb
@@ -86,12 +86,12 @@ class SignalFactory(IndicatorFactory):
             if exit_trace_kwargs is None:
                 exit_trace_kwargs = {}
             if entry_types is not None:
-                entry_trace_kwargs = merge_kwargs(dict(
+                entry_trace_kwargs = merge_dicts(dict(
                     customdata=entry_types,
                     hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
                 ), entry_trace_kwargs)
             if exit_types is not None:
-                exit_trace_kwargs = merge_kwargs(dict(
+                exit_trace_kwargs = merge_dicts(dict(
                     customdata=exit_types,
                     hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
                 ), exit_trace_kwargs)
@@ -385,7 +385,7 @@ class SignalFactory(IndicatorFactory):
                     entry_choice_func = first_choice_nb
                 if entry_settings is None:
                     entry_settings = {}
-                entry_settings = merge_kwargs(dict(
+                entry_settings = merge_dicts(dict(
                     pass_inputs=['entries']
                 ), entry_settings)
         else:
@@ -515,9 +515,9 @@ class SignalFactory(IndicatorFactory):
                 first=True,
                 flex_2d=flex_2d,
             )
-            entry_kwargs = merge_kwargs(kwargs_defaults, entry_kwargs)
-            exit_kwargs = merge_kwargs(kwargs_defaults, exit_kwargs)
-            cache_kwargs = merge_kwargs(kwargs_defaults, cache_kwargs)
+            entry_kwargs = merge_dicts(kwargs_defaults, entry_kwargs)
+            exit_kwargs = merge_dicts(kwargs_defaults, exit_kwargs)
+            cache_kwargs = merge_dicts(kwargs_defaults, cache_kwargs)
             entry_wait = entry_kwargs['wait']
             exit_wait = exit_kwargs['wait']
 

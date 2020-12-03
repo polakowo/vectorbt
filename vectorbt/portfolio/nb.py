@@ -1772,8 +1772,9 @@ def orders_to_trades_nb(close, order_records, col_map):
     ... def order_func_nb(oc, order_size, order_price):
     ...     return create_order_nb(
     ...         size=order_size[oc.i, oc.col],
-    ...         price=order_price[oc.i, oc.col]
-    ...         )
+    ...         price=order_price[oc.i, oc.col],
+    ...         fees=0.01, slippage=0.01, fixed_fees=1.
+    ...     )
 
     >>> order_size = np.asarray([
     ...     [1, -1],
@@ -1810,24 +1811,22 @@ def orders_to_trades_nb(close, order_records, col_map):
     >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
     >>> pd.DataFrame.from_records(trade_records)
        col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   1.0          0     1.090909         0.0         2         3.0
-    1    0   0.1          0     1.090909         0.0         3         4.0
-    2    0   1.0          4     5.000000         0.0         5         6.0
-    3    0   1.0          5     6.000000         0.0         5         6.0
-    4    1   1.0          0     5.909091         0.0         2         4.0
-    5    1   0.1          0     5.909091         0.0         3         3.0
-    6    1   1.0          4     2.000000         0.0         5         1.0
-    7    1   1.0          5     1.000000         0.0         5         1.0
+    0    0   1.0          0     1.101818     1.82920         2        2.97
+    1    0   1.1          0     4.691074     1.23342         5        5.94
+    2    0   0.9          5     5.940000     0.50346         5        6.00
+    3    1   1.0          0     5.940000     1.05940         2        4.04
+    4    1   0.1          3     3.030000     1.00303         4        1.98
+    5    1   0.9          4     1.980000     0.91782         5        1.01
+    6    1   1.1          5     1.010000     0.56111         5        1.00
 
        exit_fees       pnl    return  direction  status  position_idx
-    0        0.0  1.909091  1.750000          0       1             0
-    1        0.0  0.290909  2.666667          0       1             0
-    2        0.0  1.000000  0.200000          0       1             1
-    3        0.0  0.000000  0.000000          1       0             2
-    4        0.0  1.909091  0.323077          1       1             0
-    5        0.0  0.290909  0.492308          1       1             0
-    6        0.0  1.000000  0.500000          1       1             1
-    7        0.0  0.000000  0.000000          0       0             2
+    0    1.02970 -0.990718 -0.899167          0       1             0
+    1    0.61534 -0.474942 -0.092040          0       1             0
+    2    0.00000 -0.557460 -0.104276          1       0             1
+    3    1.04040 -0.199800 -0.033636          1       1             0
+    4    0.10198 -1.210010 -3.993432          0       1             1
+    5    0.45909 -0.503910 -0.282778          1       1             2
+    6    0.00000 -0.572110 -0.514950          0       0             3
     ```
     """
     col_idxs, col_ns = col_map
@@ -1992,7 +1991,7 @@ def save_position_nb(record, trade_records):
     col = trade_records['col'][0]
     size = np.sum(trade_records['size'])
     entry_idx = trade_records['entry_idx'][0]
-    entry_price = trade_records['entry_price'][0]
+    entry_price = np.sum(trade_records['size'] * trade_records['entry_price']) / size
     entry_fees = np.sum(trade_records['entry_fees'])
     exit_idx = trade_records['exit_idx'][-1]
     exit_price = np.sum(trade_records['size'] * trade_records['exit_price']) / size
@@ -2039,20 +2038,20 @@ def trades_to_positions_nb(trade_records, col_map):
     >>> position_records = trades_to_positions_nb(trade_records, col_map)
     >>> pd.DataFrame.from_records(position_records)
        col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   1.1          0     1.090909         0.0         3    3.090909
-    1    0   1.0          4     5.000000         0.0         5    6.000000
-    2    0   1.0          5     6.000000         0.0         5    6.000000
-    3    1   1.1          0     5.909091         0.0         3    3.909091
-    4    1   1.0          4     2.000000         0.0         5    1.000000
-    5    1   1.0          5     1.000000         0.0         5    1.000000
+    0    0   2.1          0     2.981905     3.06262         5    4.525714
+    1    0   0.9          5     5.940000     0.50346         5    6.000000
+    2    1   1.0          0     5.940000     1.05940         2    4.040000
+    3    1   0.1          3     3.030000     1.00303         4    1.980000
+    4    1   0.9          4     1.980000     0.91782         5    1.010000
+    5    1   1.1          5     1.010000     0.56111         5    1.000000
 
-       exit_fees  pnl    return  direction  status  position_idx
-    0        0.0  2.2  1.833333          0       1             0
-    1        0.0  1.0  0.200000          0       1             1
-    2        0.0  0.0  0.000000          1       0             2
-    3        0.0  2.2  0.338462          1       1             0
-    4        0.0  1.0  0.500000          1       1             1
-    5        0.0  0.0  0.000000          0       0             2
+       exit_fees      pnl    return  direction  status  position_idx
+    0    1.64504 -1.46566 -0.234056          0       1             0
+    1    0.00000 -0.55746 -0.104276          1       0             1
+    2    1.04040 -0.19980 -0.033636          1       1             0
+    3    0.10198 -1.21001 -3.993432          0       1             1
+    4    0.45909 -0.50391 -0.282778          1       1             2
+    5    0.00000 -0.57211 -0.514950          0       0             3
     ```
     """
     col_idxs, col_ns = col_map
@@ -2083,13 +2082,12 @@ def trades_to_positions_nb(trade_records, col_map):
                 from_r = r
                 last_position_idx = position_idx
 
-        if last_position_idx != -1:
-            if r - from_r > 1:
-                save_position_nb(records[ridx], trade_records[from_r:r + 1])
-            else:
-                # Speed up
-                records[ridx] = trade_records[from_r]
-            ridx += 1
+        if r - from_r > 0:
+            save_position_nb(records[ridx], trade_records[from_r:r + 1])
+        else:
+            # Speed up
+            records[ridx] = trade_records[from_r]
+        ridx += 1
 
     return records[:ridx]
 

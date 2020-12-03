@@ -40,7 +40,7 @@ import plotly.graph_objects as go
 
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base import reshape_fns
@@ -473,7 +473,7 @@ class Signals_Accessor(Generic_Accessor):
         entries = self._obj
 
         keep_raw = (False, True, True)
-        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         entries, ts, stop = reshape_fns.broadcast(entries, ts, stop, **broadcast_kwargs, keep_raw=keep_raw)
 
         # Perform generation
@@ -570,7 +570,7 @@ class Signals_Accessor(Generic_Accessor):
             out_args += (stop_type_out,)
 
         keep_raw = (False, True, True, True, True, True, True, True) + (False,) * len(out_args)
-        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args = reshape_fns.broadcast(
             entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args,
             **broadcast_kwargs, keep_raw=keep_raw)
@@ -1011,7 +1011,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         if trace_kwargs is None:
             trace_kwargs = {}
-        trace_kwargs = merge_kwargs(dict(
+        trace_kwargs = merge_dicts(dict(
             marker=dict(
                 symbol='triangle-up',
                 color=contrast_color_schema['green'],
@@ -1032,7 +1032,7 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         if trace_kwargs is None:
             trace_kwargs = {}
-        trace_kwargs = merge_kwargs(dict(
+        trace_kwargs = merge_dicts(dict(
             marker=dict(
                 symbol='triangle-down',
                 color=contrast_color_schema['red'],

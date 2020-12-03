@@ -21,6 +21,6 @@ StopType = namedtuple('StopType', [
 __pdoc__['StopType'] = f"""Stop type.
 
 ```plaintext
-{json.dumps(dict(zip(StopType._fields, StopType)), indent=2)}
+{json.dumps(dict(zip(StopType._fields, StopType)), indent=2, default=str)}
 ```
 """

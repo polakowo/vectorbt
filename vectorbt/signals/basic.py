@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from vectorbt.utils.config import Config
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.nb import (
     rand_enex_apply_nb,
@@ -13,28 +14,21 @@ from vectorbt.signals.nb import (
     stop_choice_nb,
     adv_stop_choice_nb
 )
-from vectorbt.signals.enums import StopType
 
 flex_elem_param_config = Config(
-    frozen=False,
-    **dict(
-        array_like=True,  # passing a NumPy array means passing one value, for multiple use list
-        bc_to_input=True,  # broadcast to input
-        broadcast_kwargs=dict(
-            keep_raw=True  # keep original shape for flexible indexing to save memory
-        )
+    array_like=True,  # passing a NumPy array means passing one value, for multiple use list
+    bc_to_input=True,  # broadcast to input
+    broadcast_kwargs=dict(
+        keep_raw=True  # keep original shape for flexible indexing to save memory
     )
 )
 """Config for flexible element-wise parameters."""
 
 flex_col_param_config = Config(
-    frozen=False,
-    **dict(
-        array_like=True,
-        bc_to_input=1,  # broadcast to axis 1 (columns)
-        broadcast_kwargs=dict(
-            keep_raw=True
-        )
+    array_like=True,
+    bc_to_input=1,  # broadcast to axis 1 (columns)
+    broadcast_kwargs=dict(
+        keep_raw=True
     )
 )
 """Config for flexible column-wise parameters."""
@@ -237,32 +231,26 @@ class RPROB(RPROB):
 fix_class_for_docs(RPROB)
 
 rprobex_config = Config(
-    frozen=False,
-    **dict(
-        class_name='RPROBEX',
-        module_name=__name__,
-        short_name='rprobex',
-        param_names=['prob'],
-        exit_only=True,
-        iteratively=False
-    )
+    class_name='RPROBEX',
+    module_name=__name__,
+    short_name='rprobex',
+    param_names=['prob'],
+    exit_only=True,
+    iteratively=False
 )
 """Factory config for `RPROBEX`."""
 
 rprobex_func_config = Config(
-    frozen=False,
-    **dict(
-        exit_choice_func=rand_by_prob_choice_nb,
-        exit_settings=dict(
-            pass_params=['prob'],
-            pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
-        ),
-        forward_flex_2d=True,
-        param_settings=dict(
-            prob=flex_elem_param_config
-        ),
-        seed=None
-    )
+    exit_choice_func=rand_by_prob_choice_nb,
+    exit_settings=dict(
+        pass_params=['prob'],
+        pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
+    ),
+    forward_flex_2d=True,
+    param_settings=dict(
+        prob=flex_elem_param_config
+    ),
+    seed=None
 )
 """Exit function config for `RPROBEX`."""
 
@@ -312,35 +300,29 @@ fix_class_for_docs(IRPROBEX)
 # ############# Stop signals ############# #
 
 stex_config = Config(
-    frozen=False,
-    **dict(
-        class_name='STEX',
-        module_name=__name__,
-        short_name='stex',
-        input_names=['ts'],
-        param_names=['stop', 'trailing'],
-        exit_only=True,
-        iteratively=False
-    )
+    class_name='STEX',
+    module_name=__name__,
+    short_name='stex',
+    input_names=['ts'],
+    param_names=['stop', 'trailing'],
+    exit_only=True,
+    iteratively=False
 )
 """Factory config for `STEX`."""
 
 stex_func_config = Config(
-    frozen=False,
-    **dict(
-        exit_choice_func=stop_choice_nb,
-        exit_settings=dict(
-            pass_inputs=['ts'],
-            pass_params=['stop', 'trailing'],
-            pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
-        ),
-        forward_flex_2d=True,
-        param_settings=dict(
-            stop=flex_elem_param_config,
-            trailing=flex_elem_param_config
-        ),
-        trailing=False
-    )
+    exit_choice_func=stop_choice_nb,
+    exit_settings=dict(
+        pass_inputs=['ts'],
+        pass_params=['stop', 'trailing'],
+        pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
+    ),
+    forward_flex_2d=True,
+    param_settings=dict(
+        stop=flex_elem_param_config,
+        trailing=flex_elem_param_config
+    ),
+    trailing=False
 )
 """Exit function config for `STEX`."""
 
@@ -393,49 +375,43 @@ fix_class_for_docs(ISTEX)
 # ############# Advanced stop signals ############# #
 
 advstex_config = Config(
-    frozen=False,
-    **dict(
-        class_name='ADVSTEX',
-        module_name=__name__,
-        short_name='advstex',
-        input_names=['open', 'high', 'low', 'close'],
-        in_output_names=['hit_price', 'stop_type'],
-        param_names=['sl_stop', 'ts_stop', 'tp_stop'],
-        attr_settings=dict(
-            stop_type=dict(dtype=StopType)  # creates rand_type_readable
-        ),
-        exit_only=True,
-        iteratively=False
-    )
+    class_name='ADVSTEX',
+    module_name=__name__,
+    short_name='advstex',
+    input_names=['open', 'high', 'low', 'close'],
+    in_output_names=['hit_price', 'stop_type'],
+    param_names=['sl_stop', 'ts_stop', 'tp_stop'],
+    attr_settings=dict(
+        stop_type=dict(dtype=StopType)  # creates rand_type_readable
+    ),
+    exit_only=True,
+    iteratively=False
 )
 """Factory config for `ADVSTEX`."""
 
 advstex_func_config = Config(
-    frozen=False,
-    **dict(
-        exit_choice_func=adv_stop_choice_nb,
-        exit_settings=dict(
-            pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
-            pass_in_outputs=['hit_price', 'stop_type'],
-            pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
-            pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
+    exit_choice_func=adv_stop_choice_nb,
+    exit_settings=dict(
+        pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
+        pass_in_outputs=['hit_price', 'stop_type'],
+        pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
+        pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
+    ),
+    forward_flex_2d=True,
+    in_output_settings=dict(
+        hit_price=dict(
+            dtype=np.float_
         ),
-        forward_flex_2d=True,
-        in_output_settings=dict(
-            hit_price=dict(
-                dtype=np.float_
-            ),
-            stop_type=dict(
-                dtype=np.int_
-            )
-        ),
-        param_settings=dict(stop=flex_elem_param_config),  # param per frame/row/col/element
-        sl_stop=0.,
-        ts_stop=0.,
-        tp_stop=0.,
-        hit_price=np.nan,
-        stop_type=-1
-    )
+        stop_type=dict(
+            dtype=np.int_
+        )
+    ),
+    param_settings=dict(stop=flex_elem_param_config),  # param per frame/row/col/element
+    sl_stop=0.,
+    ts_stop=0.,
+    tp_stop=0.,
+    hit_price=np.nan,
+    stop_type=-1
 )
 """Exit function config for `ADVSTEX`."""
 

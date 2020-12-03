@@ -216,7 +216,7 @@ InitCashMode = namedtuple('InitCashMode', [
 __pdoc__['InitCashMode'] = f"""Initial cash mode.
 
 ```plaintext
-{json.dumps(dict(zip(InitCashMode._fields, InitCashMode)), indent=2)}
+{json.dumps(dict(zip(InitCashMode._fields, InitCashMode)), indent=2, default=str)}
 ```
 
 Attributes:
@@ -235,7 +235,7 @@ CallSeqType = namedtuple('CallSeqType', [
 __pdoc__['CallSeqType'] = f"""Call sequence type.
 
 ```plaintext
-{json.dumps(dict(zip(CallSeqType._fields, CallSeqType)), indent=2)}
+{json.dumps(dict(zip(CallSeqType._fields, CallSeqType)), indent=2, default=str)}
 ```
 
 Attributes:
@@ -256,7 +256,7 @@ SizeType = namedtuple('SizeType', [
 __pdoc__['SizeType'] = f"""Size type.
 
 ```plaintext
-{json.dumps(dict(zip(SizeType._fields, SizeType)), indent=2)}
+{json.dumps(dict(zip(SizeType._fields, SizeType)), indent=2, default=str)}
 ```
 
 Attributes:
@@ -277,7 +277,7 @@ ConflictMode = namedtuple('ConflictMode', [
 __pdoc__['ConflictMode'] = f"""Conflict mode.
 
 ```plaintext
-{json.dumps(dict(zip(ConflictMode._fields, ConflictMode)), indent=2)}
+{json.dumps(dict(zip(ConflictMode._fields, ConflictMode)), indent=2, default=str)}
 ```
 
 What should happen if both entry and exit signals occur simultaneously?
@@ -339,7 +339,7 @@ OrderStatus = namedtuple('OrderStatus', [
 __pdoc__['OrderStatus'] = f"""Order status.
 
 ```plaintext
-{json.dumps(dict(zip(OrderStatus._fields, OrderStatus)), indent=2)}
+{json.dumps(dict(zip(OrderStatus._fields, OrderStatus)), indent=2, default=str)}
 ```
 
 Attributes:
@@ -357,7 +357,7 @@ OrderSide = namedtuple('OrderSide', [
 __pdoc__['OrderSide'] = f"""Order side.
 
 ```plaintext
-{json.dumps(dict(zip(OrderSide._fields, OrderSide)), indent=2)}
+{json.dumps(dict(zip(OrderSide._fields, OrderSide)), indent=2, default=str)}
 ```
 """
 
@@ -382,7 +382,7 @@ StatusInfo = namedtuple('StatusInfo', [
 __pdoc__['StatusInfo'] = f"""Order status information.
 
 ```plaintext
-{json.dumps(dict(zip(StatusInfo._fields, StatusInfo)), indent=2)}
+{json.dumps(dict(zip(StatusInfo._fields, StatusInfo)), indent=2, default=str)}
 ```
 """
 
@@ -407,7 +407,7 @@ status_info_desc = [
 __pdoc__['status_info_desc'] = f"""Order status description.
 
 ```plaintext
-{json.dumps(status_info_desc, indent=2)}
+{json.dumps(status_info_desc, indent=2, default=str)}
 ```
 """
 
@@ -444,7 +444,7 @@ Direction = namedtuple('Direction', [
 __pdoc__['Direction'] = f"""Position direction.
 
 ```plaintext
-{json.dumps(dict(zip(Direction._fields, Direction)), indent=2)}
+{json.dumps(dict(zip(Direction._fields, Direction)), indent=2, default=str)}
 ```
 
 Attributes:
@@ -471,7 +471,7 @@ __pdoc__['order_dt'] = f"""`np.dtype` of order records.
 {json.dumps(dict(zip(
     dict(order_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(order_dt.fields).values()))
-)), indent=2)}
+)), indent=2, default=str)}
 ```
 """
 
@@ -484,7 +484,7 @@ TradeDirection = namedtuple('TradeDirection', [
 __pdoc__['TradeDirection'] = f"""Event direction.
 
 ```plaintext
-{json.dumps(dict(zip(TradeDirection._fields, TradeDirection)), indent=2)}
+{json.dumps(dict(zip(TradeDirection._fields, TradeDirection)), indent=2, default=str)}
 ```
 """
 
@@ -497,7 +497,7 @@ TradeStatus = namedtuple('TradeStatus', [
 __pdoc__['TradeStatus'] = f"""Event status.
 
 ```plaintext
-{json.dumps(dict(zip(TradeStatus._fields, TradeStatus)), indent=2)}
+{json.dumps(dict(zip(TradeStatus._fields, TradeStatus)), indent=2, default=str)}
 ```
 """
 
@@ -526,7 +526,7 @@ __pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 {json.dumps(dict(zip(
     dict(trade_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(trade_dt.fields).values()))
-)), indent=2)}
+)), indent=2, default=str)}
 ```
 """
 
@@ -571,7 +571,7 @@ __pdoc__['log_dt'] = f"""`np.dtype` of log records.
 {json.dumps(dict(zip(
     dict(log_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(log_dt.fields).values()))
-)), indent=2)}
+)), indent=2, default=str)}
 ```
 """
 
@@ -584,7 +584,7 @@ TradeType = namedtuple('TradeType', [
 __pdoc__['TradeType'] = f"""Trade type.
 
 ```plaintext
-{json.dumps(dict(zip(TradeType._fields, TradeType)), indent=2)}
+{json.dumps(dict(zip(TradeType._fields, TradeType)), indent=2, default=str)}
 ```
 """
 
@@ -598,7 +598,7 @@ BenchmarkSize = namedtuple('BenchmarkSize', [
 __pdoc__['BenchmarkSize'] = f"""Benchmark size.
 
 ```plaintext
-{json.dumps(dict(zip(BenchmarkSize._fields, BenchmarkSize)), indent=2)}
+{json.dumps(dict(zip(BenchmarkSize._fields, BenchmarkSize)), indent=2, default=str)}
 ```
 
 Attributes:

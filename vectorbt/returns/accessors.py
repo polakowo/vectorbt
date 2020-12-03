@@ -12,7 +12,7 @@ from scipy.stats import skew, kurtosis
 
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.base import reshape_fns
 from vectorbt.generic.accessors import (
@@ -431,7 +431,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
             benchmark_rets = reshape_fns.broadcast_to(benchmark_rets, self._obj)
             if benchmark_kwargs is None:
                 benchmark_kwargs = {}
-            benchmark_kwargs = merge_kwargs(dict(
+            benchmark_kwargs = merge_dicts(dict(
                 trace_kwargs=dict(
                     line_color=color_schema['gray'],
                     name='Benchmark'
@@ -445,7 +445,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         # Plot main
         if main_kwargs is None:
             main_kwargs = {}
-        main_kwargs = merge_kwargs(dict(
+        main_kwargs = merge_dicts(dict(
             trace_kwargs=dict(
                 line_color=color_schema['purple'],
             ),
@@ -460,7 +460,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         # Plot hline
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
-        fig.add_shape(**merge_kwargs(dict(
+        fig.add_shape(**merge_dicts(dict(
             xref="paper",
             yref=yref,
             x0=x_domain[0],

@@ -24,7 +24,7 @@ DrawdownStatus = namedtuple('DrawdownStatus', [
 __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 
 ```plaintext
-{json.dumps(dict(zip(DrawdownStatus._fields, DrawdownStatus)), indent=2)}
+{json.dumps(dict(zip(DrawdownStatus._fields, DrawdownStatus)), indent=2, default=str)}
 ```
 """
 
@@ -43,6 +43,6 @@ __pdoc__['drawdown_dt'] = f"""`np.dtype` of drawdown records.
 {json.dumps(dict(zip(
     dict(drawdown_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(drawdown_dt.fields).values()))
-)), indent=2)}
+)), indent=2, default=str)}
 ```
 """

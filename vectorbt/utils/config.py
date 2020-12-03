@@ -2,16 +2,17 @@
 
 import numpy as np
 import pandas as pd
+from copy import copy
 
 
-def merge_kwargs(*dicts):
-    """Merge dictionaries `dicts`."""
+def merge_dicts(*dicts):
+    """Merge dicts."""
     z = {}
     x, y = dicts[0], dicts[1]
     overlapping_keys = x.keys() & y.keys()
     for key in overlapping_keys:
         if isinstance(x[key], dict) and isinstance(y[key], dict):
-            z[key] = merge_kwargs(x[key], y[key])
+            z[key] = merge_dicts(x[key], y[key])
         else:
             z[key] = y[key]
     for key in x.keys() - overlapping_keys:
@@ -19,40 +20,94 @@ def merge_kwargs(*dicts):
     for key in y.keys() - overlapping_keys:
         z[key] = y[key]
     if len(dicts) > 2:
-        return merge_kwargs(z, *dicts[2:])
+        return merge_dicts(z, *dicts[2:])
     return z
 
 
-class Config(dict):
-    """A simple dict with (optionally) frozen keys."""
+def copy_dict(dct):
+    """Copy dict using shallow-deep copy hybrid.
+    
+    Traverses all nested dicts and copies each value using shallow copy."""
+    dct_copy = dict()
+    for k, v in dct.items():
+        if isinstance(v, dict):
+            dct_copy[k] = copy_dict(v)
+        else:
+            dct_copy[k] = copy(v)
+    return dct_copy
 
-    def __init__(self, *args, frozen=True, read_only=False, **kwargs):
+
+class Config(dict):
+    """Extends dict with config features."""
+
+    def __init__(self, *args, frozen=False, read_only=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.frozen = frozen
-        self.read_only = read_only
-        self.default_config = dict(self)
-        for key, value in dict.items(self):
-            if isinstance(value, dict):
-                dict.__setitem__(self, key, Config(value, read_only=read_only, frozen=frozen))
+        self._frozen = frozen
+        self._read_only = read_only
+        self._init_config = copy_dict(self)
+
+    @property
+    def frozen(self):
+        """Whether this dict's keys are frozen."""
+        return self._frozen
+
+    @property
+    def read_only(self):
+        """Whether this dict is read-only."""
+        return self._read_only
+
+    @property
+    def init_config(self):
+        """Initial config."""
+        return self._init_config
 
     def __setitem__(self, key, val):
         if self.read_only:
             raise ValueError("Config is read-only")
-        if self.frozen and key not in self:
-            raise KeyError(f"Key {key} is not a valid parameter")
-        dict.__setitem__(self, key, val)
+        if self.frozen:
+            if key not in self:
+                raise KeyError(f"Key '{key}' is not valid")
+        super().__setitem__(key, val)
 
-    def merge_with(self, other):
-        """Update with the elements and properties from the another config.
+    def __delitem__(self, key):
+        if self.read_only:
+            raise ValueError("Config is read-only")
+        super().__delitem__(key)
 
-        Returns a new config."""
-        read_only = other.read_only if isinstance(other, Config) else self.read_only
-        frozen = other.frozen if isinstance(other, Config) else self.frozen
-        return Config(read_only=read_only, frozen=frozen, **merge_kwargs(self, other))
+    def pop(self, key):
+        if self.read_only:
+            raise ValueError("Config is read-only")
+        return super().pop(key)
+
+    def popitem(self):
+        if self.read_only:
+            raise ValueError("Config is read-only")
+        return super().popitem()
+
+    def clear(self):
+        if self.read_only:
+            raise ValueError("Config is read-only")
+        return super().clear()
+
+    def update(self, *args, force_update=False, **kwargs):
+        other = dict(*args, **kwargs)
+        if force_update:
+            super().update(other)
+        if self.read_only:
+            raise ValueError("Config is read-only")
+        if self.frozen:
+            for key in other:
+                if key not in self:
+                    raise KeyError(f"Key '{key}' is not valid")
+        super().update(other)
+
+    def merge_with(self, other, **kwargs):
+        """Merge this and other dict into a new config."""
+        return self.__class__(merge_dicts(self, other), **kwargs)
 
     def reset(self):
-        """Reset dictionary to the one passed at instantiation."""
-        self.update(self.default_config)
+        """Reset config to initial config."""
+        self.update(copy_dict(self.init_config), force_update=True)
 
 
 class Configured:

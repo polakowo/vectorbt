@@ -208,17 +208,13 @@ to each `__init__` argument with index:
 
 ## Caching
 
-`Records` supports caching. If a method or a property requires heavy computation, it's Wrapping
+`Records` supports caching. If a method or a property requires heavy computation, it's wrapped
 with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
-respectively. Caching can be disabled globally via `vectorbt.settings` or locally via the
-method/property. There is currently no way to disable caching for an entire class.
+respectively. Caching can be disabled globally via `vectorbt.settings`.
 
 !!! note
     Because of caching, class is meant to be immutable and all properties are read-only.
     To change any attribute, use the `copy` method and pass the attribute as keyword argument.
-
-!!! note
-    This class is meant to be immutable. To change any attribute, use `Records.copy`.
 """
 
 import numpy as np

@@ -80,9 +80,7 @@ Date
 
 ![](/vectorbt/docs/img/portfolio_value.png)
 
-## Features
-
-### Broadcasting
+## Broadcasting
 
 `Portfolio` is very flexible towards inputs:
 
@@ -91,7 +89,7 @@ Date
 * Many inputs (such as `fees`) can be passed as a single value, value per column/row, or as a matrix
 * Implements flexible indexing wherever possible to save memory
 
-### Grouping
+## Grouping
 
 One of the key features of `Portfolio` is the ability to group columns. Groups can be specified by
 `group_by`, which can be anything from positions or names of column levels, to a NumPy array with
@@ -148,7 +146,7 @@ dtype: float64
 !!! note
     If cash sharing is enabled, grouping can be disabled but cannot be modified.
 
-### Indexing
+## Indexing
 
 In addition, you can use pandas indexing on the `Portfolio` class itself, which forwards
 indexing operation to each argument with index:
@@ -179,7 +177,7 @@ Combined portfolio is indexed by group:
     For example, if `group_select` is enabled indexing will be performed on groups,
     otherwise on single columns. You can pass wrapper arguments with `wrapper_kwargs`.
 
-### Logging
+## Logging
 
 To collect more information on how a specific order was processed or to be able to track the whole
 simulation from the beginning to the end, you can turn on logging.
@@ -233,27 +231,50 @@ variables it's specified per order and can broadcast automatically.
 !!! note
     Logging can slow down simulation.
 
-### Caching
+## Caching
 
-This class supports caching. If a method or a property requires heavy computation, it's wrapped
-with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property` respectively.
-Caching can be disabled globally via `vectorbt.settings` or locally via the method/property.
-There is currently no way to disable caching for an entire class.
+`Portfolio` heavily relies upon caching. If a method or a property requires heavy computation,
+it's wrapped with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
+respectively. Caching can be disabled globally via `vectorbt.settings`.
 
 !!! note
-    Because of caching, this class is meant to be immutable and all properties are read-only.
+    Because of caching, class is meant to be immutable and all properties are read-only.
     To change any attribute, use the `copy` method and pass the attribute as keyword argument.
 
-!!! warning
-    Make sure to disable caching when working with large arrays. Note that methods in `Portfolio`
-    heavily depend upon each other, and a single call may trigger a chain of caching operations.
-    For example, calling `Portfolio.total_return` caches 7 different time series of the same shape
-    as the reference price.
+If you're running out of memory when working with large arrays, make sure to disable caching
+and then store most important time series manually. For example, if you're interested in Sharpe
+ratio or other metrics based on returns, run and save `Portfolio.returns` and then use the
+`vectorbt.returns.accessors.Returns_Accessor` to analyze them. Do not use methods akin to
+`Portfolio.sharpe_ratio` because they will re-calculate returns each time.
 
-    If caching is disabled, make sure to store most important time series manually. For example,
-    if you're interested in Sharpe ratio or other metrics based on returns, run and save
-    `Portfolio.returns` and then use the `vectorbt.returns.accessors.Returns_Accessor` to analyze them.
-    Do not use methods akin to `Portfolio.sharpe_ratio` because they will re-calculate returns each time."""
+Alternatively, you can precisely point at attributes and methods that should or shouldn't
+be cached. For example, you can blacklist the entire `Portfolio` class except a few most called
+methods such as `Portfolio.cash_flow` and `Portfolio.share_flow`:
+
+```python-repl
+>>> import vectorbt as vbt
+
+>>> vbt.settings.caching['blacklist'].append('Portfolio')
+>>> vbt.settings.caching['whitelist'].extend(['Portfolio.cash_flow', 'Portfolio.share_flow'])
+```
+
+Define rules for one instance of `Portfolio`:
+
+```python-repl
+>>> vbt.settings.caching['blacklist'].append(portfolio)
+>>> vbt.settings.caching['whitelist'].extend([portfolio.cash_flow, portfolio.share_flow])
+```
+
+!!! note
+    Note that the above approach doesn't work for cached properties, use tuples
+    of instance and property name instead.
+
+To reset caching:
+
+```python-repl
+>>> vbt.settings.caching.reset()
+```
+"""
 
 import numpy as np
 import pandas as pd
@@ -264,7 +285,7 @@ from plotly.subplots import make_subplots
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import convert_str_enum_value
-from vectorbt.utils.config import merge_kwargs
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.widgets import CustomFigureWidget
@@ -729,7 +750,7 @@ class Portfolio(Wrapping):
             raise_reject, accumulate, log, conflict_mode, direction, val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
-        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs, keep_raw=keep_raw)
         close = broadcasted_args[0]
         if not checks.is_pandas(close):
@@ -1068,7 +1089,7 @@ class Portfolio(Wrapping):
             val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
-        broadcast_kwargs = merge_kwargs(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs, keep_raw=keep_raw)
         close = broadcasted_args[0]
         if not checks.is_pandas(close):
@@ -1376,7 +1397,7 @@ class Portfolio(Wrapping):
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         require_kwargs = dict(require_kwargs=dict(requirements='W'))
-        broadcast_kwargs = merge_kwargs(require_kwargs, broadcast_kwargs)
+        broadcast_kwargs = merge_dicts(require_kwargs, broadcast_kwargs)
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
         if not wrapper_kwargs.get('group_select', True) and cash_sharing:
@@ -2216,7 +2237,7 @@ class Portfolio(Wrapping):
         fig.update_layout(default_layout)
 
         def _add_hline(value, x_domain, yref):
-            fig.add_shape(**merge_kwargs(dict(
+            fig.add_shape(**merge_dicts(dict(
                 xref="paper",
                 yref=yref,
                 x0=x_domain[0],
@@ -2278,7 +2299,7 @@ class Portfolio(Wrapping):
                         custom_kwargs['x_domain'] = x_domain
                     if 'y_domain' in arg_names:
                         custom_kwargs['y_domain'] = y_domain
-                    custom_kwargs = merge_kwargs(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
+                    custom_kwargs = merge_dicts(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
                     plot_func(self_col, **custom_kwargs, fig=fig)
                     
             else:
@@ -2333,7 +2354,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'PnL'
     
                 elif name == 'cum_returns':
-                    cum_returns_kwargs = merge_kwargs(dict(
+                    cum_returns_kwargs = merge_dicts(dict(
                         benchmark_rets=self_col.market_returns(),
                         main_kwargs=dict(
                             trace_kwargs=dict(
@@ -2355,7 +2376,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Cumulative Returns'
     
                 elif name == 'drawdowns':
-                    drawdowns_kwargs = merge_kwargs(dict(
+                    drawdowns_kwargs = merge_dicts(dict(
                         ts_trace_kwargs=dict(
                             line_color=color_schema['purple'],
                             name='Value'
@@ -2369,7 +2390,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Value'
     
                 elif name == 'underwater':
-                    underwater_kwargs = merge_kwargs(dict(
+                    underwater_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['red'],
                             fillcolor=adjust_opacity(color_schema['red'], 0.3),
@@ -2387,7 +2408,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['tickformat'] = '%'
     
                 elif name == 'share_flow':
-                    share_flow_kwargs = merge_kwargs(dict(
+                    share_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['brown'],
                             name='Shares'
@@ -2402,7 +2423,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Share Flow'
     
                 elif name == 'cash_flow':
-                    cash_flow_kwargs = merge_kwargs(dict(
+                    cash_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['green'],
                             name='Cash'
@@ -2417,7 +2438,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Cash Flow'
     
                 elif name == 'shares':
-                    shares_kwargs = merge_kwargs(dict(
+                    shares_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['brown'],
                             name='Shares'
@@ -2439,7 +2460,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Shares'
     
                 elif name == 'cash':
-                    cash_kwargs = merge_kwargs(dict(
+                    cash_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['green'],
                             name='Cash'
@@ -2461,7 +2482,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Cash'
     
                 elif name == 'holding_value':
-                    holding_value_kwargs = merge_kwargs(dict(
+                    holding_value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['cyan'],
                             name='Holding Value'
@@ -2483,7 +2504,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Holding Value'
     
                 elif name == 'value':
-                    value_kwargs = merge_kwargs(dict(
+                    value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['purple'],
                             name='Value'
@@ -2499,7 +2520,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Value'
     
                 elif name == 'gross_exposure':
-                    gross_exposure_kwargs = merge_kwargs(dict(
+                    gross_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['pink'],
                             name='Exposure'
@@ -2521,7 +2542,7 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Gross Exposure'
     
                 elif name == 'net_exposure':
-                    net_exposure_kwargs = merge_kwargs(dict(
+                    net_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
                             line_color=color_schema['pink'],
                             name='Exposure'

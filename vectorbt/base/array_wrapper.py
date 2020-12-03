@@ -5,7 +5,7 @@ import pandas as pd
 import warnings
 
 from vectorbt.utils import checks
-from vectorbt.utils.config import Configured, merge_kwargs
+from vectorbt.utils.config import Configured, merge_dicts
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes, to_time_units
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
@@ -57,7 +57,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         self._grouped_ndim = grouped_ndim
 
         PandasIndexer.__init__(self)
-        Configured.__init__(self, **merge_kwargs(config, self._grouper._config))
+        Configured.__init__(self, **merge_dicts(config, self._grouper._config))
 
     @cached_method
     def _indexing_func_meta(self, pd_indexing_func, index=None, columns=None,
