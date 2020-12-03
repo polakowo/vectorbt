@@ -162,19 +162,6 @@ class TestDecorators:
         assert g2.cache_me == cached_number2
         assert g3.cache_me == cached_number3
 
-        # disabled locally
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        G.cache_me.disabled = True
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
-        G.cache_me.disabled = False
-
         # test blacklist
 
         # instance + name
@@ -527,19 +514,6 @@ class TestDecorators:
         assert g2.cache_me() == cached_number2
         assert g3.cache_me() == cached_number3
 
-        # disabled locally
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        G.cache_me.disabled = True
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        G.cache_me.disabled = False
-
         # test blacklist
 
         # function
@@ -547,7 +521,6 @@ class TestDecorators:
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
         settings.caching['blacklist'].append(g.cache_me)
-        cached_number = g.cache_me()
         cached_number2 = g2.cache_me()
         cached_number3 = g3.cache_me()
         assert g.cache_me() != cached_number

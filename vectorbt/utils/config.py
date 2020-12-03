@@ -44,7 +44,7 @@ class Config(dict):
         super().__init__(*args, **kwargs)
         self._frozen = frozen
         self._read_only = read_only
-        self._init_config = copy_dict(self) if read_only else None
+        self._init_config = copy_dict(self) if not read_only else None
 
     @property
     def frozen(self):
@@ -63,7 +63,7 @@ class Config(dict):
 
     def __setitem__(self, key, val):
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         if self.frozen:
             if key not in self:
                 raise KeyError(f"Key '{key}' is not valid")
@@ -71,22 +71,22 @@ class Config(dict):
 
     def __delitem__(self, key):
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         super().__delitem__(key)
 
     def pop(self, key):
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         return super().pop(key)
 
     def popitem(self):
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         return super().popitem()
 
     def clear(self):
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         return super().clear()
 
     def update(self, *args, force_update=False, **kwargs):
@@ -94,7 +94,7 @@ class Config(dict):
         if force_update:
             super().update(other)
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         if self.frozen:
             for key in other:
                 if key not in self:
@@ -108,7 +108,7 @@ class Config(dict):
     def reset(self):
         """Reset config to initial config."""
         if self.read_only:
-            raise ValueError("Config is read-only")
+            raise TypeError("Config is read-only")
         self.update(copy_dict(self.init_config), force_update=True)
 
 
