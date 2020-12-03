@@ -255,19 +255,25 @@ methods such as `Portfolio.cash_flow` and `Portfolio.share_flow`:
 >>> import vectorbt as vbt
 
 >>> vbt.settings.caching['blacklist'].append('Portfolio')
->>> vbt.settings.caching['whitelist'].extend(['Portfolio.cash_flow', 'Portfolio.share_flow'])
+>>> vbt.settings.caching['whitelist'].extend([
+...     'Portfolio.cash_flow',
+...     'Portfolio.share_flow'
+... ])
 ```
 
 Define rules for one instance of `Portfolio`:
 
 ```python-repl
 >>> vbt.settings.caching['blacklist'].append(portfolio)
->>> vbt.settings.caching['whitelist'].extend([portfolio.cash_flow, portfolio.share_flow])
+>>> vbt.settings.caching['whitelist'].extend([
+...     portfolio.cash_flow,
+...     portfolio.share_flow
+... ])
 ```
 
 !!! note
-    Note that the above approach doesn't work for cached properties, use tuples
-    of instance and property name instead.
+    Note that the above approach doesn't work for cached properties.
+    Use tuples of the instance and the property name instead, such as `(portfolio, '_orders')`.
 
 To reset caching:
 
@@ -2147,11 +2153,12 @@ class Portfolio(Wrapping):
         by creating a placeholder that can be written later:
 
         ```python-repl
-        >>> from vectorbt.settings import color_schema
-
         >>> fig = portfolio.plot(subplots=[
         ...     'orders',
-        ...     ('order_size', dict(title='Order Size', can_plot_groups=False))  # placeholder
+        ...     ('order_size', dict(
+        ...         title='Order Size',
+        ...         can_plot_groups=False
+        ...     ))  # placeholder
         ... ])
 
         >>> size.vbt.plot(name='Order Size', row=2, col=1, fig=fig)

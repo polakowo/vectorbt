@@ -348,7 +348,7 @@ for Plotly figures.
 - [Comparing effectiveness of stop signals](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopSignals.ipynb)
 - [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TradingSessions.ipynb)
 
-Note: you will need to run the notebook to play with widgets.
+Note: you need to run the notebook to play with widgets.
 
 ## Dashboards
 

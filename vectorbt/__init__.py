@@ -1,9 +1,9 @@
 """Python library for backtesting and analyzing trading strategies at scale.
 
-While there are many great backtesting packages for Python, vectorbt was designed specifically for data mining: 
+While there are many great backtesting packages for Python, vectorbt was designed specifically for data science:
 it excels at processing performance and offers interactive tools to explore complex phenomena in trading. 
 With it you can traverse a huge number of strategy configurations, time periods and instruments in seconds, 
-to explore where your strategy performs best and to uncover hidden patterns in data. Accessing and analyzing 
+to explore where your strategy performs best and to uncover hidden patterns in data. Accessing and analyzing
 this information for yourself could give you an information advantage in your own trading.
 
 ## How it works
@@ -13,11 +13,11 @@ It builds upon the idea that each instance of a trading strategy can be represen
 so multiple strategy instances can be packed into a single multi-dimensional array, processed in a highly
 efficient manner, and compared easily. It overhauls the traditional OOP approach that represents strategies
 as classes or other data structures, which are far more easier to write and extend, but harder to analyze
-compared to vectors and require additional effort to do it fast.
+compared to vectors, and also require additional effort to do it fast.
 
 Thanks to the time series nature of trading data, most of the aspects related to backtesting can be translated
-to vectors. Instead of performing operations on one element at a time, vectorization allows us to avoid naive
-looping and perform the same operation on all the elements at the same time. The path-dependency problem
+into vectors. Instead of processing one element at a time, vectorization allows us to avoid naive
+looping and perform the same operation on all elements at the same time. The path-dependency problem
 related to vectorization is solved by using Numba - it allows both writing iterative code and compiling slow
 Python loops to be run at native machine code speed.
 
@@ -62,15 +62,15 @@ From the user's point of view, working with NumPy and Numba alone is difficult, 
 in form of index and columns and all indexing checks must be explicitly handled by the user,
 making analysis prone to errors. That's why vectorbt introduces a namespace (accessor) to pandas objects
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)).
-This way, user can easily switch between native pandas functionality such as indexing, and highly-efficient
-vectorbt methods. Moreover, each vectorbt method is flexible and can work on both Series and DataFrames.
+This way, user can easily switch between pandas and vectorbt functionality. Moreover, each vectorbt
+method is flexible towards inputs and can work on both Series and DataFrames.
 
 Another argument against using exclusively NumPy is iterative code: sometimes vectorized implementation is hard
-to read or cannot be properly defined at all, and one must rely on an iterative approach instead,
-which is processing data in element-by-element fashion. That's where Numba comes into play.
+to read or cannot be properly defined at all, and one must rely on an iterative approach instead -
+processing data in element-by-element fashion. That's where Numba comes into play.
 
 The [previous versions](https://github.com/polakowo/vectorbt/tree/9f270820dd3e5dc4ff5468dbcc14a29c4f45f557)
-of vectorbt were written in pure NumPy which led to more performance but less usability.
+of vectorbt were written in pure NumPy which led to greater performance but lesser usability.
 
 ### Indexing
 
@@ -94,7 +94,7 @@ and gets stored as a separate column level. Below is an example of a column hier
 macd_fast_window           2         3
 macd_slow_window           3         4
 macd_signal_window         2         3
-macd_macd_ewm          True      False
+macd_macd_ewm           True     False
 macd_signal_ewm        False      True
 0                        NaN       NaN
 1                        NaN       NaN
@@ -110,7 +110,7 @@ You might, for example, consider grouping your performance by `macd_fast_window`
 the fast window impacts profitability of the strategy.
 
 The other advantage of vectorbt is that it ensures that the column hierarchy is preserved across
-the whole backtesting pipeline, from signal generation, to performance modeling.
+the whole backtesting pipeline - from signal generation to performance modeling.
 
 ### Broadcasting
 
@@ -152,7 +152,7 @@ y  6  7  8
 z  7  8  9
 ```
 
-In case index or columns in both objects are different, they are stacked upon each other:
+In case where index or columns in both objects are different, they are stacked upon each other:
 
 ```python-repl
 >>> df2 = pd.DataFrame([[4, 5, 6]], index=['x', 'y', 'z'], columns=['a2', 'b2', 'c2'])
@@ -177,7 +177,7 @@ z  8  10  12
 ```
 
 This way, you can perform operations on objects of arbitrary broadcastable shapes, and still
-preserve their index information. This is handy for combining DataFrames with lots of metadata,
+preserve their individual information. This is handy for combining DataFrames with lots of metadata,
 such as indicators or signals with many hyperparameters.
 
 Another feature of vectorbt is that it can broadcast objects with incompatible shapes but common
@@ -217,9 +217,10 @@ z  11  13  15  14  16  18
 
 ## Example
 
-To better understand how these concepts fit together in vectorbt, consider the following example.
-You have a complex strategy that has lots of (hyper-)parameters that have to be tuned. While brute-
-forcing all combinations seems to be a rather unrealistic attempt, you can still interpolate, and
+To better understand how these concepts fit together, consider the following example.
+
+You have a complex strategy that has lots of (hyper-)parameters that have to be tuned. While
+brute-forcing all combinations seems to be a rather unrealistic attempt, you can still interpolate, and
 vectorbt makes exactly this possible. It doesn't care whether you have one strategy instance or millions.
 As soon as their vectors can be concatenated into a matrix and you have enough memory, you can analyze
 them in one go.
@@ -251,10 +252,10 @@ Date
 Name: Open, Length: 366, dtype: float64
 ```
 
-We will test a simple Dual Moving Average Crossover (DMAC) strategy. For this, we will be using the
-`vectorbt.indicators.basic.MA` class for calculating moving averages and generating signals.
+We are going to test a simple Dual Moving Average Crossover (DMAC) strategy. For this, we are going to
+use `vectorbt.indicators.basic.MA` class for calculating moving averages and generating signals.
 
-Our first test will be rather simple: buy when the 10-day moving average crosses above the 20-day moving
+Our first test is rather simple: buy when the 10-day moving average crosses above the 20-day moving
 average, and sell when the opposite happens.
 
 ```python-repl
@@ -293,8 +294,8 @@ Name: (10, 20, Open), Length: 366, dtype: bool
 One strategy instance of DMAC produced one column in signals and one performance value.
 
 Adding one more strategy instance is as simple as adding a new column. Here we are passing an array of
-window sizes instead of a single value. For each window size in this array, it will compute a moving
-average over the entire price series and store it as a distinct column.
+window sizes instead of a single value. For each window size in this array, it computes a moving
+average over the entire price series and stores it as a distinct column.
 
 ```python-repl
 >>> # Multiple strategy instances: (10, 30) and (20, 30)
@@ -419,7 +420,7 @@ dtype: float64
 
 ![](/vectorbt/docs/img/index_by_asset.png)
 
-Not only strategies and instruments can act as separate features, but also time! If you want to find out
+Not only strategies and instruments can act as separate features, but also time. If you want to find out
 when your strategy performs best, it's reasonable to test it over multiple time periods. vectorbt allows
 you to split one time period into many (given they have the same length and frequency) and represent
 them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into two equal time periods -
@@ -468,7 +469,7 @@ dtype: float64
 
 Notice how index is no more datetime-like, since it captures multiple time periods.
 That's why it's required here to pass the frequency `freq` to the `vectorbt.portfolio.base.Portfolio`
-class methods in order to be able to compute performance metrics such as Sharpe ratio.
+class method in order to be able to compute performance metrics such as Sharpe ratio.
 
 The index hierarchy of the final performance series can be then used to group performance
 by any feature, such as window pair, asset, and time period.
@@ -483,7 +484,7 @@ by any feature, such as window pair, asset, and time period.
 
 ![](/vectorbt/docs/img/index_by_any.png)
 
-There is much more to backtesting than simply stacking columns. vectorbt offers functions for
+There is much more to backtesting than simply stacking columns: vectorbt offers functions for
 most parts of a common backtesting pipeline, from building indicators and generating signals, to
 modeling portfolio performance and visualizing results.
 
@@ -494,7 +495,7 @@ modeling portfolio performance and visualizing results.
 - [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TradingSessions.ipynb)
 - There is also [a range of notebooks](https://github.com/polakowo/vectorbt/tree/master/tests/notebooks) for testing purposes.
 
-Note: you will need to run the notebook to play with widgets.
+Note: you need to run the notebook to play with widgets.
 
 ## Dashboards
 
