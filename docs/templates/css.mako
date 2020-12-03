@@ -101,19 +101,19 @@ pre code {
 }
 
 .hljs {
-    padding: 20px;
-    font-size: 15px;
+    padding: 1.25rem 1.5rem;
     margin-left: -15px;
     margin-right: -15px;
     border: 1px solid #eee;
     border-radius: 6px;
+    background: #282c34 !important;
 }
 
 code {
     background: #f2f2f1;
     padding: 1px 4px;
     overflow-wrap: break-word;
-    font-size: 0.95em;
+    font-size: 90%;
 }
 
 h1 code {
