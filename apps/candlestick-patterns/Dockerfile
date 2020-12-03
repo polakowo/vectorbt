@@ -16,7 +16,7 @@ RUN curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --upgrade git+https://github.com/polakowo/vectorbt.git@shorting
+RUN pip install git+https://github.com/polakowo/vectorbt.git@shorting
 
 # Clean up APT when done.
 RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*

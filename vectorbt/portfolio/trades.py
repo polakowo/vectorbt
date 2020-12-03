@@ -176,10 +176,10 @@ class Trades(Records):
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Size'] = records_df['size']
         out['Entry Date'] = records_df['entry_idx'].map(lambda x: self.wrapper.index[x])
-        out['Entry Price'] = records_df['entry_price']
+        out['Avg. Entry Price'] = records_df['entry_price']
         out['Entry Fees'] = records_df['entry_fees']
         out['Exit Date'] = records_df['exit_idx'].map(lambda x: self.wrapper.index[x])
-        out['Exit Price'] = records_df['exit_price']
+        out['Avg. Exit Price'] = records_df['exit_price']
         out['Exit Fees'] = records_df['exit_fees']
         out['PnL'] = records_df['pnl']
         out['Return'] = records_df['return']
@@ -349,7 +349,7 @@ class Trades(Records):
                  closed_profit_trace_kwargs=None,
                  closed_loss_trace_kwargs=None,
                  open_trace_kwargs=None,
-                 zeroline_shape_kwargs=None,
+                 hline_shape_kwargs=None,
                  row=None, col=None,
                  xref='x', yref='y',
                  fig=None,
@@ -361,7 +361,7 @@ class Trades(Records):
             closed_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Profit" markers.
             closed_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Loss" markers.
             open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.
-            zeroline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
             row (int): Row position.
             col (int): Column position.
             xref (str): X coordinate axis.
@@ -387,8 +387,8 @@ class Trades(Records):
             closed_loss_trace_kwargs = {}
         if open_trace_kwargs is None:
             open_trace_kwargs = {}
-        if zeroline_shape_kwargs is None:
-            zeroline_shape_kwargs = {}
+        if hline_shape_kwargs is None:
+            hline_shape_kwargs = {}
         marker_size_range = tuple(marker_size_range)
 
         if fig is None:
@@ -494,6 +494,7 @@ class Trades(Records):
 
         # Plot zeroline
         fig.add_shape(**merge_dicts(dict(
+            type='line',
             xref="paper",
             yref=yref,
             x0=x_domain[0],
@@ -502,14 +503,15 @@ class Trades(Records):
             y1=0,
             line=dict(
                 color="gray",
-                dash="dashdot",
+                dash="dash",
             )
-        ), zeroline_shape_kwargs))
+        ), hline_shape_kwargs))
         return fig
 
     def plot(self,
              column=None,
-             show_close=True,
+             plot_close=True,
+             plot_zones=True,
              close_trace_kwargs=None,
              entry_trace_kwargs=None,
              exit_trace_kwargs=None,
@@ -526,7 +528,10 @@ class Trades(Records):
 
         Args:
             column (str): Name of the column to plot.
-            show_close (bool): Whether to show `Trades.close`.
+            plot_close (bool): Whether to plot `Trades.close`.
+            plot_zones (bool): Whether to plot zones.
+
+                Set to False if there are many trades within one position.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Trades.close`.
             entry_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Entry" markers.
             exit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Exit" markers.
@@ -579,7 +584,7 @@ class Trades(Records):
         fig.update_layout(**layout_kwargs)
 
         # Plot close
-        if show_close:
+        if plot_close:
             fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, row=row, col=col, fig=fig)
 
         if len(self_col.values) > 0:
@@ -633,7 +638,7 @@ class Trades(Records):
                     ),
                     name='Entry',
                     customdata=entry_customdata,
-                    hovertemplate="%{x}<br>Price: %{y}"
+                    hovertemplate="%{x}<br>Avg. Price: %{y}"
                                   "<br>Size: %{customdata[0]:.4f}"
                                   "<br>Fees: %{customdata[1]:.4f}"
                                   "<br>Direction: %{customdata[2]}"
@@ -669,7 +674,7 @@ class Trades(Records):
                         ),
                         name=name,
                         customdata=customdata,
-                        hovertemplate="%{x}<br>Price: %{y}"
+                        hovertemplate="%{x}<br>Avg. Price: %{y}"
                                       "<br>Size: %{customdata[0]:.4f}"
                                       "<br>Fees: %{customdata[1]:.4f}"
                                       "<br>PnL: %{customdata[2]:.4f}"
@@ -713,41 +718,42 @@ class Trades(Records):
                 active_trace_kwargs
             )
 
-            profit_mask = pnl > 0.
-            if np.any(profit_mask):
-                # Plot profit zones
-                for i in np.flatnonzero(profit_mask):
-                    fig.add_shape(**merge_dicts(dict(
-                        type="rect",
-                        xref=xref,
-                        yref=yref,
-                        x0=self_col.wrapper.index[entry_idx[i]],
-                        y0=entry_price[i],
-                        x1=self_col.wrapper.index[exit_idx[i]],
-                        y1=exit_price[i],
-                        fillcolor='green',
-                        opacity=0.2,
-                        layer="below",
-                        line_width=0,
-                    ), profit_shape_kwargs))
+            if plot_zones:
+                profit_mask = pnl > 0.
+                if np.any(profit_mask):
+                    # Plot profit zones
+                    for i in np.flatnonzero(profit_mask):
+                        fig.add_shape(**merge_dicts(dict(
+                            type="rect",
+                            xref=xref,
+                            yref=yref,
+                            x0=self_col.wrapper.index[entry_idx[i]],
+                            y0=entry_price[i],
+                            x1=self_col.wrapper.index[exit_idx[i]],
+                            y1=exit_price[i],
+                            fillcolor='green',
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        ), profit_shape_kwargs))
 
-            loss_mask = pnl < 0.
-            if np.any(loss_mask):
-                # Plot loss zones
-                for i in np.flatnonzero(loss_mask):
-                    fig.add_shape(**merge_dicts(dict(
-                        type="rect",
-                        xref=xref,
-                        yref=yref,
-                        x0=self_col.wrapper.index[entry_idx[i]],
-                        y0=entry_price[i],
-                        x1=self_col.wrapper.index[exit_idx[i]],
-                        y1=exit_price[i],
-                        fillcolor='red',
-                        opacity=0.2,
-                        layer="below",
-                        line_width=0,
-                    ), loss_shape_kwargs))
+                loss_mask = pnl < 0.
+                if np.any(loss_mask):
+                    # Plot loss zones
+                    for i in np.flatnonzero(loss_mask):
+                        fig.add_shape(**merge_dicts(dict(
+                            type="rect",
+                            xref=xref,
+                            yref=yref,
+                            x0=self_col.wrapper.index[entry_idx[i]],
+                            y0=entry_price[i],
+                            x1=self_col.wrapper.index[exit_idx[i]],
+                            y1=exit_price[i],
+                            fillcolor='red',
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        ), loss_shape_kwargs))
 
         return fig
 

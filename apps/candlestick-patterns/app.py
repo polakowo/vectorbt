@@ -159,12 +159,17 @@ default_candle_settings = pd.DataFrame({
 })
 default_entry_dates = []
 default_exit_dates = []
+directions = vbt.portfolio.enums.Direction._fields
+default_direction = directions[0]
+conflict_modes = vbt.portfolio.enums.ConflictMode._fields
+default_conflict_mode = conflict_modes[0]
 default_sim_options = ['allow_accumulate']
 default_n_random_strat = 50
 default_stats_options = ['incl_unrealized']
 default_layout = dict(
+    width=None,
+    height=None,
     autosize=True,
-    automargin=True,
     margin=dict(b=40, t=20),
     font=dict(
         color="#9fa6b7"
@@ -237,16 +242,16 @@ app.layout = html.Div(
                                                 html.Div(
                                                     className="banner",
                                                     children=[
-                                                        html.H6("Orders, trades and value")
+                                                        html.H6("Portfolio")
                                                     ],
                                                 ),
                                                 dcc.Loading(
-                                                    id="value_loading",
+                                                    id="portfolio_loading",
                                                     type="default",
                                                     color="#387c9e",
                                                     children=[
                                                         dcc.Graph(
-                                                            id="value_graph",
+                                                            id="portfolio_graph",
                                                             figure={
                                                                 "layout": default_layout
                                                             }
@@ -438,7 +443,7 @@ app.layout = html.Div(
                                                         html.Label("Period:"),
                                                         dcc.Dropdown(
                                                             id="period_dropdown",
-                                                            options=[{"label": i, "value": i} for i in periods],
+                                                            options=[{"value": i, "label": i} for i in periods],
                                                             value=default_period,
                                                         ),
                                                     ]
@@ -448,7 +453,7 @@ app.layout = html.Div(
                                                         html.Label("Interval:"),
                                                         dcc.Dropdown(
                                                             id="interval_dropdown",
-                                                            options=[{"label": i, "value": i} for i in intervals],
+                                                            options=[{"value": i, "label": i} for i in intervals],
                                                             value=default_interval,
                                                         ),
                                                     ]
@@ -526,11 +531,10 @@ app.layout = html.Div(
                                                 html.Label("Select patterns:"),
                                                 dcc.Dropdown(
                                                     id="entry_pattern_dropdown",
-                                                    options=[{"label": i, "value": i} for i in patterns],
+                                                    options=[{"value": i, "label": i} for i in patterns],
                                                     multi=True,
                                                     value=default_entry_patterns,
                                                 ),
-
                                             ],
                                         ),
                                     ],
@@ -591,7 +595,7 @@ app.layout = html.Div(
                                                 html.Label("Select patterns:"),
                                                 dcc.Dropdown(
                                                     id="exit_pattern_dropdown",
-                                                    options=[{"label": i, "value": i} for i in patterns],
+                                                    options=[{"value": i, "label": i} for i in patterns],
                                                     multi=True,
                                                     value=default_exit_patterns,
                                                 ),
@@ -736,6 +740,30 @@ app.layout = html.Div(
                                                     ]
                                                 ),
                                                 dbc.Col()
+                                            ],
+                                        ),
+                                        dbc.Row(
+                                            children=[
+                                                dbc.Col(
+                                                    children=[
+                                                        html.Label("Direction:"),
+                                                        dcc.Dropdown(
+                                                            id="direction_dropdown",
+                                                            options=[{"value": i, "label": i} for i in directions],
+                                                            value=default_direction,
+                                                        ),
+                                                    ]
+                                                ),
+                                                dbc.Col(
+                                                    children=[
+                                                        html.Label("Conflict Mode:"),
+                                                        dcc.Dropdown(
+                                                            id="conflict_mode_dropdown",
+                                                            options=[{"value": i, "label": i} for i in conflict_modes],
+                                                            value=default_conflict_mode
+                                                        ),
+                                                    ]
+                                                ),
                                             ],
                                         ),
                                         dcc.Checklist(
@@ -894,7 +922,7 @@ def update_custom_options(date_list, date_range):
 
     If selected dates cannot be found in new dates, they will be automatically removed."""
     filtered_dates = np.asarray(date_list)[date_range[0]:date_range[1] + 1].tolist()
-    custom_options = [{"label": i, "value": i} for i in filtered_dates]
+    custom_options = [{"value": i, "label": i} for i in filtered_dates]
     return custom_options, custom_options
 
 
@@ -1152,8 +1180,8 @@ def update_ohlcv(df_json, date_range, entry_patterns, exit_patterns, _1,
 
 
 def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, exit_patterns,
-                       entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options,
-                       n_random_strat, prob_options, entry_prob, exit_prob):
+                       entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
+                       sim_options, n_random_strat, prob_options, entry_prob, exit_prob):
     """Simulate portfolio of the main strategy, buy & hold strategy, and a bunch of random strategies."""
     # Filter by date
     df = df.iloc[date_range[0]:date_range[1] + 1]
@@ -1232,6 +1260,8 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
             exits=size < 0,
             price=df['Open'],
             size=np.abs(size),
+            direction=direction,
+            conflict_mode=conflict_mode,
             accumulate='allow_accumulate' in sim_options,
             init_cash=init_cash,
             fees=float(fees) / 100,
@@ -1257,7 +1287,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
 
 
 @app.callback(
-    [Output('value_graph', 'figure'),
+    [Output('portfolio_graph', 'figure'),
      Output('stats_table', 'data'),
      Output('stats_signal', 'children'),
      Output('metric_dropdown', 'options'),
@@ -1274,6 +1304,8 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
      Input('fees_input', 'value'),
      Input('fixed_fees_input', 'value'),
      Input('slippage_input', 'value'),
+     Input('direction_dropdown', 'value'),
+     Input('conflict_mode_dropdown', 'value'),
      Input('sim_checklist', 'value'),
      Input('n_random_strat_input', 'value'),
      Input('prob_checklist', 'value'),
@@ -1284,116 +1316,21 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     [State('metric_dropdown', 'value')]
 )
 def update_stats(df_json, interval, date_range, selected_data, entry_patterns, exit_patterns,
-                 _1, entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options, n_random_strat,
-                 prob_options, entry_prob, exit_prob, stats_options, _2, curr_metric):
+                 _1, entry_dates, exit_dates, fees, fixed_fees, slippage, direction,
+                 conflict_mode, sim_options, n_random_strat, prob_options, entry_prob,
+                 exit_prob, stats_options, _2, curr_metric):
     """Final stage where we calculate key performance metrics and compare strategies."""
     df = pd.read_json(df_json, orient='split')
 
     # Simulate portfolio
     main_portfolio, hold_portfolio, rand_portfolio = simulate_portfolio(
         df, interval, date_range, selected_data, entry_patterns, exit_patterns,
-        entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options,
-        n_random_strat, prob_options, entry_prob, exit_prob)
+        entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
+        sim_options, n_random_strat, prob_options, entry_prob, exit_prob)
 
-    # Get orders
-    buy_trace, sell_trace = main_portfolio.orders().plot().data[1:]
-    buy_trace.update(dict(
-        x=pd.to_datetime(buy_trace.x),
-        marker_line=None,
-        marker_size=8,
-        marker_symbol='triangle-up',
-        marker_color='#38a6a5',
-        yaxis='y4'
-    ))
-    sell_trace.update(dict(
-        x=pd.to_datetime(sell_trace.x),
-        marker_line=None,
-        marker_size=8,
-        marker_symbol='triangle-down',
-        marker_color='#cc503e',
-        yaxis='y4'
-    ))
-
-    # Get returns
-    returns = main_portfolio.trades().returns
-    profit_mask = returns.values > 0
-    loss_mask = returns.values < 0
-
-    figure = dict(
-        data=[
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index),
-                y=main_portfolio.shares(),
-                name="Holdings",
-                yaxis="y2",
-                line_color='#1f77b4'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index),
-                y=main_portfolio.value(),
-                name="Value",
-                line_color='#2ca02c'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(hold_portfolio.wrapper.index),
-                y=hold_portfolio.value(),
-                name=f"Value (Buy & Hold)",
-                line_color='#ff7f0e'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[profit_mask]]),
-                y=returns.values[profit_mask],
-                marker_color='#2ca02c',
-                marker_size=8,
-                mode='markers',
-                name="Profit",
-                yaxis="y3",
-            ),
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[loss_mask]]),
-                y=returns.values[loss_mask],
-                marker_color='#d62728',
-                marker_size=8,
-                mode='markers',
-                name="Loss",
-                yaxis="y3"
-            ),
-            buy_trace,
-            sell_trace
-        ],
-        layout=merge_dicts(
-            default_layout,
-            dict(
-                hovermode="closest",
-                xaxis=dict(
-                    gridcolor='#323b56',
-                    title='Date',
-                ),
-                yaxis=dict(
-                    gridcolor='#323b56',
-                    title='Value',
-                    domain=[0, 0.4]
-                ),
-                yaxis2=dict(
-                    showgrid=False,
-                    overlaying="y",
-                    side="right",
-                    title='Holdings',
-                ),
-                yaxis3=dict(
-                    gridcolor='#323b56',
-                    title='Trade return',
-                    domain=[0.45, 0.7],
-                    tickformat='%'
-                ),
-                yaxis4=dict(
-                    gridcolor='#323b56',
-                    title='Order price',
-                    domain=[0.75, 1],
-                )
-            )
-        )
-    )
+    fig = main_portfolio.plot(**default_layout)
+    fig.update_xaxes(gridcolor='#323b56')
+    fig.update_yaxes(gridcolor='#323b56')
 
     def _chop_microseconds(delta):
         return delta - pd.Timedelta(microseconds=delta.microseconds, nanoseconds=delta.nanoseconds)
@@ -1442,14 +1379,14 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             metric = default_metric
     if metric is None:
         metric = default_metric
-    return figure, \
+    return dict(data=fig.data, layout=fig.layout), \
            table_data.to_dict("records"), \
            json.dumps({
                'main': {m: [_to_float(main_stats[m])] for m in main_stats.index[3:]},
                'hold': {m: [_to_float(hold_stats[m])] for m in main_stats.index[3:]},
                'rand': {m: rand_stats[m].apply(_to_float).values.tolist() for m in main_stats.index[3:]}
            }), \
-           [{"label": i, "value": i} for i in main_stats.index[3:]], \
+           [{"value": i, "label": i} for i in main_stats.index[3:]], \
            metric
 
 
@@ -1544,6 +1481,8 @@ def update_metric_stats(stats_json, metric):
      Output('fees_input', 'value'),
      Output('fixed_fees_input', 'value'),
      Output('slippage_input', 'value'),
+     Output('conflict_mode_dropdown', 'value'),
+     Output('direction_dropdown', 'value'),
      Output('sim_checklist', 'value'),
      Output('n_random_strat_input', 'value'),
      Output("prob_checklist", "value"),
@@ -1565,6 +1504,8 @@ def reset_settings(_):
            default_fees, \
            default_fixed_fees, \
            default_slippage, \
+           default_conflict_mode, \
+           default_direction, \
            default_sim_options, \
            default_n_random_strat, \
            default_prob_options, \

@@ -415,7 +415,7 @@ dtype: float64
 >>> mean_return = portfolio.total_return().groupby('asset').mean()
 >>> mean_return.vbt.bar(
 ...     xaxis_title='Asset',
-...     yaxis_title='Mean total return').show_png()
+...     yaxis_title='Mean total return')
 ```
 
 ![](/vectorbt/docs/img/index_by_asset.png)
@@ -479,7 +479,7 @@ by any feature, such as window pair, asset, and time period.
 >>> mean_return = mean_return.unstack(level=-1).vbt.bar(
 ...     xaxis_title='End date',
 ...     yaxis_title='Mean total return',
-...     legend_title_text='Asset').show_png()
+...     legend_title_text='Asset')
 ```
 
 ![](/vectorbt/docs/img/index_by_any.png)

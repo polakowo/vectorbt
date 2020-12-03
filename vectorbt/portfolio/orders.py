@@ -136,7 +136,7 @@ class Orders(Records):
 
     def plot(self,
              column=None,
-             show_close=True,
+             plot_close=True,
              close_trace_kwargs=None,
              buy_trace_kwargs=None,
              sell_trace_kwargs=None,
@@ -147,7 +147,7 @@ class Orders(Records):
 
         Args:
             column (str): Name of the column to plot.
-            show_close (bool): Whether to show `Orders.close`.
+            plot_close (bool): Whether to plot `Orders.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Orders.close`.
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
@@ -183,7 +183,7 @@ class Orders(Records):
         fig.update_layout(**layout_kwargs)
 
         # Plot close
-        if show_close:
+        if plot_close:
             fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, row=row, col=col, fig=fig)
 
         if len(self_col.values) > 0:

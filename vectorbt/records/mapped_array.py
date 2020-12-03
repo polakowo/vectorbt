@@ -116,7 +116,7 @@ You can build histograms and boxplots of `MappedArray` directly:
 To use scatterplots or any other plots that require index, convert to matrix first:
 
 ```python-repl
->>> ma.to_matrix().vbt.scatter().show_png()
+>>> ma.to_matrix().vbt.scatter()
 ```
 
 ![](/vectorbt/docs/img/mapped_scatter.png)

@@ -405,10 +405,10 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         >>> import pandas as pd
         >>> import numpy as np
 
-        >>> np.random.seed(20)
+        >>> np.random.seed(0)
         >>> rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
         >>> benchmark_rets = pd.Series(np.random.uniform(-0.05, 0.05, size=100))
-        >>> rets.vbt.returns.plot_cum_returns(rets, benchmark_rets=benchmark_rets)
+        >>> rets.vbt.returns.plot_cum_returns(benchmark_rets=benchmark_rets)
         ```
 
         ![](/vectorbt/docs/img/plot_cum_returns.png)
@@ -461,6 +461,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
         fig.add_shape(**merge_dicts(dict(
+            type='line',
             xref="paper",
             yref=yref,
             x0=x_domain[0],
@@ -469,7 +470,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
             y1=start_value,
             line=dict(
                 color="gray",
-                dash="dashdot",
+                dash="dash",
             )
         ), hline_shape_kwargs))
 

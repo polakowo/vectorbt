@@ -253,8 +253,9 @@ class Drawdowns(Records):
 
     def plot(self,
              column=None,
-             show_ts=True,
              top_n=5,
+             plot_ts=True,
+             plot_zones=True,
              ts_trace_kwargs=None,
              peak_trace_kwargs=None,
              valley_trace_kwargs=None,
@@ -271,8 +272,9 @@ class Drawdowns(Records):
 
         Args:
             column (str): Name of the column to plot.
-            show_ts (bool): Whether to show time series.
             top_n (int): Filter top N drawdown records by maximum drawdown.
+            plot_ts (bool): Whether to plot time series.
+            plot_zones (bool): Whether to plot zones.
             ts_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for time series.
             peak_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for peak values.
             valley_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for valley values.
@@ -337,7 +339,7 @@ class Drawdowns(Records):
                 if fig.layout[yaxis]['domain'] is not None:
                     y_domain = fig.layout[yaxis]['domain']
 
-        if show_ts:
+        if plot_ts:
             fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, row=row, col=col, fig=fig)
 
         if len(self_col.values) > 0:
@@ -360,7 +362,7 @@ class Drawdowns(Records):
                     duration = to_idx - from_idx
                 return np.vectorize(str)(duration)
 
-            # Plot peak markers and zones
+            # Plot peak markers
             peak_mask = start_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
             if np.any(peak_mask):
                 peak_scatter = go.Scatter(
@@ -383,7 +385,7 @@ class Drawdowns(Records):
 
             recovery_mask = status == DrawdownStatus.Recovered
             if np.any(recovery_mask):
-                # Plot valley markers and zones
+                # Plot valley markers
                 valley_drawdown = (valley_val[recovery_mask] - start_val[recovery_mask]) / start_val[recovery_mask]
                 valley_duration = get_duration_str(start_idx[recovery_mask], valley_idx[recovery_mask])
                 valley_customdata = np.stack((valley_drawdown, valley_duration), axis=1)
@@ -407,22 +409,24 @@ class Drawdowns(Records):
                 valley_scatter.update(**valley_trace_kwargs)
                 fig.add_trace(valley_scatter, row=row, col=col)
 
-                for i in np.flatnonzero(recovery_mask):
-                    fig.add_shape(**merge_dicts(dict(
-                        type="rect",
-                        xref=xref,
-                        yref="paper",
-                        x0=self_col.ts.index[start_idx[i]],
-                        y0=y_domain[0],
-                        x1=self_col.ts.index[valley_idx[i]],
-                        y1=y_domain[1],
-                        fillcolor='red',
-                        opacity=0.2,
-                        layer="below",
-                        line_width=0,
-                    ), ptv_shape_kwargs))
+                if plot_zones:
+                    # Plot drawdown zones
+                    for i in np.flatnonzero(recovery_mask):
+                        fig.add_shape(**merge_dicts(dict(
+                            type="rect",
+                            xref=xref,
+                            yref="paper",
+                            x0=self_col.ts.index[start_idx[i]],
+                            y0=y_domain[0],
+                            x1=self_col.ts.index[valley_idx[i]],
+                            y1=y_domain[1],
+                            fillcolor='red',
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        ), ptv_shape_kwargs))
 
-                # Plot recovery markers and zones
+                # Plot recovery markers
                 recovery_return = (end_val[recovery_mask] - valley_val[recovery_mask]) / valley_val[recovery_mask]
                 recovery_duration = get_duration_str(valley_idx[recovery_mask], end_idx[recovery_mask])
                 recovery_customdata = np.stack((recovery_return, recovery_duration), axis=1)
@@ -446,22 +450,24 @@ class Drawdowns(Records):
                 recovery_scatter.update(**recovery_trace_kwargs)
                 fig.add_trace(recovery_scatter, row=row, col=col)
 
-                for i in np.flatnonzero(recovery_mask):
-                    fig.add_shape(**merge_dicts(dict(
-                        type="rect",
-                        xref=xref,
-                        yref="paper",
-                        x0=self_col.ts.index[valley_idx[i]],
-                        y0=y_domain[0],
-                        x1=self_col.ts.index[end_idx[i]],
-                        y1=y_domain[1],
-                        fillcolor='green',
-                        opacity=0.2,
-                        layer="below",
-                        line_width=0,
-                    ), vtr_shape_kwargs))
+                if plot_zones:
+                    # Plot recovery zones
+                    for i in np.flatnonzero(recovery_mask):
+                        fig.add_shape(**merge_dicts(dict(
+                            type="rect",
+                            xref=xref,
+                            yref="paper",
+                            x0=self_col.ts.index[valley_idx[i]],
+                            y0=y_domain[0],
+                            x1=self_col.ts.index[end_idx[i]],
+                            y1=y_domain[1],
+                            fillcolor='green',
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        ), vtr_shape_kwargs))
 
-            # Plot active markers and zones
+            # Plot active markers
             active_mask = ~recovery_mask
             if np.any(active_mask):
                 active_drawdown = (valley_val[active_mask] - start_val[active_mask]) / start_val[active_mask]
@@ -487,19 +493,21 @@ class Drawdowns(Records):
                 active_scatter.update(**active_trace_kwargs)
                 fig.add_trace(active_scatter, row=row, col=col)
 
-                for i in np.flatnonzero(active_mask):
-                    fig.add_shape(**merge_dicts(dict(
-                        type="rect",
-                        xref=xref,
-                        yref="paper",
-                        x0=self_col.ts.index[start_idx[i]],
-                        y0=y_domain[0],
-                        x1=self_col.ts.index[end_idx[i]],
-                        y1=y_domain[1],
-                        fillcolor='orange',
-                        opacity=0.2,
-                        layer="below",
-                        line_width=0,
-                    ), active_shape_kwargs))
+                if plot_zones:
+                    # Plot active drawdown zones
+                    for i in np.flatnonzero(active_mask):
+                        fig.add_shape(**merge_dicts(dict(
+                            type="rect",
+                            xref=xref,
+                            yref="paper",
+                            x0=self_col.ts.index[start_idx[i]],
+                            y0=y_domain[0],
+                            x1=self_col.ts.index[end_idx[i]],
+                            y1=y_domain[1],
+                            fillcolor='orange',
+                            opacity=0.2,
+                            layer="below",
+                            line_width=0,
+                        ), active_shape_kwargs))
 
         return fig

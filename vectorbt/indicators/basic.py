@@ -62,7 +62,7 @@ class MA(MA):
 
     def plot(self,
              column=None,
-             show_close=True,
+             plot_close=True,
              close_trace_kwargs=None,
              ma_trace_kwargs=None,
              row=None, col=None,
@@ -72,7 +72,7 @@ class MA(MA):
 
         Args:
             column (str): Name of the column to plot.
-            show_close (bool): Whether to show `MA.close`.
+            plot_close (bool): Whether to plot `MA.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
             row (int): Row position.
@@ -108,7 +108,7 @@ class MA(MA):
             name='MA'
         ), ma_trace_kwargs)
 
-        if show_close:
+        if plot_close:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
                 row=row, col=col, fig=fig)
@@ -225,7 +225,7 @@ class BBANDS(BBANDS):
 
     def plot(self,
              column=None,
-             show_close=True,
+             plot_close=True,
              close_trace_kwargs=None,
              middle_trace_kwargs=None,
              upper_trace_kwargs=None,
@@ -238,7 +238,7 @@ class BBANDS(BBANDS):
 
         Args:
             column (str): Name of the column to plot.
-            show_close (bool): Whether to show `MA.close`.
+            plot_close (bool): Whether to plot `MA.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.close`.
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
@@ -299,7 +299,7 @@ class BBANDS(BBANDS):
         fig = self_col.middle.vbt.plot(
             trace_kwargs=middle_trace_kwargs,
             row=row, col=col, fig=fig)
-        if show_close:
+        if plot_close:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
                 row=row, col=col, fig=fig)

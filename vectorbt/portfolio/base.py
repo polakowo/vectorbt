@@ -536,7 +536,7 @@ class Portfolio(Wrapping):
                 Will broadcast.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price` if set, otherwise to previous `close`.
-                
+
                 See `val_price` in `Portfolio.from_orders`.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
@@ -568,7 +568,7 @@ class Portfolio(Wrapping):
             If you generated signals using close price, don't forget to shift your signals by one tick
             forward, for example, with `signals.vbt.fshift(1)`. In general, make sure to use a price
             that comes after the signal.
-            
+
         Also see notes and hints for `Portfolio.from_orders`.
 
         ## Example
@@ -2184,6 +2184,16 @@ class Portfolio(Wrapping):
             subplots = [subplots]
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
+        hline_shape_kwargs = merge_dicts(
+            dict(
+                type='line',
+                line=dict(
+                    color="gray",
+                    dash="dash",
+                )
+            ),
+            hline_shape_kwargs
+        )
         if make_subplots_kwargs is None:
             make_subplots_kwargs = {}
 
@@ -2200,12 +2210,16 @@ class Portfolio(Wrapping):
                     row_col_tuples.append((row + 1, col + 1))
         shared_xaxes = make_subplots_kwargs.pop('shared_xaxes', True)
         shared_yaxes = make_subplots_kwargs.pop('shared_yaxes', False)
-        vertical_spacing = make_subplots_kwargs.pop('vertical_spacing', 40)
+        if height is not None:
+            vertical_spacing = make_subplots_kwargs.pop('vertical_spacing', 40)
+            if vertical_spacing is not None and vertical_spacing > 1:
+                vertical_spacing /= height
+        else:
+            vertical_spacing = make_subplots_kwargs.pop('vertical_spacing', None)
         horizontal_spacing = make_subplots_kwargs.pop('horizontal_spacing', None)
-        if vertical_spacing is not None and vertical_spacing > 1:
-            vertical_spacing /= height
-        if horizontal_spacing is not None and horizontal_spacing > 1:
-            horizontal_spacing /= width
+        if width is not None:
+            if horizontal_spacing is not None and horizontal_spacing > 1:
+                horizontal_spacing /= width
         if show_titles:
             _subplot_titles = []
             for name in subplots:
@@ -2233,7 +2247,7 @@ class Portfolio(Wrapping):
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=1 + 30 / height,
+                y=(1 + 30 / height) if height is not None else 1.02,
                 xanchor="right",
                 x=1,
                 traceorder='normal'
@@ -2248,11 +2262,7 @@ class Portfolio(Wrapping):
                 x0=x_domain[0],
                 y0=value,
                 x1=x_domain[1],
-                y1=value,
-                line=dict(
-                    color="gray",
-                    dash="dashdot",
-                )
+                y1=value
             ), hline_shape_kwargs))
 
         def _get_arg_names(method):
@@ -2341,7 +2351,9 @@ class Portfolio(Wrapping):
                     fig.layout[yaxis]['title'] = 'Price'
     
                 elif name == 'trade_pnl':
-                    trade_pnl_kwargs = kwargs.pop('trade_pnl_kwargs', {})
+                    trade_pnl_kwargs = merge_dicts(dict(
+                        hline_shape_kwargs=hline_shape_kwargs
+                    ), kwargs.pop('trade_pnl_kwargs', {}))
                     method_kwargs = _extract_method_kwargs(self_col.trades, trade_pnl_kwargs)
                     self_col.trades(**method_kwargs).plot_pnl(
                         **trade_pnl_kwargs,
@@ -2366,7 +2378,8 @@ class Portfolio(Wrapping):
                                 line_color=color_schema['purple'],
                                 name='Value'
                             )
-                        )
+                        ),
+                        hline_shape_kwargs=hline_shape_kwargs
                     ), kwargs.pop('cum_returns_kwargs', {}))
                     active_returns = cum_returns_kwargs.pop('active_returns', False)
                     in_sim_order = cum_returns_kwargs.pop('in_sim_order', False)
