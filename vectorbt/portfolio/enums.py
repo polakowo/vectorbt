@@ -27,6 +27,7 @@ __all__ = [
     'TradeDirection',
     'TradeStatus',
     'trade_dt',
+    'position_dt',
     'log_dt',
     'TradeType',
     'BenchmarkSize'
@@ -456,8 +457,9 @@ Attributes:
 # ############# Records ############# #
 
 order_dt = np.dtype([
-    ('col', np.int_),
+    ('id', np.int_),
     ('idx', np.int_),
+    ('col', np.int_),
     ('size', np.float_),
     ('price', np.float_),
     ('fees', np.float_),
@@ -502,6 +504,7 @@ __pdoc__['TradeStatus'] = f"""Event status.
 """
 
 _trade_fields = [
+    ('id', np.int_),
     ('col', np.int_),
     ('size', np.float_),
     ('entry_idx', np.int_),
@@ -514,7 +517,7 @@ _trade_fields = [
     ('return', np.float_),
     ('direction', np.int_),
     ('status', np.int_),
-    ('position_idx', np.int_)
+    ('position_id', np.int_)
 ]
 
 trade_dt = np.dtype(_trade_fields, align=True)
@@ -530,7 +533,23 @@ __pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 ```
 """
 
+_position_fields = _trade_fields[:-1]
+
+position_dt = np.dtype(_position_fields, align=True)
+"""_"""
+
+__pdoc__['position_dt'] = f"""`np.dtype` of position records.
+
+```plaintext
+{json.dumps(dict(zip(
+    dict(position_dt.fields).keys(),
+    list(map(lambda x: str(x[0]), dict(position_dt.fields).values()))
+)), indent=2, default=str)}
+```
+"""
+
 _log_fields = [
+    ('id', np.int_),
     ('idx', np.int_),
     ('col', np.int_),
     ('group', np.int_),
@@ -559,7 +578,8 @@ _log_fields = [
     ('res_fees', np.float_),
     ('res_side', np.int_),
     ('res_status', np.int_),
-    ('res_status_info', np.int_)
+    ('res_status_info', np.int_),
+    ('order_id', np.int_)
 ]
 
 log_dt = np.dtype(_log_fields, align=True)

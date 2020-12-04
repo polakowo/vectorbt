@@ -73,6 +73,7 @@ from vectorbt.portfolio.enums import (
     TradeDirection,
     TradeStatus,
     trade_dt,
+    position_dt,
     log_dt
 )
 
@@ -80,12 +81,8 @@ from vectorbt.portfolio.enums import (
 # ############# Simulation ############# #
 
 @njit(cache=True)
-def fill_req_log_nb(i, col, group, cash_now, shares_now, val_price_now,
-                           value_now, order, log_record):
+def fill_req_log_nb(cash_now, shares_now, val_price_now, value_now, order, log_record):
     """Fill log record on order request."""
-    log_record['idx'] = i
-    log_record['col'] = col
-    log_record['group'] = group
     log_record['cash_now'] = cash_now
     log_record['shares_now'] = shares_now
     log_record['val_price_now'] = val_price_now
@@ -281,13 +278,10 @@ def sell_shares_nb(cash_now, shares_now, size, direction, price, fees, fixed_fee
 
 
 @njit(cache=True)
-def process_order_nb(i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_record):
+def process_order_nb(cash_now, shares_now, val_price_now, value_now, order, log_record):
     """Process an order given current cash and share balance.
 
     Args:
-        i (int): Current index.
-        col (int): Current column.
-        group (int): Current group.
         cash_now (float): Cash available to this asset or group with cash sharing.
         shares_now (float): Holdings of this particular asset.
         val_price_now (float): Valuation price for this particular asset.
@@ -304,9 +298,7 @@ def process_order_nb(i, col, group, cash_now, shares_now, val_price_now, value_n
     Order is rejected if an input goes over a limit/restriction.
     """
     if order.log:
-        fill_req_log_nb(
-            i, col, group, cash_now, shares_now, val_price_now,
-            value_now, order, log_record)
+        fill_req_log_nb(cash_now, shares_now, val_price_now, value_now, order, log_record)
 
     if np.isnan(order.size):
         return order_not_filled_nb(
@@ -324,8 +316,6 @@ def process_order_nb(i, col, group, cash_now, shares_now, val_price_now, value_n
         raise ValueError("cash_now must be greater than 0")
     if not np.isfinite(shares_now):
         raise ValueError("shares_now must be finite")
-    if np.isinf(val_price_now) or val_price_now <= 0:
-        raise ValueError("val_price_now must be finite and greater than 0")
 
     # Check order
     if order.direction == Direction.LongOnly and shares_now < 0:
@@ -372,6 +362,8 @@ def process_order_nb(i, col, group, cash_now, shares_now, val_price_now, value_n
 
     if order_size_type == SizeType.TargetValue:
         # Target value
+        if np.isinf(val_price_now) or val_price_now <= 0:
+            raise ValueError("val_price_now must be finite and greater than 0")
         if np.isnan(val_price_now):
             return order_not_filled_nb(
                 cash_now, shares_now,
@@ -925,16 +917,16 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                 running order 2 at column 1
 
     >>> pd.DataFrame.from_records(order_records)
-       col  idx       size     price      fees  side
-    0    0    0   7.626262  4.375232  1.033367     0
-    1    0    2   5.210115  1.524275  1.007942     0
-    2    0    4   7.899568  8.483492  1.067016     1
-    3    1    0   3.488053  9.565985  1.033367     0
-    4    1    2   0.920352  8.786790  1.008087     1
-    5    1    4  10.713236  2.913963  1.031218     0
-    6    2    0   3.972040  7.595533  1.030170     0
-    7    2    2   0.448747  6.403625  1.002874     1
-    8    2    4  12.378281  2.639061  1.032667     0
+       id  idx  col       size     price      fees  side
+    0   0    0    0   7.626262  4.375232  1.033367     0
+    1   1    0    1   3.488053  9.565985  1.033367     0
+    2   2    0    2   3.972040  7.595533  1.030170     0
+    3   3    2    1   0.920352  8.786790  1.008087     1
+    4   4    2    2   0.448747  6.403625  1.002874     1
+    5   5    2    0   5.210115  1.524275  1.007942     0
+    6   6    4    0   7.899568  8.483492  1.067016     1
+    7   7    4    2  12.378281  2.639061  1.032667     0
+    8   8    4    1  10.713236  2.913963  1.031218     0
 
     >>> call_seq
     array([[0, 1, 2],
@@ -1095,16 +1087,25 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
                         # Process the order
                         cash_now, shares_now, order_result = process_order_nb(
-                            i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+                            cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
-                        # Increment log index
                         if order.log:
+                            # Add log metadata
+                            log_records[lidx]['id'] = lidx
+                            log_records[lidx]['idx'] = i
+                            log_records[lidx]['col'] = col
+                            log_records[lidx]['group'] = group
+                            if order_result.status == OrderStatus.Filled:
+                                log_records[lidx]['order_id'] = ridx
+                            else:
+                                log_records[lidx]['order_id'] = -1
                             lidx += 1
 
                         if order_result.status == OrderStatus.Filled:
-                            # Add a new record
-                            order_records[ridx]['col'] = col
+                            # Add order metadata
+                            order_records[ridx]['id'] = ridx
                             order_records[ridx]['idx'] = i
+                            order_records[ridx]['col'] = col
                             order_records[ridx]['size'] = order_result.size
                             order_records[ridx]['price'] = order_result.price
                             order_records[ridx]['fees'] = order_result.fees
@@ -1306,16 +1307,25 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 
                         # Process the order
                         cash_now, shares_now, order_result = process_order_nb(
-                            i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+                            cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
-                        # Increment log index
                         if order.log:
+                            # Add log metadata
+                            log_records[lidx]['id'] = lidx
+                            log_records[lidx]['idx'] = i
+                            log_records[lidx]['col'] = col
+                            log_records[lidx]['group'] = group
+                            if order_result.status == OrderStatus.Filled:
+                                log_records[lidx]['order_id'] = ridx
+                            else:
+                                log_records[lidx]['order_id'] = -1
                             lidx += 1
 
                         if order_result.status == OrderStatus.Filled:
-                            # Add a new record
-                            order_records[ridx]['col'] = col
+                            # Add order metadata
+                            order_records[ridx]['id'] = ridx
                             order_records[ridx]['idx'] = i
+                            order_records[ridx]['col'] = col
                             order_records[ridx]['size'] = order_result.size
                             order_records[ridx]['price'] = order_result.price
                             order_records[ridx]['fees'] = order_result.fees
@@ -1433,16 +1443,25 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
 
                 # Process the order
                 cash_now, shares_now, order_result = process_order_nb(
-                    i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+                    cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
-                # Increment log index
                 if order.log:
+                    # Add log metadata
+                    log_records[lidx]['id'] = lidx
+                    log_records[lidx]['idx'] = i
+                    log_records[lidx]['col'] = col
+                    log_records[lidx]['group'] = group
+                    if order_result.status == OrderStatus.Filled:
+                        log_records[lidx]['order_id'] = ridx
+                    else:
+                        log_records[lidx]['order_id'] = -1
                     lidx += 1
 
                 if order_result.status == OrderStatus.Filled:
-                    # Add a new record
-                    order_records[ridx]['col'] = col
+                    # Add order metadata
+                    order_records[ridx]['id'] = ridx
                     order_records[ridx]['idx'] = i
+                    order_records[ridx]['col'] = col
                     order_records[ridx]['size'] = order_result.size
                     order_records[ridx]['price'] = order_result.price
                     order_records[ridx]['fees'] = order_result.fees
@@ -1656,16 +1675,25 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
 
                     # Process the order
                     cash_now, shares_now, order_result = process_order_nb(
-                        i, col, group, cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
+                        cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
-                    # Increment log index
                     if order.log:
+                        # Add log metadata
+                        log_records[lidx]['id'] = lidx
+                        log_records[lidx]['idx'] = i
+                        log_records[lidx]['col'] = col
+                        log_records[lidx]['group'] = group
+                        if order_result.status == OrderStatus.Filled:
+                            log_records[lidx]['order_id'] = ridx
+                        else:
+                            log_records[lidx]['order_id'] = -1
                         lidx += 1
 
                     if order_result.status == OrderStatus.Filled:
-                        # Add a new record
-                        order_records[ridx]['col'] = col
+                        # Add order metadata
+                        order_records[ridx]['id'] = ridx
                         order_records[ridx]['idx'] = i
+                        order_records[ridx]['col'] = col
                         order_records[ridx]['size'] = order_result.size
                         order_records[ridx]['price'] = order_result.price
                         order_records[ridx]['fees'] = order_result.fees
@@ -1714,7 +1742,7 @@ price_zero_neg_err = "Found order with price 0 or less"
 def save_trade_nb(record, col,
                   entry_idx, entry_size_sum, entry_gross_sum, entry_fees_sum,
                   exit_idx, exit_size, exit_price, exit_fees,
-                  direction, status, position_idx):
+                  direction, status, position_id):
     """Save trade to the record."""
     # Size-weighted average of price
     entry_price = entry_gross_sum / entry_size_sum
@@ -1746,7 +1774,7 @@ def save_trade_nb(record, col,
     record['return'] = ret
     record['direction'] = direction
     record['status'] = status
-    record['position_idx'] = position_idx
+    record['position_id'] = position_id
 
 
 @njit(cache=True)
@@ -1773,7 +1801,7 @@ def orders_to_trades_nb(close, order_records, col_map):
     ...     return create_order_nb(
     ...         size=order_size[oc.i, oc.col],
     ...         price=order_price[oc.i, oc.col],
-    ...         fees=0.01, slippage=0.01, fixed_fees=1.
+    ...         fees=0.01, slippage=0.01
     ...     )
 
     >>> order_size = np.asarray([
@@ -1809,24 +1837,26 @@ def orders_to_trades_nb(close, order_records, col_map):
 
     >>> col_map = col_map_nb(order_records['col'], target_shape[1])
     >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
-    >>> pd.DataFrame.from_records(trade_records)
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   1.0          0     1.101818     1.82920         2        2.97
-    1    0   1.1          0     4.691074     1.23342         5        5.94
-    2    0   0.9          5     5.940000     0.50346         5        6.00
-    3    1   1.0          0     5.940000     1.05940         2        4.04
-    4    1   0.1          3     3.030000     1.00303         4        1.98
-    5    1   0.9          4     1.980000     0.91782         5        1.01
-    6    1   1.1          5     1.010000     0.56111         5        1.00
+    >>> print(pd.DataFrame.from_records(trade_records))
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   1.0          0     1.101818    0.011018         2        2.97
+    1   1    0   0.1          0     1.101818    0.001102         3        3.96
+    2   2    0   1.0          4     5.050000    0.050500         5        5.94
+    3   3    0   1.0          5     5.940000    0.059400         5        6.00
+    4   4    1   1.0          0     5.850000    0.058500         2        4.04
+    5   5    1   0.1          0     5.850000    0.005850         3        3.03
+    6   6    1   1.0          4     1.980000    0.019800         5        1.01
+    7   7    1   1.0          5     1.010000    0.010100         5        1.00
 
-       exit_fees       pnl    return  direction  status  position_idx
-    0    1.02970 -0.990718 -0.899167          0       1             0
-    1    0.61534 -0.474942 -0.092040          0       1             0
-    2    0.00000 -0.557460 -0.104276          1       0             1
-    3    1.04040 -0.199800 -0.033636          1       1             0
-    4    0.10198 -1.210010 -3.993432          0       1             1
-    5    0.45909 -0.503910 -0.282778          1       1             2
-    6    0.00000 -0.572110 -0.514950          0       0             3
+       exit_fees       pnl    return  direction  status  position_id
+    0    0.02970  1.827464  1.658589          0       1            0
+    1    0.00396  0.280756  2.548119          0       1            0
+    2    0.05940  0.780100  0.154475          0       1            1
+    3    0.00000 -0.119400 -0.020101          1       0            2
+    4    0.04040  1.711100  0.292496          1       1            3
+    5    0.00303  0.273120  0.466872          1       1            3
+    6    0.01010  0.940100  0.474798          1       1            4
+    7    0.00000 -0.020100 -0.019901          0       0            5
     ```
     """
     col_idxs, col_ns = col_map
@@ -1835,6 +1865,7 @@ def orders_to_trades_nb(close, order_records, col_map):
     entry_size_sum = 0.
     entry_gross_sum = 0.
     entry_fees_sum = 0.
+    position_id = -1
 
     for col in range(col_idxs.shape[0]):
         n = col_ns[col]
@@ -1842,16 +1873,17 @@ def orders_to_trades_nb(close, order_records, col_map):
             continue
         entry_idx = -1
         direction = -1
-        position_idx = -1
-        last_i = -1
+        last_id = -1
 
         for i in range(n):
             r = col_idxs[col][i]
             record = order_records[r]
 
-            i = int(record['idx'])
-            if i < last_i:
-                raise ValueError("idx must be sorted for each column")
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
+
+            i = record['idx']
             order_size = record['size']
             order_price = record['price']
             order_fees = record['fees']
@@ -1869,7 +1901,7 @@ def orders_to_trades_nb(close, order_records, col_map):
                     direction = TradeDirection.Long
                 else:
                     direction = TradeDirection.Short
-                position_idx += 1
+                position_id += 1
 
                 # Reset running vars for a new position
                 entry_size_sum = 0.
@@ -1907,8 +1939,9 @@ def orders_to_trades_nb(close, order_records, col_map):
                         exit_fees,
                         direction,
                         TradeStatus.Closed,
-                        position_idx
+                        position_id
                     )
+                    records[ridx]['id'] = ridx
                     ridx += 1
 
                     if is_close_nb(order_size, entry_size_sum):
@@ -1941,8 +1974,9 @@ def orders_to_trades_nb(close, order_records, col_map):
                         cl_exit_fees,
                         direction,
                         TradeStatus.Closed,
-                        position_idx
+                        position_id
                     )
+                    records[ridx]['id'] = ridx
                     ridx += 1
 
                     # Open a new trade
@@ -1954,7 +1988,7 @@ def orders_to_trades_nb(close, order_records, col_map):
                         direction = TradeDirection.Short
                     else:
                         direction = TradeDirection.Long
-                    position_idx += 1
+                    position_id += 1
 
         if entry_idx != -1 and is_less_nb(-entry_size_sum, 0):
             # Trade in the previous column hasn't been closed
@@ -1975,8 +2009,9 @@ def orders_to_trades_nb(close, order_records, col_map):
                 exit_fees,
                 direction,
                 TradeStatus.Open,
-                position_idx
+                position_id
             )
+            records[ridx]['id'] = ridx
             ridx += 1
 
     return records[:ridx]
@@ -1998,7 +2033,6 @@ def save_position_nb(record, trade_records):
     exit_fees = np.sum(trade_records['exit_fees'])
     direction = trade_records['direction'][-1]
     status = trade_records['status'][-1]
-    position_idx = trade_records['position_idx'][-1]
     pnl, ret = get_trade_stats_nb(
         size,
         entry_price,
@@ -2008,7 +2042,7 @@ def save_position_nb(record, trade_records):
         direction
     )
 
-    # Save trade
+    # Save position
     record['col'] = col
     record['size'] = size
     record['entry_idx'] = entry_idx
@@ -2021,7 +2055,23 @@ def save_position_nb(record, trade_records):
     record['return'] = ret
     record['direction'] = direction
     record['status'] = status
-    record['position_idx'] = position_idx
+
+
+@njit(cache=True)
+def copy_trade_record_nb(position_record, trade_record):
+    # Save position
+    position_record['col'] = trade_record['col']
+    position_record['size'] = trade_record['size']
+    position_record['entry_idx'] = trade_record['entry_idx']
+    position_record['entry_price'] = trade_record['entry_price']
+    position_record['entry_fees'] = trade_record['entry_fees']
+    position_record['exit_idx'] = trade_record['exit_idx']
+    position_record['exit_price'] = trade_record['exit_price']
+    position_record['exit_fees'] = trade_record['exit_fees']
+    position_record['pnl'] = trade_record['pnl']
+    position_record['return'] = trade_record['return']
+    position_record['direction'] = trade_record['direction']
+    position_record['status'] = trade_record['status']
 
 
 @njit(cache=True)
@@ -2037,25 +2087,25 @@ def trades_to_positions_nb(trade_records, col_map):
     >>> col_map = col_map_nb(trade_records['col'], target_shape[1])
     >>> position_records = trades_to_positions_nb(trade_records, col_map)
     >>> pd.DataFrame.from_records(position_records)
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   2.1          0     2.981905     3.06262         5    4.525714
-    1    0   0.9          5     5.940000     0.50346         5    6.000000
-    2    1   1.0          0     5.940000     1.05940         2    4.040000
-    3    1   0.1          3     3.030000     1.00303         4    1.980000
-    4    1   0.9          4     1.980000     0.91782         5    1.010000
-    5    1   1.1          5     1.010000     0.56111         5    1.000000
-
-       exit_fees      pnl    return  direction  status  position_idx
-    0    1.64504 -1.46566 -0.234056          0       1             0
-    1    0.00000 -0.55746 -0.104276          1       0             1
-    2    1.04040 -0.19980 -0.033636          1       1             0
-    3    0.10198 -1.21001 -3.993432          0       1             1
-    4    0.45909 -0.50391 -0.282778          1       1             2
-    5    0.00000 -0.57211 -0.514950          0       0             3
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   1.1          0     1.101818     0.01212         3    3.060000   
+    1   1    0   1.0          4     5.050000     0.05050         5    5.940000   
+    2   2    0   1.0          5     5.940000     0.05940         5    6.000000   
+    3   3    1   1.1          0     5.850000     0.06435         3    3.948182   
+    4   4    1   1.0          4     1.980000     0.01980         5    1.010000   
+    5   5    1   1.0          5     1.010000     0.01010         5    1.000000   
+    
+       exit_fees      pnl    return  direction  status  
+    0    0.03366  2.10822  1.739455          0       1  
+    1    0.05940  0.78010  0.154475          0       1  
+    2    0.00000 -0.11940 -0.020101          1       0  
+    3    0.04343  1.98422  0.308348          1       1  
+    4    0.01010  0.94010  0.474798          1       1  
+    5    0.00000 -0.02010 -0.019901          0       0  
     ```
     """
     col_idxs, col_ns = col_map
-    records = np.empty(trade_records.shape[0], dtype=trade_dt)
+    records = np.empty(trade_records.shape[0], dtype=position_dt)
     ridx = 0
     from_r = -1
 
@@ -2063,30 +2113,37 @@ def trades_to_positions_nb(trade_records, col_map):
         n = col_ns[col]
         if n == 0:
             continue
-        last_position_idx = -1
+        last_id = -1
+        last_position_id = -1
 
         for i in range(n):
             r = col_idxs[col][i]
-            position_idx = int(trade_records[r]['position_idx'])
-            if position_idx < last_position_idx:
-                raise ValueError("position_idx must be sorted for each column")
+            record = trade_records[r]
 
-            if position_idx != last_position_idx:
-                if last_position_idx != -1:
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
+
+            position_id = record['position_id']
+
+            if position_id != last_position_id:
+                if last_position_id != -1:
                     if r - from_r > 1:
                         save_position_nb(records[ridx], trade_records[from_r:r])
                     else:
                         # Speed up
-                        records[ridx] = trade_records[from_r]
+                        copy_trade_record_nb(records[ridx], trade_records[from_r])
+                    records[ridx]['id'] = ridx
                     ridx += 1
                 from_r = r
-                last_position_idx = position_idx
+                last_position_id = position_id
 
         if r - from_r > 0:
             save_position_nb(records[ridx], trade_records[from_r:r + 1])
         else:
             # Speed up
-            records[ridx] = trade_records[from_r]
+            copy_trade_record_nb(records[ridx], trade_records[from_r])
+        records[ridx]['id'] = ridx
         ridx += 1
 
     return records[:ridx]
@@ -2129,17 +2186,18 @@ def share_flow_nb(target_shape, order_records, col_map, direction):
         n = col_ns[col]
         if n == 0:
             continue
-        last_i = -1
+        last_id = -1
         shares_now = 0.
 
         for i in range(n):
             r = col_idxs[col][i]
             record = order_records[r]
 
-            i = int(record['idx'])
-            if i < last_i:
-                raise ValueError("idx must be sorted for each column")
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
 
+            i = record['idx']
             side = record['side']
             size = record['size']
 
@@ -2206,7 +2264,7 @@ def cash_flow_nb(target_shape, order_records, col_map, short_cash):
         n = col_ns[col]
         if n == 0:
             continue
-        last_i = -1
+        last_id = -1
         shares_now = 0.
         debt_now = 0.
 
@@ -2214,10 +2272,11 @@ def cash_flow_nb(target_shape, order_records, col_map, short_cash):
             r = col_idxs[col][i]
             record = order_records[r]
 
-            i = int(record['idx'])
-            if i < last_i:
-                raise ValueError("idx must be sorted for each column")
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
 
+            i = record['idx']
             side = record['side']
             size = record['size']
             price = record['price']
@@ -2428,15 +2487,15 @@ def total_profit_nb(target_shape, close, order_records, col_map, init_cash):
         n = col_ns[col]
         if n == 0:
             continue
-        last_i = -1
+        last_id = -1
 
         for i in range(n):
             r = col_idxs[col][i]
             record = order_records[r]
 
-            i = int(record['idx'])
-            if i < last_i:
-                raise ValueError("idx must be sorted for each column")
+            if record['id'] < last_id:
+                raise ValueError("id must come in ascending order per column")
+            last_id = record['id']
 
             # Fill shares
             if record['side'] == OrderSide.Buy:

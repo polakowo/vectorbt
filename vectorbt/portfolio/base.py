@@ -113,8 +113,8 @@ For example, let's divide our portfolio into two groups sharing the same cash:
 >>> # Get total profit per group
 >>> comb_portfolio.total_profit()
 group
-first     21783.914914
-second     8324.056293
+first     21474.794005
+second     7973.848970
 dtype: float64
 ```
 
@@ -123,12 +123,12 @@ Not only can you analyze each group, but also each column in the group:
 ```python-repl
 >>> # Get total profit per column
 >>> comb_portfolio.total_profit(group_by=False)
-BTC-USD     5169.398270
-ETH-USD    13107.725763
+BTC-USD     5101.957521
+ETH-USD    12866.045602
 XRP-USD     3506.790882
-BNB-USD     5345.521391
-BCH-USD     -240.095003
-LTC-USD     3218.629904
+BNB-USD     5065.017577
+BCH-USD     -240.275095
+LTC-USD     3149.106488
 dtype: float64
 ```
 
@@ -138,8 +138,8 @@ In the same way, you can introduce new grouping to the method itself:
 >>> # Get total profit per group
 >>> portfolio.total_profit(group_by=group_by)
 group
-first     21783.914914
-second     8324.056293
+first     21474.794005
+second     7973.848970
 dtype: float64
 ```
 
@@ -156,7 +156,7 @@ indexing operation to each argument with index:
 <vectorbt.portfolio.base.Portfolio at 0x7fac7517ac88>
 
 >>> portfolio['BTC-USD'].total_profit()
-5169.398269899575
+5101.957521326392
 ```
 
 Combined portfolio is indexed by group:
@@ -166,7 +166,7 @@ Combined portfolio is indexed by group:
 <vectorbt.portfolio.base.Portfolio at 0x7fac5756b828>
 
 >>> comb_portfolio['first'].total_profit()
-21783.914914322257
+21474.794005172986
 ```
 
 !!! note
@@ -190,27 +190,22 @@ simulation from the beginning to the end, you can turn on logging.
 ... )
 
 >>> portfolio.logs().records
-      idx  col  group  cash_now  shares_now  val_price_now  value_now  \\
-0       0    0      0       inf    0.000000        7294.44        inf
-...   ...  ...    ...       ...         ...            ...        ...
-1469  244    5      5       inf  278.298302          62.84        inf
+        id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \
+0        0    0    0      0       inf    0.000000        7294.44        inf
+...    ...  ...  ...    ...       ...         ...            ...        ...
+1469  1469  244    5      5       inf  273.894381          62.84        inf
 
-          size  size_type  direction  ...  raise_reject   log  new_cash  \\
-0          NaN          0          0  ...         False  True       inf
-...        ...        ...        ...  ...           ...   ...       ...
-1469  7.956715          0          0  ...         False  True       inf
+          size  size_type  ...   log  new_cash  new_shares  res_size  \
+0          NaN          0  ...  True       inf    0.000000       NaN
+...        ...        ...  ...   ...       ...         ...       ...
+1469  7.956715          0  ...  True       inf  281.851096  7.956715
 
-      new_shares  res_size   res_price  res_fees  res_side  res_status  \\
-4       0.013614  0.013614  7352.72538    0.1001         0           0
-...          ...       ...         ...       ...       ...         ...
-1469  286.255017  7.956715    62.90284    0.5005         0           0
+       res_price  res_fees  res_side  res_status  res_status_info  order_id
+0            NaN       NaN        -1           1                0        -1
+...          ...       ...       ...         ...              ...       ...
+1469    62.90284    0.5005         0           0               -1      1054
 
-      res_status_info
-0                   0
-...               ...
-1469               -1
-
-[1470 rows x 29 columns]
+[1470 rows x 31 columns]
 ```
 
 Just as orders, logs are also records and thus can be easily analyzed:
@@ -219,10 +214,9 @@ Just as orders, logs are also records and thus can be easily analyzed:
 >>> from vectorbt.portfolio.enums import OrderStatus
 
 >>> portfolio.logs().map_field('res_status', value_map=OrderStatus).value_counts()
-          BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
-Filled        185      168      172      169      177      178
-Ignored        59       76       73       74       68       65
-Rejected        1        1        0        2        0        2
+         BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
+Ignored       59       76       73       74       68       65
+Filled       186      169      172      171      177      180
 ```
 
 Logging can also be turned on just for one order, row, or column, since as many other
@@ -703,7 +697,7 @@ class Portfolio(Wrapping):
             conflict_mode = settings.portfolio['conflict_mode']
         conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
         if direction is None:
-            direction = settings.portfolio['direction']
+            direction = settings.portfolio['signal_direction']
         direction = convert_str_enum_value(Direction, direction)
         if val_price is None:
             if price is None:
@@ -963,8 +957,7 @@ class Portfolio(Wrapping):
         >>> import numpy as np
 
         >>> size = [np.inf, -np.inf, -np.inf, np.inf, np.inf]
-        >>> portfolio = vbt.Portfolio.from_orders(
-        ...     close, size, close_first=True, direction='all')
+        >>> portfolio = vbt.Portfolio.from_orders(close, size, close_first=True)
 
         >>> portfolio.shares()
         0    100.000000
@@ -1015,7 +1008,7 @@ class Portfolio(Wrapping):
             size_type = settings.portfolio['size_type']
         size_type = convert_str_enum_value(SizeType, size_type)
         if direction is None:
-            direction = settings.portfolio['direction']
+            direction = settings.portfolio['order_direction']
         direction = convert_str_enum_value(Direction, direction)
         if price is None:
             price = close

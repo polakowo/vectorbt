@@ -103,6 +103,23 @@ z  12.0  15.0  18.0
 5   15.0     NaN
 ```
 
+## Filtering
+
+Use `MappedArray.filter_by_mask` to filter elements per column/group:
+
+```python-repl
+>>> mask = [True, False, True, False, True, False, True, False, True]
+>>> filtered_ma = ma.filter_by_mask(mask)
+>>> filtered_ma.count()
+a    2
+b    1
+c    2
+dtype: int64
+
+>>> filtered_ma.id_arr
+array([0, 2, 4, 6, 8])
+```
+
 ## Plotting
 
 You can build histograms and boxplots of `MappedArray` directly:
@@ -192,7 +209,8 @@ operations (such as addition) on mapped arrays as if they were NumPy arrays.
 !!! note
     You should ensure that your `MappedArray` operand is on the left if the other operand is an array.
 
-    If two `MappedArray` operands have different metadata, will copy metadata from the first one.
+    If two `MappedArray` operands have different metadata, will copy metadata from the first one,
+    but at least their `id_arr` and `col_arr` must match.
 
 ## Indexing
 
@@ -246,8 +264,12 @@ from vectorbt.records.col_mapper import ColumnMapper
 
 
 def combine_mapped_with_other(self, other, np_func):
-    """Combine `MappedArray` with other compatible object."""
+    """Combine `MappedArray` with other compatible object.
+
+    If other object is also `MappedArray`, their `id_arr` and `col_arr` must match."""
     if isinstance(other, MappedArray):
+        checks.assert_array_equal(self.id_arr, other.id_arr)
+        checks.assert_array_equal(self.col_arr, other.col_arr)
         other = other.values
     return self.copy(mapped_arr=np_func(self.values, other))
 
@@ -271,6 +293,9 @@ class MappedArray(Wrapping):
         col_arr (array_like): A one-dimensional column array.
 
             Must be of the same size as `mapped_arr`.
+        id_arr (array_like): A one-dimensional id array. Defaults to simple range.
+
+            Must be of the same size as `mapped_arr`.
         idx_arr (array_like): A one-dimensional index array. Optional.
 
             Must be of the same size as `mapped_arr`.
@@ -280,12 +305,13 @@ class MappedArray(Wrapping):
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, mapped_arr, col_arr, idx_arr=None, value_map=None, **kwargs):
+    def __init__(self, wrapper, mapped_arr, col_arr, id_arr=None, idx_arr=None, value_map=None, **kwargs):
         Wrapping.__init__(
             self,
             wrapper,
             mapped_arr=mapped_arr,
             col_arr=col_arr,
+            id_arr=id_arr,
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
@@ -293,6 +319,8 @@ class MappedArray(Wrapping):
         mapped_arr = np.asarray(mapped_arr)
         col_arr = np.asarray(col_arr)
         checks.assert_shape_equal(mapped_arr, col_arr, axis=0)
+        if id_arr is None:
+            id_arr = np.arange(len(mapped_arr))
         if idx_arr is not None:
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
@@ -301,6 +329,7 @@ class MappedArray(Wrapping):
                 value_map = to_value_map(value_map)
 
         self._mapped_arr = mapped_arr
+        self._id_arr = id_arr
         self._col_arr = col_arr
         self._idx_arr = idx_arr
         self._value_map = value_map
@@ -312,20 +341,22 @@ class MappedArray(Wrapping):
             self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True)
         new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs)
         new_mapped_arr = self.values[new_indices]
+        new_id_arr = self.id_arr[new_indices]
         if self.idx_arr is not None:
             new_idx_arr = self.idx_arr[new_indices]
         else:
             new_idx_arr = None
-        return new_wrapper, new_mapped_arr, new_col_arr, new_idx_arr, group_idxs, col_idxs
+        return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, group_idxs, col_idxs
 
     def _indexing_func(self, pd_indexing_func):
         """Perform indexing on `MappedArray`."""
-        new_wrapper, new_mapped_arr, new_col_arr, new_idx_arr, _, _ = \
+        new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
             self._indexing_func_meta(pd_indexing_func)
         return self.copy(
             wrapper=new_wrapper,
             mapped_arr=new_mapped_arr,
             col_arr=new_col_arr,
+            id_arr=new_id_arr,
             idx_arr=new_idx_arr
         )
 
@@ -352,6 +383,11 @@ class MappedArray(Wrapping):
         return self._col_mapper
 
     @property
+    def id_arr(self):
+        """Id array."""
+        return self._id_arr
+
+    @property
     def idx_arr(self):
         """Index array."""
         return self._idx_arr
@@ -362,56 +398,39 @@ class MappedArray(Wrapping):
         return self._value_map
 
     @cached_method
-    def is_sorted(self, idx_arr=None, incl_idx=False):
+    def is_sorted(self, incl_id=False):
         """Check whether mapped array is sorted."""
-        if idx_arr is None:
-            idx_arr = self.idx_arr
-        if incl_idx:
-            if idx_arr is None:
-                raise ValueError("Must pass idx_arr")
-            return nb.is_col_idx_sorted_nb(self.col_arr, idx_arr)
+        if incl_id:
+            return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
         return nb.is_col_sorted_nb(self.col_arr)
 
-    def sort(self, idx_arr=None, incl_idx=False, value_map=None, group_by=None, **kwargs):
-        """Sort mapped array by column array (primary) and index array (secondary, optional).
-
-        !!! note
-            Sorting is expensive. A better approach is to append records already in the correct order."""
+    def sort(self, incl_id=False, idx_arr=None, group_by=None, **kwargs):
+        """Sort mapped array by column array (primary) and id array (secondary, optional)."""
         if idx_arr is None:
             idx_arr = self.idx_arr
-        if value_map is None:
-            value_map = self.value_map
-        if self.is_sorted(idx_arr=idx_arr, incl_idx=incl_idx):
-            return self.copy(
-                idx_arr=idx_arr,
-                value_map=value_map,
-                **kwargs
-            ).regroup(group_by)
-        if incl_idx:
-            if idx_arr is None:
-                raise ValueError("Must pass idx_arr")
-            ind = np.lexsort((idx_arr, self.col_arr))  # expensive!
+        if self.is_sorted(incl_id=incl_id):
+            return self.copy(idx_arr=idx_arr, **kwargs).regroup(group_by)
+        if incl_id:
+            ind = np.lexsort((self.id_arr, self.col_arr))  # expensive!
         else:
             ind = np.argsort(self.col_arr)
         return self.copy(
             mapped_arr=self.values[ind],
             col_arr=self.col_arr[ind],
-            idx_arr=idx_arr[ind] if idx_arr is not None else idx_arr,
-            value_map=value_map,
+            id_arr=self.id_arr[ind],
+            idx_arr=idx_arr[ind] if idx_arr is not None else None,
             **kwargs
         ).regroup(group_by)
 
-    def filter_by_mask(self, mask, idx_arr=None, value_map=None, group_by=None, **kwargs):
+    def filter_by_mask(self, mask, idx_arr=None, group_by=None, **kwargs):
         """Return a new class instance, filtered by mask."""
         if idx_arr is None:
             idx_arr = self.idx_arr
-        if value_map is None:
-            value_map = self.value_map
         return self.copy(
             mapped_arr=self.values[mask],
             col_arr=self.col_arr[mask],
-            idx_arr=self.idx_arr[mask] if idx_arr is not None else idx_arr,
-            value_map=value_map,
+            id_arr=self.id_arr[mask],
+            idx_arr=idx_arr[mask] if idx_arr is not None else None,
             **kwargs
         ).regroup(group_by)
 

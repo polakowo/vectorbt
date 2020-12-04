@@ -47,7 +47,7 @@ class Orders(Records):
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in order_dt.names):
-            raise ValueError("Records array must have all fields defined in order_dt")
+            raise TypeError("Records array must match order_dt")
 
     def _indexing_func_meta(self, pd_indexing_func):
         """Perform indexing on `Orders` and return metadata."""
@@ -74,8 +74,9 @@ class Orders(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
-        out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
+        out['Id'] = records_df['id']
         out['Date'] = records_df['idx'].map(lambda x: self.wrapper.index[x])
+        out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Size'] = records_df['size']
         out['Price'] = records_df['price']
         out['Fees'] = records_df['fees']
@@ -188,6 +189,7 @@ class Orders(Records):
 
         if len(self_col.values) > 0:
             # Extract information
+            _id = self_col.values['id']
             idx = self_col.values['idx']
             size = self_col.values['size']
             price = self_col.values['price']
@@ -196,7 +198,7 @@ class Orders(Records):
 
             # Plot Buy markers
             buy_mask = side == OrderSide.Buy
-            buy_customdata = np.stack((size[buy_mask], fees[buy_mask]), axis=1)
+            buy_customdata = np.stack((_id[buy_mask], size[buy_mask], fees[buy_mask]), axis=1)
             buy_scatter = go.Scatter(
                 x=self_col.wrapper.index[idx[buy_mask]],
                 y=price[buy_mask],
@@ -212,14 +214,18 @@ class Orders(Records):
                 ),
                 name='Buy',
                 customdata=buy_customdata,
-                hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.4f}"
+                hovertemplate="Id: %{customdata[0]}"
+                              "<br>Date: %{x}"
+                              "<br>Price: %{y}"
+                              "<br>Size: %{customdata[1]:.6f}"
+                              "<br>Fees: %{customdata[2]:.6f}"
             )
             buy_scatter.update(**buy_trace_kwargs)
             fig.add_trace(buy_scatter, row=row, col=col)
 
             # Plot Sell markers
             sell_mask = side == OrderSide.Sell
-            sell_customdata = np.stack((size[sell_mask], fees[sell_mask]), axis=1)
+            sell_customdata = np.stack((_id[sell_mask], size[sell_mask], fees[sell_mask]), axis=1)
             sell_scatter = go.Scatter(
                 x=self_col.wrapper.index[idx[sell_mask]],
                 y=price[sell_mask],
@@ -235,7 +241,11 @@ class Orders(Records):
                 ),
                 name='Sell',
                 customdata=sell_customdata,
-                hovertemplate="%{x}<br>Price: %{y}<br>Size: %{customdata[0]:.4f}<br>Fees: %{customdata[1]:.4f}"
+                hovertemplate="Id: %{customdata[0]}"
+                              "<br>Date: %{x}"
+                              "<br>Price: %{y}"
+                              "<br>Size: %{customdata[1]:.6f}"
+                              "<br>Fees: %{customdata[2]:.6f}"
             )
             sell_scatter.update(**sell_trace_kwargs)
             fig.add_trace(sell_scatter, row=row, col=col)

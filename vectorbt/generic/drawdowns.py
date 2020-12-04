@@ -37,12 +37,12 @@ class Drawdowns(Records):
     >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
 
     >>> drawdowns.records.head()
-       col  start_idx  valley_idx  end_idx  status
-    0    0          2           3        6       1
-    1    0          6          38       54       1
-    2    0         54          63       91       1
-    3    0         93          94       95       1
-    4    0         98          99      100       1
+       id  col  start_idx  valley_idx  end_idx  status
+    0   0    0          2           3        6       1
+    1   1    0          6          38       54       1
+    2   2    0         54          63       91       1
+    3   3    0         93          94       95       1
+    4   4    0         98          99      100       1
 
     >>> drawdowns.drawdown
     <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
@@ -68,7 +68,7 @@ class Drawdowns(Records):
         self._ts = ts
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
-            raise ValueError("Records array must have all fields defined in drawdown_dt")
+            raise TypeError("Records array must match drawdown_dt")
 
     def _indexing_func(self, pd_indexing_func):
         """Perform indexing on `Drawdowns`."""
@@ -100,6 +100,7 @@ class Drawdowns(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
+        out['Id'] = records_df['id']
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Start Date'] = records_df['start_idx'].map(lambda x: self.wrapper.index[x])
         out['Valley Date'] = records_df['valley_idx'].map(lambda x: self.wrapper.index[x])
@@ -344,6 +345,7 @@ class Drawdowns(Records):
 
         if len(self_col.values) > 0:
             # Extract information
+            _id = self_col.values['id']
             start_idx = self_col.values['start_idx']
             valley_idx = self_col.values['valley_idx']
             end_idx = self_col.values['end_idx']
@@ -365,6 +367,7 @@ class Drawdowns(Records):
             # Plot peak markers
             peak_mask = start_idx != np.roll(end_idx, 1)  # peak and recovery at same time -> recovery wins
             if np.any(peak_mask):
+                peak_customdata = _id[peak_mask][:, None]
                 peak_scatter = go.Scatter(
                     x=self_col.ts.index[start_idx[peak_mask]],
                     y=start_val[peak_mask],
@@ -378,7 +381,11 @@ class Drawdowns(Records):
                             color=adjust_lightness(contrast_color_schema['blue'])
                         )
                     ),
-                    name='Peak'
+                    name='Peak',
+                    customdata=peak_customdata,
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>Price: %{y}"
                 )
                 peak_scatter.update(**peak_trace_kwargs)
                 fig.add_trace(peak_scatter, row=row, col=col)
@@ -388,7 +395,7 @@ class Drawdowns(Records):
                 # Plot valley markers
                 valley_drawdown = (valley_val[recovery_mask] - start_val[recovery_mask]) / start_val[recovery_mask]
                 valley_duration = get_duration_str(start_idx[recovery_mask], valley_idx[recovery_mask])
-                valley_customdata = np.stack((valley_drawdown, valley_duration), axis=1)
+                valley_customdata = np.stack((_id[recovery_mask], valley_drawdown, valley_duration), axis=1)
                 valley_scatter = go.Scatter(
                     x=self_col.ts.index[valley_idx[recovery_mask]],
                     y=valley_val[recovery_mask],
@@ -404,7 +411,11 @@ class Drawdowns(Records):
                     ),
                     name='Valley',
                     customdata=valley_customdata,
-                    hovertemplate="(%{x}, %{y})<br>Drawdown: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>Price: %{y}"
+                                  "<br>Drawdown: %{customdata[1]:.2%}"
+                                  "<br>Duration: %{customdata[2]}"
                 )
                 valley_scatter.update(**valley_trace_kwargs)
                 fig.add_trace(valley_scatter, row=row, col=col)
@@ -429,7 +440,7 @@ class Drawdowns(Records):
                 # Plot recovery markers
                 recovery_return = (end_val[recovery_mask] - valley_val[recovery_mask]) / valley_val[recovery_mask]
                 recovery_duration = get_duration_str(valley_idx[recovery_mask], end_idx[recovery_mask])
-                recovery_customdata = np.stack((recovery_return, recovery_duration), axis=1)
+                recovery_customdata = np.stack((_id[recovery_mask], recovery_return, recovery_duration), axis=1)
                 recovery_scatter = go.Scatter(
                     x=self_col.ts.index[end_idx[recovery_mask]],
                     y=end_val[recovery_mask],
@@ -445,7 +456,11 @@ class Drawdowns(Records):
                     ),
                     name='Recovery/Peak',
                     customdata=recovery_customdata,
-                    hovertemplate="(%{x}, %{y})<br>Return: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>Price: %{y}"
+                                  "<br>Return: %{customdata[1]:.2%}"
+                                  "<br>Duration: %{customdata[2]}"
                 )
                 recovery_scatter.update(**recovery_trace_kwargs)
                 fig.add_trace(recovery_scatter, row=row, col=col)
@@ -472,7 +487,7 @@ class Drawdowns(Records):
             if np.any(active_mask):
                 active_drawdown = (valley_val[active_mask] - start_val[active_mask]) / start_val[active_mask]
                 active_duration = get_duration_str(valley_idx[active_mask], end_idx[active_mask])
-                active_customdata = np.stack((active_drawdown, active_duration), axis=1)
+                active_customdata = np.stack((_id[active_mask], active_drawdown, active_duration), axis=1)
                 active_scatter = go.Scatter(
                     x=self_col.ts.index[end_idx[active_mask]],
                     y=end_val[active_mask],
@@ -488,7 +503,11 @@ class Drawdowns(Records):
                     ),
                     name='Active',
                     customdata=active_customdata,
-                    hovertemplate="(%{x}, %{y})<br>Drawdown: %{customdata[0]:.2%}<br>Duration: %{customdata[1]}"
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>Price: %{y}"
+                                  "<br>Drawdown: %{customdata[1]:.2%}"
+                                  "<br>Duration: %{customdata[2]}"
                 )
                 active_scatter.update(**active_trace_kwargs)
                 fig.add_trace(active_scatter, row=row, col=col)

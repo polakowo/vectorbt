@@ -29,6 +29,7 @@ __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 """
 
 drawdown_dt = np.dtype([
+    ('id', np.int_),
     ('col', np.int_),
     ('start_idx', np.int_),
     ('valley_idx', np.int_),

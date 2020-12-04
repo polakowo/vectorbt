@@ -17,7 +17,7 @@ from vectorbt.utils.widgets import CustomFigureWidget
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.records.base import Records
-from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, TradeType
+from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, position_dt, TradeType
 from vectorbt.portfolio import nb
 
 
@@ -49,11 +49,11 @@ class Trades(Records):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., 1., 1., 1., -4.]),
     ...     fixed_fees=1.).trades().records
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   4.0          0          2.5         4.0         4         5.0
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   4.0          0          2.5         4.0         4         5.0
 
-       exit_fees  pnl  return  direction  status  position_idx
-    0        1.0  5.0     0.5          0       1             0
+       exit_fees  pnl  return  direction  status  position_id
+    0        1.0  5.0     0.5          0       1            0
     ```
 
     Decreasing position:
@@ -62,17 +62,17 @@ class Trades(Records):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([4., -1., -1., -1., -1.]),
     ...     fixed_fees=1.).trades().records
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   1.0          0          1.0        0.25         1         2.0
-    1    0   1.0          0          1.0        0.25         2         3.0
-    2    0   1.0          0          1.0        0.25         3         4.0
-    3    0   1.0          0          1.0        0.25         4         5.0
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   1.0          0          1.0        0.25         1         2.0
+    1   1    0   1.0          0          1.0        0.25         2         3.0
+    2   2    0   1.0          0          1.0        0.25         3         4.0
+    3   3    0   1.0          0          1.0        0.25         4         5.0
 
-       exit_fees   pnl  return  direction  status  position_idx
-    0        1.0 -0.25   -0.25          0       1             0
-    1        1.0  0.75    0.75          0       1             0
-    2        1.0  1.75    1.75          0       1             0
-    3        1.0  2.75    2.75          0       1             0
+       exit_fees   pnl  return  direction  status  position_id
+    0        1.0 -0.25   -0.25          0       1            0
+    1        1.0  0.75    0.75          0       1            0
+    2        1.0  1.75    1.75          0       1            0
+    3        1.0  2.75    2.75          0       1            0
     ```
 
     Multiple reversing positions:
@@ -81,17 +81,17 @@ class Trades(Records):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., -2., 2., -2., 1.]),
     ...     fixed_fees=1.).trades().records
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   1.0          0          1.0         1.0         1         2.0
-    1    0   1.0          1          2.0         0.5         2         3.0
-    2    0   1.0          2          3.0         0.5         3         4.0
-    3    0   1.0          3          4.0         0.5         4         5.0
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   1.0          0          1.0         1.0         1         2.0
+    1   1    0   1.0          1          2.0         0.5         2         3.0
+    2   2    0   1.0          2          3.0         0.5         3         4.0
+    3   3    0   1.0          3          4.0         0.5         4         5.0
 
-       exit_fees  pnl  return  direction  status  position_idx
-    0        0.5 -0.5  -0.500          0       1             0
-    1        0.5 -2.0  -1.000          1       1             1
-    2        0.5  0.0   0.000          0       1             2
-    3        1.0 -2.5  -0.625          1       1             3
+       exit_fees  pnl  return  direction  status  position_id
+    0        0.5 -0.5  -0.500          0       1            0
+    1        0.5 -2.0  -1.000          1       1            1
+    2        0.5  0.0   0.000          0       1            2
+    3        1.0 -2.5  -0.625          1       1            3
     ```
 
     Get count and PnL of trades:
@@ -122,19 +122,26 @@ class Trades(Records):
     ```
     """
 
-    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx', **kwargs):
+    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx',
+                 trade_type=TradeType.Trade, **kwargs):
         Records.__init__(
             self,
             wrapper,
             records_arr,
             idx_field=idx_field,
             close=close,
+            trade_type=trade_type,
             **kwargs
         )
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
+        self._trade_type = trade_type
 
-        if not all(field in records_arr.dtype.names for field in trade_dt.names):
-            raise ValueError("Records array must have all fields defined in trade_dt")
+        if trade_type == TradeType.Trade:
+            if not all(field in records_arr.dtype.names for field in trade_dt.names):
+                raise TypeError("Records array must match trade_dt")
+        else:
+            if not all(field in records_arr.dtype.names for field in position_dt.names):
+                raise TypeError("Records array must match position_dt")
 
     def _indexing_func_meta(self, pd_indexing_func):
         """Perform indexing on `Trades` and also return metadata."""
@@ -151,12 +158,15 @@ class Trades(Records):
         """Perform indexing on `Trades`."""
         return self._indexing_func_meta(pd_indexing_func)[0]
 
-    trade_type = TradeType.Trade
-
     @property
     def close(self):
         """Reference price such as close."""
         return self._close
+
+    @property
+    def trade_type(self):
+        """Trade type."""
+        return self._trade_type
 
     @classmethod
     def from_orders(cls, orders, **kwargs):
@@ -173,6 +183,7 @@ class Trades(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
+        out['Id'] = records_df['id']
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Size'] = records_df['size']
         out['Entry Date'] = records_df['entry_idx'].map(lambda x: self.wrapper.index[x])
@@ -185,7 +196,8 @@ class Trades(Records):
         out['Return'] = records_df['return']
         out['Direction'] = records_df['direction'].map(to_value_map(TradeDirection))
         out['Status'] = records_df['status'].map(to_value_map(TradeStatus))
-        out['Position'] = records_df['position_idx']
+        if self.trade_type == TradeType.Trade:
+            out['Position Id'] = records_df['position_id']
         return out
 
     @cached_property
@@ -202,11 +214,6 @@ class Trades(Records):
     def returns(self):
         """Return of each trade."""
         return self.map_field('return')
-
-    @cached_property
-    def position_idx(self):
-        """Position index of each trade."""
-        return self.map_field('position_idx')
 
     # ############# PnL ############# #
 
@@ -403,6 +410,7 @@ class Trades(Records):
 
         if len(self_col.values) > 0:
             # Extract information
+            _id = self.values['id']
             exit_idx = self.values['exit_idx']
             pnl = self.values['pnl']
             returns = self.values['return']
@@ -440,8 +448,11 @@ class Trades(Records):
                         ),
                     ),
                     name='Closed - Profit',
-                    customdata=returns[closed_profit_mask],
-                    hovertemplate="(%{x}, %{y})<br>Return: %{customdata:.2%}"
+                    customdata=np.stack((_id[closed_profit_mask], returns[closed_profit_mask]), axis=1),
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>PnL: %{y}"
+                                  "<br>Return: %{customdata[1]:.2%}"
                 )
                 profit_scatter.update(**closed_profit_trace_kwargs)
                 fig.add_trace(profit_scatter, row=row, col=col)
@@ -463,8 +474,11 @@ class Trades(Records):
                         )
                     ),
                     name='Closed - Loss',
-                    customdata=returns[closed_loss_mask],
-                    hovertemplate="(%{x}, %{y})<br>Return: %{customdata:.2%}"
+                    customdata=np.stack((_id[closed_loss_mask], returns[closed_loss_mask]), axis=1),
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>PnL: %{y}"
+                                  "<br>Return: %{customdata[1]:.2%}"
                 )
                 loss_scatter.update(**closed_loss_trace_kwargs)
                 fig.add_trace(loss_scatter, row=row, col=col)
@@ -486,8 +500,11 @@ class Trades(Records):
                         )
                     ),
                     name='Open',
-                    customdata=returns[open_mask],
-                    hovertemplate="(%{x}, %{y})<br>Return: %{customdata:.2%}"
+                    customdata=np.stack((_id[open_mask], returns[open_mask]), axis=1),
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>PnL: %{y}"
+                                  "<br>Return: %{customdata[1]:.2%}"
                 )
                 active_scatter.update(**open_trace_kwargs)
                 fig.add_trace(active_scatter, row=row, col=col)
@@ -589,6 +606,7 @@ class Trades(Records):
 
         if len(self_col.values) > 0:
             # Extract information
+            _id = self_col.values['id']
             size = self_col.values['size']
             entry_idx = self_col.values['entry_idx']
             entry_price = self_col.values['entry_price']
@@ -602,7 +620,6 @@ class Trades(Records):
             direction = self_col.values['direction']
             direction = np.vectorize(lambda x: str(direction_value_map[x]))(direction)
             status = self_col.values['status']
-            position_idx = self_col.values['position_idx']
 
             def get_duration_str(from_idx, to_idx):
                 if isinstance(self_col.wrapper.index, DatetimeTypes):
@@ -618,10 +635,12 @@ class Trades(Records):
             if len(entry_idx) > 0:
                 # Plot Entry markers
                 entry_customdata = np.stack((
+                    _id,
                     size,
                     entry_fees,
                     direction,
-                    position_idx
+                    *((self_col.values['position_id'],)
+                      if self.trade_type == TradeType.Trade else ())
                 ), axis=1)
                 entry_scatter = go.Scatter(
                     x=self_col.wrapper.index[entry_idx],
@@ -638,11 +657,14 @@ class Trades(Records):
                     ),
                     name='Entry',
                     customdata=entry_customdata,
-                    hovertemplate="%{x}<br>Avg. Price: %{y}"
-                                  "<br>Size: %{customdata[0]:.4f}"
-                                  "<br>Fees: %{customdata[1]:.4f}"
-                                  "<br>Direction: %{customdata[2]}"
-                                  "<br>Position: %{customdata[3]}"
+                    hovertemplate="Id: %{customdata[0]}"
+                                  "<br>Date: %{x}"
+                                  "<br>Avg. Price: %{y}"
+                                  "<br>Size: %{customdata[1]:.6f}"
+                                  "<br>Fees: %{customdata[2]:.6f}"
+                                  "<br>Direction: %{customdata[3]}"
+                                  + ("<br>Position Id: %{customdata[4]}"
+                                     if self.trade_type == TradeType.Trade else '')
                 )
                 entry_scatter.update(**entry_trace_kwargs)
                 fig.add_trace(entry_scatter, row=row, col=col)
@@ -651,13 +673,15 @@ class Trades(Records):
             def _plot_end_markers(mask, name, color, kwargs):
                 if np.any(mask):
                     customdata = np.stack((
+                        _id[mask],
+                        duration[mask],
                         size[mask],
                         exit_fees[mask],
                         pnl[mask],
                         ret[mask],
                         direction[mask],
-                        position_idx[mask],
-                        duration[mask]
+                        *((self_col.values['position_id'][mask],)
+                          if self.trade_type == TradeType.Trade else ())
                     ), axis=1)
                     scatter = go.Scatter(
                         x=self_col.wrapper.index[exit_idx[mask]],
@@ -674,14 +698,17 @@ class Trades(Records):
                         ),
                         name=name,
                         customdata=customdata,
-                        hovertemplate="%{x}<br>Avg. Price: %{y}"
-                                      "<br>Size: %{customdata[0]:.4f}"
-                                      "<br>Fees: %{customdata[1]:.4f}"
-                                      "<br>PnL: %{customdata[2]:.4f}"
-                                      "<br>Return: %{customdata[3]:.2%}"
-                                      "<br>Direction: %{customdata[4]}"
-                                      "<br>Position: %{customdata[5]}"
-                                      "<br>Duration: %{customdata[6]}"
+                        hovertemplate="Id: %{customdata[0]}"
+                                      "<br>Date: %{x}"
+                                      "<br>Duration: %{customdata[1]}"
+                                      "<br>Avg. Price: %{y}"
+                                      "<br>Size: %{customdata[2]:.6f}"
+                                      "<br>Fees: %{customdata[3]:.6f}"
+                                      "<br>PnL: %{customdata[4]:.6f}"
+                                      "<br>Return: %{customdata[5]:.2%}"
+                                      "<br>Direction: %{customdata[6]}"
+                                      + ("<br>Position Id: %{customdata[7]}"
+                                         if self.trade_type == TradeType.Trade else '')
                     )
                     scatter.update(**kwargs)
                     fig.add_trace(scatter, row=row, col=col)
@@ -778,11 +805,11 @@ class Positions(Trades):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., 1., 1., 1., -4.]),
     ...     fixed_fees=1.).positions().records
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   4.0          0          2.5         4.0         4         5.0
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   4.0          0          2.5         4.0         4         5.0
 
-       exit_fees  pnl  return  direction  status  position_idx
-    0        1.0  5.0     0.5          0       1             0
+       exit_fees  pnl  return  direction  status
+    0        1.0  5.0     0.5          0       1
     ```
 
     Decreasing position:
@@ -791,11 +818,11 @@ class Positions(Trades):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([4., -1., -1., -1., -1.]),
     ...     fixed_fees=1.).positions().records
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   4.0          0          1.0         1.0         4         3.5
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
+    0   0    0   4.0          0          1.0         1.0         4         3.5
 
-       exit_fees  pnl  return  direction  status  position_idx
-    0        4.0  5.0    1.25          0       1             0
+       exit_fees  pnl  return  direction  status
+    0        4.0  5.0    1.25          0       1
     ```
 
     Multiple positions:
@@ -804,21 +831,24 @@ class Positions(Trades):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., -2., 2., -2., 1.]),
     ...     fixed_fees=1.).positions().records
-       col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
-    0    0   1.0          0          1.0         1.0         1         2.0
-    1    0   1.0          1          2.0         0.5         2         3.0
-    2    0   1.0          2          3.0         0.5         3         4.0
-    3    0   1.0          3          4.0         0.5         4         5.0
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+    0   0    0   1.0          0          1.0         1.0         1         2.0
+    1   1    0   1.0          1          2.0         0.5         2         3.0
+    2   2    0   1.0          2          3.0         0.5         3         4.0
+    3   3    0   1.0          3          4.0         0.5         4         5.0
 
-       exit_fees  pnl  return  direction  status  position_idx
-    0        0.5 -0.5  -0.500          0       1             0
-    1        0.5 -2.0  -1.000          1       1             1
-    2        0.5  0.0   0.000          0       1             2
-    3        1.0 -2.5  -0.625          1       1             3
+       exit_fees  pnl  return  direction  status
+    0        0.5 -0.5  -0.500          0       1
+    1        0.5 -2.0  -1.000          1       1
+    2        0.5  0.0   0.000          0       1
+    3        1.0 -2.5  -0.625          1       1
     ```
     """
 
-    trade_type = TradeType.Position
+    def __init__(self, *args, trade_type=TradeType.Position, **kwargs):
+        if trade_type != TradeType.Position:
+            raise ValueError("Trade type must be TradeType.Position")
+        Trades.__init__(self, *args, trade_type=trade_type, **kwargs)
 
     @classmethod
     def from_orders(cls, orders, **kwargs):

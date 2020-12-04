@@ -26,13 +26,13 @@ attr2 =  1  10.0   NaN
          3  12.0  16.0
             |
             v
-      col  idx  attr1  attr2
-0       0    0      1      9
-1       0    1      2     10
-2       0    3      4     12
-3       1    0      5     13
-4       1    1      7     15
-5       1    3      8     16
+      id  idx  col  attr1  attr2
+0      0    0    0      1      9
+1      1    1    0      2     10
+2      2    3    0      4     12
+3      3    0    1      5     13
+4      4    1    1      7     15
+5      5    3    1      8     16
 ```
 
 Another advantage of records is that they are not constrained by size. Multiple records can map
@@ -56,36 +56,37 @@ Consider the following example:
 >>> import vectorbt as vbt
 
 >>> example_dt = np.dtype([
-...     ('col', np.int64),
+...     ('id', np.int64),
 ...     ('idx', np.int64),
+...     ('col', np.int64),
 ...     ('some_field', np.float64)
 ... ])
 >>> records_arr = np.array([
-...     (0, 0, 10.),
-...     (0, 1, 11.),
-...     (0, 2, 12.),
-...     (1, 0, 13.),
-...     (1, 1, 14.),
-...     (1, 2, 15.),
-...     (2, 0, 16.),
-...     (2, 1, 17.),
-...     (2, 2, 18.)
+...     (0, 0, 0, 10.),
+...     (1, 1, 0, 11.),
+...     (2, 2, 0, 12.),
+...     (3, 0, 1, 13.),
+...     (4, 1, 1, 14.),
+...     (5, 2, 1, 15.),
+...     (6, 0, 2, 16.),
+...     (7, 1, 2, 17.),
+...     (8, 2, 2, 18.)
 ... ], dtype=example_dt)
 >>> wrapper = vbt.ArrayWrapper(index=['x', 'y', 'z'],
 ...     columns=['a', 'b', 'c'], ndim=2, freq='1 day')
 >>> records = vbt.Records(wrapper, records_arr)
 
 >>> records.records
-   col  idx  some_field
-0    0    0        10.0
-1    0    1        11.0
-2    0    2        12.0
-3    1    0        13.0
-4    1    1        14.0
-5    1    2        15.0
-6    2    0        16.0
-7    2    1        17.0
-8    2    2        18.0
+   id  idx  col  some_field
+0   0    0    0        10.0
+1   1    1    0        11.0
+2   2    2    0        12.0
+3   3    0    1        13.0
+4   4    1    1        14.0
+5   5    2    1        15.0
+6   6    0    2        16.0
+7   7    1    2        17.0
+8   8    2    2        18.0
 ```
 
 `Records` can be mapped to `vectorbt.records.mapped_array.MappedArray` in several ways:
@@ -124,6 +125,23 @@ array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 array([100., 121., 144., 169., 196., 225., 256., 289., 324.])
 ```
 
+## Filtering
+
+Use `Records.filter_by_mask` to filter elements per column/group:
+
+```python-repl
+>>> mask = [True, False, True, False, True, False, True, False, True]
+>>> filtered_records = records.filter_by_mask(mask)
+>>> filtered_records.count()
+a    2
+b    1
+c    2
+dtype: int64
+
+>>> filtered_records.values['id']
+array([0, 2, 4, 6, 8])
+```
+
 ## Grouping
 
 One of the key features of `Records` is that you can perform reducing operations on a group
@@ -137,7 +155,7 @@ There are multiple ways of define grouping:
 ```python-repl
 >>> group_by = np.array(['first', 'first', 'second'])
 >>> grouped_wrapper = wrapper.copy(group_by=group_by)
->>> grouped_records = vbt.Records(wrapper, records_arr)
+>>> grouped_records = vbt.Records(grouped_wrapper, records_arr)
 
 >>> grouped_records.map_field('some_field').mean()
 first     12.5
@@ -183,19 +201,19 @@ to each `__init__` argument with index:
 
 ```python-repl
 >>> records['a'].records
-   col  idx  some_field
-0    0    0        10.0
-1    0    1        11.0
-2    0    2        12.0
+   id  idx  col  some_field
+0   0    0    0        10.0
+1   1    1    0        11.0
+2   2    2    0        12.0
 
 >>> grouped_records['first'].records
-   col  idx  some_field
-0    0    0        10.0
-1    0    1        11.0
-2    0    2        12.0
-3    1    0        13.0
-4    1    1        14.0
-5    1    2        15.0
+   id  idx  col  some_field
+0   0    0    0        10.0
+1   1    1    0        11.0
+2   2    2    0        12.0
+3   3    0    1        13.0
+4   4    1    1        14.0
+5   5    2    1        15.0
 ```
 
 !!! note
@@ -238,7 +256,7 @@ class Records(Wrapping):
             See `vectorbt.base.array_wrapper.ArrayWrapper`.
         records_arr (array_like): A structured NumPy array of records.
 
-            Must have the field `col` (column position in a matrix).
+            Must have the fields `id` (record index) and `col` (column index).
         idx_field (str): The name of the field corresponding to the index. Optional.
 
             Searches for a field with name 'idx' if `idx_field` is 'auto'.
@@ -258,6 +276,7 @@ class Records(Wrapping):
         )
         records_arr = np.asarray(records_arr)
         checks.assert_not_none(records_arr.dtype.fields)
+        checks.assert_in('id', records_arr.dtype.names)
         checks.assert_in('col', records_arr.dtype.names)
         if idx_field == 'auto':
             if 'idx' in records_arr.dtype.names:
@@ -328,26 +347,21 @@ class Records(Wrapping):
         return self._col_mapper
 
     @cached_method
-    def is_sorted(self, idx_field=None, incl_idx=False):
+    def is_sorted(self, incl_id=False):
         """Check whether records are sorted."""
-        if incl_idx:
-            if idx_field is None:
-                idx_field = self.idx_field
-            if idx_field is None:
-                raise ValueError("Must pass idx_field")
-            return nb.is_col_idx_sorted_nb(self.values['col'], self.values[idx_field])
+        if incl_id:
+            return nb.is_col_idx_sorted_nb(self.values['col'], self.values['id'])
         return nb.is_col_sorted_nb(self.values['col'])
 
-    def sort(self, idx_field=None, incl_idx=False, group_by=None, **kwargs):
-        """Sort records."""
-        if self.is_sorted(idx_field=idx_field, incl_idx=incl_idx):
+    def sort(self, incl_id=False, group_by=None, **kwargs):
+        """Sort records by columns (primary) and ids (secondary, optional).
+
+        !!! note
+            Sorting is expensive. A better approach is to append records already in the correct order."""
+        if self.is_sorted(incl_id=incl_id):
             return self.copy(**kwargs).regroup(group_by)
-        if incl_idx:
-            if idx_field is None:
-                idx_field = self.idx_field
-            if idx_field is None:
-                raise ValueError("Must pass idx_field")
-            ind = np.lexsort((self.values[idx_field], self.values['col']))  # expensive!
+        if incl_id:
+            ind = np.lexsort((self.values['id'], self.values['col']))  # expensive!
         else:
             ind = np.argsort(self.values['col'])
         return self.copy(records_arr=self.values[ind], **kwargs).regroup(group_by)
@@ -372,6 +386,7 @@ class Records(Wrapping):
             self.wrapper,
             mapped_arr,
             self.values['col'],
+            id_arr=self.values['id'],
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
@@ -389,6 +404,7 @@ class Records(Wrapping):
             self.wrapper,
             self.values[field],
             self.values['col'],
+            id_arr=self.values['id'],
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs
@@ -411,6 +427,7 @@ class Records(Wrapping):
             self.wrapper,
             a,
             self.values['col'],
+            id_arr=self.values['id'],
             idx_arr=idx_arr,
             value_map=value_map,
             **kwargs

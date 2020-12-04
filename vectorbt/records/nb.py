@@ -21,14 +21,17 @@ def col_range_nb(col_arr, n_cols):
     """Build column range for sorted column array.
 
     Creates a 2-dim array with first column being start indices (inclusive) and
-    second column being end indices (exclusive)."""
+    second column being end indices (exclusive).
+
+    !!! note
+        Requires `col_arr` to be in ascending order. This can be done by sorting."""
     col_range = np.full((n_cols, 2), -1, dtype=np.int_)
     last_col = -1
 
     for r in range(col_arr.shape[0]):
         col = col_arr[r]
         if col < last_col:
-            raise ValueError("col_arr must be sorted")
+            raise ValueError("col_arr must be in ascending order")
         if col != last_col:
             if last_col != -1:
                 col_range[last_col, 1] = r
@@ -153,12 +156,12 @@ def is_col_sorted_nb(col_arr):
 
 
 @njit(cache=True)
-def is_col_idx_sorted_nb(col_arr, idx_arr):
+def is_col_idx_sorted_nb(col_arr, id_arr):
     """Check whether the column and index arrays are sorted."""
     for i in range(len(col_arr) - 1):
         if col_arr[i + 1] < col_arr[i]:
             return False
-        if col_arr[i + 1] == col_arr[i] and idx_arr[i + 1] < idx_arr[i]:
+        if col_arr[i + 1] == col_arr[i] and id_arr[i + 1] < id_arr[i]:
             return False
     return True
 

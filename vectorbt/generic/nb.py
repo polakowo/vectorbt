@@ -1126,14 +1126,14 @@ def find_drawdowns_nb(ts):
     >>> records = find_drawdowns_nb(ts)
 
     >>> pd.DataFrame.from_records(records)
-       col  start_idx  valley_idx  end_idx  status
-    0    1          0           4        4       0
-    1    2          2           4        4       0
-    2    3          0           2        4       1
+       id  col  start_idx  valley_idx  end_idx  status
+    0   0    1          0           4        4       0
+    1   1    2          2           4        4       0
+    2   2    3          0           2        4       1
     ```
     """
     out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
-    j = 0
+    ridx = 0
 
     for col in range(ts.shape[1]):
         drawdown_started = False
@@ -1181,12 +1181,13 @@ def find_drawdowns_nb(ts):
 
                 if store_drawdown:
                     # Save drawdown to the records
-                    out[j]['col'] = col
-                    out[j]['start_idx'] = peak_idx
-                    out[j]['valley_idx'] = valley_idx
-                    out[j]['end_idx'] = i
-                    out[j]['status'] = status
-                    j += 1
+                    out[ridx]['id'] = ridx
+                    out[ridx]['col'] = col
+                    out[ridx]['start_idx'] = peak_idx
+                    out[ridx]['valley_idx'] = valley_idx
+                    out[ridx]['end_idx'] = i
+                    out[ridx]['status'] = status
+                    ridx += 1
 
                     # Reset running vars for a new drawdown
                     peak_idx = i
@@ -1196,7 +1197,7 @@ def find_drawdowns_nb(ts):
                     store_drawdown = False
                     status = -1
 
-    return out[:j]
+    return out[:ridx]
 
 
 @njit(cache=True)
