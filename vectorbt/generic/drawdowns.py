@@ -100,7 +100,7 @@ class Drawdowns(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
-        out['Id'] = records_df['id']
+        out['Drawdown Id'] = records_df['id']
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Start Date'] = records_df['start_idx'].map(lambda x: self.wrapper.index[x])
         out['Valley Date'] = records_df['valley_idx'].map(lambda x: self.wrapper.index[x])
@@ -383,7 +383,7 @@ class Drawdowns(Records):
                     ),
                     name='Peak',
                     customdata=peak_customdata,
-                    hovertemplate="Id: %{customdata[0]}"
+                    hovertemplate="Drawdown Id: %{customdata[0]}"
                                   "<br>Date: %{x}"
                                   "<br>Price: %{y}"
                 )
@@ -411,7 +411,7 @@ class Drawdowns(Records):
                     ),
                     name='Valley',
                     customdata=valley_customdata,
-                    hovertemplate="Id: %{customdata[0]}"
+                    hovertemplate="Drawdown Id: %{customdata[0]}"
                                   "<br>Date: %{x}"
                                   "<br>Price: %{y}"
                                   "<br>Drawdown: %{customdata[1]:.2%}"
@@ -456,7 +456,7 @@ class Drawdowns(Records):
                     ),
                     name='Recovery/Peak',
                     customdata=recovery_customdata,
-                    hovertemplate="Id: %{customdata[0]}"
+                    hovertemplate="Drawdown Id: %{customdata[0]}"
                                   "<br>Date: %{x}"
                                   "<br>Price: %{y}"
                                   "<br>Return: %{customdata[1]:.2%}"
@@ -503,7 +503,7 @@ class Drawdowns(Records):
                     ),
                     name='Active',
                     customdata=active_customdata,
-                    hovertemplate="Id: %{customdata[0]}"
+                    hovertemplate="Drawdown Id: %{customdata[0]}"
                                   "<br>Date: %{x}"
                                   "<br>Price: %{y}"
                                   "<br>Drawdown: %{customdata[1]:.2%}"

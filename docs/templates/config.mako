@@ -46,7 +46,7 @@
     # The whitespace-separated tokens represent arbitrary extra queries (at least one
     # must match) passed to regular Google search. Example:
     #search_query = 'inurl:github.com/USER/PROJECT  site:PROJECT.github.io  site:PROJECT.website'
-    search_query = False
+    google_search_query = False
 
     # If set, render LaTeX math syntax within \(...\) (inline equations),
     # or within \[...\] or $$...$$ or `.. math::` (block equations)

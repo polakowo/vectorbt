@@ -74,7 +74,7 @@ class Orders(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
-        out['Id'] = records_df['id']
+        out['Order Id'] = records_df['id']
         out['Date'] = records_df['idx'].map(lambda x: self.wrapper.index[x])
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Size'] = records_df['size']
@@ -214,7 +214,7 @@ class Orders(Records):
                 ),
                 name='Buy',
                 customdata=buy_customdata,
-                hovertemplate="Id: %{customdata[0]}"
+                hovertemplate="Order Id: %{customdata[0]}"
                               "<br>Date: %{x}"
                               "<br>Price: %{y}"
                               "<br>Size: %{customdata[1]:.6f}"
@@ -241,7 +241,7 @@ class Orders(Records):
                 ),
                 name='Sell',
                 customdata=sell_customdata,
-                hovertemplate="Id: %{customdata[0]}"
+                hovertemplate="Order Id: %{customdata[0]}"
                               "<br>Date: %{x}"
                               "<br>Price: %{y}"
                               "<br>Size: %{customdata[1]:.6f}"

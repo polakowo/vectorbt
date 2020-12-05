@@ -1202,7 +1202,7 @@ class TestDrawdowns:
         pd.testing.assert_frame_equal(
             drawdowns.records_readable,
             pd.DataFrame({
-                'Id': [0, 1, 2, 3, 4, 5],
+                'Drawdown Id': [0, 1, 2, 3, 4, 5],
                 'Column': ['a', 'a', 'a', 'b', 'b', 'c'],
                 'Start Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-03 00:00:00'),
                                pd.Timestamp('2020-01-05 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
@@ -1531,7 +1531,7 @@ class TestOrders:
         pd.testing.assert_frame_equal(
             orders.records_readable,
             pd.DataFrame({
-                'Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
+                'Order Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
                 'Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
                          pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
                          pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-07 00:00:00'),
@@ -1722,7 +1722,7 @@ class TestTrades:
         pd.testing.assert_frame_equal(
             trades.records_readable,
             pd.DataFrame({
-                'Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+                'Trade Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
                 'Column': ['a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'c'],
                 'Size': [1.0, 0.10000000000000009, 1.0, 2.0, 1.0, 0.10000000000000009, 1.0,
                          2.0, 1.0, 0.10000000000000009, 1.0, 1.0, 1.0],
@@ -2115,7 +2115,7 @@ class TestPositions:
         pd.testing.assert_frame_equal(
             positions.records_readable,
             pd.DataFrame({
-                'Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+                'Position Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
                 'Column': ['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'c'],
                 'Size': [1.1, 1.0, 2.0, 1.1, 1.0, 2.0, 1.1, 1.0, 1.0, 1.0],
                 'Entry Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
@@ -2197,7 +2197,7 @@ logs_grouped = vbt.Logs(logs_wrapper.regroup(True), logs_records_arr)
 class TestLogs:
     def test_records_readable(self):
         df = pd.DataFrame(columns=pd.MultiIndex.from_tuples([
-            ('Context', 'Id'),
+            ('Context', 'Log Id'),
             ('Context', 'Date'),
             ('Context', 'Column'),
             ('Context', 'Group'),

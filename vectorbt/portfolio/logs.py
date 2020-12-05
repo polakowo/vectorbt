@@ -37,7 +37,7 @@ class Logs(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame(columns=pd.MultiIndex.from_tuples([
-            ('Context', 'Id'),
+            ('Context', 'Log Id'),
             ('Context', 'Date'),
             ('Context', 'Column'),
             ('Context', 'Group'),

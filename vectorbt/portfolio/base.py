@@ -2019,12 +2019,6 @@ class Portfolio(Wrapping):
         cum_returns=dict(
             title="Cumulative Returns"
         ),
-        drawdowns=dict(
-            title="Drawdowns"
-        ),
-        underwater=dict(
-            title="Underwater"
-        ),
         share_flow=dict(
             title="Share Flow",
             can_plot_groups=False
@@ -2044,6 +2038,12 @@ class Portfolio(Wrapping):
         ),
         value=dict(
             title="Value"
+        ),
+        drawdowns=dict(
+            title="Drawdowns"
+        ),
+        underwater=dict(
+            title="Underwater"
         ),
         gross_exposure=dict(
             title="Gross Exposure"
@@ -2115,7 +2115,8 @@ class Portfolio(Wrapping):
         >>> rand_idxs = np.random.randint(0, len(size), size=n_orders)
         >>> size.iloc[rand_idxs] = np.random.uniform(-1, 1, size=n_orders)
         >>> portfolio = vbt.Portfolio.from_orders(
-        ...     close, size, init_cash='auto', freq='1D')
+        ...     close, size, direction='longonly',
+        ...     init_cash='auto', freq='1D')
         >>> portfolio.plot()
         ```
 
@@ -2181,7 +2182,7 @@ class Portfolio(Wrapping):
             dict(
                 type='line',
                 line=dict(
-                    color="gray",
+                    color='gray',
                     dash="dash",
                 )
             ),

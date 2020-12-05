@@ -167,8 +167,6 @@ default_sim_options = ['allow_accumulate']
 default_n_random_strat = 50
 default_stats_options = ['incl_unrealized']
 default_layout = dict(
-    width=None,
-    height=None,
     autosize=True,
     margin=dict(b=40, t=20),
     font=dict(
@@ -1328,9 +1326,9 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
         entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
         sim_options, n_random_strat, prob_options, entry_prob, exit_prob)
 
-    fig = main_portfolio.plot(**default_layout)
+    fig = main_portfolio.plot(subplots='all', **default_layout)
     fig.update_xaxes(gridcolor='#323b56')
-    fig.update_yaxes(gridcolor='#323b56')
+    fig.update_yaxes(gridcolor='#323b56', zerolinecolor='#323b56')
 
     def _chop_microseconds(delta):
         return delta - pd.Timedelta(microseconds=delta.microseconds, nanoseconds=delta.nanoseconds)

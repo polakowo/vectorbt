@@ -183,7 +183,8 @@ class Trades(Records):
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
-        out['Id'] = records_df['id']
+        _id_str = 'Trade Id' if self.trade_type == TradeType.Trade else 'Position Id'
+        out[_id_str] = records_df['id']
         out['Column'] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out['Size'] = records_df['size']
         out['Entry Date'] = records_df['entry_idx'].map(lambda x: self.wrapper.index[x])
@@ -411,6 +412,7 @@ class Trades(Records):
         if len(self_col.values) > 0:
             # Extract information
             _id = self.values['id']
+            _id_str = 'Trade Id' if self.trade_type == TradeType.Trade else 'Position Id'
             exit_idx = self.values['exit_idx']
             pnl = self.values['pnl']
             returns = self.values['return']
@@ -449,10 +451,10 @@ class Trades(Records):
                     ),
                     name='Closed - Profit',
                     customdata=np.stack((_id[closed_profit_mask], returns[closed_profit_mask]), axis=1),
-                    hovertemplate="Id: %{customdata[0]}"
-                                  "<br>Date: %{x}"
-                                  "<br>PnL: %{y}"
-                                  "<br>Return: %{customdata[1]:.2%}"
+                    hovertemplate=_id_str + ": %{customdata[0]}"
+                                            "<br>Date: %{x}"
+                                            "<br>PnL: %{y}"
+                                            "<br>Return: %{customdata[1]:.2%}"
                 )
                 profit_scatter.update(**closed_profit_trace_kwargs)
                 fig.add_trace(profit_scatter, row=row, col=col)
@@ -475,10 +477,10 @@ class Trades(Records):
                     ),
                     name='Closed - Loss',
                     customdata=np.stack((_id[closed_loss_mask], returns[closed_loss_mask]), axis=1),
-                    hovertemplate="Id: %{customdata[0]}"
-                                  "<br>Date: %{x}"
-                                  "<br>PnL: %{y}"
-                                  "<br>Return: %{customdata[1]:.2%}"
+                    hovertemplate=_id_str + ": %{customdata[0]}"
+                                            "<br>Date: %{x}"
+                                            "<br>PnL: %{y}"
+                                            "<br>Return: %{customdata[1]:.2%}"
                 )
                 loss_scatter.update(**closed_loss_trace_kwargs)
                 fig.add_trace(loss_scatter, row=row, col=col)
@@ -501,10 +503,10 @@ class Trades(Records):
                     ),
                     name='Open',
                     customdata=np.stack((_id[open_mask], returns[open_mask]), axis=1),
-                    hovertemplate="Id: %{customdata[0]}"
-                                  "<br>Date: %{x}"
-                                  "<br>PnL: %{y}"
-                                  "<br>Return: %{customdata[1]:.2%}"
+                    hovertemplate=_id_str + ": %{customdata[0]}"
+                                            "<br>Date: %{x}"
+                                            "<br>PnL: %{y}"
+                                            "<br>Return: %{customdata[1]:.2%}"
                 )
                 active_scatter.update(**open_trace_kwargs)
                 fig.add_trace(active_scatter, row=row, col=col)
@@ -607,6 +609,7 @@ class Trades(Records):
         if len(self_col.values) > 0:
             # Extract information
             _id = self_col.values['id']
+            _id_str = 'Trade Id' if self.trade_type == TradeType.Trade else 'Position Id'
             size = self_col.values['size']
             entry_idx = self_col.values['entry_idx']
             entry_price = self_col.values['entry_price']
@@ -657,12 +660,12 @@ class Trades(Records):
                     ),
                     name='Entry',
                     customdata=entry_customdata,
-                    hovertemplate="Id: %{customdata[0]}"
-                                  "<br>Date: %{x}"
-                                  "<br>Avg. Price: %{y}"
-                                  "<br>Size: %{customdata[1]:.6f}"
-                                  "<br>Fees: %{customdata[2]:.6f}"
-                                  "<br>Direction: %{customdata[3]}"
+                    hovertemplate=_id_str + ": %{customdata[0]}"
+                                            "<br>Date: %{x}"
+                                            "<br>Avg. Price: %{y}"
+                                            "<br>Size: %{customdata[1]:.6f}"
+                                            "<br>Fees: %{customdata[2]:.6f}"
+                                            "<br>Direction: %{customdata[3]}"
                                   + ("<br>Position Id: %{customdata[4]}"
                                      if self.trade_type == TradeType.Trade else '')
                 )
@@ -698,15 +701,15 @@ class Trades(Records):
                         ),
                         name=name,
                         customdata=customdata,
-                        hovertemplate="Id: %{customdata[0]}"
-                                      "<br>Date: %{x}"
-                                      "<br>Duration: %{customdata[1]}"
-                                      "<br>Avg. Price: %{y}"
-                                      "<br>Size: %{customdata[2]:.6f}"
-                                      "<br>Fees: %{customdata[3]:.6f}"
-                                      "<br>PnL: %{customdata[4]:.6f}"
-                                      "<br>Return: %{customdata[5]:.2%}"
-                                      "<br>Direction: %{customdata[6]}"
+                        hovertemplate=_id_str + ": %{customdata[0]}"
+                                                "<br>Date: %{x}"
+                                                "<br>Duration: %{customdata[1]}"
+                                                "<br>Avg. Price: %{y}"
+                                                "<br>Size: %{customdata[2]:.6f}"
+                                                "<br>Fees: %{customdata[3]:.6f}"
+                                                "<br>PnL: %{customdata[4]:.6f}"
+                                                "<br>Return: %{customdata[5]:.2%}"
+                                                "<br>Direction: %{customdata[6]}"
                                       + ("<br>Position Id: %{customdata[7]}"
                                          if self.trade_type == TradeType.Trade else '')
                     )
