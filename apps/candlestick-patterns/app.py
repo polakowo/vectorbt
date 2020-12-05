@@ -87,8 +87,8 @@ dark_bgcolor = "#171b26"
 fontcolor = "#9fa6b7"
 dark_fontcolor = "#7b7d8d"
 gridcolor = "#323b56"
-active_color = color_schema['cyan']
-loadcolor = adjust_lightness(color_schema['cyan'], 0.5)
+loadcolor = "#387c9e"
+active_color = "#88ccee"
 
 # Defaults
 data_path = 'data/data.h5'
@@ -1129,9 +1129,9 @@ def update_ohlcv(plot_type, df_json, date_range, entry_patterns, exit_patterns, 
     # Color volume
     close_open_diff = df['Close'].values - df['Open'].values
     volume_color = np.empty(df['Volume'].shape, dtype=np.object)
-    volume_color[close_open_diff > 0] = adjust_lightness(color_schema['increasing'], 0.7)
+    volume_color[close_open_diff > 0] = color_schema['increasing']
     volume_color[close_open_diff == 0] = color_schema['gray']
-    volume_color[close_open_diff < 0] = adjust_lightness(color_schema['decreasing'], 0.7)
+    volume_color[close_open_diff < 0] = color_schema['decreasing']
 
     # Build graph
     graph_obj = go.Ohlc if plot_type == 'OHLC' else go.Candlestick
@@ -1155,9 +1155,11 @@ def update_ohlcv(plot_type, df_json, date_range, entry_patterns, exit_patterns, 
                 customdata=entry_patterns[:, None],
                 hovertemplate='%{x}<br>%{customdata[0]}',
                 mode='markers',
-                marker_size=8,
-                marker_symbol='triangle-up',
-                marker_color=contrast_color_schema['green'],
+                marker=dict(
+                    size=8,
+                    symbol='triangle-up',
+                    color=contrast_color_schema['green']
+                ),
                 name='Bullish signal',
                 yaxis="y2",
                 xaxis="x",
@@ -1168,9 +1170,11 @@ def update_ohlcv(plot_type, df_json, date_range, entry_patterns, exit_patterns, 
                 customdata=exit_patterns[:, None],
                 hovertemplate='%{x}<br>%{customdata[0]}',
                 mode='markers',
-                marker_size=8,
-                marker_symbol='triangle-down',
-                marker_color=contrast_color_schema['red'],
+                marker=dict(
+                    size=8,
+                    symbol='triangle-down',
+                    color=contrast_color_schema['red'],
+                ),
                 name='Bearish signal',
                 yaxis="y2",
                 xaxis="x",
@@ -1178,8 +1182,11 @@ def update_ohlcv(plot_type, df_json, date_range, entry_patterns, exit_patterns, 
             go.Bar(
                 x=pd.to_datetime(df.index),
                 y=df['Volume'],
-                marker_color=volume_color,
-                marker_line_width=0,
+                marker=dict(
+                    color=volume_color,
+                    line_width=0
+                ),
+                opacity=0.3,
                 name='Volume',
                 yaxis="y",
                 xaxis="x"

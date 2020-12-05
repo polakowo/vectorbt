@@ -9,7 +9,6 @@ import plotly.graph_objects as go
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.widgets import CustomFigureWidget
-from vectorbt.utils.colors import adjust_lightness
 from vectorbt.generic.accessors import Generic_DFAccessor
 
 
@@ -67,9 +66,13 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             fig = CustomFigureWidget()
             fig.update_layout(
                 showlegend=True,
-                xaxis_rangeslider_visible=False,
-                xaxis_showgrid=True,
-                yaxis_showgrid=True,
+                xaxis=dict(
+                    rangeslider_visible=False,
+                    showgrid=True
+                ),
+                yaxis=dict(
+                    showgrid=True
+                ),
                 bargap=0
             )
         fig.update_layout(**layout_kwargs)
@@ -95,15 +98,17 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             volume = self._obj[column_names['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=np.object)
-            marker_colors[(close.values - open.values) > 0] = adjust_lightness(color_schema['increasing'], 0.7)
+            marker_colors[(close.values - open.values) > 0] = color_schema['increasing']
             marker_colors[(close.values - open.values) == 0] = color_schema['gray']
-            marker_colors[(close.values - open.values) < 0] = adjust_lightness(color_schema['decreasing'], 0.7)
+            marker_colors[(close.values - open.values) < 0] = color_schema['decreasing']
             bar = go.Bar(
                 x=self.wrapper.index,
                 y=volume,
-                marker_color=marker_colors,
-                marker_line_width=0,
-                marker_opacity=0.7,
+                marker=dict(
+                    color=marker_colors,
+                    line_width=0
+                ),
+                opacity=0.5,
                 name='Volume',
                 yaxis="y",
                 xaxis="x"
