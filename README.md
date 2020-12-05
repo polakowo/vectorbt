@@ -24,6 +24,15 @@ With vectorbt you can
 * Test machine learning models
 * Build interactive charts/dashboards without leaving Jupyter
 
+## Installation
+
+```
+pip install vectorbt
+```
+
+See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) 
+for Plotly figures.
+
 ## Example
 
 We all hate boilerplate code, that's why in vectorbt you can start with as little as a couple of lines.
@@ -347,15 +356,6 @@ sma_timeperiod    2    3
 ``` 
 
 ![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/Box.png)
-
-## Installation
-
-```
-pip install vectorbt
-```
-
-See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) 
-for Plotly figures.
 
 ## [Documentation](https://polakowo.io/vectorbt/)
 
