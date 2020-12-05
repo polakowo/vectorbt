@@ -26,7 +26,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
         Generic_DFAccessor.__init__(self, obj, **kwargs)
 
     def plot(self,
-             plot_type=go.Ohlc,
+             plot_type='OHLC',
              display_volume=True,
              ohlc_kwargs=None,
              bar_kwargs=None,
@@ -35,7 +35,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
         """Plot OHLCV data.
 
         Args:
-            plot_type: Either `plotly.graph_objects.Ohlc` or `plotly.graph_objects.Candlestick`.
+            plot_type: Either 'OHLC' or 'Candlestick'.
             display_volume (bool): If True, displays volume as bar chart.
             ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
             bar_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
@@ -80,13 +80,21 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             ohlc_kwargs = {}
         if bar_kwargs is None:
             bar_kwargs = {}
-        ohlc = plot_type(
+        if plot_type.lower() == 'ohlc':
+            plot_type = 'OHLC'
+            plot_obj = go.Ohlc
+        elif plot_type.lower() == 'candlestick':
+            plot_type = 'Candlestick'
+            plot_obj = go.Candlestick
+        else:
+            raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
+        ohlc = plot_obj(
             x=self.wrapper.index,
             open=open,
             high=high,
             low=low,
             close=close,
-            name='OHLC',
+            name=plot_type,
             yaxis="y2",
             xaxis="x",
             increasing_line_color=color_schema['increasing'],
