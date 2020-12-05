@@ -17,10 +17,10 @@ setup(
         'numpy', 
         'pandas',
         'scipy',
+        'matplotlib',
         'plotly>=4.12.0',
-        'numba>=0.51.2',
         'ipywidgets>=7.0.0',
-        'matplotlib'
+        'numba>=0.51.2'
     ],
     python_requires='>=3.6'
 )
