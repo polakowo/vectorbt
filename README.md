@@ -24,31 +24,48 @@ With vectorbt you can
 * Test machine learning models
 * Build interactive charts/dashboards without leaving Jupyter
 
-## Basic example
+## Example
 
-We hate boilerplate code, that's why in vectorbt you can start with as little as a couple of lines.
-Here is how much profit we would have made if we bought 10 Netflix shares back in 2002:
+We all hate boilerplate code, that's why in vectorbt you can start with as little as a couple of lines.
+Here is how much profit we would have made if we invested 100$ into Bitcoin in 2014:
 
 ```python
 import yfinance as yf
+import numpy as np
 import pandas as pd
 import vectorbt as vbt
 
-price = yf.Ticker('NFLX').history(period='max')['Close']
+price = yf.Ticker('BTC-USD').history(period='max')['Close']
 size = pd.Series.vbt.empty_like(price, 0.)
-size.iloc[0] = 1.
-portfolio = vbt.Portfolio.from_orders(price, size, init_cash='auto')
+size.iloc[0] = np.inf  # go all in
+portfolio = vbt.Portfolio.from_orders(price, size, init_cash=100.)
 portfolio.total_profit()
 ```
 
 ```plaintext
-5021.8
+4065.1702287767293
 ```
 
-## Advanced example
+And here is how a crossover of 10-day SMA and 50-day SMA would perform under the same conditions:
 
-Here a snippet for testing 10,000 window combinations of a dual SMA crossover strategy on BTC, USD and XRP
-from 2017 onwards, in under 5 seconds (Note: first time compiling with Numba may take a while):
+```python
+fast_ma = vbt.MA.run(price, 10)
+slow_ma = vbt.MA.run(price, 50)
+entries = fast_ma.ma_above(slow_ma, crossed=True)
+exits = fast_ma.ma_below(slow_ma, crossed=True)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100., freq='1D')
+portfolio.total_profit()
+```
+
+```plaintext
+6302.288201465419
+```
+
+Hint: There are much more profitable window combinations than this one.
+
+For fans of grid search, here is a snippet for testing 10,000 window combinations of a dual SMA crossover 
+strategy on BTC, USD and XRP from 2017 onwards, in under 5 seconds (Note: first time compiling with Numba 
+may take a while):
 
 ```python
 import numpy as np

@@ -28,8 +28,8 @@ from talib._ta_lib import (
 )
 import vectorbt as vbt
 from vectorbt.utils.config import merge_dicts
-from vectorbt.settings import color_schema, contrast_color_schema
-from vectorbt.utils.colors import adjust_opacity, adjust_lightness
+from vectorbt.settings import color_schema
+from vectorbt.utils.colors import adjust_opacity
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
@@ -234,6 +234,7 @@ app.layout = html.Div(
                                 dbc.Row(
                                     children=[
                                         dbc.Col(
+                                            lg=4, sm=12,
                                             children=[
                                                 html.Label("Select plot type:"),
                                                 dcc.Dropdown(
@@ -242,9 +243,7 @@ app.layout = html.Div(
                                                     value=default_plot_type,
                                                 ),
                                             ]
-                                        ),
-                                        dbc.Col(),
-                                        dbc.Col()
+                                        )
                                     ],
                                 ),
                                 dcc.Loading(
@@ -279,6 +278,7 @@ app.layout = html.Div(
                                                 dbc.Row(
                                                     children=[
                                                         dbc.Col(
+                                                            lg=6, sm=12,
                                                             children=[
                                                                 html.Label("Select subplots:"),
                                                                 dcc.Dropdown(
@@ -289,8 +289,7 @@ app.layout = html.Div(
                                                                     value=default_subplots,
                                                                 ),
                                                             ]
-                                                        ),
-                                                        dbc.Col()
+                                                        )
                                                     ],
                                                 ),
                                                 dcc.Loading(
@@ -914,8 +913,20 @@ app.layout = html.Div(
         html.Div(id='data_signal', style={'display': 'none'}),
         html.Div(id='index_signal', style={'display': 'none'}),
         html.Div(id='candle_settings_signal', style={'display': 'none'}),
-        html.Div(id='stats_signal', style={'display': 'none'})
+        html.Div(id='stats_signal', style={'display': 'none'}),
+        html.Div(id="window_width", style={'display': 'none'}),
+        dcc.Location(id="url")
     ],
+)
+
+app.clientside_callback(
+    """
+    function(href) {
+        return window.innerWidth;
+    }
+    """,
+    Output("window_width", "children"),
+    [Input("url", "href")],
 )
 
 
@@ -1057,7 +1068,8 @@ def set_candle_settings(data):
      Output("prob_settings", "hidden"),
      Output("entry_prob_input", "value"),
      Output("exit_prob_input", "value")],
-    [Input('plot_type_dropdown', 'value'),
+    [Input('window_width', 'children'),
+     Input('plot_type_dropdown', 'value'),
      Input('data_signal', 'children'),
      Input('date_slider', 'value'),
      Input('entry_pattern_dropdown', 'value'),
@@ -1070,7 +1082,7 @@ def set_candle_settings(data):
     [State("entry_prob_input", "value"),
      State("exit_prob_input", "value")]
 )
-def update_ohlcv(plot_type, df_json, date_range, entry_patterns, exit_patterns, _1,
+def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, exit_patterns, _1,
                  entry_dates, exit_dates, prob_options, _2, entry_prob, exit_prob):
     """Update OHLCV graph.
 
@@ -1124,104 +1136,65 @@ def update_ohlcv(plot_type, df_json, date_range, entry_patterns, exit_patterns, 
     lowest_low = df['Low'].min()
     distance = (highest_high - lowest_low) / 5
     entry_y = df.loc[entry_df.index, 'Low'] - distance
+    entry_y.index = pd.to_datetime(entry_y.index)
     exit_y = df.loc[exit_df.index, 'High'] + distance
+    exit_y.index = pd.to_datetime(exit_y.index)
 
-    # Color volume
-    close_open_diff = df['Close'].values - df['Open'].values
-    volume_color = np.empty(df['Volume'].shape, dtype=np.object)
-    volume_color[close_open_diff > 0] = color_schema['increasing']
-    volume_color[close_open_diff == 0] = color_schema['gray']
-    volume_color[close_open_diff < 0] = color_schema['decreasing']
+    # Prepare signals
+    entry_signals = pd.Series.vbt.empty_like(entry_y, True)
+    exit_signals = pd.Series.vbt.empty_like(exit_y, True)
 
     # Build graph
-    graph_obj = go.Ohlc if plot_type == 'OHLC' else go.Candlestick
-    figure = dict(
-        data=[
-            graph_obj(
-                x=pd.to_datetime(df.index),
-                open=df['Open'],
-                high=df['High'],
-                low=df['Low'],
-                close=df['Close'],
-                name='OHLC',
-                yaxis="y2",
-                xaxis="x",
-                increasing_line_color=color_schema['increasing'],
-                decreasing_line_color=color_schema['decreasing']
-            ),
-            go.Scatter(
-                x=pd.to_datetime(entry_y.index),
-                y=entry_y,
-                customdata=entry_patterns[:, None],
-                hovertemplate='%{x}<br>%{customdata[0]}',
-                mode='markers',
-                marker=dict(
-                    size=8,
-                    symbol='triangle-up',
-                    color=contrast_color_schema['green']
-                ),
-                name='Bullish signal',
-                yaxis="y2",
-                xaxis="x",
-            ),
-            go.Scatter(
-                x=pd.to_datetime(exit_y.index),
-                y=exit_y,
-                customdata=exit_patterns[:, None],
-                hovertemplate='%{x}<br>%{customdata[0]}',
-                mode='markers',
-                marker=dict(
-                    size=8,
-                    symbol='triangle-down',
-                    color=contrast_color_schema['red'],
-                ),
-                name='Bearish signal',
-                yaxis="y2",
-                xaxis="x",
-            ),
-            go.Bar(
-                x=pd.to_datetime(df.index),
-                y=df['Volume'],
-                marker=dict(
-                    color=volume_color,
-                    line_width=0
-                ),
-                opacity=0.3,
-                name='Volume',
-                yaxis="y",
-                xaxis="x"
-            )
-        ],
-        layout=merge_dicts(
+    height = int(9 / 21 * 2 / 3 * window_width)
+    fig = df.vbt.ohlcv.plot(
+        plot_type=plot_type,
+        **merge_dicts(
             default_layout,
             dict(
-                height=500,
+                width=None,
+                height=max(500, height),
                 margin=dict(r=40),
                 hovermode="closest",
                 xaxis=dict(
-                    gridcolor=gridcolor,
-                    rangeslider=dict(
-                        visible=False
-                    ),
-                    spikemode='across+marker',
                     title='Date'
                 ),
                 yaxis=dict(
-                    gridcolor=gridcolor,
-                    domain=[0, 0.3],
-                    spikemode='across+marker',
                     title='Volume'
                 ),
                 yaxis2=dict(
-                    gridcolor=gridcolor,
-                    domain=[0.4, 1],
-                    spikemode='across+marker',
                     title='Price',
-                ),
-                bargap=0
+                )
             )
         )
     )
+    fig.update_xaxes(spikemode='across+marker')
+    fig.update_yaxes(spikemode='across+marker')
+    entry_signals.vbt.signals.plot_as_entry_markers(
+        name='Bullish signal',
+        y=entry_y,
+        trace_kwargs=dict(
+            customdata=entry_patterns[:, None],
+            hovertemplate='%{x}<br>%{customdata[0]}',
+            yaxis="y2",
+            xaxis="x"
+        ),
+        fig=fig
+    )
+    exit_signals.vbt.signals.plot_as_exit_markers(
+        name='Bearish signal',
+        y=exit_y,
+        trace_kwargs=dict(
+            customdata=exit_patterns[:, None],
+            hovertemplate='%{x}<br>%{customdata[0]}',
+            yaxis="y2",
+            xaxis="x"
+        ),
+        fig=fig
+    )
+    fig.update_xaxes(gridcolor=gridcolor)
+    fig.update_yaxes(gridcolor=gridcolor, zerolinecolor=gridcolor)
+    figure = dict(data=fig.data, layout=fig.layout)
+
     mimic_strategy = 'mimic_strategy' in prob_options
     ctx = dash.callback_context
     if ctx.triggered:
@@ -1349,7 +1322,8 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
      Output('stats_signal', 'children'),
      Output('metric_dropdown', 'options'),
      Output('metric_dropdown', 'value')],
-    [Input('subplot_dropdown', 'value'),
+    [Input('window_width', 'children'),
+     Input('subplot_dropdown', 'value'),
      Input('data_signal', 'children'),
      Input('symbol_input', 'value'),
      Input('interval_dropdown', 'value'),
@@ -1374,10 +1348,10 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
      Input("reset_button", "n_clicks")],
     [State('metric_dropdown', 'value')]
 )
-def update_stats(subplots, df_json, symbol, interval, date_range, selected_data, entry_patterns, exit_patterns,
-                 _1, entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
-                 sim_options, n_random_strat, prob_options, entry_prob, exit_prob, stats_options,
-                 _2, curr_metric):
+def update_stats(window_width, subplots, df_json, symbol, interval, date_range, selected_data,
+                 entry_patterns, exit_patterns, _1, entry_dates, exit_dates, fees, fixed_fees,
+                 slippage, direction, conflict_mode, sim_options, n_random_strat, prob_options,
+                 entry_prob, exit_prob, stats_options, _2, curr_metric):
     """Final stage where we calculate key performance metrics and compare strategies."""
     df = pd.read_json(df_json, orient='split')
 
@@ -1397,18 +1371,28 @@ def update_stats(subplots, df_json, symbol, interval, date_range, selected_data,
                 )
             )
         )
+    height = int(6 / 21 * 2 / 3 * window_width)
     fig = main_portfolio.plot(
         subplots=subplots,
         **subplot_kwags,
         **merge_dicts(
             default_layout,
             dict(
-                width=None
+                width=None,
+                height=len(subplots) * max(300, height) if len(subplots) > 1 else max(350, height)
             )
         )
     )
-    fig.update_xaxes(gridcolor=gridcolor)
-    fig.update_yaxes(gridcolor=gridcolor, zerolinecolor=gridcolor)
+    fig.update_traces(xaxis="x" if len(subplots) == 1 else "x" + str(len(subplots)))
+    fig.update_xaxes(
+        spikemode='across+marker',
+        gridcolor=gridcolor
+    )
+    fig.update_yaxes(
+        spikemode='across+marker',
+        gridcolor=gridcolor,
+        zerolinecolor=gridcolor
+    )
 
     def _chop_microseconds(delta):
         return delta - pd.Timedelta(microseconds=delta.microseconds, nanoseconds=delta.nanoseconds)
@@ -1470,12 +1454,14 @@ def update_stats(subplots, df_json, symbol, interval, date_range, selected_data,
 
 @app.callback(
     Output('metric_graph', 'figure'),
-    [Input('stats_signal', 'children'),
+    [Input('window_width', 'children'),
+     Input('stats_signal', 'children'),
      Input('metric_dropdown', 'value')]
 )
-def update_metric_stats(stats_json, metric):
+def update_metric_stats(window_width, stats_json, metric):
     """Once a new metric has been selected, plot its distribution."""
     stats_dict = json.loads(stats_json)
+    height = int(9 / 21 * 2 / 3 * 2 / 3 * window_width)
     return dict(
         data=[
             go.Box(
@@ -1530,7 +1516,7 @@ def update_metric_stats(stats_json, metric):
         layout=merge_dicts(
             default_layout,
             dict(
-                height=350,
+                height=max(350, height),
                 showlegend=False,
                 margin=dict(l=60, r=20, t=40, b=20),
                 hovermode="closest",
