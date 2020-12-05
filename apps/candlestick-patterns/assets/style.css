@@ -24,8 +24,8 @@ button, .button {
 }
 
 button:hover, .button:hover {
-    color: #88ccee !important;
-    border: 1px solid #88ccee !important;
+    color: #17becf !important;
+    border: 1px solid #17becf !important;
 }
 
 .banner {
@@ -79,18 +79,18 @@ Select--single,
 }
 
 .Select.is-focused .Select-input input {
-    color: #88ccee !important;
+    color: #17becf !important;
 }
 
 .Select.is-focused .Select-value .Select-value-label {
-    color: #88ccee !important;
+    color: #17becf !important;
 }
 
 .Select-menu-outer,
 .Select.is-focused .Select-control,
 .input-control:focus {
-    color: #88ccee !important;
-    border: 1px solid #88ccee !important;
+    color: #17becf !important;
+    border: 1px solid #17becf !important;
 }
 
 .input-control {
@@ -110,7 +110,7 @@ span.Select-clear-zone {
 }
 
 .Select-menu-outer div:hover {
-    color: #88ccee !important;
+    color: #17becf !important;
     cursor: pointer;
 }
 
@@ -165,12 +165,12 @@ label, small {
 }
 
 .rc-slider-track {
-    background-color: #387c9e !important
+    background-color: #0f7f8a !important
 }
 
 .rc-slider-dot-active, .rc-slider-handle {
-    border-color: #88ccee !important;
-    background-color: #88ccee;
+    border-color: #17becf !important;
+    background-color: #17becf;
 }
 
 .rc-slider-handle {
@@ -183,7 +183,7 @@ label, small {
 
 .dash-cell.column-2 .input-active,
 .dash-cell.column-3 .input-active {
-    color: #88ccee !important;
+    color: #17becf !important;
 }
 
 .dash-spreadsheet-inner .row {

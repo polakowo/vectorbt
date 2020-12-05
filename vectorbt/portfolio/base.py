@@ -2176,6 +2176,8 @@ class Portfolio(Wrapping):
             subplots = list(list(zip(*supported_subplots))[0])
         if not isinstance(subplots, list):
             subplots = [subplots]
+        if len(subplots) == 0:
+            raise ValueError("You must select at least one subplot")
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
         hline_shape_kwargs = merge_dicts(

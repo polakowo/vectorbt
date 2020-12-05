@@ -9,6 +9,7 @@ import plotly.graph_objects as go
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.colors import adjust_lightness
 from vectorbt.generic.accessors import Generic_DFAccessor
 
 
@@ -53,9 +54,9 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
 
         ![](/vectorbt/docs/img/ohlcv.png)
         """
-        from vectorbt import settings
+        from vectorbt.settings import ohlcv, color_schema
 
-        column_names = settings.ohlcv['column_names'] if self._column_names is None else self._column_names
+        column_names = ohlcv['column_names'] if self._column_names is None else self._column_names
         open = self._obj[column_names['open']]
         high = self._obj[column_names['high']]
         low = self._obj[column_names['low']]
@@ -85,8 +86,8 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             name='OHLC',
             yaxis="y2",
             xaxis="x",
-            increasing_line_color='#1b9e76',
-            decreasing_line_color='#d95f02'
+            increasing_line_color=color_schema['increasing'],
+            decreasing_line_color=color_schema['decreasing']
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc)
@@ -94,9 +95,9 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             volume = self._obj[column_names['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=np.object)
-            marker_colors[(close.values - open.values) > 0] = '#1b9e76'
-            marker_colors[(close.values - open.values) == 0] = 'lightgrey'
-            marker_colors[(close.values - open.values) < 0] = '#d95f02'
+            marker_colors[(close.values - open.values) > 0] = adjust_lightness(color_schema['increasing'], 0.7)
+            marker_colors[(close.values - open.values) == 0] = color_schema['gray']
+            marker_colors[(close.values - open.values) < 0] = adjust_lightness(color_schema['decreasing'], 0.7)
             bar = go.Bar(
                 x=self.wrapper.index,
                 y=volume,

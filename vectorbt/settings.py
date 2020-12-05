@@ -28,7 +28,9 @@ color_schema = Config(
     pink="#e377c2",
     gray="#7f7f7f",
     yellow="#bcbd22",
-    cyan="#17becf"
+    cyan="#17becf",
+    increasing="#1b9e76",
+    decreasing="#d95f02"
 )
 """_"""
 
