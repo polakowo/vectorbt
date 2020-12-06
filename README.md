@@ -3,6 +3,7 @@
 ![https://polakowo.io/vectorbt/](https://img.shields.io/website?style=for-the-badge&url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)
 ![](https://img.shields.io/pypi/v/vectorbt?color=blueviolet&style=for-the-badge)
 ![](https://img.shields.io/pypi/dd/vectorbt?color=orange&style=for-the-badge)
+![](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)
 
 # vectorbt
 
