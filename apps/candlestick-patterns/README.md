@@ -12,6 +12,10 @@ This app creates a dashboard using [Dash](https://github.com/plotly/dash) to vis
 * Compares main strategy to holding and trading randomly
 * Responsive design using [Dash Bootstrap Components](https://github.com/facultyai/dash-bootstrap-components)
 
+## Live version
+
+https://candlestick-patterns.herokuapp.com/
+
 ## How to run the app
 
 ### Using Docker
