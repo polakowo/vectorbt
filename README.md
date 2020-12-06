@@ -79,15 +79,9 @@ dual SMA crossover strategy on BTC, USD and XRP from 2017 onwards, in under 5 se
 (Note: first time compiling with Numba may take a while):
 
 ```python
-import numpy as np
-import pandas as pd
-import yfinance as yf
-from datetime import datetime
-import vectorbt as vbt
-
 # Define your params
 assets = ["BTC-USD", "ETH-USD", "LTC-USD"]
-yf_kwargs = dict(start=datetime(2017, 1, 1))
+yf_kwargs = dict(start='2017-1-1')
 windows = np.arange(2, 101)
 portfolio_kwargs = dict(fees=0.001)
 
