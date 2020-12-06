@@ -834,7 +834,7 @@ class Positions(Trades):
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., -2., 2., -2., 1.]),
     ...     fixed_fees=1.).positions().records
-       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \
+       id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.0          0          1.0         1.0         1         2.0
     1   1    0   1.0          1          2.0         0.5         2         3.0
     2   2    0   1.0          2          3.0         0.5         3         4.0

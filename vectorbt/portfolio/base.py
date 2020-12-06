@@ -190,12 +190,12 @@ simulation from the beginning to the end, you can turn on logging.
 ... )
 
 >>> portfolio.logs().records
-        id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \
+        id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \\
 0        0    0    0      0       inf    0.000000        7294.44        inf
 ...    ...  ...  ...    ...       ...         ...            ...        ...
 1469  1469  244    5      5       inf  273.894381          62.84        inf
 
-          size  size_type  ...   log  new_cash  new_shares  res_size  \
+          size  size_type  ...   log  new_cash  new_shares  res_size  \\
 0          NaN          0  ...  True       inf    0.000000       NaN
 ...        ...        ...  ...   ...       ...         ...       ...
 1469  7.956715          0  ...  True       inf  281.851096  7.956715
