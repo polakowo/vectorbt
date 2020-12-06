@@ -22,5 +22,18 @@ setup(
         'ipywidgets>=7.0.0',
         'numba>=0.51.2'
     ],
-    python_requires='>=3.6'
+    python_requires='>=3.6, <3.9',
+    license='GPLv3+',
+    classifiers=[
+        'Development Status :: 5 - Production/Stable',
+        'Intended Audience :: Developers',
+        'Intended Audience :: Financial and Insurance Industry',
+        'Topic :: Software Development',
+        'Topic :: Office/Business :: Financial',
+        'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Operating System :: OS Independent'
+    ],
 )

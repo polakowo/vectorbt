@@ -1,6 +1,9 @@
 ![](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)
 ![](https://img.shields.io/codecov/c/github/polakowo/vectorbt?style=for-the-badge)
+![https://polakowo.io/vectorbt/](https://img.shields.io/website?style=for-the-badge&url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)
 ![](https://img.shields.io/pypi/v/vectorbt?color=blueviolet&style=for-the-badge)
+![](https://img.shields.io/pypi/dd/vectorbt?color=orange&style=for-the-badge)
+![](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)
 
 # vectorbt
 
@@ -11,16 +14,16 @@ accelerated by [Numba](https://github.com/numba/numba) to analyze trading strate
 
 In contrast to conventional libraries, vectorbt represents trading data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but compiled 
-operations with Numba, for example, for hyperparameter optimization. It also integrates 
-[plotly.py](https://github.com/plotly/plotly.py) and [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) 
-to display complex charts and dashboards akin to Tableau right in the Jupyter notebook. Due to high 
-performance, vectorbt is able to process large amounts of data even without GPU and parallelization (both are work 
-in progress), and enable the user to interact with data-hungry widgets without significant delays.
+operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
+[ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
+to Tableau right in the Jupyter notebook. Due to high performance, vectorbt is able to process large amounts of 
+data even without GPU and parallelization (both are work in progress), and enable the user to interact with 
+data-hungry widgets without significant delays.
 
 With vectorbt you can
-* Analyze and engineer features for any time series data
+* Analyze time series and engineer features
 * Supercharge pandas and your favorite tools to run much faster
-* Test thousands of strategies, configurations, assets, and time ranges in one go
+* Test many strategies, configurations, assets, and time ranges in one go
 * Test machine learning models
 * Build interactive charts/dashboards without leaving Jupyter
 
@@ -35,8 +38,9 @@ for Plotly figures.
 
 ## Example
 
-We all hate boilerplate code, that's why in vectorbt you can start with as little as a couple of lines.
-Here is how much profit we would have made if we invested 100$ into Bitcoin in 2014:
+You can start backtesting with just a couple of lines.
+
+Here is how much profit we would have made if we invested $100 into Bitcoin in 2014:
 
 ```python
 import yfinance as yf
@@ -55,7 +59,7 @@ portfolio.total_profit()
 4065.1702287767293
 ```
 
-And here is how a crossover of 10-day SMA and 50-day SMA would perform under the same conditions:
+And here is the crossover of 10-day SMA and 50-day SMA under the same conditions:
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
@@ -70,11 +74,9 @@ portfolio.total_profit()
 6302.288201465419
 ```
 
-Hint: There are much more profitable window combinations than this one.
-
-For fans of grid search, here is a snippet for testing 10,000 window combinations of a dual SMA crossover 
-strategy on BTC, USD and XRP from 2017 onwards, in under 5 seconds (Note: first time compiling with Numba 
-may take a while):
+For fans of hyperparameter optimization, here is a snippet for testing 10,000 window combinations of a 
+dual SMA crossover strategy on BTC, USD and XRP from 2017 onwards, in under 5 seconds 
+(Note: first time compiling with Numba may take a while):
 
 ```python
 import numpy as np
@@ -197,9 +199,9 @@ This way, it is often much faster than pandas alone:
 ```
 
 In contrast to most other similar backtesting libraries where backtesting is limited to simple arrays 
-(think of an array for price, an array for signals, etc.), vectorbt is optimized for working with 
-2-dimensional data: it treats index of a DataFrame as time axis and columns as distinct features
-that should be backtest, and performs computations on the entire matrix at once, without "Pythonic" loops.
+(price, signals, etc.), vectorbt is optimized for working with multi-dimensional data: it treats index 
+of a DataFrame as time axis and columns as distinct features that should be backtest, and performs 
+computations on the entire matrix at once, without slow Python loops.
 
 To make the library easier to use, vectorbt introduces a namespace (accessor) to pandas objects 
 (see [extending pandas](https://pandas.pydata.org/pandas-docs/stable/development/extending.html)). 
@@ -370,3 +372,8 @@ Note: you need to run the notebook to play with widgets.
 ## Dashboards
 
 - [Detecting and backtesting common candlestick patterns](https://github.com/polakowo/vectorbt/tree/master/apps/candlestick-patterns)
+
+## Disclaimer
+
+This software is for educational purposes only. Do not risk money which you are afraid to lose. 
+USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
