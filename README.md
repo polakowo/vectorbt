@@ -147,10 +147,7 @@ Name: (10, 20, ETH-USD), dtype: object
 ```
 
 ```python
-fig = portfolio[(10, 20, 'ETH-USD')].plot()
-fig.update_traces(xaxis="x3")
-fig.update_xaxes(spikemode='across+marker')
-fig.show()
+portfolio[(10, 20, 'ETH-USD')].plot().show()
 ```
 
 ![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_portfolio.png)

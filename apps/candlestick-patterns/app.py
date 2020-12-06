@@ -1167,8 +1167,6 @@ def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, e
             )
         )
     )
-    fig.update_xaxes(spikemode='across+marker')
-    fig.update_yaxes(spikemode='across+marker')
     entry_signals.vbt.signals.plot_as_entry_markers(
         name='Bullish signal',
         y=entry_y,
@@ -1385,11 +1383,9 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
     )
     fig.update_traces(xaxis="x" if len(subplots) == 1 else "x" + str(len(subplots)))
     fig.update_xaxes(
-        spikemode='across+marker',
         gridcolor=gridcolor
     )
     fig.update_yaxes(
-        spikemode='across+marker',
         gridcolor=gridcolor,
         zerolinecolor=gridcolor
     )
