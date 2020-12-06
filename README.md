@@ -30,7 +30,7 @@ With vectorbt you can
 
 ## Installation
 
-```
+```bash
 pip install vectorbt
 ```
 
@@ -364,6 +364,27 @@ Note: you need to run the notebook to play with widgets.
 ## Dashboards
 
 - [Detecting and backtesting common candlestick patterns](https://github.com/polakowo/vectorbt/tree/master/apps/candlestick-patterns)
+
+## How to contribute
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+First, you need to install vectorbt from the repository:
+
+```bash
+pip uninstall vectorbt
+git clone https://github.com/polakowo/vectorbt.git
+cd vectorbt
+pip install -e .
+```
+
+After making changes, make sure you did not break any functionality:
+
+```bash
+pytest
+```
+
+Please make sure to update tests as appropriate.
 
 ## Disclaimer
 
