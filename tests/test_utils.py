@@ -3,11 +3,14 @@ import pandas as pd
 from numba import njit
 import pytest
 import os
+from collections import namedtuple
 
-from vectorbt import defaults
-from vectorbt.utils import checks, config, decorators, math, array, random
+from vectorbt import settings
+from vectorbt.utils import checks, config, decorators, math, array, random, enum
 
 from tests.utils import hash
+
+seed = 42
 
 
 # ############# config.py ############# #
@@ -23,29 +26,58 @@ class TestConfig:
         with pytest.raises(Exception) as e_info:
             conf['d'] = 2
 
-        # go deeper
-        conf['b']['c'] = 2
+        with pytest.raises(Exception) as e_info:
+            conf.update(d=2)
+
+        conf.update(d=2, force_update=True)
+        assert conf['d'] == 2
+
+        conf = config.Config({'a': 0, 'b': {'c': 1}}, read_only=True)
 
         with pytest.raises(Exception) as e_info:
-            conf['b']['d'] = 2
+            conf['a'] = 2
 
-    def test_merge_kwargs(self):
-        assert config.merge_kwargs({'a': 1}, {'b': 2}) == {'a': 1, 'b': 2}
-        assert config.merge_kwargs({'a': 1}, {'a': 2}) == {'a': 2}
-        assert config.merge_kwargs({'a': {'b': 2}}, {'a': {'c': 3}}) == {'a': {'b': 2, 'c': 3}}
-        assert config.merge_kwargs({'a': {'b': 2}}, {'a': {'b': 3}}) == {'a': {'b': 3}}
+        with pytest.raises(Exception) as e_info:
+            del conf['a']
+
+        with pytest.raises(Exception) as e_info:
+            conf.pop('a')
+
+        with pytest.raises(Exception) as e_info:
+            conf.popitem()
+
+        with pytest.raises(Exception) as e_info:
+            conf.clear()
+
+        with pytest.raises(Exception) as e_info:
+            conf.update(a=2)
+
+        assert isinstance(conf.merge_with(dict(b=dict(d=2))), config.Config)
+        assert conf.merge_with(dict(b=dict(d=2)), read_only=True).read_only
+        assert conf.merge_with(dict(b=dict(d=2)))['b']['d'] == 2
+
+        conf = config.Config({'a': 0, 'b': {'c': [1, 2]}})
+        conf['a'] = 1
+        conf['b']['c'].append(3)
+        conf['b']['d'] = 2
+        assert conf == {'a': 1, 'b': {'c': [1, 2, 3], 'd': 2}}
+        conf.reset()
+        assert conf == {'a': 0, 'b': {'c': [1, 2]}}
+
+    def test_merge_dicts(self):
+        assert config.merge_dicts({'a': 1}, {'b': 2}) == {'a': 1, 'b': 2}
+        assert config.merge_dicts({'a': 1}, {'a': 2}) == {'a': 2}
+        assert config.merge_dicts({'a': {'b': 2}}, {'a': {'c': 3}}) == {'a': {'b': 2, 'c': 3}}
+        assert config.merge_dicts({'a': {'b': 2}}, {'a': {'b': 3}}) == {'a': {'b': 3}}
 
     def test_configured(self):
         class H(config.Configured):
             def __init__(self, a, b=2, **kwargs):
                 super().__init__(a=a, b=b, **kwargs)
 
-            def return_config(self):
-                return self.config
-
-        assert H(1).return_config() == {'a': 1, 'b': 2}
-        assert H(1).copy(b=3).return_config() == {'a': 1, 'b': 3}
-        assert H(1).copy(c=4).return_config() == {'a': 1, 'b': 2, 'c': 4}
+        assert H(1).config == {'a': 1, 'b': 2}
+        assert H(1).copy(b=3).config == {'a': 1, 'b': 3}
+        assert H(1).copy(c=4).config == {'a': 1, 'b': 2, 'c': 4}
         assert H(pd.Series([1, 2, 3])) == H(pd.Series([1, 2, 3]))
         assert H(pd.Series([1, 2, 3])) != H(pd.Series([1, 2, 4]))
         assert H(pd.DataFrame([1, 2, 3])) == H(pd.DataFrame([1, 2, 3]))
@@ -89,85 +121,739 @@ class TestDecorators:
         assert G.cache_me.kwargs['some'] == 'key'
 
     def test_cached_property(self):
-        class G:
-            @decorators.cached_property(some='key')
-            def cache_me(self): return np.random.uniform()
-
-        assert 'some' in G.cache_me.kwargs
-        assert G.cache_me.kwargs['some'] == 'key'
+        np.random.seed(seed)
 
         class G:
             @decorators.cached_property
             def cache_me(self): return np.random.uniform()
 
         g = G()
-
-        # general caching
         cached_number = g.cache_me
         assert g.cache_me == cached_number
 
-        # clear_cache method
-        G.cache_me.clear_cache(g)
-        cached_number2 = g.cache_me
-        assert cached_number2 != cached_number
-        assert g.cache_me == cached_number2
-
-        # disabled locally
-        G.cache_me.disabled = True
-        cached_number3 = g.cache_me
-        assert cached_number3 != cached_number2
-        assert g.cache_me != cached_number3
-        G.cache_me.disabled = False
-
-        # disabled globally
-        defaults.caching = False
-        cached_number4 = g.cache_me
-        assert cached_number4 != cached_number3
-        assert g.cache_me != cached_number4
-        defaults.caching = True
-
-    def test_cached_method(self):
         class G:
-            @decorators.cached_method(some='key')
+            @decorators.cached_property(hello="world", hello2="world2")
             def cache_me(self): return np.random.uniform()
 
-        assert 'some' in G.cache_me.kwargs
-        assert G.cache_me.kwargs['some'] == 'key'
+        assert 'hello' in G.cache_me.kwargs
+        assert G.cache_me.kwargs['hello'] == 'world'
+
+        g = G()
+        g2 = G()
+
+        class G3(G):
+            pass
+
+        g3 = G3()
+
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+
+        # clear_cache method
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        G.cache_me.clear_cache(g)
+        assert g.cache_me != cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+
+        # test blacklist
+
+        # instance + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append((g, 'cache_me'))
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('cache_me')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # instance
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append(g)
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # class + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append((G, 'cache_me'))
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # class
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append(G)
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # class name + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('G.cache_me')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('G')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # improper class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('g')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # kwargs
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append({'hello': 'world'})
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2'})
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # disabled globally
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # test whitelist
+
+        # instance + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append((g, 'cache_me'))
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('cache_me')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        # instance
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append(g)
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # class + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append((G, 'cache_me'))
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # class
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append(G)
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # class name + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('G.cache_me')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('G')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # improper class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('g')
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+        # kwargs
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append({'hello': 'world'})
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2'})
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me == cached_number
+        assert g2.cache_me == cached_number2
+        assert g3.cache_me == cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
+        cached_number = g.cache_me
+        cached_number2 = g2.cache_me
+        cached_number3 = g3.cache_me
+        assert g.cache_me != cached_number
+        assert g2.cache_me != cached_number2
+        assert g3.cache_me != cached_number3
+        settings.caching.reset()
+
+    def test_cached_method(self):
+        np.random.seed(seed)
 
         class G:
             @decorators.cached_method
-            def cache_me(self, b=10): return np.random.uniform() * 10
+            def cache_me(self, b=10): return np.random.uniform()
 
         g = G()
+        cached_number = g.cache_me
+        assert g.cache_me == cached_number
 
-        # general caching
+        class G:
+            @decorators.cached_method(hello="world", hello2="world2")
+            def cache_me(self, b=10): return np.random.uniform()
+
+        assert 'hello' in G.cache_me.kwargs
+        assert G.cache_me.kwargs['hello'] == 'world'
+
+        g = G()
+        g2 = G()
+
+        class G3(G):
+            pass
+
+        g3 = G3()
+
         cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
         assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
 
         # clear_cache method
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
         G.cache_me.clear_cache(g)
-        cached_number2 = g.cache_me()
-        assert cached_number2 != cached_number
-        assert g.cache_me() == cached_number2
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
 
-        # disabled locally
-        G.cache_me.disabled = True
-        cached_number3 = g.cache_me()
-        assert cached_number3 != cached_number2
-        assert g.cache_me() != cached_number3
-        G.cache_me.disabled = False
+        # test blacklist
+
+        # function
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append(g.cache_me)
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # instance + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append((g, 'cache_me'))
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('cache_me')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # instance
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append(g)
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # class + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append((G, 'cache_me'))
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # class
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append(G)
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # class name + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('G.cache_me')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('G')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # improper class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append('g')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # kwargs
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append({'hello': 'world'})
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2'})
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
 
         # disabled globally
-        defaults.caching = False
-        cached_number4 = g.cache_me()
-        assert cached_number4 != cached_number3
-        assert g.cache_me() != cached_number4
-        defaults.caching = True
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # test whitelist
+
+        # function
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append(g.cache_me)
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # instance + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append((g, 'cache_me'))
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('cache_me')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        # instance
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append(g)
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # class + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append((G, 'cache_me'))
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # class
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append(G)
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # class name + name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('G.cache_me')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('G')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # improper class name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append('g')
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
+
+        # kwargs
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append({'hello': 'world'})
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2'})
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() == cached_number
+        assert g2.cache_me() == cached_number2
+        assert g3.cache_me() == cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = False
+        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
+        cached_number = g.cache_me()
+        cached_number2 = g2.cache_me()
+        cached_number3 = g3.cache_me()
+        assert g.cache_me() != cached_number
+        assert g2.cache_me() != cached_number2
+        assert g3.cache_me() != cached_number3
+        settings.caching.reset()
 
         # disabled by non-hashable args
-        cached_number5 = g.cache_me(b=np.zeros(1))
-        assert cached_number5 != cached_number4
-        assert g.cache_me(b=np.zeros(1)) != cached_number5
+        G.cache_me.clear_cache(g)
+        cached_number = g.cache_me(b=np.zeros(1))
+        assert g.cache_me(b=np.zeros(1)) != cached_number
 
     def test_traverse_attr_kwargs(self):
         class A:
@@ -282,6 +968,10 @@ class TestChecks:
         assert not checks.is_equal(np.arange(3), None, np.array_equal)
         assert not checks.is_equal(None, np.arange(3), np.array_equal)
         assert checks.is_equal(None, None, np.array_equal)
+
+    def test_is_namedtuple(self):
+        assert checks.is_namedtuple(namedtuple('Hello', ['world'])(*range(1)))
+        assert not checks.is_namedtuple((0,))
 
     def test_assert_in(self):
         checks.assert_in(0, (0, 1))
@@ -408,7 +1098,8 @@ class TestChecks:
         columns = ['a', 'b', 'c']
         checks.assert_array_equal(np.array([1, 2, 3]), np.array([1, 2, 3]))
         checks.assert_array_equal(pd.Series([1, 2, 3], index=index), pd.Series([1, 2, 3], index=index))
-        checks.assert_array_equal(pd.DataFrame([[1, 2, 3]], columns=columns), pd.DataFrame([[1, 2, 3]], columns=columns))
+        checks.assert_array_equal(pd.DataFrame([[1, 2, 3]], columns=columns),
+                                  pd.DataFrame([[1, 2, 3]], columns=columns))
         with pytest.raises(Exception) as e_info:
             checks.assert_array_equal(np.array([1, 2]), np.array([1, 2, 3]))
 
@@ -439,92 +1130,98 @@ class TestChecks:
 # ############# math.py ############# #
 
 class TestMath:
-    @pytest.mark.parametrize(
-        "test_func",
-        [math.is_close, math.is_close_nb],
-    )
-    def test_is_close(self, test_func):
+    def test_is_close(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert test_func(a, a)
-        assert test_func(a, b)
-        assert test_func(-a, -b)
-        assert not test_func(-a, b)
-        assert not test_func(a, -b)
-        assert test_func(1e10 + a, 1e10 + b)
+        assert math.is_close_nb(a, a)
+        assert math.is_close_nb(a, b)
+        assert math.is_close_nb(-a, -b)
+        assert not math.is_close_nb(-a, b)
+        assert not math.is_close_nb(a, -b)
+        assert math.is_close_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not test_func(np.nan, b)
-        assert not test_func(a, np.nan)
+        assert not math.is_close_nb(np.nan, b)
+        assert not math.is_close_nb(a, np.nan)
 
         # test np.inf
-        assert not test_func(np.inf, b)
-        assert not test_func(a, np.inf)
-        assert not test_func(-np.inf, b)
-        assert not test_func(a, -np.inf)
-        assert not test_func(-np.inf, -np.inf)
-        assert not test_func(np.inf, np.inf)
-        assert not test_func(-np.inf, np.inf)
+        assert not math.is_close_nb(np.inf, b)
+        assert not math.is_close_nb(a, np.inf)
+        assert not math.is_close_nb(-np.inf, b)
+        assert not math.is_close_nb(a, -np.inf)
+        assert not math.is_close_nb(-np.inf, -np.inf)
+        assert not math.is_close_nb(np.inf, np.inf)
+        assert not math.is_close_nb(-np.inf, np.inf)
 
-    @pytest.mark.parametrize(
-        "test_func",
-        [math.is_close_or_less, math.is_close_or_less_nb],
-    )
-    def test_is_close_or_less(self, test_func):
+    def test_is_close_or_less(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert test_func(a, a)
-        assert test_func(a, b)
-        assert test_func(-a, -b)
-        assert test_func(-a, b)
-        assert not test_func(a, -b)
-        assert test_func(1e10 + a, 1e10 + b)
+        assert math.is_close_or_less_nb(a, a)
+        assert math.is_close_or_less_nb(a, b)
+        assert math.is_close_or_less_nb(-a, -b)
+        assert math.is_close_or_less_nb(-a, b)
+        assert not math.is_close_or_less_nb(a, -b)
+        assert math.is_close_or_less_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not test_func(np.nan, b)
-        assert not test_func(a, np.nan)
+        assert not math.is_close_or_less_nb(np.nan, b)
+        assert not math.is_close_or_less_nb(a, np.nan)
 
         # test np.inf
-        assert not test_func(np.inf, b)
-        assert test_func(a, np.inf)
-        assert test_func(-np.inf, b)
-        assert not test_func(a, -np.inf)
-        assert not test_func(-np.inf, -np.inf)
-        assert not test_func(np.inf, np.inf)
-        assert test_func(-np.inf, np.inf)
+        assert not math.is_close_or_less_nb(np.inf, b)
+        assert math.is_close_or_less_nb(a, np.inf)
+        assert math.is_close_or_less_nb(-np.inf, b)
+        assert not math.is_close_or_less_nb(a, -np.inf)
+        assert not math.is_close_or_less_nb(-np.inf, -np.inf)
+        assert not math.is_close_or_less_nb(np.inf, np.inf)
+        assert math.is_close_or_less_nb(-np.inf, np.inf)
 
-    @pytest.mark.parametrize(
-        "test_func",
-        [math.is_less, math.is_less_nb],
-    )
-    def test_is_less(self, test_func):
+    def test_is_less(self):
         a = 0.3
         b = 0.1 + 0.2
 
         # test scalar
-        assert not test_func(a, a)
-        assert not test_func(a, b)
-        assert not test_func(-a, -b)
-        assert test_func(-a, b)
-        assert not test_func(a, -b)
-        assert not test_func(1e10 + a, 1e10 + b)
+        assert not math.is_less_nb(a, a)
+        assert not math.is_less_nb(a, b)
+        assert not math.is_less_nb(-a, -b)
+        assert math.is_less_nb(-a, b)
+        assert not math.is_less_nb(a, -b)
+        assert not math.is_less_nb(1e10 + a, 1e10 + b)
 
         # test np.nan
-        assert not test_func(np.nan, b)
-        assert not test_func(a, np.nan)
+        assert not math.is_less_nb(np.nan, b)
+        assert not math.is_less_nb(a, np.nan)
 
         # test np.inf
-        assert not test_func(np.inf, b)
-        assert test_func(a, np.inf)
-        assert test_func(-np.inf, b)
-        assert not test_func(a, -np.inf)
-        assert not test_func(-np.inf, -np.inf)
-        assert not test_func(np.inf, np.inf)
-        assert test_func(-np.inf, np.inf)
+        assert not math.is_less_nb(np.inf, b)
+        assert math.is_less_nb(a, np.inf)
+        assert math.is_less_nb(-np.inf, b)
+        assert not math.is_less_nb(a, -np.inf)
+        assert not math.is_less_nb(-np.inf, -np.inf)
+        assert not math.is_less_nb(np.inf, np.inf)
+        assert math.is_less_nb(-np.inf, np.inf)
+
+    def test_is_addition_zero(self):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        assert not math.is_addition_zero_nb(a, b)
+        assert math.is_addition_zero_nb(-a, b)
+        assert math.is_addition_zero_nb(a, -b)
+        assert not math.is_addition_zero_nb(-a, -b)
+
+    def test_add_nb(self):
+        a = 0.3
+        b = 0.1 + 0.2
+
+        assert math.add_nb(a, b) == a + b
+        assert math.add_nb(-a, b) == 0
+        assert math.add_nb(a, -b) == 0
+        assert math.add_nb(-a, -b) == -(a + b)
 
 
 # ############# array.py ############# #
@@ -565,12 +1262,81 @@ class TestArray:
             np.array([0, 1, 2, 3, 4, 5])
         )
 
+    def test_uniform_summing_to_one_nb(self):
+        @njit
+        def set_seed():
+            np.random.seed(seed)
+
+        set_seed()
+        np.testing.assert_array_almost_equal(
+            array.uniform_summing_to_one_nb(10),
+            np.array([
+                5.808361e-02, 9.791091e-02, 2.412011e-05, 2.185215e-01,
+                2.241184e-01, 2.456528e-03, 1.308789e-01, 1.341822e-01,
+                8.453816e-02, 4.928569e-02
+            ])
+        )
+        assert np.sum(array.uniform_summing_to_one_nb(10)) == 1
+
+    def test_renormalize(self):
+        assert array.renormalize(0, [0, 10], [0, 1]) == 0
+        assert array.renormalize(10, [0, 10], [0, 1]) == 1
+        np.testing.assert_array_equal(
+            array.renormalize(np.array([0, 2, 4, 6, 8, 10]), [0, 10], [0, 1]),
+            np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
+        )
+        np.testing.assert_array_equal(
+            array.renormalize_nb(np.array([0, 2, 4, 6, 8, 10]), [0, 10], [0, 1]),
+            np.array([0., 0.2, 0.4, 0.6, 0.8, 1.])
+        )
+
+    def test_min_rel_rescale(self):
+        np.testing.assert_array_equal(
+            array.min_rel_rescale(np.array([2, 4, 6]), [10, 20]),
+            np.array([10., 15., 20.])
+        )
+        np.testing.assert_array_equal(
+            array.min_rel_rescale(np.array([5, 6, 7]), [10, 20]),
+            np.array([10., 12., 14.])
+        )
+        np.testing.assert_array_equal(
+            array.min_rel_rescale(np.array([5, 5, 5]), [10, 20]),
+            np.array([10., 10., 10.])
+        )
+
+    def test_max_rel_rescale(self):
+        np.testing.assert_array_equal(
+            array.max_rel_rescale(np.array([2, 4, 6]), [10, 20]),
+            np.array([10., 15., 20.])
+        )
+        np.testing.assert_array_equal(
+            array.max_rel_rescale(np.array([5, 6, 7]), [10, 20]),
+            np.array([14.285714285714286, 17.142857142857142, 20.])
+        )
+        np.testing.assert_array_equal(
+            array.max_rel_rescale(np.array([5, 5, 5]), [10, 20]),
+            np.array([20., 20., 20.])
+        )
+
+    def test_rescale_float_to_int_nb(self):
+        @njit
+        def set_seed():
+            np.random.seed(seed)
+
+        set_seed()
+        np.testing.assert_array_equal(
+            array.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), [10, 20], 70),
+            np.array([17, 14, 22, 17])
+        )
+        assert np.sum(array.rescale_float_to_int_nb(np.array([0.3, 0.3, 0.3, 0.1]), [10, 20], 70)) == 70
+
+
 # ############# random.py ############# #
 
 
 class TestRandom:
     def test_set_seed(self):
-        random.set_seed(42)
+        random.set_seed(seed)
 
         def test_seed():
             return np.random.uniform(0, 1)
@@ -585,3 +1351,28 @@ class TestRandom:
             assert test_seed_nb() == 0.3745401188473625
 
 
+# ############# enum.py ############# #
+
+Enum = namedtuple('Enum', ['Attr1', 'Attr2'])(*range(2))
+
+
+class TestEnum:
+    def test_caseins_getattr(self):
+        assert enum.caseins_getattr(Enum, 'Attr1') == 0
+        assert enum.caseins_getattr(Enum, 'attr1') == 0
+        assert enum.caseins_getattr(Enum, 'Attr2') == 1
+        assert enum.caseins_getattr(Enum, 'attr2') == 1
+        with pytest.raises(Exception) as e_info:
+            enum.caseins_getattr(Enum, 'Attr3')
+
+    def test_convert_str_enum_value(self):
+        assert enum.convert_str_enum_value(Enum, 0) == 0
+        assert enum.convert_str_enum_value(Enum, 10) == 10
+        assert enum.convert_str_enum_value(Enum, 10.) == 10.
+        assert enum.convert_str_enum_value(Enum, 'Attr1') == 0
+        assert enum.convert_str_enum_value(Enum, 'attr1') == 0
+        assert enum.convert_str_enum_value(Enum, ('attr1', 'attr2')) == (0, 1)
+        assert enum.convert_str_enum_value(Enum, [['attr1', 'attr2']]) == [[0, 1]]
+
+    def test_to_value_map(self):
+        assert enum.to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}

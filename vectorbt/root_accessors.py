@@ -37,22 +37,22 @@ from vectorbt.generic.accessors import Generic_SRAccessor, Generic_DFAccessor
 class Vbt_SRAccessor(DirNamesMixin, Generic_SRAccessor):
     """The main vectorbt accessor for `pd.Series`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         self._obj = obj
 
         DirNamesMixin.__init__(self)
-        Generic_SRAccessor.__init__(self, obj, freq=freq)
+        Generic_SRAccessor.__init__(self, obj, **kwargs)
 
 
 @pd.api.extensions.register_dataframe_accessor("vbt")
 class Vbt_DFAccessor(DirNamesMixin, Generic_DFAccessor):
     """The main vectorbt accessor for `pd.DataFrame`."""
 
-    def __init__(self, obj, freq=None):
+    def __init__(self, obj, **kwargs):
         self._obj = obj
 
         DirNamesMixin.__init__(self)
-        Generic_DFAccessor.__init__(self, obj, freq=freq)
+        Generic_DFAccessor.__init__(self, obj, **kwargs)
 
 
 def register_dataframe_accessor(name):

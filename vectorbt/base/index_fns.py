@@ -5,7 +5,6 @@ import pandas as pd
 from numba import njit
 from collections.abc import Iterable
 
-from vectorbt import defaults
 from vectorbt.utils import checks
 
 
@@ -63,10 +62,12 @@ def tile_index(index, n):
 
 def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None):
     """Stack each index in `indexes` on top of each other, from top to bottom."""
+    from vectorbt import settings
+
     if drop_duplicates is None:
-        drop_duplicates = defaults.broadcasting['drop_duplicates']
+        drop_duplicates = settings.broadcasting['drop_duplicates']
     if drop_redundant is None:
-        drop_redundant = defaults.broadcasting['drop_redundant']
+        drop_redundant = settings.broadcasting['drop_redundant']
 
     levels = []
     for i in range(len(indexes)):
@@ -180,8 +181,10 @@ def drop_duplicate_levels(index, keep=None):
     """Drop levels in `index` with the same name and values.
 
     Set `keep` to 'last' to keep last levels, otherwise 'first'."""
+    from vectorbt import settings
+
     if keep is None:
-        keep = defaults.broadcasting['keep']
+        keep = settings.broadcasting['keep']
     if not isinstance(index, pd.MultiIndex):
         return index
 
@@ -233,8 +236,10 @@ def align_index_to(index1, index2):
             name2 = index2.names[j]
             if name1 == name2:
                 if set(index2.levels[j]).issubset(set(index1.levels[i])):
+                    if i in mapper:
+                        raise ValueError(f"There are multiple candidate levels with name {name1} in second index")
                     mapper[i] = j
-                    break
+                    continue
                 if name1 is not None:
                     raise ValueError(f"Level {name1} in second index contains values not in first index")
     if len(mapper) == 0:
@@ -312,6 +317,8 @@ def pick_levels(index, required_levels=[], optional_levels=[]):
             checks.assert_type(level, (int, str))
             if isinstance(level, str):
                 level = index.names.index(level)
+            if level < 0:
+                level = index.nlevels + level
             levels_left.remove(level)
         _optional_levels.append(level)
 
@@ -322,6 +329,8 @@ def pick_levels(index, required_levels=[], optional_levels=[]):
             checks.assert_type(level, (int, str))
             if isinstance(level, str):
                 level = index.names.index(level)
+            if level < 0:
+                level = index.nlevels + level
             levels_left.remove(level)
         _required_levels.append(level)
     for i, level in enumerate(_required_levels):

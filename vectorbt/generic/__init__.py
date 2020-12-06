@@ -1,4 +1,4 @@
-"""Modules for working with data of any type.
+"""Modules for working with any time series.
 
 In contrast to the `vectorbt.base` sub-package, focuses on the data itself.
 
@@ -28,16 +28,29 @@ specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.return
 
 ## Plotting
 
-`vectorbt.generic.plotting` provides functions for visualizing data in an efficient and convenient way.
+Module `vectorbt.generic.plotting` provides functions for visualizing data in an efficient and convenient way.
 Each creates a figure widget that is compatible with ipywidgets and enables interactive data visualization
 in Jupyter Notebook and JupyterLab environments. For more details on using Plotly, see
 [Getting Started with Plotly in Python](https://plotly.com/python/getting-started/).
 
 The module can be accessed directly via `vbt.plotting`.
 
+## Drawdowns
+
+Class `vectorbt.generic.drawdowns.Drawdowns` accepts drawdown records and the corresponding time series
+to analyze the periods of drawdown. Using `vectorbt.generic.drawdowns.Drawdowns.from_ts`, you can generate
+drawdown records for any time series and analyze them right away.
+
+Moreover, all time series accessors have a method `drawdowns`:
+
+```python-repl
+>>> price.vbt.drawdowns().current_drawdown()
+-0.4473361334272673
+```
+
 ## Numba-compiled functions
 
-`vectorbt.generic.nb` provides an arsenal of Numba-compiled functions that are used by accessors
+Module `vectorbt.generic.nb` provides an arsenal of Numba-compiled functions that are used by accessors
 and in many other parts of the backtesting pipeline, such as technical indicators.
 These only accept NumPy arrays and other Numba-compatible types.
 
@@ -48,5 +61,17 @@ The module can be accessed directly via `vbt.nb`.
 >>> vbt.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
 array([nan, 1.5, 2.5, 3.5])
 ```
+
+## Enums
+
+Module `vectorbt.generic.enums` defines enums and other schemas for `vectorbt.generic`.
 """
 
+from vectorbt.generic.enums import *
+from vectorbt.generic.drawdowns import Drawdowns
+
+__all__ = [
+    'Drawdowns'
+]
+
+__pdoc__ = {k: False for k in __all__}

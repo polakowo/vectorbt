@@ -4,8 +4,8 @@ from datetime import datetime
 import pytest
 import empyrical
 
-from vectorbt import defaults
-from vectorbt.records.drawdowns import Drawdowns
+from vectorbt import settings
+from vectorbt.generic.drawdowns import Drawdowns
 
 from tests.utils import isclose
 
@@ -25,9 +25,12 @@ ts = pd.DataFrame({
 }, index=index)
 ret = ts.pct_change()
 
-defaults.returns['year_freq'] = '252 days'  # same as empyrical
+settings.returns['year_freq'] = '252 days'  # same as empyrical
 
-factor_returns = pd.DataFrame({
+seed = 42
+
+np.random.seed(seed)
+benchmark_rets = pd.DataFrame({
     'a': ret['a'] * np.random.uniform(0.8, 1.2, ret.shape[0]),
     'b': ret['b'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 2,
     'c': ret['c'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 3
@@ -39,17 +42,17 @@ factor_returns = pd.DataFrame({
 
 class TestAccessors:
     def test_freq(self):
-        assert ret.vbt.returns.freq == day_dt
-        assert ret['a'].vbt.returns.freq == day_dt
-        assert ret.vbt.returns(freq='2D').freq == day_dt * 2
-        assert ret['a'].vbt.returns(freq='2D').freq == day_dt * 2
-        assert pd.Series([1, 2, 3]).vbt.returns.freq is None
-        assert pd.Series([1, 2, 3]).vbt.returns(freq='3D').freq == day_dt * 3
-        assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).freq == day_dt * 4
+        assert ret.vbt.returns.wrapper.freq == day_dt
+        assert ret['a'].vbt.returns.wrapper.freq == day_dt
+        assert ret.vbt.returns(freq='2D').wrapper.freq == day_dt * 2
+        assert ret['a'].vbt.returns(freq='2D').wrapper.freq == day_dt * 2
+        assert pd.Series([1, 2, 3]).vbt.returns.wrapper.freq is None
+        assert pd.Series([1, 2, 3]).vbt.returns(freq='3D').wrapper.freq == day_dt * 3
+        assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
     def test_year_freq(self):
-        assert ret.vbt.returns.year_freq == pd.to_timedelta(defaults.returns['year_freq'])
-        assert ret['a'].vbt.returns.year_freq == pd.to_timedelta(defaults.returns['year_freq'])
+        assert ret.vbt.returns.year_freq == pd.to_timedelta(settings.returns['year_freq'])
+        assert ret['a'].vbt.returns.year_freq == pd.to_timedelta(settings.returns['year_freq'])
         assert ret['a'].vbt.returns(year_freq='365 days').year_freq == pd.to_timedelta('365 days')
         assert ret.vbt.returns(year_freq='365 days').year_freq == pd.to_timedelta('365 days')
 
@@ -251,22 +254,22 @@ class TestAccessors:
         )
 
     def test_information_ratio(self):
-        res_a = empyrical.excess_sharpe(ret['a'], factor_returns['a'])
-        res_b = empyrical.excess_sharpe(ret['b'], factor_returns['b'])
-        res_c = empyrical.excess_sharpe(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.information_ratio(factor_returns['a']), res_a)
+        res_a = empyrical.excess_sharpe(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.excess_sharpe(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.excess_sharpe(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.information_ratio(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.information_ratio(factor_returns),
+            ret.vbt.returns.information_ratio(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
     def test_beta(self):
-        res_a = empyrical.beta(ret['a'], factor_returns['a'])
-        res_b = empyrical.beta(ret['b'], factor_returns['b'])
-        res_c = empyrical.beta(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.beta(factor_returns['a']), res_a)
+        res_a = empyrical.beta(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.beta(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.beta(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.beta(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.beta(factor_returns),
+            ret.vbt.returns.beta(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
@@ -275,12 +278,12 @@ class TestAccessors:
         [0.01, 0.02, 0.03],
     )
     def test_alpha(self, test_risk_free):
-        res_a = empyrical.alpha(ret['a'], factor_returns['a'], risk_free=test_risk_free)
-        res_b = empyrical.alpha(ret['b'], factor_returns['b'], risk_free=test_risk_free)
-        res_c = empyrical.alpha(ret['c'], factor_returns['c'], risk_free=test_risk_free)
-        assert isclose(ret['a'].vbt.returns.alpha(factor_returns['a'], risk_free=test_risk_free), res_a)
+        res_a = empyrical.alpha(ret['a'], benchmark_rets['a'], risk_free=test_risk_free)
+        res_b = empyrical.alpha(ret['b'], benchmark_rets['b'], risk_free=test_risk_free)
+        res_c = empyrical.alpha(ret['c'], benchmark_rets['c'], risk_free=test_risk_free)
+        assert isclose(ret['a'].vbt.returns.alpha(benchmark_rets['a'], risk_free=test_risk_free), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.alpha(factor_returns, risk_free=test_risk_free),
+            ret.vbt.returns.alpha(benchmark_rets, risk_free=test_risk_free),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
@@ -325,32 +328,32 @@ class TestAccessors:
         )
 
     def test_capture(self):
-        res_a = empyrical.capture(ret['a'], factor_returns['a'])
-        res_b = empyrical.capture(ret['b'], factor_returns['b'])
-        res_c = empyrical.capture(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.capture(factor_returns['a']), res_a)
+        res_a = empyrical.capture(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.capture(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.capture(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.capture(factor_returns),
+            ret.vbt.returns.capture(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
     def test_up_capture(self):
-        res_a = empyrical.up_capture(ret['a'], factor_returns['a'])
-        res_b = empyrical.up_capture(ret['b'], factor_returns['b'])
-        res_c = empyrical.up_capture(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.up_capture(factor_returns['a']), res_a)
+        res_a = empyrical.up_capture(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.up_capture(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.up_capture(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.up_capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.up_capture(factor_returns),
+            ret.vbt.returns.up_capture(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
     def test_down_capture(self):
-        res_a = empyrical.down_capture(ret['a'], factor_returns['a'])
-        res_b = empyrical.down_capture(ret['b'], factor_returns['b'])
-        res_c = empyrical.down_capture(ret['c'], factor_returns['c'])
-        assert isclose(ret['a'].vbt.returns.down_capture(factor_returns['a']), res_a)
+        res_a = empyrical.down_capture(ret['a'], benchmark_rets['a'])
+        res_b = empyrical.down_capture(ret['b'], benchmark_rets['b'])
+        res_c = empyrical.down_capture(ret['c'], benchmark_rets['c'])
+        assert isclose(ret['a'].vbt.returns.down_capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
-            ret.vbt.returns.down_capture(factor_returns),
+            ret.vbt.returns.down_capture(benchmark_rets),
             pd.Series([res_a, res_b, res_c], index=ret.columns)
         )
 
@@ -396,11 +399,151 @@ class TestAccessors:
 
     def test_drawdowns(self):
         assert type(ret['a'].vbt.returns.drawdowns()) is Drawdowns
-        assert ret['a'].vbt.returns.drawdowns().wrapper.freq == ret['a'].vbt.returns.freq
+        assert ret['a'].vbt.returns.drawdowns().wrapper.freq == ret['a'].vbt.wrapper.freq
         assert ret['a'].vbt.returns.drawdowns().wrapper.ndim == ret['a'].ndim
         assert ret.vbt.returns.drawdowns().wrapper.ndim == ret.ndim
         assert isclose(ret['a'].vbt.returns.drawdowns().max_drawdown(), ret['a'].vbt.returns.max_drawdown())
         pd.testing.assert_series_equal(
             ret.vbt.returns.drawdowns().max_drawdown(),
             ret.vbt.returns.max_drawdown()
+        )
+
+    def test_stats(self):
+        pd.testing.assert_series_equal(
+            ret['b'].vbt.returns.stats(
+                benchmark_rets['b'],
+                levy_alpha=2.,
+                risk_free=0.01,
+                required_return=0.1
+            ),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                -80.0,
+                -100.72986288899584,
+                -100.0,
+                208.74625745148103,
+                -39.93844058228336,
+                -1.25,
+                -80.0,
+                0.0,
+                -15.323368643952458,
+                -1.0653693625282994,
+                0.6452153997516223,
+                0.43684210526315786,
+                0.0,
+                -0.47500000000000003,
+                -0.9999978857530595,
+                0.4123019930790345
+            ], index=[
+                'Start',
+                'End',
+                'Duration',
+                'Total Return [%]',
+                'Benchmark Return [%]',
+                'Annual Return [%]',
+                'Annual Volatility [%]',
+                'Sharpe Ratio',
+                'Calmar Ratio',
+                'Max. Drawdown [%]',
+                'Omega Ratio',
+                'Sortino Ratio',
+                'Skew',
+                'Kurtosis',
+                'Tail Ratio',
+                'Common Sense Ratio',
+                'Value at Risk',
+                'Alpha',
+                'Beta'
+            ], name='b')
+        )
+        pd.testing.assert_frame_equal(
+            ret.vbt.returns.stats(
+                benchmark_rets,
+                levy_alpha=[1., 2., 3.],
+                risk_free=[0., 0.01, 0.02],
+                required_return=[0., 0.1, 0.2]
+            ),
+            pd.DataFrame([[
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                400.0,
+                451.8597134178033,
+                1.690784346944584e+37,
+                8465.370635713476,
+                24.612379624271007,
+                np.nan,
+                0.0,
+                np.inf,
+                np.inf,
+                1.4693345482106241,
+                2.030769230769236,
+                3.5238095238095237,
+                5.958001984471391e+35,
+                0.26249999999999996,
+                35691351.69391792,
+                0.7853755858374825
+            ], [
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                -80.0,
+                -100.72986288899584,
+                -100.0,
+                208.74625745148103,
+                -39.93844058228336,
+                -1.25,
+                -80.0,
+                0.0,
+                -15.323368643952458,
+                -1.0653693625282994,
+                0.6452153997516223,
+                0.43684210526315786,
+                0.0,
+                -0.47500000000000003,
+                -0.9999978857530595,
+                0.4123019930790345
+            ], [
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                0.0,
+                -143.81732886778948,
+                0.0,
+                446.63407039155584,
+                3.292658500361067,
+                0.0,
+                -66.66666666666667,
+                1.7951447662614517,
+                -1.2025797235076259,
+                0.3666479606152471,
+                -3.438271604938274,
+                1.947368421052631,
+                1.947368421052631,
+                -0.47500000000000003,
+                -0.9999999997371561,
+                0.30840682076341036
+            ]], columns=[
+                'Start',
+                'End',
+                'Duration',
+                'Total Return [%]',
+                'Benchmark Return [%]',
+                'Annual Return [%]',
+                'Annual Volatility [%]',
+                'Sharpe Ratio',
+                'Calmar Ratio',
+                'Max. Drawdown [%]',
+                'Omega Ratio',
+                'Sortino Ratio',
+                'Skew',
+                'Kurtosis',
+                'Tail Ratio',
+                'Common Sense Ratio',
+                'Value at Risk',
+                'Alpha',
+                'Beta'
+            ], index=ret.columns)
         )

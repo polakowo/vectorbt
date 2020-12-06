@@ -14,6 +14,8 @@
 from numba import njit
 import numpy as np
 
+from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
+
 
 @njit(cache=True)
 def prepend_1d_nb(a, n, value):
@@ -54,7 +56,7 @@ def set_by_mask_nb(a, mask, value):
 def set_by_mask_mult_1d_nb(a, mask, values):
     """Set each element in one array to the corresponding element in another by boolean mask.
 
-    `values` must be of the same shape as in `a`."""
+    `values` should be of the same shape as in `a`."""
     out = a.astype(np.float_)
     out[mask] = values[mask]
     return out
@@ -491,7 +493,7 @@ def rolling_std_1d_nb(a, window, minp=None, ddof=0):
         else:
             mean = window_cumsum / window_len
             out[i] = np.sqrt(np.abs(window_cumsum_sq - 2 * window_cumsum *
-                                       mean + window_len * mean ** 2) / (window_len - ddof))
+                                    mean + window_len * mean ** 2) / (window_len - ddof))
     return out
 
 
@@ -744,13 +746,13 @@ def expanding_std_nb(a, minp=1, ddof=0):
 def rolling_apply_nb(a, window, apply_func_nb, *args):
     """Provide rolling window calculations.
 
-    `apply_func_nb` must accept index of the current column, index of the current row, 
-    the array, and `*args`. Must return a single value."""
+    `apply_func_nb` should accept index of the row, index of the column,
+    the array, and `*args`. Should return a single value."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
         for i in range(a.shape[0]):
             window_a = a[max(0, i + 1 - window):i + 1, col]
-            out[i, col] = apply_func_nb(col, i, window_a, *args)
+            out[i, col] = apply_func_nb(i, col, window_a, *args)
     return out
 
 
@@ -758,8 +760,8 @@ def rolling_apply_nb(a, window, apply_func_nb, *args):
 def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
-    `apply_func_nb` must accept index of the current row, the 2-dim array, and `*args`. 
-    Must return a single value or an array of shape `a.shape[1]`."""
+    `apply_func_nb` should accept index of the row, the 2-dim array, and `*args`.
+    Should return a single value or an array of shape `a.shape[1]`."""
     out = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
         window_a = a[max(0, i + 1 - window):i + 1, :]
@@ -783,16 +785,16 @@ def expanding_apply_matrix_nb(a, apply_func_nb, *args):
 def groupby_apply_nb(a, groups, apply_func_nb, *args):
     """Provide group-by calculations.
 
-    `groups` must be a dictionary, where each key is an index that points to an element in the new array 
+    `groups` should be a dictionary, where each key is an index that points to an element in the new array
     where a group-by result will be stored, while the value should be an array of indices in `a`
     to apply `apply_func_nb` on.
 
-    `apply_func_nb` must accept index of the current column, indices of the current group, 
-    the array, and `*args`. Must return a single value."""
+    `apply_func_nb` should accept indices of the group, index of the column,
+    the array, and `*args`. Should return a single value."""
     out = np.empty((len(groups), a.shape[1]), dtype=np.float_)
     for col in range(a.shape[1]):
         for i, idxs in groups.items():
-            out[i, col] = apply_func_nb(col, idxs, a[idxs, col], *args)
+            out[i, col] = apply_func_nb(idxs, col, a[idxs, col], *args)
     return out
 
 
@@ -800,8 +802,8 @@ def groupby_apply_nb(a, groups, apply_func_nb, *args):
 def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
     """`groupby_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
-    `apply_func_nb` must accept indices of the current group, the 2-dim array, and `*args`. 
-    Must return a single value or an array of shape `a.shape[1]`."""
+    `apply_func_nb` should accept indices of the group, the 2-dim array, and `*args`.
+    Should return a single value or an array of shape `a.shape[1]`."""
     out = np.empty((len(groups), a.shape[1]), dtype=np.float_)
     for i, idxs in groups.items():
         out[i, :] = apply_func_nb(idxs, a[idxs, :], *args)
@@ -815,14 +817,14 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
 def applymap_nb(a, map_func_nb, *args):
     """Map non-NA elements elementwise using `map_func_nb`.
 
-    `map_func_nb` must accept index of the current column, index of the current element, 
-    the element itself, and `*args`. Must return an array of same size."""
+    `map_func_nb` should accept index of the row, index of the column,
+    the element itself, and `*args`. Should return an array of same size."""
     out = np.full_like(a, np.nan, dtype=np.float_)
 
     for col in range(out.shape[1]):
         idxs = np.flatnonzero(~np.isnan(a[:, col]))
         for i in idxs:
-            out[i, col] = map_func_nb(col, i, a[i, col], *args)
+            out[i, col] = map_func_nb(i, col, a[i, col], *args)
     return out
 
 
@@ -831,32 +833,32 @@ def filter_nb(a, filter_func_nb, *args):
     """Filter non-NA elements elementwise using `filter_func_nb`. 
     The filtered out elements will become NA.
 
-    `filter_func_nb` must accept index of the current column, index of the current element, 
-    the element itself, and `*args`. Must return a boolean value."""
+    `filter_func_nb` should accept index of the row, index of the column,
+    the element itself, and `*args`. Should return a boolean value."""
     out = a.astype(np.float_)
 
     for col in range(out.shape[1]):
         idxs = np.flatnonzero(~np.isnan(a[:, col]))
         for i in idxs:
-            if not filter_func_nb(col, i, a[i, col], *args):
+            if not filter_func_nb(i, col, a[i, col], *args):
                 out[i, col] = np.nan
     return out
 
 
 @njit
-def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
+def apply_and_reduce_nb(a, apply_func_nb, apply_args, reduce_func_nb, reduce_args):
     """Apply `apply_func_nb` on each column and reduce into a single value using `reduce_func_nb`.
 
-    `apply_func_nb` must accept index of the current column, the column itself, and `*args`. 
-    Must return an array.
+    `apply_func_nb` should accept index of the column, the column itself, and `*apply_args`.
+    Should return an array.
 
-    `reduce_func_nb` must accept index of the current column, the array of results from 
-    `apply_func_nb` for that column, and `*args`. Must return a single value."""
+    `reduce_func_nb` should accept index of the column, the array of results from
+    `apply_func_nb` for that column, and `*reduce_args`. Should return a single value."""
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
-        mapped = apply_func_nb(col, a[:, col], *args)
-        out[col] = reduce_func_nb(col, mapped, *args)
+        mapped = apply_func_nb(col, a[:, col], *apply_args)
+        out[col] = reduce_func_nb(col, mapped, *reduce_args)
     return out
 
 
@@ -864,8 +866,8 @@ def apply_and_reduce_nb(a, apply_func_nb, reduce_func_nb, *args):
 def reduce_nb(a, reduce_func_nb, *args):
     """Reduce each column into a single value using `reduce_func_nb`.
 
-    `reduce_func_nb` must accept index of the current column, the array, and `*args`. 
-    Must return a single value."""
+    `reduce_func_nb` should accept index of the column, the array, and `*args`.
+    Should return a single value."""
     out = np.full(a.shape[1], np.nan, dtype=np.float_)
 
     for col in range(a.shape[1]):
@@ -877,10 +879,10 @@ def reduce_nb(a, reduce_func_nb, *args):
 def reduce_to_array_nb(a, reduce_func_nb, *args):
     """Reduce each column into an array of values using `reduce_func_nb`.
 
-    `reduce_func_nb` same as for `reduce_nb` but must return an array.
+    `reduce_func_nb` same as for `reduce_nb` but should return an array.
 
     !!! note
-        Output of `reduce_func_nb` must be strictly homogeneous."""
+        Output of `reduce_func_nb` should be strictly homogeneous."""
     out_inited = False
     for col in range(a.shape[1]):
         col_out = reduce_func_nb(col, a[:, col], *args)
@@ -892,8 +894,126 @@ def reduce_to_array_nb(a, reduce_func_nb, *args):
     return out
 
 
+@njit
+def reduce_grouped_nb(a, group_lens, reduce_func_nb, *args):
+    """Reduce each group of columns into a single value using `reduce_func_nb`.
+
+    `reduce_func_nb` should accept index of the group, the array, and `*args`.
+    Should return a single value."""
+    out = np.empty(len(group_lens), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        out[group] = reduce_func_nb(group, a[:, from_col:to_col], *args)
+        from_col = to_col
+    return out
+
+
+@njit(cache=True)
+def flatten_forder_nb(a):
+    """Flatten `a` in F order."""
+    out = np.empty(a.shape[0] * a.shape[1], dtype=a.dtype)
+    for col in range(a.shape[1]):
+        out[col * a.shape[0]:(col + 1) * a.shape[0]] = a[:, col]
+    return out
+
+
+@njit
+def flat_reduce_grouped_nb(a, group_lens, in_c_order, reduce_func_nb, *args):
+    """Same as `reduce_grouped_nb` but passes flattened array."""
+    out = np.empty(len(group_lens), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        if in_c_order:
+            out[group] = reduce_func_nb(group, a[:, from_col:to_col].flatten(), *args)
+        else:
+            out[group] = reduce_func_nb(group, flatten_forder_nb(a[:, from_col:to_col]), *args)
+        from_col = to_col
+    return out
+
+
+@njit
+def reduce_grouped_to_array_nb(a, group_lens, reduce_func_nb, *args):
+    """Reduce each group of columns into an array of values using `reduce_func_nb`.
+
+    `reduce_func_nb` same as for `reduce_grouped_nb` but should return an array.
+
+    !!! note
+        Output of `reduce_func_nb` should be strictly homogeneous."""
+    out_inited = False
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        group_out = reduce_func_nb(group, a[:, from_col:to_col], *args)
+        if not out_inited:
+            out = np.full((group_out.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+            out_inited = True
+        out[:, group] = group_out
+        from_col = to_col
+    return out
+
+
+@njit
+def flat_reduce_grouped_to_array_nb(a, group_lens, in_c_order, reduce_func_nb, *args):
+    """Same as `reduce_grouped_to_array_nb` but passes flattened 1D array."""
+    out_inited = False
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        if in_c_order:
+            group_out = reduce_func_nb(group, a[:, from_col:to_col].flatten(), *args)
+        else:
+            group_out = reduce_func_nb(group, flatten_forder_nb(a[:, from_col:to_col]), *args)
+        if not out_inited:
+            out = np.full((group_out.shape[0], len(group_lens)), np.nan, dtype=np.float_)
+            out_inited = True
+        out[:, group] = group_out
+        from_col = to_col
+    return out
+
+
+@njit
+def squeeze_grouped_nb(a, group_lens, reduce_func_nb, *args):
+    """Squeeze each group of columns into a single column using `reduce_func_nb`.
+
+    `reduce_func_nb` should accept index of the row, index of the group,
+    the array, and `*args`. Should return a single value."""
+    out = np.empty((a.shape[0], len(group_lens)), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        for i in range(a.shape[0]):
+            out[i, group] = reduce_func_nb(i, group, a[i, from_col:to_col], *args)
+        from_col = to_col
+    return out
+
+
+# ############# Reshaping ############# #
+
+@njit(cache=True)
+def flatten_grouped_nb(a, group_lens, in_c_order):
+    """Flatten each group of columns."""
+    out = np.full((a.shape[0] * np.max(group_lens), len(group_lens)), np.nan, dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        group_len = to_col - from_col
+        for k in range(group_len):
+            if in_c_order:
+                out[k::np.max(group_lens), group] = a[:, from_col + k]
+            else:
+                out[k * a.shape[0]:(k + 1) * a.shape[0], group] = a[:, from_col + k]
+        from_col = to_col
+    return out
+
+
+# ############# Reducers ############# #
+
+
 @njit(cache=True)
 def nst_reduce_nb(col, a, n, *args):
+    """Return nst element."""
     if n >= a.shape[0]:
         raise ValueError("index is out of bounds")
     return a[n]
@@ -901,42 +1021,71 @@ def nst_reduce_nb(col, a, n, *args):
 
 @njit(cache=True)
 def min_reduce_nb(col, a, *args):
+    """Return min (ignores NaNs)."""
     return np.nanmin(a)
 
 
 @njit(cache=True)
 def max_reduce_nb(col, a, *args):
+    """Return max (ignores NaNs)."""
     return np.nanmax(a)
 
 
 @njit(cache=True)
 def mean_reduce_nb(col, a, *args):
+    """Return mean (ignores NaNs)."""
     return np.nanmean(a)
 
 
 @njit(cache=True)
 def median_reduce_nb(col, a, *args):
+    """Return median (ignores NaNs)."""
     return np.nanmedian(a)
 
 
 @njit(cache=True)
 def sum_reduce_nb(col, a, *args):
+    """Return sum (ignores NaNs)."""
     return np.nansum(a)
 
 
 @njit(cache=True)
 def count_reduce_nb(col, a, *args):
+    """Return count (ignores NaNs)."""
     return np.sum(~np.isnan(a))
 
 
 @njit(cache=True)
 def std_reduce_nb(col, a, ddof, *args):
+    """Return std (ignores NaNs)."""
     return nanstd_1d_nb(a, ddof=ddof)
 
 
 @njit(cache=True)
+def argmin_reduce_nb(col, a, *args):
+    """Return position of min."""
+    a = np.copy(a)
+    mask = np.isnan(a)
+    if np.all(mask):
+        raise ValueError("All-NaN slice encountered")
+    a[mask] = np.inf
+    return np.argmin(a)
+
+
+@njit(cache=True)
+def argmax_reduce_nb(col, a, *args):
+    """Return position of max."""
+    a = np.copy(a)
+    mask = np.isnan(a)
+    if np.all(mask):
+        raise ValueError("All-NaN slice encountered")
+    a[mask] = -np.inf
+    return np.argmax(a)
+
+
+@njit(cache=True)
 def describe_reduce_nb(col, a, perc, ddof, *args):
-    """Return descriptive statistics.
+    """Return descriptive statistics (ignores NaNs).
 
     Numba equivalent to `pd.Series(a).describe(perc)`."""
     a = a[~np.isnan(a)]
@@ -953,21 +1102,159 @@ def describe_reduce_nb(col, a, perc, ddof, *args):
     return out
 
 
+# ############# Drawdowns ############# #
+
 @njit(cache=True)
-def argmin_reduce_nb(col, a, *args):
-    a = np.copy(a)
-    mask = np.isnan(a)
-    if np.all(mask):
-        raise ValueError("All-NaN slice encountered")
-    a[mask] = np.inf
-    return np.argmin(a)
+def find_drawdowns_nb(ts):
+    """Find drawdows and store their information as records to an array.
+
+    ## Example
+
+    Find drawdowns in time series:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.generic.nb import find_drawdowns_nb
+
+    >>> ts = np.asarray([
+    ...     [1, 5, 1, 3],
+    ...     [2, 4, 2, 2],
+    ...     [3, 3, 3, 1],
+    ...     [4, 2, 2, 2],
+    ...     [5, 1, 1, 3]
+    ... ])
+    >>> records = find_drawdowns_nb(ts)
+
+    >>> pd.DataFrame.from_records(records)
+       id  col  start_idx  valley_idx  end_idx  status
+    0   0    1          0           4        4       0
+    1   1    2          2           4        4       0
+    2   2    3          0           2        4       1
+    ```
+    """
+    out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
+    ridx = 0
+
+    for col in range(ts.shape[1]):
+        drawdown_started = False
+        peak_idx = np.nan
+        valley_idx = np.nan
+        peak_val = ts[0, col]
+        valley_val = ts[0, col]
+        store_drawdown = False
+        status = -1
+
+        for i in range(ts.shape[0]):
+            cur_val = ts[i, col]
+
+            if not np.isnan(cur_val):
+                if np.isnan(peak_val) or cur_val >= peak_val:
+                    # Value increased
+                    if not drawdown_started:
+                        # If not running, register new peak
+                        peak_val = cur_val
+                        peak_idx = i
+                    else:
+                        # If running, potential recovery
+                        if cur_val >= peak_val:
+                            drawdown_started = False
+                            store_drawdown = True
+                            status = DrawdownStatus.Recovered
+                else:
+                    # Value decreased
+                    if not drawdown_started:
+                        # If not running, start new drawdown
+                        drawdown_started = True
+                        valley_val = cur_val
+                        valley_idx = i
+                    else:
+                        # If running, potential valley
+                        if cur_val < valley_val:
+                            valley_val = cur_val
+                            valley_idx = i
+
+                if i == ts.shape[0] - 1 and drawdown_started:
+                    # If still running, mark for save
+                    drawdown_started = False
+                    store_drawdown = True
+                    status = DrawdownStatus.Active
+
+                if store_drawdown:
+                    # Save drawdown to the records
+                    out[ridx]['id'] = ridx
+                    out[ridx]['col'] = col
+                    out[ridx]['start_idx'] = peak_idx
+                    out[ridx]['valley_idx'] = valley_idx
+                    out[ridx]['end_idx'] = i
+                    out[ridx]['status'] = status
+                    ridx += 1
+
+                    # Reset running vars for a new drawdown
+                    peak_idx = i
+                    valley_idx = i
+                    peak_val = cur_val
+                    valley_val = cur_val
+                    store_drawdown = False
+                    status = -1
+
+    return out[:ridx]
 
 
 @njit(cache=True)
-def argmax_reduce_nb(col, a, *args):
-    a = np.copy(a)
-    mask = np.isnan(a)
-    if np.all(mask):
-        raise ValueError("All-NaN slice encountered")
-    a[mask] = -np.inf
-    return np.argmax(a)
+def dd_start_value_map_nb(record, ts):
+    """`map_func_nb` that returns start value of a drawdown."""
+    return ts[record['start_idx'], record['col']]
+
+
+@njit(cache=True)
+def dd_valley_value_map_nb(record, ts):
+    """`map_func_nb` that returns valley value of a drawdown."""
+    return ts[record['valley_idx'], record['col']]
+
+
+@njit(cache=True)
+def dd_end_value_map_nb(record, ts):
+    """`map_func_nb` that returns end value of a drawdown.
+
+    This can be either recovery value or last value of an active drawdown."""
+    return ts[record['end_idx'], record['col']]
+
+
+@njit(cache=True)
+def dd_drawdown_map_nb(record, ts):
+    """`map_func_nb` that returns drawdown value of a drawdown."""
+    valley_val = dd_valley_value_map_nb(record, ts)
+    start_val = dd_start_value_map_nb(record, ts)
+    return (valley_val - start_val) / start_val
+
+
+@njit(cache=True)
+def dd_duration_map_nb(record):
+    """`map_func_nb` that returns total duration of a drawdown."""
+    return record['end_idx'] - record['start_idx']
+
+
+@njit(cache=True)
+def dd_ptv_duration_map_nb(record):
+    """`map_func_nb` that returns duration of the peak-to-valley (PtV) phase."""
+    return record['valley_idx'] - record['start_idx']
+
+
+@njit(cache=True)
+def dd_vtr_duration_map_nb(record):
+    """`map_func_nb` that returns duration of the valley-to-recovery (VtR) phase."""
+    return record['end_idx'] - record['valley_idx']
+
+
+@njit(cache=True)
+def dd_vtr_duration_ratio_map_nb(record):
+    """`map_func_nb` that returns ratio of VtR duration to total duration."""
+    return dd_vtr_duration_map_nb(record) / dd_duration_map_nb(record)
+
+
+@njit(cache=True)
+def dd_recovery_return_map_nb(record, ts):
+    """`map_func_nb` that returns recovery return of a drawdown."""
+    end_val = dd_end_value_map_nb(record, ts)
+    valley_val = dd_valley_value_map_nb(record, ts)
+    return (end_val - valley_val) / valley_val

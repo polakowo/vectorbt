@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
-from vectorbt import defaults
 from vectorbt.utils import checks
 from vectorbt.base import index_fns, array_wrapper
 
@@ -110,7 +109,7 @@ def tile(arg, n, axis=1):
         raise ValueError("Only axis 0 and 1 are supported")
 
 
-def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
+def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=None, **kwargs):
     """Produce a broadcast index/columns.
 
     Args:
@@ -120,17 +119,21 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
 
             Accepts the following values:
 
-            * `'default'` - take the value from `vectorbt.defaults.broadcasting`
+            * 'default' - take the value from `vectorbt.settings.broadcasting`
+            * 'strict' - ensure that all pandas objects have the same index/columns
+            * 'stack' - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
+            * 'ignore' - ignore any index/columns
+            * integer - use the index/columns of the i-nth object in `args`
             * None - use the original index/columns of the objects in `args`
-            * `int` - use the index/columns of the i-nth object in `args`
-            * `'strict'` - ensure that all pandas objects have the same index/columns
-            * `'stack'` - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
+        ignore_sr_names (bool): Whether to ignore Series names if they are in conflict.
+
+            Conflicting Series names are those that are different but not None.
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
-    For defaults, see `vectorbt.defaults.broadcasting`.
+    For defaults, see `vectorbt.settings.broadcasting`.
 
     !!! note
         Series names are treated as columns with a single element but without a name.
@@ -138,11 +141,15 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
         with one column prior to broadcasting. If the name of a Series is not that important,
         better to drop it altogether by setting it to None.
     """
+    from vectorbt import settings
+
+    if ignore_sr_names is None:
+        ignore_sr_names = settings.broadcasting['ignore_sr_names']
     index_str = 'columns' if axis == 1 else 'index'
+    to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
+    # maxlen stores the length of the longest index
+    maxlen = to_shape_2d[1] if axis == 1 else to_shape_2d[0]
     new_index = None
-    if axis == 1 and len(to_shape) == 1:
-        to_shape = (to_shape[0], 1)
-    maxlen = to_shape[1] if axis == 1 else to_shape[0]
 
     if index_from is not None:
         if isinstance(index_from, int):
@@ -151,38 +158,57 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
                 raise TypeError(f"Argument under index {index_from} must be a pandas object")
             new_index = index_fns.get_index(args[index_from], axis)
         elif isinstance(index_from, str):
-            if index_from in ('stack', 'strict'):
-                # If pandas objects have different index/columns, stack them together
-                # maxlen stores the length of the longest index
+            if index_from == 'ignore':
+                # Ignore index/columns
+                new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
+            elif index_from in ('stack', 'strict'):
+                # Check whether all indexes/columns are equal
+                last_index = None  # of type pd.Index
+                index_conflict = False
                 for arg in args:
                     if checks.is_pandas(arg):
                         index = index_fns.get_index(arg, axis)
-                        if checks.is_default_index(index):
-                            # ignore simple ranges without name
-                            continue
-                        if new_index is None:
-                            new_index = index
-                        else:
-                            if index_from == 'strict':
-                                # If pandas objects have different index/columns, raise an exception
-                                if not pd.Index.equals(index, new_index):
-                                    raise ValueError(
-                                        f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
-                            # Broadcasting index must follow the rules of a regular broadcasting operation
-                            # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
-                            # 1. rule: if indexes are of the same length, they are simply stacked
-                            # 2. rule: if index has one element, it gets repeated and then stacked
-
-                            if pd.Index.equals(index, new_index):
+                        if last_index is not None:
+                            if not pd.Index.equals(index, last_index):
+                                index_conflict = True
+                        last_index = index
+                        continue
+                if not index_conflict:
+                    new_index = last_index
+                else:
+                    # If pandas objects have different index/columns, stack them together
+                    for arg in args:
+                        if checks.is_pandas(arg):
+                            index = index_fns.get_index(arg, axis)
+                            if axis == 1 and checks.is_series(arg) and ignore_sr_names:
+                                # ignore Series name
                                 continue
-                            if len(index) != len(new_index):
-                                if len(index) > 1 and len(new_index) > 1:
-                                    raise ValueError("Indexes could not be broadcast together")
-                                if len(index) > len(new_index):
-                                    new_index = index_fns.repeat_index(new_index, len(index))
-                                elif len(index) < len(new_index):
-                                    index = index_fns.repeat_index(index, len(new_index))
-                            new_index = index_fns.stack_indexes(new_index, index, **kwargs)
+                            if checks.is_default_index(index):
+                                # ignore simple ranges without name
+                                continue
+                            if new_index is None:
+                                new_index = index
+                            else:
+                                if index_from == 'strict':
+                                    # If pandas objects have different index/columns, raise an exception
+                                    if not pd.Index.equals(index, new_index):
+                                        raise ValueError(
+                                            f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
+                                # Broadcasting index must follow the rules of a regular broadcasting operation
+                                # https://docs.scipy.org/doc/numpy/user/basics.broadcasting.html#general-broadcasting-rules
+                                # 1. rule: if indexes are of the same length, they are simply stacked
+                                # 2. rule: if index has one element, it gets repeated and then stacked
+
+                                if pd.Index.equals(index, new_index):
+                                    continue
+                                if len(index) != len(new_index):
+                                    if len(index) > 1 and len(new_index) > 1:
+                                        raise ValueError("Indexes could not be broadcast together")
+                                    if len(index) > len(new_index):
+                                        new_index = index_fns.repeat_index(new_index, len(index))
+                                    elif len(index) < len(new_index):
+                                        index = index_fns.repeat_index(index, len(new_index))
+                                new_index = index_fns.stack_indexes(new_index, index, **kwargs)
             else:
                 raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
         else:
@@ -190,12 +216,16 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, **kwargs):
         if new_index is not None:
             if maxlen > len(new_index):
                 if index_from == 'strict':
-                    raise ValueError(f"Broadcasting {index_str} is not allowed for {index_str}_from=strict")
+                    raise ValueError(f"Broadcasting {index_str} is not allowed when {index_str}_from=strict")
                 # This happens only when some numpy object is longer than the new pandas index
                 # In this case, new pandas index (one element) should be repeated to match this length.
                 if maxlen > 1 and len(new_index) > 1:
                     raise ValueError("Indexes could not be broadcast together")
                 new_index = index_fns.repeat_index(new_index, maxlen)
+        elif index_from is not None:
+            # new_index=None can mean two things: 1) take original metadata or 2) reset index/columns
+            # In case when index_from is not None, we choose 2)
+            new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)
     return new_index
 
 
@@ -257,133 +287,136 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
         return_meta (bool): If True, will also return new shape, index and columns.
         **kwargs: Keyword arguments passed to `broadcast_index`.
 
-    For defaults, see `vectorbt.defaults.broadcasting`.
+    For defaults, see `vectorbt.settings.broadcasting`.
 
-    Example:
-        Without broadcasting index and columns:
-        ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import broadcast
+    ## Example
 
-        >>> v = 0
-        >>> a = np.array([1, 2, 3])
-        >>> sr = pd.Series([1, 2, 3], index=pd.Index(['x', 'y', 'z']), name='a')
-        >>> df = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]], 
-        ...     index=pd.Index(['x2', 'y2', 'z2']), 
-        ...     columns=pd.Index(['a2', 'b2', 'c2']))
+    Without broadcasting index and columns:
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import broadcast
 
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from=None,
-        ...     columns_from=None,
-        ... ): print(i)
-           0  1  2
-        0  0  0  0
-        1  0  0  0
-        2  0  0  0
-           0  1  2
-        0  1  2  3
-        1  1  2  3
-        2  1  2  3
-           a  a  a
-        x  1  1  1
-        y  2  2  2
-        z  3  3  3
-            a2  b2  c2
-        x2   1   2   3
-        y2   4   5   6
-        z2   7   8   9
-        ```
+    >>> v = 0
+    >>> a = np.array([1, 2, 3])
+    >>> sr = pd.Series([1, 2, 3], index=pd.Index(['x', 'y', 'z']), name='a')
+    >>> df = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+    ...     index=pd.Index(['x2', 'y2', 'z2']),
+    ...     columns=pd.Index(['a2', 'b2', 'c2']))
 
-        Taking new index and columns from position:
-        ```python-repl
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from=2,
-        ...     columns_from=3
-        ... ): print(i)
-           a2  b2  c2
-        x   0   0   0
-        y   0   0   0
-        z   0   0   0
-           a2  b2  c2
-        x   1   2   3
-        y   1   2   3
-        z   1   2   3
-           a2  b2  c2
-        x   1   1   1
-        y   2   2   2
-        z   3   3   3
-           a2  b2  c2
-        x   1   2   3
-        y   4   5   6
-        z   7   8   9
-        ```
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from=None,
+    ...     columns_from=None,
+    ... ): print(i)
+       0  1  2
+    0  0  0  0
+    1  0  0  0
+    2  0  0  0
+       0  1  2
+    0  1  2  3
+    1  1  2  3
+    2  1  2  3
+       a  a  a
+    x  1  1  1
+    y  2  2  2
+    z  3  3  3
+        a2  b2  c2
+    x2   1   2   3
+    y2   4   5   6
+    z2   7   8   9
+    ```
 
-        Broadcasting index and columns through stacking:
-        ```python-repl
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from='stack',
-        ...     columns_from='stack'
-        ... ): print(i)
-              a2  b2  c2
-        x x2   0   0   0
-        y y2   0   0   0
-        z z2   0   0   0
-              a2  b2  c2
-        x x2   1   2   3
-        y y2   1   2   3
-        z z2   1   2   3
-              a2  b2  c2
-        x x2   1   1   1
-        y y2   2   2   2
-        z z2   3   3   3
-              a2  b2  c2
-        x x2   1   2   3
-        y y2   4   5   6
-        z z2   7   8   9
-        ```
+    Taking new index and columns from position:
+    ```python-repl
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from=2,
+    ...     columns_from=3
+    ... ): print(i)
+       a2  b2  c2
+    x   0   0   0
+    y   0   0   0
+    z   0   0   0
+       a2  b2  c2
+    x   1   2   3
+    y   1   2   3
+    z   1   2   3
+       a2  b2  c2
+    x   1   1   1
+    y   2   2   2
+    z   3   3   3
+       a2  b2  c2
+    x   1   2   3
+    y   4   5   6
+    z   7   8   9
+    ```
 
-        Setting index and columns manually:
-        ```python-repl
-        >>> for i in broadcast(
-        ...     v, a, sr, df,
-        ...     index_from=['a', 'b', 'c'],
-        ...     columns_from=['d', 'e', 'f']
-        ... ): print(i)
-           d  e  f
-        a  0  0  0
-        b  0  0  0
-        c  0  0  0
-           d  e  f
-        a  1  2  3
-        b  1  2  3
-        c  1  2  3
-           d  e  f
-        a  1  1  1
-        b  2  2  2
-        c  3  3  3
-           d  e  f
-        a  1  2  3
-        b  4  5  6
-        c  7  8  9
-        ```
+    Broadcasting index and columns through stacking:
+    ```python-repl
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from='stack',
+    ...     columns_from='stack'
+    ... ): print(i)
+          a2  b2  c2
+    x x2   0   0   0
+    y y2   0   0   0
+    z z2   0   0   0
+          a2  b2  c2
+    x x2   1   2   3
+    y y2   1   2   3
+    z z2   1   2   3
+          a2  b2  c2
+    x x2   1   1   1
+    y y2   2   2   2
+    z z2   3   3   3
+          a2  b2  c2
+    x x2   1   2   3
+    y y2   4   5   6
+    z z2   7   8   9
+    ```
+
+    Setting index and columns manually:
+    ```python-repl
+    >>> for i in broadcast(
+    ...     v, a, sr, df,
+    ...     index_from=['a', 'b', 'c'],
+    ...     columns_from=['d', 'e', 'f']
+    ... ): print(i)
+       d  e  f
+    a  0  0  0
+    b  0  0  0
+    c  0  0  0
+       d  e  f
+    a  1  2  3
+    b  1  2  3
+    c  1  2  3
+       d  e  f
+    a  1  1  1
+    b  2  2  2
+    c  3  3  3
+       d  e  f
+    a  1  2  3
+    b  4  5  6
+    c  7  8  9
+    ```
     """
+    from vectorbt import settings
+
     is_pd = False
     is_2d = False
     args = list(args)
     if require_kwargs is None:
         require_kwargs = {}
     if align_index is None:
-        align_index = defaults.broadcasting['align_index']
+        align_index = settings.broadcasting['align_index']
     if align_columns is None:
-        align_columns = defaults.broadcasting['align_columns']
+        align_columns = settings.broadcasting['align_columns']
     if isinstance(index_from, str) and index_from == 'default':
-        index_from = defaults.broadcasting['index_from']
+        index_from = settings.broadcasting['index_from']
     if isinstance(columns_from, str) and columns_from == 'default':
-        columns_from = defaults.broadcasting['columns_from']
+        columns_from = settings.broadcasting['columns_from']
 
     # Convert to np.ndarray object if not numpy or pandas
     # Also check whether we broadcast to pandas and whether work on 2-dim data
@@ -510,24 +543,26 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
 
     Keyword arguments `**kwargs` are passed to `broadcast`.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import broadcast_to
+    ## Example
 
-        >>> a = np.array([1, 2, 3])
-        >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
+    ```python-repl
+    >>> import numpy as np
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import broadcast_to
 
-        >>> broadcast_to(a, sr)
-        x    1
-        y    2
-        z    3
-        Name: a, dtype: int64
+    >>> a = np.array([1, 2, 3])
+    >>> sr = pd.Series([4, 5, 6], index=pd.Index(['x', 'y', 'z']), name='a')
 
-        >>> broadcast_to(sr, a)
-        array([4, 5, 6])
-        ```"""
+    >>> broadcast_to(a, sr)
+    x    1
+    y    2
+    z    3
+    Name: a, dtype: int64
+
+    >>> broadcast_to(sr, a)
+    array([4, 5, 6])
+    ```
+    """
     if not checks.is_array(arg1):
         arg1 = np.asarray(arg1)
     if not checks.is_array(arg2):
@@ -548,18 +583,20 @@ def broadcast_to_array_of(arg1, arg2):
 
     `arg1` must be either a scalar, a 1-dim array, or have 1 dimension more than `arg2`.
 
-    Example:
-        ```python-repl
-        >>> import numpy as np
-        >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
+    ## Example
 
-        >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
-        [[[0.1 0.1]
-          [0.1 0.1]]
+    ```python-repl
+    >>> import numpy as np
+    >>> from vectorbt.base.reshape_fns import broadcast_to_array_of
 
-         [[0.2 0.2]
-          [0.2 0.2]]]
-        ```"""
+    >>> broadcast_to_array_of([0.1, 0.2], np.empty((2, 2)))
+    [[[0.1 0.1]
+      [0.1 0.1]]
+
+     [[0.2 0.2]
+      [0.2 0.2]]]
+    ```
+    """
     arg1 = np.asarray(arg1)
     arg2 = np.asarray(arg2)
     if arg1.ndim == arg2.ndim + 1:
@@ -599,31 +636,33 @@ def unstack_to_array(arg, levels=None):
 
     Use `levels` to specify what index levels to unstack and in which order.
 
-    Example:
-        ```python-repl
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import unstack_to_array
+    ## Example
 
-        >>> index = pd.MultiIndex.from_arrays(
-        ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
-        >>> sr = pd.Series([1, 2, 3, 4], index=index)
+    ```python-repl
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import unstack_to_array
 
-        >>> unstack_to_array(sr).shape
-        (2, 2, 4)
+    >>> index = pd.MultiIndex.from_arrays(
+    ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']])
+    >>> sr = pd.Series([1, 2, 3, 4], index=index)
 
-        >>> unstack_to_array(sr)
-        [[[ 1. nan nan nan]
-         [nan  2. nan nan]]
+    >>> unstack_to_array(sr).shape
+    (2, 2, 4)
 
-         [[nan nan  3. nan]
-        [nan nan nan  4.]]]
+    >>> unstack_to_array(sr)
+    [[[ 1. nan nan nan]
+     [nan  2. nan nan]]
 
-        >>> unstack_to_array(sr, levels=(2, 0))
-        [[ 1. nan]
-         [ 2. nan]
-         [nan  3.]
-         [nan  4.]]
-        ```"""
+     [[nan nan  3. nan]
+    [nan nan nan  4.]]]
+
+    >>> unstack_to_array(sr, levels=(2, 0))
+    [[ 1. nan]
+     [ 2. nan]
+     [nan  3.]
+     [nan  4.]]
+    ```
+    """
     checks.assert_type(arg, pd.Series)
     checks.assert_type(arg.index, pd.MultiIndex)
 
@@ -651,20 +690,22 @@ def make_symmetric(arg):
 
     Requires the index and columns to have the same number of levels.
 
-    Example:
-        ```python-repl
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import make_symmetric
+    ## Example
 
-        >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
+    ```python-repl
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import make_symmetric
 
-        >>> make_symmetric(df)
-             a    b    c    d
-        a  NaN  NaN  1.0  2.0
-        b  NaN  NaN  3.0  4.0
-        c  1.0  3.0  NaN  NaN
-        d  2.0  4.0  NaN  NaN
-        ```"""
+    >>> df = pd.DataFrame([[1, 2], [3, 4]], index=['a', 'b'], columns=['c', 'd'])
+
+    >>> make_symmetric(df)
+         a    b    c    d
+    a  NaN  NaN  1.0  2.0
+    b  NaN  NaN  3.0  4.0
+    c  1.0  3.0  NaN  NaN
+    d  2.0  4.0  NaN  NaN
+    ```
+    """
     checks.assert_type(arg, (pd.Series, pd.DataFrame))
     arg = to_2d(arg)
     if isinstance(arg.index, pd.MultiIndex) or isinstance(arg.columns, pd.MultiIndex):
@@ -704,24 +745,26 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     Use `index_levels` to specify what index levels will form new index, and `column_levels` 
     for new columns. Set `symmetric` to True to make DataFrame symmetric.
 
-    Example:
-        ```python-repl
-        >>> import pandas as pd
-        >>> from vectorbt.base.reshape_fns import unstack_to_df
+    ## Example
 
-        >>> index = pd.MultiIndex.from_arrays(
-        ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']], 
-        ...     names=['x', 'y', 'z'])
-        >>> sr = pd.Series([1, 2, 3, 4], index=index)
+    ```python-repl
+    >>> import pandas as pd
+    >>> from vectorbt.base.reshape_fns import unstack_to_df
 
-        >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
-        z      a    b    c    d
-        x y                    
-        1 3  1.0  NaN  NaN  NaN
-        1 4  NaN  2.0  NaN  NaN
-        2 3  NaN  NaN  3.0  NaN
-        2 4  NaN  NaN  NaN  4.0
-        ```"""
+    >>> index = pd.MultiIndex.from_arrays(
+    ...     [[1, 1, 2, 2], [3, 4, 3, 4], ['a', 'b', 'c', 'd']],
+    ...     names=['x', 'y', 'z'])
+    >>> sr = pd.Series([1, 2, 3, 4], index=index)
+
+    >>> unstack_to_df(sr, index_levels=(0, 1), column_levels=2)
+    z      a    b    c    d
+    x y
+    1 3  1.0  NaN  NaN  NaN
+    1 4  NaN  2.0  NaN  NaN
+    2 3  NaN  NaN  3.0  NaN
+    2 4  NaN  NaN  NaN  4.0
+    ```
+    """
     # Perform checks
     checks.assert_type(arg, (pd.Series, pd.DataFrame))
     if checks.is_frame(arg):
@@ -810,3 +853,4 @@ def flex_select_auto_nb(i, col, a, flex_2d):
         Slower since it must call `flex_choose_i_and_col_nb` each time."""
     flex_i, flex_col = flex_choose_i_and_col_nb(a, flex_2d)
     return flex_select_nb(i, col, a, flex_i, flex_col, flex_2d)
+

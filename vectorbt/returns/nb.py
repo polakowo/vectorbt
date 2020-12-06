@@ -17,7 +17,7 @@ from vectorbt.generic import nb as generic_nb
 
 
 @njit(cache=True)
-def total_return_apply_nb(col, idxs, returns):
+def total_return_apply_nb(idxs, col, returns):
     """Calculate total return from returns."""
     return generic_nb.product_1d_nb(returns + 1) - 1
 
@@ -268,34 +268,34 @@ def sortino_ratio_nb(returns, ann_factor, required_return):
 
 
 @njit(cache=True)
-def information_ratio_1d_nb(returns, factor_returns):
+def information_ratio_1d_nb(returns, benchmark_rets):
     """See `empyrical.excess_sharpe`."""
     if returns.shape[0] < 2:
         return np.nan
 
-    active_return = returns - factor_returns
+    active_return = returns - benchmark_rets
     return np.nanmean(active_return) / generic_nb.nanstd_1d_nb(active_return, ddof=1)
 
 
 @njit(cache=True)
-def information_ratio_nb(returns, factor_returns):
+def information_ratio_nb(returns, benchmark_rets):
     """2-dim version of `information_ratio_1d_nb`."""
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = information_ratio_1d_nb(returns[:, col], factor_returns[:, col])
+        out[col] = information_ratio_1d_nb(returns[:, col], benchmark_rets[:, col])
     return out
 
 
 @njit(cache=True)
-def beta_1d_nb(returns, factor_returns):
+def beta_1d_nb(returns, benchmark_rets):
     """See `empyrical.beta`."""
-    if factor_returns.shape[0] < 2:
+    if benchmark_rets.shape[0] < 2:
         return np.nan
 
     independent = np.where(
         np.isnan(returns),
         np.nan,
-        factor_returns,
+        benchmark_rets,
     )
     ind_residual = independent - np.nanmean(independent)
     covariances = np.nanmean(ind_residual * returns)
@@ -309,29 +309,29 @@ def beta_1d_nb(returns, factor_returns):
 
 
 @njit(cache=True)
-def beta_nb(returns, factor_returns):
+def beta_nb(returns, benchmark_rets):
     """2-dim version of `beta_1d_nb`."""
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = beta_1d_nb(returns[:, col], factor_returns[:, col])
+        out[col] = beta_1d_nb(returns[:, col], benchmark_rets[:, col])
     return out
 
 
 @njit(cache=True)
-def alpha_1d_nb(returns, factor_returns, ann_factor, risk_free=0.):
+def alpha_1d_nb(returns, benchmark_rets, ann_factor, risk_free=0.):
     """See `empyrical.alpha`."""
     if returns.shape[0] < 2:
         return np.nan
 
     adj_returns = returns - risk_free
-    adj_factor_returns = factor_returns - risk_free
-    beta = beta_1d_nb(returns, factor_returns)
-    alpha_series = adj_returns - (beta * adj_factor_returns)
+    adj_benchmark_rets = benchmark_rets - risk_free
+    beta = beta_1d_nb(returns, benchmark_rets)
+    alpha_series = adj_returns - (beta * adj_benchmark_rets)
     return (np.nanmean(alpha_series) + 1) ** ann_factor - 1
 
 
 @njit(cache=True)
-def alpha_nb(returns, factor_returns, ann_factor, risk_free):
+def alpha_nb(returns, benchmark_rets, ann_factor, risk_free):
     """2-dim version of `alpha_1d_nb`.
 
     `risk_free_arr` should be an array of shape `returns.shape[1]`."""
@@ -339,7 +339,7 @@ def alpha_nb(returns, factor_returns, ann_factor, risk_free):
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
         _risk_free = flex_select_auto_nb(0, col, risk_free_arr, True)
-        out[col] = alpha_1d_nb(returns[:, col], factor_returns[:, col], ann_factor, risk_free=_risk_free)
+        out[col] = alpha_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor, risk_free=_risk_free)
     return out
 
 
@@ -408,65 +408,65 @@ def conditional_value_at_risk_nb(returns, cutoff):
 
 
 @njit(cache=True)
-def capture_1d_nb(returns, factor_returns, ann_factor):
+def capture_1d_nb(returns, benchmark_rets, ann_factor):
     """See `empyrical.capture`."""
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
-    annualized_return2 = annualized_return_1d_nb(factor_returns, ann_factor)
+    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
     if annualized_return2 == 0.:
         return np.inf
     return annualized_return1 / annualized_return2
 
 
 @njit(cache=True)
-def capture_nb(returns, factor_returns, ann_factor):
+def capture_nb(returns, benchmark_rets, ann_factor):
     """2-dim version of `capture_1d_nb`."""
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
+        out[col] = capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
     return out
 
 
 @njit(cache=True)
-def up_capture_1d_nb(returns, factor_returns, ann_factor):
+def up_capture_1d_nb(returns, benchmark_rets, ann_factor):
     """See `empyrical.up_capture`."""
-    returns = returns[factor_returns > 0]
-    factor_returns = factor_returns[factor_returns > 0]
+    returns = returns[benchmark_rets > 0]
+    benchmark_rets = benchmark_rets[benchmark_rets > 0]
     if returns.shape[0] < 1:
         return np.nan
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
-    annualized_return2 = annualized_return_1d_nb(factor_returns, ann_factor)
+    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
     if annualized_return2 == 0.:
         return np.inf
     return annualized_return1 / annualized_return2
 
 
 @njit(cache=True)
-def up_capture_nb(returns, factor_returns, ann_factor):
+def up_capture_nb(returns, benchmark_rets, ann_factor):
     """2-dim version of `up_capture_1d_nb`."""
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = up_capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
+        out[col] = up_capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
     return out
 
 
 @njit(cache=True)
-def down_capture_1d_nb(returns, factor_returns, ann_factor):
+def down_capture_1d_nb(returns, benchmark_rets, ann_factor):
     """See `empyrical.down_capture`."""
-    returns = returns[factor_returns < 0]
-    factor_returns = factor_returns[factor_returns < 0]
+    returns = returns[benchmark_rets < 0]
+    benchmark_rets = benchmark_rets[benchmark_rets < 0]
     if returns.shape[0] < 1:
         return np.nan
     annualized_return1 = annualized_return_1d_nb(returns, ann_factor)
-    annualized_return2 = annualized_return_1d_nb(factor_returns, ann_factor)
+    annualized_return2 = annualized_return_1d_nb(benchmark_rets, ann_factor)
     if annualized_return2 == 0.:
         return np.inf
     return annualized_return1 / annualized_return2
 
 
 @njit(cache=True)
-def down_capture_nb(returns, factor_returns, ann_factor):
+def down_capture_nb(returns, benchmark_rets, ann_factor):
     """2-dim version of `down_capture_1d_nb`."""
     out = np.empty(returns.shape[1], dtype=np.float_)
     for col in range(returns.shape[1]):
-        out[col] = down_capture_1d_nb(returns[:, col], factor_returns[:, col], ann_factor)
+        out[col] = down_capture_1d_nb(returns[:, col], benchmark_rets[:, col], ann_factor)
     return out

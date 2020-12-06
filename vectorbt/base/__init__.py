@@ -1,13 +1,13 @@
 """Modules with base classes and utilities for pandas objects, such as broadcasting.
 
-## Array wrapper
+## Classes ArrayWrapper and Wrapping
 
 vectorbt's functionality is based upon the ability to perform the most essential pandas operations
 using NumPy+Numba stack. One has to convert the Series/DataFrame into the NumPy format, perform
 the computation, and put the array back into the pandas format. The last step is done using
 `vectorbt.base.array_wrapper.ArrayWrapper`.
 
-It stores the metadata of the original pandas object and offers methods `wrap` and `wrap_reduced`
+It stores metadata of the original pandas object and offers methods `wrap` and `wrap_reduced`
 for wrapping NumPy arrays to match the stored metadata as closest as possible.
 
 ```python-repl
@@ -19,13 +19,17 @@ for wrapping NumPy arrays to match the stored metadata as closest as possible.
 >>> aw = ArrayWrapper(index=['x', 'y', 'z'], columns=['a', 'b', 'c'], ndim=2)
 >>> aw._config
 {
-    'index': ['x', 'y', 'z'],
-    'columns': ['a', 'b', 'c'],
+    'columns': Index(['a', 'b', 'c'], dtype='object'),
+    'group_select': None,
     'ndim': 2,
     'freq': None,
     'column_only_select': None,
-    'group_select': None,
-    'grouped_ndim': None
+    'grouped_ndim': None,
+    'index': ['x', 'y', 'z'],
+    'allow_modify': True,
+    'allow_enable': True,
+    'group_by': None,
+    'allow_disable': True
 }
 
 >>> np.random.seed(42)
@@ -48,32 +52,42 @@ It can also be indexed as a regular pandas object and integrates `vectorbt.base.
 ```python-repl
 >>> aw.loc['x':'y', 'a']._config
 {
-    'index': Index(['x', 'y'], dtype='object'),
     'columns': Index(['a'], dtype='object'),
+    'group_select': None,
     'ndim': 1,
     'freq': None,
     'column_only_select': None,
-    'group_select': None,
     'grouped_ndim': None,
-    'group_by': None
+    'index': Index(['x', 'y'], dtype='object'),
+    'allow_modify': True,
+    'allow_enable': True,
+    'group_by': None,
+    'allow_disable': True
 }
 
 >>> aw.regroup(np.array([0, 0, 1]))._config
 {
-    'index': ['x', 'y', 'z'],
-    'columns': ['a', 'b', 'c'],
+    'columns': Index(['a', 'b', 'c'], dtype='object'),
+    'group_select': None,
     'ndim': 2,
     'freq': None,
     'column_only_select': None,
-    'group_select': None,
     'grouped_ndim': None,
-    'group_by': array([0, 0, 1])
+    'index': ['x', 'y', 'z'],
+    'allow_modify': True,
+    'allow_enable': True,
+    'group_by': array([0, 0, 1]),
+    'allow_disable': True
 }
 ```
 
-## Column grouper
+Class `vectorbt.base.array_wrapper.Wrapping` is a convenience class meant to be subclassed
+by classes that do not want to subclass `vectorbt.base.array_wrapper.ArrayWrapper` but
+rather use it as an attribute (which is a better SE design pattern anyway!).
 
-`vectorbt.base.column_grouper.ColumnGrouper` stores metadata related to grouping columns.
+## ColumnGrouper
+
+Class `vectorbt.base.column_grouper.ColumnGrouper` stores metadata related to grouping columns.
 It can return, for example, the number of groups, the start indices of groups, and other
 information useful for reducing operations that utilize grouping. It also allows to dynamically
 enable/disable/modify groups and checks whether a certain operation is permitted.
@@ -101,6 +115,11 @@ The main purpose of indexing classes is to provide pandas-like indexing to user-
 holding objects that have rows and/or columns. This is done by forwarding indexing commands
 to each structured object and constructing the new user-defined class using them. This way,
 one can manupulate complex classes with dozens of pandas objects using a single command.
+
+## Class helpers
+
+Module `vectorbt.base.class_helpers` contains class decorators and other helper functions,
+for example, to quickly add a range of Numba-compiled functions to the class.
 
 ## Accessors
 
@@ -158,3 +177,10 @@ and 2) the compuation with NumPy under the hood, which is mostly much faster tha
     You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
 """
 
+from vectorbt.base.array_wrapper import ArrayWrapper
+
+__all__ = [
+    'ArrayWrapper'
+]
+
+__pdoc__ = {k: False for k in __all__}

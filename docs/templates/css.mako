@@ -97,27 +97,32 @@ h2[id^="header-"] {
 }
 
 pre code {
-    background: #f8f8f8;
-    line-height: 1.4em;
+    background: #f8f8f8
+}
+
+.hljs {
+    padding: 1.25rem 1.5rem;
+    margin-left: -15px;
+    margin-right: -15px;
+    border: 1px solid #eee;
+    border-radius: 6px;
+    background: #282c34 !important;
+    color: #9da29e !important;
+}
+
+.python {
+    color: #c5c8c6 !important;
 }
 
 code {
     background: #f2f2f1;
     padding: 1px 4px;
     overflow-wrap: break-word;
+    font-size: 90%;
 }
 
 h1 code {
     background: transparent
-}
-
-pre {
-    background: #f8f8f8;
-    border: 0;
-    border-top: 1px solid #ccc;
-    border-bottom: 1px solid #ccc;
-    margin: 1em 0;
-    padding: 1ex;
 }
 
 #http-server-module-list {
@@ -529,8 +534,9 @@ a.badge-dark.focus {
     font-size: 1rem;
     line-height: 1.5;
     color: white;
-    background: rgba(0, 0, 0, .2);
+    background: #282c34 !important;
     border: none;
+    border-radius: 6px;
     border-bottom: 1px solid #e82;
     outline: none;
 }
@@ -539,6 +545,7 @@ a.badge-dark.focus {
     width: 100%;
     background: rgba(0, 0, 0, .2);
     border: none;
+    border-radius: 6px;
 }
 
 .algolia-autocomplete input {
@@ -594,6 +601,7 @@ pre .btnIcon:hover {
 .btnIcon__body {
     align-items: center;
     display: flex;
+    color: #abb2bf;
 }
 
 .btnIcon svg {

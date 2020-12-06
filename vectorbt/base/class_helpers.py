@@ -1,10 +1,7 @@
-"""Common functions and classes."""
+"""Class decorators and other helpers."""
 
 import numpy as np
 import inspect
-
-from vectorbt.utils import checks
-from vectorbt.base.array_wrapper import ArrayWrapper
 
 
 def get_kwargs(func):
@@ -19,11 +16,9 @@ def get_kwargs(func):
 def add_nb_methods(nb_funcs, module_name=None):
     """Class decorator to wrap each Numba function in `nb_funcs` as a method of an accessor class.
 
-    Requires the class to be a subclass of `vectorbt.base.array_wrapper.ArrayWrapper`."""
+    Requires the instance to have attribute `wrapper` of type `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def wrapper(cls):
-        checks.assert_subclass(cls, ArrayWrapper)
-
         for nb_func in nb_funcs:
             default_kwargs = get_kwargs(nb_func)
 
@@ -31,15 +26,15 @@ def add_nb_methods(nb_funcs, module_name=None):
                 if '_1d' in nb_func.__name__:
                     # One-dimensional array as input
                     a = nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs})
-                    if np.asarray(a).ndim == 0 or len(self.index) != a.shape[0]:
-                        return self.wrap_reduced(a)
-                    return self.wrap(a)
+                    if np.asarray(a).ndim == 0 or len(self.wrapper.index) != a.shape[0]:
+                        return self.wrapper.wrap_reduced(a)
+                    return self.wrapper.wrap(a)
                 else:
                     # Two-dimensional array as input
                     a = nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs})
-                    if np.asarray(a).ndim == 0 or a.ndim == 1 or len(self.index) != a.shape[0]:
-                        return self.wrap_reduced(a)
-                    return self.wrap(a)
+                    if np.asarray(a).ndim == 0 or a.ndim == 1 or len(self.wrapper.index) != a.shape[0]:
+                        return self.wrapper.wrap_reduced(a)
+                    return self.wrapper.wrap(a)
 
             # Replace the function's signature with the original one
             sig = inspect.signature(nb_func)

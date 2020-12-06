@@ -42,13 +42,13 @@ price = pd.DataFrame({
 
 class TestAccessors:
     def test_freq(self):
-        assert sig.vbt.signals.freq == day_dt
-        assert sig['a'].vbt.signals.freq == day_dt
-        assert sig.vbt.signals(freq='2D').freq == day_dt * 2
-        assert sig['a'].vbt.signals(freq='2D').freq == day_dt * 2
-        assert pd.Series([False, True]).vbt.signals.freq is None
-        assert pd.Series([False, True]).vbt.signals(freq='3D').freq == day_dt * 3
-        assert pd.Series([False, True]).vbt.signals(freq=np.timedelta64(4, 'D')).freq == day_dt * 4
+        assert sig.vbt.signals.wrapper.freq == day_dt
+        assert sig['a'].vbt.signals.wrapper.freq == day_dt
+        assert sig.vbt.signals(freq='2D').wrapper.freq == day_dt * 2
+        assert sig['a'].vbt.signals(freq='2D').wrapper.freq == day_dt * 2
+        assert pd.Series([False, True]).vbt.signals.wrapper.freq is None
+        assert pd.Series([False, True]).vbt.signals(freq='3D').wrapper.freq == day_dt * 3
+        assert pd.Series([False, True]).vbt.signals(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
     def test_shuffle(self):
         pd.testing.assert_series_equal(
@@ -110,7 +110,7 @@ class TestAccessors:
 
     def test_generate(self):
         @njit
-        def choice_func_nb(col, from_i, to_i, n):
+        def choice_func_nb(from_i, to_i, col, n):
             if col == 0:
                 return np.arange(from_i, to_i)
             elif col == 1:
@@ -145,12 +145,12 @@ class TestAccessors:
 
     def test_generate_both(self):
         @njit
-        def entry_func_nb(col, from_i, to_i, temp_int):
+        def entry_func_nb(from_i, to_i, col, temp_int):
             temp_int[0] = from_i
             return temp_int[:1]
 
         @njit
-        def exit_func_nb(col, from_i, to_i, temp_int):
+        def exit_func_nb(from_i, to_i, col, temp_int):
             temp_int[0] = from_i
             return temp_int[:1]
 
@@ -247,7 +247,7 @@ class TestAccessors:
 
     def test_generate_exits(self):
         @njit
-        def choice_func_nb(col, from_i, to_i, temp_int):
+        def choice_func_nb(from_i, to_i, col, temp_int):
             temp_int[0] = from_i
             return temp_int[:1]
 
@@ -1118,7 +1118,7 @@ class TestAccessors:
 
     def test_map_reduce_between(self):
         @njit
-        def distance_map_nb(col, from_i, to_i):
+        def distance_map_nb(from_i, to_i, col):
             return to_i - from_i
 
         @njit
@@ -1160,7 +1160,7 @@ class TestAccessors:
 
     def test_map_reduce_partitions(self):
         @njit
-        def distance_map_nb(col, from_i, to_i):
+        def distance_map_nb(from_i, to_i, col):
             return to_i - from_i
 
         @njit
@@ -1430,7 +1430,7 @@ class TestFactory:
             return arg0
 
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw, cache):
+        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw, cache):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw + cache
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]
@@ -1472,7 +1472,8 @@ class TestFactory:
                 )
             ),
             in_out1=np.nan,
-            in_out2=np.nan
+            in_out2=np.nan,
+            variable_args=True
         )
         my_sig = MySignals.run(
             np.arange(5), np.arange(5), [0, 1], [1, 0],
@@ -1598,7 +1599,7 @@ class TestFactory:
 
     def test_exit_only(self):
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
+        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]
@@ -1622,7 +1623,8 @@ class TestFactory:
                     dtype=np.float_
                 )
             ),
-            in_out2=np.nan
+            in_out2=np.nan,
+            variable_args=True
         )
         e = np.array([True, False, True, False, True])
         my_sig = MySignals.run(e, np.arange(5), [1, 0], 100)
@@ -1700,7 +1702,7 @@ class TestFactory:
 
     def test_iteratively(self):
         @njit
-        def choice_nb(col, from_i, to_i, ts, in_out, n, arg, temp_idx_arr, kw):
+        def choice_nb(from_i, to_i, col, ts, in_out, n, arg, temp_idx_arr, kw):
             in_out[from_i, col] = ts[from_i, col] * n + arg + kw
             temp_idx_arr[0] = from_i
             return temp_idx_arr[:1]
@@ -1724,7 +1726,8 @@ class TestFactory:
                     dtype=np.float_
                 )
             ),
-            in_out2=np.nan
+            in_out2=np.nan,
+            variable_args=True
         )
         e = np.array([True, True, True, True, True])
         my_sig = MySignals.run(e, np.arange(5), [1, 0], 100)

@@ -19,6 +19,7 @@ import json
 import random
 import yfinance as yf
 import talib
+from collections import OrderedDict
 from talib import abstract
 from talib._ta_lib import (
     CandleSettingType,
@@ -26,8 +27,9 @@ from talib._ta_lib import (
     _ta_set_candle_settings
 )
 import vectorbt as vbt
-from vectorbt.utils.config import merge_kwargs
-from vectorbt.portfolio.enums import InitCashMode, AccumulateExitMode
+from vectorbt.utils.config import merge_dicts
+from vectorbt.settings import color_schema
+from vectorbt.utils.colors import adjust_opacity
 
 USE_CACHING = os.environ.get(
     "USE_CACHING",
@@ -74,7 +76,21 @@ periods = ['1d', '5d', '1mo', '3mo', '6mo', '1y', '2y', '5y', '10y', 'ytd', 'max
 intervals = ['1m', '2m', '5m', '15m', '30m', '60m', '90m', '1d', '5d', '1wk', '1mo', '3mo']
 patterns = talib.get_function_groups()['Pattern Recognition']
 stats_table_columns = ["Metric", "Buy & Hold", "Random (Median)", "Strategy", "Z-Score"]
+directions = vbt.portfolio.enums.Direction._fields
+conflict_modes = vbt.portfolio.enums.ConflictMode._fields
+plot_types = ['OHLC', 'Candlestick']
+subplots = OrderedDict([(k, v['title']) for k, v in vbt.Portfolio.subplot_settings.items()])
 
+# Colors
+bgcolor = "#1f2536"
+dark_bgcolor = "#171b26"
+fontcolor = "#9fa6b7"
+dark_fontcolor = "#7b7d8d"
+gridcolor = "#323b56"
+loadcolor = "#387c9e"
+active_color = "#88ccee"
+
+# Defaults
 data_path = 'data/data.h5'
 default_metric = 'Total Return [%]'
 default_symbol = 'BTC-USD'
@@ -160,18 +176,19 @@ default_candle_settings = pd.DataFrame({
 })
 default_entry_dates = []
 default_exit_dates = []
-default_sim_options = ['allow_inc_position', 'allow_dec_position']
+default_direction = directions[0]
+default_conflict_mode = conflict_modes[0]
+default_sim_options = ['allow_accumulate']
 default_n_random_strat = 50
 default_stats_options = ['incl_unrealized']
 default_layout = dict(
     autosize=True,
-    automargin=True,
     margin=dict(b=40, t=20),
     font=dict(
-        color="#9fa6b7"
+        color=fontcolor
     ),
-    plot_bgcolor="#1f2536",
-    paper_bgcolor="#1f2536",
+    plot_bgcolor=bgcolor,
+    paper_bgcolor=bgcolor,
     legend=dict(
         font=dict(size=10),
         orientation="h",
@@ -181,13 +198,15 @@ default_layout = dict(
         x=1
     ),
 )
+default_subplots = ['orders', 'trade_pnl', 'cum_returns']
+default_plot_type = 'OHLC'
 
 app.layout = html.Div(
     children=[
         html.Div(
             className="banner",
             children=[
-                html.H6("Candlestick patterns @ VBT"),
+                html.H6("vectorbt: candlestick patterns"),
                 html.Div(
                     html.A(
                         "View on GitHub",
@@ -212,10 +231,25 @@ app.layout = html.Div(
                                         html.H6("OHLCV and signals")
                                     ],
                                 ),
+                                dbc.Row(
+                                    children=[
+                                        dbc.Col(
+                                            lg=4, sm=12,
+                                            children=[
+                                                html.Label("Select plot type:"),
+                                                dcc.Dropdown(
+                                                    id="plot_type_dropdown",
+                                                    options=[{"value": i, "label": i} for i in plot_types],
+                                                    value=default_plot_type,
+                                                ),
+                                            ]
+                                        )
+                                    ],
+                                ),
                                 dcc.Loading(
                                     id="ohlcv_loading",
                                     type="default",
-                                    color="#387c9e",
+                                    color=loadcolor,
                                     children=[
                                         dcc.Graph(
                                             id="ohlcv_graph",
@@ -238,16 +272,33 @@ app.layout = html.Div(
                                                 html.Div(
                                                     className="banner",
                                                     children=[
-                                                        html.H6("Orders, trades and value")
+                                                        html.H6("Portfolio")
+                                                    ],
+                                                ),
+                                                dbc.Row(
+                                                    children=[
+                                                        dbc.Col(
+                                                            lg=6, sm=12,
+                                                            children=[
+                                                                html.Label("Select subplots:"),
+                                                                dcc.Dropdown(
+                                                                    id="subplot_dropdown",
+                                                                    options=[{"value": k, "label": v}
+                                                                             for k, v in subplots.items()],
+                                                                    multi=True,
+                                                                    value=default_subplots,
+                                                                ),
+                                                            ]
+                                                        )
                                                     ],
                                                 ),
                                                 dcc.Loading(
-                                                    id="value_loading",
+                                                    id="portfolio_loading",
                                                     type="default",
-                                                    color="#387c9e",
+                                                    color=loadcolor,
                                                     children=[
                                                         dcc.Graph(
-                                                            id="value_graph",
+                                                            id="portfolio_graph",
                                                             figure={
                                                                 "layout": default_layout
                                                             }
@@ -277,7 +328,7 @@ app.layout = html.Div(
                                                 dcc.Loading(
                                                     id="stats_loading",
                                                     type="default",
-                                                    color="#387c9e",
+                                                    color=loadcolor,
                                                     children=[
                                                         dash_table.DataTable(
                                                             id="stats_table",
@@ -303,25 +354,25 @@ app.layout = html.Div(
                                                                 "fontWeight": "bold",
                                                             }, {
                                                                 "if": {"state": "selected"},
-                                                                "backgroundColor": "#171b26",
-                                                                "color": "#88ccee",
-                                                                "border": "1px solid #88ccee",
+                                                                "backgroundColor": dark_bgcolor,
+                                                                "color": active_color,
+                                                                "border": "1px solid " + active_color,
                                                             }, {
                                                                 "if": {"state": "active"},
-                                                                "backgroundColor": "#171b26",
-                                                                "color": "#88ccee",
-                                                                "border": "1px solid #88ccee",
+                                                                "backgroundColor": dark_bgcolor,
+                                                                "color": active_color,
+                                                                "border": "1px solid " + active_color,
                                                             }],
                                                             style_header={
                                                                 "border": "none",
-                                                                "backgroundColor": "#1f2536",
+                                                                "backgroundColor": bgcolor,
                                                                 "fontWeight": "bold",
                                                                 "padding": "0px 5px"
                                                             },
                                                             style_data={
                                                                 "border": "none",
-                                                                "backgroundColor": "#1f2536",
-                                                                "color": "#7b7d8d",
+                                                                "backgroundColor": bgcolor,
+                                                                "color": dark_fontcolor,
                                                                 "paddingRight": "10px"
                                                             },
                                                             style_table={
@@ -354,7 +405,7 @@ app.layout = html.Div(
                                                 dcc.Loading(
                                                     id="metric_stats_loading",
                                                     type="default",
-                                                    color="#387c9e",
+                                                    color=loadcolor,
                                                     children=[
                                                         html.Label("Metric:"),
                                                         dbc.Row(
@@ -439,7 +490,7 @@ app.layout = html.Div(
                                                         html.Label("Period:"),
                                                         dcc.Dropdown(
                                                             id="period_dropdown",
-                                                            options=[{"label": i, "value": i} for i in periods],
+                                                            options=[{"value": i, "label": i} for i in periods],
                                                             value=default_period,
                                                         ),
                                                     ]
@@ -449,7 +500,7 @@ app.layout = html.Div(
                                                         html.Label("Interval:"),
                                                         dcc.Dropdown(
                                                             id="interval_dropdown",
-                                                            options=[{"label": i, "value": i} for i in intervals],
+                                                            options=[{"value": i, "label": i} for i in intervals],
                                                             value=default_interval,
                                                         ),
                                                     ]
@@ -478,7 +529,7 @@ app.layout = html.Div(
                                             }],
                                             value=default_yf_options,
                                             style={
-                                                "color": "#7b7d8d"
+                                                "color": dark_fontcolor
                                             }
                                         ),
                                     ],
@@ -527,11 +578,10 @@ app.layout = html.Div(
                                                 html.Label("Select patterns:"),
                                                 dcc.Dropdown(
                                                     id="entry_pattern_dropdown",
-                                                    options=[{"label": i, "value": i} for i in patterns],
+                                                    options=[{"value": i, "label": i} for i in patterns],
                                                     multi=True,
                                                     value=default_entry_patterns,
                                                 ),
-
                                             ],
                                         ),
                                     ],
@@ -551,7 +601,7 @@ app.layout = html.Div(
                                             }],
                                             value=default_exit_options,
                                             style={
-                                                "color": "#7b7d8d"
+                                                "color": dark_fontcolor
                                             }
                                         ),
                                         html.Div(
@@ -592,11 +642,10 @@ app.layout = html.Div(
                                                 html.Label("Select patterns:"),
                                                 dcc.Dropdown(
                                                     id="exit_pattern_dropdown",
-                                                    options=[{"label": i, "value": i} for i in patterns],
+                                                    options=[{"value": i, "label": i} for i in patterns],
                                                     multi=True,
                                                     value=default_exit_patterns,
                                                 ),
-
                                             ],
                                         ),
                                     ],
@@ -621,29 +670,29 @@ app.layout = html.Div(
                                             data=default_candle_settings.to_dict("records"),
                                             style_data_conditional=[{
                                                 "if": {"column_editable": True},
-                                                "backgroundColor": "#171b26",
+                                                "backgroundColor": dark_bgcolor,
                                                 "border": "1px solid dimgrey"
                                             }, {
                                                 "if": {"state": "selected"},
-                                                "backgroundColor": "#171b26",
-                                                "color": "#88ccee",
-                                                "border": "1px solid #88ccee",
+                                                "backgroundColor": dark_bgcolor,
+                                                "color": active_color,
+                                                "border": "1px solid " + active_color,
                                             }, {
                                                 "if": {"state": "active"},
-                                                "backgroundColor": "#171b26",
-                                                "color": "#88ccee",
-                                                "border": "1px solid #88ccee",
+                                                "backgroundColor": dark_bgcolor,
+                                                "color": active_color,
+                                                "border": "1px solid " + active_color,
                                             }],
                                             style_header={
                                                 "border": "none",
-                                                "backgroundColor": "#1f2536",
+                                                "backgroundColor": bgcolor,
                                                 "fontWeight": "bold",
                                                 "padding": "0px 5px"
                                             },
                                             style_data={
                                                 "border": "none",
-                                                "backgroundColor": "#1f2536",
-                                                "color": "#7b7d8d"
+                                                "backgroundColor": bgcolor,
+                                                "color": dark_fontcolor
                                             },
                                             style_table={
                                                 'overflowX': 'scroll',
@@ -739,18 +788,39 @@ app.layout = html.Div(
                                                 dbc.Col()
                                             ],
                                         ),
+                                        dbc.Row(
+                                            children=[
+                                                dbc.Col(
+                                                    children=[
+                                                        html.Label("Direction:"),
+                                                        dcc.Dropdown(
+                                                            id="direction_dropdown",
+                                                            options=[{"value": i, "label": i} for i in directions],
+                                                            value=default_direction,
+                                                        ),
+                                                    ]
+                                                ),
+                                                dbc.Col(
+                                                    children=[
+                                                        html.Label("Conflict Mode:"),
+                                                        dcc.Dropdown(
+                                                            id="conflict_mode_dropdown",
+                                                            options=[{"value": i, "label": i} for i in conflict_modes],
+                                                            value=default_conflict_mode
+                                                        ),
+                                                    ]
+                                                ),
+                                            ],
+                                        ),
                                         dcc.Checklist(
                                             id="sim_checklist",
                                             options=[{
-                                                "label": "Allow increasing position",
-                                                "value": "allow_inc_position"
-                                            }, {
-                                                "label": "Allow decreasing position",
-                                                "value": "allow_dec_position"
+                                                "label": "Allow signal accumulation",
+                                                "value": "allow_accumulate"
                                             }],
                                             value=default_sim_options,
                                             style={
-                                                "color": "#7b7d8d"
+                                                "color": dark_fontcolor
                                             }
                                         ),
                                         html.Label("Number of random strategies to test against:"),
@@ -780,7 +850,7 @@ app.layout = html.Div(
                                             }],
                                             value=default_prob_options,
                                             style={
-                                                "color": "#7b7d8d"
+                                                "color": dark_fontcolor
                                             }
                                         ),
                                         html.Div(
@@ -829,7 +899,7 @@ app.layout = html.Div(
                                             }],
                                             value=default_stats_options,
                                             style={
-                                                "color": "#7b7d8d"
+                                                "color": dark_fontcolor
                                             }
                                         ),
                                     ],
@@ -843,8 +913,20 @@ app.layout = html.Div(
         html.Div(id='data_signal', style={'display': 'none'}),
         html.Div(id='index_signal', style={'display': 'none'}),
         html.Div(id='candle_settings_signal', style={'display': 'none'}),
-        html.Div(id='stats_signal', style={'display': 'none'})
+        html.Div(id='stats_signal', style={'display': 'none'}),
+        html.Div(id="window_width", style={'display': 'none'}),
+        dcc.Location(id="url")
     ],
+)
+
+app.clientside_callback(
+    """
+    function(href) {
+        return window.innerWidth;
+    }
+    """,
+    Output("window_width", "children"),
+    [Input("url", "href")],
 )
 
 
@@ -898,7 +980,7 @@ def update_custom_options(date_list, date_range):
 
     If selected dates cannot be found in new dates, they will be automatically removed."""
     filtered_dates = np.asarray(date_list)[date_range[0]:date_range[1] + 1].tolist()
-    custom_options = [{"label": i, "value": i} for i in filtered_dates]
+    custom_options = [{"value": i, "label": i} for i in filtered_dates]
     return custom_options, custom_options
 
 
@@ -986,7 +1068,9 @@ def set_candle_settings(data):
      Output("prob_settings", "hidden"),
      Output("entry_prob_input", "value"),
      Output("exit_prob_input", "value")],
-    [Input('data_signal', 'children'),
+    [Input('window_width', 'children'),
+     Input('plot_type_dropdown', 'value'),
+     Input('data_signal', 'children'),
      Input('date_slider', 'value'),
      Input('entry_pattern_dropdown', 'value'),
      Input('exit_pattern_dropdown', 'value'),
@@ -998,7 +1082,7 @@ def set_candle_settings(data):
     [State("entry_prob_input", "value"),
      State("exit_prob_input", "value")]
 )
-def update_ohlcv(df_json, date_range, entry_patterns, exit_patterns, _1,
+def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, exit_patterns, _1,
                  entry_dates, exit_dates, prob_options, _2, entry_prob, exit_prob):
     """Update OHLCV graph.
 
@@ -1052,95 +1136,65 @@ def update_ohlcv(df_json, date_range, entry_patterns, exit_patterns, _1,
     lowest_low = df['Low'].min()
     distance = (highest_high - lowest_low) / 5
     entry_y = df.loc[entry_df.index, 'Low'] - distance
+    entry_y.index = pd.to_datetime(entry_y.index)
     exit_y = df.loc[exit_df.index, 'High'] + distance
+    exit_y.index = pd.to_datetime(exit_y.index)
 
-    # Color volume
-    close_open_diff = df['Close'].values - df['Open'].values
-    volume_color = np.empty(df['Volume'].shape, dtype=np.object)
-    volume_color[close_open_diff > 0] = '#0b623e'
-    volume_color[close_open_diff == 0] = 'gray'
-    volume_color[close_open_diff < 0] = '#bb6704'
+    # Prepare signals
+    entry_signals = pd.Series.vbt.empty_like(entry_y, True)
+    exit_signals = pd.Series.vbt.empty_like(exit_y, True)
 
     # Build graph
-    figure = dict(
-        data=[
-            go.Ohlc(
-                x=pd.to_datetime(df.index),
-                open=df['Open'],
-                high=df['High'],
-                low=df['Low'],
-                close=df['Close'],
-                name='OHLC',
-                yaxis="y2",
-                xaxis="x",
-                increasing_line_color='#0f8554',
-                decreasing_line_color='#e17c05'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(entry_y.index),
-                y=entry_y,
-                customdata=entry_patterns[:, None],
-                hovertemplate='%{x}<br>%{customdata[0]}',
-                mode='markers',
-                marker_size=8,
-                marker_symbol='triangle-up',
-                marker_color='#38a6a5',
-                name='Bullish signal',
-                yaxis="y2",
-                xaxis="x",
-            ),
-            go.Scatter(
-                x=pd.to_datetime(exit_y.index),
-                y=exit_y,
-                customdata=exit_patterns[:, None],
-                hovertemplate='%{x}<br>%{customdata[0]}',
-                mode='markers',
-                marker_size=8,
-                marker_symbol='triangle-down',
-                marker_color='#cc503e',
-                name='Bearish signal',
-                yaxis="y2",
-                xaxis="x",
-            ),
-            go.Bar(
-                x=pd.to_datetime(df.index),
-                y=df['Volume'],
-                marker_color=volume_color,
-                marker_line_width=0,
-                name='Volume',
-                yaxis="y",
-                xaxis="x"
-            )
-        ],
-        layout=merge_kwargs(
+    height = int(9 / 21 * 2 / 3 * window_width)
+    fig = df.vbt.ohlcv.plot(
+        plot_type=plot_type,
+        **merge_dicts(
             default_layout,
             dict(
+                width=None,
+                height=max(500, height),
                 margin=dict(r=40),
                 hovermode="closest",
                 xaxis=dict(
-                    gridcolor='#323b56',
-                    rangeslider=dict(
-                        visible=False
-                    ),
-                    spikemode='across+marker',
                     title='Date'
                 ),
                 yaxis=dict(
-                    gridcolor='#323b56',
-                    domain=[0, 0.3],
-                    spikemode='across+marker',
                     title='Volume'
                 ),
                 yaxis2=dict(
-                    gridcolor='#323b56',
-                    domain=[0.4, 1],
-                    spikemode='across+marker',
                     title='Price',
-                ),
-                bargap=0
+                )
             )
         )
     )
+    fig.update_xaxes(spikemode='across+marker')
+    fig.update_yaxes(spikemode='across+marker')
+    entry_signals.vbt.signals.plot_as_entry_markers(
+        name='Bullish signal',
+        y=entry_y,
+        trace_kwargs=dict(
+            customdata=entry_patterns[:, None],
+            hovertemplate='%{x}<br>%{customdata[0]}',
+            yaxis="y2",
+            xaxis="x"
+        ),
+        fig=fig
+    )
+    exit_signals.vbt.signals.plot_as_exit_markers(
+        name='Bearish signal',
+        y=exit_y,
+        trace_kwargs=dict(
+            customdata=exit_patterns[:, None],
+            hovertemplate='%{x}<br>%{customdata[0]}',
+            yaxis="y2",
+            xaxis="x"
+        ),
+        fig=fig
+    )
+    fig.update_xaxes(gridcolor=gridcolor)
+    fig.update_yaxes(gridcolor=gridcolor, zerolinecolor=gridcolor)
+    figure = dict(data=fig.data, layout=fig.layout)
+
     mimic_strategy = 'mimic_strategy' in prob_options
     ctx = dash.callback_context
     if ctx.triggered:
@@ -1156,8 +1210,8 @@ def update_ohlcv(df_json, date_range, entry_patterns, exit_patterns, _1,
 
 
 def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, exit_patterns,
-                       entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options,
-                       n_random_strat, prob_options, entry_prob, exit_prob):
+                       entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
+                       sim_options, n_random_strat, prob_options, entry_prob, exit_prob):
     """Simulate portfolio of the main strategy, buy & hold strategy, and a bunch of random strategies."""
     # Filter by date
     df = df.iloc[date_range[0]:date_range[1] + 1]
@@ -1229,19 +1283,16 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
         rand_size[1:, :] = np.where(entry_signals, 1., 0.) - np.where(exit_signals, 1., 0.)
 
     # Simulate portfolio
-    def _simulate_portfolio(size, init_cash):
-        accumulate = 'allow_inc_position' in sim_options
-        accumulate_exit_mode = AccumulateExitMode.Reduce \
-            if 'allow_dec_position' in sim_options else AccumulateExitMode.Close
+    def _simulate_portfolio(size, init_cash='autoalign'):
         return vbt.Portfolio.from_signals(
             close=df['Close'],
             entries=size > 0,
             exits=size < 0,
-            entry_price=df['Open'],
-            exit_price=df['Open'],
+            price=df['Open'],
             size=np.abs(size),
-            accumulate=accumulate,
-            accumulate_exit_mode=accumulate_exit_mode,
+            direction=direction,
+            conflict_mode=conflict_mode,
+            accumulate='allow_accumulate' in sim_options,
             init_cash=init_cash,
             fees=float(fees) / 100,
             fixed_fees=float(fixed_fees),
@@ -1250,7 +1301,7 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
         )
 
     # Align initial cash across main and random strategies
-    aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)), InitCashMode.AutoAlign)
+    aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)))
     # Fixate initial cash for indexing
     aligned_portfolio = aligned_portfolio.copy(
         init_cash=aligned_portfolio.init_cash()
@@ -1260,18 +1311,21 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     rand_portfolio = aligned_portfolio.iloc[1:]
 
     # Simulate buy & hold portfolio
-    hold_portfolio = _simulate_portfolio(hold_size, main_portfolio.init_cash())
+    hold_portfolio = _simulate_portfolio(hold_size, init_cash=main_portfolio.init_cash())
 
     return main_portfolio, hold_portfolio, rand_portfolio
 
 
 @app.callback(
-    [Output('value_graph', 'figure'),
+    [Output('portfolio_graph', 'figure'),
      Output('stats_table', 'data'),
      Output('stats_signal', 'children'),
      Output('metric_dropdown', 'options'),
      Output('metric_dropdown', 'value')],
-    [Input('data_signal', 'children'),
+    [Input('window_width', 'children'),
+     Input('subplot_dropdown', 'value'),
+     Input('data_signal', 'children'),
+     Input('symbol_input', 'value'),
      Input('interval_dropdown', 'value'),
      Input('date_slider', 'value'),
      Input('ohlcv_graph', 'selectedData'),
@@ -1283,6 +1337,8 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
      Input('fees_input', 'value'),
      Input('fixed_fees_input', 'value'),
      Input('slippage_input', 'value'),
+     Input('direction_dropdown', 'value'),
+     Input('conflict_mode_dropdown', 'value'),
      Input('sim_checklist', 'value'),
      Input('n_random_strat_input', 'value'),
      Input('prob_checklist', 'value'),
@@ -1292,117 +1348,50 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
      Input("reset_button", "n_clicks")],
     [State('metric_dropdown', 'value')]
 )
-def update_stats(df_json, interval, date_range, selected_data, entry_patterns, exit_patterns,
-                 _1, entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options, n_random_strat,
-                 prob_options, entry_prob, exit_prob, stats_options, _2, curr_metric):
+def update_stats(window_width, subplots, df_json, symbol, interval, date_range, selected_data,
+                 entry_patterns, exit_patterns, _1, entry_dates, exit_dates, fees, fixed_fees,
+                 slippage, direction, conflict_mode, sim_options, n_random_strat, prob_options,
+                 entry_prob, exit_prob, stats_options, _2, curr_metric):
     """Final stage where we calculate key performance metrics and compare strategies."""
     df = pd.read_json(df_json, orient='split')
 
     # Simulate portfolio
     main_portfolio, hold_portfolio, rand_portfolio = simulate_portfolio(
         df, interval, date_range, selected_data, entry_patterns, exit_patterns,
-        entry_dates, exit_dates, fees, fixed_fees, slippage, sim_options,
-        n_random_strat, prob_options, entry_prob, exit_prob)
+        entry_dates, exit_dates, fees, fixed_fees, slippage, direction, conflict_mode,
+        sim_options, n_random_strat, prob_options, entry_prob, exit_prob)
 
-    # Get orders
-    buy_trace, sell_trace = main_portfolio.orders().plot().data[1:]
-    buy_trace.update(dict(
-        x=pd.to_datetime(buy_trace.x),
-        marker_line=None,
-        marker_size=8,
-        marker_symbol='triangle-up',
-        marker_color='#38a6a5',
-        yaxis='y4'
-    ))
-    sell_trace.update(dict(
-        x=pd.to_datetime(sell_trace.x),
-        marker_line=None,
-        marker_size=8,
-        marker_symbol='triangle-down',
-        marker_color='#cc503e',
-        yaxis='y4'
-    ))
-
-    # Get returns
-    incl_unrealized = 'incl_unrealized' in stats_options
-    returns = main_portfolio.trades(incl_unrealized=incl_unrealized).returns
-    profit_mask = returns.mapped_arr > 0
-    loss_mask = returns.mapped_arr < 0
-
-    figure = dict(
-        data=[
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index),
-                y=main_portfolio.shares(),
-                name="Holdings",
-                yaxis="y2",
-                line_color='#1f77b4'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index),
-                y=main_portfolio.value(),
-                name="Value",
-                line_color='#2ca02c'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(hold_portfolio.wrapper.index),
-                y=hold_portfolio.value(),
-                name=f"Value (Buy & Hold)",
-                line_color='#ff7f0e'
-            ),
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[profit_mask]]),
-                y=returns.mapped_arr[profit_mask],
-                marker_color='#2ca02c',
-                marker_size=8,
-                mode='markers',
-                name="Profit",
-                yaxis="y3",
-            ),
-            go.Scatter(
-                x=pd.to_datetime(main_portfolio.wrapper.index[returns.idx_arr[loss_mask]]),
-                y=returns.mapped_arr[loss_mask],
-                marker_color='#d62728',
-                marker_size=8,
-                mode='markers',
-                name="Loss",
-                yaxis="y3"
-            ),
-            buy_trace,
-            sell_trace
-        ],
-        layout=merge_kwargs(
-            default_layout,
-            dict(
-                hovermode="closest",
-                xaxis=dict(
-                    gridcolor='#323b56',
-                    title='Date',
-                ),
-                yaxis=dict(
-                    gridcolor='#323b56',
-                    title='Value',
-                    domain=[0, 0.4]
-                ),
-                yaxis2=dict(
-                    showgrid=False,
-                    overlaying="y",
-                    side="right",
-                    title='Holdings',
-                ),
-                yaxis3=dict(
-                    gridcolor='#323b56',
-                    title='Trade return',
-                    domain=[0.45, 0.7],
-                    tickformat='%'
-                ),
-                yaxis4=dict(
-                    gridcolor='#323b56',
-                    title='Order price',
-                    domain=[0.75, 1],
+    subplot_kwags = dict()
+    if 'cum_returns' in subplots:
+        subplot_kwags['cum_returns_kwargs'] = dict(
+            benchmark_kwargs=dict(
+                trace_kwargs=dict(
+                    line_color=adjust_opacity(color_schema['yellow'], 0.5),
+                    name=symbol
                 )
             )
         )
+    height = int(6 / 21 * 2 / 3 * window_width)
+    fig = main_portfolio.plot(
+        subplots=subplots,
+        **subplot_kwags,
+        **merge_dicts(
+            default_layout,
+            dict(
+                width=None,
+                height=len(subplots) * max(300, height) if len(subplots) > 1 else max(350, height)
+            )
+        )
+    )
+    fig.update_traces(xaxis="x" if len(subplots) == 1 else "x" + str(len(subplots)))
+    fig.update_xaxes(
+        spikemode='across+marker',
+        gridcolor=gridcolor
+    )
+    fig.update_yaxes(
+        spikemode='across+marker',
+        gridcolor=gridcolor,
+        zerolinecolor=gridcolor
     )
 
     def _chop_microseconds(delta):
@@ -1415,6 +1404,7 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             return str(_chop_microseconds(x))
         return str(x)
 
+    incl_unrealized = 'incl_unrealized' in stats_options
     main_stats = main_portfolio.stats(incl_unrealized=incl_unrealized)
     hold_stats = hold_portfolio.stats(incl_unrealized=True)
     rand_stats = rand_portfolio.stats(incl_unrealized=incl_unrealized, agg_func=None)
@@ -1451,25 +1441,27 @@ def update_stats(df_json, interval, date_range, selected_data, entry_patterns, e
             metric = default_metric
     if metric is None:
         metric = default_metric
-    return figure, \
+    return dict(data=fig.data, layout=fig.layout), \
            table_data.to_dict("records"), \
            json.dumps({
                'main': {m: [_to_float(main_stats[m])] for m in main_stats.index[3:]},
                'hold': {m: [_to_float(hold_stats[m])] for m in main_stats.index[3:]},
                'rand': {m: rand_stats[m].apply(_to_float).values.tolist() for m in main_stats.index[3:]}
            }), \
-           [{"label": i, "value": i} for i in main_stats.index[3:]], \
+           [{"value": i, "label": i} for i in main_stats.index[3:]], \
            metric
 
 
 @app.callback(
     Output('metric_graph', 'figure'),
-    [Input('stats_signal', 'children'),
+    [Input('window_width', 'children'),
+     Input('stats_signal', 'children'),
      Input('metric_dropdown', 'value')]
 )
-def update_metric_stats(stats_json, metric):
+def update_metric_stats(window_width, stats_json, metric):
     """Once a new metric has been selected, plot its distribution."""
     stats_dict = json.loads(stats_json)
+    height = int(9 / 21 * 2 / 3 * 2 / 3 * window_width)
     return dict(
         data=[
             go.Box(
@@ -1483,7 +1475,7 @@ def update_metric_stats(stats_json, metric):
                 hovertemplate='%{x}<br>Random',
                 name='',
                 marker=dict(
-                    color="#1f77b4",
+                    color=color_schema['blue'],
                     opacity=0.5,
                     size=8,
                 ),
@@ -1500,7 +1492,7 @@ def update_metric_stats(stats_json, metric):
                 line=dict(color="rgba(0,0,0,0)"),
                 name='',
                 marker=dict(
-                    color="#ff7f0e",
+                    color=color_schema['orange'],
                     size=8,
                 ),
             ),
@@ -1516,24 +1508,25 @@ def update_metric_stats(stats_json, metric):
                 line=dict(color="rgba(0,0,0,0)"),
                 name='',
                 marker=dict(
-                    color="#2ca02c",
+                    color=color_schema['green'],
                     size=8,
                 ),
             ),
         ],
-        layout=merge_kwargs(
+        layout=merge_dicts(
             default_layout,
             dict(
+                height=max(350, height),
                 showlegend=False,
                 margin=dict(l=60, r=20, t=40, b=20),
                 hovermode="closest",
                 xaxis=dict(
-                    gridcolor='#323b56',
+                    gridcolor=gridcolor,
                     title=metric,
                     side='top'
                 ),
                 yaxis=dict(
-                    gridcolor='#323b56'
+                    gridcolor=gridcolor
                 ),
             )
         )
@@ -1553,6 +1546,8 @@ def update_metric_stats(stats_json, metric):
      Output('fees_input', 'value'),
      Output('fixed_fees_input', 'value'),
      Output('slippage_input', 'value'),
+     Output('conflict_mode_dropdown', 'value'),
+     Output('direction_dropdown', 'value'),
      Output('sim_checklist', 'value'),
      Output('n_random_strat_input', 'value'),
      Output("prob_checklist", "value"),
@@ -1574,6 +1569,8 @@ def reset_settings(_):
            default_fees, \
            default_fixed_fees, \
            default_slippage, \
+           default_conflict_mode, \
+           default_direction, \
            default_sim_options, \
            default_n_random_strat, \
            default_prob_options, \

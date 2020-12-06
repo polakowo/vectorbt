@@ -1,6 +1,14 @@
 """Functions for working with colors."""
 
 
+def adjust_opacity(color, opacity):
+    """Adjust opacity of color."""
+    import matplotlib.colors as mc
+
+    rgb = mc.to_rgb(color)
+    return 'rgba(%d,%d,%d,%.4f)' % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255), opacity)
+
+
 def adjust_lightness(color, amount=0.7):
     """Lightens the given color by multiplying (1-luminosity) by the given amount.
 
@@ -8,6 +16,7 @@ def adjust_lightness(color, amount=0.7):
     Output will be an RGB string."""
     import matplotlib.colors as mc
     import colorsys
+
     try:
         c = mc.cnames[color]
     except:

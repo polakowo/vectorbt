@@ -11,7 +11,7 @@ def approx_exp_max_sharpe(mean_sharpe, var_sharpe, nb_trials):
 def deflated_sharpe_ratio(*, est_sharpe, var_sharpe, nb_trials, backtest_horizon, skew, kurtosis):
     """Deflated Sharpe Ratio (DSR).
 
-    See https://gmarti.gitlab.io/qfin/2018/05/30/deflated-sharpe-ratio.html."""
+    See [Deflated Sharpe Ratio](https://gmarti.gitlab.io/qfin/2018/05/30/deflated-sharpe-ratio.html)."""
     SR0 = approx_exp_max_sharpe(0, var_sharpe, nb_trials)
 
     return norm.cdf(((est_sharpe - SR0) * np.sqrt(backtest_horizon - 1)) /
