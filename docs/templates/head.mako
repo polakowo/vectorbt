@@ -20,4 +20,10 @@
 </%def>
 
 <style>${homelink()}</style>
-<link rel="icon" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-16x16.png">
+<link rel="manifest" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/site.webmanifest">
+<link rel="mask-icon" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/safari-pinned-tab.svg" color="#5bbad5">
+<meta name="msapplication-TileColor" content="#da532c">
+<meta name="theme-color" content="#ffffff">

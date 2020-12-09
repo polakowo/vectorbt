@@ -8,7 +8,7 @@
 
 # vectorbt
 
-![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/logo.png)
+![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/logo.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze trading strategies at speed and scale :fire:
@@ -110,7 +110,7 @@ fig = portfolio.total_return().vbt.heatmap(
 fig.show()
 ```
 
-![dmac_heatmap.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_heatmap.gif)
+![dmac_heatmap.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_heatmap.gif)
 
 Digging into each strategy configuration is as simple as indexing with pandas:
 
@@ -151,7 +151,7 @@ Name: (10, 20, ETH-USD), dtype: object
 portfolio[(10, 20, 'ETH-USD')].plot().show()
 ```
 
-![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/dmac_portfolio.png)
+![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.png)
 
 ## Motivation
 
@@ -253,7 +253,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 >>> pd.Series([2, 1, 3, 2]).vbt.drawdowns().plot().show()
 ```
 
-![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/drawdowns.png)
+![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.png)
 
 - Functions for working with signals
     - Entry, exit and random signal generation
@@ -313,7 +313,7 @@ rand_n      0      1      2
 >>> portfolio.trades().plot().show()
 ```
 
-![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/trades.png)
+![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.png)
     
 - A range of basic technical indicators with full Numba support
     - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
@@ -349,7 +349,7 @@ sma_timeperiod    2    3
 >>> pd.Series(a).vbt.box(horizontal=True, trace_kwargs=dict(boxmean='sd')).show()
 ``` 
 
-![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/img/Box.png)
+![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/Box.png)
 
 ## [Documentation](https://polakowo.io/vectorbt/)
 

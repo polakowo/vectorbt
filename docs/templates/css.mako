@@ -565,7 +565,7 @@ a.badge-dark.focus {
 }
 
 #sidebar {
-    background: #3A4D6B;
+    background: #3B4556;
 }
 
 .toc ul ul, #index ul {
