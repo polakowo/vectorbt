@@ -67,7 +67,7 @@ fast_ma = vbt.MA.run(price, 10)
 slow_ma = vbt.MA.run(price, 50)
 entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100., freq='1D')
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, size=np.inf, init_cash=100.)
 portfolio.total_profit()
 ```
 
@@ -84,7 +84,7 @@ dual SMA crossover strategy on BTC, USD and XRP from 2017 onwards, in under 5 se
 assets = ["BTC-USD", "ETH-USD", "LTC-USD"]
 yf_kwargs = dict(start='2017-1-1')
 windows = np.arange(2, 101)
-portfolio_kwargs = dict(fees=0.001)
+portfolio_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
 
 # Fetch daily price
 price = {}
@@ -101,7 +101,7 @@ entries = fast_ma.ma_above(slow_ma, crossed=True)
 exits = fast_ma.ma_below(slow_ma, crossed=True)
 
 # Run simulation
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D', **portfolio_kwargs)
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, **portfolio_kwargs)
 
 # Get total return, reshape to symmetric matrix, and plot the whole thing
 fig = portfolio.total_return().vbt.heatmap(
