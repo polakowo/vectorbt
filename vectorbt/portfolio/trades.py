@@ -422,6 +422,7 @@ class Trades(Records):
             profit_mask = pnl > 0
             loss_mask = pnl < 0
 
+            _id = _id[~neutral_mask]
             exit_idx = exit_idx[~neutral_mask]  # needed for rel_rescale
             pnl = pnl[~neutral_mask]
             returns = returns[~neutral_mask]
@@ -431,7 +432,10 @@ class Trades(Records):
             open_mask = status == TradeStatus.Open
             closed_profit_mask = (~open_mask) & profit_mask
             closed_loss_mask = (~open_mask) & loss_mask
+
             open_mask &= ~neutral_mask
+            closed_profit_mask = closed_profit_mask[~neutral_mask]
+            closed_loss_mask = closed_loss_mask[~neutral_mask]
 
             if np.any(closed_profit_mask):
                 # Plot Profit markers
