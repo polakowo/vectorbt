@@ -389,6 +389,9 @@ class Trades(Records):
 
         self_col = self.select_series(column=column, group_by=False)
 
+        self_col = self_col.filter_by_mask(self_col.values['return'] != 0)
+
+
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}
         if closed_loss_trace_kwargs is None:
@@ -422,20 +425,13 @@ class Trades(Records):
             profit_mask = pnl > 0
             loss_mask = pnl < 0
 
-            _id = _id[~neutral_mask]
-            exit_idx = exit_idx[~neutral_mask]  # needed for rel_rescale
-            pnl = pnl[~neutral_mask]
-            returns = returns[~neutral_mask]
             marker_size = min_rel_rescale(np.abs(returns), marker_size_range)
             opacity = max_rel_rescale(np.abs(returns), opacity_range)
 
             open_mask = status == TradeStatus.Open
             closed_profit_mask = (~open_mask) & profit_mask
             closed_loss_mask = (~open_mask) & loss_mask
-
             open_mask &= ~neutral_mask
-            closed_profit_mask = closed_profit_mask[~neutral_mask]
-            closed_loss_mask = closed_loss_mask[~neutral_mask]
 
             if np.any(closed_profit_mask):
                 # Plot Profit markers
