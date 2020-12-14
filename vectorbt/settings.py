@@ -12,6 +12,7 @@ Changes take effect immediately."""
 
 import numpy as np
 import json
+import os
 
 from vectorbt.utils.config import Config
 
@@ -58,15 +59,27 @@ __pdoc__['contrast_color_schema'] = f"""Neon color schema.
 ```
 """
 
+# Templates
+with open(os.path.join(os.path.dirname(__file__), 'templates/light.json')) as json_file:
+    light_template = Config(json.load(json_file))
+    """_"""
+
+    __pdoc__['light_template'] = "Light template."
+
+with open(os.path.join(os.path.dirname(__file__), 'templates/dark.json')) as json_file:
+    dark_template = Config(json.load(json_file))
+    """_"""
+
+    __pdoc__['dark_template'] = "Dark template."
+
 # Layout
 layout = Config(
-    autosize=False,
+    template=light_template,
     width=700,
     height=350,
     margin=dict(
         t=30, b=30, l=30, r=30
     ),
-    hovermode='closest',
     legend=dict(
         orientation="h",
         yanchor="bottom",
@@ -225,4 +238,3 @@ __pdoc__['portfolio'] = f"""Parameters for portfolio.
 {json.dumps(portfolio, indent=2, default=str)}
 ```
 """
-
