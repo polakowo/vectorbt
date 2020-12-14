@@ -389,8 +389,6 @@ class Trades(Records):
 
         self_col = self.select_series(column=column, group_by=False)
 
-        self_col = self_col.filter_by_mask(self_col.values['return'] != 0)
-
 
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}

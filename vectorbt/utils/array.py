@@ -86,7 +86,11 @@ def min_rel_rescale(a, to_range):
     if a_max - a_min == 0:
         return np.full(a.shape, to_range[0])
     from_range = (a_min, a_max)
-    from_range_ratio = a_max / a_min
+
+    from_range_ratio = np.inf
+    if a_min != 0:
+        from_range_ratio = a_max / a_min
+
     to_range_ratio = to_range[1] / to_range[0]
     if from_range_ratio < to_range_ratio:
         to_range = (to_range[0], to_range[0] * from_range_ratio)
@@ -100,7 +104,11 @@ def max_rel_rescale(a, to_range):
     if a_max - a_min == 0:
         return np.full(a.shape, to_range[1])
     from_range = (a_min, a_max)
-    from_range_ratio = a_max / a_min
+
+    from_range_ratio = np.inf
+    if a_min != 0:
+        from_range_ratio = a_max / a_min
+
     to_range_ratio = to_range[1] / to_range[0]
     if from_range_ratio < to_range_ratio:
         to_range = (to_range[1] / from_range_ratio, to_range[1])
