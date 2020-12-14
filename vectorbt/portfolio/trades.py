@@ -389,6 +389,7 @@ class Trades(Records):
 
         self_col = self.select_series(column=column, group_by=False)
 
+
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}
         if closed_loss_trace_kwargs is None:
@@ -422,9 +423,6 @@ class Trades(Records):
             profit_mask = pnl > 0
             loss_mask = pnl < 0
 
-            exit_idx = exit_idx[~neutral_mask]  # needed for rel_rescale
-            pnl = pnl[~neutral_mask]
-            returns = returns[~neutral_mask]
             marker_size = min_rel_rescale(np.abs(returns), marker_size_range)
             opacity = max_rel_rescale(np.abs(returns), opacity_range)
 
