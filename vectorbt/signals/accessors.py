@@ -50,7 +50,6 @@ from vectorbt.signals import nb
 
 
 @add_nb_methods([
-    nb.shuffle_nb,
     nb.fshift_nb,
 ], module_name='vectorbt.signals.nb')
 class Signals_Accessor(Generic_Accessor):
@@ -90,7 +89,7 @@ class Signals_Accessor(Generic_Accessor):
         2020-01-05  False  False  False
         ```
         """
-        return Generic_Accessor.empty(*args, fill_value=fill_value, **kwargs)
+        return Generic_Accessor.empty(*args, fill_value=fill_value, dtype=bool, **kwargs)
 
     @classmethod
     def empty_like(cls, *args, fill_value=False, **kwargs):
@@ -116,7 +115,7 @@ class Signals_Accessor(Generic_Accessor):
         2020-01-05  False  False  False
         ```
         """
-        return Generic_Accessor.empty_like(*args, fill_value=fill_value, **kwargs)
+        return Generic_Accessor.empty_like(*args, fill_value=fill_value, dtype=bool, **kwargs)
 
     # ############# Signal generation ############# #
 

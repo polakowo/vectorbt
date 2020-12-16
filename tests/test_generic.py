@@ -8,6 +8,8 @@ from itertools import product
 from vectorbt.generic import nb
 from vectorbt.generic.drawdowns import Drawdowns
 
+seed = 42
+
 day_dt = np.timedelta64(86400000000000)
 
 df = pd.DataFrame({
@@ -185,6 +187,34 @@ class TestAccessors:
             df.vbt.split_into_ranges(end_idxs=[2, 4])
         with pytest.raises(Exception) as e_info:
             df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[2, 4])
+
+    def test_shuffle(self):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.shuffle(seed=seed),
+            pd.Series(
+                np.array([2.0, np.nan, 3.0, 1.0, 4.0]),
+                index=df['a'].index,
+                name=df['a'].name
+            )
+        )
+        np.testing.assert_array_equal(
+            df['a'].vbt.shuffle(seed=seed).values,
+            nb.shuffle_1d_nb(df['a'].values, seed=seed)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.shuffle(seed=seed),
+            pd.DataFrame(
+                np.array([
+                    [2., 2., 2.],
+                    [np.nan, 4., 1.],
+                    [3., 3., 2.],
+                    [1., np.nan, 1.],
+                    [4., 1., np.nan]
+                ]),
+                index=df.index,
+                columns=df.columns
+            )
+        )
 
     @pytest.mark.parametrize(
         "test_value",

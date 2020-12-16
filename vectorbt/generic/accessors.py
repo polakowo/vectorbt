@@ -74,6 +74,7 @@ except ImportError:
 
 
 @add_nb_methods([
+    nb.shuffle_nb,
     nb.fillna_nb,
     nb.fshift_nb,
     nb.diff_nb,

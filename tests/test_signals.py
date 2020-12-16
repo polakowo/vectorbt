@@ -50,34 +50,6 @@ class TestAccessors:
         assert pd.Series([False, True]).vbt.signals(freq='3D').wrapper.freq == day_dt * 3
         assert pd.Series([False, True]).vbt.signals(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
-    def test_shuffle(self):
-        pd.testing.assert_series_equal(
-            sig['a'].vbt.signals.shuffle(seed=seed),
-            pd.Series(
-                np.array([False, False, False, True, True]),
-                index=sig['a'].index,
-                name=sig['a'].name
-            )
-        )
-        np.testing.assert_array_equal(
-            sig['a'].vbt.signals.shuffle(seed=seed).values,
-            nb.shuffle_1d_nb(sig['a'].values, seed=seed)
-        )
-        pd.testing.assert_frame_equal(
-            sig.vbt.signals.shuffle(seed=seed),
-            pd.DataFrame(
-                np.array([
-                    [False, False, False],
-                    [False, True, False],
-                    [False, False, False],
-                    [True, False, False],
-                    [True, True, True]
-                ]),
-                index=sig.index,
-                columns=sig.columns
-            )
-        )
-
     @pytest.mark.parametrize(
         "test_n",
         [1, 2, 3, 4, 5],

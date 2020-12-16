@@ -146,28 +146,6 @@ def generate_enex_nb(shape, entry_wait, exit_wait, entry_choice_func_nb,
 
 
 @njit(cache=True)
-def shuffle_1d_nb(a, seed=None):
-    """Shuffle each column in `a`.
-
-    Specify `seed` to make output deterministic."""
-    if seed is not None:
-        np.random.seed(seed)
-    return np.random.permutation(a)
-
-
-@njit(cache=True)
-def shuffle_nb(a, seed=None):
-    """2-dim version of `shuffle_1d_nb`."""
-    if seed is not None:
-        np.random.seed(seed)
-    out = np.empty_like(a, dtype=np.bool_)
-
-    for col in range(a.shape[1]):
-        out[:, col] = np.random.permutation(a[:, col])
-    return out
-
-
-@njit(cache=True)
 def rand_choice_nb(from_i, to_i, col, n):
     """`choice_func_nb` to randomly pick `n` values from range `[from_i, to_i)`.
 

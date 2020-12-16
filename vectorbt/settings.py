@@ -12,7 +12,7 @@ Changes take effect immediately."""
 
 import numpy as np
 import json
-import os
+import pkgutil
 
 from vectorbt.utils.config import Config
 
@@ -60,17 +60,13 @@ __pdoc__['contrast_color_schema'] = f"""Neon color schema.
 """
 
 # Templates
-with open(os.path.join(os.path.dirname(__file__), 'templates/light.json')) as json_file:
-    light_template = Config(json.load(json_file))
-    """_"""
+light_template = Config(json.loads(pkgutil.get_data(__name__, "templates/light.json")))
 
-    __pdoc__['light_template'] = "Light template."
+__pdoc__['light_template'] = "Light template."
 
-with open(os.path.join(os.path.dirname(__file__), 'templates/dark.json')) as json_file:
-    dark_template = Config(json.load(json_file))
-    """_"""
+dark_template = Config(json.loads(pkgutil.get_data(__name__, "templates/dark.json")))
 
-    __pdoc__['dark_template'] = "Dark template."
+__pdoc__['dark_template'] = "Dark template."
 
 # Layout
 layout = Config(

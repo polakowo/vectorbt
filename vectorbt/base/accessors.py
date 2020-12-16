@@ -65,11 +65,11 @@ class Base_Accessor:
         return pd.DataFrame(np.full(shape, fill_value), **kwargs)
 
     @classmethod
-    def empty_like(cls, other, fill_value=np.nan):
+    def empty_like(cls, other, fill_value=np.nan, **kwargs):
         """Generate an empty Series/DataFrame like `other` and fill with `fill_value`."""
         if checks.is_series(other):
-            return cls.empty(other.shape, fill_value=fill_value, index=other.index, name=other.name)
-        return cls.empty(other.shape, fill_value=fill_value, index=other.index, columns=other.columns)
+            return cls.empty(other.shape, fill_value=fill_value, index=other.index, name=other.name, **kwargs)
+        return cls.empty(other.shape, fill_value=fill_value, index=other.index, columns=other.columns, **kwargs)
 
     # ############# Index and columns ############# #
 
@@ -336,10 +336,10 @@ class Base_Accessor:
             objs = (self_or_cls._obj,) + others
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
         broadcasted = tuple(map(reshape_fns.to_2d, broadcasted))
-        concatenated = pd.concat(broadcasted, axis=1, keys=keys)
-        if np.all(concatenated.columns == 0):
-            concatenated.columns = pd.RangeIndex(start=0, stop=len(concatenated.columns), step=1)
-        return concatenated
+        out = pd.concat(broadcasted, axis=1, keys=keys)
+        if not isinstance(out.columns, pd.MultiIndex) and np.all(out.columns == 0):
+            out.columns = pd.RangeIndex(start=0, stop=len(out.columns), step=1)
+        return out
 
     def apply_and_concat(self, ntimes, *args, apply_func=None, to_2d=False, keys=None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.

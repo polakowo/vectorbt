@@ -18,6 +18,28 @@ from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 
 
 @njit(cache=True)
+def shuffle_1d_nb(a, seed=None):
+    """Shuffle each column in `a`.
+
+    Specify `seed` to make output deterministic."""
+    if seed is not None:
+        np.random.seed(seed)
+    return np.random.permutation(a)
+
+
+@njit(cache=True)
+def shuffle_nb(a, seed=None):
+    """2-dim version of `shuffle_1d_nb`."""
+    if seed is not None:
+        np.random.seed(seed)
+    out = np.empty_like(a, dtype=a.dtype)
+
+    for col in range(a.shape[1]):
+        out[:, col] = np.random.permutation(a[:, col])
+    return out
+
+
+@njit(cache=True)
 def prepend_1d_nb(a, n, value):
     """Prepend value `n` times."""
     out = np.empty(a.shape[0] + n, dtype=np.float_)
