@@ -1808,13 +1808,11 @@ class Portfolio(Wrapping):
             )
         else:
             close = to_2d(self.fill_close(), raw=True)
-            init_cash = to_1d(self.init_cash(group_by=False), raw=True)
             total_profit = nb.total_profit_nb(
                 self.wrapper.shape_2d,
                 close,
                 self._orders.values,
-                self._orders.col_mapper.col_map,
-                init_cash
+                self._orders.col_mapper.col_map
             )
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by)
 

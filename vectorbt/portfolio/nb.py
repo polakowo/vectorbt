@@ -2475,13 +2475,13 @@ def value_nb(cash, holding_value):
 
 
 @njit(cache=True)
-def total_profit_nb(target_shape, close, order_records, col_map, init_cash):
+def total_profit_nb(target_shape, close, order_records, col_map):
     """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
     col_idxs, col_ns = col_map
     shares = np.full(target_shape[1], 0., dtype=np.float_)
-    cash = init_cash.copy()
+    cash = np.full(target_shape[1], 0., dtype=np.float_)
 
     for col in range(col_idxs.shape[0]):
         n = col_ns[col]
@@ -2513,7 +2513,7 @@ def total_profit_nb(target_shape, close, order_records, col_map, init_cash):
                 order_cash = record['size'] * record['price'] - record['fees']
                 cash[col] = add_nb(cash[col], order_cash)
 
-    return cash + shares * close[-1, :] - init_cash
+    return cash + shares * close[-1, :]
 
 
 @njit(cache=True)
