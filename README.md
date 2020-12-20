@@ -351,9 +351,11 @@ sma_timeperiod    2    3
 
 ![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/Box.png)
 
-## [Documentation](https://polakowo.io/vectorbt/)
+## Resources
 
-## Example notebooks
+Head over to the [documentation](https://polakowo.io/vectorbt) to get started.
+
+### Notebooks
 
 - [Assessing performance of DMAC on Bitcoin](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/BitcoinDMAC.ipynb)
 - [Comparing effectiveness of stop signals](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/StopSignals.ipynb)
@@ -361,9 +363,13 @@ sma_timeperiod    2    3
 
 Note: you need to run the notebook to play with widgets.
 
-## Dashboards
+### Dashboards
 
 - [Detecting and backtesting common candlestick patterns](https://github.com/polakowo/vectorbt/tree/master/apps/candlestick-patterns)
+
+### Articles
+
+- [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
 
 ## How to contribute
 
