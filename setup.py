@@ -26,7 +26,7 @@ setup(
         'numba>=0.51.2'
     ],
     python_requires='>=3.6, <3.9',
-    license='GPLv3+',
+    license='Apache 2.0',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
