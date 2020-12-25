@@ -27,7 +27,8 @@ class SignalFactory(IndicatorFactory):
         iteratively (bool): Whether to use entries to iteratively generate new entries and exits.
 
             If True, uses `entries` as input and `new_entries` and `exits` as outputs.
-        **kwargs: Keyword arguments passed to `vectorbt.indicators.factory.IndicatorFactory`.
+
+    Other arguments are passed to `vectorbt.indicators.factory.IndicatorFactory`.
     ```"""
 
     def __init__(self,
@@ -313,17 +314,7 @@ class SignalFactory(IndicatorFactory):
         >>> # Build signal generator
         >>> MySignals = SignalFactory(
         ...     in_output_names=['rand_type'],
-        ...     in_output_settings=dict(
-        ...         rand_type=dict(
-        ...             dtype=int,
-        ...             default=-1
-        ...         )
-        ...     ),
         ...     param_names=['prob1', 'prob2'],
-        ...     param_settings=dict(
-        ...         prob1=flex_elem_param_config,  # param per frame/row/col/element
-        ...         prob2=flex_elem_param_config
-        ...     ),
         ...     attr_settings=dict(
         ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
         ...     ),
@@ -335,7 +326,12 @@ class SignalFactory(IndicatorFactory):
         ...         pass_params=['prob1', 'prob2'],
         ...         pass_kwargs=['temp_idx_arr1', 'temp_idx_arr2', 'flex_2d']
         ...     ),
-        ...     forward_flex_2d=True
+        ...     param_settings=dict(
+        ...         prob1=flex_elem_param_config,  # param per frame/row/col/element
+        ...         prob2=flex_elem_param_config
+        ...     ),
+        ...     forward_flex_2d=True,
+        ...     rand_type=-1  # fill with this value
         ... )
 
         >>> # Run signal generator
