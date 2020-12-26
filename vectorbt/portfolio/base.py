@@ -1960,8 +1960,8 @@ class Portfolio(Wrapping):
             return agg_stats_sr
         return stats_df
 
-    def returns_stats(self, column=None, group_by=None, active_returns=False,
-                      in_sim_order=False, agg_func=lambda x: x.mean(axis=0), **kwargs):
+    def returns_stats(self, column=None, group_by=None, active_returns=False, in_sim_order=False,
+                      agg_func=lambda x: x.mean(axis=0), year_freq=None, **kwargs):
         """Compute various statistics on returns of this portfolio.
 
         For keyword arguments and notes, see `Portfolio.stats`.
@@ -1977,7 +1977,7 @@ class Portfolio(Wrapping):
         # Run stats
         if 'benchmark_rets' not in kwargs:
             kwargs['benchmark_rets'] = self.market_returns(group_by=group_by)
-        stats_obj = returns.vbt.returns.stats(**kwargs)
+        stats_obj = returns.vbt.returns(freq=self.wrapper.freq, year_freq=year_freq).stats(**kwargs)
 
         # Select columns or reduce
         if checks.is_series(stats_obj):
