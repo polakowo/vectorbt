@@ -2366,8 +2366,7 @@ def cash_nb(cash_flow, group_lens, init_cash):
         for i in range(cash_flow.shape[0]):
             for col in range(from_col, to_col):
                 cash_now = init_cash[col] if i == 0 else out[i - 1, col]
-                flow_value = cash_flow[i, col]
-                out[i, col] = add_nb(cash_now, flow_value)
+                out[i, col] = add_nb(cash_now, cash_flow[i, col])
         from_col = to_col
     return out
 
@@ -2386,7 +2385,8 @@ def cash_in_sim_order_nb(cash_flow, group_lens, init_cash_grouped, call_seq):
         for i in range(cash_flow.shape[0]):
             for k in range(group_len):
                 col = from_col + call_seq[i, from_col + k]
-                out[i, col] = add_nb(cash_now, cash_flow[i, col])
+                cash_now = add_nb(cash_now, cash_flow[i, col])
+                out[i, col] = cash_now
         from_col = to_col
     return out
 
