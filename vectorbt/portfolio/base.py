@@ -456,7 +456,8 @@ class Portfolio(Wrapping):
                      slippage=None, min_size=None, max_size=None, reject_prob=None, close_first=None,
                      allow_partial=None, raise_reject=None, accumulate=None, log=None, conflict_mode=None,
                      direction=None, val_price=None, init_cash=None, cash_sharing=None, call_seq=None,
-                     seed=None, freq=None, group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
+                     max_orders=None, max_logs=None, seed=None, group_by=None, broadcast_kwargs=None,
+                     wrapper_kwargs=None, freq=None, **kwargs):
         """Simulate portfolio from entry and exit signals.
 
         Starting with initial cash `init_cash`, for each signal in `entries`, enters a position by
@@ -541,11 +542,20 @@ class Portfolio(Wrapping):
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
                 See `call_seq` in `Portfolio.from_orders`.
+            max_orders (int): Size of the order records array.
+                Defaults to the number of elements in the broadcasted shape.
+
+                Set to a lower number if you run out of memory.
+            max_logs (int): Size of the log records array.
+                Defaults to the number of elements in the broadcasted shape if any of the `log` is True,
+                otherwise to 1.
+
+                Set to a lower number if you run out of memory.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
-            freq (any): Index frequency in case `close.index` is not datetime-like.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
+            freq (any): Index frequency in case `close.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
@@ -762,6 +772,12 @@ class Portfolio(Wrapping):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+        if max_orders is None:
+            max_orders = target_shape_2d[0] * target_shape_2d[1]
+        if max_logs is None:
+            max_logs = target_shape_2d[0] * target_shape_2d[1]
+        if not np.any(log):
+            max_logs = 1
 
         # Perform calculation
         order_records, log_records = nb.simulate_from_signals_nb(
@@ -771,6 +787,8 @@ class Portfolio(Wrapping):
             call_seq,
             auto_call_seq,
             *broadcasted_args[1:],
+            max_orders,
+            max_logs,
             close.ndim == 2
         )
 
@@ -790,8 +808,8 @@ class Portfolio(Wrapping):
     def from_orders(cls, close, size, size_type=None, direction=None, price=None, fees=None,
                     fixed_fees=None, slippage=None, min_size=None, max_size=None, reject_prob=None,
                     close_first=None, allow_partial=None, raise_reject=None, log=None, val_price=None,
-                    init_cash=None, cash_sharing=None, call_seq=None, freq=None, seed=None,
-                    group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
+                    init_cash=None, cash_sharing=None, call_seq=None, max_orders=None, max_logs=None,
+                    seed=None, group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
         """Simulate portfolio from orders.
 
         Starting with initial cash `init_cash`, orders the number of shares specified in `size`
@@ -902,11 +920,21 @@ class Portfolio(Wrapping):
                         leave them without required funds.
 
                     For more control, use `Portfolio.from_order_func`.
+            max_orders (int): Size of the order records array.
+                Defaults to the number of elements in the broadcasted shape.
+
+                Set to a lower number if you run out of memory.
+            max_logs (int): Size of the log records array.
+                Defaults to the number of elements in the broadcasted shape if any of the `log` is True,
+                otherwise to 1.
+
+                Set to a lower number if you run out of memory.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
-            freq (any): Index frequency in case `close.index` is not datetime-like.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
+            freq (any): Index frequency in case `close.index` is not datetime-like.
+            **kwargs: Keyword arguments passed to the `__init__` method.
 
         All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
@@ -1100,6 +1128,12 @@ class Portfolio(Wrapping):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+        if max_orders is None:
+            max_orders = target_shape_2d[0] * target_shape_2d[1]
+        if max_logs is None:
+            max_logs = target_shape_2d[0] * target_shape_2d[1]
+        if not np.any(log):
+            max_logs = 1
 
         # Perform calculation
         order_records, log_records = nb.simulate_from_orders_nb(
@@ -1109,6 +1143,8 @@ class Portfolio(Wrapping):
             call_seq,
             auto_call_seq,
             *broadcasted_args[1:],
+            max_orders,
+            max_logs,
             close.ndim == 2
         )
 
@@ -1129,8 +1165,8 @@ class Portfolio(Wrapping):
                         init_cash=None, cash_sharing=None, call_seq=None, active_mask=None,
                         prep_func_nb=None, prep_args=None, group_prep_func_nb=None, group_prep_args=None,
                         row_prep_func_nb=None, row_prep_args=None, segment_prep_func_nb=None,
-                        segment_prep_args=None, row_wise=None, seed=None, freq=None, group_by=None,
-                        broadcast_kwargs=None, wrapper_kwargs=None, **kwargs):
+                        segment_prep_args=None, row_wise=None, log=None, max_orders=None, max_logs=None,
+                        seed=None, group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
         """Build portfolio from a custom order function.
 
         For details, see `vectorbt.portfolio.nb.simulate_nb`.
@@ -1203,11 +1239,19 @@ class Portfolio(Wrapping):
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
 
                 See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+            max_orders (int): Size of the order records array.
+                Defaults to the number of elements in the broadcasted shape.
+
+                Set to a lower number if you run out of memory.
+            max_logs (int): Size of the log records array.
+                Defaults to the number of elements in the broadcasted shape.
+
+                Set to a lower number if you run out of memory.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
-            freq (any): Index frequency in case `close.index` is not datetime-like.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
+            freq (any): Index frequency in case `close.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `vectorbt.settings.portfolio`.
@@ -1430,6 +1474,10 @@ class Portfolio(Wrapping):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
+        if max_orders is None:
+            max_orders = target_shape_2d[0] * target_shape_2d[1]
+        if max_logs is None:
+            max_logs = target_shape_2d[0] * target_shape_2d[1]
 
         # Prepare arguments
         if prep_func_nb is None:
@@ -1466,7 +1514,9 @@ class Portfolio(Wrapping):
                 segment_prep_func_nb,
                 segment_prep_args,
                 order_func_nb,
-                order_args
+                order_args,
+                max_orders,
+                max_logs
             )
         else:
             order_records, log_records = nb.simulate_nb(
@@ -1484,7 +1534,9 @@ class Portfolio(Wrapping):
                 segment_prep_func_nb,
                 segment_prep_args,
                 order_func_nb,
-                order_args
+                order_args,
+                max_orders,
+                max_logs
             )
 
         # Create an instance

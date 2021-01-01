@@ -1109,6 +1109,18 @@ class TestFromSignals:
             ])
         )
 
+    def test_max_orders(self):
+        _ = from_signals_all(price=price_wide)
+        _ = from_signals_all(price=price_wide, max_orders=6)
+        with pytest.raises(Exception) as e_info:
+            _ = from_signals_all(price=price_wide, max_orders=5)
+
+    def test_max_logs(self):
+        _ = from_signals_all(price=price_wide, log=True)
+        _ = from_signals_all(price=price_wide, log=True, max_logs=6)
+        with pytest.raises(Exception) as e_info:
+            _ = from_signals_all(price=price_wide, log=True, max_logs=5)
+
 
 # ############# from_orders ############# #
 
@@ -1826,12 +1838,29 @@ class TestFromOrders:
             target_hold_value
         )
 
+    def test_max_orders(self):
+        _ = from_orders_all(price=price_wide)
+        _ = from_orders_all(price=price_wide, max_orders=9)
+        with pytest.raises(Exception) as e_info:
+            _ = from_orders_all(price=price_wide, max_orders=8)
+
+    def test_max_logs(self):
+        _ = from_orders_all(price=price_wide, log=True)
+        _ = from_orders_all(price=price_wide, log=True, max_logs=15)
+        with pytest.raises(Exception) as e_info:
+            _ = from_orders_all(price=price_wide, log=True, max_logs=14)
+
 
 # ############# from_order_func ############# #
 
 @njit
 def order_func_nb(oc, size):
     return nb.create_order_nb(size=size if oc.i % 2 == 0 else -size, price=oc.close[oc.i, oc.col])
+
+
+@njit
+def log_order_func_nb(oc, size):
+    return nb.create_order_nb(size=size if oc.i % 2 == 0 else -size, price=oc.close[oc.i, oc.col], log=True)
 
 
 class TestFromOrderFunc:
@@ -2517,6 +2546,32 @@ class TestFromOrderFunc:
         assert list(row_lst) == [2, 5, 9]
         assert list(segment_lst) == [3, 6, 10, 13]
         assert list(order_lst) == [4, 7, 8, 11, 12, 14]
+
+    @pytest.mark.parametrize(
+        "test_row_wise",
+        [False, True],
+    )
+    def test_max_orders(self, test_row_wise):
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, order_func_nb, np.inf, row_wise=test_row_wise)
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, order_func_nb, np.inf, row_wise=test_row_wise, max_orders=15)
+        with pytest.raises(Exception) as e_info:
+            _ = vbt.Portfolio.from_order_func(
+                price_wide, order_func_nb, np.inf, row_wise=test_row_wise, max_orders=14)
+
+    @pytest.mark.parametrize(
+        "test_row_wise",
+        [False, True],
+    )
+    def test_max_logs(self, test_row_wise):
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, log_order_func_nb, np.inf, row_wise=test_row_wise)
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, log_order_func_nb, np.inf, row_wise=test_row_wise, max_logs=15)
+        with pytest.raises(Exception) as e_info:
+            _ = vbt.Portfolio.from_order_func(
+                price_wide, log_order_func_nb, np.inf, row_wise=test_row_wise, max_logs=14)
 
 
 # ############# Portfolio ############# #

@@ -13,6 +13,7 @@ install:
   - cd ..
   - pip install TA-Lib
 script:
+  - export NUMBA_BOUNDSCHECK=1
   - pytest tests/
   - export NUMBA_DISABLE_JIT=1
   - pytest --cov=vectorbt tests/

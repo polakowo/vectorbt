@@ -710,7 +710,7 @@ def auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr):
 @njit
 def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_seq, active_mask,
                 prep_func_nb, prep_args, group_prep_func_nb, group_prep_args, segment_prep_func_nb,
-                segment_prep_args, order_func_nb, order_args):
+                segment_prep_args, order_func_nb, order_args, max_orders, max_logs):
     """Simulate a portfolio by generating and filling orders.
 
     Starting with initial cash `init_cash`, iterates over each group and column over shape `target_shape`,
@@ -790,6 +790,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
             `*order_args`. Should either return `vectorbt.portfolio.enums.Order`, or
             `vectorbt.portfolio.enums.NoOrder` to do nothing.
         order_args (tuple): Arguments passed to `order_func_nb`.
+        max_orders (int): Size of the order records array.
+        max_logs (int): Size of the log records array.
 
     !!! note
         Broadcasting isn't done automatically: you should either broadcast inputs before passing them
@@ -900,7 +902,9 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     ...     prep_func_nb, (),
     ...     group_prep_func_nb, (),
     ...     segment_prep_func_nb, (),
-    ...     order_func_nb, (fees, fixed_fees, slippage))
+    ...     order_func_nb, (fees, fixed_fees, slippage),
+    ...     target_shape[0] * target_shape[1], 0
+    ... )
     preparing simulation
         preparing group 0
             preparing segment 0 (row)
@@ -951,9 +955,11 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
+    order_records = np.empty(max_orders, dtype=order_dt)
     ridx = 0
-    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    if max_logs == 0:
+        max_logs = 1
+    log_records = np.empty(max_logs, dtype=log_dt)
     lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
@@ -1086,6 +1092,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
                         order = order_func_nb(oc, *segment_prep_out, *order_args)
 
                         # Process the order
+                        if lidx > len(log_records) - 1:
+                            raise IndexError("log_records index out of range")
                         cash_now, shares_now, order_result = process_order_nb(
                             cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
@@ -1103,6 +1111,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 
                         if order_result.status == OrderStatus.Filled:
                             # Add order metadata
+                            if ridx > len(order_records) - 1:
+                                raise IndexError("order_records index out of range")
                             order_records[ridx]['id'] = ridx
                             order_records[ridx]['idx'] = i
                             order_records[ridx]['col'] = col
@@ -1127,7 +1137,8 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
 @njit
 def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_seq,
                          active_mask, prep_func_nb, prep_args, row_prep_func_nb, row_prep_args,
-                         segment_prep_func_nb, segment_prep_args, order_func_nb, order_args):
+                         segment_prep_func_nb, segment_prep_args, order_func_nb, order_args,
+                         max_orders, max_logs):
     """Same as `simulate_nb`, but iterates using row-major order, with the rows
     changing fastest, and the columns/groups changing slowest.
 
@@ -1174,9 +1185,11 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
+    order_records = np.empty(max_orders, dtype=order_dt)
     ridx = 0
-    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    if max_logs == 0:
+        max_logs = 1
+    log_records = np.empty(max_logs, dtype=log_dt)
     lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
@@ -1306,6 +1319,8 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
                         order = order_func_nb(oc, *segment_prep_out, *order_args)
 
                         # Process the order
+                        if lidx > len(log_records) - 1:
+                            raise IndexError("log_records index out of range")
                         cash_now, shares_now, order_result = process_order_nb(
                             cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
@@ -1323,6 +1338,8 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 
                         if order_result.status == OrderStatus.Filled:
                             # Add order metadata
+                            if ridx > len(order_records) - 1:
+                                raise IndexError("order_records index out of range")
                             order_records[ridx]['id'] = ridx
                             order_records[ridx]['idx'] = i
                             order_records[ridx]['col'] = col
@@ -1348,7 +1365,7 @@ def simulate_row_wise_nb(target_shape, close, group_lens, init_cash, cash_sharin
 def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_call_seq,
                             size, size_type, direction, price, fees, fixed_fees, slippage,
                             min_size, max_size, reject_prob, close_first, allow_partial,
-                            raise_reject, log, val_price, flex_2d):
+                            raise_reject, log, val_price, max_orders, max_logs, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on orders.
 
     Utilizes flexible broadcasting.
@@ -1361,9 +1378,11 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
+    order_records = np.empty(max_orders, dtype=order_dt)
     ridx = 0
-    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    if max_logs == 0:
+        max_logs = 1
+    log_records = np.empty(max_logs, dtype=log_dt)
     lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
@@ -1442,6 +1461,8 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
                 )
 
                 # Process the order
+                if lidx > len(log_records) - 1:
+                    raise IndexError("log_records index out of range")
                 cash_now, shares_now, order_result = process_order_nb(
                     cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
@@ -1459,6 +1480,8 @@ def simulate_from_orders_nb(target_shape, group_lens, init_cash, call_seq, auto_
 
                 if order_result.status == OrderStatus.Filled:
                     # Add order metadata
+                    if ridx > len(order_records) - 1:
+                        raise IndexError("order_records index out of range")
                     order_records[ridx]['id'] = ridx
                     order_records[ridx]['idx'] = i
                     order_records[ridx]['col'] = col
@@ -1563,7 +1586,7 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
                              entries, exits, size, price, fees, fixed_fees, slippage,
                              min_size, max_size, reject_prob, close_first, allow_partial,
                              raise_reject, accumulate, log, conflict_mode, direction,
-                             val_price, flex_2d):
+                             val_price, max_orders, max_logs, flex_2d):
     """Adaptation of `simulate_nb` for simulation based on entry and exit signals.
 
     Utilizes flexible broadcasting.
@@ -1574,9 +1597,11 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    order_records = np.empty(target_shape[0] * target_shape[1], dtype=order_dt)
+    order_records = np.empty(max_orders, dtype=order_dt)
     ridx = 0
-    log_records = np.empty(target_shape[0] * target_shape[1], dtype=log_dt)
+    if max_logs == 0:
+        max_logs = 1
+    log_records = np.empty(max_logs, dtype=log_dt)
     lidx = 0
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
@@ -1674,6 +1699,8 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
                     )
 
                     # Process the order
+                    if lidx > len(log_records) - 1:
+                        raise IndexError("log_records index out of range")
                     cash_now, shares_now, order_result = process_order_nb(
                         cash_now, shares_now, val_price_now, value_now, order, log_records[lidx])
 
@@ -1691,6 +1718,8 @@ def simulate_from_signals_nb(target_shape, group_lens, init_cash, call_seq, auto
 
                     if order_result.status == OrderStatus.Filled:
                         # Add order metadata
+                        if ridx > len(order_records) - 1:
+                            raise IndexError("order_records index out of range")
                         order_records[ridx]['id'] = ridx
                         order_records[ridx]['idx'] = i
                         order_records[ridx]['col'] = col
@@ -1833,7 +1862,9 @@ def orders_to_trades_nb(close, order_records, col_map):
     ...     empty_prep_nb, (),
     ...     empty_prep_nb, (),
     ...     empty_prep_nb, (),
-    ...     order_func_nb, (order_size, order_price))
+    ...     order_func_nb, (order_size, order_price),
+    ...     target_shape[0] * target_shape[1], 0
+    ... )
 
     >>> col_map = col_map_nb(order_records['col'], target_shape[1])
     >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
@@ -1859,24 +1890,25 @@ def orders_to_trades_nb(close, order_records, col_map):
     7    0.00000 -0.020100 -0.019901          0       0            5
     ```
     """
-    col_idxs, col_ns = col_map
-    records = np.empty(close.shape[0] * close.shape[1], dtype=trade_dt)
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    records = np.empty(len(order_records), dtype=trade_dt)
     ridx = 0
     entry_size_sum = 0.
     entry_gross_sum = 0.
     entry_fees_sum = 0.
     position_id = -1
 
-    for col in range(col_idxs.shape[0]):
-        n = col_ns[col]
-        if n == 0:
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
             continue
         entry_idx = -1
         direction = -1
         last_id = -1
 
-        for i in range(n):
-            r = col_idxs[col][i]
+        for i in range(col_len):
+            r = col_idxs[col_start_idxs[col] + i]
             record = order_records[r]
 
             if record['id'] < last_id:
@@ -2104,20 +2136,21 @@ def trades_to_positions_nb(trade_records, col_map):
     5    0.00000 -0.02010 -0.019901          0       0  
     ```
     """
-    col_idxs, col_ns = col_map
-    records = np.empty(trade_records.shape[0], dtype=position_dt)
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    records = np.empty(len(trade_records), dtype=position_dt)
     ridx = 0
     from_r = -1
 
-    for col in range(col_idxs.shape[0]):
-        n = col_ns[col]
-        if n == 0:
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
             continue
         last_id = -1
         last_position_id = -1
 
-        for i in range(n):
-            r = col_idxs[col][i]
+        for i in range(col_len):
+            r = col_idxs[col_start_idxs[col] + i]
             record = trade_records[r]
 
             if record['id'] < last_id:
@@ -2179,18 +2212,19 @@ def get_short_size_nb(shares_now, new_shares_now):
 @njit(cache=True)
 def share_flow_nb(target_shape, order_records, col_map, direction):
     """Get share flow series per column. Has opposite sign."""
-    col_idxs, col_ns = col_map
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.full(target_shape, 0., dtype=np.float_)
 
-    for col in range(col_idxs.shape[0]):
-        n = col_ns[col]
-        if n == 0:
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
             continue
         last_id = -1
         shares_now = 0.
 
-        for i in range(n):
-            r = col_idxs[col][i]
+        for i in range(col_len):
+            r = col_idxs[col_start_idxs[col] + i]
             record = order_records[r]
 
             if record['id'] < last_id:
@@ -2257,19 +2291,20 @@ def pos_coverage_grouped_nb(pos_mask, group_lens):
 @njit(cache=True)
 def cash_flow_nb(target_shape, order_records, col_map, short_cash):
     """Get cash flow series per column."""
-    col_idxs, col_ns = col_map
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.full(target_shape, 0., dtype=np.float_)
 
-    for col in range(col_idxs.shape[0]):
-        n = col_ns[col]
-        if n == 0:
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
             continue
         last_id = -1
         shares_now = 0.
         debt_now = 0.
 
-        for i in range(n):
-            r = col_idxs[col][i]
+        for i in range(col_len):
+            r = col_idxs[col_start_idxs[col] + i]
             record = order_records[r]
 
             if record['id'] < last_id:
@@ -2479,18 +2514,19 @@ def total_profit_nb(target_shape, close, order_records, col_map):
     """Get total profit per column.
 
     A much faster version than the one based on `value_nb`."""
-    col_idxs, col_ns = col_map
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
     shares = np.full(target_shape[1], 0., dtype=np.float_)
     cash = np.full(target_shape[1], 0., dtype=np.float_)
 
-    for col in range(col_idxs.shape[0]):
-        n = col_ns[col]
-        if n == 0:
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
             continue
         last_id = -1
 
-        for i in range(n):
-            r = col_idxs[col][i]
+        for i in range(col_len):
+            r = col_idxs[col_start_idxs[col] + i]
             record = order_records[r]
 
             if record['id'] < last_id:
