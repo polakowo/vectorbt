@@ -533,8 +533,8 @@ MACD = IndicatorFactory(
 ).from_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
-    fast_window=26,
-    slow_window=12,
+    fast_window=12,
+    slow_window=26,
     signal_window=9,
     macd_ewm=False,
     signal_ewm=False
@@ -640,6 +640,7 @@ ATR = IndicatorFactory(
 ).from_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
+    window=14,
     ewm=False
 )
 
@@ -650,7 +651,11 @@ class ATR(ATR):
 
     See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
 
-    Use `ATR.run` or `ATR.run_combs` to run the indicator."""
+    Use `ATR.run` or `ATR.run_combs` to run the indicator.
+
+    !!! note
+        Uses Simple MA and Exponential MA as compared to Wilder.
+    """
 
     def plot(self,
              column=None,

@@ -153,23 +153,16 @@ def macd_apply_nb(ts, fast_window, slow_window, signal_window, macd_ewm, signal_
 
 
 @njit(cache=True)
-def nanmax_cube_nb(a):
-    """Return max of a cube by reducing the axis 0."""
-    out = np.empty((a.shape[1], a.shape[2]), dtype=np.float_)
-    for i in range(a.shape[1]):
-        for j in range(a.shape[2]):
-            out[i, j] = np.nanmax(a[:, i, j])
-    return out
-
-
-@njit(cache=True)
-def true_range(high_ts, low_ts, close_ts):
+def true_range_nb(high_ts, low_ts, close_ts):
     """Calculate true range."""
     prev_close = generic_nb.fshift_nb(close_ts, 1)
     tr1 = high_ts - low_ts
     tr2 = np.abs(high_ts - prev_close)
     tr3 = np.abs(low_ts - prev_close)
-    tr = nanmax_cube_nb(np.stack((tr1, tr2, tr3)))
+    tr = np.empty(prev_close.shape, dtype=np.float_)
+    for col in range(tr.shape[1]):
+        for i in range(tr.shape[0]):
+            tr[i, col] = max(tr1[i, col], tr2[i, col], tr3[i, col])
     return tr
 
 
@@ -177,8 +170,7 @@ def true_range(high_ts, low_ts, close_ts):
 def atr_cache_nb(high_ts, low_ts, close_ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.ATR`."""
     # Calculate TR here instead of re-calculating it for each param in atr_apply_nb
-    tr = true_range(high_ts, low_ts, close_ts)
-
+    tr = true_range_nb(high_ts, low_ts, close_ts)
     cache_dict = dict()
     for i in range(len(windows)):
         h = hash((windows[i], ewms[i]))
