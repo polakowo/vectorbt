@@ -495,11 +495,11 @@ class Portfolio(Wrapping):
             price (array_like of float): Order price.
                 Defaults to `close`. Will broadcast.
             fees (float or array_like): Fees in percentage of the order value.
-                Will broadcast.
+                Will broadcast. Note that 0.01 = 1%.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
                 Will broadcast.
             slippage (float or array_like): Slippage in percentage of price.
-                Will broadcast.
+                Will broadcast. Note that 0.01 = 1%.
             min_size (float or array_like): Minimum size for an order to be accepted.
                 Will broadcast.
             max_size (float or array_like): Maximum size for an order.
@@ -843,11 +843,11 @@ class Portfolio(Wrapping):
             price (array_like of float): Order price.
                 Defaults to `close`. Will broadcast.
             fees (float or array_like): Fees in percentage of the order value.
-                Will broadcast.
+                Will broadcast. Note that 0.01 = 1%.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
                 Will broadcast.
             slippage (float or array_like): Slippage in percentage of price.
-                Will broadcast.
+                Will broadcast. Note that 0.01 = 1%.
             min_size (float or array_like): Minimum size for an order to be accepted.
                 Will broadcast.
             max_size (float or array_like): Maximum size for an order.
