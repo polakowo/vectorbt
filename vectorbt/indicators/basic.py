@@ -641,7 +641,7 @@ ATR = IndicatorFactory(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
     window=14,
-    ewm=False
+    ewm=True
 )
 
 
