@@ -26,7 +26,7 @@ class Orders(Records):
 
     >>> price = pd.Series([1., 2., 3., 2., 1.])
     >>> size = pd.Series([1., 1., 1., 1., -1.])
-    >>> orders = vbt.Portfolio.from_orders(price, size).orders()
+    >>> orders = vbt.Portfolio.from_orders(price, size).orders
 
     >>> orders.buy.count()
     4

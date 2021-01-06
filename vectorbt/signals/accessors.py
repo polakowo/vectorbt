@@ -4,8 +4,6 @@
     The underlying Series/DataFrame should already be a signal series.
 
     Input arrays should be `np.bool`.
-
-    Accessors do not utilize caching.
     
 ```python-repl
 >>> import vectorbt as vbt

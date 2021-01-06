@@ -48,7 +48,7 @@ class Trades(Records):
     >>> vbt.Portfolio.from_orders(
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., 1., 1., 1., -4.]),
-    ...     fixed_fees=1.).trades().records
+    ...     fixed_fees=1.).trades.records
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   4.0          0          2.5         4.0         4         5.0
 
@@ -61,7 +61,7 @@ class Trades(Records):
     >>> vbt.Portfolio.from_orders(
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([4., -1., -1., -1., -1.]),
-    ...     fixed_fees=1.).trades().records
+    ...     fixed_fees=1.).trades.records
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.0          0          1.0        0.25         1         2.0
     1   1    0   1.0          0          1.0        0.25         2         3.0
@@ -80,7 +80,7 @@ class Trades(Records):
     >>> vbt.Portfolio.from_orders(
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., -2., 2., -2., 1.]),
-    ...     fixed_fees=1.).trades().records
+    ...     fixed_fees=1.).trades.records
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.0          0          1.0         1.0         1         2.0
     1   1    0   1.0          1          2.0         0.5         2         3.0
@@ -100,7 +100,7 @@ class Trades(Records):
     >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
     >>> portfolio = vbt.Portfolio.from_orders(price, orders)
 
-    >>> trades = vbt.Trades.from_orders(portfolio.orders())
+    >>> trades = vbt.Trades.from_orders(portfolio.orders)
     >>> trades.count()
     6
     >>> trades.pnl.sum()
@@ -805,7 +805,7 @@ class Positions(Trades):
     >>> vbt.Portfolio.from_orders(
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., 1., 1., 1., -4.]),
-    ...     fixed_fees=1.).positions().records
+    ...     fixed_fees=1.).positions.records
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   4.0          0          2.5         4.0         4         5.0
 
@@ -818,7 +818,7 @@ class Positions(Trades):
     >>> vbt.Portfolio.from_orders(
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([4., -1., -1., -1., -1.]),
-    ...     fixed_fees=1.).positions().records
+    ...     fixed_fees=1.).positions.records
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   4.0          0          1.0         1.0         4         3.5
 
@@ -831,7 +831,7 @@ class Positions(Trades):
     >>> vbt.Portfolio.from_orders(
     ...     pd.Series([1., 2., 3., 4., 5.]),
     ...     pd.Series([1., -2., 2., -2., 1.]),
-    ...     fixed_fees=1.).positions().records
+    ...     fixed_fees=1.).positions.records
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.0          0          1.0         1.0         1         2.0
     1   1    0   1.0          1          2.0         0.5         2         3.0

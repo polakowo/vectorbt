@@ -222,7 +222,8 @@ portfolio = Config(
         row_wise=False,
         seed=None,
         freq=None,
-        incl_unrealized=False
+        incl_unrealized=False,
+        use_filled_close=True
     ),
     frozen=True
 )

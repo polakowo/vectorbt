@@ -2518,10 +2518,12 @@ def total_profit_nb(target_shape, close, order_records, col_map):
     col_start_idxs = np.cumsum(col_lens) - col_lens
     shares = np.full(target_shape[1], 0., dtype=np.float_)
     cash = np.full(target_shape[1], 0., dtype=np.float_)
+    zero_mask = np.full(target_shape[1], False, dtype=np.bool_)
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
         if col_len == 0:
+            zero_mask[col] = True
             continue
         last_id = -1
 
@@ -2549,7 +2551,9 @@ def total_profit_nb(target_shape, close, order_records, col_map):
                 order_cash = record['size'] * record['price'] - record['fees']
                 cash[col] = add_nb(cash[col], order_cash)
 
-    return cash + shares * close[-1, :]
+    total_profit = cash + shares * close[-1, :]
+    total_profit[zero_mask] = 0.
+    return total_profit
 
 
 @njit(cache=True)

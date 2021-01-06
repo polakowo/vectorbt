@@ -250,7 +250,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 - Drawdown analysis
 
 ```python-repl
->>> pd.Series([2, 1, 3, 2]).vbt.drawdowns().plot().show()
+>>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot().show()
 ```
 
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.png)
@@ -310,7 +310,7 @@ rand_n      0      1      2
 >>> entries = [True, False, True, False, False]
 >>> exits = [False, True, False, True, False]
 >>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
->>> portfolio.trades().plot().show()
+>>> portfolio.trades.plot().show()
 ```
 
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.png)

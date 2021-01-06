@@ -44,7 +44,7 @@ drawdown records for any time series and analyze them right away.
 Moreover, all time series accessors have a method `drawdowns`:
 
 ```python-repl
->>> price.vbt.drawdowns().current_drawdown()
+>>> price.vbt.drawdowns.current_drawdown()
 -0.4473361334272673
 ```
 

@@ -1302,14 +1302,14 @@ def simulate_portfolio(df, interval, date_range, selected_data, entry_patterns, 
     aligned_portfolio = _simulate_portfolio(np.hstack((main_size[:, None], rand_size)))
     # Fixate initial cash for indexing
     aligned_portfolio = aligned_portfolio.copy(
-        init_cash=aligned_portfolio.init_cash()
+        init_cash=aligned_portfolio.init_cash
     )
     # Separate portfolios
     main_portfolio = aligned_portfolio.iloc[0]
     rand_portfolio = aligned_portfolio.iloc[1:]
 
     # Simulate buy & hold portfolio
-    hold_portfolio = _simulate_portfolio(hold_size, init_cash=main_portfolio.init_cash())
+    hold_portfolio = _simulate_portfolio(hold_size, init_cash=main_portfolio.init_cash)
 
     return main_portfolio, hold_portfolio, rand_portfolio
 

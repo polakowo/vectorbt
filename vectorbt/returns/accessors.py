@@ -2,8 +2,6 @@
 
 !!! note
     The underlying Series/DataFrame must already be a return series.
-
-    Accessors do not utilize caching.
 """
 
 import numpy as np
@@ -14,6 +12,7 @@ from vectorbt.root_accessors import register_dataframe_accessor, register_series
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import reshape_fns
 from vectorbt.generic.accessors import (
     Generic_Accessor,
@@ -279,13 +278,19 @@ class Returns_Accessor(Generic_Accessor):
         """Total maximum drawdown (MDD)."""
         return self.wrapper.wrap_reduced(nb.max_drawdown_nb(self.to_2d_array()))
 
-    def drawdowns(self, group_by=None, **kwargs):
+    @cached_property
+    def drawdowns(self):
+        """`Returns_Accessor.get_drawdowns` with default arguments."""
+        return self.get_drawdowns()
+
+    @cached_method
+    def get_drawdowns(self, group_by=None, **kwargs):
         """Generate drawdown records of cumulative returns.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         if group_by is None:
             group_by = self.wrapper.grouper.group_by
-        return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).drawdowns(**kwargs)
+        return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).get_drawdowns(**kwargs)
 
     def stats(self, benchmark_rets, levy_alpha=2.0, risk_free=0., required_return=0.):
         """Compute various statistics on these returns.

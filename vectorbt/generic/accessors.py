@@ -3,8 +3,6 @@
 !!! note
     Input arrays can be of any type, but most output arrays are `np.float64`.
 
-    Accessors do not utilize caching.
-
     Grouping is only supported by the methods that accept the `group_by` argument.
     
 ```python-repl
@@ -43,6 +41,7 @@ import warnings
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
 from vectorbt.base.class_helpers import add_nb_methods
@@ -776,7 +775,13 @@ class Generic_Accessor(Base_Accessor):
         """Drawdown series."""
         return self.wrapper.wrap(self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1)
 
-    def drawdowns(self, group_by=None, **kwargs):
+    @cached_property
+    def drawdowns(self):
+        """`Generic_Accessor.get_drawdowns` with default arguments."""
+        return self.get_drawdowns()
+
+    @cached_method
+    def get_drawdowns(self, group_by=None, **kwargs):
         """Generate drawdown records.
 
         See `vectorbt.generic.drawdowns.Drawdowns`."""
