@@ -24,15 +24,15 @@ def insert_argsort_nb(A, I):
 
     In-memory and without recursion -> very fast for smaller arrays."""
     for j in range(1, len(A)):
-        key = A[j]
-        key2 = I[j]
+        A_j = A[j]
+        I_j = I[j]
         i = j - 1
-        while (i >= 0) & (A[i] > key):
+        while i >= 0 and (A[i] > A_j or np.isnan(A[i])):
             A[i + 1] = A[i]
             I[i + 1] = I[i]
             i = i - 1
-        A[i + 1] = key
-        I[i + 1] = key2
+        A[i + 1] = A_j
+        I[i + 1] = I_j
 
 
 def get_ranges_arr(starts, ends):
