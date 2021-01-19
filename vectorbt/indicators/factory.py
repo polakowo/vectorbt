@@ -124,7 +124,8 @@ series with different shapes will broadcast them to a single shape.
 ```python-repl
 >>> MyInd = vbt.IndicatorFactory(
 ...     input_names=['price1', 'price2'],
-...     param_names=['p1', 'p2']
+...     param_names=['p1', 'p2'],
+...     output_names=['output']
 ... ).from_apply_func(
 ...     lambda price1, price2, p1, p2: price1 * p1 + price2 * p2
 ... )
@@ -136,7 +137,7 @@ series with different shapes will broadcast them to a single shape.
 2020-01-03     9.0
 2020-01-04     8.0
 2020-01-05     7.0
-Name: (1, 2, a, b), dtype: float64
+Name: (1, 2), dtype: float64
 
 >>> myInd = MyInd.run(price, price['b'], 1, 2)
 >>> myInd.output
@@ -283,7 +284,7 @@ from collections import OrderedDict
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
-from vectorbt.utils.config import merge_dicts, Configured
+from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import ParamIndexerFactory
@@ -295,7 +296,7 @@ def flatten_param_tuples(param_tuples):
     param_list = []
     unzipped_tuples = zip(*param_tuples)
     for i, unzipped in enumerate(unzipped_tuples):
-        unzipped = tuple(unzipped)
+        unzipped = list(unzipped)
         if isinstance(unzipped[0], tuple):
             param_list.extend(flatten_param_tuples(unzipped))
         else:
@@ -317,9 +318,9 @@ def create_param_combs(op_tree, depth=0):
     >>> from itertools import combinations, product
 
     >>> create_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
-    [(0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2),
-     (1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3),
-     (4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5)]
+    [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
+     [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
+     [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]]
     ```
     """
     checks.assert_type(op_tree, tuple)
@@ -348,15 +349,15 @@ def broadcast_params(param_list):
             new_params = []
             for j in range(max_len):
                 new_params.append(params[0])
-            new_param_list.append(tuple(new_params))
+            new_param_list.append(list(new_params))
         else:
-            new_param_list.append(tuple(params))
+            new_param_list.append(list(params))
     return new_param_list
 
 
 def create_param_product(param_list):
     """Make Cartesian product out of all params in `param_list`."""
-    return list(map(tuple, zip(*list(itertools.product(*param_list)))))
+    return list(map(list, zip(*list(itertools.product(*param_list)))))
 
 
 def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
@@ -376,9 +377,9 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
             # Array is treated as multiple values
             check_against = (list, tuple, List, np.ndarray)
         if isinstance(params, check_against):
-            new_params = tuple(params)
+            new_params = list(params)
         else:
-            new_params = (params,)
+            new_params = [params]
         if bc_to_input is not False:
             # Broadcast to input or its axis
             if input_shape is None:
@@ -407,7 +408,7 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
                     keep_raw = broadcast_kwargs.get('keep_raw', False)
                     if keep_raw is False or (isinstance(keep_raw, (tuple, list)) and not keep_raw[j]):
                         __new_params[j] = reshape_fns.to_2d(param)
-                new_params = tuple(__new_params)
+                new_params = __new_params
             else:
                 new_params = _new_params
         new_param_list.append(new_params)
@@ -421,10 +422,12 @@ def reindex_outputs(new_params, from_params, n_ts_cols):
     return idx_map[idxs].flatten()
 
 
-def build_column_hierarchy(param_list, level_names, input_columns, hide_levels=[]):
+def build_column_hierarchy(param_list, level_names, input_columns, hide_levels=None):
     """For each parameter in `param_list`, create a new column level with parameter values. 
     Combine this level with columns `input_columns` using Cartesian product."""
     checks.assert_len_equal(param_list, level_names)
+    if hide_levels is None:
+        hide_levels = []
 
     param_indexes = []
     for i in range(len(param_list)):
@@ -702,6 +705,10 @@ def run_pipeline(
             # Broadcast such that each array has the same length
             param_list = broadcast_params(param_list)
     n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
+    if checks.is_numba_func(custom_func):
+        param_list_passed = [List(params) for params in param_list]
+    else:
+        param_list_passed = param_list
 
     # Reshape inputs
     input_list_passed = input_list
@@ -726,10 +733,12 @@ def run_pipeline(
             in_output_shape = (input_shape_passed[0], input_shape_passed[1] * n_param_values)
             in_output = np.empty(in_output_shape, dtype=dtype)
         in_output_list[i] = in_output
-        in_output_tuple = ()
+        in_outputs = []
         for i in range(n_param_values):
-            in_output_tuple += (in_output[:, i * input_shape_passed[1]: (i + 1) * input_shape_passed[1]],)
-        in_output_list_passed.append(in_output_tuple)
+            in_outputs.append(in_output[:, i * input_shape_passed[1]: (i + 1) * input_shape_passed[1]])
+        in_output_list_passed.append(in_outputs)
+    if checks.is_numba_func(custom_func):
+        in_output_list_passed = [List(in_outputs) for in_outputs in in_output_list_passed]
 
     # Get raw results
     if use_raw is not None:
@@ -758,21 +767,21 @@ def run_pipeline(
                 output = custom_func(
                     tuple(input_list_passed),
                     tuple(in_output_list_passed),
-                    tuple(param_list),
+                    tuple(param_list_passed),
                     *args, **func_kwargs
                 )
             else:
                 output = custom_func(
                     input_list_passed,
                     in_output_list_passed,
-                    param_list,
+                    param_list_passed,
                     *args, **func_kwargs
                 )
         else:
             output = custom_func(
                 *input_list_passed,
                 *in_output_list_passed,
-                *param_list, 
+                *param_list_passed,
                 *args, **func_kwargs
             )
 
@@ -841,6 +850,7 @@ def run_pipeline(
 
 class Default:
     """Class for wrapping default values."""
+
     def __repr__(self):
         return self.value.__repr__()
 
@@ -1169,9 +1179,9 @@ class IndicatorFactory:
 
             def _isinstance_namedtuple(obj) -> bool:
                 return (
-                    isinstance(obj, tuple) and
-                    hasattr(obj, '_asdict') and
-                    hasattr(obj, '_fields')
+                        isinstance(obj, tuple) and
+                        hasattr(obj, '_asdict') and
+                        hasattr(obj, '_fields')
                 )
 
             if _isinstance_namedtuple(dtype):
@@ -1261,7 +1271,7 @@ class IndicatorFactory:
                          in_output_settings=None,
                          hide_params=None,
                          hide_default=True,
-                         variable_args=False,
+                         var_args=False,
                          keyword_only_args=False,
                          **pipeline_kwargs):
         """Build indicator class around a custom calculation function.
@@ -1294,8 +1304,8 @@ class IndicatorFactory:
                 See `run_pipeline` for keys.
             hide_params (list): Parameter names to hide column levels for.
             hide_default (bool): Whether to hide column levels of parameters with default value.
-            variable_args (bool): Whether `run` and `run_combs` should use starred expression.
-            keyword_only_args (bool): Whether `run` and `run_combs` should accept keyword-only arguments.
+            var_args (bool): Whether `run` and `run_combs` should accept variable arguments (`*args`).
+            keyword_only_args (bool): Whether `run` and `run_combs` should accept keyword-only arguments (`*`).
             **pipeline_kwargs: Keyword arguments passed to `run_pipeline`.
 
                 Can be default values for `param_names` and `in_output_names`, but also custom keyword
@@ -1326,7 +1336,7 @@ class IndicatorFactory:
         ...     input_names=['ts1', 'ts2'],
         ...     param_names=['p1', 'p2'],
         ...     output_names=['o1', 'o2']
-        ... ).from_custom_func(custom_func)
+        ... ).from_custom_func(custom_func, var_args=True)
 
         >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
         >>> myInd.o1
@@ -1366,8 +1376,8 @@ class IndicatorFactory:
         checks.assert_type(in_output_settings, dict)
         if len(in_output_settings) > 0:
             checks.assert_dict_valid(in_output_settings, [in_output_names])
-        if variable_args and keyword_only_args:
-            raise ValueError("variable_args and keyword_only_args cannot be used together")
+        if var_args and keyword_only_args:
+            raise ValueError("var_args and keyword_only_args cannot be used together")
 
         for k, v in pipeline_kwargs.items():
             if k in param_names and not isinstance(v, Default):
@@ -1407,9 +1417,9 @@ class IndicatorFactory:
             in_output_list = args[:len(in_output_names)]
             checks.assert_len_equal(in_output_list, in_output_names)
             args = args[len(in_output_names):]
-            if not variable_args and len(args) > 0:
+            if not var_args and len(args) > 0:
                 raise TypeError("Variable length arguments are not supported by this function "
-                                "(variable_args is set to False)")
+                                "(var_args is set to False)")
 
             # Prepare column levels
             level_names = []
@@ -1481,7 +1491,7 @@ class IndicatorFactory:
             _1 = '*, ' if keyword_only_args else ''
             _2 = pos_names
             _2 = ', '.join(_2) + ', ' if len(_2) > 0 else ''
-            _3 = '*args, ' if variable_args else ''
+            _3 = '*args, ' if var_args else ''
             _4 = ['{}={}'.format(k, k) for k in main_kw_names + other_kw_names]
             _4 = ', '.join(_4) + ', ' if len(_4) > 0 else ''
             _5 = docstring
@@ -1490,9 +1500,9 @@ class IndicatorFactory:
             _7 = ['{}={}'.format(k, k) for k in other_kw_names]
             _7 = ', '.join(_7) + ', ' if len(_7) > 0 else ''
             func_str = "@classmethod\n" \
-                "def {0}(cls, {1}{2}{3}{4}**kwargs):\n" \
-                "    \"\"\"{5}\"\"\"\n" \
-                "    return cls._{0}({6}{3}{7}**kwargs)".format(
+                       "def {0}(cls, {1}{2}{3}{4}**kwargs):\n" \
+                       "    \"\"\"{5}\"\"\"\n" \
+                       "    return cls._{0}({6}{3}{7}**kwargs)".format(
                 _0, _1, _2, _3, _4, _5, _6, _7
             )
             scope = {**dict(Default=Default), **default_kwargs}
@@ -1578,9 +1588,9 @@ class IndicatorFactory:
                         param_list[i] = param_list[i].value
                 checks.assert_len_equal(param_list, param_names)
                 args = args[len(param_names):]
-                if not variable_args and len(args) > 0:
+                if not var_args and len(args) > 0:
                     raise TypeError("Variable length arguments are not supported by this function "
-                                    "(variable_args is set to False)")
+                                    "(var_args is set to False)")
 
                 # Prepare params
                 param_settings_list = [param_settings.get(n, {}) for n in param_names]
@@ -1716,7 +1726,7 @@ class IndicatorFactory:
         ...     input_names=['ts1', 'ts2'],
         ...     param_names=['p1', 'p2'],
         ...     output_names=['o1', 'o2']
-        ... ).from_apply_func(apply_func_nb)
+        ... ).from_apply_func(apply_func_nb, var_args=True)
 
         >>> myInd = MyInd.run(price, price * 2, [1, 2], [3, 4], 100)
         >>> myInd.o1
@@ -1743,41 +1753,57 @@ class IndicatorFactory:
             pass_kwargs = []
         output_names = self.output_names
         in_output_names = self.in_output_names
+        param_names = self.param_names
 
         num_ret_outputs = len(output_names) - len(in_output_names)
+
+        # Build a function that selects a parameter tuple
+        _0 = "i"
+        _0 += ", args_before"
+        _0 += ", input_tuple"
+        if len(in_output_names) > 0:
+            _0 += ", in_output_tuples"
+        if len(param_names) > 0:
+            _0 += ", param_tuples"
+        _0 += ", *args"
+        if not checks.is_numba_func(apply_func):
+            _0 += ", **_kwargs"
+        _1 = "*args_before"
+        _1 += ", *input_tuple"
+        if len(in_output_names) > 0:
+            _1 += ", *in_output_tuples[i]"
+        if len(param_names) > 0:
+            _1 += ", *param_tuples[i]"
+        _1 += ", *args"
+        if not checks.is_numba_func(apply_func):
+            _1 += ", **_kwargs"
+        func_str = "def select_params_func({0}):\n   return apply_func({1})".format(_0, _1)
+        scope = {'apply_func': apply_func}
+        filename = inspect.getfile(lambda: None)
+        code = compile(func_str, filename, 'single')
+        exec(code, scope)
+        select_params_func = scope['select_params_func']
+        if checks.is_numba_func(apply_func):
+            select_params_func = njit(select_params_func)
 
         if checks.is_numba_func(apply_func):
             if num_ret_outputs > 1:
                 apply_and_concat_func = combine_fns.apply_and_concat_multiple_nb
             else:
                 apply_and_concat_func = combine_fns.apply_and_concat_one_nb
-
-            @njit
-            def select_params(i, args_before, input_list, in_output_tuples, param_tuples, *args):
-                # Select the next tuple of parameters
-                return apply_func(*args_before, *input_list, *in_output_tuples[i], *param_tuples[i], *args)
-
         else:
             if num_ret_outputs > 1:
                 apply_and_concat_func = combine_fns.apply_and_concat_multiple
             else:
                 apply_and_concat_func = combine_fns.apply_and_concat_one
 
-            def select_params(i, args_before, input_list, in_output_tuples, param_tuples, *args, **_kwargs):
-                # Select the next tuple of parameters
-                return apply_func(*args_before, *input_list, *in_output_tuples[i], *param_tuples[i], *args, **_kwargs)
-
         def custom_func(input_list, in_output_list, param_list, *args, input_shape=None,
                         return_cache=False, use_cache=None, **_kwargs):
 
             n_params = len(param_list[0]) if len(param_list) > 0 else 1
-            input_list = tuple(input_list)
-            in_output_tuples = tuple(zip(*in_output_list))
-            if len(in_output_list) == 0:
-                in_output_tuples = ((),) * n_params
-            param_tuples = tuple(zip(*param_list))
-            if len(param_list) == 0:
-                param_tuples = ((),) * n_params
+            input_tuple = tuple(input_list)
+            in_output_tuples = list(zip(*in_output_list))
+            param_tuples = list(zip(*param_list))
             args_before = ()
             if input_shape is not None:
                 args_before += (input_shape,)
@@ -1794,11 +1820,18 @@ class IndicatorFactory:
             # Caching
             cache = use_cache
             if cache is None and cache_func is not None:
+                _in_output_list = in_output_list
+                _param_list = param_list
+                if checks.is_numba_func(cache_func):
+                    if len(in_output_list) > 0:
+                        _in_output_list = [List(in_outputs) for in_outputs in in_output_list]
+                    if len(param_list) > 0:
+                        _param_list = [List(params) for params in param_list]
                 cache = cache_func(
                     *args_before,
-                    *input_list,
-                    *in_output_list,
-                    *param_list,
+                    *input_tuple,
+                    *_in_output_list,
+                    *_param_list,
                     *args,
                     *more_args,
                     **_kwargs
@@ -1810,17 +1843,33 @@ class IndicatorFactory:
             if not isinstance(cache, (tuple, list, List)):
                 cache = (cache,)
 
+            if len(in_output_names) > 0:
+                _in_output_tuples = in_output_tuples
+                if checks.is_numba_func(apply_func):
+                    _in_output_tuples = List(_in_output_tuples)
+                _in_output_tuples = (_in_output_tuples,)
+            else:
+                _in_output_tuples = ()
+            if len(param_names) > 0:
+                _param_tuples = param_tuples
+                if checks.is_numba_func(apply_func):
+                    _param_tuples = List(_param_tuples)
+                _param_tuples = (_param_tuples,)
+            else:
+                _param_tuples = ()
+
             return apply_and_concat_func(
                 n_params,
-                select_params,
+                select_params_func,
                 args_before,
-                input_list,
-                in_output_tuples,
-                param_tuples,
+                input_tuple,
+                *_in_output_tuples,
+                *_param_tuples,
                 *args,
                 *more_args,
                 *cache,
-                **_kwargs)
+                **_kwargs
+            )
 
         return self.from_custom_func(custom_func, pass_lists=True, **kwargs)
 

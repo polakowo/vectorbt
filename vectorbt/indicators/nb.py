@@ -87,10 +87,11 @@ def bb_apply_nb(ts, window, ewm, alpha, ma_cache_dict, mstd_cache_dict):
 @njit(cache=True)
 def rsi_cache_nb(ts, windows, ewms):
     """Caching function for `vectorbt.indicators.basic.RSI`."""
-    delta = generic_nb.diff_nb(ts)  # otherwise ewma will be all NaN
+    delta = generic_nb.diff_nb(ts)
     up, down = delta.copy(), delta.copy()
     up = generic_nb.set_by_mask_nb(up, up < 0, 0)
     down = np.abs(generic_nb.set_by_mask_nb(down, down > 0, 0))
+
     # Cache
     cache_dict = dict()
     for i in range(len(windows)):
@@ -137,7 +138,11 @@ def stoch_apply_nb(high_ts, low_ts, close_ts, k_window, d_window, d_ewm, cache_d
 @njit(cache=True)
 def macd_cache_nb(ts, fast_windows, slow_windows, signal_windows, macd_ewms, signal_ewms):
     """Caching function for `vectorbt.indicators.basic.MACD`."""
-    return ma_cache_nb(ts, fast_windows + slow_windows, macd_ewms + macd_ewms)
+    windows = fast_windows.copy()
+    windows.extend(slow_windows)
+    ewms = macd_ewms.copy()
+    ewms.extend(macd_ewms)
+    return ma_cache_nb(ts, windows, ewms)
 
 
 @njit(cache=True)

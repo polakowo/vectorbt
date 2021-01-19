@@ -53,7 +53,9 @@ MA = IndicatorFactory(
 
 
 class MA(MA):
-    """A moving average (MA) is a widely used indicator in technical analysis that helps smooth out 
+    """Moving Average (MA).
+
+    A moving average is a widely used indicator in technical analysis that helps smooth out
     price action by filtering out the “noise” from random short-term price fluctuations. 
 
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp).
@@ -139,7 +141,9 @@ MSTD = IndicatorFactory(
 
 
 class MSTD(MSTD):
-    """Standard deviation is an indicator that measures the size of an assets recent price moves
+    """Moving Standard Deviation (MSTD).
+
+    Standard deviation is an indicator that measures the size of an assets recent price moves
     in order to predict how volatile the price may be in the future.
 
     Use `MSTD.run` or `MSTD.run_combs` to run the indicator."""
@@ -215,7 +219,9 @@ BBANDS = IndicatorFactory(
 
 
 class BBANDS(BBANDS):
-    """A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard
+    """Bollinger Bands (BBANDS).
+
+    A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard
     deviations (positively and negatively) away from a simple moving average (SMA) of the security's
     price, but can be adjusted to user preferences.
 
@@ -328,10 +334,12 @@ RSI = IndicatorFactory(
 
 
 class RSI(RSI):
-    """The relative strength index (RSI) is a momentum indicator that measures the magnitude of
-    recent price changes to evaluate overbought or oversold conditions in the price of a stock
-    or other asset. The RSI is displayed as an oscillator (a line graph that moves between two
-    extremes) and can have a reading from 0 to 100.
+    """Relative Strength Index (RSI).
+
+    Compares the magnitude of recent gains and losses over a specified time
+    period to measure speed and change of price movements of a security. It is
+    primarily used to attempt to identify overbought or oversold conditions in
+    the trading of an asset.
 
     See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp).
 
@@ -425,9 +433,11 @@ STOCH = IndicatorFactory(
 
 
 class STOCH(STOCH):
-    """A stochastic oscillator is a momentum indicator comparing a particular closing price of a security
-    to a range of its prices over a certain period of time. It is used to generate overbought and oversold
-    trading signals, utilizing a 0-100 bounded range of values.
+    """Stochastic Oscillator (STOCH).
+
+    A stochastic oscillator is a momentum indicator comparing a particular closing price
+    of a security to a range of its prices over a certain period of time. It is used to
+    generate overbought and oversold trading signals, utilizing a 0-100 bounded range of values.
 
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
 
@@ -542,8 +552,10 @@ MACD = IndicatorFactory(
 
 
 class MACD(MACD):
-    """Moving Average Convergence Divergence (MACD) is a trend-following momentum indicator that
-    shows the relationship between two moving averages of a security’s price.
+    """Moving Average Convergence Divergence (MACD).
+
+    Is a trend-following momentum indicator that shows the relationship between
+    two moving averages of prices.
 
     See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp).
 
@@ -646,8 +658,11 @@ ATR = IndicatorFactory(
 
 
 class ATR(ATR):
-    """The average true range (ATR) is a technical analysis indicator that measures market volatility
-    by decomposing the entire range of an asset price for that period.
+    """Average True Range (ATR).
+
+    The indicator provide an indication of the degree of price volatility.
+    Strong moves, in either direction, are often accompanied by large ranges,
+    or large True Ranges.
 
     See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
 
@@ -726,8 +741,9 @@ OBV = IndicatorFactory(
 
 
 class OBV(OBV):
-    """On-balance volume (OBV) is a technical trading momentum indicator that uses volume flow to predict
-    changes in stock price.
+    """On-balance volume (OBV).
+
+    It relates price and volume in the stock market. OBV is based on a cumulative total volume.
 
     See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp).
 

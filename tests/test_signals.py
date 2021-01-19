@@ -1445,7 +1445,7 @@ class TestFactory:
             ),
             in_out1=np.nan,
             in_out2=np.nan,
-            variable_args=True
+            var_args=True
         )
         my_sig = MySignals.run(
             np.arange(5), np.arange(5), [0, 1], [1, 0],
@@ -1596,7 +1596,7 @@ class TestFactory:
                 )
             ),
             in_out2=np.nan,
-            variable_args=True
+            var_args=True
         )
         e = np.array([True, False, True, False, True])
         my_sig = MySignals.run(e, np.arange(5), [1, 0], 100)
@@ -1699,7 +1699,7 @@ class TestFactory:
                 )
             ),
             in_out2=np.nan,
-            variable_args=True
+            var_args=True
         )
         e = np.array([True, True, True, True, True])
         my_sig = MySignals.run(e, np.arange(5), [1, 0], 100)

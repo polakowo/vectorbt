@@ -3,6 +3,7 @@
 import numpy as np
 from numba import njit
 from numba.typed import List
+import inspect
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
@@ -398,11 +399,11 @@ class SignalFactory(IndicatorFactory):
         def _check_settings(func_settings):
             for k in func_settings:
                 if k not in (
-                        'pass_inputs',
-                        'pass_in_outputs',
-                        'pass_params',
-                        'pass_kwargs',
-                        'pass_cache'
+                    'pass_inputs',
+                    'pass_in_outputs',
+                    'pass_params',
+                    'pass_kwargs',
+                    'pass_cache'
                 ):
                     raise ValueError(f"Can't find key {k} in function settings")
 
@@ -432,40 +433,82 @@ class SignalFactory(IndicatorFactory):
         exit_param_names = _get_func_names(exit_settings, 'pass_params', param_names)
         cache_param_names = _get_func_names(cache_settings, 'pass_params', param_names)
 
+        # Build a function that selects a parameter tuple
         if exit_only and not iteratively:
-            @njit
-            def apply_nb(i, entries, exit_wait, exit_input_list, exit_in_output_tuples,
-                         exit_param_tuples, exit_args):
-                return generate_ex_nb(
-                    entries,
-                    exit_wait,
-                    exit_choice_func,
-                    *exit_input_list,
-                    *exit_in_output_tuples[i],
-                    *exit_param_tuples[i],
-                    *exit_args
-                )
+            _0 = "i"
+            _0 += ", entries"
+            _0 += ", exit_wait"
+            _0 += ", exit_input_tuple"
+            if len(exit_in_output_names) > 0:
+                _0 += ", exit_in_output_tuples"
+            if len(exit_param_names) > 0:
+                _0 += ", exit_param_tuples"
+            _0 += ", exit_args"
+            _1 = "entries"
+            _1 += ", exit_wait"
+            _1 += ", exit_choice_func"
+            _1 += ", *exit_input_tuple"
+            if len(exit_in_output_names) > 0:
+                _1 += ", *exit_in_output_tuples[i]"
+            if len(exit_param_names) > 0:
+                _1 += ", *exit_param_tuples[i]"
+            _1 += ", *exit_args"
+            func_str = "def apply_func_nb({0}):\n   return generate_ex_nb({1})".format(_0, _1)
+            scope = {
+                'generate_ex_nb': generate_ex_nb,
+                'exit_choice_func': exit_choice_func
+            }
+            filename = inspect.getfile(lambda: None)
+            code = compile(func_str, filename, 'single')
+            exec(code, scope)
+            apply_func_nb = scope['apply_func_nb']
+            apply_func_nb = njit(apply_func_nb)
+
         else:
-            @njit
-            def apply_nb(i, shape, entry_wait, exit_wait, entry_input_list, exit_input_list,
-                         entry_in_output_tuples, exit_in_output_tuples, entry_param_tuples,
-                         exit_param_tuples, entry_args, exit_args):
-                return generate_enex_nb(
-                    shape,
-                    entry_wait, exit_wait,
-                    entry_choice_func, (
-                        *entry_input_list,
-                        *entry_in_output_tuples[i],
-                        *entry_param_tuples[i],
-                        *entry_args
-                    ),
-                    exit_choice_func, (
-                        *exit_input_list,
-                        *exit_in_output_tuples[i],
-                        *exit_param_tuples[i],
-                        *exit_args
-                    )
-                )
+            _0 = "i"
+            _0 += ", shape"
+            _0 += ", entry_wait"
+            _0 += ", exit_wait"
+            _0 += ", entry_input_tuple"
+            _0 += ", exit_input_tuple"
+            if len(entry_in_output_names) > 0:
+                _0 += ", entry_in_output_tuples"
+            if len(exit_in_output_names) > 0:
+                _0 += ", exit_in_output_tuples"
+            if len(entry_param_names) > 0:
+                _0 += ", entry_param_tuples"
+            if len(exit_param_names) > 0:
+                _0 += ", exit_param_tuples"
+            _0 += ", entry_args"
+            _0 += ", exit_args"
+            _1 = "shape"
+            _1 += ", entry_wait"
+            _1 += ", exit_wait"
+            _1 += ", entry_choice_func"
+            _1 += ", (*entry_input_tuple"
+            if len(entry_in_output_names) > 0:
+                _1 += ", *entry_in_output_tuples[i]"
+            if len(entry_param_names) > 0:
+                _1 += ", *entry_param_tuples[i]"
+            _1 += ", *entry_args)"
+            _1 += ", exit_choice_func"
+            _1 += ", (*exit_input_tuple"
+            if len(exit_in_output_names) > 0:
+                _1 += ", *exit_in_output_tuples[i]"
+            if len(exit_param_names) > 0:
+                _1 += ", *exit_param_tuples[i]"
+            _1 += ", *exit_args)"
+            func_str = "def apply_func_nb({0}):\n   return generate_enex_nb({1})".format(_0, _1)
+            scope = {
+                'generate_enex_nb': generate_enex_nb,
+                'entry_choice_func': entry_choice_func,
+                'exit_choice_func': exit_choice_func
+            }
+            filename = inspect.getfile(lambda: None)
+            code = compile(func_str, filename, 'single')
+            exec(code, scope)
+            apply_func_nb = scope['apply_func_nb']
+            apply_func_nb = njit(apply_func_nb)
 
         def custom_func(input_list, in_output_list, param_list, *args, input_shape=None, flex_2d=None,
                         entry_args=None, exit_args=None, cache_args=None, entry_kwargs=None,
@@ -518,49 +561,41 @@ class SignalFactory(IndicatorFactory):
             exit_wait = exit_kwargs['wait']
 
             # Distribute arguments across functions
-            entry_input_list = ()
-            exit_input_list = ()
-            cache_input_list = ()
+            entry_input_tuple = ()
+            exit_input_tuple = ()
+            cache_input_tuple = ()
             for input_name in entry_input_names:
-                entry_input_list += (input_list[input_names.index(input_name)],)
+                entry_input_tuple += (input_list[input_names.index(input_name)],)
             for input_name in exit_input_names:
-                exit_input_list += (input_list[input_names.index(input_name)],)
+                exit_input_tuple += (input_list[input_names.index(input_name)],)
             for input_name in cache_input_names:
-                cache_input_list += (input_list[input_names.index(input_name)],)
+                cache_input_tuple += (input_list[input_names.index(input_name)],)
 
-            entry_in_output_list = ()
-            exit_in_output_list = ()
-            cache_in_output_list = ()
+            entry_in_output_list = []
+            exit_in_output_list = []
+            cache_in_output_list = []
             for in_output_name in entry_in_output_names:
-                entry_in_output_list += (in_output_list[in_output_names.index(in_output_name)],)
+                entry_in_output_list.append(in_output_list[in_output_names.index(in_output_name)])
             for in_output_name in exit_in_output_names:
-                exit_in_output_list += (in_output_list[in_output_names.index(in_output_name)],)
+                exit_in_output_list.append(in_output_list[in_output_names.index(in_output_name)])
             for in_output_name in cache_in_output_names:
-                cache_in_output_list += (in_output_list[in_output_names.index(in_output_name)],)
+                cache_in_output_list.append(in_output_list[in_output_names.index(in_output_name)])
 
-            entry_param_list = ()
-            exit_param_list = ()
-            cache_param_list = ()
+            entry_param_list = []
+            exit_param_list = []
+            cache_param_list = []
             for param_name in entry_param_names:
-                entry_param_list += (param_list[param_names.index(param_name)],)
+                entry_param_list.append(param_list[param_names.index(param_name)])
             for param_name in exit_param_names:
-                exit_param_list += (param_list[param_names.index(param_name)],)
+                exit_param_list.append(param_list[param_names.index(param_name)])
             for param_name in cache_param_names:
-                cache_param_list += (param_list[param_names.index(param_name)],)
+                cache_param_list.append(param_list[param_names.index(param_name)])
 
             n_params = len(param_list[0]) if len(param_list) > 0 else 1
-            entry_in_output_tuples = tuple(zip(*entry_in_output_list))
-            if len(entry_in_output_tuples) == 0:
-                entry_in_output_tuples = ((),) * n_params
-            exit_in_output_tuples = tuple(zip(*exit_in_output_list))
-            if len(exit_in_output_tuples) == 0:
-                exit_in_output_tuples = ((),) * n_params
-            entry_param_tuples = tuple(zip(*entry_param_list))
-            if len(entry_param_tuples) == 0:
-                entry_param_tuples = ((),) * n_params
-            exit_param_tuples = tuple(zip(*exit_param_list))
-            if len(exit_param_tuples) == 0:
-                exit_param_tuples = ((),) * n_params
+            entry_in_output_tuples = list(zip(*entry_in_output_list))
+            exit_in_output_tuples = list(zip(*exit_in_output_list))
+            entry_param_tuples = list(zip(*entry_param_list))
+            exit_param_tuples = list(zip(*exit_param_list))
 
             def _build_more_args(func_settings, func_kwargs):
                 pass_kwargs = func_settings.get('pass_kwargs', [])
@@ -583,10 +618,18 @@ class SignalFactory(IndicatorFactory):
             # Caching
             cache = use_cache
             if cache is None and cache_func is not None:
+                _cache_in_output_list = cache_in_output_list
+                _cache_param_list = cache_param_list
+                if checks.is_numba_func(cache_func):
+                    if len(_cache_in_output_list) > 0:
+                        _cache_in_output_list = [List(in_outputs) for in_outputs in _cache_in_output_list]
+                    if len(_cache_param_list) > 0:
+                        _cache_param_list = [List(params) for params in _cache_param_list]
+
                 cache = cache_func(
-                    *cache_input_list,
-                    *cache_in_output_list,
-                    *cache_param_list,
+                    *cache_input_tuple,
+                    *_cache_in_output_list,
+                    *_cache_param_list,
                     *cache_args,
                     *cache_more_args
                 )
@@ -606,29 +649,56 @@ class SignalFactory(IndicatorFactory):
 
             # Apply and concatenate
             if exit_only and not iteratively:
+                if len(exit_in_output_names) > 0:
+                    _exit_in_output_tuples = (List(exit_in_output_tuples),)
+                else:
+                    _exit_in_output_tuples = ()
+                if len(exit_param_names) > 0:
+                    _exit_param_tuples = (List(exit_param_tuples),)
+                else:
+                    _exit_param_tuples = ()
+
                 return combine_fns.apply_and_concat_one_nb(
                     n_params,
-                    apply_nb,
+                    apply_func_nb,
                     input_list[0],
                     exit_wait,
-                    exit_input_list,
-                    exit_in_output_tuples,
-                    exit_param_tuples,
+                    exit_input_tuple,
+                    *_exit_in_output_tuples,
+                    *_exit_param_tuples,
                     exit_args + exit_more_args + exit_cache
                 )
+
             else:
+                if len(entry_in_output_names) > 0:
+                    _entry_in_output_tuples = (List(entry_in_output_tuples),)
+                else:
+                    _entry_in_output_tuples = ()
+                if len(entry_param_names) > 0:
+                    _entry_param_tuples = (List(entry_param_tuples),)
+                else:
+                    _entry_param_tuples = ()
+                if len(exit_in_output_names) > 0:
+                    _exit_in_output_tuples = (List(exit_in_output_tuples),)
+                else:
+                    _exit_in_output_tuples = ()
+                if len(exit_param_names) > 0:
+                    _exit_param_tuples = (List(exit_param_tuples),)
+                else:
+                    _exit_param_tuples = ()
+
                 return combine_fns.apply_and_concat_multiple_nb(
                     n_params,
-                    apply_nb,
+                    apply_func_nb,
                     input_shape,
                     entry_wait,
                     exit_wait,
-                    entry_input_list,
-                    exit_input_list,
-                    entry_in_output_tuples,
-                    exit_in_output_tuples,
-                    entry_param_tuples,
-                    exit_param_tuples,
+                    entry_input_tuple,
+                    exit_input_tuple,
+                    *_entry_in_output_tuples,
+                    *_exit_in_output_tuples,
+                    *_entry_param_tuples,
+                    *_exit_param_tuples,
                     entry_args + entry_more_args + entry_cache,
                     exit_args + exit_more_args + exit_cache
                 )

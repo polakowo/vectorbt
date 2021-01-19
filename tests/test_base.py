@@ -2018,59 +2018,59 @@ class TestReshapeFns:
             reshape_fns.make_symmetric(sr2),
             pd.DataFrame(
                 np.array([
-                    [np.nan, np.nan, np.nan, 1.0],
-                    [np.nan, np.nan, np.nan, 2.0],
-                    [np.nan, np.nan, np.nan, 3.0],
-                    [1.0, 2.0, 3.0, np.nan]
+                    [np.nan, 1.0, 2.0, 3.0],
+                    [1.0, np.nan, np.nan, np.nan],
+                    [2.0, np.nan, np.nan, np.nan],
+                    [3.0, np.nan, np.nan, np.nan]
                 ]),
-                index=pd.Index(['x2', 'y2', 'z2', 'a2'], dtype='object', name=('i2', None)),
-                columns=pd.Index(['x2', 'y2', 'z2', 'a2'], dtype='object', name=('i2', None))
+                index=pd.Index(['a2', 'x2', 'y2', 'z2'], dtype='object', name=('i2', None)),
+                columns=pd.Index(['a2', 'x2', 'y2', 'z2'], dtype='object', name=('i2', None))
             )
         )
         pd.testing.assert_frame_equal(
             reshape_fns.make_symmetric(df2),
             pd.DataFrame(
                 np.array([
-                    [np.nan, np.nan, np.nan, 1.0],
-                    [np.nan, np.nan, np.nan, 2.0],
-                    [np.nan, np.nan, np.nan, 3.0],
-                    [1.0, 2.0, 3.0, np.nan]
+                    [np.nan, 1.0, 2.0, 3.0],
+                    [1.0, np.nan, np.nan, np.nan],
+                    [2.0, np.nan, np.nan, np.nan],
+                    [3.0, np.nan, np.nan, np.nan]
                 ]),
-                index=pd.Index(['x4', 'y4', 'z4', 'a4'], dtype='object', name=('i4', 'c4')),
-                columns=pd.Index(['x4', 'y4', 'z4', 'a4'], dtype='object', name=('i4', 'c4'))
+                index=pd.Index(['a4', 'x4', 'y4', 'z4'], dtype='object', name=('i4', 'c4')),
+                columns=pd.Index(['a4', 'x4', 'y4', 'z4'], dtype='object', name=('i4', 'c4'))
             )
         )
         pd.testing.assert_frame_equal(
             reshape_fns.make_symmetric(df5),
             pd.DataFrame(
                 np.array([
-                    [np.nan, np.nan, np.nan, 1.0, 2.0, 3.0],
-                    [np.nan, np.nan, np.nan, 4.0, 5.0, 6.0],
-                    [np.nan, np.nan, np.nan, 7.0, 8.0, 9.0],
-                    [1.0, 4.0, 7.0, np.nan, np.nan, np.nan],
-                    [2.0, 5.0, 8.0, np.nan, np.nan, np.nan],
-                    [3.0, 6.0, 9.0, np.nan, np.nan, np.nan]
+                    [np.nan, np.nan, np.nan, 1.0, 4.0, 7.0],
+                    [np.nan, np.nan, np.nan, 2.0, 5.0, 8.0],
+                    [np.nan, np.nan, np.nan, 3.0, 6.0, 9.0],
+                    [1.0, 2.0, 3.0, np.nan, np.nan, np.nan],
+                    [4.0, 5.0, 6.0, np.nan, np.nan, np.nan],
+                    [7.0, 8.0, 9.0, np.nan, np.nan, np.nan]
                 ]),
                 index=pd.MultiIndex.from_tuples([
-                    ('x7', 'x8'),
-                    ('y7', 'y8'),
-                    ('z7', 'z8'),
                     ('a7', 'a8'),
                     ('b7', 'b8'),
-                    ('c7', 'c8')
+                    ('c7', 'c8'),
+                    ('x7', 'x8'),
+                    ('y7', 'y8'),
+                    ('z7', 'z8')
                 ], names=[('i7', 'c7'), ('i8', 'c8')]),
                 columns=pd.MultiIndex.from_tuples([
-                    ('x7', 'x8'),
-                    ('y7', 'y8'),
-                    ('z7', 'z8'),
                     ('a7', 'a8'),
                     ('b7', 'b8'),
-                    ('c7', 'c8')
+                    ('c7', 'c8'),
+                    ('x7', 'x8'),
+                    ('y7', 'y8'),
+                    ('z7', 'z8')
                 ], names=[('i7', 'c7'), ('i8', 'c8')])
             )
         )
         pd.testing.assert_frame_equal(
-            reshape_fns.make_symmetric(pd.Series([1, 2, 3], name='yo')),
+            reshape_fns.make_symmetric(pd.Series([1, 2, 3], name='yo'), sort=False),
             pd.DataFrame(
                 np.array([
                     [np.nan, np.nan, np.nan, 1.0],

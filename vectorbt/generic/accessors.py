@@ -1079,8 +1079,8 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         other.vbt.plot(name=other_name, trace_kwargs=other_trace_kwargs, row=row, col=col, fig=fig)
         return fig
 
-    def heatmap(self, x_level=None, y_level=None, symmetric=False, x_labels=None, y_labels=None,
-                slider_level=None, slider_labels=None, fig=None, **kwargs):  # pragma: no cover
+    def heatmap(self, x_level=None, y_level=None, symmetric=False, sort=True, x_labels=None,
+                y_labels=None, slider_level=None, slider_labels=None, fig=None, **kwargs):  # pragma: no cover
         """Create a heatmap figure based on object's multi-index and values.
 
         If multi-index contains more than two levels or you want them in specific order,
@@ -1157,7 +1157,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
         if slider_level is None:
             # No grouping
-            df = self.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
+            df = self.unstack_to_df(
+                index_levels=y_level, column_levels=x_level,
+                symmetric=symmetric, sort=sort
+            )
             fig = df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, **kwargs)
         else:
             # Requires grouping
@@ -1167,7 +1170,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 if slider_labels is not None:
                     name = slider_labels[i]
                 _slider_labels.append(name)
-                df = group.vbt.unstack_to_df(index_levels=x_level, column_levels=y_level, symmetric=symmetric)
+                df = group.vbt.unstack_to_df(
+                    index_levels=y_level, column_levels=x_level,
+                    symmetric=symmetric, sort=sort
+                )
                 if x_labels is None:
                     x_labels = df.columns
                 if y_labels is None:
@@ -1212,8 +1218,9 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
 
         return fig
 
-    def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None,
-               z_labels=None, slider_level=None, slider_labels=None, fig=None, **kwargs):  # pragma: no cover
+    def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None, 
+               z_labels=None, slider_level=None, slider_labels=None, scene_name='scene', 
+               fillna=None, fig=None, **kwargs):  # pragma: no cover
         """Create a 3D volume figure based on object's multi-index and values.
 
         If multi-index contains more than three levels or you want them in specific order, pass
@@ -1262,26 +1269,29 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         x_name = x_level_vals.name if x_level_vals.name is not None else 'x'
         y_name = y_level_vals.name if y_level_vals.name is not None else 'y'
         z_name = z_level_vals.name if z_level_vals.name is not None else 'z'
-        kwargs = merge_dicts(dict(
-            trace_kwargs=dict(
-                hovertemplate=f"{x_name}: %{{x}}<br>" +
-                              f"{y_name}: %{{y}}<br>" +
-                              f"{z_name}: %{{z}}<br>" +
-                              "value: %{value}<extra></extra>"
-            ),
-            scene=dict(
-                xaxis_title=x_level_vals.name,
-                yaxis_title=y_level_vals.name,
-                zaxis_title=z_level_vals.name
-            )
-        ), kwargs)
+        def_kwargs = dict()
+        def_kwargs['trace_kwargs'] = dict(
+            hovertemplate=f"{x_name}: %{{x}}<br>" +
+                          f"{y_name}: %{{y}}<br>" +
+                          f"{z_name}: %{{z}}<br>" +
+                          "value: %{value}<extra></extra>"
+        )
+        def_kwargs[scene_name] = dict(
+            xaxis_title=x_level_vals.name,
+            yaxis_title=y_level_vals.name,
+            zaxis_title=z_level_vals.name
+        )
+        def_kwargs['scene_name'] = scene_name
+        kwargs = merge_dicts(def_kwargs, kwargs)
 
-        contains_nans = False
+        contains_nan = False
         if slider_level is None:
             # No grouping
             v = self.unstack_to_array(levels=(x_level, y_level, z_level))
+            if fillna is not None:
+                v = np.nan_to_num(v, nan=fillna)
             if np.isnan(v).any():
-                contains_nans = True
+                contains_nan = True
             fig = plotting.create_volume(
                 data=v,
                 x_labels=x_labels,
@@ -1299,8 +1309,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     name = slider_labels[i]
                 _slider_labels.append(name)
                 v = group.vbt.unstack_to_array(levels=(x_level, y_level, z_level))
+                if fillna is not None:
+                    v = np.nan_to_num(v, nan=fillna)
                 if np.isnan(v).any():
-                    contains_nans = True
+                    contains_nan = True
                 _kwargs = merge_dicts(dict(
                     trace_kwargs=dict(
                         name=str(name) if name is not None else None,
@@ -1340,8 +1352,9 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 sliders=sliders
             )
 
-        if contains_nans:
-            warnings.warn("Data contains NaNs. Use `show` method in case of visualization issues.", stacklevel=2)
+        if contains_nan:
+            warnings.warn("Data contains NaNs. Use `fillna` argument or "
+                          "`show` method in case of visualization issues.", stacklevel=2)
         return fig
 
 

@@ -612,7 +612,7 @@ def update_heatmap_data(fig, data, horizontal=False, trace_idx=None):
 # ############# Volume ############# #
 
 def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False, trace_kwargs=None,
-                  return_trace_idx=False, row=None, col=None, scene='scene', fig=None, **layout_kwargs):
+                  return_trace_idx=False, row=None, col=None, scene_name='scene', fig=None, **layout_kwargs):
     """Create a volume plot.
 
     Args:
@@ -626,7 +626,7 @@ def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False, trace
         return_trace_idx (bool): Whether to return trace index for `update_volume_data`.
         row (int): Row position.
         col (int): Column position.
-        scene (str): Reference to the 3D scene.
+        scene_name (str): Reference to the 3D scene.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.
 
@@ -683,15 +683,15 @@ def create_volume(data=None, x_labels=None, y_labels=None, z_labels=False, trace
     if not np.issubdtype(x_labels.dtype, np.number):
         x_ticktext = x_labels
         x_labels = np.arange(data.shape[0])
-        more_layout[scene] = dict(xaxis=dict(ticktext=x_ticktext, tickvals=x_labels, tickmode='array'))
+        more_layout[scene_name] = dict(xaxis=dict(ticktext=x_ticktext, tickvals=x_labels, tickmode='array'))
     if not np.issubdtype(y_labels.dtype, np.number):
         y_ticktext = y_labels
         y_labels = np.arange(data.shape[1])
-        more_layout[scene] = dict(yaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode='array'))
+        more_layout[scene_name] = dict(yaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode='array'))
     if not np.issubdtype(z_labels.dtype, np.number):
         z_ticktext = z_labels
         z_labels = np.arange(data.shape[2])
-        more_layout[scene] = dict(zaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode='array'))
+        more_layout[scene_name] = dict(zaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode='array'))
     fig.update_layout(**more_layout)
     fig.update_layout(**layout_kwargs)
 

@@ -683,12 +683,15 @@ def unstack_to_array(arg, levels=None):
     return a
 
 
-def make_symmetric(arg):
+def make_symmetric(arg, sort=True):
     """Make `arg` symmetric.
 
     The index and columns of the resulting DataFrame will be identical.
 
     Requires the index and columns to have the same number of levels.
+
+    Pass `sort=False` if index and columns should not be sorted, but concatenated
+    and get duplicates removed.
 
     ## Example
 
@@ -723,7 +726,10 @@ def make_symmetric(arg):
             new_name = tuple(zip(*[names1, names2]))
         else:
             new_name = (names1, names2)
-    idx_vals = list(dict.fromkeys(np.concatenate((arg.index, arg.columns))))
+    if sort:
+        idx_vals = np.unique(np.concatenate((arg.index, arg.columns))).tolist()
+    else:
+        idx_vals = list(dict.fromkeys(np.concatenate((arg.index, arg.columns))))
     arg = arg.copy()
     if isinstance(arg.index, pd.MultiIndex):
         unique_index = pd.MultiIndex.from_tuples(idx_vals, names=new_name)
@@ -739,7 +745,7 @@ def make_symmetric(arg):
     return df_out
 
 
-def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
+def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False, sort=True):
     """Reshape `arg` based on its multi-index into a DataFrame.
 
     Use `index_levels` to specify what index levels will form new index, and `column_levels` 
@@ -792,7 +798,7 @@ def unstack_to_df(arg, index_levels=None, column_levels=None, symmetric=False):
     unstacked = unstack_to_array(sr, levels=(index_levels, column_levels))
     df = pd.DataFrame(unstacked, index=new_index, columns=new_columns)
     if symmetric:
-        return make_symmetric(df)
+        return make_symmetric(df, sort=sort)
     return df
 
 
