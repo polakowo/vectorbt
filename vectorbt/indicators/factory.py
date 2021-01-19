@@ -291,6 +291,17 @@ from vectorbt.base.indexing import ParamIndexerFactory
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 
 
+def to_typed_list(lst):
+    """Cast Python list to typed list.
+
+    Direct construction is flawed in Numba 0.52.0.
+    See https://github.com/numba/numba/issues/6651."""
+    nb_lst = List()
+    for elem in lst:
+        nb_lst.append(elem)
+    return nb_lst
+
+
 def flatten_param_tuples(param_tuples):
     """Flattens a nested list of tuples using unzipping."""
     param_list = []
@@ -706,7 +717,7 @@ def run_pipeline(
             param_list = broadcast_params(param_list)
     n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
     if checks.is_numba_func(custom_func):
-        param_list_passed = [List(params) for params in param_list]
+        param_list_passed = [to_typed_list(params) for params in param_list]
     else:
         param_list_passed = param_list
 
@@ -738,7 +749,7 @@ def run_pipeline(
             in_outputs.append(in_output[:, i * input_shape_passed[1]: (i + 1) * input_shape_passed[1]])
         in_output_list_passed.append(in_outputs)
     if checks.is_numba_func(custom_func):
-        in_output_list_passed = [List(in_outputs) for in_outputs in in_output_list_passed]
+        in_output_list_passed = [to_typed_list(in_outputs) for in_outputs in in_output_list_passed]
 
     # Get raw results
     if use_raw is not None:
@@ -1824,9 +1835,9 @@ class IndicatorFactory:
                 _param_list = param_list
                 if checks.is_numba_func(cache_func):
                     if len(in_output_list) > 0:
-                        _in_output_list = [List(in_outputs) for in_outputs in in_output_list]
+                        _in_output_list = [to_typed_list(in_outputs) for in_outputs in in_output_list]
                     if len(param_list) > 0:
-                        _param_list = [List(params) for params in param_list]
+                        _param_list = [to_typed_list(params) for params in param_list]
                 cache = cache_func(
                     *args_before,
                     *input_tuple,
@@ -1846,14 +1857,14 @@ class IndicatorFactory:
             if len(in_output_names) > 0:
                 _in_output_tuples = in_output_tuples
                 if checks.is_numba_func(apply_func):
-                    _in_output_tuples = List(_in_output_tuples)
+                    _in_output_tuples = to_typed_list(_in_output_tuples)
                 _in_output_tuples = (_in_output_tuples,)
             else:
                 _in_output_tuples = ()
             if len(param_names) > 0:
                 _param_tuples = param_tuples
                 if checks.is_numba_func(apply_func):
-                    _param_tuples = List(_param_tuples)
+                    _param_tuples = to_typed_list(_param_tuples)
                 _param_tuples = (_param_tuples,)
             else:
                 _param_tuples = ()

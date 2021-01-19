@@ -8,7 +8,7 @@ import inspect
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base import combine_fns
-from vectorbt.indicators.factory import IndicatorFactory
+from vectorbt.indicators.factory import IndicatorFactory, to_typed_list
 from vectorbt.signals.nb import generate_ex_nb, generate_enex_nb, first_choice_nb
 
 
@@ -622,9 +622,9 @@ class SignalFactory(IndicatorFactory):
                 _cache_param_list = cache_param_list
                 if checks.is_numba_func(cache_func):
                     if len(_cache_in_output_list) > 0:
-                        _cache_in_output_list = [List(in_outputs) for in_outputs in _cache_in_output_list]
+                        _cache_in_output_list = [to_typed_list(in_outputs) for in_outputs in _cache_in_output_list]
                     if len(_cache_param_list) > 0:
-                        _cache_param_list = [List(params) for params in _cache_param_list]
+                        _cache_param_list = [to_typed_list(params) for params in _cache_param_list]
 
                 cache = cache_func(
                     *cache_input_tuple,
@@ -650,11 +650,11 @@ class SignalFactory(IndicatorFactory):
             # Apply and concatenate
             if exit_only and not iteratively:
                 if len(exit_in_output_names) > 0:
-                    _exit_in_output_tuples = (List(exit_in_output_tuples),)
+                    _exit_in_output_tuples = (to_typed_list(exit_in_output_tuples),)
                 else:
                     _exit_in_output_tuples = ()
                 if len(exit_param_names) > 0:
-                    _exit_param_tuples = (List(exit_param_tuples),)
+                    _exit_param_tuples = (to_typed_list(exit_param_tuples),)
                 else:
                     _exit_param_tuples = ()
 
@@ -671,19 +671,19 @@ class SignalFactory(IndicatorFactory):
 
             else:
                 if len(entry_in_output_names) > 0:
-                    _entry_in_output_tuples = (List(entry_in_output_tuples),)
+                    _entry_in_output_tuples = (to_typed_list(entry_in_output_tuples),)
                 else:
                     _entry_in_output_tuples = ()
                 if len(entry_param_names) > 0:
-                    _entry_param_tuples = (List(entry_param_tuples),)
+                    _entry_param_tuples = (to_typed_list(entry_param_tuples),)
                 else:
                     _entry_param_tuples = ()
                 if len(exit_in_output_names) > 0:
-                    _exit_in_output_tuples = (List(exit_in_output_tuples),)
+                    _exit_in_output_tuples = (to_typed_list(exit_in_output_tuples),)
                 else:
                     _exit_in_output_tuples = ()
                 if len(exit_param_names) > 0:
-                    _exit_param_tuples = (List(exit_param_tuples),)
+                    _exit_param_tuples = (to_typed_list(exit_param_tuples),)
                 else:
                     _exit_param_tuples = ()
 
