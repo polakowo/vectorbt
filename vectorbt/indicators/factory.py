@@ -126,9 +126,7 @@ series with different shapes will broadcast them to a single shape.
 ...     input_names=['price1', 'price2'],
 ...     param_names=['p1', 'p2'],
 ...     output_names=['output']
-... ).from_apply_func(
-...     lambda price1, price2, p1, p2: price1 * p1 + price2 * p2
-... )
+... ).from_apply_func(lambda price1, price2, p1, p2: price1 * p1 + price2 * p2)
 
 >>> myInd = MyInd.run(price['a'], price['b'], 1, 2)
 >>> myInd.output

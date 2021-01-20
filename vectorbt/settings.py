@@ -204,6 +204,7 @@ portfolio = Config(
         init_cash=100.,
         size=np.inf,
         size_type='shares',
+        signal_size_type='shares',
         fees=0.,
         fixed_fees=0.,
         slippage=0.,

@@ -607,8 +607,7 @@ def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop
     >>> generate_adv_stop_ex_nb(
     ...     entries, open_p, high_p, low_p, close_p,
     ...     hit_p_out, stop_type_out, sl_stop, tp_stop, tp_stop,
-    ...     is_entry_p_safe, 0, first, flex_2d
-    ... )
+    ...     is_entry_p_safe, 0, first, flex_2d)
     array([[ True],  <<< exit
            [False],
            [False],

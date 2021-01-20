@@ -256,7 +256,7 @@ class TestMappedArray:
     def test_top_n_mask(self):
         np.testing.assert_array_equal(
             mapped_array.top_n_mask(1),
-            np.array([False, False, True, False, True, False, True, False, False])
+            np.array([False, False,  True, False, True, False, True, False, False])
         )
 
     def test_bottom_n_mask(self):
@@ -2157,25 +2157,25 @@ class TestPositions:
 
 logs_records_arr = np.asarray([
     (0, 0, 1, 0, 100., 0., 5., 100., 1., 0, 2, 5., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 94.95, 1., 1., 5., 0.05, 0, 0, -1, 0),
+     True, False, True, 94.95, 1., 1., 5., 0.05, 0, 0, -1, 0),
     (1, 0, 0, 0, 94.95, 0., 1., 100., 1., 0, 2, 1., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 93.94, 1., 1., 1., 0.01, 0, 0, -1, 1),
+     True, False, True, 93.94, 1., 1., 1., 0.01, 0, 0, -1, 1),
     (2, 1, 0, 0, 93.94, 1., 2., 99.94, 1., 0, 2, 2., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 91.92, 2., 1., 2., 0.02, 0, 0, -1, 2),
+     True, False, True, 91.92, 2., 1., 2., 0.02, 0, 0, -1, 2),
     (3, 1, 1, 0, 91.92, 1., 4., 99.94, 1., 0, 2, 4., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 87.88, 2., 1., 4., 0.04, 0, 0, -1, 3),
+     True, False, True, 87.88, 2., 1., 4., 0.04, 0, 0, -1, 3),
     (4, 2, 1, 0, 87.88, 2., 3., 99.88, 1., 0, 2, 3., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 84.85, 3., 1., 3., 0.03, 0, 0, -1, 4),
+     True, False, True, 84.85, 3., 1., 3., 0.03, 0, 0, -1, 4),
     (5, 2, 0, 0, 84.85, 2., 3., 99.88, 1., 0, 2, 3., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 81.82, 3., 1., 3., 0.03, 0, 0, -1, 5),
+     True, False, True, 81.82, 3., 1., 3., 0.03, 0, 0, -1, 5),
     (6, 3, 1, 0, 81.82, 3., 2., 99.82, 1., 0, 2, 2., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 79.8, 4., 1., 2., 0.02, 0, 0, -1, 6),
+     True, False, True, 79.8, 4., 1., 2., 0.02, 0, 0, -1, 6),
     (7, 3, 0, 0, 79.8, 3., 4., 99.82, 1., 0, 2, 4., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 75.76, 4., 1., 4., 0.04, 0, 0, -1, 7),
+     True, False, True, 75.76, 4., 1., 4., 0.04, 0, 0, -1, 7),
     (8, 4, 1, 0, 75.76, 4., 1., 99.76, 1., 0, 2, 1., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 74.75, 5., 1., 1., 0.01, 0, 0, -1, 8),
+     True, False, True, 74.75, 5., 1., 1., 0.01, 0, 0, -1, 8),
     (9, 4, 0, 0, 74.75, 4., 5., 99.76, 1., 0, 2, 5., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     False, True, False, True, 69.7, 5., 1., 5., 0.05, 0, 0, -1, 9)
+     True, False, True, 69.7, 5., 1., 5., 0.05, 0, 0, -1, 9)
 ], dtype=log_dt)
 
 logs_wrapper = vbt.ArrayWrapper([
@@ -2211,7 +2211,6 @@ class TestLogs:
             ('Order', 'Min. Size'),
             ('Order', 'Max. Size'),
             ('Order', 'Rejection Prob.'),
-            ('Order', 'Close First?'),
             ('Order', 'Allow Partial?'),
             ('Order', 'Raise Rejection?'),
             ('Order', 'Log?'),
@@ -2248,20 +2247,19 @@ class TestLogs:
         df.iloc[:, 15] = [1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08]
         df.iloc[:, 16] = [np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]
         df.iloc[:, 17] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        df.iloc[:, 18] = [False, False, False, False, False, False, False, False, False, False]
-        df.iloc[:, 19] = [True, True, True, True, True, True, True, True, True, True]
-        df.iloc[:, 20] = [False, False, False, False, False, False, False, False, False, False]
-        df.iloc[:, 21] = [True, True, True, True, True, True, True, True, True, True]
-        df.iloc[:, 22] = [94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75, 69.7]
-        df.iloc[:, 23] = [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0]
-        df.iloc[:, 24] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        df.iloc[:, 25] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
-        df.iloc[:, 26] = [0.05, 0.01, 0.02, 0.04, 0.03, 0.03, 0.02, 0.04, 0.01, 0.05]
-        df.iloc[:, 27] = ['Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy']
-        df.iloc[:, 28] = ['Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
+        df.iloc[:, 18] = [True, True, True, True, True, True, True, True, True, True]
+        df.iloc[:, 19] = [False, False, False, False, False, False, False, False, False, False]
+        df.iloc[:, 20] = [True, True, True, True, True, True, True, True, True, True]
+        df.iloc[:, 21] = [94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75, 69.7]
+        df.iloc[:, 22] = [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0]
+        df.iloc[:, 23] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+        df.iloc[:, 24] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
+        df.iloc[:, 25] = [0.05, 0.01, 0.02, 0.04, 0.03, 0.03, 0.02, 0.04, 0.01, 0.05]
+        df.iloc[:, 26] = ['Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy']
+        df.iloc[:, 27] = ['Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
                           'Filled', 'Filled', 'Filled', 'Filled']
-        df.iloc[:, 29] = [None, None, None, None, None, None, None, None, None, None]
-        df.iloc[:, 30] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        df.iloc[:, 28] = [None, None, None, None, None, None, None, None, None, None]
+        df.iloc[:, 29] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         pd.testing.assert_frame_equal(logs.records_readable, df)
 
     def test_count(self):

@@ -515,9 +515,7 @@ class Signals_Accessor(Generic_Accessor):
         >>> out_dict = {}
         >>> exits = sig.vbt.signals.generate_adv_stop_exits(
         ...     price['open'], price['high'], price['low'], price['close'],
-        ...     out_dict=out_dict, sl_stop=0.2, ts_stop=0.2,
-        ...     tp_stop=0.2
-        ... )
+        ...     out_dict=out_dict, sl_stop=0.2, ts_stop=0.2, tp_stop=0.2)
         >>> out_dict['hit_price'][~exits] = np.nan
         >>> out_dict['stop_type'][~exits] = -1
 

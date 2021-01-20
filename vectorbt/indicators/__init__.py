@@ -20,9 +20,7 @@ creates methods for signal generation and supports common pandas and parameter i
 ...     input_names=['ts'],
 ...     param_names=['param1', 'param2'],
 ...     output_names=['output']
-... ).from_apply_func(
-...     lambda ts, param1, param2: ts * param1 + ts * param2
-... )
+... ).from_apply_func(lambda ts, param1, param2: ts * param1 + ts * param2)
 
 >>> # Create indicator instance
 >>> myind = MyInd.run(pd.Series([1, 2, 3]), [1, 2], [3, 4], param_product=True)

@@ -69,9 +69,7 @@ class RAND(RAND):
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> rand = vbt.RAND.run(
-    ...     n=[1, 2, 3], input_shape=(6,), seed=42
-    ... )
+    >>> rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=42)
 
     >>> rand.entries
     rand_n      1      2      3
@@ -98,8 +96,7 @@ class RAND(RAND):
 
     >>> rand = vbt.RAND.run(
     ...     n=[np.array([1, 2]), np.array([3, 4])],
-    ...     input_shape=(8, 2), seed=42
-    ... )
+    ...     input_shape=(8, 2), seed=42)
 
     >>> rand.entries
     rand_n         mix_0         mix_1
@@ -173,8 +170,7 @@ class RPROB(RPROB):
 
     >>> rprob = vbt.RPROB.run(
     ...     entry_prob=[0.5, 1.], exit_prob=[0.5, 1.],
-    ...     input_shape=(5,), param_product=True, seed=42
-    ... )
+    ...     input_shape=(5,), param_product=True, seed=42)
 
     >>> rprob.entries
     rprob_entry_prob           0.5           1.0
@@ -203,8 +199,7 @@ class RPROB(RPROB):
     >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
     >>> rprob = vbt.RPROB.run(
     ...     entry_prob=[entry_prob1, entry_prob2], exit_prob=1.,
-    ...     input_shape=(5,), seed=42
-    ... )
+    ...     input_shape=(5,), seed=42)
 
     >>> rprob.entries
     rprob_entry_prob  mix_0  mix_1
@@ -524,8 +519,7 @@ class ADVSTEX(ADVSTEX):
     ... })
     >>> advstex = vbt.ADVSTEX.run(
     ...     entries, price['open'], price['high'], price['low'], price['close'],
-    ...     sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
-    ... )
+    ...     sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1])
 
     >>> advstex.entries
     advstex_sl_stop    0.1    0.0    0.0

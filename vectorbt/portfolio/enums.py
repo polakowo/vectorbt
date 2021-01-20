@@ -250,8 +250,9 @@ SizeType = namedtuple('SizeType', [
     'Shares',
     'TargetShares',
     'TargetValue',
-    'TargetPercent'
-])(*range(4))
+    'TargetPercent',
+    'Percent'
+])(*range(5))
 """_"""
 
 __pdoc__['SizeType'] = f"""Size type.
@@ -262,9 +263,10 @@ __pdoc__['SizeType'] = f"""Size type.
 
 Attributes:
     Shares: Number of shares.
-    TargetShares: Number of shares to hold after transaction.
-    TargetValue: Total value of holdings to hold after transaction.
-    TargetPercent: Percentage of total value to hold after transaction.
+    TargetShares: Target number of shares.
+    TargetValue: Target total value of holdings.
+    TargetPercent: Target percentage of total value.
+    Percent: Percentage of available cash (if buy) or shares (if sell).
 """
 
 ConflictMode = namedtuple('ConflictMode', [
@@ -301,7 +303,6 @@ Order = namedtuple('Order', [
     'min_size',
     'max_size',
     'reject_prob',
-    'close_first',
     'allow_partial',
     'raise_reject',
     'log'
@@ -318,14 +319,11 @@ __pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
 __pdoc__['Order.min_size'] = "Minimum size. Lower than that will be rejected."
 __pdoc__['Order.max_size'] = "Maximum size. Higher than that will be cut."
 __pdoc__['Order.reject_prob'] = "Probability of rejecting this order."
-__pdoc__['Order.close_first'] = """Whether reversal should close the position first. 
-
-Requires second order to open opposite position."""
 __pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
 __pdoc__['Order.raise_reject'] = "Whether to raise exception if order has been rejected."
 __pdoc__['Order.log'] = "Whether to log this order by filling a log record."
 
-NoOrder = Order(np.nan, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False, False, False)
+NoOrder = Order(np.nan, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, False, False, False)
 """_"""
 
 __pdoc__['NoOrder'] = "Order that will not be processed."
@@ -567,7 +565,6 @@ _log_fields = [
     ('min_size', np.float_),
     ('max_size', np.float_),
     ('reject_prob', np.float_),
-    ('close_first', np.bool_),
     ('allow_partial', np.bool_),
     ('raise_reject', np.bool_),
     ('log', np.bool_),

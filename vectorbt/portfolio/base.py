@@ -71,8 +71,7 @@ Date
 >>> # Simulate portfolio
 >>> portfolio = vbt.Portfolio.from_orders(
 ...     price['Close'], size, price=price['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001
-... )
+...     init_cash='autoalign', fees=0.001, slippage=0.001)
 
 >>> # Visualize portfolio value
 >>> portfolio.value().vbt.plot()
@@ -107,8 +106,7 @@ For example, let's divide our portfolio into two groups sharing the same cash:
 >>> comb_portfolio = vbt.Portfolio.from_orders(
 ...     price['Close'], size, price=price['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001,
-...     group_by=group_by, cash_sharing=True
-... )
+...     group_by=group_by, cash_sharing=True)
 
 >>> # Get total profit per group
 >>> comb_portfolio.total_profit()
@@ -186,8 +184,7 @@ simulation from the beginning to the end, you can turn on logging.
 >>> # Simulate portfolio with logging
 >>> portfolio = vbt.Portfolio.from_orders(
 ...     price['Close'], size, price=price['Open'],
-...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True
-... )
+...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
 
 >>> portfolio.logs.records
         id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \\
@@ -462,21 +459,21 @@ class Portfolio(Wrapping):
     # ############# Class methods ############# #
 
     @classmethod
-    def from_signals(cls, close, entries, exits, size=None, price=None, fees=None, fixed_fees=None,
-                     slippage=None, min_size=None, max_size=None, reject_prob=None, close_first=None,
-                     allow_partial=None, raise_reject=None, accumulate=None, log=None, conflict_mode=None,
-                     direction=None, val_price=None, init_cash=None, cash_sharing=None, call_seq=None,
-                     max_orders=None, max_logs=None, seed=None, group_by=None, broadcast_kwargs=None,
-                     wrapper_kwargs=None, freq=None, **kwargs):
+    def from_signals(cls, close, entries, exits, size=None, size_type=None, direction=None, price=None,
+                     fees=None, fixed_fees=None, slippage=None, min_size=None, max_size=None,
+                     reject_prob=None, allow_partial=None, raise_reject=None, accumulate=None, log=None,
+                     conflict_mode=None, close_first=None, val_price=None, init_cash=None, cash_sharing=None,
+                     call_seq=None, max_orders=None, max_logs=None, seed=None, group_by=None,
+                     broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
         """Simulate portfolio from entry and exit signals.
 
-        Starting with initial cash `init_cash`, for each signal in `entries`, enters a position by
-        buying/selling `size` of shares. For each signal in `exits`, closes the position by
+        Starting with initial cash `init_cash`, for each signal in `entries`, enters a long/short position
+        by buying/selling `size` of shares. For each signal in `exits`, closes the position by
         selling/buying shares. Depending upon accumulation, each entry signal may increase
         the position and each exit signal may decrease the position. When both entry and exit signals
         are present, ignores them by default. When grouping is enabled with `group_by`, will compute
-        performance for the entire group. When, additionally, `cash_sharing` is enabled, will share
-        the cash among all columns in the group.
+        the performance of the entire group. When `cash_sharing` is enabled, will share the cash among
+        all columns in the group.
 
         Args:
             close (array_like): Reference price, such as close.
@@ -502,6 +499,20 @@ class Portfolio(Wrapping):
 
                 !!! note
                     Sign will be ignored.
+            size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
+                Will broadcast.
+
+                Only `SizeType.Shares` and `SizeType.Percent` are supported.
+                Other modes such as target percentage are not compatible with signals since
+                their logic may contradict the direction of the signal.
+
+                !!! note
+                    `SizeType.Percent` does not support position reversal. Switch to a single
+                    direction or use `close_first`.
+
+                See warning on `size_type` in `Portfolio.from_orders`.
+            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
+                Will broadcast.
             price (array_like of float): Order price.
                 Defaults to `close`. Will broadcast.
             fees (float or array_like): Fees in percentage of the order value.
@@ -519,10 +530,6 @@ class Portfolio(Wrapping):
                 the position if accumulation is enabled and `max_size` is too low.
             reject_prob (float or array_like): Order rejection probability.
                 Will broadcast.
-            close_first (bool or array_like): Whether to close the position first before reversal.
-                Will broadcast.
-
-                See `close_first` in `Portfolio.from_orders`.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
 
@@ -537,8 +544,13 @@ class Portfolio(Wrapping):
                 Behaves similarly to `Portfolio.from_orders`.
             conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
                 Will broadcast.
-            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
+            close_first (bool or array_like): Whether to close the position first before reversal.
                 Will broadcast.
+
+                Otherwise reverses the position with a single order and within the same tick.
+                Takes only effect under `Direction.All`. Requires a second signal to enter
+                the opposite position. This allows to define parameters such as `fixed_fees` for long
+                and short positions separately.
             val_price (array_like of float): Asset valuation price.
                 Defaults to `price` if set, otherwise to previous `close`.
 
@@ -572,11 +584,6 @@ class Portfolio(Wrapping):
         but keep original shape to utilize flexible indexing and to save memory.
 
         For defaults, see `vectorbt.settings.portfolio`.
-
-        !!! note
-            Only `SizeType.Shares` is supported. Other modes such as target percentage are not
-            compatible with signals since their logic may contradict the direction the user has
-            specified for the order.
 
         !!! hint
             If you generated signals using close price, don't forget to shift your signals by one tick
@@ -689,6 +696,12 @@ class Portfolio(Wrapping):
 
         if size is None:
             size = settings.portfolio['size']
+        if size_type is None:
+            size_type = settings.portfolio['signal_size_type']
+        size_type = convert_str_enum_value(SizeType, size_type)
+        if direction is None:
+            direction = settings.portfolio['signal_direction']
+        direction = convert_str_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
@@ -703,8 +716,6 @@ class Portfolio(Wrapping):
             max_size = settings.portfolio['max_size']
         if reject_prob is None:
             reject_prob = settings.portfolio['reject_prob']
-        if close_first is None:
-            close_first = settings.portfolio['close_first']
         if allow_partial is None:
             allow_partial = settings.portfolio['allow_partial']
         if raise_reject is None:
@@ -716,9 +727,8 @@ class Portfolio(Wrapping):
         if conflict_mode is None:
             conflict_mode = settings.portfolio['conflict_mode']
         conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
-        if direction is None:
-            direction = settings.portfolio['signal_direction']
-        direction = convert_str_enum_value(Direction, direction)
+        if close_first is None:
+            close_first = settings.portfolio['close_first']
         if val_price is None:
             if price is None:
                 if checks.is_pandas(close):
@@ -763,9 +773,26 @@ class Portfolio(Wrapping):
         # Broadcast inputs
         # Only close is broadcast, others can remain unchanged thanks to flexible indexing
         broadcastable_args = (
-            close, entries, exits, size, price, fees, fixed_fees, slippage,
-            min_size, max_size, reject_prob, close_first, allow_partial,
-            raise_reject, accumulate, log, conflict_mode, direction, val_price
+            close,
+            entries,
+            exits,
+            size,
+            size_type,
+            direction,
+            price,
+            fees,
+            fixed_fees,
+            slippage,
+            min_size,
+            max_size,
+            reject_prob,
+            allow_partial,
+            raise_reject,
+            accumulate,
+            log,
+            conflict_mode,
+            close_first,
+            val_price
         )
         keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
@@ -817,9 +844,9 @@ class Portfolio(Wrapping):
     @classmethod
     def from_orders(cls, close, size, size_type=None, direction=None, price=None, fees=None,
                     fixed_fees=None, slippage=None, min_size=None, max_size=None, reject_prob=None,
-                    close_first=None, allow_partial=None, raise_reject=None, log=None, val_price=None,
-                    init_cash=None, cash_sharing=None, call_seq=None, max_orders=None, max_logs=None,
-                    seed=None, group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
+                    allow_partial=None, raise_reject=None, log=None, val_price=None, init_cash=None,
+                    cash_sharing=None, call_seq=None, max_orders=None, max_logs=None, seed=None,
+                    group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
         """Simulate portfolio from orders.
 
         Starting with initial cash `init_cash`, orders the number of shares specified in `size`
@@ -848,6 +875,16 @@ class Portfolio(Wrapping):
                 * Set to `np.nan` to skip.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
                 Will broadcast.
+
+                !!! note
+                    `SizeType.Percent` does not support position reversal. Switch to a single direction.
+
+                !!! warning
+                    Be cautious using `SizeType.Percent` with `call_seq` set to 'auto'.
+                    To execute sell orders before buy orders, the value of each order in the group
+                    needs to be approximated in advance. But since `SizeType.Percent` depends
+                    upon cash balance, which cannot be calculated in advance, the latest cash balance
+                    is used. This can yield wrong call sequence for buy orders.
             direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
                 Will broadcast.
             price (array_like of float): Order price.
@@ -866,13 +903,6 @@ class Portfolio(Wrapping):
                 Will be partially filled if exceeded.
             reject_prob (float or array_like): Order rejection probability.
                 Will broadcast.
-            close_first (bool or array_like): Whether to close the position first before reversal.
-                Will broadcast.
-
-                Otherwise reverses the position with a single order and within the same tick.
-                Takes only effect under `Direction.All`. Requires a second signal to enter
-                the opposite position. This allows to define parameters such as `fixed_fees` for long
-                and short positions separately.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
 
@@ -992,10 +1022,8 @@ class Portfolio(Wrapping):
 
         Reverse each position by first closing it:
         ```python-repl
-        >>> import numpy as np
-
-        >>> size = [np.inf, -np.inf, -np.inf, np.inf, np.inf]
-        >>> portfolio = vbt.Portfolio.from_orders(close, size, close_first=True)
+        >>> size = [1, 0, -1, 0, 1]
+        >>> portfolio = vbt.Portfolio.from_orders(close, size, size_type='targetpercent')
 
         >>> portfolio.shares()
         0    100.000000
@@ -1017,6 +1045,8 @@ class Portfolio(Wrapping):
         It's more compact but has less control over execution:
 
         ```python-repl
+        >>> import numpy as np
+
         >>> np.random.seed(42)
         >>> close = pd.DataFrame(np.random.uniform(1, 10, size=(5, 3)))
         >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
@@ -1062,8 +1092,6 @@ class Portfolio(Wrapping):
             max_size = settings.portfolio['max_size']
         if reject_prob is None:
             reject_prob = settings.portfolio['reject_prob']
-        if close_first is None:
-            close_first = settings.portfolio['close_first']
         if allow_partial is None:
             allow_partial = settings.portfolio['allow_partial']
         if raise_reject is None:
@@ -1117,7 +1145,6 @@ class Portfolio(Wrapping):
             min_size,
             max_size,
             reject_prob,
-            close_first,
             allow_partial,
             raise_reject,
             log,
