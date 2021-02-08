@@ -14,39 +14,39 @@ An example of how to assess performance of a random strategy on Bitcoin:
 >>> import pandas as pd
 >>> import yfinance as yf
 
->>> price = yf.Ticker("BTC-USD").history(period="max")
+>>> ohlcv = vbt.utils.data.download("BTC-USD", period="max")
 >>> entries, exits = pd.Series.vbt.signals.generate_random_both(
-...     price.shape[0], n=10, seed=42)
+...     ohlcv.shape[0], n=10, seed=42)
 >>> portfolio = vbt.Portfolio.from_signals(
-...     price['Close'], entries, exits, price=price['Open'],
+...     ohlcv['Close'], entries, exits, price=ohlcv['Open'],
 ...     fees=0.001, init_cash=100., freq='1D')
 
 >>> portfolio.stats()
 Start                            2014-09-17 00:00:00
-End                              2020-11-20 00:00:00
-Duration                          2257 days 00:00:00
+End                              2021-02-06 00:00:00
+Duration                          2331 days 00:00:00
 Init. Cash                                       100
-Total Profit                                 1445.18
-Total Return [%]                             1445.18
-Benchmark Return [%]                          3949.4
-Position Coverage [%]                        44.1737
-Max. Drawdown [%]                            64.3272
-Avg. Drawdown [%]                            7.64067
-Max. Drawdown Duration            1070 days 00:00:00
-Avg. Drawdown Duration    51 days 18:27:41.538461538
+Total Profit                                  1439.6
+Total Return [%]                              1439.6
+Benchmark Return [%]                          8481.8
+Position Coverage [%]                        32.3466
+Max. Drawdown [%]                             32.646
+Avg. Drawdown [%]                            7.25155
+Max. Drawdown Duration             493 days 00:00:00
+Avg. Drawdown Duration    54 days 16:12:58.378378379
 Num. Trades                                       10
-Win Rate [%]                                      70
-Best Trade [%]                               427.383
-Worst Trade [%]                             -15.5047
-Avg. Trade [%]                               56.3168
-Max. Trade Duration                298 days 00:00:00
-Avg. Trade Duration                 99 days 16:48:00
-Expectancy                                   144.518
-SQN                                          1.59598
-Gross Exposure                              0.441737
-Sharpe Ratio                                 1.13649
-Sortino Ratio                                1.80862
-Calmar Ratio                                0.865842
+Win Rate [%]                                      90
+Best Trade [%]                               306.417
+Worst Trade [%]                             -6.90366
+Avg. Trade [%]                               46.7981
+Max. Trade Duration                316 days 00:00:00
+Avg. Trade Duration                 75 days 09:36:00
+Expectancy                                    143.96
+SQN                                          2.17025
+Gross Exposure                              0.323466
+Sharpe Ratio                                 1.50143
+Sortino Ratio                                2.31876
+Calmar Ratio                                 1.63687
 dtype: object
 ```
 

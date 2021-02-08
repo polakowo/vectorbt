@@ -20,16 +20,6 @@ __pdoc__ = {}
 
 # Color schema
 color_schema = Config(
-    blue="#1f77b4",
-    orange="#ff7f0e",
-    green="#2ca02c",
-    red="#dc3912",
-    purple="#9467bd",
-    brown="#8c564b",
-    pink="#e377c2",
-    gray="#7f7f7f",
-    yellow="#bcbd22",
-    cyan="#17becf",
     increasing="#1b9e76",
     decreasing="#d95f02"
 )
@@ -44,11 +34,11 @@ __pdoc__['color_schema'] = f"""Color schema.
 
 # Contrast color schema
 contrast_color_schema = Config(
-    blue='#4285F4',
-    orange='#FFAA00',
-    green='#37B13F',
-    red='#EA4335',
-    gray='#E2E2E2'
+    blue="#4285F4",
+    orange="#FFAA00",
+    green="#37B13F",
+    red="#EA4335",
+    gray="#E2E2E2"
 )
 """_"""
 
@@ -68,9 +58,12 @@ dark_template = Config(json.loads(pkgutil.get_data(__name__, "templates/dark.jso
 
 __pdoc__['dark_template'] = "Dark template."
 
+seaborn_template = Config(json.loads(pkgutil.get_data(__name__, "templates/seaborn.json")))
+
+__pdoc__['seaborn_template'] = "Seaborn template."
+
 # Layout
 layout = Config(
-    template=light_template,
     width=700,
     height=350,
     margin=dict(
@@ -93,6 +86,48 @@ __pdoc__['layout'] = f"""Plotly layout.
 {json.dumps(layout, indent=2, default=str)}
 ```
 """
+
+
+def set_theme(theme):
+    if theme == 'light' or theme == 'dark':
+        color_schema.update(
+            blue="#1f77b4",
+            orange="#ff7f0e",
+            green="#2ca02c",
+            red="#dc3912",
+            purple="#9467bd",
+            brown="#8c564b",
+            pink="#e377c2",
+            gray="#7f7f7f",
+            yellow="#bcbd22",
+            cyan="#17becf"
+        )
+
+        layout['template'] = light_template if theme == 'light' else dark_template
+    elif theme == 'seaborn':
+        color_schema.update(
+            blue="rgb(76,114,176)",
+            orange="rgb(221,132,82)",
+            green="rgb(129,114,179)",
+            red="rgb(85,168,104)",
+            purple="rgb(218,139,195)",
+            brown="rgb(204,185,116)",
+            pink="rgb(140,140,140)",
+            gray="rgb(100,181,205)",
+            yellow="rgb(147,120,96)",
+            cyan="rgb(196,78,82)"
+        )
+
+        layout['template'] = seaborn_template
+    else:
+        raise ValueError(f"Theme '{theme}' not supported")
+
+
+def reset_theme():
+    set_theme('light')
+
+
+reset_theme()
 
 # OHLCV
 ohlcv = Config(

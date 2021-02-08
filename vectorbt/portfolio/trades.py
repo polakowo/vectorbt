@@ -13,7 +13,7 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.records.base import Records
@@ -358,7 +358,7 @@ class Trades(Records):
                  closed_loss_trace_kwargs=None,
                  open_trace_kwargs=None,
                  hline_shape_kwargs=None,
-                 row=None, col=None,
+                 add_trace_kwargs=None,
                  xref='x', yref='y',
                  fig=None,
                  **layout_kwargs):  # pragma: no cover
@@ -370,8 +370,7 @@ class Trades(Records):
             closed_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Loss" markers.
             open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.
             hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -389,7 +388,6 @@ class Trades(Records):
 
         self_col = self.select_series(column=column, group_by=False)
 
-
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}
         if closed_loss_trace_kwargs is None:
@@ -398,10 +396,12 @@ class Trades(Records):
             open_trace_kwargs = {}
         if hline_shape_kwargs is None:
             hline_shape_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         marker_size_range = tuple(marker_size_range)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
         x_domain = [0, 1]
         xaxis = 'xaxis' + xref[1:]
@@ -455,7 +455,7 @@ class Trades(Records):
                                             "<br>Return: %{customdata[1]:.2%}"
                 )
                 profit_scatter.update(**closed_profit_trace_kwargs)
-                fig.add_trace(profit_scatter, row=row, col=col)
+                fig.add_trace(profit_scatter, **add_trace_kwargs)
 
             if np.any(closed_loss_mask):
                 # Plot Loss markers
@@ -481,7 +481,7 @@ class Trades(Records):
                                             "<br>Return: %{customdata[1]:.2%}"
                 )
                 loss_scatter.update(**closed_loss_trace_kwargs)
-                fig.add_trace(loss_scatter, row=row, col=col)
+                fig.add_trace(loss_scatter, **add_trace_kwargs)
 
             if np.any(open_mask):
                 # Plot Active markers
@@ -507,7 +507,7 @@ class Trades(Records):
                                             "<br>Return: %{customdata[1]:.2%}"
                 )
                 active_scatter.update(**open_trace_kwargs)
-                fig.add_trace(active_scatter, row=row, col=col)
+                fig.add_trace(active_scatter, **add_trace_kwargs)
 
         # Plot zeroline
         fig.add_shape(**merge_dicts(dict(
@@ -537,7 +537,7 @@ class Trades(Records):
              active_trace_kwargs=None,
              profit_shape_kwargs=None,
              loss_shape_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
@@ -557,8 +557,7 @@ class Trades(Records):
             active_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Active" markers.
             profit_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for profit zones.
             loss_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for loss zones.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -595,14 +594,16 @@ class Trades(Records):
             profit_shape_kwargs = {}
         if loss_shape_kwargs is None:
             loss_shape_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         # Plot close
         if plot_close:
-            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, row=row, col=col, fig=fig)
+            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         if len(self_col.values) > 0:
             # Extract information
@@ -668,7 +669,7 @@ class Trades(Records):
                                      if self.trade_type == TradeType.Trade else '')
                 )
                 entry_scatter.update(**entry_trace_kwargs)
-                fig.add_trace(entry_scatter, row=row, col=col)
+                fig.add_trace(entry_scatter, **add_trace_kwargs)
 
             # Plot end markers
             def _plot_end_markers(mask, name, color, kwargs):
@@ -712,7 +713,7 @@ class Trades(Records):
                                          if self.trade_type == TradeType.Trade else '')
                     )
                     scatter.update(**kwargs)
-                    fig.add_trace(scatter, row=row, col=col)
+                    fig.add_trace(scatter, **add_trace_kwargs)
 
             # Plot Exit markers
             _plot_end_markers(

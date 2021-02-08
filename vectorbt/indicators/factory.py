@@ -103,8 +103,8 @@ Now the same using `IndicatorFactory`:
 ... ).from_apply_func(vbt.nb.rolling_mean_nb)
 
 >>> myma = MyMA.run(price, [2, 3])
->>> above_signals = myma.price_above(myma.ma, crossed=True)
->>> below_signals = myma.price_below(myma.ma, crossed=True)
+>>> above_signals = myma.price_above(myma.ma, crossover=True)
+>>> below_signals = myma.price_below(myma.ma, crossover=True)
 ```
 
 The `IndicatorFactory` class is used to construct indicator classes from UDFs. First, you provide
@@ -203,7 +203,7 @@ myma_2_window         3                   4
 2020-01-04     3.0  3.0  2.5  3.5  2.5  3.5
 2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
 
->>> myma1.ma_above(myma2.ma, crossed=True)
+>>> myma1.ma_above(myma2.ma, crossover=True)
 myma_1_window                           2             3
 myma_2_window             3             4             4
                    a      b      a      b      a      b
@@ -890,7 +890,7 @@ def combine_objs(obj, other, combine_func, multiple=False, level_name=None, keys
     Both will be broadcast together. Set `multiple` to True to compare with multiple arguments.
     In this case, a new column level will be created with the name `level_name`.
 
-    See `vectorbt.base.accessors.Base_Accessor.combine_with`."""
+    See `vectorbt.base.accessors.BaseAccessor.combine_with`."""
     if multiple:
         if keys is None:
             keys = index_fns.index_from_values(other, name=level_name)
@@ -1205,7 +1205,7 @@ class IndicatorFactory:
 
             elif np.issubdtype(dtype, np.number):
                 def assign_numeric_method(func_name, combine_func, attr_name=attr_name):
-                    def numeric_method(_self, other, crossed=False, wait=0, after_false=True,
+                    def numeric_method(_self, other, crossover=False, wait=0, after_false=True,
                                        level_name=None, prepend_name=prepend_name, **kwargs):
                         if isinstance(other, _self.__class__):
                             other = getattr(other, attr_name)
@@ -1224,14 +1224,14 @@ class IndicatorFactory:
                             level_name=level_name,
                             **kwargs
                         )
-                        if crossed:
+                        if crossover:
                             return out.vbt.signals.nst(wait + 1, after_false=after_false)
                         return out
 
                     numeric_method.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_{func_name}'
                     numeric_method.__doc__ = f"""Return True for each element where `{attr_name}` is {func_name} `other`. 
     
-                    Set `crossed` to True to return the first True after crossover. Specify `wait` to return 
+                    Set `crossover` to True to return the first True after crossover. Specify `wait` to return 
                     True only when `{attr_name}` is {func_name} for a number of time steps in a row after crossover.
                 
                     See `vectorbt.indicators.factory.combine_objs`."""

@@ -835,7 +835,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     >>> import numpy as np
     >>> import pandas as pd
     >>> from numba import njit
-    >>> from vectorbt.generic.plotting import create_scatter
+    >>> from vectorbt.generic.plotting import Scatter
     >>> from vectorbt.records.nb import col_map_nb
     >>> from vectorbt.portfolio.enums import SizeType, Direction
     >>> from vectorbt.portfolio.nb import (
@@ -957,7 +957,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     >>> share_flow = share_flow_nb(target_shape, order_records, col_map, Direction.All)
     >>> shares = shares_nb(share_flow)
     >>> holding_value = holding_value_nb(close, shares)
-    >>> create_scatter(data=holding_value)
+    >>> Scatter(data=holding_value).fig
     ```
 
     ![](/vectorbt/docs/img/simulate_nb.png)

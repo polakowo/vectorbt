@@ -1269,7 +1269,7 @@ class TestFactory:
             )
         )
         pd.testing.assert_frame_equal(
-            obj.out_above(2, crossed=True),
+            obj.out_above(2, crossover=True),
             pd.DataFrame(
                 np.array([
                     [False, False, False],

@@ -6,7 +6,7 @@ import os
 from collections import namedtuple
 
 from vectorbt import settings
-from vectorbt.utils import checks, config, decorators, math, array, random, enum
+from vectorbt.utils import checks, config, decorators, math, array, random, enum, data
 
 from tests.utils import hash
 
@@ -1376,3 +1376,107 @@ class TestEnum:
 
     def test_to_value_map(self):
         assert enum.to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}
+
+
+# ############# data.py ############# #
+
+
+class TestData:
+    def test_download(self):
+        def downloader(symbols, kw=None):
+            return {s: pd.DataFrame({
+                'feat1': np.arange(i, 5 + i),
+                'feat2': np.arange(i, 5 + i) + kw,
+            }, index=pd.Index(np.arange(i, 5 + i))) for i, s in enumerate(symbols)}
+
+        result = data.download('a', kw=10, downloader=downloader)
+        pd.testing.assert_frame_equal(
+            result,
+            pd.DataFrame({
+                'feat1': np.arange(5),
+                'feat2': np.arange(5) + 10
+            }, index=pd.Index(np.arange(5)))
+        )
+        result = data.download('a', kw=10, downloader=downloader, cols='feat1')
+        pd.testing.assert_series_equal(
+            result,
+            pd.Series(np.arange(5), name='feat1', index=pd.Index(np.arange(5)))
+        )
+        result = data.download('a', kw=10, downloader=downloader, cols=['feat1'])
+        pd.testing.assert_frame_equal(
+            result,
+            pd.DataFrame(np.arange(5), columns=['feat1'], index=pd.Index(np.arange(5)))
+        )
+        result = data.download(['a', 'b'], kw=10, downloader=downloader)
+        pd.testing.assert_frame_equal(
+            result['a'],
+            pd.DataFrame({
+                'feat1': np.arange(5),
+                'feat2': np.arange(5) + 10
+            }, index=pd.Index(np.arange(5)))
+        )
+        pd.testing.assert_frame_equal(
+            result['b'],
+            pd.DataFrame({
+                'feat1': np.arange(1, 6),
+                'feat2': np.arange(1, 6) + 10
+            }, index=pd.Index(np.arange(1, 6)))
+        )
+        result = data.download(['a', 'b'], kw=10, downloader=downloader, cols='feat1')
+        pd.testing.assert_series_equal(
+            result['a'],
+            pd.Series(np.arange(5), name='feat1', index=pd.Index(np.arange(5)))
+        )
+        pd.testing.assert_series_equal(
+            result['b'],
+            pd.Series(np.arange(1, 6), name='feat1', index=pd.Index(np.arange(1, 6)))
+        )
+
+    def test_concat_symbols(self):
+        def downloader(symbols, kw=None):
+            return {s: pd.DataFrame({
+                'feat1': np.arange(i, 5 + i),
+                'feat2': np.arange(i, 5 + i) + kw,
+            }, index=pd.Index(np.arange(i, 5 + i))) for i, s in enumerate(symbols)}
+
+        downloaded = data.download(['a', 'b'], kw=10, downloader=downloader)
+        result = data.concat_symbols(downloaded, treat_missing='nan')
+        pd.testing.assert_frame_equal(
+            result['feat1'],
+            pd.DataFrame({
+                'a': np.concatenate((np.arange(5), np.array([np.nan]))),
+                'b': np.concatenate((np.array([np.nan]), np.arange(1, 6)))
+            }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
+        )
+        pd.testing.assert_frame_equal(
+            result['feat2'],
+            pd.DataFrame({
+                'a': np.concatenate((np.arange(5), np.array([np.nan]))) + 10,
+                'b': np.concatenate((np.array([np.nan]), np.arange(1, 6))) + 10
+            }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
+        )
+        result = data.concat_symbols(downloaded, treat_missing='drop')
+        pd.testing.assert_frame_equal(
+            result['feat1'],
+            pd.DataFrame({
+                'a': np.arange(1, 5),
+                'b': np.arange(1, 5)
+            }, index=pd.Index(np.arange(1, 5)), columns=pd.Index(['a', 'b'], name='symbol'))
+        )
+        pd.testing.assert_frame_equal(
+            result['feat2'],
+            pd.DataFrame({
+                'a': np.arange(1, 5) + 10,
+                'b': np.arange(1, 5) + 10
+            }, index=pd.Index(np.arange(1, 5)), columns=pd.Index(['a', 'b'], name='symbol'))
+        )
+
+        downloaded = data.download(['a', 'b'], kw=10, downloader=downloader, cols='feat1')
+        result = data.concat_symbols(downloaded, treat_missing='nan')
+        pd.testing.assert_frame_equal(
+            result,
+            pd.DataFrame({
+                'a': np.concatenate((np.arange(5), np.array([np.nan]))),
+                'b': np.concatenate((np.array([np.nan]), np.arange(1, 6)))
+            }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
+        )

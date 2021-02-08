@@ -8,12 +8,12 @@ import plotly.graph_objects as go
 
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.widgets import CustomFigureWidget
-from vectorbt.generic.accessors import Generic_DFAccessor
+from vectorbt.utils.widgets import FigureWidget
+from vectorbt.generic.accessors import GenericDFAccessor
 
 
 @register_dataframe_accessor('ohlcv')
-class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
+class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.ohlcv`."""
@@ -23,7 +23,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
             obj = obj._obj
         self._column_names = column_names
 
-        Generic_DFAccessor.__init__(self, obj, **kwargs)
+        GenericDFAccessor.__init__(self, obj, **kwargs)
 
     def plot(self,
              plot_type='OHLC',
@@ -46,9 +46,8 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
 
         ```python-repl
         >>> import vectorbt as vbt
-        >>> import yfinance as yf
 
-        >>> yf.Ticker("BTC-USD").history(period="max").vbt.ohlcv.plot()
+        >>> vbt.utils.data.download("BTC-USD").vbt.ohlcv.plot()
         ```
 
         ![](/vectorbt/docs/img/ohlcv.png)
@@ -63,7 +62,7 @@ class OHLCV_DFAccessor(Generic_DFAccessor):  # pragma: no cover
 
         # Set up figure
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
             fig.update_layout(
                 showlegend=True,
                 xaxis=dict(

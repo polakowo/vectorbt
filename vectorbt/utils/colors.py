@@ -1,5 +1,19 @@
 """Functions for working with colors."""
 
+import numpy as np
+
+
+def rgb_from_cmap(cmap_name, value, value_range):
+    """Map `value_range` to colormap with name `cmap_name` and get RGB of the `value` from that range."""
+    import matplotlib.pyplot as plt
+
+    if value_range[0] == value_range[1]:
+        norm_value = 0.5
+    else:
+        norm_value = (value - value_range[0]) / (value_range[1] - value_range[0])
+    cmap = plt.get_cmap(cmap_name)
+    return "rgb(%d,%d,%d)" % tuple(np.round(np.asarray(cmap(norm_value))[:3] * 255))
+
 
 def adjust_opacity(color, opacity):
     """Adjust opacity of color."""

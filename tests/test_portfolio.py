@@ -1236,6 +1236,96 @@ class TestFromSignals:
             _ = from_signals_all(price=price_wide, log=True, max_logs=5)
 
 
+# ############# from_holding ############# #
+
+class TestFromHolding:
+    def test_from_holding(self):
+        record_arrays_close(
+            vbt.Portfolio.from_holding(price).order_records,
+            vbt.Portfolio.from_signals(price, True, False, accumulate=False).order_records
+        )
+
+
+# ############# from_random ############# #
+
+class TestFromRandom:
+    def test_from_random_n(self):
+        result = vbt.Portfolio.from_random(price, n=2, seed=seed)
+        record_arrays_close(
+            result.order_records,
+            vbt.Portfolio.from_signals(
+                price,
+                [True, False, True, False, False],
+                [False, True, False, False, True]
+            ).order_records
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.index,
+            price.vbt.wrapper.index
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.columns,
+            price.vbt.wrapper.columns
+        )
+        result = vbt.Portfolio.from_random(price, n=[1, 2], seed=seed)
+        record_arrays_close(
+            result.order_records,
+            vbt.Portfolio.from_signals(
+                price,
+                [[False, True], [True, False], [False, True], [False, False], [False, False]],
+                [[False, False], [False, True], [False, False], [False, True], [True, False]]
+            ).order_records
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.index,
+            pd.DatetimeIndex([
+                '2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04', '2020-01-05'
+            ], dtype='datetime64[ns]', freq=None)
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.columns,
+            pd.Int64Index([1, 2], dtype='int64', name='rand_n')
+        )
+
+    def test_from_random_prob(self):
+        result = vbt.Portfolio.from_random(price, prob=0.5, seed=seed)
+        record_arrays_close(
+            result.order_records,
+            vbt.Portfolio.from_signals(
+                price,
+                [True, False, False, False, False],
+                [False, False, False, False, True]
+            ).order_records
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.index,
+            price.vbt.wrapper.index
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.columns,
+            price.vbt.wrapper.columns
+        )
+        result = vbt.Portfolio.from_random(price, prob=[0.25, 0.5], seed=seed)
+        record_arrays_close(
+            result.order_records,
+            vbt.Portfolio.from_signals(
+                price,
+                [[False, True], [False, False], [False, False], [False, False], [True, False]],
+                [[False, False], [False, True], [False, False], [False, False], [False, False]]
+            ).order_records
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.index,
+            pd.DatetimeIndex([
+                '2020-01-01', '2020-01-02', '2020-01-03', '2020-01-04', '2020-01-05'
+            ], dtype='datetime64[ns]', freq=None)
+        )
+        pd.testing.assert_index_equal(
+            result.wrapper.columns,
+            pd.MultiIndex.from_tuples([(0.25, 0.25),  (0.5,  0.5)], names=['rprob_entry_prob', 'rprob_exit_prob'])
+        )
+
+
 # ############# from_orders ############# #
 
 order_size = pd.Series([np.inf, -np.inf, np.nan, np.inf, -np.inf], index=price.index)

@@ -7,15 +7,15 @@ but Numba-compiled and optimized for 2-dim arrays.
 
 You can access methods listed in `vectorbt.returns.accessors` as follows:
 
-* `vectorbt.returns.accessors.Returns_SRAccessor` -> `pd.Series.vbt.returns.*`
-* `vectorbt.returns.accessors.Returns_DFAccessor` -> `pd.DataFrame.vbt.returns.*`
+* `vectorbt.returns.accessors.ReturnsSRAccessor` -> `pd.Series.vbt.returns.*`
+* `vectorbt.returns.accessors.ReturnsDFAccessor` -> `pd.DataFrame.vbt.returns.*`
 
 ```python-repl
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
->>> # vectorbt.returns.accessors.Returns_Accessor.total
+>>> # vectorbt.returns.accessors.ReturnsAccessor.total
 >>> price = pd.Series([1.1, 1.2, 1.3, 1.2, 1.1])
 >>> returns = price.pct_change()
 >>> returns.vbt.returns.total()
@@ -25,7 +25,7 @@ You can access methods listed in `vectorbt.returns.accessors` as follows:
 The accessors extend `vectorbt.generic.accessors`.
 
 ```python-repl
->>> # inherited from Generic_Accessor
+>>> # inherited from GenericAccessor
 >>> returns.vbt.returns.max()
 0.09090909090909083
 ```

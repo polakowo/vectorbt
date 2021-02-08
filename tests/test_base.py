@@ -2564,7 +2564,7 @@ class TestCommon:
             reduced_dim1_one_1d_nb,
             reduced_dim1_1d_nb
         ])
-        class H_1d(accessors.Base_Accessor):
+        class H_1d(accessors.BaseAccessor):
             def __init__(self, sr):
                 super().__init__(sr)
 
@@ -2598,7 +2598,7 @@ class TestCommon:
             reduced_dim1_nb,
             reduced_dim2_nb
         ])
-        class H(accessors.Base_Accessor):
+        class H(accessors.BaseAccessor):
             pass
 
         pd.testing.assert_frame_equal(H(df3).same_shape(), df3 ** 2)

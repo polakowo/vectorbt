@@ -40,17 +40,17 @@ from vectorbt.root_accessors import register_dataframe_accessor, register_series
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.base import reshape_fns
 from vectorbt.base.class_helpers import add_nb_methods
-from vectorbt.generic.accessors import Generic_Accessor, Generic_SRAccessor, Generic_DFAccessor
+from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.signals import nb
 
 
 @add_nb_methods([
     nb.fshift_nb,
 ], module_name='vectorbt.signals.nb')
-class Signals_Accessor(Generic_Accessor):
+class SignalsAccessor(GenericAccessor):
     """Accessor on top of signal series. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
@@ -61,11 +61,11 @@ class Signals_Accessor(Generic_Accessor):
 
         checks.assert_dtype(obj, np.bool)
 
-        Generic_Accessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, **kwargs)
 
     @classmethod
     def empty(cls, *args, fill_value=False, **kwargs):
-        """`vectorbt.base.accessors.Base_Accessor.empty` with `fill_value=False`.
+        """`vectorbt.base.accessors.BaseAccessor.empty` with `fill_value=False`.
 
         ## Example
 
@@ -87,11 +87,11 @@ class Signals_Accessor(Generic_Accessor):
         2020-01-05  False  False  False
         ```
         """
-        return Generic_Accessor.empty(*args, fill_value=fill_value, dtype=bool, **kwargs)
+        return GenericAccessor.empty(*args, fill_value=fill_value, dtype=bool, **kwargs)
 
     @classmethod
     def empty_like(cls, *args, fill_value=False, **kwargs):
-        """`vectorbt.base.accessors.Base_Accessor.empty_like` with `fill_value=False`.
+        """`vectorbt.base.accessors.BaseAccessor.empty_like` with `fill_value=False`.
 
         ## Example
 
@@ -113,7 +113,7 @@ class Signals_Accessor(Generic_Accessor):
         2020-01-05  False  False  False
         ```
         """
-        return Generic_Accessor.empty_like(*args, fill_value=fill_value, dtype=bool, **kwargs)
+        return GenericAccessor.empty_like(*args, fill_value=fill_value, dtype=bool, **kwargs)
 
     # ############# Signal generation ############# #
 
@@ -298,6 +298,8 @@ class Signals_Accessor(Generic_Accessor):
             flex_2d = False
             shape = (shape[0], 1)
 
+        if n is not None and prob is not None:
+            raise ValueError("Either n or prob should be set")
         if n is not None:
             n = np.broadcast_to(n, shape[1])
             result = nb.generate_rand_nb(shape, n, seed=seed)
@@ -323,7 +325,7 @@ class Signals_Accessor(Generic_Accessor):
         If `n` is set, see `vectorbt.signals.nb.generate_rand_enex_nb`.
         If `entry_prob` and `exit_prob` are set, see `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`.
 
-        For arguments, see `Signals_Accessor.generate_random`.
+        For arguments, see `SignalsAccessor.generate_random`.
 
         ## Example
 
@@ -705,7 +707,7 @@ class Signals_Accessor(Generic_Accessor):
     def avg_distance(self, to=None, **kwargs):
         """Calculate the average distance between True values in `self` and optionally `to`.
 
-        See `Signals_Accessor.map_reduce_between`."""
+        See `SignalsAccessor.map_reduce_between`."""
         return self.map_reduce_between(
             other=to,
             map_func_nb=nb.distance_map_nb,
@@ -831,7 +833,7 @@ class Signals_Accessor(Generic_Accessor):
     def AND(self, *others, **kwargs):
         """Combine with each in `*others` using logical AND.
 
-        See `vectorbt.base.accessors.Base_Accessor.combine_with_multiple`.
+        See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`.
 
         """
         return self.combine_with_multiple(others, combine_func=np.logical_and, **kwargs)
@@ -839,7 +841,7 @@ class Signals_Accessor(Generic_Accessor):
     def OR(self, *others, **kwargs):
         """Combine with each in `*others` using logical OR.
 
-        See `vectorbt.base.accessors.Base_Accessor.combine_with_multiple`.
+        See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`.
 
         ## Example
 
@@ -861,12 +863,12 @@ class Signals_Accessor(Generic_Accessor):
     def XOR(self, *others, **kwargs):
         """Combine with each in `*others` using logical XOR.
 
-        See `vectorbt.base.accessors.Base_Accessor.combine_with_multiple`."""
+        See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`."""
         return self.combine_with_multiple(others, combine_func=np.logical_xor, **kwargs)
 
 
 @register_series_accessor('signals')
-class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
+class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
     """Accessor on top of signal series. For Series only.
 
     Accessible through `pd.Series.vbt.signals`."""
@@ -875,18 +877,15 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_SRAccessor.__init__(self, obj, **kwargs)
-        Signals_Accessor.__init__(self, obj, **kwargs)
+        GenericSRAccessor.__init__(self, obj, **kwargs)
+        SignalsAccessor.__init__(self, obj, **kwargs)
 
-    def plot(self, name=None, trace_kwargs=None, row=None, col=None, yref='y',
-             fig=None, **layout_kwargs):  # pragma: no cover
+    def plot(self, trace_kwargs=None, add_trace_kwargs=None, yref='y', fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line.
 
         Args:
-            name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
@@ -901,9 +900,12 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         """
         if trace_kwargs is None:
             trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
         # Set up figure
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(
             tickmode='array',
@@ -912,11 +914,10 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
         )
         fig.update_layout(**default_layout)
         fig.update_layout(**layout_kwargs)
-        if name is None:
-            if 'name' in trace_kwargs:
-                name = trace_kwargs.pop('name')
-            else:
-                name = self._obj.name
+        if 'name' in trace_kwargs:
+            name = trace_kwargs.pop('name')
+        else:
+            name = self._obj.name
         if name is not None:
             name = str(name)
 
@@ -928,11 +929,11 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
-        fig.add_trace(scatter, row=row, col=col)
+        fig.add_trace(scatter, **add_trace_kwargs)
 
         return fig
 
-    def plot_as_markers(self, y=None, name=None, trace_kwargs=None, row=None, col=None,
+    def plot_as_markers(self, y=None, trace_kwargs=None, add_trace_kwargs=None,
                         fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as markers.
 
@@ -941,11 +942,8 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
                 !!! note
                     Doesn't plot `y`.
-
-            name (str): Name of the signals.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
@@ -964,15 +962,16 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
 
         if trace_kwargs is None:
             trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
-        if name is None:
-            if 'name' in trace_kwargs:
-                name = trace_kwargs.pop('name')
-            else:
-                name = self._obj.name
+        if 'name' in trace_kwargs:
+            name = trace_kwargs.pop('name')
+        else:
+            name = self._obj.name
         if name is not None:
             name = str(name)
 
@@ -995,13 +994,13 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
             showlegend=name is not None
         )
         scatter.update(**trace_kwargs)
-        fig.add_trace(scatter, row=row, col=col)
+        fig.add_trace(scatter, **add_trace_kwargs)
         return fig
 
-    def plot_as_entry_markers(self, *args, name='Entry', trace_kwargs=None, **kwargs):  # pragma: no cover
+    def plot_as_entry_markers(self, *args, trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as entry markers.
 
-        See `Signals_SRAccessor.plot_as_markers`."""
+        See `SignalsSRAccessor.plot_as_markers`."""
         from vectorbt.settings import contrast_color_schema
 
         if trace_kwargs is None:
@@ -1015,14 +1014,15 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                     width=1,
                     color=adjust_lightness(contrast_color_schema['green'])
                 )
-            )
+            ),
+            name='Entry'
         ), trace_kwargs)
-        return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
+        return self.plot_as_markers(*args, trace_kwargs=trace_kwargs, **kwargs)
 
-    def plot_as_exit_markers(self, *args, name='Exit', trace_kwargs=None, **kwargs):  # pragma: no cover
+    def plot_as_exit_markers(self, *args, trace_kwargs=None, **kwargs):  # pragma: no cover
         """Plot signals as exit markers.
 
-        See `Signals_SRAccessor.plot_as_markers`."""
+        See `SignalsSRAccessor.plot_as_markers`."""
         from vectorbt.settings import contrast_color_schema
 
         if trace_kwargs is None:
@@ -1036,13 +1036,14 @@ class Signals_SRAccessor(Signals_Accessor, Generic_SRAccessor):
                     width=1,
                     color=adjust_lightness(contrast_color_schema['red'])
                 )
-            )
+            ),
+            name='Exit'
         ), trace_kwargs)
-        return self.plot_as_markers(*args, name=name, trace_kwargs=trace_kwargs, **kwargs)
+        return self.plot_as_markers(*args, trace_kwargs=trace_kwargs, **kwargs)
 
 
 @register_dataframe_accessor('signals')
-class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
+class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
     """Accessor on top of signal series. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.signals`."""
@@ -1051,8 +1052,8 @@ class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_DFAccessor.__init__(self, obj, **kwargs)
-        Signals_Accessor.__init__(self, obj, **kwargs)
+        GenericDFAccessor.__init__(self, obj, **kwargs)
+        SignalsAccessor.__init__(self, obj, **kwargs)
 
     def plot(self, trace_kwargs=None, fig=None, **kwargs):  # pragma: no cover
         """Plot each column in DataFrame as a line.
@@ -1060,7 +1061,7 @@ class Signals_DFAccessor(Signals_Accessor, Generic_DFAccessor):
         Args:
             trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Scatter`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **kwargs: Keyword arguments passed to `Signals_SRAccessor.plot`.
+            **kwargs: Keyword arguments passed to `SignalsSRAccessor.plot`.
 
         ## Example
 

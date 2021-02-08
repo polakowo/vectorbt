@@ -665,6 +665,8 @@ def unstack_to_array(arg, levels=None):
     """
     checks.assert_type(arg, pd.Series)
     checks.assert_type(arg.index, pd.MultiIndex)
+    if arg.index.duplicated().any():
+        raise ValueError("Index contains duplicate entries, cannot reshape")
 
     unique_idx_list = []
     vals_idx_list = []

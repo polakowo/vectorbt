@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.records.base import Records
@@ -141,7 +141,7 @@ class Orders(Records):
              close_trace_kwargs=None,
              buy_trace_kwargs=None,
              sell_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot orders.
@@ -152,8 +152,7 @@ class Orders(Records):
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `Orders.close`.
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
@@ -178,14 +177,16 @@ class Orders(Records):
             buy_trace_kwargs = {}
         if sell_trace_kwargs is None:
             sell_trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         # Plot close
         if plot_close:
-            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, row=row, col=col, fig=fig)
+            fig = self_col.close.vbt.plot(trace_kwargs=close_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         if len(self_col.values) > 0:
             # Extract information
@@ -221,7 +222,7 @@ class Orders(Records):
                               "<br>Fees: %{customdata[2]:.6f}"
             )
             buy_scatter.update(**buy_trace_kwargs)
-            fig.add_trace(buy_scatter, row=row, col=col)
+            fig.add_trace(buy_scatter, **add_trace_kwargs)
 
             # Plot Sell markers
             sell_mask = side == OrderSide.Sell
@@ -248,6 +249,6 @@ class Orders(Records):
                               "<br>Fees: %{customdata[2]:.6f}"
             )
             sell_scatter.update(**sell_trace_kwargs)
-            fig.add_trace(sell_scatter, row=row, col=col)
+            fig.add_trace(sell_scatter, **add_trace_kwargs)
 
         return fig

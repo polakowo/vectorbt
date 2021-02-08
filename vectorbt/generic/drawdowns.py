@@ -9,7 +9,7 @@ from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeTypes
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb
@@ -28,12 +28,11 @@ class Drawdowns(Records):
     >>> import vectorbt as vbt
     >>> import numpy as np
     >>> import pandas as pd
-    >>> import yfinance as yf
     >>> from datetime import datetime
 
     >>> start = datetime(2019, 1, 1)
     >>> end = datetime(2020, 1, 1)
-    >>> price = yf.Ticker("BTC-USD").history(start=start, end=end)['Close']
+    >>> price = vbt.utils.data.download("BTC-USD", start=start, end=end)['Close']
     >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
 
     >>> drawdowns.records.head()
@@ -265,7 +264,7 @@ class Drawdowns(Records):
              ptv_shape_kwargs=None,
              vtr_shape_kwargs=None,
              active_shape_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
@@ -284,8 +283,7 @@ class Drawdowns(Records):
             ptv_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for PtV zones.
             vtr_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for VtR zones.
             active_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for active VtR zones.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -329,9 +327,11 @@ class Drawdowns(Records):
             vtr_shape_kwargs = {}
         if active_shape_kwargs is None:
             active_shape_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
         y_domain = [0, 1]
         yaxis = 'yaxis' + yref[1:]
@@ -341,7 +341,7 @@ class Drawdowns(Records):
                     y_domain = fig.layout[yaxis]['domain']
 
         if plot_ts:
-            fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, row=row, col=col, fig=fig)
+            fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         if len(self_col.values) > 0:
             # Extract information
@@ -388,7 +388,7 @@ class Drawdowns(Records):
                                   "<br>Price: %{y}"
                 )
                 peak_scatter.update(**peak_trace_kwargs)
-                fig.add_trace(peak_scatter, row=row, col=col)
+                fig.add_trace(peak_scatter, **add_trace_kwargs)
 
             recovery_mask = status == DrawdownStatus.Recovered
             if np.any(recovery_mask):
@@ -418,7 +418,7 @@ class Drawdowns(Records):
                                   "<br>Duration: %{customdata[2]}"
                 )
                 valley_scatter.update(**valley_trace_kwargs)
-                fig.add_trace(valley_scatter, row=row, col=col)
+                fig.add_trace(valley_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot drawdown zones
@@ -463,7 +463,7 @@ class Drawdowns(Records):
                                   "<br>Duration: %{customdata[2]}"
                 )
                 recovery_scatter.update(**recovery_trace_kwargs)
-                fig.add_trace(recovery_scatter, row=row, col=col)
+                fig.add_trace(recovery_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot recovery zones
@@ -510,7 +510,7 @@ class Drawdowns(Records):
                                   "<br>Duration: %{customdata[2]}"
                 )
                 active_scatter.update(**active_trace_kwargs)
-                fig.add_trace(active_scatter, row=row, col=col)
+                fig.add_trace(active_scatter, **add_trace_kwargs)
 
                 if plot_zones:
                     # Plot active drawdown zones

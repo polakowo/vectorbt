@@ -133,10 +133,10 @@ You can build histograms and boxplots of `MappedArray` directly:
 To use scatterplots or any other plots that require index, convert to matrix first:
 
 ```python-repl
->>> ma.to_matrix().vbt.scatter()
+>>> ma.to_matrix().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/mapped_scatter.png)
+![](/vectorbt/docs/img/mapped_plot.png)
 
 ## Grouping
 
@@ -691,11 +691,11 @@ class MappedArray(Wrapping):
 
     def hist(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot histogram by column."""
-        return self.stack(group_by=group_by).vbt.hist(**kwargs)
+        return self.stack(group_by=group_by).vbt.histplot(**kwargs)
 
     def box(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot box plot by column."""
-        return self.stack(group_by=group_by).vbt.box(**kwargs)
+        return self.stack(group_by=group_by).vbt.boxplot(**kwargs)
 
 
 

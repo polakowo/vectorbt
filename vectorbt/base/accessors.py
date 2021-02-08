@@ -28,14 +28,14 @@ from vectorbt.base.class_helpers import (
     unary_magic_methods,
     lambda self, np_func: self.apply(apply_func=np_func)
 )
-class Base_Accessor:
+class BaseAccessor:
     """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
 
     Series is just a DataFrame with one column, hence to avoid defining methods exclusively for 1-dim data,
     we will convert any Series to a DataFrame and perform matrix computation on it. Afterwards,
-    by using `Base_Accessor.wrapper`, we will convert the 2-dim output back to a Series.
+    by using `BaseAccessor.wrapper`, we will convert the 2-dim output back to a Series.
 
     `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
@@ -104,7 +104,7 @@ class Base_Accessor:
 
         Set `on_top` to False to stack at bottom.
 
-        See `Base_Accessor.apply_on_index` for other keyword arguments."""
+        See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             if on_top:
@@ -116,7 +116,7 @@ class Base_Accessor:
     def drop_levels(self, levels, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.drop_levels`.
 
-        See `Base_Accessor.apply_on_index` for other keyword arguments."""
+        See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_levels(obj_index, levels)
@@ -126,7 +126,7 @@ class Base_Accessor:
     def rename_levels(self, name_dict, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.rename_levels`.
 
-        See `Base_Accessor.apply_on_index` for other keyword arguments."""
+        See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.rename_levels(obj_index, name_dict)
@@ -136,7 +136,7 @@ class Base_Accessor:
     def select_levels(self, level_names, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.select_levels`.
 
-        See `Base_Accessor.apply_on_index` for other keyword arguments."""
+        See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.select_levels(obj_index, level_names)
@@ -146,7 +146,7 @@ class Base_Accessor:
     def drop_redundant_levels(self, axis=1, inplace=False):
         """See `vectorbt.base.index_fns.drop_redundant_levels`.
 
-        See `Base_Accessor.apply_on_index` for other keyword arguments."""
+        See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_redundant_levels(obj_index)
@@ -156,7 +156,7 @@ class Base_Accessor:
     def drop_duplicate_levels(self, keep='last', axis=1, inplace=False):
         """See `vectorbt.base.index_fns.drop_duplicate_levels`.
 
-        See `Base_Accessor.apply_on_index` for other keyword arguments."""
+        See `BaseAccessor.apply_on_index` for other keyword arguments."""
 
         def apply_func(obj_index):
             return index_fns.drop_duplicate_levels(obj_index, keep=keep)
@@ -249,14 +249,14 @@ class Base_Accessor:
     @class_or_instancemethod
     def broadcast(self_or_cls, *others, **kwargs):
         """See `vectorbt.base.reshape_fns.broadcast`."""
-        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(self_or_cls, type):
             return reshape_fns.broadcast(*others, **kwargs)
         return reshape_fns.broadcast(self_or_cls._obj, *others, **kwargs)
 
     def broadcast_to(self, other, **kwargs):
         """See `vectorbt.base.reshape_fns.broadcast_to`."""
-        if isinstance(other, Base_Accessor):
+        if isinstance(other, BaseAccessor):
             other = other._obj
         return reshape_fns.broadcast_to(self._obj, other, **kwargs)
 
@@ -329,7 +329,7 @@ class Base_Accessor:
         y  2  2  5  6
         ```
         """
-        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(self_or_cls, type):
             objs = others
         else:
@@ -411,7 +411,7 @@ class Base_Accessor:
         y  7  8
         ```
         """
-        if isinstance(other, Base_Accessor):
+        if isinstance(other, BaseAccessor):
             other = other._obj
         checks.assert_not_none(combine_func)
         if checks.is_numba_func(combine_func):
@@ -474,7 +474,7 @@ class Base_Accessor:
         y  7  8  12  14
         ```
         """
-        others = tuple(map(lambda x: x._obj if isinstance(x, Base_Accessor) else x, others))
+        others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
         checks.assert_not_none(combine_func)
         checks.assert_type(others, Iterable)
         # Broadcast arguments
@@ -514,7 +514,7 @@ class Base_Accessor:
             return new_obj.vbt.wrapper.wrap(result)
 
 
-class Base_SRAccessor(Base_Accessor):
+class BaseSRAccessor(BaseAccessor):
     """Accessor on top of Series.
 
     Accessible through `pd.Series.vbt` and all child accessors."""
@@ -524,7 +524,7 @@ class Base_SRAccessor(Base_Accessor):
             obj = obj._obj
         checks.assert_type(obj, pd.Series)
 
-        Base_Accessor.__init__(self, obj, **kwargs)
+        BaseAccessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
     def is_series(self_or_cls):
@@ -535,7 +535,7 @@ class Base_SRAccessor(Base_Accessor):
         return False
 
 
-class Base_DFAccessor(Base_Accessor):
+class BaseDFAccessor(BaseAccessor):
     """Accessor on top of DataFrames.
 
     Accessible through `pd.DataFrame.vbt` and all child accessors."""
@@ -545,7 +545,7 @@ class Base_DFAccessor(Base_Accessor):
             obj = obj._obj
         checks.assert_type(obj, pd.DataFrame)
 
-        Base_Accessor.__init__(self, obj, **kwargs)
+        BaseAccessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
     def is_series(self_or_cls):

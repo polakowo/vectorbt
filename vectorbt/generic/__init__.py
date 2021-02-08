@@ -6,15 +6,15 @@ In contrast to the `vectorbt.base` sub-package, focuses on the data itself.
 
 You can access methods listed in `vectorbt.generic.accessors` as follows:
 
-* `vectorbt.generic.accessors.Generic_SRAccessor` -> `pd.Series.vbt.*`
-* `vectorbt.generic.accessors.Generic_DFAccessor` -> `pd.DataFrame.vbt.*`
+* `vectorbt.generic.accessors.GenericSRAccessor` -> `pd.Series.vbt.*`
+* `vectorbt.generic.accessors.GenericDFAccessor` -> `pd.DataFrame.vbt.*`
 
 ```python-repl
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
->>> # vectorbt.generic.accessors.Generic_Accessor.rolling_mean
+>>> # vectorbt.generic.accessors.GenericAccessor.rolling_mean
 >>> pd.Series([1, 2, 3, 4]).vbt.rolling_mean(2)
 0    NaN
 1    1.5

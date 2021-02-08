@@ -34,16 +34,17 @@
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
+from scipy import stats
+from plotly.subplots import make_subplots
 from numba.typed import Dict
 import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import index_fns, reshape_fns
-from vectorbt.base.accessors import Base_Accessor, Base_DFAccessor, Base_SRAccessor
+from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
@@ -89,7 +90,7 @@ except ImportError:
     nb.expanding_max_nb,
     nb.expanding_mean_nb
 ], module_name='vectorbt.generic.nb')
-class Generic_Accessor(Base_Accessor):
+class GenericAccessor(BaseAccessor):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
@@ -98,7 +99,7 @@ class Generic_Accessor(Base_Accessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Base_Accessor.__init__(self, obj, **kwargs)
+        BaseAccessor.__init__(self, obj, **kwargs)
 
     def rolling_std(self, window, minp=1, ddof=1):  # pragma: no cover
         """See `vectorbt.generic.nb.rolling_std_nb`."""
@@ -777,7 +778,7 @@ class Generic_Accessor(Base_Accessor):
 
     @cached_property
     def drawdowns(self):
-        """`Generic_Accessor.get_drawdowns` with default arguments."""
+        """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
     @cached_method
@@ -807,100 +808,138 @@ class Generic_Accessor(Base_Accessor):
 
     # ############# Plotting ############# #
 
-    def bar(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_bar`.
+    def plot(self, trace_names=None, x_labels=None, return_fig=True, **kwargs):  # pragma: no cover
+        """Create `vectorbt.generic.plotting.Scatter` and return the figure.
 
         ## Example
 
         ```python-repl
-        >>> ts.vbt.bar()
+        >>> df[['a', 'b']].vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/df_bar.png)
+        ![](/vectorbt/docs/img/df_plot.png)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
-        return plotting.create_bar(
+        scatter = plotting.Scatter(
             data=self.to_2d_array(),
             trace_names=trace_names,
             x_labels=x_labels,
             **kwargs
         )
+        if return_fig:
+            return scatter.fig
+        return scatter
 
-    def scatter(self, trace_names=None, x_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_scatter`.
+    def lineplot(self, **kwargs):
+        """`GenericAccessor.plot` with 'lines' mode.
 
         ## Example
 
         ```python-repl
-        >>> ts.vbt.scatter()
+        >>> df.vbt.lineplot()
         ```
 
-        ![](/vectorbt/docs/img/df_scatter.png)
+        ![](/vectorbt/docs/img/df_lineplot.png)
+        """
+        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='lines')), kwargs))
+
+    def scatterplot(self, **kwargs):
+        """`GenericAccessor.plot` with 'markers' mode.
+
+        ## Example
+
+        ```python-repl
+        >>> df.vbt.scatterplot()
+        ```
+
+        ![](/vectorbt/docs/img/df_scatterplot.png)
+        """
+        return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='markers')), kwargs))
+
+    def barplot(self, trace_names=None, x_labels=None, return_fig=True, **kwargs):  # pragma: no cover
+        """Create `vectorbt.generic.plotting.Bar` and return the figure.
+
+        ## Example
+
+        ```python-repl
+        >>> df.vbt.barplot()
+        ```
+
+        ![](/vectorbt/docs/img/df_barplot.png)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
-        return plotting.create_scatter(
+        bar = plotting.Bar(
             data=self.to_2d_array(),
             trace_names=trace_names,
             x_labels=x_labels,
             **kwargs
         )
+        if return_fig:
+            return bar.fig
+        return bar
 
-    def hist(self, trace_names=None, group_by=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_hist`.
-
-        ## Example
-
-        ```python-repl
-        >>> ts.vbt.hist()
-        ```
-
-        ![](/vectorbt/docs/img/df_hist.png)
-        """
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.flatten_grouped(group_by=group_by).vbt.hist(trace_names=trace_names, **kwargs)
-
-        if trace_names is None:
-            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
-                trace_names = self.wrapper.columns
-        return plotting.create_hist(
-            data=self.to_2d_array(),
-            trace_names=trace_names,
-            **kwargs
-        )
-
-    def box(self, trace_names=None, group_by=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_box`.
+    def histplot(self, trace_names=None, group_by=None, return_fig=True, **kwargs):  # pragma: no cover
+        """Create `vectorbt.generic.plotting.Histogram` and return the figure.
 
         ## Example
 
         ```python-repl
-        >>> ts.vbt.box()
+        >>> df.vbt.histplot()
         ```
 
-        ![](/vectorbt/docs/img/df_box.png)
+        ![](/vectorbt/docs/img/df_histplot.png)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            return self.flatten_grouped(group_by=group_by).vbt.box(trace_names=trace_names, **kwargs)
+            return self.flatten_grouped(group_by=group_by).vbt.histplot(trace_names=trace_names, **kwargs)
 
         if trace_names is None:
             if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
                 trace_names = self.wrapper.columns
-        return plotting.create_box(
+        hist = plotting.Histogram(
             data=self.to_2d_array(),
             trace_names=trace_names,
             **kwargs
         )
+        if return_fig:
+            return hist.fig
+        return hist
+
+    def boxplot(self, trace_names=None, group_by=None, return_fig=True, **kwargs):  # pragma: no cover
+        """Create `vectorbt.generic.plotting.Box` and return the figure.
+
+        ## Example
+
+        ```python-repl
+        >>> df.vbt.boxplot()
+        ```
+
+        ![](/vectorbt/docs/img/df_boxplot.png)
+        """
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            return self.flatten_grouped(group_by=group_by).vbt.boxplot(trace_names=trace_names, **kwargs)
+
+        if trace_names is None:
+            if self.is_frame() or (self.is_series() and self.wrapper.name is not None):
+                trace_names = self.wrapper.columns
+        box = plotting.Box(
+            data=self.to_2d_array(),
+            trace_names=trace_names,
+            **kwargs
+        )
+        if return_fig:
+            return box.fig
+        return box
 
 
-class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
+class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
     """Accessor on top of data of any type. For Series only.
 
     Accessible through `pd.Series.vbt`."""
@@ -909,61 +948,16 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Base_SRAccessor.__init__(self, obj, **kwargs)
-        Generic_Accessor.__init__(self, obj, **kwargs)
+        BaseSRAccessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, **kwargs)
 
-    def plot(self, name=None, trace_kwargs=None, row=None, col=None, fig=None, **layout_kwargs):  # pragma: no cover
-        """Plot Series as a line.
-
-        Args:
-            name (str): Name of the trace.
-            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
-            row (int): Row position.
-            col (int): Column position.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **layout_kwargs: Keyword arguments for layout.
-
-        ## Example
-
-        ```python-repl
-        >>> df['a'].vbt.plot()
-        ```
-
-        ![](/vectorbt/docs/img/sr_plot.png)
-        """
-        if trace_kwargs is None:
-            trace_kwargs = {}
-        if fig is None:
-            fig = CustomFigureWidget()
-        fig.update_layout(**layout_kwargs)
-        if name is None:
-            if 'name' in trace_kwargs:
-                name = trace_kwargs.pop('name')
-            else:
-                name = self._obj.name
-        if name is not None:
-            name = str(name)
-
-        scatter = go.Scatter(
-            x=self.wrapper.index,
-            y=self._obj.values,
-            mode='lines',
-            name=name,
-            showlegend=name is not None
-        )
-        scatter.update(**trace_kwargs)
-        fig.add_trace(scatter, row=row, col=col)
-
-        return fig
-
-    def plot_against(self, other, name=None, other_name=None, trace_kwargs=None,
-                     other_trace_kwargs=None, pos_trace_kwargs=None, neg_trace_kwargs=None,
-                     hidden_trace_kwargs=None, row=None, col=None, fig=None, **layout_kwargs):  # pragma: no cover
+    def plot_against(self, other, trace_kwargs=None, other_trace_kwargs=None, pos_trace_kwargs=None,
+                     neg_trace_kwargs=None, hidden_trace_kwargs=None, add_trace_kwargs=None,
+                     fig=None, **layout_kwargs):  # pragma: no cover
         """Plot Series as a line against another line.
 
         Args:
-            name (str): Name of the trace.
-            other_name (str): Name of the trace for `other`.
+            other (array_like): Second array. Will broadcast.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
             other_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `other`.
 
@@ -971,8 +965,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
             pos_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for positive line.
             neg_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for negative line.
             hidden_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for hidden lines.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
@@ -995,8 +988,9 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
         obj, other = reshape_fns.broadcast(self._obj, other, columns_from=None)
+        checks.assert_type(other, pd.Series)
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         # TODO: Using masks feels hacky
@@ -1014,7 +1008,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     showlegend=False,
                     name=None,
                 ), hidden_trace_kwargs),
-                row=row, col=col,
+                add_trace_kwargs=add_trace_kwargs,
                 fig=fig
             )
             pos_obj.vbt.plot(
@@ -1029,7 +1023,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     showlegend=False,
                     name=None
                 ), pos_trace_kwargs),
-                row=row, col=col,
+                add_trace_kwargs=add_trace_kwargs,
                 fig=fig
             )
         neg_mask = self._obj < other
@@ -1046,7 +1040,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     showlegend=False,
                     name=None
                 ), hidden_trace_kwargs),
-                row=row, col=col,
+                add_trace_kwargs=add_trace_kwargs,
                 fig=fig
             )
             neg_obj.vbt.plot(
@@ -1061,12 +1055,12 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     showlegend=False,
                     name=None
                 ), neg_trace_kwargs),
-                row=row, col=col,
+                add_trace_kwargs=add_trace_kwargs,
                 fig=fig
             )
 
         # Plot main traces
-        self.plot(name=name, trace_kwargs=trace_kwargs, row=row, col=col, fig=fig)
+        self.plot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         if other_trace_kwargs == 'hidden':
             other_trace_kwargs = dict(
                 line_color='rgba(0, 0, 0, 0)',
@@ -1076,18 +1070,65 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 showlegend=False,
                 name=None
             )
-        other.vbt.plot(name=other_name, trace_kwargs=other_trace_kwargs, row=row, col=col, fig=fig)
+        other.vbt.plot(trace_kwargs=other_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         return fig
 
-    def heatmap(self, x_level=None, y_level=None, symmetric=False, sort=True, x_labels=None,
-                y_labels=None, slider_level=None, slider_labels=None, fig=None, **kwargs):  # pragma: no cover
+    def overlay_with_heatmap(self, other, trace_kwargs=None, heatmap_kwargs=None,
+                             add_trace_kwargs=None, fig=None, **layout_kwargs):  # pragma: no cover
+        """Plot Series as a line and overlays it with a heatmap.
+
+        Args:
+            other (array_like): Second array. Will broadcast.
+            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            heatmap_kwargs (dict): Keyword arguments passed to `GenericDFAccessor.heatmap`.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
+            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            **layout_kwargs: Keyword arguments for layout.
+
+        ## Example
+
+        ```python-repl
+        >>> df['a'].vbt.overlay_with_heatmap(df['b'])
+        ```
+
+        ![](/vectorbt/docs/img/sr_overlay_with_heatmap.png)
+        """
+        from vectorbt.settings import layout, color_schema
+
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        trace_kwargs = merge_dicts(dict(
+            line_color=color_schema['blue']
+        ), trace_kwargs)
+        if heatmap_kwargs is None:
+            heatmap_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
+        obj, other = reshape_fns.broadcast(self._obj, other, columns_from=None)
+        checks.assert_type(other, pd.Series)
+        if fig is None:
+            fig = make_subplots(specs=[[{"secondary_y": True}]])
+            fig = FigureWidget(fig)
+            if 'width' in layout:
+                fig.update_layout(width=layout['width'] + 150)
+        fig.update_layout(**layout_kwargs)
+
+        other.to_frame().vbt.heatmap(**heatmap_kwargs, horizontal=True, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        add_trace_kwargs = merge_dicts(dict(secondary_y=True), add_trace_kwargs)
+        self.plot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
+        return fig
+
+    def heatmap(self, x_level=None, y_level=None, symmetric=False, sort=True,
+                x_labels=None, y_labels=None, slider_level=None, slider_labels=None,
+                return_fig=True, fig=None, **kwargs):  # pragma: no cover
         """Create a heatmap figure based on object's multi-index and values.
 
         If multi-index contains more than two levels or you want them in specific order,
         pass `x_level` and `y_level`, each (`int` if index or `str` if name) corresponding
         to an axis of the heatmap. Optionally, pass `slider_level` to use a level as a slider.
 
-        See `vectorbt.generic.plotting.create_heatmap` for other keyword arguments.
+        Creates `vectorbt.generic.plotting.Heatmap` and returns the figure.
 
         ## Example
 
@@ -1107,7 +1148,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         >>> sr.vbt.heatmap()
         ```
 
-        ![](/vectorbt/docs/img/heatmap.png)
+        ![](/vectorbt/docs/img/sr_heatmap.png)
 
         Using one level as a slider:
 
@@ -1130,10 +1171,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
            1  1    5
         dtype: int64
 
-        >>> sr.vbt.heatmap(slider_level=0).show()
+        >>> sr.vbt.heatmap(slider_level=0)
         ```
 
-        ![](/vectorbt/docs/img/heatmap_slider.gif)
+        ![](/vectorbt/docs/img/sr_heatmap_slider.gif)
         """
         (x_level, y_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
@@ -1161,73 +1202,74 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 index_levels=y_level, column_levels=x_level,
                 symmetric=symmetric, sort=sort
             )
-            fig = df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, **kwargs)
-        else:
-            # Requires grouping
-            # See https://plotly.com/python/sliders/
-            _slider_labels = []
-            for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
-                if slider_labels is not None:
-                    name = slider_labels[i]
-                _slider_labels.append(name)
-                df = group.vbt.unstack_to_df(
-                    index_levels=y_level, column_levels=x_level,
-                    symmetric=symmetric, sort=sort
-                )
-                if x_labels is None:
-                    x_labels = df.columns
-                if y_labels is None:
-                    y_labels = df.index
-                _kwargs = merge_dicts(dict(
-                    trace_kwargs=dict(
-                        name=str(name) if name is not None else None,
-                        visible=False
-                    ),
-                ), kwargs)
-                default_size = fig is None and 'height' not in _kwargs
-                fig = plotting.create_heatmap(
-                    data=df.vbt.to_2d_array(),
-                    x_labels=x_labels,
-                    y_labels=y_labels,
-                    fig=fig,
-                    **_kwargs
-                )
-                if default_size:
-                    fig.layout['height'] += 100  # slider takes up space
-            fig.data[0].visible = True
-            steps = []
-            for i in range(len(fig.data)):
-                step = dict(
-                    method="update",
-                    args=[{"visible": [False] * len(fig.data)}, {}],
-                    label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
-                )
-                step["args"][0]["visible"][i] = True
-                steps.append(step)
-            prefix = f'{self.wrapper.index.names[slider_level]}: ' \
-                if self.wrapper.index.names[slider_level] is not None else None
-            sliders = [dict(
-                active=0,
-                currentvalue={"prefix": prefix},
-                pad={"t": 50},
-                steps=steps
-            )]
-            fig.update_layout(
-                sliders=sliders
-            )
+            return df.vbt.heatmap(x_labels=x_labels, y_labels=y_labels, fig=fig, return_fig=return_fig, **kwargs)
 
+        # Requires grouping
+        # See https://plotly.com/python/sliders/
+        if not return_fig:
+            raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
+        _slider_labels = []
+        for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
+            if slider_labels is not None:
+                name = slider_labels[i]
+            _slider_labels.append(name)
+            df = group.vbt.unstack_to_df(
+                index_levels=y_level, column_levels=x_level,
+                symmetric=symmetric, sort=sort
+            )
+            if x_labels is None:
+                x_labels = df.columns
+            if y_labels is None:
+                y_labels = df.index
+            _kwargs = merge_dicts(dict(
+                trace_kwargs=dict(
+                    name=str(name) if name is not None else None,
+                    visible=False
+                ),
+            ), kwargs)
+            default_size = fig is None and 'height' not in _kwargs
+            fig = plotting.Heatmap(
+                data=df.vbt.to_2d_array(),
+                x_labels=x_labels,
+                y_labels=y_labels,
+                fig=fig,
+                **_kwargs
+            ).fig
+            if default_size:
+                fig.layout['height'] += 100  # slider takes up space
+        fig.data[0].visible = True
+        steps = []
+        for i in range(len(fig.data)):
+            step = dict(
+                method="update",
+                args=[{"visible": [False] * len(fig.data)}, {}],
+                label=str(_slider_labels[i]) if _slider_labels[i] is not None else None
+            )
+            step["args"][0]["visible"][i] = True
+            steps.append(step)
+        prefix = f'{self.wrapper.index.names[slider_level]}: ' \
+            if self.wrapper.index.names[slider_level] is not None else None
+        sliders = [dict(
+            active=0,
+            currentvalue={"prefix": prefix},
+            pad={"t": 50},
+            steps=steps
+        )]
+        fig.update_layout(
+            sliders=sliders
+        )
         return fig
 
-    def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None, 
-               z_labels=None, slider_level=None, slider_labels=None, scene_name='scene', 
-               fillna=None, fig=None, **kwargs):  # pragma: no cover
+    def volume(self, x_level=None, y_level=None, z_level=None, x_labels=None, y_labels=None,
+               z_labels=None, slider_level=None, slider_labels=None, scene_name='scene',
+               fillna=None, fig=None, return_fig=True, **kwargs):  # pragma: no cover
         """Create a 3D volume figure based on object's multi-index and values.
 
         If multi-index contains more than three levels or you want them in specific order, pass
         `x_level`, `y_level`, and `z_level`, each (`int` if index or `str` if name) corresponding
         to an axis of the volume. Optionally, pass `slider_level` to use a level as a slider.
 
-        See `vectorbt.generic.plotting.create_volume` for other keyword arguments.
+        Creates `vectorbt.generic.plotting.Volume` and returns the figure.
 
         ## Example
 
@@ -1244,10 +1286,10 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
         3  3  3    2
         dtype: int64
 
-        >>> sr.vbt.volume()
+        >>> sr.vbt.volume().show()
         ```
 
-        ![](/vectorbt/docs/img/volume.png)
+        ![](/vectorbt/docs/img/sr_volume.png)
         """
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
@@ -1292,7 +1334,7 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 v = np.nan_to_num(v, nan=fillna)
             if np.isnan(v).any():
                 contains_nan = True
-            fig = plotting.create_volume(
+            volume = plotting.Volume(
                 data=v,
                 x_labels=x_labels,
                 y_labels=y_labels,
@@ -1300,9 +1342,15 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                 fig=fig,
                 **kwargs
             )
+            if return_fig:
+                fig = volume.fig
+            else:
+                fig = volume
         else:
             # Requires grouping
             # See https://plotly.com/python/sliders/
+            if not return_fig:
+                raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
             _slider_labels = []
             for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
                 if slider_labels is not None:
@@ -1320,14 +1368,14 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                     )
                 ), kwargs)
                 default_size = fig is None and 'height' not in _kwargs
-                fig = plotting.create_volume(
+                fig = plotting.Volume(
                     data=v,
                     x_labels=x_labels,
                     y_labels=y_labels,
                     z_labels=z_labels,
                     fig=fig,
                     **_kwargs
-                )
+                ).fig
                 if default_size:
                     fig.layout['height'] += 100  # slider takes up space
             fig.data[0].visible = True
@@ -1357,8 +1405,43 @@ class Generic_SRAccessor(Generic_Accessor, Base_SRAccessor):
                           "`show` method in case of visualization issues.", stacklevel=2)
         return fig
 
+    def qqplot(self, sparams=(), dist='norm', plot_line=True, line_shape_kwargs=None,
+               xref='x', yref='y', fig=None, **kwargs):  # pragma: no cover
+        """Plot probability plot using `scipy.stats.probplot`.
 
-class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
+        `**kwargs` will be passed to `GenericAccessor.scatterplot`.
+
+        ## Example
+
+        ```python-repl
+        >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
+        ```
+
+        ![](/vectorbt/docs/img/sr_qqplot.png)
+        """
+        qq = stats.probplot(self._obj, sparams=sparams, dist=dist)
+        fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
+
+        if plot_line:
+            if line_shape_kwargs is None:
+                line_shape_kwargs = {}
+            x = np.array([qq[0][0][0], qq[0][0][-1]])
+            y = qq[1][1] + qq[1][0] * x
+            fig.add_shape(**merge_dicts(dict(
+                type="line",
+                xref=xref,
+                yref=yref,
+                x0=x[0],
+                y0=y[0],
+                x1=x[1],
+                y1=y[1],
+                line_color='red'
+            ), line_shape_kwargs))
+
+        return fig
+
+
+class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     """Accessor on top of data of any type. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt`."""
@@ -1367,38 +1450,11 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Base_DFAccessor.__init__(self, obj, **kwargs)
-        Generic_Accessor.__init__(self, obj, **kwargs)
+        BaseDFAccessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, **kwargs)
 
-    def plot(self, trace_kwargs=None, fig=None, **kwargs):  # pragma: no cover
-        """Plot each column in DataFrame as a line.
-
-        Args:
-            trace_kwargs (dict or list of dict): Keyword arguments passed to each `plotly.graph_objects.Scatter`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
-            **kwargs: Keyword arguments passed to `Generic_SRAccessor.plot`.
-
-        ## Example
-
-        ```python-repl
-        >>> df[['a', 'b']].vbt.plot()
-        ```
-
-        ![](/vectorbt/docs/img/df_plot.png)
-        """
-        if trace_kwargs is None:
-            trace_kwargs = {}
-        for col in range(self._obj.shape[1]):
-            fig = self._obj.iloc[:, col].vbt.plot(
-                trace_kwargs=trace_kwargs,
-                fig=fig,
-                **kwargs
-            )
-
-        return fig
-
-    def heatmap(self, x_labels=None, y_labels=None, **kwargs):  # pragma: no cover
-        """See `vectorbt.generic.plotting.create_heatmap`.
+    def heatmap(self, x_labels=None, y_labels=None, return_fig=True, **kwargs):  # pragma: no cover
+        """Create `vectorbt.generic.plotting.Heatmap` and return the figure.
 
         ## Example
 
@@ -1411,15 +1467,19 @@ class Generic_DFAccessor(Generic_Accessor, Base_DFAccessor):
         >>> df.vbt.heatmap()
         ```
 
-        ![](/vectorbt/docs/img/heatmap.png)
+        ![](/vectorbt/docs/img/df_heatmap.png)
         """
         if x_labels is None:
             x_labels = self.wrapper.columns
         if y_labels is None:
             y_labels = self.wrapper.index
-        return plotting.create_heatmap(
+        heatmap = plotting.Heatmap(
             data=self.to_2d_array(),
             x_labels=x_labels,
             y_labels=y_labels,
             **kwargs
         )
+        if return_fig:
+            return heatmap.fig
+        return heatmap
+

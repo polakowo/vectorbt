@@ -37,75 +37,79 @@ pip install vectorbt
 See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) 
 for Plotly figures.
 
-## Example
+## Examples
 
 You can start backtesting with just a couple of lines.
 
-Here is how much profit we would have made if we invested $100 into Bitcoin in 2014:
+Here is how much profit we would have made if we invested $100 into Bitcoin in 2014 and held 
+(Note: first time compiling with Numba may take a while):
 
 ```python
-import yfinance as yf
-import numpy as np
-import pandas as pd
 import vectorbt as vbt
 
-price = yf.Ticker('BTC-USD').history(period='max')['Close']
-size = pd.Series.vbt.empty_like(price, 0.)
-size.iloc[0] = np.inf  # go all in
-portfolio = vbt.Portfolio.from_orders(price, size, init_cash=100.)
+price = vbt.utils.data.download('BTC-USD', period='max')['Close']
+
+portfolio = vbt.Portfolio.from_holding(price, init_cash=100)
 portfolio.total_profit()
 ```
 
 ```plaintext
-4065.1702287767293
+8412.436065824717
 ```
 
-And here is the crossover of 10-day SMA and 50-day SMA under the same conditions:
+The crossover of 10-day SMA and 50-day SMA under the same conditions:
 
 ```python
 fast_ma = vbt.MA.run(price, 10)
 slow_ma = vbt.MA.run(price, 50)
-entries = fast_ma.ma_above(slow_ma, crossed=True)
-exits = fast_ma.ma_below(slow_ma, crossed=True)
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, size=np.inf, init_cash=100.)
+entries = fast_ma.ma_above(slow_ma, crossover=True)
+exits = fast_ma.ma_below(slow_ma, crossover=True)
+
+portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
 portfolio.total_profit()
 ```
 
 ```plaintext
-6302.288201465419
+12642.617149066731
 ```
 
-For fans of hyperparameter optimization, here is a snippet for testing 10,000 window combinations of a 
-dual SMA crossover strategy on BTC, USD and XRP from 2017 onwards, in under 5 seconds 
-(Note: first time compiling with Numba may take a while):
+Quickly assessing the performance of 1000 random strategies on BTC and ETH:
 
 ```python
-# Define your params
-assets = ["BTC-USD", "ETH-USD", "LTC-USD"]
-yf_kwargs = dict(start='2017-1-1')
+import numpy as np
+
+symbols = ["BTC-USD", "ETH-USD"]
+price_by_symbol = vbt.utils.data.download(symbols, period='max', cols='Close')
+price = vbt.utils.data.concat_symbols(price_by_symbol, treat_missing='drop')
+
+n = np.random.randint(10, 101, size=1000).tolist()
+portfolio = vbt.Portfolio.from_random(price, n=n, init_cash=100, seed=42)
+
+mean_expectancy = portfolio.trades.expectancy().groupby(['rand_n', 'symbol']).mean()
+fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='rand_n', yaxis_title='mean_expectancy')
+fig.show()
+```
+
+![rand_scatter.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.png)
+
+For fans of hyperparameter optimization, here is a snippet for testing 10000 window combinations of a 
+dual SMA crossover strategy on BTC, USD and XRP:
+
+```python
+symbols = ["BTC-USD", "ETH-USD", "LTC-USD"]
+price_by_symbol = vbt.utils.data.download(symbols, period='max', cols='Close')
+price = vbt.utils.data.concat_symbols(price_by_symbol, treat_missing='drop')
+
 windows = np.arange(2, 101)
-portfolio_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
-
-# Fetch daily price
-price = {}
-for asset in assets:
-    price[asset] = yf.Ticker(asset).history(**yf_kwargs)['Close']
-price = pd.DataFrame(price)
-price.columns.name = 'asset'
-
-# Compute moving averages for all combinations of fast and slow windows
 fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=['fast', 'slow'])
+entries = fast_ma.ma_above(slow_ma, crossover=True)
+exits = fast_ma.ma_below(slow_ma, crossover=True)
 
-# Generate crossover signals for each combination
-entries = fast_ma.ma_above(slow_ma, crossed=True)
-exits = fast_ma.ma_below(slow_ma, crossed=True)
-
-# Run simulation
+portfolio_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
 portfolio = vbt.Portfolio.from_signals(price, entries, exits, **portfolio_kwargs)
 
-# Get total return, reshape to symmetric matrix, and plot the whole thing
 fig = portfolio.total_return().vbt.heatmap(
-    x_level='fast_window', y_level='slow_window', slider_level='asset', symmetric=True,
+    x_level='fast_window', y_level='slow_window', slider_level='symbol', symmetric=True,
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')))
 fig.show()
 ```
@@ -152,6 +156,54 @@ portfolio[(10, 20, 'ETH-USD')].plot().show()
 ```
 
 ![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.png)
+
+It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
+Let's generate a GIF for comparing %B and bandwidth of Bollinger Bands for different symbols:
+
+```python
+import vectorbt as vbt
+import imageio
+from tqdm import tqdm
+
+symbols = ["BTC-USD", "ETH-USD", "ADA-USD"]
+gif_delta, gif_step, gif_fps = 90, 3, 3
+gif_fname = 'bbands.gif'
+
+price_by_symbol = vbt.utils.data.download(symbols, period='6mo', cols='Close')
+price = vbt.utils.data.concat_symbols(price_by_symbol, treat_missing='drop')
+
+bbands = vbt.BBANDS.run(price)
+
+def plot(bbands):
+    fig = vbt.make_subplots(
+            rows=5, cols=1, shared_xaxes=True, 
+            row_heights=[*[0.4 / 3] * len(symbols), 0.3, 0.3], vertical_spacing=0.05,
+            subplot_titles=(*symbols, '%B', 'Bandwidth'))
+    fig.update_layout(showlegend=False, width=800, height=700)
+    for i, symbol in enumerate(symbols):
+        bbands.close[symbol].vbt.lineplot(add_trace_kwargs=dict(row=i + 1, col=1), fig=fig)
+    bbands.percent_b.iloc[:, ::-1].vbt.heatmap(
+        trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(
+            y=(fig.layout.yaxis4.domain[0] + fig.layout.yaxis4.domain[1]) / 2, len=0.3
+        )), add_trace_kwargs=dict(row=4, col=1), horizontal=True, fig=fig)
+    bbands.bandwidth.iloc[:, ::-1].vbt.heatmap(
+        trace_kwargs=dict(colorbar=dict(
+            y=(fig.layout.yaxis5.domain[0] + fig.layout.yaxis5.domain[1]) / 2, len=0.3
+        )), add_trace_kwargs=dict(row=5, col=1), horizontal=True, fig=fig)
+    return fig
+
+with imageio.get_writer(gif_fname, fps=gif_fps) as writer:
+    for i in tqdm(range(0, len(bbands.wrapper.index) - gif_delta, gif_step)):
+        fig = plot(bbands.iloc[i:i + gif_delta])
+        fig_np = imageio.imread(fig.to_image(format="png"))
+        writer.append_data(fig_np)
+```
+
+```plaintext
+100%|██████████| 31/31 [00:21<00:00,  1.21it/s]
+```
+
+![bbands.gif](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/bbands.gif)
 
 ## Motivation
 
@@ -343,13 +395,6 @@ sma_timeperiod    2    3
     
 - Interactive Plotly-based widgets to visualize backtest results
     - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
-
-```python-repl
->>> a = np.random.normal(0, 4, size=10000)
->>> pd.Series(a).vbt.box(horizontal=True, trace_kwargs=dict(boxmean='sd')).show()
-``` 
-
-![Box.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/Box.png)
 
 ## Resources
 

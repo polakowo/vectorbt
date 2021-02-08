@@ -912,10 +912,6 @@ def rank_partitions_nb(a, reset_by=None, after_false=False):
 
 # ############# Boolean operations ############# #
 
-# Boolean operations are natively supported by pandas
-# You can, for example, perform Signals_1 & Signals_2 to get logical AND of both arrays
-# NOTE: We don't implement backward operations to avoid look-ahead bias!
-
 @njit(cache=True)
 def fshift_1d_nb(a, n):
     """Shift forward `a` by `n` positions."""

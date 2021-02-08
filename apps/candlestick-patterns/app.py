@@ -1168,24 +1168,24 @@ def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, e
         )
     )
     entry_signals.vbt.signals.plot_as_entry_markers(
-        name='Bullish signal',
         y=entry_y,
         trace_kwargs=dict(
             customdata=entry_patterns[:, None],
             hovertemplate='%{x}<br>%{customdata[0]}',
             yaxis="y2",
-            xaxis="x"
+            xaxis="x",
+            name='Bullish signal'
         ),
         fig=fig
     )
     exit_signals.vbt.signals.plot_as_exit_markers(
-        name='Bearish signal',
         y=exit_y,
         trace_kwargs=dict(
             customdata=exit_patterns[:, None],
             hovertemplate='%{x}<br>%{customdata[0]}',
             yaxis="y2",
-            xaxis="x"
+            xaxis="x",
+            name='Bearish signal'
         ),
         fig=fig
     )

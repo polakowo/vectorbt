@@ -4,15 +4,15 @@
 
 You can access methods listed in `vectorbt.signals.accessors` as follows:
 
-* `vectorbt.signals.accessors.Signals_SRAccessor` -> `pd.Series.vbt.signals.*`
-* `vectorbt.signals.accessors.Signals_DFAccessor` -> `pd.DataFrame.vbt.signals.*`
+* `vectorbt.signals.accessors.SignalsSRAccessor` -> `pd.Series.vbt.signals.*`
+* `vectorbt.signals.accessors.SignalsDFAccessor` -> `pd.DataFrame.vbt.signals.*`
 
 ```python-repl
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
->>> # vectorbt.signals.accessors.Signals_Accessor.rank
+>>> # vectorbt.signals.accessors.SignalsAccessor.rank
 >>> pd.Series([False, True, True, True, False]).vbt.signals.rank()
 0    0
 1    1

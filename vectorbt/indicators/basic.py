@@ -3,34 +3,52 @@
 ```python-repl
 >>> import vectorbt as vbt
 >>> from datetime import datetime
->>> import yfinance as yf
 
->>> ticker = yf.Ticker("BTC-USD")
->>> price = ticker.history(start=datetime(2019, 3, 1), end=datetime(2019, 9, 1))
->>> price = price[['Open', 'High', 'Low', 'Close', 'Volume']]
->>> price
-                Open      High       Low     Close       Volume
+>>> start = datetime(2019, 3, 1)
+>>> end = datetime(2019, 9, 1)
+>>> cols = ['Open', 'High', 'Low', 'Close', 'Volume']
+>>> ohlcv = vbt.utils.data.download("BTC-USD", start=start, end=end, cols=cols)
+>>> ohlcv
+                    Open          High           Low         Close  \
 Date
-2019-02-28   3848.26   3906.06   3845.82   3854.79   8399767798
-2019-03-01   3853.76   3907.80   3851.69   3859.58   7661247975
-2019-03-02   3855.32   3874.61   3832.13   3864.42   7578786075
-...              ...       ...       ...       ...          ...
-2019-08-29   9756.79   9756.79   9421.63   9510.20  17045878500
-2019-08-30   9514.84   9656.12   9428.30   9598.17  13595263986
-2019-08-31   9597.54   9673.22   9531.80   9630.66  11454806419
+2019-02-28   3848.261963   3906.058350   3845.821289   3854.785400
+2019-03-01   3853.757080   3907.795410   3851.692383   3859.583740
+2019-03-02   3855.318115   3874.607422   3832.127930   3864.415039
+2019-03-03   3862.266113   3875.483643   3836.905762   3847.175781
+2019-03-04   3845.091553   3867.381836   3733.749756   3761.557129
+...                  ...           ...           ...           ...
+2019-08-27  10372.826172  10381.328125  10087.300781  10185.500000
+2019-08-28  10203.426758  10279.366211   9716.656250   9754.422852
+2019-08-29   9756.786133   9756.786133   9421.629883   9510.200195
+2019-08-30   9514.844727   9656.124023   9428.302734   9598.173828
+2019-08-31   9597.539062   9673.220703   9531.799805   9630.664062
+
+                 Volume
+Date
+2019-02-28   8399767798
+2019-03-01   7661247975
+2019-03-02   7578786076
+2019-03-03   7253558152
+2019-03-04   9029175788
+...                 ...
+2019-08-27  14762609503
+2019-08-28  17603790323
+2019-08-29  17045878501
+2019-08-30  13595263986
+2019-08-31  11454806419
 
 [185 rows x 5 columns]
 
->>> price.vbt.ohlcv.plot()
+>>> ohlcv.vbt.ohlcv.plot()
 ```
-![](/vectorbt/docs/img/Indicators_price.png)"""
+![](/vectorbt/docs/img/basic_price.png)"""
 
 import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.docs import fix_class_for_docs
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.generic import nb as generic_nb
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators import nb
@@ -67,7 +85,7 @@ class MA(MA):
              plot_close=True,
              close_trace_kwargs=None,
              ma_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MA.ma` against `MA.close`.
@@ -77,15 +95,14 @@ class MA(MA):
             plot_close (bool): Whether to plot `MA.close`.
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
 
         ```python-repl
-        >>> vbt.MA.run(price['Close'], 10).plot()
+        >>> vbt.MA.run(ohlcv['Close'], 10).plot()
         ```
 
         ![](/vectorbt/docs/img/MA.png)
@@ -95,7 +112,7 @@ class MA(MA):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         if close_trace_kwargs is None:
@@ -113,10 +130,10 @@ class MA(MA):
         if plot_close:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
-                row=row, col=col, fig=fig)
+                add_trace_kwargs=add_trace_kwargs, fig=fig)
         fig = self_col.ma.vbt.plot(
             trace_kwargs=ma_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
@@ -151,7 +168,7 @@ class MSTD(MSTD):
     def plot(self,
              column=None,
              mstd_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MSTD.mstd`.
@@ -159,15 +176,14 @@ class MSTD(MSTD):
         Args:
             column (str): Name of the column to plot.
             mstd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSTD.mstd`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
 
         ```python-repl
-        >>> vbt.MSTD.run(price['Close'], 10).plot()
+        >>> vbt.MSTD.run(ohlcv['Close'], 10).plot()
         ```
 
         ![](/vectorbt/docs/img/MSTD.png)
@@ -175,7 +191,7 @@ class MSTD(MSTD):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         if mstd_trace_kwargs is None:
@@ -186,7 +202,7 @@ class MSTD(MSTD):
 
         fig = self_col.mstd.vbt.plot(
             trace_kwargs=mstd_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
@@ -236,7 +252,7 @@ class BBANDS(BBANDS):
              middle_trace_kwargs=None,
              upper_trace_kwargs=None,
              lower_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
@@ -249,15 +265,14 @@ class BBANDS(BBANDS):
             middle_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.middle`.
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
             lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.lower`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
 
         ```python-repl
-        >>> vbt.BBANDS.run(price['Close']).plot()
+        >>> vbt.BBANDS.run(ohlcv['Close']).plot()
         ```
 
         ![](/vectorbt/docs/img/BBANDS.png)
@@ -267,7 +282,7 @@ class BBANDS(BBANDS):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         if close_trace_kwargs is None:
@@ -298,17 +313,17 @@ class BBANDS(BBANDS):
 
         fig = self_col.lower.vbt.plot(
             trace_kwargs=lower_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
         fig = self_col.upper.vbt.plot(
             trace_kwargs=upper_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
         fig = self_col.middle.vbt.plot(
             trace_kwargs=middle_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
         if plot_close:
             fig = self_col.close.vbt.plot(
                 trace_kwargs=close_trace_kwargs,
-                row=row, col=col, fig=fig)
+                add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
@@ -349,7 +364,7 @@ class RSI(RSI):
              column=None,
              levels=(30, 70),
              rsi_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
@@ -359,8 +374,7 @@ class RSI(RSI):
             column (str): Name of the column to plot.
             levels (tuple): Two extremes: bottom and top.
             rsi_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `RSI.rsi`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -369,7 +383,7 @@ class RSI(RSI):
         ## Example
 
         ```python-repl
-        >>> vbt.RSI.run(price['Close']).plot()
+        >>> vbt.RSI.run(ohlcv['Close']).plot()
         ```
 
         ![](/vectorbt/docs/img/RSI.png)
@@ -377,7 +391,7 @@ class RSI(RSI):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
         fig.update_layout(**default_layout)
@@ -391,7 +405,7 @@ class RSI(RSI):
 
         fig = self_col.rsi.vbt.plot(
             trace_kwargs=rsi_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         # Fill void between levels
         fig.add_shape(
@@ -449,7 +463,7 @@ class STOCH(STOCH):
              percent_k_trace_kwargs=None,
              percent_d_trace_kwargs=None,
              shape_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              xref='x', yref='y',
              fig=None,
              **layout_kwargs):  # pragma: no cover
@@ -461,8 +475,7 @@ class STOCH(STOCH):
             percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
             percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
             shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zone between levels.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -471,7 +484,7 @@ class STOCH(STOCH):
         ## Example
 
         ```python-repl
-        >>> vbt.STOCH.run(price['High'], price['Low'], price['Close']).plot()
+        >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
         ```
 
         ![](/vectorbt/docs/img/STOCH.png)
@@ -479,7 +492,7 @@ class STOCH(STOCH):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
         fig.update_layout(**default_layout)
@@ -500,10 +513,10 @@ class STOCH(STOCH):
 
         fig = self_col.percent_k.vbt.plot(
             trace_kwargs=percent_k_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
         fig = self_col.percent_d.vbt.plot(
             trace_kwargs=percent_d_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         # Plot levels
         # Fill void between levels
@@ -566,7 +579,7 @@ class MACD(MACD):
              macd_trace_kwargs=None,
              signal_trace_kwargs=None,
              hist_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
@@ -576,22 +589,21 @@ class MACD(MACD):
             macd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.macd`.
             signal_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.signal`.
             hist_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar` for `MACD.hist`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
 
         ```python-repl
-        >>> vbt.MACD.run(price['Close']).plot()
+        >>> vbt.MACD.run(ohlcv['Close']).plot()
         ```
 
         ![](/vectorbt/docs/img/MACD.png)"""
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
             fig.update_layout(bargap=0)
         fig.update_layout(**layout_kwargs)
 
@@ -611,10 +623,10 @@ class MACD(MACD):
 
         fig = self_col.macd.vbt.plot(
             trace_kwargs=macd_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
         fig = self_col.signal.vbt.plot(
             trace_kwargs=signal_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         # Plot hist
         hist = self_col.hist.values
@@ -632,7 +644,9 @@ class MACD(MACD):
             marker_line_width=0
         )
         hist_bar.update(**hist_trace_kwargs)
-        fig.add_trace(hist_bar, row=row, col=col)
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+        fig.add_trace(hist_bar, **add_trace_kwargs)
 
         return fig
 
@@ -676,7 +690,7 @@ class ATR(ATR):
              column=None,
              tr_trace_kwargs=None,
              atr_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
@@ -685,15 +699,14 @@ class ATR(ATR):
             column (str): Name of the column to plot.
             tr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.tr`.
             atr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.atr`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
 
         ```python-repl
-        >>> vbt.ATR.run(price['High'], price['Low'], price['Close'], 10).plot()
+        >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close'], 10).plot()
         ```
 
         ![](/vectorbt/docs/img/ATR.png)
@@ -701,7 +714,7 @@ class ATR(ATR):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         if tr_trace_kwargs is None:
@@ -717,10 +730,10 @@ class ATR(ATR):
 
         fig = self_col.tr.vbt.plot(
             trace_kwargs=tr_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
         fig = self_col.atr.vbt.plot(
             trace_kwargs=atr_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 
@@ -752,7 +765,7 @@ class OBV(OBV):
     def plot(self,
              column=None,
              obv_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         """Plot `OBV.obv`.
@@ -760,15 +773,14 @@ class OBV(OBV):
         Args:
             column (str): Name of the column to plot.
             obv_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OBV.obv`.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
 
         ```py
-        >>> vbt.OBV.run(price['Close'], price['Volume']).plot()
+        >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot()
         ```
 
         ![](/vectorbt/docs/img/OBV.png)
@@ -776,7 +788,7 @@ class OBV(OBV):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
 
         if obv_trace_kwargs is None:
@@ -787,7 +799,7 @@ class OBV(OBV):
 
         fig = self_col.obv.vbt.plot(
             trace_kwargs=obv_trace_kwargs,
-            row=row, col=col, fig=fig)
+            add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         return fig
 

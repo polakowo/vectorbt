@@ -11,19 +11,19 @@ from scipy.stats import skew, kurtosis
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import reshape_fns
 from vectorbt.generic.accessors import (
-    Generic_Accessor,
-    Generic_SRAccessor,
-    Generic_DFAccessor
+    GenericAccessor,
+    GenericSRAccessor,
+    GenericDFAccessor
 )
 from vectorbt.utils.datetime import freq_delta, DatetimeTypes
 from vectorbt.returns import nb, metrics
 
 
-class Returns_Accessor(Generic_Accessor):
+class ReturnsAccessor(GenericAccessor):
     """Accessor on top of return series. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt.returns` and `pd.DataFrame.vbt.returns`."""
@@ -32,14 +32,14 @@ class Returns_Accessor(Generic_Accessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_Accessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, **kwargs)
 
         # Set year frequency
         self._year_freq = year_freq
 
     @classmethod
     def from_price(cls, price, **kwargs):
-        """Returns a new `Returns_Accessor` instance with returns from `price`."""
+        """Returns a new `ReturnsAccessor` instance with returns from `price`."""
         return cls(price.vbt.pct_change(), **kwargs)
 
     @property
@@ -280,7 +280,7 @@ class Returns_Accessor(Generic_Accessor):
 
     @cached_property
     def drawdowns(self):
-        """`Returns_Accessor.get_drawdowns` with default arguments."""
+        """`ReturnsAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
     @cached_method
@@ -310,33 +310,32 @@ class Returns_Accessor(Generic_Accessor):
         ```python-repl
         >>> import pandas as pd
         >>> from datetime import datetime
-        >>> import yfinance as yf
         >>> import vectorbt as vbt
 
-        >>> btc_price = yf.Ticker("BTC-USD").history()['Close']
-        >>> spy_price = yf.Ticker("SPY").history()['Close']
-        >>> price_df = pd.concat([btc_price, spy_price], axis=1, keys=("BTC-USD", "SPY"))
-        >>> returns_df = price_df.pct_change()
-        >>> returns_df["BTC-USD"].vbt.returns.stats(returns_df["SPY"])
-        Start                    2020-11-01 00:00:00
-        End                      2020-12-01 00:00:00
-        Duration                    31 days 00:00:00
-        Total Return [%]                     37.9835
-        Benchmark Return [%]                 10.7935
-        Annual Return [%]                    4329.46
-        Annual Volatility [%]                71.5084
-        Sharpe Ratio                         5.84964
-        Calmar Ratio                         413.819
-        Max. Drawdown [%]                   -10.4622
-        Omega Ratio                          2.36607
-        Sortino Ratio                        11.0962
-        Skew                                0.036609
-        Kurtosis                             1.04302
-        Tail Ratio                           1.66878
-        Common Sense Ratio                   73.9178
-        Value at Risk                     -0.0412519
-        Alpha                                43.0408
-        Beta                                0.531022
+        >>> symbols = ["BTC-USD", "SPY"]
+        >>> price_by_symbol = vbt.utils.data.download(symbols, cols='Close')
+        >>> price = vbt.utils.data.concat_symbols(price_by_symbol)
+        >>> returns = price.pct_change()
+        >>> returns["BTC-USD"].vbt.returns(freq='D').stats(returns["SPY"])
+        Start                    2021-01-06 00:00:00
+        End                      2021-02-07 00:00:00
+        Duration                    32 days 00:00:00
+        Total Return [%]                   -0.418286
+        Benchmark Return [%]                 3.79066
+        Annual Return [%]                   -4.66859
+        Annual Volatility [%]                 97.232
+        Sharpe Ratio                        0.423346
+        Calmar Ratio                       -0.183759
+        Max. Drawdown [%]                   -25.4061
+        Omega Ratio                          1.05892
+        Sortino Ratio                       0.601933
+        Skew                               -0.317326
+        Kurtosis                            0.436989
+        Tail Ratio                           1.12418
+        Common Sense Ratio                    1.0717
+        Value at Risk                     -0.0695332
+        Alpha                               0.180043
+        Beta                                0.859574
         Name: BTC-USD, dtype: object
         ```
         """
@@ -371,7 +370,7 @@ class Returns_Accessor(Generic_Accessor):
 
 
 @register_series_accessor('returns')
-class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
+class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
     """Accessor on top of return series. For Series only.
 
     Accessible through `pd.Series.vbt.returns`."""
@@ -380,12 +379,12 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_SRAccessor.__init__(self, obj, **kwargs)
-        Returns_Accessor.__init__(self, obj, year_freq=year_freq, **kwargs)
+        GenericSRAccessor.__init__(self, obj, **kwargs)
+        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, **kwargs)
 
     def plot_cum_returns(self, benchmark_rets=None, start_value=1, fill_to_benchmark=False,
                          main_kwargs=None, benchmark_kwargs=None, hline_shape_kwargs=None,
-                         row=None, col=None, xref='x', yref='y',
+                         add_trace_kwargs=None, xref='x', yref='y',
                          fig=None, **layout_kwargs):  # pragma: no cover
         """Plot cumulative returns.
 
@@ -394,11 +393,10 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
                 Will broadcast per element.
             start_value (float): The starting returns.
             fill_to_benchmark (bool): Whether to fill between main and benchmark, or between main and `start_value`.
-            main_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot` for main.
-            benchmark_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.Generic_SRAccessor.plot` for benchmark.
+            main_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot` for main.
+            benchmark_kwargs (dict): Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot` for benchmark.
             hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for `start_value` line.
-            row (int): Row position.
-            col (int): Column position.
+            add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -421,7 +419,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         from vectorbt.settings import color_schema
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
         fig.update_layout(**layout_kwargs)
         x_domain = [0, 1]
         xaxis = 'xaxis' + xref[1:]
@@ -443,7 +441,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
                 )
             ), benchmark_kwargs)
             benchmark_cumrets = benchmark_rets.vbt.returns.cumulative(start_value=start_value)
-            benchmark_cumrets.vbt.plot(**benchmark_kwargs, row=row, col=col, fig=fig)
+            benchmark_cumrets.vbt.plot(**benchmark_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:
             benchmark_cumrets = None
 
@@ -458,9 +456,9 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
         ), main_kwargs)
         cumrets = self.cumulative(start_value=start_value)
         if fill_to_benchmark:
-            cumrets.vbt.plot_against(benchmark_cumrets, **main_kwargs, row=row, col=col, fig=fig)
+            cumrets.vbt.plot_against(benchmark_cumrets, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         else:
-            cumrets.vbt.plot_against(start_value, **main_kwargs, row=row, col=col, fig=fig)
+            cumrets.vbt.plot_against(start_value, **main_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
 
         # Plot hline
         if hline_shape_kwargs is None:
@@ -483,7 +481,7 @@ class Returns_SRAccessor(Returns_Accessor, Generic_SRAccessor):
 
 
 @register_dataframe_accessor('returns')
-class Returns_DFAccessor(Returns_Accessor, Generic_DFAccessor):
+class ReturnsDFAccessor(ReturnsAccessor, GenericDFAccessor):
     """Accessor on top of return series. For DataFrames only.
 
     Accessible through `pd.DataFrame.vbt.returns`."""
@@ -492,5 +490,5 @@ class Returns_DFAccessor(Returns_Accessor, Generic_DFAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        Generic_DFAccessor.__init__(self, obj, **kwargs)
-        Returns_Accessor.__init__(self, obj, year_freq=year_freq, **kwargs)
+        GenericDFAccessor.__init__(self, obj, **kwargs)
+        ReturnsAccessor.__init__(self, obj, year_freq=year_freq, **kwargs)

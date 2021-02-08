@@ -230,7 +230,6 @@ Let's start with fetching the daily price of Bitcoin:
 ```python-repl
 >>> import numpy as np
 >>> import pandas as pd
->>> import yfinance as yf
 >>> from datetime import datetime
 
 >>> import vectorbt as vbt
@@ -238,18 +237,22 @@ Let's start with fetching the daily price of Bitcoin:
 >>> # Prepare data
 >>> start = datetime(2019, 1, 1)
 >>> end = datetime(2020, 1, 1)
->>> btc_price = yf.Ticker("BTC-USD").history(start=start, end=end)['Open']
+>>> btc_price = vbt.utils.data.download("BTC-USD", start=start, end=end)['Close']
 
 >>> btc_price
 Date
-2018-12-31    3866.84
-2019-01-01    3746.71
-2019-01-02    3849.22
-               ...
-2019-12-29    7317.65
-2019-12-30    7420.27
-2019-12-31    7294.44
-Name: Open, Length: 366, dtype: float64
+2018-12-31    3742.700439
+2019-01-01    3843.520020
+2019-01-02    3943.409424
+2019-01-03    3836.741211
+2019-01-04    3857.717529
+                 ...
+2019-12-27    7290.088379
+2019-12-28    7317.990234
+2019-12-29    7422.652832
+2019-12-30    7292.995117
+2019-12-31    7193.599121
+Name: Close, Length: 366, dtype: float64
 ```
 
 We are going to test a simple Dual Moving Average Crossover (DMAC) strategy. For this, we are going to
@@ -262,33 +265,41 @@ average, and sell when the opposite happens.
 >>> fast_ma = vbt.MA.run(btc_price, 10, short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, 20, short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossed=True)
+>>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
 Date
 2018-12-31    False
 2019-01-01    False
 2019-01-02    False
+2019-01-03    False
+2019-01-04    False
               ...
+2019-12-27     True
+2019-12-28    False
 2019-12-29    False
 2019-12-30    False
 2019-12-31    False
-Name: (10, 20, Open), Length: 366, dtype: bool
+Length: 366, dtype: bool
 
->>> exits = fast_ma.ma_below(slow_ma, crossed=True)
+>>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
 Date
 2018-12-31    False
 2019-01-01    False
 2019-01-02    False
+2019-01-03    False
+2019-01-04    False
               ...
+2019-12-27    False
+2019-12-28    False
 2019-12-29    False
 2019-12-30    False
 2019-12-31    False
-Name: (10, 20, Open), Length: 366, dtype: bool
+Length: 366, dtype: bool
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
-0.663318597097753
+0.6351860771192923
 ```
 
 One strategy instance of DMAC produced one column in signals and one performance value.
@@ -302,7 +313,7 @@ average over the entire price series and stores it as a distinct column.
 >>> fast_ma = vbt.MA.run(btc_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(btc_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossed=True)
+>>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
 fast_window     10     20
 slow_window     30     30
@@ -310,14 +321,18 @@ Date
 2018-12-31   False  False
 2019-01-01   False  False
 2019-01-02   False  False
+2019-01-03   False  False
+2019-01-04   False  False
 ...            ...    ...
-2019-12-29   False  False
-2019-12-30    True  False
+2019-12-27   False  False
+2019-12-28   False  False
+2019-12-29    True  False
+2019-12-30   False  False
 2019-12-31   False  False
 
 [366 rows x 2 columns]
 
->>> exits = fast_ma.ma_below(slow_ma, crossed=True)
+>>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
 fast_window     10     20
 slow_window     30     30
@@ -325,7 +340,11 @@ Date
 2018-12-31   False  False
 2019-01-01   False  False
 2019-01-02   False  False
+2019-01-03   False  False
+2019-01-04   False  False
 ...            ...    ...
+2019-12-27   False  False
+2019-12-28   False  False
 2019-12-29   False  False
 2019-12-30   False  False
 2019-12-31   False  False
@@ -335,8 +354,8 @@ Date
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
 fast_window  slow_window
-10           30             0.865956
-20           30             0.547047
+10           30             0.847151
+20           30             0.543411
 dtype: float64
 ```
 
@@ -352,51 +371,64 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 
 ```python-repl
 >>> # Multiple strategy instances and instruments
->>> eth_price = yf.Ticker("ETH-USD").history(start=start, end=end)['Open']
+>>> eth_price = vbt.utils.data.download("ETH-USD", start=start, end=end)['Close']
 >>> comb_price = btc_price.vbt.concat(eth_price,
-...     keys=pd.Index(['BTC', 'ETH'], name='asset'))
->>> comb_price
-asset           BTC     ETH
+...     keys=pd.Index(['BTC', 'ETH'], name='symbol'))
+>>> comb_price.vbt.drop_levels(-1, inplace=True)
+>>> print(comb_price)
+symbol              BTC         ETH
 Date
-2018-12-31  3866.84  140.03
-2019-01-01  3746.71  133.42
-2019-01-02  3849.22  141.52
-...             ...     ...
-2019-12-29  7317.65  128.27
-2019-12-30  7420.27  134.80
-2019-12-31  7294.44  132.61
+2018-12-31  3742.700439  133.368256
+2019-01-01  3843.520020  140.819412
+2019-01-02  3943.409424  155.047684
+2019-01-03  3836.741211  149.135010
+2019-01-04  3857.717529  154.581940
+...                 ...         ...
+2019-12-27  7290.088379  127.214607
+2019-12-28  7317.990234  128.322708
+2019-12-29  7422.652832  134.757980
+2019-12-30  7292.995117  132.633484
+2019-12-31  7193.599121  129.610855
 
 [366 rows x 2 columns]
 
 >>> fast_ma = vbt.MA.run(comb_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(comb_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossed=True)
+>>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
-fast_window     10            20
-slow_window     30            30
-asset          BTC    ETH    BTC    ETH
+fast_window            10            20
+slow_window            30            30
+symbol         BTC    ETH    BTC    ETH
 Date
 2018-12-31   False  False  False  False
 2019-01-01   False  False  False  False
 2019-01-02   False  False  False  False
+2019-01-03   False  False  False  False
+2019-01-04   False  False  False  False
 ...            ...    ...    ...    ...
-2019-12-29   False  False  False  False
-2019-12-30    True  False  False  False
+2019-12-27   False  False  False  False
+2019-12-28   False  False  False  False
+2019-12-29    True  False  False  False
+2019-12-30   False  False  False  False
 2019-12-31   False  False  False  False
 
 [366 rows x 4 columns]
 
->>> exits = fast_ma.ma_below(slow_ma, crossed=True)
+>>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
-fast_window     10            20
-slow_window     30            30
-asset          BTC    ETH    BTC    ETH
+fast_window            10            20
+slow_window            30            30
+symbol         BTC    ETH    BTC    ETH
 Date
 2018-12-31   False  False  False  False
 2019-01-01   False  False  False  False
 2019-01-02   False  False  False  False
+2019-01-03   False  False  False  False
+2019-01-04   False  False  False  False
 ...            ...    ...    ...    ...
+2019-12-27   False  False  False  False
+2019-12-28   False  False  False  False
 2019-12-29   False  False  False  False
 2019-12-30   False  False  False  False
 2019-12-31   False  False  False  False
@@ -405,20 +437,18 @@ Date
 
 >>> portfolio = vbt.Portfolio.from_signals(comb_price, entries, exits)
 >>> portfolio.total_return()
-fast_window  slow_window  asset
-10           30           BTC      0.865956
-                          ETH      0.249013
-20           30           BTC      0.547047
-                          ETH     -0.319945
+fast_window  slow_window  symbol
+10           30           BTC       0.847151
+                          ETH       0.244204
+20           30           BTC       0.543411
+                          ETH      -0.319102
 dtype: float64
 
->>> mean_return = portfolio.total_return().groupby('asset').mean()
->>> mean_return.vbt.bar(
-...     xaxis_title='Asset',
-...     yaxis_title='Mean total return')
+>>> mean_return = portfolio.total_return().groupby('symbol').mean()
+>>> mean_return.vbt.barplot(xaxis_title='Symbol', yaxis_title='Mean total return')
 ```
 
-![](/vectorbt/docs/img/index_by_asset.png)
+![](/vectorbt/docs/img/index_by_symbol.png)
 
 Not only strategies and instruments can act as separate features, but also time. If you want to find out
 when your strategy performs best, it's reasonable to test it over multiple time periods. vectorbt allows
@@ -430,40 +460,40 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 >>> # Multiple strategy instances, instruments and time periods
 >>> mult_comb_price = comb_price.vbt.split_into_ranges(n=2)
 >>> mult_comb_price
-asset             BTC                   ETH
-range_start 2018-12-31 2019-07-02 2018-12-31 2019-07-02
-range_end   2019-07-01 2019-12-31 2019-07-01 2019-12-31
-0              3866.84   10588.68     140.03     293.54
-1              3746.71   10818.16     133.42     291.76
-2              3849.22   11972.72     141.52     303.03
-3              3931.05   11203.10     155.20     284.38
-4              3832.04   10982.54     148.91     287.89
-..                 ...        ...        ...        ...
-178           13017.12    7238.14     336.96     126.37
-179           11162.17    7289.03     294.14     127.21
-180           12400.76    7317.65     311.28     128.27
-181           11931.99    7420.27     319.58     134.80
-182           10796.93    7294.44     290.27     132.61
+symbol                              BTC                     ETH
+range_start    2018-12-31    2019-07-02  2018-12-31  2019-07-02
+range_end      2019-07-01    2019-12-31  2019-07-01  2019-12-31
+0             3742.700439  10801.677734  133.368256  291.596436
+1             3843.520020  11961.269531  140.819412  303.099976
+2             3943.409424  11215.437500  155.047684  284.523224
+3             3836.741211  10978.459961  149.135010  287.997528
+4             3857.717529  11208.550781  154.581940  287.547119
+..                    ...           ...         ...         ...
+178          11182.806641   7290.088379  294.267639  127.214607
+179          12407.332031   7317.990234  311.226105  128.322708
+180          11959.371094   7422.652832  320.058899  134.757980
+181          10817.155273   7292.995117  290.695984  132.633484
+182          10583.134766   7193.599121  293.641113  129.610855
 
 [183 rows x 4 columns]
 
 >>> fast_ma = vbt.MA.run(mult_comb_price, [10, 20], short_name='fast')
 >>> slow_ma = vbt.MA.run(mult_comb_price, [30, 30], short_name='slow')
 
->>> entries = fast_ma.ma_above(slow_ma, crossed=True)
->>> exits = fast_ma.ma_below(slow_ma, crossed=True)
+>>> entries = fast_ma.ma_above(slow_ma, crossover=True)
+>>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 
 >>> portfolio = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
 >>> portfolio.total_return()
-fast_window  slow_window  asset  range_start  range_end
-10           30           BTC    2018-12-31   2019-07-01    1.631617
-                                 2019-07-02   2019-12-31   -0.281432
-                          ETH    2018-12-31   2019-07-01    0.941945
-                                 2019-07-02   2019-12-31   -0.306689
-20           30           BTC    2018-12-31   2019-07-01    1.725547
-                                 2019-07-02   2019-12-31   -0.417770
-                          ETH    2018-12-31   2019-07-01    0.336136
-                                 2019-07-02   2019-12-31   -0.257854
+fast_window  slow_window  symbol  range_start  range_end
+10           30           BTC     2018-12-31   2019-07-01    1.579002
+                                  2019-07-02   2019-12-31   -0.289369
+                          ETH     2018-12-31   2019-07-01    0.960437
+                                  2019-07-02   2019-12-31   -0.308387
+20           30           BTC     2018-12-31   2019-07-01    1.666387
+                                  2019-07-02   2019-12-31   -0.418280
+                          ETH     2018-12-31   2019-07-01    0.352693
+                                  2019-07-02   2019-12-31   -0.257947
 dtype: float64
 ```
 
@@ -472,14 +502,14 @@ That's why it's required here to pass the frequency `freq` to the `vectorbt.port
 class method in order to be able to compute performance metrics such as Sharpe ratio.
 
 The index hierarchy of the final performance series can be then used to group performance
-by any feature, such as window pair, asset, and time period.
+by any feature, such as window pair, symbol, and time period.
 
 ```python-repl
->>> mean_return = portfolio.total_return().groupby(['range_end', 'asset']).mean()
->>> mean_return = mean_return.unstack(level=-1).vbt.bar(
+>>> mean_return = portfolio.total_return().groupby(['range_end', 'symbol']).mean()
+>>> mean_return = mean_return.unstack(level=-1).vbt.barplot(
 ...     xaxis_title='End date',
 ...     yaxis_title='Mean total return',
-...     legend_title_text='Asset')
+...     legend_title_text='Symbol')
 ```
 
 ![](/vectorbt/docs/img/index_by_any.png)
@@ -514,17 +544,11 @@ This software is for educational purposes only. Do not risk money which you are 
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
 """
 
-# Load all accessors
-import vectorbt.root_accessors
-import vectorbt.base.accessors
-import vectorbt.generic.accessors
-import vectorbt.signals.accessors
-import vectorbt.returns.accessors
-import vectorbt.ohlcv.accessors
+import importlib
+import pkgutil
 
 # Most important modules
 from vectorbt.generic import nb, plotting
-from vectorbt import settings
 
 # Most important classes
 from vectorbt.utils import *
@@ -540,3 +564,19 @@ import warnings
 from numba.core.errors import NumbaExperimentalFeatureWarning
 
 warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
+
+
+def import_submodules(package):
+    """Import all submodules of a module, recursively, including subpackages."""
+    if isinstance(package, str):
+        package = importlib.import_module(package)
+    results = {}
+    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
+        full_name = package.__name__ + '.' + name
+        results[full_name] = importlib.import_module(full_name)
+        if is_pkg:
+            results.update(import_submodules(full_name))
+    return results
+
+
+import_submodules(__name__)  # otherwise AttributeError

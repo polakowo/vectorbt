@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 
 from vectorbt.utils.config import Config
 from vectorbt.utils.docs import fix_class_for_docs
-from vectorbt.utils.widgets import CustomFigureWidget
+from vectorbt.utils.widgets import FigureWidget
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.nb import (
@@ -423,14 +423,14 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
              ohlc_kwargs=None,
              entry_trace_kwargs=None,
              exit_trace_kwargs=None,
-             row=None, col=None,
+             add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):  # pragma: no cover
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
         if fig is None:
-            fig = CustomFigureWidget()
+            fig = FigureWidget()
             fig.update_layout(
                 showlegend=True,
                 xaxis_rangeslider_visible=False,
@@ -440,6 +440,8 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
         fig.update_layout(**layout_kwargs)
         if ohlc_kwargs is None:
             ohlc_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
 
         # Plot OHLC
         ohlc = plot_type(
@@ -454,7 +456,7 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
             opacity=0.7
         )
         ohlc.update(**ohlc_kwargs)
-        fig.add_trace(ohlc, row=row, col=col)
+        fig.add_trace(ohlc, **add_trace_kwargs)
 
         # Plot entry and exit markers
         base_cls.plot(
@@ -464,7 +466,7 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
             exit_types=self.stop_type_readable,
             entry_trace_kwargs=entry_trace_kwargs,
             exit_trace_kwargs=exit_trace_kwargs,
-            row=row, col=col,
+            add_trace_kwargs=add_trace_kwargs,
             fig=fig
         )
         return fig
@@ -475,9 +477,9 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
         plot_type: Either `plotly.graph_objects.Ohlc` or `plotly.graph_objects.Candlestick`.
         ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
         entry_trace_kwargs (dict): Keyword arguments passed to \
-        `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_entry_markers` for `{0}.{1}`.
+        `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_entry_markers` for `{0}.{1}`.
         exit_trace_kwargs (dict): Keyword arguments passed to \
-        `vectorbt.signals.accessors.Signals_SRAccessor.plot_as_exit_markers` for `{0}.exits`.
+        `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
         fig (plotly.graph_objects.Figure): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.""".format(base_cls.__name__, entries_attr)
 

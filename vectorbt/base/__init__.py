@@ -123,16 +123,16 @@ for example, to quickly add a range of Numba-compiled functions to the class.
 
 ## Accessors
 
-The base accessor of vectorbt is `vectorbt.base.accessors.Base_Accessor`.
+The base accessor of vectorbt is `vectorbt.base.accessors.BaseAccessor`.
 You can access its methods as follows:
 
-* `vectorbt.base.accessors.Base_SRAccessor` -> `pd.Series.vbt.*`
-* `vectorbt.base.accessors.Base_DFAccessor` -> `pd.DataFrame.vbt.*`
+* `vectorbt.base.accessors.BaseSRAccessor` -> `pd.Series.vbt.*`
+* `vectorbt.base.accessors.BaseDFAccessor` -> `pd.DataFrame.vbt.*`
 
 For example:
 
 ```python-repl
->>> # vectorbt.base.accessors.Base_Accessor.make_symmetric
+>>> # vectorbt.base.accessors.BaseAccessor.make_symmetric
 >>> pd.Series([1, 2, 3]).vbt.make_symmetric()
      0    1    2
 0  1.0  2.0  3.0
@@ -161,7 +161,7 @@ you can find its variations as accessor methods.
 2  1
 ```
 
-Additionally, `vectorbt.base.accessors.Base_Accessor` implements arithmetic (such as `+`),
+Additionally, `vectorbt.base.accessors.BaseAccessor` implements arithmetic (such as `+`),
 comparison (such as `>`) and logical operators (such as `&`) by doing 1) NumPy-like broadcasting
 and 2) the compuation with NumPy under the hood, which is mostly much faster than with pandas.
 
