@@ -35,13 +35,12 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from plotly.subplots import make_subplots
 from numba.typed import Dict
 import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.widgets import FigureWidget, make_subplots
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
@@ -1109,7 +1108,6 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         checks.assert_type(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
-            fig = FigureWidget(fig)
             if 'width' in layout:
                 fig.update_layout(width=layout['width'] + 150)
         fig.update_layout(**layout_kwargs)

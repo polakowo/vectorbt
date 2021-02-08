@@ -281,7 +281,6 @@ import numpy as np
 import pandas as pd
 from inspect import signature
 from collections import OrderedDict
-from plotly.subplots import make_subplots
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
@@ -289,7 +288,7 @@ from vectorbt.utils.enum import convert_str_enum_value
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.widgets import make_subplots
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
@@ -2405,7 +2404,7 @@ class Portfolio(Wrapping):
                     _subplot_titles.append(self_col.subplot_settings[name]['title'])
         else:
             _subplot_titles = None
-        fig = FigureWidget(make_subplots(
+        fig = make_subplots(
             rows=rows,
             cols=cols,
             specs=specs,
@@ -2415,7 +2414,7 @@ class Portfolio(Wrapping):
             vertical_spacing=vertical_spacing,
             horizontal_spacing=horizontal_spacing,
             **make_subplots_kwargs
-        ))
+        )
         default_layout = dict(
             autosize=True,
             width=width,

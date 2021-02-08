@@ -8,7 +8,8 @@ import plotly.graph_objects as go
 
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.widgets import FigureWidget, make_subplots
+from vectorbt.utils.config import merge_dicts
 from vectorbt.generic.accessors import GenericDFAccessor
 
 
@@ -29,7 +30,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
              plot_type='OHLC',
              display_volume=True,
              ohlc_kwargs=None,
-             bar_kwargs=None,
+             volume_kwargs=None,
+             ohlc_add_trace_kwargs=None,
+             volume_add_trace_kwargs=None,
              fig=None,
              **layout_kwargs):
         """Plot OHLCV data.
@@ -38,7 +41,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             plot_type: Either 'OHLC' or 'Candlestick'.
             display_volume (bool): If True, displays volume as bar chart.
             ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
-            bar_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
+            volume_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
+            ohlc_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for OHLC.
+            volume_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for volume.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
@@ -54,6 +59,18 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         """
         from vectorbt.settings import ohlcv, color_schema
 
+        if ohlc_kwargs is None:
+            ohlc_kwargs = {}
+        if volume_kwargs is None:
+            volume_kwargs = {}
+        if ohlc_add_trace_kwargs is None:
+            ohlc_add_trace_kwargs = {}
+        if volume_add_trace_kwargs is None:
+            volume_add_trace_kwargs = {}
+        if display_volume:
+            ohlc_add_trace_kwargs = merge_dicts(dict(row=1, col=1), ohlc_add_trace_kwargs)
+            volume_add_trace_kwargs = merge_dicts(dict(row=2, col=1), volume_add_trace_kwargs)
+
         column_names = ohlcv['column_names'] if self._column_names is None else self._column_names
         open = self._obj[column_names['open']]
         high = self._obj[column_names['high']]
@@ -62,7 +79,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
         # Set up figure
         if fig is None:
-            fig = FigureWidget()
+            if display_volume:
+                fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0, row_heights=[0.7, 0.3])
+            else:
+                fig = FigureWidget()
             fig.update_layout(
                 showlegend=True,
                 xaxis=dict(
@@ -75,10 +95,6 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 bargap=0
             )
         fig.update_layout(**layout_kwargs)
-        if ohlc_kwargs is None:
-            ohlc_kwargs = {}
-        if bar_kwargs is None:
-            bar_kwargs = {}
         if plot_type.lower() == 'ohlc':
             plot_type = 'OHLC'
             plot_obj = go.Ohlc
@@ -94,13 +110,12 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             low=low,
             close=close,
             name=plot_type,
-            yaxis="y2",
-            xaxis="x",
             increasing_line_color=color_schema['increasing'],
             decreasing_line_color=color_schema['decreasing']
         )
         ohlc.update(**ohlc_kwargs)
-        fig.add_trace(ohlc)
+        fig.add_trace(ohlc, **ohlc_add_trace_kwargs)
+
         if display_volume:
             volume = self._obj[column_names['volume']]
 
@@ -108,7 +123,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             marker_colors[(close.values - open.values) > 0] = color_schema['increasing']
             marker_colors[(close.values - open.values) == 0] = color_schema['gray']
             marker_colors[(close.values - open.values) < 0] = color_schema['decreasing']
-            bar = go.Bar(
+            volume_bar = go.Bar(
                 x=self.wrapper.index,
                 y=volume,
                 marker=dict(
@@ -116,18 +131,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                     line_width=0
                 ),
                 opacity=0.5,
-                name='Volume',
-                yaxis="y",
-                xaxis="x"
+                name='Volume'
             )
-            bar.update(**bar_kwargs)
-            fig.add_trace(bar)
-            fig.update_layout(
-                yaxis2=dict(
-                    domain=[0.33, 1]
-                ),
-                yaxis=dict(
-                    domain=[0, 0.33]
-                )
-            )
+            volume_bar.update(**volume_kwargs)
+            fig.add_trace(volume_bar, **volume_add_trace_kwargs)
+
         return fig

@@ -177,18 +177,18 @@ bbands = vbt.BBANDS.run(price)
 def plot(bbands):
     fig = vbt.make_subplots(
             rows=5, cols=1, shared_xaxes=True, 
-            row_heights=[*[0.4 / 3] * len(symbols), 0.3, 0.3], vertical_spacing=0.05,
+            row_heights=[*[0.5 / 3] * len(symbols), 0.25, 0.25], vertical_spacing=0.05,
             subplot_titles=(*symbols, '%B', 'Bandwidth'))
-    fig.update_layout(showlegend=False, width=800, height=700)
+    fig.update_layout(template=vbt.settings.dark_template, showlegend=False, width=750, height=650)
     for i, symbol in enumerate(symbols):
         bbands.close[symbol].vbt.lineplot(add_trace_kwargs=dict(row=i + 1, col=1), fig=fig)
     bbands.percent_b.iloc[:, ::-1].vbt.heatmap(
         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(
-            y=(fig.layout.yaxis4.domain[0] + fig.layout.yaxis4.domain[1]) / 2, len=0.3
+            y=(fig.layout.yaxis4.domain[0] + fig.layout.yaxis4.domain[1]) / 2, len=0.2
         )), add_trace_kwargs=dict(row=4, col=1), horizontal=True, fig=fig)
     bbands.bandwidth.iloc[:, ::-1].vbt.heatmap(
         trace_kwargs=dict(colorbar=dict(
-            y=(fig.layout.yaxis5.domain[0] + fig.layout.yaxis5.domain[1]) / 2, len=0.3
+            y=(fig.layout.yaxis5.domain[0] + fig.layout.yaxis5.domain[1]) / 2, len=0.2
         )), add_trace_kwargs=dict(row=5, col=1), horizontal=True, fig=fig)
     return fig
 

@@ -33,8 +33,8 @@ def concat_symbols(data, level_name='symbol', treat_missing='nan'):
 
     The argument `treat_missing` accepts the following values:
 
-    * `'nan'`: set missing data points to NaN
-    * `'drop'`: remove missing data points
+    * 'nan': set missing data points to NaN
+    * 'drop': remove missing data points
 
     Returns a dictionary if `data` contains dataframes, otherwise returns a single dataframe."""
     if treat_missing not in ['nan', 'drop']:
