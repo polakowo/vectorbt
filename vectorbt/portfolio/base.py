@@ -2375,7 +2375,7 @@ class Portfolio(Wrapping):
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))
         cols = make_subplots_kwargs.pop('cols', 1)
-        width = kwargs.get('width', layout['width'] + 25)
+        width = kwargs.get('width', layout['width'] + 50)
         height = kwargs.get('height', (layout['height'] - 50) * rows if rows > 1 else layout['height'])
         specs = make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
