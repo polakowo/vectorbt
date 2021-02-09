@@ -571,12 +571,11 @@ def import_submodules(package):
     if isinstance(package, str):
         package = importlib.import_module(package)
     results = {}
-    for loader, name, is_pkg in pkgutil.walk_packages(package.__path__):
-        full_name = package.__name__ + '.' + name
-        results[full_name] = importlib.import_module(full_name)
+    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, package.__name__ + '.'):
+        results[name] = importlib.import_module(name)
         if is_pkg:
-            results.update(import_submodules(full_name))
+            results.update(import_submodules(name))
     return results
 
 
-import_submodules(__name__)  # otherwise AttributeError
+import_submodules(__name__)

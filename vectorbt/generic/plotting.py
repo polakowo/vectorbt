@@ -187,6 +187,8 @@ class Bar(Configured, TraceUpdater):
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
+            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
             bar = go.Bar(
@@ -194,7 +196,7 @@ class Bar(Configured, TraceUpdater):
                 name=trace_name,
                 showlegend=trace_name is not None
             )
-            bar.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
+            bar.update(**_trace_kwargs)
             fig.add_trace(bar, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
@@ -279,6 +281,8 @@ class Scatter(Configured, TraceUpdater):
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
+            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
             scatter = go.Scatter(
@@ -286,7 +290,7 @@ class Scatter(Configured, TraceUpdater):
                 name=trace_name,
                 showlegend=trace_name is not None
             )
-            scatter.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
+            scatter.update(**_trace_kwargs)
             fig.add_trace(scatter, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
@@ -373,6 +377,8 @@ class Histogram(Configured, TraceUpdater):
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
+            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
             hist = go.Histogram(
@@ -380,7 +386,7 @@ class Histogram(Configured, TraceUpdater):
                 name=trace_name,
                 showlegend=trace_name is not None
             )
-            hist.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
+            hist.update(**_trace_kwargs)
             fig.add_trace(hist, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])
@@ -468,13 +474,15 @@ class Box(Configured, TraceUpdater):
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
+            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
             box = go.Box(
                 name=trace_name,
                 showlegend=trace_name is not None
             )
-            box.update(**(trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs))
+            box.update(**_trace_kwargs)
             fig.add_trace(box, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, fig.data[-len(trace_names):])

@@ -123,31 +123,31 @@ portfolio[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
-Start                     2016-12-31 00:00:00
-End                       2020-12-03 00:00:00
-Duration                   1434 days 00:00:00
-Init. Cash                                100
-Total Profit                          51417.2
-Total Return [%]                      51417.2
-Benchmark Return [%]                  7594.86
-Position Coverage [%]                 56.0669
-Max. Drawdown [%]                     70.7334
-Avg. Drawdown [%]                     9.70672
-Max. Drawdown Duration      760 days 00:00:00
-Avg. Drawdown Duration       29 days 12:00:00
-Num. Trades                                33
-Win Rate [%]                          57.5758
-Best Trade [%]                        477.295
-Worst Trade [%]                      -27.7724
-Avg. Trade [%]                        36.1783
-Max. Trade Duration          79 days 00:00:00
-Avg. Trade Duration          22 days 16:00:00
-Expectancy                            929.696
-SQN                                    1.7616
-Gross Exposure                       0.560669
-Sharpe Ratio                          2.30658
-Sortino Ratio                          4.1649
-Calmar Ratio                          5.51501
+Start                            2015-08-07 00:00:00
+End                              2021-02-09 00:00:00
+Duration                          2010 days 00:00:00
+Init. Cash                                       100
+Total Profit                                  852058
+Total Return [%]                              852058
+Benchmark Return [%]                         62649.5
+Position Coverage [%]                        55.4229
+Max. Drawdown [%]                             70.735
+Avg. Drawdown [%]                            11.8845
+Max. Drawdown Duration             760 days 00:00:00
+Avg. Drawdown Duration    29 days 07:23:04.615384615
+Num. Trades                                       48
+Win Rate [%]                                 54.1667
+Best Trade [%]                                1075.8
+Worst Trade [%]                             -29.5934
+Avg. Trade [%]                               47.5687
+Max. Trade Duration                 80 days 00:00:00
+Avg. Trade Duration                 22 days 02:00:00
+Expectancy                                   6687.62
+SQN                                          1.90991
+Gross Exposure                              0.554229
+Sharpe Ratio                                 2.23221
+Sortino Ratio                                3.95263
+Calmar Ratio                                 5.89963
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
@@ -161,7 +161,6 @@ It's not all about backtesting - vectorbt can be used to facilitate financial da
 Let's generate a GIF for comparing %B and bandwidth of Bollinger Bands for different symbols:
 
 ```python
-import vectorbt as vbt
 import imageio
 from tqdm import tqdm
 

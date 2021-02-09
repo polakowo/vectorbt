@@ -2332,12 +2332,12 @@ class Portfolio(Wrapping):
         ...     ))  # placeholder
         ... ])
 
-        >>> size.vbt.plot(name='Order Size', add_trace_kwargs=dict(row=2, col=1), fig=fig)
+        >>> size.rename('Order Size').vbt.plot(add_trace_kwargs=dict(row=2, col=1), fig=fig)
         ```
 
         ![](/vectorbt/docs/img/portfolio_plot_custom.png)
         """
-        from vectorbt.settings import color_schema
+        from vectorbt.settings import color_schema, layout
 
         # Select one column/group
         self_col = self.select_series(column=column, group_by=group_by)
@@ -2375,8 +2375,8 @@ class Portfolio(Wrapping):
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))
         cols = make_subplots_kwargs.pop('cols', 1)
-        width = kwargs.get('width', 800)
-        height = kwargs.get('height', 300 * rows if rows > 1 else 350)
+        width = kwargs.get('width', layout['width'] + 25)
+        height = kwargs.get('height', (layout['height'] - 50) * rows if rows > 1 else layout['height'])
         specs = make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
         for row, row_spec in enumerate(specs):
