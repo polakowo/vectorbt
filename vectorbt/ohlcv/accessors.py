@@ -91,9 +91,18 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 ),
                 yaxis=dict(
                     showgrid=True
-                ),
-                bargap=0
+                )
             )
+            if display_volume:
+                fig.update_layout(
+                    xaxis2=dict(
+                        showgrid=True
+                    ),
+                    yaxis2=dict(
+                        showgrid=True
+                    ),
+                    bargap=0
+                )
         fig.update_layout(**layout_kwargs)
         if plot_type.lower() == 'ohlc':
             plot_type = 'OHLC'
