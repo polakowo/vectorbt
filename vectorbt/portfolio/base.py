@@ -2489,6 +2489,9 @@ class Portfolio(Wrapping):
                         custom_kwargs['y_domain'] = y_domain
                     custom_kwargs = merge_dicts(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
                     plot_func(self_col, **custom_kwargs, fig=fig)
+
+                fig.layout[xaxis]['title'] = 'Date'
+                fig.layout[yaxis]['title'] = settings.get('title', None)
                     
             else:
                 settings = self.subplot_settings[name]

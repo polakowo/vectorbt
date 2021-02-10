@@ -211,6 +211,7 @@ class Bar(Configured, TraceUpdater):
 
         ```python-repl
         >>> bar.update([[2, 1], [4, 3]])
+        >>> bar.fig
         ```
         ![](/vectorbt/docs/img/update_bar_data.png)
         """

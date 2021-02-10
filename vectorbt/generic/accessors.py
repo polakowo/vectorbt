@@ -813,7 +813,7 @@ class GenericAccessor(BaseAccessor):
         ## Example
 
         ```python-repl
-        >>> df[['a', 'b']].vbt.plot()
+        >>> df.vbt.plot()
         ```
 
         ![](/vectorbt/docs/img/df_plot.png)
