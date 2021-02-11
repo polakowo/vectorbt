@@ -5,6 +5,7 @@
 [![Downloads](https://img.shields.io/pypi/dd/vectorbt?color=orange&style=for-the-badge)](https://pepy.tech/project/vectorbt)
 [![License](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
 [![Gitter](https://img.shields.io/gitter/room/polakowo/vectorbt?color=9cf&style=for-the-badge)](https://gitter.im/vectorbt/community)
+[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)
 
 # vectorbt
 
