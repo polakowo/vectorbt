@@ -17,7 +17,7 @@ setup(
         'vectorbt': ['templates/*.json']
     },
     install_requires=[
-        'numpy', 
+        'numpy',
         'pandas',
         'scipy',
         'matplotlib',
