@@ -7,18 +7,29 @@ from copy import copy
 
 def merge_dicts(*dicts):
     """Merge dicts."""
-    z = {}
     x, y = dicts[0], dicts[1]
-    overlapping_keys = x.keys() & y.keys()
-    for key in overlapping_keys:
-        if isinstance(x[key], dict) and isinstance(y[key], dict):
-            z[key] = merge_dicts(x[key], y[key])
-        else:
-            z[key] = y[key]
-    for key in x.keys() - overlapping_keys:
-        z[key] = x[key]
-    for key in y.keys() - overlapping_keys:
-        z[key] = y[key]
+    if x is None:
+        x = {}
+    if y is None:
+        y = {}
+
+    if len(x) == 0:
+        z = y.copy()
+    elif len(y) == 0:
+        z = x.copy()
+    else:
+        z = {}
+        overlapping_keys = x.keys() & y.keys()
+        for k in overlapping_keys:
+            if isinstance(x[k], dict) and isinstance(y[k], dict):
+                z[k] = merge_dicts(x[k], y[k])
+            else:
+                z[k] = y[k]
+        for k in x.keys() - overlapping_keys:
+            z[k] = x[k]
+        for k in y.keys() - overlapping_keys:
+            z[k] = y[k]
+
     if len(dicts) > 2:
         return merge_dicts(z, *dicts[2:])
     return z
@@ -35,6 +46,9 @@ def copy_dict(dct):
         else:
             dct_copy[k] = copy(v)
     return dct_copy
+
+
+_RaiseKeyError = object()
 
 
 class Config(dict):
@@ -61,23 +75,25 @@ class Config(dict):
         """Initial config."""
         return self._init_config
 
-    def __setitem__(self, key, val):
+    def __setitem__(self, k, v):
         if self.read_only:
             raise TypeError("Config is read-only")
         if self.frozen:
-            if key not in self:
-                raise KeyError(f"Key '{key}' is not valid")
-        super().__setitem__(key, val)
+            if k not in self:
+                raise KeyError(f"Key '{k}' is not valid")
+        super().__setitem__(k, v)
 
-    def __delitem__(self, key):
+    def __delitem__(self, k):
         if self.read_only:
             raise TypeError("Config is read-only")
-        super().__delitem__(key)
+        super().__delitem__(k)
 
-    def pop(self, key):
+    def pop(self, k, v=_RaiseKeyError):
         if self.read_only:
             raise TypeError("Config is read-only")
-        return super().pop(key)
+        if v is _RaiseKeyError:
+            return super().pop(k)
+        return super().pop(k, v)
 
     def popitem(self):
         if self.read_only:
@@ -96,10 +112,13 @@ class Config(dict):
         if self.read_only:
             raise TypeError("Config is read-only")
         if self.frozen:
-            for key in other:
-                if key not in self:
-                    raise KeyError(f"Key '{key}' is not valid")
+            for k in other:
+                if k not in self:
+                    raise KeyError(f"Key '{k}' is not valid")
         super().update(other)
+
+    def copy(self):
+        return type(self)(self)
 
     def merge_with(self, other, **kwargs):
         """Merge this and other dict into a new config."""
