@@ -1,36 +1,37 @@
 """Utilities for validation during runtime."""
 
+import os
 import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
 from collections.abc import Iterable
-import os
+from inspect import signature
 
 # ############# Checks ############# #
 
 
 def is_series(arg):
-    """Determine whether `arg` is `pd.Series`."""
+    """Check whether `arg` is `pd.Series`."""
     return isinstance(arg, pd.Series)
 
 
 def is_frame(arg):
-    """Determine whether `arg` is `pd.DataFrame`."""
+    """Check whether `arg` is `pd.DataFrame`."""
     return isinstance(arg, pd.DataFrame)
 
 
 def is_pandas(arg):
-    """Determine whether `arg` is `pd.Series` or `pd.DataFrame`."""
+    """Check whether `arg` is `pd.Series` or `pd.DataFrame`."""
     return is_series(arg) or is_frame(arg)
 
 
 def is_array(arg):
-    """Determine whether `arg` is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
+    """Check whether `arg` is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
 
 def is_numba_func(arg):
-    """Determine whether `arg` is a Numba-compiled function."""
+    """Check whether `arg` is a Numba-compiled function."""
     if 'NUMBA_DISABLE_JIT' in os.environ:
         if os.environ['NUMBA_DISABLE_JIT'] == '1':
             if arg.__name__.endswith('_nb'):
@@ -39,7 +40,7 @@ def is_numba_func(arg):
 
 
 def is_hashable(arg):
-    """Determine whether `arg` can be hashed."""
+    """Check whether `arg` can be hashed."""
     try:
         hash(arg)
     except Exception:
@@ -48,7 +49,7 @@ def is_hashable(arg):
 
 
 def is_index_equal(arg1, arg2, strict=True):
-    """Determine whether indexes are equal.
+    """Check whether indexes are equal.
 
     Introduces naming tests on top of `pd.Index.equals`, but still doesn't check for types."""
     if not strict:
@@ -65,12 +66,12 @@ def is_index_equal(arg1, arg2, strict=True):
 
 
 def is_default_index(arg):
-    """Determine whether index is a basic range."""
+    """Check whether index is a basic range."""
     return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1))
 
 
 def is_equal(arg1, arg2, equality_func):
-    """Determine whether two objects are equal."""
+    """Check whether two objects are equal."""
     if arg1 is None or arg2 is None:
         if arg1 is not None or arg2 is not None:
             return False
@@ -81,7 +82,7 @@ def is_equal(arg1, arg2, equality_func):
 
 
 def is_namedtuple(x):
-    """Determines whether object is an instance of namedtuple."""
+    """Check whether object is an instance of namedtuple."""
     t = type(x)
     b = t.__bases__
     if len(b) != 1 or b[0] != tuple:
@@ -90,6 +91,25 @@ def is_namedtuple(x):
     if not isinstance(f, tuple):
         return False
     return all(type(n) == str for n in f)
+
+
+def method_accepts_argument(method, arg_name):
+    """Check whether method accepts a positional or keyword argument with name `arg_name`."""
+    sig = signature(method)
+    if arg_name.startswith('**'):
+        return arg_name[2:] in [
+            p.name for p in sig.parameters.values()
+            if p.kind == p.VAR_KEYWORD
+        ]
+    if arg_name.startswith('*'):
+        return arg_name[1:] in [
+            p.name for p in sig.parameters.values()
+            if p.kind == p.VAR_POSITIONAL
+        ]
+    return arg_name in [
+        p.name for p in sig.parameters.values()
+        if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+    ]
 
 
 # ############# Asserts ############# #
