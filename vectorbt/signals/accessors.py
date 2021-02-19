@@ -34,13 +34,11 @@
 
 import numpy as np
 import pandas as pd
-import plotly.graph_objects as go
 
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.widgets import FigureWidget
 from vectorbt.base import reshape_fns
 from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
@@ -48,7 +46,7 @@ from vectorbt.signals import nb
 
 
 @add_nb_methods([
-    nb.fshift_nb,
+    (nb.fshift_nb, False),
 ], module_name='vectorbt.signals.nb')
 class SignalsAccessor(GenericAccessor):
     """Accessor on top of signal series. For both, Series and DataFrames.
@@ -226,7 +224,7 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
-    def generate_exits(self, exit_choice_func_nb, *args, wait=1):
+    def generate_exits(self, exit_choice_func_nb, *args, wait=1, wrap_kwargs=None):
         """See `vectorbt.signals.nb.generate_ex_nb`.
 
         ## Example
@@ -249,7 +247,8 @@ class SignalsAccessor(GenericAccessor):
         """
         checks.assert_numba_func(exit_choice_func_nb)
 
-        return self.wrapper.wrap(nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args))
+        exits = nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args)
+        return self.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
 
     # ############# Random ############# #
 
@@ -395,7 +394,7 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_random_exits(self, prob=None, seed=None, wait=1):
+    def generate_random_exits(self, prob=None, seed=None, wait=1, wrap_kwargs=None):
         """Generate exit signals randomly.
 
         If `prob` is None, see `vectorbt.signals.nb.generate_rand_ex_nb`.
@@ -427,12 +426,13 @@ class SignalsAccessor(GenericAccessor):
         """
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self._obj, prob, keep_raw=[False, True])
-            return obj.vbt.wrapper.wrap(nb.generate_rand_ex_by_prob_nb(
-                obj.vbt.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed))
-        return self.wrapper.wrap(nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed))
+            exits = nb.generate_rand_ex_by_prob_nb(obj.vbt.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed)
+            return obj.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
+        exits = nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed)
+        return self.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
 
     def generate_stop_exits(self, ts, stop, trailing=False, entry_wait=1, exit_wait=1,
-                            first=True, iteratively=False, broadcast_kwargs=None):
+                            first=True, iteratively=False, broadcast_kwargs=None, wrap_kwargs=None):
         """Generate exits based on when `ts` hits the stop.
 
         If `iteratively` is True, see `vectorbt.signals.nb.generate_stop_ex_iter_nb`.
@@ -479,15 +479,16 @@ class SignalsAccessor(GenericAccessor):
         if iteratively:
             new_entries, exits = nb.generate_stop_ex_iter_nb(
                 entries.vbt.to_2d_array(), ts, stop, trailing, entry_wait, exit_wait, entries.ndim == 2)
-            return entries.vbt.wrapper.wrap(new_entries), entries.vbt.wrapper.wrap(exits)
+            return entries.vbt.wrapper.wrap(new_entries, **merge_dicts({}, wrap_kwargs)), \
+                   entries.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
         else:
             exits = nb.generate_stop_ex_nb(
                 entries.vbt.to_2d_array(), ts, stop, trailing, exit_wait, first, entries.ndim == 2)
-            return entries.vbt.wrapper.wrap(exits)
+            return entries.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
 
-    def generate_adv_stop_exits(self, open, high=None, low=None, close=None, is_open_safe=True,
+    def generate_ohlc_stop_exits(self, open, high=None, low=None, close=None, is_open_safe=True,
                                 out_dict=None, sl_stop=0., ts_stop=0., tp_stop=0., entry_wait=1,
-                                exit_wait=1, first=True, iteratively=False, broadcast_kwargs=None):
+                                exit_wait=1, first=True, iteratively=False, broadcast_kwargs=None, wrap_kwargs=None):
         """Generate exits based on when price hits (trailing) stop loss or take profit.
 
         If any of `high`, `low` or `close` is None, it will be set to `open`.
@@ -495,13 +496,13 @@ class SignalsAccessor(GenericAccessor):
         Use `out_dict` as a dict to pass `hit_price` and `stop_type` arrays. You can also
         set `out_dict` to {} to produce these arrays automatically and still have access to them.
 
-        If `iteratively` is True, see `vectorbt.signals.nb.generate_adv_stop_ex_iter_nb`.
-        Otherwise, see `vectorbt.signals.nb.generate_adv_stop_ex_nb`.
+        If `iteratively` is True, see `vectorbt.signals.nb.generate_ohlc_stop_ex_iter_nb`.
+        Otherwise, see `vectorbt.signals.nb.generate_ohlc_stop_ex_nb`.
 
         All array-like arguments including stops and `out_dict` will be broadcast using
         `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`.
 
-        For arguments, see `vectorbt.signals.nb.adv_stop_choice_nb`.
+        For arguments, see `vectorbt.signals.nb.ohlc_stop_choice_nb`.
 
         ## Example
 
@@ -515,7 +516,7 @@ class SignalsAccessor(GenericAccessor):
         ...     'close': [10, 11, 12, 11, 10]
         ... })
         >>> out_dict = {}
-        >>> exits = sig.vbt.signals.generate_adv_stop_exits(
+        >>> exits = sig.vbt.signals.generate_ohlc_stop_exits(
         ...     price['open'], price['high'], price['low'], price['close'],
         ...     out_dict=out_dict, sl_stop=0.2, ts_stop=0.2, tp_stop=0.2)
         >>> out_dict['hit_price'][~exits] = np.nan
@@ -587,26 +588,27 @@ class SignalsAccessor(GenericAccessor):
 
         # Perform generation
         if iteratively:
-            new_entries, exits = nb.generate_adv_stop_ex_iter_nb(
+            new_entries, exits = nb.generate_ohlc_stop_ex_iter_nb(
                 entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
                 stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
                 exit_wait, first, entries.ndim == 2)
-            out_dict['hit_price'] = entries.vbt.wrapper.wrap(hit_price_out)
-            out_dict['stop_type'] = entries.vbt.wrapper.wrap(stop_type_out)
-            return entries.vbt.wrapper.wrap(new_entries), entries.vbt.wrapper.wrap(exits)
+            out_dict['hit_price'] = entries.vbt.wrapper.wrap(hit_price_out, **merge_dicts({}, wrap_kwargs))
+            out_dict['stop_type'] = entries.vbt.wrapper.wrap(stop_type_out, **merge_dicts({}, wrap_kwargs))
+            return entries.vbt.wrapper.wrap(new_entries, **merge_dicts({}, wrap_kwargs)), \
+                   entries.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
         else:
-            exits = nb.generate_adv_stop_ex_nb(
+            exits = nb.generate_ohlc_stop_ex_nb(
                 entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
                 stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait,
                 first, entries.ndim == 2)
-            out_dict['hit_price'] = entries.vbt.wrapper.wrap(hit_price_out)
-            out_dict['stop_type'] = entries.vbt.wrapper.wrap(stop_type_out)
-            return entries.vbt.wrapper.wrap(exits)
+            out_dict['hit_price'] = entries.vbt.wrapper.wrap(hit_price_out, **merge_dicts({}, wrap_kwargs))
+            out_dict['stop_type'] = entries.vbt.wrapper.wrap(stop_type_out, **merge_dicts({}, wrap_kwargs))
+            return entries.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
 
     # ############# Map and reduce ############# #
 
     def map_reduce_between(self, other=None, map_func_nb=None, map_args=None,
-                           reduce_func_nb=None, reduce_args=None, broadcast_kwargs=None):
+                           reduce_func_nb=None, reduce_args=None, broadcast_kwargs=None, wrap_kwargs=None):
         """See `vectorbt.signals.nb.map_reduce_between_nb`.
 
         If `other` specified, see `vectorbt.signals.nb.map_reduce_between_two_nb`.
@@ -642,6 +644,7 @@ class SignalsAccessor(GenericAccessor):
         if reduce_args is None:
             reduce_args = ()
 
+        wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_between'), wrap_kwargs)
         if other is None:
             # One input array
             result = nb.map_reduce_between_nb(
@@ -649,9 +652,7 @@ class SignalsAccessor(GenericAccessor):
                 map_func_nb, map_args,
                 reduce_func_nb, reduce_args
             )
-            if isinstance(self._obj, pd.Series):
-                return result[0]
-            return pd.Series(result, index=self.wrapper.columns)
+            return self.wrapper.wrap_reduced(result, **wrap_kwargs)
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
@@ -662,10 +663,10 @@ class SignalsAccessor(GenericAccessor):
                 map_func_nb, map_args,
                 reduce_func_nb, reduce_args
             )
-            return obj.vbt.wrapper.wrap_reduced(result)
+            return obj.vbt.wrapper.wrap_reduced(result, **wrap_kwargs)
 
     def map_reduce_partitions(self, map_func_nb=None, map_args=None,
-                              reduce_func_nb=None, reduce_args=None):
+                              reduce_func_nb=None, reduce_args=None, wrap_kwargs=None):
         """See `vectorbt.signals.nb.map_reduce_partitions_nb`.
 
         ## Example
@@ -698,26 +699,26 @@ class SignalsAccessor(GenericAccessor):
             map_func_nb, map_args,
             reduce_func_nb, reduce_args
         )
-        return self.wrapper.wrap_reduced(result)
+        wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_partitions'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(result, **wrap_kwargs)
 
-    def num_signals(self):
+    def num_signals(self, **kwargs):
         """Sum up True values."""
-        return self.sum()
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='num_signals')), kwargs)
+        return self.sum(**kwargs)
 
     def avg_distance(self, to=None, **kwargs):
         """Calculate the average distance between True values in `self` and optionally `to`.
 
         See `SignalsAccessor.map_reduce_between`."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='avg_distance')), kwargs)
         return self.map_reduce_between(
-            other=to,
-            map_func_nb=nb.distance_map_nb,
-            reduce_func_nb=nb.mean_reduce_nb,
-            **kwargs
-        )
+            other=to, map_func_nb=nb.distance_map_nb,
+            reduce_func_nb=nb.mean_reduce_nb, **kwargs)
 
     # ############# Ranking ############# #
 
-    def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs=None):
+    def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs=None, wrap_kwargs=None):
         """See `vectorbt.signals.nb.rank_nb`.
 
         ## Example
@@ -769,9 +770,9 @@ class SignalsAccessor(GenericAccessor):
             reset_by=reset_by,
             after_false=after_false,
             allow_gaps=allow_gaps)
-        return obj.vbt.wrapper.wrap(ranked)
+        return obj.vbt.wrapper.wrap(ranked, **merge_dicts({}, wrap_kwargs))
 
-    def rank_partitions(self, reset_by=None, after_false=False, broadcast_kwargs=None):
+    def rank_partitions(self, reset_by=None, after_false=False, broadcast_kwargs=None, wrap_kwargs=None):
         """See `vectorbt.signals.nb.rank_partitions_nb`.
 
         ## Example
@@ -814,19 +815,19 @@ class SignalsAccessor(GenericAccessor):
             obj.vbt.to_2d_array(),
             reset_by=reset_by,
             after_false=after_false)
-        return obj.vbt.wrapper.wrap(ranked)
+        return obj.vbt.wrapper.wrap(ranked, **merge_dicts({}, wrap_kwargs))
 
-    def first(self, **kwargs):
+    def first(self, wrap_kwargs=None, **kwargs):
         """`vectorbt.signals.nb.rank_nb` == 1."""
-        return self.wrapper.wrap(self.rank(**kwargs).values == 1)
+        return self.wrapper.wrap(self.rank(**kwargs).values == 1, **merge_dicts({}, wrap_kwargs))
 
-    def nst(self, n, **kwargs):
+    def nst(self, n, wrap_kwargs=None, **kwargs):
         """`vectorbt.signals.nb.rank_nb` == n."""
-        return self.wrapper.wrap(self.rank(**kwargs).values == n)
+        return self.wrapper.wrap(self.rank(**kwargs).values == n, **merge_dicts({}, wrap_kwargs))
 
-    def from_nst(self, n, **kwargs):
+    def from_nst(self, n, wrap_kwargs=None, **kwargs):
         """`vectorbt.signals.nb.rank_nb` >= n."""
-        return self.wrapper.wrap(self.rank(**kwargs).values >= n)
+        return self.wrapper.wrap(self.rank(**kwargs).values >= n, **merge_dicts({}, wrap_kwargs))
 
     # ############# Logical operations ############# #
 

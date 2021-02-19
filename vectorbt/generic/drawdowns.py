@@ -49,10 +49,10 @@ class Drawdowns(Records):
     >>> drawdowns.drawdown.min()
     -0.48982769972565016
 
-    >>> drawdowns.drawdown.hist(trace_kwargs=dict(nbinsx=50))
+    >>> drawdowns.drawdown.histplot(trace_kwargs=dict(nbinsx=50))
     ```
 
-    ![](/vectorbt/docs/img/drawdowns_drawdown_hist.png)
+    ![](/vectorbt/docs/img/drawdowns_drawdown_histplot.png)
     """
 
     def __init__(self, wrapper, records_arr, ts, idx_field='end_idx', **kwargs):
@@ -130,11 +130,13 @@ class Drawdowns(Records):
     @cached_method
     def avg_drawdown(self, default_val=0., **kwargs):
         """Average drawdown (ADD)."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='avg_drawdown')), kwargs)
         return self.drawdown.mean(default_val=default_val, **kwargs)
 
     @cached_method
     def max_drawdown(self, default_val=0., **kwargs):
         """Maximum drawdown (MDD)."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='max_drawdown')), kwargs)
         return self.drawdown.min(default_val=default_val, **kwargs)
 
     @cached_property
@@ -143,21 +145,24 @@ class Drawdowns(Records):
         return self.map(nb.dd_duration_map_nb)
 
     @cached_method
-    def avg_duration(self, time_units=True, **kwargs):
+    def avg_duration(self, **kwargs):
         """Average drawdown duration (in time units)."""
-        return self.duration.mean(time_units=time_units, **kwargs)
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='avg_duration')), kwargs)
+        return self.duration.mean(**kwargs)
 
     @cached_method
-    def max_duration(self, time_units=True, **kwargs):
+    def max_duration(self, **kwargs):
         """Maximum drawdown duration (in time units)."""
-        return self.duration.max(time_units=time_units, **kwargs)
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='max_duration')), kwargs)
+        return self.duration.max(**kwargs)
 
     @cached_method
-    def coverage(self, group_by=None, **kwargs):
+    def coverage(self, group_by=None, wrap_kwargs=None):
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
-        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def ptv_duration(self):
@@ -178,11 +183,12 @@ class Drawdowns(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def active_rate(self, group_by=None, **kwargs):
+    def active_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of recovered drawdowns."""
         active_count = to_1d(self.active.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(active_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='active_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(active_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def recovered(self):
@@ -191,16 +197,17 @@ class Drawdowns(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def recovered_rate(self, group_by=None, **kwargs):
+    def recovered_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of recovered drawdowns."""
         recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='recovered_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(recovered_count / total_count, group_by=group_by, **wrap_kwargs)
 
     # ############# DrawdownStatus.Active ############# #
 
     @cached_method
-    def current_drawdown(self, group_by=None, **kwargs):
+    def current_drawdown(self, group_by=None, wrap_kwargs=None):
         """Current drawdown from peak.
 
         Does not support grouping."""
@@ -209,16 +216,18 @@ class Drawdowns(Records):
         curr_end_val = self.active.end_value.nst(-1, group_by=group_by)
         curr_start_val = self.active.start_value.nst(-1, group_by=group_by)
         curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
-        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='current_drawdown'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def current_duration(self, time_units=True, group_by=None, **kwargs):
+    def current_duration(self, group_by=None, **kwargs):
         """Current duration from peak.
 
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        return self.active.duration.nst(-1, time_units=time_units, group_by=group_by, **kwargs)
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='current_duration')), kwargs)
+        return self.active.duration.nst(-1, group_by=group_by, **kwargs)
 
     @cached_method
     def current_return(self, group_by=None, **kwargs):
@@ -228,6 +237,7 @@ class Drawdowns(Records):
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
         recovery_return = self.active.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='current_return')), kwargs)
         return recovery_return.nst(-1, group_by=group_by, **kwargs)
 
     # ############# DrawdownStatus.Recovered ############# #

@@ -240,6 +240,7 @@ import pandas as pd
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.records import nb
@@ -434,11 +435,9 @@ class Records(Wrapping):
         ).regroup(group_by)
 
     @cached_method
-    def count(self, group_by=None, **kwargs):
+    def count(self, group_by=None, wrap_kwargs=None):
         """Return count by column."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
-            group_by=group_by,
-            **kwargs
-        )
-
+            group_by=group_by, **wrap_kwargs)

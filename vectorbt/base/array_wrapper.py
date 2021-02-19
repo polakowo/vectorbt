@@ -408,10 +408,11 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
         raise ValueError(f"{a.ndim}-d input is not supported")
 
-    def wrap_reduced(self, a, index=None, columns=None, time_units=False, dtype=None, group_by=None):
+    def wrap_reduced(self, a, name_or_index=None, columns=None, dtype=None, group_by=None, time_units=False):
         """Wrap result of reduction.
 
-        `index` can be set when reducing to an array of values (vs. one value) per column.
+        `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
+        or the index of the resulting series/dataframe if reducing to an array per column.
         `columns` can be set to override object's default columns.
 
         If `time_units` is set, calls `to_time_units`."""
@@ -428,6 +429,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                 warnings.warn(repr(e), stacklevel=2)
         if time_units:
             a = _self.to_time_units(a)
+            dtype = None
         if a.ndim == 0:
             # Scalar per Series/DataFrame
             if time_units:
@@ -441,23 +443,21 @@ class ArrayWrapper(Configured, PandasIndexer):
                         return pd.to_timedelta(a[0])
                     return a[0]
                 # Array per Series
-                name = columns[0]
-                if name == 0:  # was a Series before
-                    name = None
-                return pd.Series(a, index=index, name=name, dtype=dtype)
+                sr_name = columns[0]
+                if sr_name == 0:  # was a Series before
+                    sr_name = None
+                return pd.Series(a, index=name_or_index, name=sr_name, dtype=dtype)
             # Scalar per column in a DataFrame
-            if index is None:
-                index = columns
-            return pd.Series(a, index=index, dtype=dtype)
+            return pd.Series(a, index=columns, name=name_or_index, dtype=dtype)
         if a.ndim == 2:
             if a.shape[1] == 1 and _self.ndim == 1:
                 # Array per Series
-                name = columns[0]
-                if name == 0:  # was a Series before
-                    name = None
-                return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
+                sr_name = columns[0]
+                if sr_name == 0:  # was a Series before
+                    sr_name = None
+                return pd.Series(a[:, 0], index=name_or_index, name=sr_name, dtype=dtype)
             # Array per column in a DataFrame
-            return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
+            return pd.DataFrame(a, index=name_or_index, columns=columns, dtype=dtype)
         raise ValueError(f"{a.ndim}-d input is not supported")
 
     def dummy(self, group_by=None, **kwargs):

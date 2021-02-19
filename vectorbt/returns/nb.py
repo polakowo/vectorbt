@@ -1,4 +1,4 @@
-"""Numba-compiled 1-dim and 2-dim functions.
+"""Numba-compiled functions.
 
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be

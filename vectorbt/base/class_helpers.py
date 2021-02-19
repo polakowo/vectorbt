@@ -3,6 +3,9 @@
 import numpy as np
 import inspect
 
+from vectorbt.utils import checks
+from vectorbt.utils.config import merge_dicts
+
 
 def get_kwargs(func):
     """Get names and default values of keyword arguments from the signature of `func`."""
@@ -14,27 +17,45 @@ def get_kwargs(func):
 
 
 def add_nb_methods(nb_funcs, module_name=None):
-    """Class decorator to wrap each Numba function in `nb_funcs` as a method of an accessor class.
+    """Class decorator to wrap Numba functions methods of an accessor class.
+
+    `nb_funcs` should contain tuples of Numba functions, whether they are reducing, and optionally `index_or_name`.
 
     Requires the instance to have attribute `wrapper` of type `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
     def wrapper(cls):
-        for nb_func in nb_funcs:
-            default_kwargs = get_kwargs(nb_func)
+        for info in nb_funcs:
+            checks.assert_type(info, tuple)
 
-            def nb_method(self, *args, nb_func=nb_func, default_kwargs=default_kwargs, **kwargs):
-                if '_1d' in nb_func.__name__:
+            if len(info) == 3:
+                nb_func, is_reducing, name_or_index = info
+            elif len(info) == 2:
+                nb_func, is_reducing = info
+                name_or_index = None
+            else:
+                raise ValueError("Each tuple should have either length 2 or 3")
+
+            def nb_method(self,
+                          *args,
+                          _nb_func=nb_func,
+                          _is_reducing=is_reducing,
+                          _name_or_index=name_or_index,
+                          wrap_kwargs=None,
+                          **kwargs):
+                default_kwargs = get_kwargs(nb_func)
+                wrap_kwargs = merge_dicts({}, wrap_kwargs)
+                if '_1d' in _nb_func.__name__:
                     # One-dimensional array as input
-                    a = nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs})
-                    if np.asarray(a).ndim == 0 or len(self.wrapper.index) != a.shape[0]:
-                        return self.wrapper.wrap_reduced(a)
-                    return self.wrapper.wrap(a)
+                    a = _nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs})
+                    if _is_reducing:
+                        return self.wrapper.wrap_reduced(a, name_or_index=_name_or_index, **wrap_kwargs)
+                    return self.wrapper.wrap(a, **wrap_kwargs)
                 else:
                     # Two-dimensional array as input
-                    a = nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs})
-                    if np.asarray(a).ndim == 0 or a.ndim == 1 or len(self.wrapper.index) != a.shape[0]:
-                        return self.wrapper.wrap_reduced(a)
-                    return self.wrapper.wrap(a)
+                    a = _nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs})
+                    if _is_reducing:
+                        return self.wrapper.wrap_reduced(a, name_or_index=_name_or_index, **wrap_kwargs)
+                    return self.wrapper.wrap(a, **wrap_kwargs)
 
             # Replace the function's signature with the original one
             sig = inspect.signature(nb_func)

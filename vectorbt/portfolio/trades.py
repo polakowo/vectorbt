@@ -225,11 +225,12 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def win_rate(self, group_by=None, **kwargs):
+    def win_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of winning trades."""
         win_count = to_1d(self.winning.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(win_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='win_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(win_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def losing(self):
@@ -238,14 +239,15 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def loss_rate(self, group_by=None, **kwargs):
+    def loss_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of losing trades."""
         loss_count = to_1d(self.losing.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(loss_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='loss_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(loss_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def profit_factor(self, group_by=None, **kwargs):
+    def profit_factor(self, group_by=None, wrap_kwargs=None):
         """Profit factor."""
         total_win = to_1d(self.winning.pnl.sum(group_by=group_by), raw=True)
         total_loss = to_1d(self.losing.pnl.sum(group_by=group_by), raw=True)
@@ -256,10 +258,11 @@ class Trades(Records):
         total_loss[np.isnan(total_loss) & has_values] = 0.
 
         profit_factor = total_win / np.abs(total_loss)
-        return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='profit_factor'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def expectancy(self, group_by=None, **kwargs):
+    def expectancy(self, group_by=None, wrap_kwargs=None):
         """Average profitability."""
         win_rate = to_1d(self.win_rate(group_by=group_by), raw=True)
         avg_win = to_1d(self.winning.pnl.mean(group_by=group_by), raw=True)
@@ -271,16 +274,18 @@ class Trades(Records):
         avg_loss[np.isnan(avg_loss) & has_values] = 0.
 
         expectancy = win_rate * avg_win - (1 - win_rate) * np.abs(avg_loss)
-        return self.wrapper.wrap_reduced(expectancy, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='expectancy'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(expectancy, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def sqn(self, group_by=None, **kwargs):
+    def sqn(self, group_by=None, wrap_kwargs=None):
         """System Quality Number (SQN)."""
         count = to_1d(self.count(group_by=group_by), raw=True)
         pnl_mean = to_1d(self.pnl.mean(group_by=group_by), raw=True)
         pnl_std = to_1d(self.pnl.std(group_by=group_by), raw=True)
         sqn = np.sqrt(count) * pnl_mean / pnl_std
-        return self.wrapper.wrap_reduced(sqn, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='sqn'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(sqn, group_by=group_by, **wrap_kwargs)
 
     # ############# TradeDirection ############# #
 
@@ -296,11 +301,12 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def long_rate(self, group_by=None, **kwargs):
+    def long_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of long trades."""
         long_count = to_1d(self.long.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(long_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='long_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(long_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def short(self):
@@ -309,11 +315,12 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def short_rate(self, group_by=None, **kwargs):
+    def short_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of short trades."""
         short_count = to_1d(self.short.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(short_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='short_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(short_count / total_count, group_by=group_by, **wrap_kwargs)
 
     # ############# TradeStatus ############# #
 
@@ -329,11 +336,12 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def open_rate(self, group_by=None, **kwargs):
+    def open_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of open trades."""
         open_count = to_1d(self.open.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(open_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='open_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(open_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def closed(self):
@@ -342,11 +350,12 @@ class Trades(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def closed_rate(self, group_by=None, **kwargs):
+    def closed_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of closed trades."""
         closed_count = to_1d(self.closed.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(closed_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='closed_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(closed_count / total_count, group_by=group_by, **wrap_kwargs)
 
     # ############# Plotting ############# #
 
@@ -863,8 +872,9 @@ class Positions(Trades):
         return cls(trades.wrapper, position_records_arr, trades.close, **kwargs)
 
     @cached_method
-    def coverage(self, group_by=None, **kwargs):
+    def coverage(self, group_by=None, wrap_kwargs=None):
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
-        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='coverage'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)

@@ -114,11 +114,12 @@ class Orders(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def buy_rate(self, group_by=None, **kwargs):
+    def buy_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of buy operations."""
         buy_count = to_1d(self.buy.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(buy_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='buy_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(buy_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
     def sell(self):
@@ -127,11 +128,12 @@ class Orders(Records):
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def sell_rate(self, group_by=None, **kwargs):
+    def sell_rate(self, group_by=None, wrap_kwargs=None):
         """Rate of sell operations."""
         sell_count = to_1d(self.sell.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
-        return self.wrapper.wrap_reduced(sell_count / total_count, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='sell_rate'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(sell_count / total_count, group_by=group_by, **wrap_kwargs)
 
     # ############# Plotting ############# #
 

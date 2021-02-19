@@ -125,10 +125,10 @@ array([0, 2, 4, 6, 8])
 You can build histograms and boxplots of `MappedArray` directly:
 
 ```python-repl
->>> ma.box()
+>>> ma.boxplot()
 ```
 
-![](/vectorbt/docs/img/mapped_box.png)
+![](/vectorbt/docs/img/mapped_boxplot.png)
 
 To use scatterplots or any other plots that require index, convert to matrix first:
 
@@ -250,6 +250,7 @@ import pandas as pd
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import to_value_map
+from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.class_helpers import (
     add_binary_magic_methods,
@@ -472,7 +473,7 @@ class MappedArray(Wrapping):
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         return nb.mapped_matrix_compatible_nb(col_arr, idx_arr, target_shape)
 
-    def to_matrix(self, idx_arr=None, default_val=np.nan, group_by=None, **kwargs):
+    def to_matrix(self, idx_arr=None, default_val=np.nan, group_by=None, wrap_kwargs=None):
         """Convert mapped array to the matrix form.
 
         See `vectorbt.records.nb.mapped_to_matrix_nb`.
@@ -492,10 +493,10 @@ class MappedArray(Wrapping):
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         out = nb.mapped_to_matrix_nb(self.values, col_arr, idx_arr, target_shape, default_val)
-        return self.wrapper.wrap(out, group_by=group_by, **kwargs)
+        return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False, to_idx=False,
-               idx_labeled=True, default_val=np.nan, group_by=None, **kwargs):
+               idx_labeled=True, default_val=np.nan, group_by=None, wrap_kwargs=None):
         """Reduce mapped array by column.
 
         If `to_array` is False and `to_idx` is False, see `vectorbt.records.nb.reduce_mapped_nb`.
@@ -505,8 +506,7 @@ class MappedArray(Wrapping):
 
         If `to_idx` is True, must pass `idx_arr`. Set `idx_labeled` to False to return raw positions instead
         of labels. Use `default_val` to set the default value. Set `group_by` to False to disable grouping.
-
-        `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap_reduced`."""
+        """
         # Perform checks
         checks.assert_numba_func(reduce_func_nb)
         if idx_arr is None:
@@ -563,41 +563,49 @@ class MappedArray(Wrapping):
             else:
                 out[nan_mask] = -1
                 out = out.astype(np.int_)
-        return self.wrapper.wrap_reduced(out, group_by=group_by, **kwargs)
+        wrap_kwargs = merge_dicts(dict(name_or_index='reduce' if not to_array else None), wrap_kwargs)
+        return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
     @cached_method
     def nst(self, n, **kwargs):
         """Return nst element of each column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nst')), kwargs)
         return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def min(self, **kwargs):
         """Return min by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='min')), kwargs)
         return self.reduce(generic_nb.min_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def max(self, **kwargs):
         """Return max by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='max')), kwargs)
         return self.reduce(generic_nb.max_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def mean(self, **kwargs):
         """Return mean by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='mean')), kwargs)
         return self.reduce(generic_nb.mean_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def median(self, **kwargs):
         """Return median by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='median')), kwargs)
         return self.reduce(generic_nb.median_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def std(self, ddof=1, **kwargs):
         """Return std by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='std')), kwargs)
         return self.reduce(generic_nb.std_reduce_nb, ddof, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
     def sum(self, default_val=0., **kwargs):
         """Return sum by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='sum')), kwargs)
         return self.reduce(
             generic_nb.sum_reduce_nb,
             to_array=False,
@@ -609,11 +617,13 @@ class MappedArray(Wrapping):
     @cached_method
     def idxmin(self, **kwargs):
         """Return index of min by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='idxmin')), kwargs)
         return self.reduce(generic_nb.argmin_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
     @cached_method
     def idxmax(self, **kwargs):
         """Return index of max by column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='idxmax')), kwargs)
         return self.reduce(generic_nb.argmax_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
     @cached_method
@@ -629,13 +639,13 @@ class MappedArray(Wrapping):
         percentiles = np.unique(percentiles)
         perc_formatted = pd.io.formats.format.format_percentiles(percentiles)
         index = pd.Index(['count', 'mean', 'std', 'min', *perc_formatted, 'max'])
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index=index)), kwargs)
         out = self.reduce(
             generic_nb.describe_reduce_nb,
             percentiles,
             ddof,
             to_array=True,
             to_idx=False,
-            index=index,
             **kwargs
         )
         if isinstance(out, pd.DataFrame):
@@ -646,16 +656,15 @@ class MappedArray(Wrapping):
         return out
 
     @cached_method
-    def count(self, group_by=None, **kwargs):
+    def count(self, group_by=None, wrap_kwargs=None):
         """Return count by column."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
-            group_by=group_by,
-            **kwargs
-        )
+            group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def value_counts(self, group_by=None, value_map=None, **kwargs):
+    def value_counts(self, group_by=None, value_map=None, wrap_kwargs=None):
         """Return a pandas object containing counts of unique values."""
         mapped_codes, mapped_uniques = pd.factorize(self.values)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
@@ -664,7 +673,7 @@ class MappedArray(Wrapping):
             value_counts,
             index=mapped_uniques,
             group_by=group_by,
-            **kwargs
+            **merge_dicts({}, wrap_kwargs)
         )
         if value_map is None:
             value_map = self.value_map
@@ -674,7 +683,7 @@ class MappedArray(Wrapping):
             value_counts_df.index = value_counts_df.index.map(value_map)
         return value_counts_df
 
-    def stack(self, group_by=None, default_val=np.nan, **kwargs):
+    def stack(self, group_by=None, default_val=np.nan, wrap_kwargs=None):
         """Stack into a matrix.
 
         Will lose index information and fill missing values with `default_val`."""
@@ -683,17 +692,19 @@ class MappedArray(Wrapping):
                 self.values,
                 index=np.arange(len(self.values)),
                 group_by=group_by,
-                **kwargs
+                **merge_dicts({}, wrap_kwargs)
             )
         col_map = self.col_mapper.get_col_map(group_by=group_by)
         out = nb.stack_mapped_nb(self.values, col_map, default_val)
-        return self.wrapper.wrap(out, index=np.arange(out.shape[0]), group_by=group_by, **kwargs)
+        return self.wrapper.wrap(
+            out, index=np.arange(out.shape[0]),
+            group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
-    def hist(self, group_by=None, **kwargs):  # pragma: no cover
+    def histplot(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot histogram by column."""
         return self.stack(group_by=group_by).vbt.histplot(**kwargs)
 
-    def box(self, group_by=None, **kwargs):  # pragma: no cover
+    def boxplot(self, group_by=None, **kwargs):  # pragma: no cover
         """Plot box plot by column."""
         return self.stack(group_by=group_by).vbt.boxplot(**kwargs)
 
