@@ -83,17 +83,17 @@ and gets stored as a separate column level. Below is an example of a column hier
 ```python-repl
 >>> macd = vbt.MACD.run(
 ...     pd.Series([1, 2, 3, 4, 3, 2, 1]),
-...     fast_window=(2, 3),
-...     slow_window=(3, 4),
-...     signal_window=(2, 3),
+...     fast_period=(2, 3),
+...     slow_period=(3, 4),
+...     signal_period=(2, 3),
 ...     macd_ewm=(True, False),
 ...     signal_ewm=(False, True)
 ... )
 
 >>> macd.signal
-macd_fast_window           2         3
-macd_slow_window           3         4
-macd_signal_window         2         3
+macd_fast_period           2         3
+macd_slow_period           3         4
+macd_signal_period         2         3
 macd_macd_ewm           True     False
 macd_signal_ewm        False      True
 0                        NaN       NaN
@@ -106,7 +106,7 @@ macd_signal_ewm        False      True
 ```
 
 Columns here capture different strategy configurations that can now be easily analyzed and compared.
-You might, for example, consider grouping your performance by `macd_fast_window` to see how the size of
+You might, for example, consider grouping your performance by `macd_fast_period` to see how the size of
 the fast window impacts profitability of the strategy.
 
 The other advantage of vectorbt is that it ensures that the column hierarchy is preserved across
@@ -315,8 +315,8 @@ average over the entire price series and stores it as a distinct column.
 
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
-fast_window     10     20
-slow_window     30     30
+fast_period     10     20
+slow_period     30     30
 Date
 2018-12-31   False  False
 2019-01-01   False  False
@@ -334,8 +334,8 @@ Date
 
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
-fast_window     10     20
-slow_window     30     30
+fast_period     10     20
+slow_period     30     30
 Date
 2018-12-31   False  False
 2019-01-01   False  False
@@ -353,13 +353,13 @@ Date
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
-fast_window  slow_window
+fast_period  slow_period
 10           30             0.847151
 20           30             0.543411
 dtype: float64
 ```
 
-For the sake of convenience, vectorbt has created column levels `fast_window` and `slow_window` for you
+For the sake of convenience, vectorbt has created column levels `fast_period` and `slow_period` for you
 to easily identify which window size corresponds to which column.
 
 Notice how signal generation part remains the same for each example - most functions in vectorbt work on
@@ -397,8 +397,8 @@ Date
 
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
-fast_window            10            20
-slow_window            30            30
+fast_period            10            20
+slow_period            30            30
 symbol         BTC    ETH    BTC    ETH
 Date
 2018-12-31   False  False  False  False
@@ -417,8 +417,8 @@ Date
 
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
-fast_window            10            20
-slow_window            30            30
+fast_period            10            20
+slow_period            30            30
 symbol         BTC    ETH    BTC    ETH
 Date
 2018-12-31   False  False  False  False
@@ -437,7 +437,7 @@ Date
 
 >>> portfolio = vbt.Portfolio.from_signals(comb_price, entries, exits)
 >>> portfolio.total_return()
-fast_window  slow_window  symbol
+fast_period  slow_period  symbol
 10           30           BTC       0.847151
                           ETH       0.244204
 20           30           BTC       0.543411
@@ -485,7 +485,7 @@ range_end      2019-07-01    2019-12-31  2019-07-01  2019-12-31
 
 >>> portfolio = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
 >>> portfolio.total_return()
-fast_window  slow_window  symbol  range_start  range_end
+fast_period  slow_period  symbol  range_start  range_end
 10           30           BTC     2018-12-31   2019-07-01    1.579002
                                   2019-07-02   2019-12-31   -0.289369
                           ETH     2018-12-31   2019-07-01    0.960437
@@ -558,6 +558,7 @@ from vectorbt.indicators import *
 from vectorbt.signals import *
 from vectorbt.records import *
 from vectorbt.portfolio import *
+from vectorbt.labels import *
 
 # silence NumbaExperimentalFeatureWarning
 import warnings

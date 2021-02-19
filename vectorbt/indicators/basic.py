@@ -61,12 +61,14 @@ MA = IndicatorFactory(
     module_name=__name__,
     short_name='ma',
     input_names=['close'],
-    param_names=['window', 'ewm'],
+    param_names=['period', 'ewm'],
     output_names=['ma']
 ).from_apply_func(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
-    ewm=False
+    pass_kwargs=['adjust'],
+    ewm=False,
+    adjust=False
 )
 
 
@@ -148,12 +150,15 @@ MSTD = IndicatorFactory(
     module_name=__name__,
     short_name='mstd',
     input_names=['close'],
-    param_names=['window', 'ewm'],
+    param_names=['period', 'ewm'],
     output_names=['mstd']
 ).from_apply_func(
     nb.mstd_apply_nb,
     cache_func=nb.mstd_cache_nb,
-    ewm=False
+    pass_kwargs=['adjust', 'ddof'],
+    ewm=False,
+    adjust=False,
+    ddof=0
 )
 
 
@@ -217,7 +222,7 @@ BBANDS = IndicatorFactory(
     module_name=__name__,
     short_name='bb',
     input_names=['close'],
-    param_names=['window', 'ewm', 'alpha'],
+    param_names=['period', 'ewm', 'alpha'],
     output_names=['middle', 'upper', 'lower'],
     custom_output_funcs=dict(
         percent_b=lambda self: self.wrapper.wrap(
@@ -228,9 +233,12 @@ BBANDS = IndicatorFactory(
 ).from_apply_func(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
-    window=20,
+    pass_kwargs=['adjust', 'ddof'],
+    period=20,
     ewm=False,
-    alpha=2
+    alpha=2,
+    adjust=False,
+    ddof=0
 )
 
 
@@ -338,13 +346,15 @@ RSI = IndicatorFactory(
     module_name=__name__,
     short_name='rsi',
     input_names=['close'],
-    param_names=['window', 'ewm'],
+    param_names=['period', 'ewm'],
     output_names=['rsi']
 ).from_apply_func(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
-    window=14,
-    ewm=False
+    pass_kwargs=['adjust'],
+    period=14,
+    ewm=False,
+    adjust=False
 )
 
 
@@ -435,14 +445,16 @@ STOCH = IndicatorFactory(
     module_name=__name__,
     short_name='stoch',
     input_names=['high', 'low', 'close'],
-    param_names=['k_window', 'd_window', 'd_ewm'],
+    param_names=['k_period', 'd_period', 'd_ewm'],
     output_names=['percent_k', 'percent_d']
 ).from_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
-    k_window=14,
-    d_window=3,
-    d_ewm=False
+    pass_kwargs=['adjust'],
+    k_period=14,
+    d_period=3,
+    d_ewm=False,
+    adjust=False
 )
 
 
@@ -548,7 +560,7 @@ MACD = IndicatorFactory(
     module_name=__name__,
     short_name='macd',
     input_names=['close'],
-    param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
+    param_names=['fast_period', 'slow_period', 'signal_period', 'macd_ewm', 'signal_ewm'],
     output_names=['macd', 'signal'],
     custom_output_funcs=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
@@ -556,11 +568,13 @@ MACD = IndicatorFactory(
 ).from_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
-    fast_window=12,
-    slow_window=26,
-    signal_window=9,
+    pass_kwargs=['adjust'],
+    fast_period=12,
+    slow_period=26,
+    signal_period=9,
     macd_ewm=False,
-    signal_ewm=False
+    signal_ewm=False,
+    adjust=False
 )
 
 
@@ -661,13 +675,15 @@ ATR = IndicatorFactory(
     module_name=__name__,
     short_name='atr',
     input_names=['high', 'low', 'close'],
-    param_names=['window', 'ewm'],
+    param_names=['period', 'ewm'],
     output_names=['tr', 'atr']
 ).from_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
-    window=14,
-    ewm=True
+    pass_kwargs=['adjust'],
+    period=14,
+    ewm=True,
+    adjust=False
 )
 
 

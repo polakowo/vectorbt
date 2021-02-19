@@ -97,7 +97,7 @@ Now the same using `IndicatorFactory`:
 ```python-repl
 >>> MyMA = vbt.IndicatorFactory(
 ...     input_names=['price'],
-...     param_names=['window'],
+...     param_names=['period'],
 ...     output_names=['ma'],
 ...     short_name='myma'
 ... ).from_apply_func(vbt.nb.rolling_mean_nb)
@@ -186,7 +186,7 @@ For example, this is useful to generate crossover signals of multiple moving ave
 >>> myma1, myma2 = MyMA.run_combs(price, [2, 3, 4])
 
 >>> myma1.ma
-myma_1_window                   2         3
+myma_1_period                   2         3
                  a    b    a    b    a    b
 2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
 2020-01-02     1.5  4.5  1.5  4.5  NaN  NaN
@@ -195,7 +195,7 @@ myma_1_window                   2         3
 2020-01-05     4.5  1.5  4.5  1.5  4.0  2.0
 
 >>> myma2.ma
-myma_2_window         3                   4
+myma_2_period         3                   4
                  a    b    a    b    a    b
 2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
 2020-01-02     NaN  NaN  NaN  NaN  NaN  NaN
@@ -204,8 +204,8 @@ myma_2_window         3                   4
 2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
 
 >>> myma1.ma_above(myma2.ma, crossover=True)
-myma_1_window                           2             3
-myma_2_window             3             4             4
+myma_1_period                           2             3
+myma_2_period             3             4             4
                    a      b      a      b      a      b
 2020-01-01     False  False  False  False  False  False
 2020-01-02     False  False  False  False  False  False
@@ -237,7 +237,7 @@ to multiple objects at once, for example:
 ```python-repl
 >>> myma.ma_above([1.5, 2.5], multiple=True)
 myma_ma_above                         1.5                         2.5
-myma_window               2             3             2             3
+myma_period               2             3             2             3
                 a         b      a      b      a      b      a      b
 2020-01-01     False  False  False  False  False  False  False  False
 2020-01-02     False   True  False  False  False   True  False  False
@@ -253,7 +253,7 @@ myma_window               2             3             2             3
 ```python-repl
 'iloc'
 'loc'
-'window_loc'
+'period_loc'
 'xs'
 ```
 
@@ -284,89 +284,16 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
+from vectorbt.utils.params import (
+    to_typed_list,
+    broadcast_params,
+    create_param_product,
+    Default
+)
+from vectorbt.utils.enum import convert_str_enum_value
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import ParamIndexerFactory
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-
-
-def to_typed_list(lst):
-    """Cast Python list to typed list.
-
-    Direct construction is flawed in Numba 0.52.0.
-    See https://github.com/numba/numba/issues/6651."""
-    nb_lst = List()
-    for elem in lst:
-        nb_lst.append(elem)
-    return nb_lst
-
-
-def flatten_param_tuples(param_tuples):
-    """Flattens a nested list of tuples using unzipping."""
-    param_list = []
-    unzipped_tuples = zip(*param_tuples)
-    for i, unzipped in enumerate(unzipped_tuples):
-        unzipped = list(unzipped)
-        if isinstance(unzipped[0], tuple):
-            param_list.extend(flatten_param_tuples(unzipped))
-        else:
-            param_list.append(unzipped)
-    return param_list
-
-
-def create_param_combs(op_tree, depth=0):
-    """Create arbitrary parameter combinations from the operation tree `op_tree`.
-
-    `op_tree` must be a tuple of tuples, each being an instruction to generate parameters.
-    The first element of each tuple should a function that takes remaining elements as arguments.
-    If one of the elements is a tuple, it will be unfolded in the same way.
-
-    ## Example
-
-    ```python-repl
-    >>> import numpy as np
-    >>> from itertools import combinations, product
-
-    >>> create_param_combs((product, (combinations, [0, 1, 2, 3], 2), [4, 5]))
-    [[0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
-     [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
-     [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]]
-    ```
-    """
-    checks.assert_type(op_tree, tuple)
-    new_op_tree = (op_tree[0],)
-    for elem in op_tree[1:]:
-        if isinstance(elem, tuple):
-            new_op_tree += (create_param_combs(elem, depth=depth + 1),)
-        else:
-            new_op_tree += (elem,)
-    out = list(new_op_tree[0](*new_op_tree[1:]))
-    if depth == 0:
-        # do something
-        return flatten_param_tuples(out)
-    return out
-
-
-def broadcast_params(param_list):
-    """Broadcast parameters in `param_list`."""
-    max_len = max(list(map(len, param_list)))
-    new_param_list = []
-    for i in range(len(param_list)):
-        params = param_list[i]
-        if len(params) < max_len:
-            if len(params) > 1:
-                raise ValueError("shape mismatch: objects cannot be broadcast to a single shape")
-            new_params = []
-            for j in range(max_len):
-                new_params.append(params[0])
-            new_param_list.append(list(new_params))
-        else:
-            new_param_list.append(list(params))
-    return new_param_list
-
-
-def create_param_product(param_list):
-    """Make Cartesian product out of all params in `param_list`."""
-    return list(map(list, zip(*list(itertools.product(*param_list)))))
 
 
 def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
@@ -374,7 +301,15 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
     new_param_list = []
     for i, params in enumerate(param_list):
         _param_settings = param_settings if isinstance(param_settings, dict) else param_settings[i]
-        checks.assert_dict_valid(_param_settings, [['array_like', 'bc_to_input', 'broadcast_kwargs']])
+        checks.assert_dict_valid(_param_settings, [[
+            'dtype',
+            'array_like',
+            'bc_to_input',
+            'broadcast_kwargs'
+        ]])
+        dtype = _param_settings.get('dtype', None)
+        if checks.is_namedtuple(dtype):
+            params = convert_str_enum_value(dtype, params)
         is_array_like = _param_settings.get('array_like', False)
         bc_to_input = _param_settings.get('bc_to_input', False)
         broadcast_kwargs = _param_settings.get('broadcast_kwargs', dict(require_kwargs=dict(requirements='W')))
@@ -432,7 +367,7 @@ def reindex_outputs(new_params, from_params, n_ts_cols):
 
 
 def build_column_hierarchy(param_list, level_names, input_columns, hide_levels=None):
-    """For each parameter in `param_list`, create a new column level with parameter values. 
+    """For each parameter in `param_list`, create a new column level with parameter values.
     Combine this level with columns `input_columns` using Cartesian product."""
     checks.assert_len_equal(param_list, level_names)
     if hide_levels is None:
@@ -857,16 +792,6 @@ def run_pipeline(
     return wrapper, input_list, input_mapper, output_list, param_list, mapper_list, other_list
 
 
-class Default:
-    """Class for wrapping default values."""
-
-    def __repr__(self):
-        return self.value.__repr__()
-
-    def __init__(self, value):
-        self.value = value
-
-
 def perform_init_checks(wrapper, input_list, input_mapper, output_list, param_list,
                         mapper_list, short_name, level_names):
     """Perform checks on objects created by running or slicing an indicator."""
@@ -900,10 +825,10 @@ def combine_objs(obj, other, combine_func, multiple=False, level_name=None, keys
 
 class IndicatorFactory:
     def __init__(self,
-                 class_name='CustomIndicator',
+                 class_name='Custom',
                  class_docstring='',
                  module_name=__name__,
-                 short_name='custom',
+                 short_name=None,
                  prepend_name=True,
                  input_names=None,
                  param_names=None,
@@ -922,6 +847,8 @@ class IndicatorFactory:
             class_docstring (str): Docstring for the created Python class.
             module_name (str): Specify the module the class originates from.
             short_name (str): A short name of the indicator.
+
+                Defaults to lower-case `class_name`.
             prepend_name (bool): Whether to prepend `short_name` to each parameter level.
             input_names (list of str): A list of names of input time series objects.
             param_names (list of str): A list of names of parameters.
@@ -967,6 +894,8 @@ class IndicatorFactory:
         self.module_name = module_name
         checks.assert_type(module_name, str)
 
+        if short_name is None:
+            short_name = class_name.lower()
         self.short_name = short_name
         checks.assert_type(short_name, str)
 
@@ -1186,14 +1115,7 @@ class IndicatorFactory:
             checks.assert_dict_valid(_attr_settings, [['dtype']])
             dtype = _attr_settings.get('dtype', np.float_)
 
-            def _isinstance_namedtuple(obj) -> bool:
-                return (
-                        isinstance(obj, tuple) and
-                        hasattr(obj, '_asdict') and
-                        hasattr(obj, '_fields')
-                )
-
-            if _isinstance_namedtuple(dtype):
+            if checks.is_namedtuple(dtype):
                 def attr_readable(_self, attr_name=attr_name, enum=dtype):
                     if _self.wrapper.ndim == 1:
                         return getattr(_self, attr_name).map(lambda x: '' if x == -1 else enum._fields[x])
