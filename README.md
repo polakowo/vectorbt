@@ -6,7 +6,7 @@
 [![License](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
 [![Gitter](https://img.shields.io/gitter/room/polakowo/vectorbt?color=9cf&style=for-the-badge)](https://gitter.im/vectorbt/community)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)
-[![Binder](https://img.shields.io/badge/launch-binder-ff69b4?style=for-the-badge)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD)
+[![Binder](https://img.shields.io/badge/launch-binder-d6604a?style=for-the-badge)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD)
 
 # vectorbt
 
