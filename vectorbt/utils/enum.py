@@ -42,5 +42,3 @@ def to_value_map(enum):
     if -1 not in value_map:
         value_map[-1] = None
     return value_map
-
-

@@ -63,8 +63,8 @@ from vectorbt.signals.basic import (
     IRPROBEX,
     STEX,
     ISTEX,
-    ADVSTEX,
-    IADVSTEX
+    OHLCSTEX,
+    IOHLCSTEX
 )
 
 __all__ = [
@@ -75,8 +75,8 @@ __all__ = [
     'IRPROBEX',
     'STEX',
     'ISTEX',
-    'ADVSTEX',
-    'IADVSTEX'
+    'OHLCSTEX',
+    'IOHLCSTEX'
 ]
 
 __pdoc__ = {k: False for k in __all__}

@@ -7,8 +7,9 @@ import inspect
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.params import to_typed_list
 from vectorbt.base import combine_fns
-from vectorbt.indicators.factory import IndicatorFactory, to_typed_list
+from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.signals.nb import generate_ex_nb, generate_enex_nb, first_choice_nb
 
 
@@ -34,7 +35,7 @@ class SignalFactory(IndicatorFactory):
 
     def __init__(self,
                  *args,
-                 class_name='CustomSignals',
+                 class_name='Custom',
                  input_names=None,
                  attr_settings=None,
                  exit_only=False,
@@ -287,9 +288,9 @@ class SignalFactory(IndicatorFactory):
         ```python-repl
         >>> from numba import njit
         >>> from collections import namedtuple
+        >>> from vectorbt.indicators.configs import flex_elem_param_config
         >>> from vectorbt.signals.factory import SignalFactory
         >>> from vectorbt.signals.nb import rand_by_prob_choice_nb
-        >>> from vectorbt.signals.basic import flex_elem_param_config
 
         >>> # Enum to distinguish random generators
         >>> RandType = namedtuple('RandType', ['R1', 'R2'])(0, 1)

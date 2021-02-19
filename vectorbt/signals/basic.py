@@ -6,32 +6,15 @@ import plotly.graph_objects as go
 from vectorbt.utils.config import Config
 from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.utils.widgets import FigureWidget
+from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
 from vectorbt.signals.nb import (
     rand_enex_apply_nb,
     rand_by_prob_choice_nb,
     stop_choice_nb,
-    adv_stop_choice_nb
+    ohlc_stop_choice_nb
 )
-
-flex_elem_param_config = Config(
-    array_like=True,  # passing a NumPy array means passing one value, for multiple use list
-    bc_to_input=True,  # broadcast to input
-    broadcast_kwargs=dict(
-        keep_raw=True  # keep original shape for flexible indexing to save memory
-    )
-)
-"""Config for flexible element-wise parameters."""
-
-flex_col_param_config = Config(
-    array_like=True,
-    bc_to_input=1,  # broadcast to axis 1 (columns)
-    broadcast_kwargs=dict(
-        keep_raw=True
-    )
-)
-"""Config for flexible column-wise parameters."""
 
 # ############# Random signals ############# #
 
@@ -367,12 +350,12 @@ class ISTEX(ISTEX):
 fix_class_for_docs(ISTEX)
 
 
-# ############# Advanced stop signals ############# #
+# ############# OHLC stop signals ############# #
 
-advstex_config = Config(
-    class_name='ADVSTEX',
+ohlcstex_config = Config(
+    class_name='OHLCSTEX',
     module_name=__name__,
-    short_name='advstex',
+    short_name='ohlcstex',
     input_names=['open', 'high', 'low', 'close'],
     in_output_names=['hit_price', 'stop_type'],
     param_names=['sl_stop', 'ts_stop', 'tp_stop'],
@@ -382,10 +365,10 @@ advstex_config = Config(
     exit_only=True,
     iteratively=False
 )
-"""Factory config for `ADVSTEX`."""
+"""Factory config for `OHLCSTEX`."""
 
-advstex_func_config = Config(
-    exit_choice_func=adv_stop_choice_nb,
+ohlcstex_func_config = Config(
+    exit_choice_func=ohlc_stop_choice_nb,
     exit_settings=dict(
         pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
         pass_in_outputs=['hit_price', 'stop_type'],
@@ -408,16 +391,16 @@ advstex_func_config = Config(
     hit_price=np.nan,
     stop_type=-1
 )
-"""Exit function config for `ADVSTEX`."""
+"""Exit function config for `OHLCSTEX`."""
 
-ADVSTEX = SignalFactory(
-    **advstex_config
+OHLCSTEX = SignalFactory(
+    **ohlcstex_config
 ).from_choice_func(
-    **advstex_func_config
+    **ohlcstex_func_config
 )
 
 
-def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
+def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
     def plot(self,
              plot_type=go.Ohlc,
              ohlc_kwargs=None,
@@ -488,18 +471,18 @@ def _generate_advstex_plot(base_cls, entries_attr):  # pragma: no cover
     ## Example
         
     ```python-repl
-    >>> advstex.iloc[:, 0].plot()
+    >>> ohlcstex.iloc[:, 0].plot()
     ```
     
-    ![](/vectorbt/docs/img/advstex.png)
+    ![](/vectorbt/docs/img/ohlcstex.png)
     """
     return plot
 
 
-class ADVSTEX(ADVSTEX):
+class OHLCSTEX(OHLCSTEX):
     """Advanced exit signal generator based on stop values.
 
-    Generates `exits` based on `entries` and `vectorbt.signals.nb.adv_stop_choice_nb`.
+    Generates `exits` based on `entries` and `vectorbt.signals.nb.ohlc_stop_choice_nb`.
 
     !!! hint
         All parameters can be either a single value (per frame) or a NumPy array (per row, column,
@@ -519,79 +502,79 @@ class ADVSTEX(ADVSTEX):
     ...     'low': [9, 10, 11, 10, 9],
     ...     'close': [10, 11, 12, 11, 10]
     ... })
-    >>> advstex = vbt.ADVSTEX.run(
+    >>> ohlcstex = vbt.OHLCSTEX.run(
     ...     entries, price['open'], price['high'], price['low'], price['close'],
     ...     sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1])
 
-    >>> advstex.entries
-    advstex_sl_stop    0.1    0.0    0.0
-    advstex_ts_stop    0.0    0.1    0.0
-    advstex_tp_stop    0.0    0.0    0.1
-    0                 True   True   True
-    1                False  False  False
-    2                False  False  False
-    3                False  False  False
-    4                False  False  False
+    >>> ohlcstex.entries
+    ohlcstex_sl_stop    0.1    0.0    0.0
+    ohlcstex_ts_stop    0.0    0.1    0.0
+    ohlcstex_tp_stop    0.0    0.0    0.1
+    0                  True   True   True
+    1                 False  False  False
+    2                 False  False  False
+    3                 False  False  False
+    4                 False  False  False
 
-    >>> advstex.exits
-    advstex_sl_stop    0.1    0.0    0.0
-    advstex_ts_stop    0.0    0.1    0.0
-    advstex_tp_stop    0.0    0.0    0.1
-    0                False  False  False
-    1                False  False   True
-    2                False  False  False
-    3                False   True  False
-    4                 True  False  False
+    >>> ohlcstex.exits
+    ohlcstex_sl_stop    0.1    0.0    0.0
+    ohlcstex_ts_stop    0.0    0.1    0.0
+    ohlcstex_tp_stop    0.0    0.0    0.1
+    0                 False  False  False
+    1                 False  False   True
+    2                 False  False  False
+    3                 False   True  False
+    4                  True  False  False
 
-    >>> advstex.hit_price
-    advstex_sl_stop  0.1   0.0   0.0
-    advstex_ts_stop  0.0   0.1   0.0
-    advstex_tp_stop  0.0   0.0   0.1
-    0                NaN   NaN   NaN
-    1                NaN   NaN  11.0
-    2                NaN   NaN   NaN
-    3                NaN  11.7   NaN
-    4                9.0   NaN   NaN
+    >>> ohlcstex.hit_price
+    ohlcstex_sl_stop  0.1   0.0   0.0
+    ohlcstex_ts_stop  0.0   0.1   0.0
+    ohlcstex_tp_stop  0.0   0.0   0.1
+    0                 NaN   NaN   NaN
+    1                 NaN   NaN  11.0
+    2                 NaN   NaN   NaN
+    3                 NaN  11.7   NaN
+    4                 9.0   NaN   NaN
 
-    >>> advstex.stop_type_readable
-    advstex_sl_stop       0.1        0.0         0.0
-    advstex_ts_stop       0.0        0.1         0.0
-    advstex_tp_stop       0.0        0.0         0.1
+    >>> ohlcstex.stop_type_readable
+    ohlcstex_sl_stop       0.1        0.0         0.0
+    ohlcstex_ts_stop       0.0        0.1         0.0
+    ohlcstex_tp_stop       0.0        0.0         0.1
     0
-    1                                     TakeProfit
+    1                                      TakeProfit
     2
-    3                          TrailStop
-    4                StopLoss
+    3                           TrailStop
+    4                 StopLoss
     ```
     """
 
-    plot = _generate_advstex_plot(ADVSTEX, 'entries')
+    plot = _generate_ohlcstex_plot(OHLCSTEX, 'entries')
 
 
-fix_class_for_docs(ADVSTEX)
+fix_class_for_docs(OHLCSTEX)
 
-IADVSTEX = SignalFactory(
-    **advstex_config.merge_with(
+IOHLCSTEX = SignalFactory(
+    **ohlcstex_config.merge_with(
         dict(
-            class_name='IADVSTEX',
-            short_name='iadvstex',
+            class_name='IOHLCSTEX',
+            short_name='iohlcstex',
             iteratively=True
         )
     )
 ).from_choice_func(
-    **advstex_func_config
+    **ohlcstex_func_config
 )
 
 
-class IADVSTEX(IADVSTEX):
+class IOHLCSTEX(IOHLCSTEX):
     """Advanced exit signal generator based on stop values.
 
     Iteratively generates `new_entries` and `exits` based on `entries` and
-    `vectorbt.signals.nb.adv_stop_choice_nb`.
+    `vectorbt.signals.nb.ohlc_stop_choice_nb`.
 
-    See `ADVSTEX` for notes on parameters."""
+    See `OHLCSTEX` for notes on parameters."""
 
-    plot = _generate_advstex_plot(IADVSTEX, 'new_entries')
+    plot = _generate_ohlcstex_plot(IOHLCSTEX, 'new_entries')
 
 
-fix_class_for_docs(IADVSTEX)
+fix_class_for_docs(IOHLCSTEX)

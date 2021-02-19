@@ -1,4 +1,4 @@
-"""Numba-compiled 1-dim and 2-dim functions.
+"""Numba-compiled functions.
 
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
@@ -468,7 +468,7 @@ def generate_stop_ex_iter_nb(entries, ts, stop, trailing, entry_wait, exit_wait,
 
 
 @njit(cache=True)
-def adv_stop_choice_nb(from_i, to_i, col, open, high, low, close, hit_price_out, stop_type_out,
+def ohlc_stop_choice_nb(from_i, to_i, col, open, high, low, close, hit_price_out, stop_type_out,
                        sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d):
     """`choice_func_nb` that returns the indices of the stop price being reached.
 
@@ -578,9 +578,9 @@ def adv_stop_choice_nb(from_i, to_i, col, open, high, low, close, hit_price_out,
 
 
 @njit
-def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
-                            sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, flex_2d):
-    """Generate using `generate_ex_nb` and `adv_stop_choice_nb`.
+def generate_ohlc_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
+                             sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, flex_2d):
+    """Generate using `generate_ex_nb` and `ohlc_stop_choice_nb`.
 
     ## Example
 
@@ -588,7 +588,7 @@ def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop
     Illustrates how exit signal can be generated within the same tick as entry.
     ```python-repl
     >>> import numpy as np
-    >>> from vectorbt.signals.nb import generate_adv_stop_ex_nb
+    >>> from vectorbt.signals.nb import generate_ohlc_stop_ex_nb
 
     >>> entries = np.asarray([True, False, False, False, False])[:, None]
     >>> open_p = np.asarray([10, 11, 12, 11, 10])[:, None]
@@ -604,7 +604,7 @@ def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop
     >>> first = True
     >>> flex_2d = True
 
-    >>> generate_adv_stop_ex_nb(
+    >>> generate_ohlc_stop_ex_nb(
     ...     entries, open_p, high_p, low_p, close_p,
     ...     hit_p_out, stop_type_out, sl_stop, tp_stop, tp_stop,
     ...     is_entry_p_safe, 0, first, flex_2d)
@@ -631,17 +631,17 @@ def generate_adv_stop_ex_nb(entries, open, high, low, close, hit_price_out, stop
     """
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
     return generate_ex_nb(
-        entries, wait, adv_stop_choice_nb,
+        entries, wait, ohlc_stop_choice_nb,
         open, high, low, close, hit_price_out, stop_type_out,
         sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d
     )
 
 
 @njit
-def generate_adv_stop_ex_iter_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
+def generate_ohlc_stop_ex_iter_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
                                  sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
                                  exit_wait, first, flex_2d):
-    """Generate iteratively using `generate_enex_nb` and `adv_stop_choice_nb`.
+    """Generate iteratively using `generate_enex_nb` and `ohlc_stop_choice_nb`.
 
     Returns two arrays: new entries and exits."""
     temp_idx_arr = np.empty((entries.shape[0],), dtype=np.int_)
@@ -649,7 +649,7 @@ def generate_adv_stop_ex_iter_nb(entries, open, high, low, close, hit_price_out,
         entries.shape,
         entry_wait, exit_wait,
         first_choice_nb, (entries,),
-        adv_stop_choice_nb, (
+        ohlc_stop_choice_nb, (
             open, high, low, close, hit_price_out, stop_type_out,
             sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait, first, temp_idx_arr, flex_2d
         )
