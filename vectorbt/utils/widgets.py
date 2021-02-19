@@ -3,6 +3,8 @@
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots as _make_subplots
 
+from vectorbt.utils.config import merge_dicts
+
 
 class Figure(go.Figure):
     def __init__(self, *args, **kwargs):
@@ -12,8 +14,7 @@ class Figure(go.Figure):
 
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
-        self.update_layout(**settings.layout)
-        self.update_layout(**layout)
+        self.update_layout(**merge_dicts(settings.layout, layout))
 
     def show_png(self):
         """Display the figure in PNG format."""
@@ -28,8 +29,7 @@ class FigureWidget(go.FigureWidget):
 
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
-        self.update_layout(**settings.layout)
-        self.update_layout(**layout)
+        self.update_layout(**merge_dicts(settings.layout, layout))
 
     def show_png(self):
         """Display the widget in PNG format."""

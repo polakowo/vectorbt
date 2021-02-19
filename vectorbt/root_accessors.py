@@ -11,6 +11,7 @@ vbt.generic.accessors.GenericSR/DFAccessor     -> pd.Series/DataFrame.vbt.*
 vbt.signals.accessors.SignalsSR/DFAccessor     -> pd.Series/DataFrame.vbt.signals.*
 vbt.returns.accessors.ReturnsSR/DFAccessor     -> pd.Series/DataFrame.vbt.returns.*
 vbt.ohlcv.accessors.OHLCVDFAccessor            -> pd.DataFrame.vbt.ohlcv.*
+vbt.px_accessors.PXAccessor                    -> pd.DataFrame.vbt.px.*
 ```
 
 Additionally, some accessors subclass other accessors building the following inheritance hiearchy:
@@ -21,6 +22,7 @@ vbt.base.accessors.BaseSR/DFAccessor
         -> vbt.signals.accessors.SignalsSR/DFAccessor
         -> vbt.returns.accessors.ReturnsSR/DFAccessor
         -> vbt.ohlcv.accessors.OHLCVDFAccessor
+    -> vbt.px_accessors.PXSR/DFAccessor
 ```
 
 So, for example, the method `pd.Series.vbt.to_2d_array` is also available as

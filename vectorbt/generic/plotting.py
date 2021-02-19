@@ -519,8 +519,8 @@ class Box(Configured, TraceUpdater):
 
 
 class Heatmap(Configured, TraceUpdater):
-    def __init__(self, data=None, x_labels=None, y_labels=None, horizontal=False,
-                 trace_kwargs=None, add_trace_kwargs=None, fig=None, **layout_kwargs):
+    def __init__(self, data=None, x_labels=None, y_labels=None,trace_kwargs=None,
+                 add_trace_kwargs=None, fig=None, **layout_kwargs):
         """Create a heatmap plot.
 
         Args:
@@ -529,7 +529,6 @@ class Heatmap(Configured, TraceUpdater):
                 Must be of shape (`y_labels`, `x_labels`).
             x_labels (array_like): X-axis labels, corresponding to columns in pandas.
             y_labels (array_like): Y-axis labels, corresponding to index in pandas.
-            horizontal (bool): Plot horizontally.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Heatmap`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -554,7 +553,6 @@ class Heatmap(Configured, TraceUpdater):
             data=data,
             x_labels=x_labels,
             y_labels=y_labels,
-            horizontal=horizontal,
             trace_kwargs=trace_kwargs,
             add_trace_kwargs=add_trace_kwargs,
             fig=fig,
@@ -572,11 +570,6 @@ class Heatmap(Configured, TraceUpdater):
                 raise ValueError("At least x_labels and y_labels must be passed")
         else:
             data = reshape_fns.to_2d(np.array(data))
-        if horizontal:
-            x_labels, y_labels = y_labels, x_labels
-            if data is not None:
-                data = data.transpose()
-            horizontal = False
 
         if fig is None:
             fig = FigureWidget()
@@ -618,7 +611,6 @@ class Heatmap(Configured, TraceUpdater):
         fig.add_trace(heatmap, **add_trace_kwargs)
 
         TraceUpdater.__init__(self, fig, [fig.data[-1]])
-        self.horizontal = horizontal
 
         if data is not None:
             self.update(data)
@@ -628,10 +620,7 @@ class Heatmap(Configured, TraceUpdater):
         data = reshape_fns.to_2d(np.array(data))
 
         with self.fig.batch_update():
-            if self.horizontal:
-                self.traces[0].z = data.transpose()
-            else:
-                self.traces[0].z = data
+            self.traces[0].z = data
 
 
 class Volume(Configured, TraceUpdater):
