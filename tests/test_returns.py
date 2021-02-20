@@ -140,14 +140,14 @@ class TestAccessors:
             pd.concat([res_a, res_b, res_c], axis=1)
         )
 
-    def test_total(self):
+    def test_total_return(self):
         res_a = empyrical.cum_returns_final(ret['a'])
         res_b = empyrical.cum_returns_final(ret['b'])
         res_c = empyrical.cum_returns_final(ret['c'])
         assert isclose(ret['a'].vbt.returns.total(), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.total(),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('total_return')
         )
 
     def test_annualized_return(self):
@@ -157,7 +157,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.annualized(), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.annualized(),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('annualized_return')
         )
 
     @pytest.mark.parametrize(
@@ -171,7 +171,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.annualized_volatility(levy_alpha=test_alpha), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.annualized_volatility(levy_alpha=test_alpha),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('annualized_volatility')
         )
 
     def test_calmar_ratio(self):
@@ -181,7 +181,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.calmar_ratio(), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.calmar_ratio(),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('calmar_ratio')
         )
 
     @pytest.mark.parametrize(
@@ -202,7 +202,7 @@ class TestAccessors:
             risk_free=test_risk_free, required_return=test_required_return), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.omega_ratio(risk_free=test_risk_free, required_return=test_required_return),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('omega_ratio')
         )
 
     @pytest.mark.parametrize(
@@ -216,13 +216,13 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.sharpe_ratio(risk_free=test_risk_free), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.sharpe_ratio(risk_free=test_risk_free),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('sharpe_ratio')
         )
 
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
             ret.vbt.returns.deflated_sharpe_ratio(risk_free=[0.01, 0.02, 0.03]),
-            pd.Series([np.nan, np.nan, 0.0037486334476184353], index=ret.columns)
+            pd.Series([np.nan, np.nan, 0.0037486334476184353], index=ret.columns).rename('deflated_sharpe_ratio')
         )
 
     @pytest.mark.parametrize(
@@ -236,7 +236,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.downside_risk(required_return=test_required_return), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.downside_risk(required_return=test_required_return),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('downside_risk')
         )
 
     @pytest.mark.parametrize(
@@ -250,7 +250,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.sortino_ratio(required_return=test_required_return), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.sortino_ratio(required_return=test_required_return),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('sortino_ratio')
         )
 
     def test_information_ratio(self):
@@ -260,7 +260,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.information_ratio(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.information_ratio(benchmark_rets),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('information_ratio')
         )
 
     def test_beta(self):
@@ -270,7 +270,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.beta(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.beta(benchmark_rets),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('beta')
         )
 
     @pytest.mark.parametrize(
@@ -284,7 +284,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.alpha(benchmark_rets['a'], risk_free=test_risk_free), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.alpha(benchmark_rets, risk_free=test_risk_free),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('alpha')
         )
 
     def test_tail_ratio(self):
@@ -294,7 +294,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.tail_ratio(), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.tail_ratio(),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('tail_ratio')
         )
 
     @pytest.mark.parametrize(
@@ -309,7 +309,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.value_at_risk(cutoff=test_cutoff), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.value_at_risk(cutoff=test_cutoff),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('value_at_risk')
         )
 
     @pytest.mark.parametrize(
@@ -324,7 +324,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.conditional_value_at_risk(cutoff=test_cutoff), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.conditional_value_at_risk(cutoff=test_cutoff),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('conditional_value_at_risk')
         )
 
     def test_capture(self):
@@ -334,7 +334,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.capture(benchmark_rets),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('capture')
         )
 
     def test_up_capture(self):
@@ -344,7 +344,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.up_capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.up_capture(benchmark_rets),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('up_capture')
         )
 
     def test_down_capture(self):
@@ -354,7 +354,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.down_capture(benchmark_rets['a']), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.down_capture(benchmark_rets),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('down_capture')
         )
 
     def test_drawdown(self):
@@ -394,7 +394,7 @@ class TestAccessors:
         assert isclose(ret['a'].vbt.returns.max_drawdown(), res_a)
         pd.testing.assert_series_equal(
             ret.vbt.returns.max_drawdown(),
-            pd.Series([res_a, res_b, res_c], index=ret.columns)
+            pd.Series([res_a, res_b, res_c], index=ret.columns).rename('max_drawdown')
         )
 
     def test_drawdowns(self):

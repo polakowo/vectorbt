@@ -25,17 +25,31 @@ df = pd.DataFrame({
 ]))
 group_by = np.array(['g1', 'g1', 'g2'])
 
+
+@njit
+def i_or_col_pow_nb(i_or_col, x, pow):
+    return np.power(x, pow)
+
+
+@njit
+def pow_nb(x, pow):
+    return np.power(x, pow)
+
+
 @njit
 def nanmean_nb(x):
     return np.nanmean(x)
+
 
 @njit
 def i_col_nanmean_nb(i, col, x):
     return np.nanmean(x)
 
+
 @njit
 def i_nanmean_nb(i, x):
     return np.nanmean(x)
+
 
 @njit
 def col_nanmean_nb(col, x):
@@ -228,6 +242,18 @@ class TestAccessors:
         "test_n",
         [1, 2, 3, 4, 5],
     )
+    def test_bshift(self, test_n):
+        pd.testing.assert_series_equal(df['a'].vbt.bshift(test_n), df['a'].shift(-test_n))
+        np.testing.assert_array_equal(
+            df['a'].vbt.bshift(test_n).values,
+            nb.bshift_1d_nb(df['a'].values, test_n)
+        )
+        pd.testing.assert_frame_equal(df.vbt.bshift(test_n), df.shift(-test_n))
+
+    @pytest.mark.parametrize(
+        "test_n",
+        [1, 2, 3, 4, 5],
+    )
     def test_fshift(self, test_n):
         pd.testing.assert_series_equal(df['a'].vbt.fshift(test_n), df['a'].shift(test_n))
         np.testing.assert_array_equal(
@@ -249,10 +275,6 @@ class TestAccessors:
     def test_ffill(self):
         pd.testing.assert_series_equal(df['a'].vbt.ffill(), df['a'].ffill())
         pd.testing.assert_frame_equal(df.vbt.ffill(), df.ffill())
-
-    def test_product(self):
-        pd.testing.assert_series_equal(df['a'].vbt.product(), df['a'].product())
-        pd.testing.assert_frame_equal(df.vbt.product(), df.product())
 
     def test_product(self):
         assert df['a'].vbt.product() == df['a'].product()
@@ -386,6 +408,16 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.expanding_std(ddof=test_ddof),
             df.expanding().std(ddof=test_ddof)
+        )
+
+    def test_apply_along_axis(self):
+        pd.testing.assert_frame_equal(
+            df.vbt.apply_along_axis(i_or_col_pow_nb, 2, axis=0),
+            df.apply(pow_nb, args=(2,), axis=0, raw=True)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.apply_along_axis(i_or_col_pow_nb, 2, axis=1),
+            df.apply(pow_nb, args=(2,), axis=1, raw=True)
         )
 
     @pytest.mark.parametrize(
@@ -534,11 +566,13 @@ class TestAccessors:
                df['a'].iloc[::2].sum() + 3
         pd.testing.assert_series_equal(
             df.vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,)),
-            df.iloc[::2].sum() + 3
+            df.iloc[::2].sum().rename('apply_and_reduce') + 3
         )
         pd.testing.assert_series_equal(
-            df.vbt.apply_and_reduce(every_nth_nb, sum_nb, apply_args=(2,), reduce_args=(3,), time_units=True),
-            (df.iloc[::2].sum() + 3) * day_dt
+            df.vbt.apply_and_reduce(
+                every_nth_nb, sum_nb, apply_args=(2,),
+                reduce_args=(3,), wrap_kwargs=dict(time_units=True)),
+            (df.iloc[::2].sum().rename('apply_and_reduce') + 3) * day_dt
         )
 
     def test_reduce(self):
@@ -549,15 +583,15 @@ class TestAccessors:
         assert df['a'].vbt.reduce(sum_nb) == df['a'].sum()
         pd.testing.assert_series_equal(
             df.vbt.reduce(sum_nb),
-            df.sum()
+            df.sum().rename('reduce')
         )
         pd.testing.assert_series_equal(
-            df.vbt.reduce(sum_nb, time_units=True),
-            df.sum() * day_dt
+            df.vbt.reduce(sum_nb, wrap_kwargs=dict(time_units=True)),
+            df.sum().rename('reduce') * day_dt
         )
         pd.testing.assert_series_equal(
             df.vbt.reduce(sum_nb, group_by=group_by),
-            pd.Series([20.0, 6.0], index=['g1', 'g2'])
+            pd.Series([20.0, 6.0], index=['g1', 'g2']).rename('reduce')
         )
 
         @njit
@@ -569,11 +603,11 @@ class TestAccessors:
         assert df['a'].vbt.reduce(argmax_nb, to_idx=True) == df['a'].idxmax()
         pd.testing.assert_series_equal(
             df.vbt.reduce(argmax_nb, to_idx=True),
-            df.idxmax()
+            df.idxmax().rename('reduce')
         )
         pd.testing.assert_series_equal(
             df.vbt.reduce(argmax_nb, to_idx=True, flatten=True, group_by=group_by),
-            pd.Series(['2018-01-02', '2018-01-02'], dtype='datetime64[ns]', index=['g1', 'g2'])
+            pd.Series(['2018-01-02', '2018-01-02'], dtype='datetime64[ns]', index=['g1', 'g2']).rename('reduce')
         )
 
         @njit
@@ -584,15 +618,21 @@ class TestAccessors:
             return out
 
         pd.testing.assert_series_equal(
-            df['a'].vbt.reduce(min_and_max_nb, index=['min', 'max'], to_array=True),
+            df['a'].vbt.reduce(
+                min_and_max_nb, to_array=True,
+                wrap_kwargs=dict(name_or_index=['min', 'max'])),
             pd.Series([np.nanmin(df['a']), np.nanmax(df['a'])], index=['min', 'max'], name='a')
         )
         pd.testing.assert_frame_equal(
-            df.vbt.reduce(min_and_max_nb, index=['min', 'max'], to_array=True),
+            df.vbt.reduce(
+                min_and_max_nb, to_array=True,
+                wrap_kwargs=dict(name_or_index=['min', 'max'])),
             df.apply(lambda x: pd.Series(np.asarray([np.nanmin(x), np.nanmax(x)]), index=['min', 'max']), axis=0)
         )
         pd.testing.assert_frame_equal(
-            df.vbt.reduce(min_and_max_nb, index=['min', 'max'], to_array=True, group_by=group_by),
+            df.vbt.reduce(
+                min_and_max_nb, to_array=True, group_by=group_by,
+                wrap_kwargs=dict(name_or_index=['min', 'max'])),
             pd.DataFrame([[1.0, 1.0], [4.0, 2.0]], index=['min', 'max'], columns=['g1', 'g2'])
         )
 
@@ -609,22 +649,28 @@ class TestAccessors:
             return out
 
         pd.testing.assert_series_equal(
-            df['a'].vbt.reduce(argmin_and_argmax_nb, index=['idxmin', 'idxmax'], to_idx=True, to_array=True),
+            df['a'].vbt.reduce(
+                argmin_and_argmax_nb, to_idx=True, to_array=True,
+                wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             pd.Series([df['a'].idxmin(), df['a'].idxmax()], index=['idxmin', 'idxmax'], name='a')
         )
         pd.testing.assert_frame_equal(
-            df.vbt.reduce(argmin_and_argmax_nb, index=['idxmin', 'idxmax'], to_idx=True, to_array=True),
+            df.vbt.reduce(
+                argmin_and_argmax_nb, to_idx=True, to_array=True,
+                wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             df.apply(lambda x: pd.Series(np.asarray([x.idxmin(), x.idxmax()]), index=['idxmin', 'idxmax']), axis=0)
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(argmin_and_argmax_nb, to_idx=True, to_array=True,
-                          flatten=True, order='C', index=['idxmin', 'idxmax'], group_by=group_by),
+                          flatten=True, order='C', group_by=group_by,
+                          wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             pd.DataFrame([['2018-01-01', '2018-01-01'], ['2018-01-02', '2018-01-02']],
                          dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['g1', 'g2'])
         )
         pd.testing.assert_frame_equal(
             df.vbt.reduce(argmin_and_argmax_nb, to_idx=True, to_array=True,
-                          flatten=True, order='F', index=['idxmin', 'idxmax'], group_by=group_by),
+                          flatten=True, order='F', group_by=group_by,
+                          wrap_kwargs=dict(name_or_index=['idxmin', 'idxmax'])),
             pd.DataFrame([['2018-01-01', '2018-01-01'], ['2018-01-04', '2018-01-02']],
                          dtype='datetime64[ns]', index=['idxmin', 'idxmax'], columns=['g1', 'g2'])
         )
@@ -674,67 +720,67 @@ class TestAccessors:
         )
 
     @pytest.mark.parametrize(
-        "test_func,test_func_nb",
+        "test_name,test_func,test_func_nb",
         [
-            (lambda x, **kwargs: x.min(**kwargs), nb.nanmin_nb),
-            (lambda x, **kwargs: x.max(**kwargs), nb.nanmax_nb),
-            (lambda x, **kwargs: x.mean(**kwargs), nb.nanmean_nb),
-            (lambda x, **kwargs: x.median(**kwargs), nb.nanmedian_nb),
-            (lambda x, **kwargs: x.std(**kwargs, ddof=0), nb.nanstd_nb),
-            (lambda x, **kwargs: x.count(**kwargs), nb.nancnt_nb),
-            (lambda x, **kwargs: x.sum(**kwargs), nb.nansum_nb)
+            ('min', lambda x, **kwargs: x.min(**kwargs), nb.nanmin_nb),
+            ('max', lambda x, **kwargs: x.max(**kwargs), nb.nanmax_nb),
+            ('mean', lambda x, **kwargs: x.mean(**kwargs), nb.nanmean_nb),
+            ('median', lambda x, **kwargs: x.median(**kwargs), nb.nanmedian_nb),
+            ('std', lambda x, **kwargs: x.std(**kwargs, ddof=0), nb.nanstd_nb),
+            ('count', lambda x, **kwargs: x.count(**kwargs), nb.nancnt_nb),
+            ('sum', lambda x, **kwargs: x.sum(**kwargs), nb.nansum_nb)
         ],
     )
-    def test_funcs(self, test_func, test_func_nb):
+    def test_funcs(self, test_name, test_func, test_func_nb):
         # numeric
         assert test_func(df['a'].vbt) == test_func(df['a'])
         pd.testing.assert_series_equal(
             test_func(df.vbt),
-            test_func(df)
+            test_func(df).rename(test_name)
         )
         pd.testing.assert_series_equal(
             test_func(df.vbt, group_by=group_by),
             pd.Series([
                 test_func(df[['a', 'b']].stack()),
                 test_func(df['c'])
-            ], index=['g1', 'g2'])
+            ], index=['g1', 'g2']).rename(test_name)
         )
         np.testing.assert_array_equal(test_func(df).values, test_func_nb(df.values))
         pd.testing.assert_series_equal(
-            test_func(df.vbt, time_units=True),
-            test_func(df) * day_dt
+            test_func(df.vbt, wrap_kwargs=dict(time_units=True)),
+            test_func(df).rename(test_name) * day_dt
         )
         # boolean
         bool_ts = df == df
         assert test_func(bool_ts['a'].vbt) == test_func(bool_ts['a'])
         pd.testing.assert_series_equal(
             test_func(bool_ts.vbt),
-            test_func(bool_ts)
+            test_func(bool_ts).rename(test_name)
         )
         pd.testing.assert_series_equal(
-            test_func(bool_ts.vbt, time_units=True),
-            test_func(bool_ts) * day_dt
+            test_func(bool_ts.vbt, wrap_kwargs=dict(time_units=True)),
+            test_func(bool_ts).rename(test_name) * day_dt
         )
 
     @pytest.mark.parametrize(
-        "test_func",
+        "test_name,test_func",
         [
-            lambda x, **kwargs: x.idxmin(**kwargs),
-            lambda x, **kwargs: x.idxmax(**kwargs)
+            ('idxmin', lambda x, **kwargs: x.idxmin(**kwargs)),
+            ('idxmax', lambda x, **kwargs: x.idxmax(**kwargs))
         ],
     )
-    def test_arg_funcs(self, test_func):
+    def test_arg_funcs(self, test_name, test_func):
         assert test_func(df['a'].vbt) == test_func(df['a'])
         pd.testing.assert_series_equal(
             test_func(df.vbt),
-            test_func(df)
+            test_func(df).rename(test_name)
         )
         pd.testing.assert_series_equal(
             test_func(df.vbt, group_by=group_by),
             pd.Series([
                 test_func(df[['a', 'b']].stack())[0],
                 test_func(df['c'])
-            ], index=['g1', 'g2'], dtype='datetime64[ns]')
+            ], index=['g1', 'g2'], dtype='datetime64[ns]').rename(test_name)
         )
 
     def test_describe(self):

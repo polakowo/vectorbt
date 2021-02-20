@@ -53,7 +53,7 @@ You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 ```python-repl
 >>> # vectorbt.indicators.basic.MA
 >>> vbt.MA.run(pd.Series([1, 2, 3]), [2, 3]).ma
-ma_period     2     3
+ma_window     2     3
 ma_ewm    False False
 0           NaN   NaN
 1           1.5   NaN

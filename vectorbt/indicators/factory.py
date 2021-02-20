@@ -97,7 +97,7 @@ Now the same using `IndicatorFactory`:
 ```python-repl
 >>> MyMA = vbt.IndicatorFactory(
 ...     input_names=['price'],
-...     param_names=['period'],
+...     param_names=['window'],
 ...     output_names=['ma'],
 ...     short_name='myma'
 ... ).from_apply_func(vbt.nb.rolling_mean_nb)
@@ -186,7 +186,7 @@ For example, this is useful to generate crossover signals of multiple moving ave
 >>> myma1, myma2 = MyMA.run_combs(price, [2, 3, 4])
 
 >>> myma1.ma
-myma_1_period                   2         3
+myma_1_window                   2         3
                  a    b    a    b    a    b
 2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
 2020-01-02     1.5  4.5  1.5  4.5  NaN  NaN
@@ -195,7 +195,7 @@ myma_1_period                   2         3
 2020-01-05     4.5  1.5  4.5  1.5  4.0  2.0
 
 >>> myma2.ma
-myma_2_period         3                   4
+myma_2_window         3                   4
                  a    b    a    b    a    b
 2020-01-01     NaN  NaN  NaN  NaN  NaN  NaN
 2020-01-02     NaN  NaN  NaN  NaN  NaN  NaN
@@ -204,8 +204,8 @@ myma_2_period         3                   4
 2020-01-05     4.0  2.0  3.5  2.5  3.5  2.5
 
 >>> myma1.ma_above(myma2.ma, crossover=True)
-myma_1_period                           2             3
-myma_2_period             3             4             4
+myma_1_window                           2             3
+myma_2_window             3             4             4
                    a      b      a      b      a      b
 2020-01-01     False  False  False  False  False  False
 2020-01-02     False  False  False  False  False  False
@@ -237,7 +237,7 @@ to multiple objects at once, for example:
 ```python-repl
 >>> myma.ma_above([1.5, 2.5], multiple=True)
 myma_ma_above                         1.5                         2.5
-myma_period               2             3             2             3
+myma_window               2             3             2             3
                 a         b      a      b      a      b      a      b
 2020-01-01     False  False  False  False  False  False  False  False
 2020-01-02     False   True  False  False  False   True  False  False
@@ -253,7 +253,7 @@ myma_period               2             3             2             3
 ```python-repl
 'iloc'
 'loc'
-'period_loc'
+'window_loc'
 'xs'
 ```
 

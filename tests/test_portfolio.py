@@ -1042,7 +1042,7 @@ class TestFromSignals:
         )
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64'))
+            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert not portfolio.cash_sharing
 
@@ -1061,7 +1061,7 @@ class TestFromSignals:
         )
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64'))
+            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert portfolio.cash_sharing
         with pytest.raises(Exception) as e_info:
@@ -1733,7 +1733,7 @@ class TestFromOrders:
         )
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64'))
+            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert not portfolio.cash_sharing
 
@@ -1753,7 +1753,7 @@ class TestFromOrders:
         )
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64'))
+            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert portfolio.cash_sharing
         with pytest.raises(Exception) as e_info:
@@ -2249,7 +2249,7 @@ class TestFromOrderFunc:
         )
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64'))
+            pd.Series([200., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert not portfolio.cash_sharing
 
@@ -2291,7 +2291,7 @@ class TestFromOrderFunc:
         )
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64'))
+            pd.Series([100., 100.], index=pd.Int64Index([0, 1], dtype='int64')).rename('init_cash')
         )
         assert portfolio.cash_sharing
 
@@ -3028,7 +3028,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([3, 4, 4]),
             index=price_na.columns
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.orders.count(),
             result
@@ -3044,7 +3044,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([7, 4]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.get_orders(group_by=group_by).count(),
             result
@@ -3099,7 +3099,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([5, 5, 5]),
             index=price_na.columns
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.logs.count(),
             result
@@ -3115,7 +3115,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([10, 5]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.get_logs(group_by=group_by).count(),
             result
@@ -3150,7 +3150,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([2, 2, 2]),
             index=price_na.columns
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.trades.count(),
             result
@@ -3166,7 +3166,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([4, 2]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.get_trades(group_by=group_by).count(),
             result
@@ -3197,7 +3197,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([2, 1, 1]),
             index=price_na.columns
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.positions.count(),
             result
@@ -3213,7 +3213,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([3, 1]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.get_positions(group_by=group_by).count(),
             result
@@ -3237,7 +3237,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([1, 1, 1]),
             index=price_na.columns
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.drawdowns.count(),
             result
@@ -3253,7 +3253,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([1, 1]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('count')
         pd.testing.assert_series_equal(
             portfolio.get_drawdowns(group_by=group_by).count(),
             result
@@ -3475,13 +3475,13 @@ class TestPortfolio:
     def test_pos_coverage(self):
         pd.testing.assert_series_equal(
             portfolio.pos_coverage(direction='longonly'),
-            pd.Series(np.array([0.4, 0., 0.6]), index=price_na.columns)
+            pd.Series(np.array([0.4, 0., 0.6]), index=price_na.columns).rename('pos_coverage')
         )
         pd.testing.assert_series_equal(
             portfolio.pos_coverage(direction='shortonly'),
-            pd.Series(np.array([0., 1., 0.]), index=price_na.columns)
+            pd.Series(np.array([0., 1., 0.]), index=price_na.columns).rename('pos_coverage')
         )
-        result = pd.Series(np.array([0.4, 1., 0.6]), index=price_na.columns)
+        result = pd.Series(np.array([0.4, 1., 0.6]), index=price_na.columns).rename('pos_coverage')
         pd.testing.assert_series_equal(
             portfolio.pos_coverage(),
             result
@@ -3494,7 +3494,10 @@ class TestPortfolio:
             portfolio_shared.pos_coverage(group_by=False),
             result
         )
-        result = pd.Series(np.array([0.7, 0.6]), pd.Index(['first', 'second'], dtype='object', name='group'))
+        result = pd.Series(
+            np.array([0.7, 0.6]),
+            pd.Index(['first', 'second'], dtype='object', name='group')
+        ).rename('pos_coverage')
         pd.testing.assert_series_equal(
             portfolio.pos_coverage(group_by=group_by),
             result
@@ -3573,17 +3576,20 @@ class TestPortfolio:
     def test_init_cash(self):
         pd.testing.assert_series_equal(
             portfolio.init_cash,
-            pd.Series(np.array([100., 100., 100.]), index=price_na.columns)
+            pd.Series(np.array([100., 100., 100.]), index=price_na.columns).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             portfolio_grouped.get_init_cash(group_by=False),
-            pd.Series(np.array([100., 100., 100.]), index=price_na.columns)
+            pd.Series(np.array([100., 100., 100.]), index=price_na.columns).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             portfolio_shared.get_init_cash(group_by=False),
-            pd.Series(np.array([200., 200., 100.]), index=price_na.columns)
+            pd.Series(np.array([200., 200., 100.]), index=price_na.columns).rename('init_cash')
         )
-        result = pd.Series(np.array([200., 100.]), pd.Index(['first', 'second'], dtype='object', name='group'))
+        result = pd.Series(
+            np.array([200., 100.]),
+            pd.Index(['first', 'second'], dtype='object', name='group')
+        ).rename('init_cash')
         pd.testing.assert_series_equal(
             portfolio.get_init_cash(group_by=group_by),
             result
@@ -3602,7 +3608,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([14000., 12000., 10000.]),
                 index=price_na.columns
-            )
+            ).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             vbt.Portfolio.from_orders(
@@ -3610,7 +3616,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([26000.0, 10000.0]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             vbt.Portfolio.from_orders(
@@ -3618,7 +3624,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([26000.0, 10000.0]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             vbt.Portfolio.from_orders(
@@ -3626,7 +3632,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([14000., 14000., 14000.]),
                 index=price_na.columns
-            )
+            ).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             vbt.Portfolio.from_orders(
@@ -3634,7 +3640,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([26000.0, 26000.0]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('init_cash')
         )
         pd.testing.assert_series_equal(
             vbt.Portfolio.from_orders(
@@ -3642,7 +3648,7 @@ class TestPortfolio:
             pd.Series(
                 np.array([26000.0, 26000.0]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('init_cash')
         )
 
     def test_cash(self):
@@ -4027,7 +4033,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([-0.31049, -4.73142, 1.70822]),
             index=price_na.columns
-        )
+        ).rename('total_profit')
         pd.testing.assert_series_equal(
             portfolio.total_profit(),
             result
@@ -4043,7 +4049,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([-5.04191, 1.70822]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('total_profit')
         pd.testing.assert_series_equal(
             portfolio.total_profit(group_by=group_by),
             result
@@ -4061,7 +4067,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([99.68951, 95.26858, 101.70822]),
             index=price_na.columns
-        )
+        ).rename('final_value')
         pd.testing.assert_series_equal(
             portfolio.final_value(),
             result
@@ -4075,12 +4081,12 @@ class TestPortfolio:
             pd.Series(
                 np.array([199.68951, 195.26858, 101.70822]),
                 index=price_na.columns
-            )
+            ).rename('final_value')
         )
         result = pd.Series(
             np.array([194.95809, 101.70822]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('final_value')
         pd.testing.assert_series_equal(
             portfolio.final_value(group_by=group_by),
             result
@@ -4098,7 +4104,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([-0.0031049, -0.0473142, 0.0170822]),
             index=price_na.columns
-        )
+        ).rename('total_return')
         pd.testing.assert_series_equal(
             portfolio.total_return(),
             result
@@ -4112,12 +4118,12 @@ class TestPortfolio:
             pd.Series(
                 np.array([-0.00155245, -0.0236571, 0.0170822]),
                 index=price_na.columns
-            )
+            ).rename('total_return')
         )
         result = pd.Series(
             np.array([-0.02520955, 0.0170822]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('total_return')
         pd.testing.assert_series_equal(
             portfolio.total_return(group_by=group_by),
             result
@@ -4361,7 +4367,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([1.5, 4., 3.]),
             index=price_na.columns
-        )
+        ).rename('total_market_return')
         pd.testing.assert_series_equal(
             portfolio.total_market_return(),
             result
@@ -4377,7 +4383,7 @@ class TestPortfolio:
         result = pd.Series(
             np.array([2.75, 3.]),
             index=pd.Index(['first', 'second'], dtype='object', name='group')
-        )
+        ).rename('total_market_return')
         pd.testing.assert_series_equal(
             portfolio.total_market_return(group_by=group_by),
             result
@@ -4425,28 +4431,28 @@ class TestPortfolio:
             pd.Series(
                 np.array([-20.82791491, 10.2576347]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('sharpe_ratio')
         )
         pd.testing.assert_series_equal(
             portfolio_shared.sharpe_ratio(risk_free=0.01),
             pd.Series(
                 np.array([-66.19490297745766, -19.873024060759022]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('sharpe_ratio')
         )
         pd.testing.assert_series_equal(
             portfolio_shared.sharpe_ratio(year_freq='365D'),
             pd.Series(
                 np.array([-25.06639947, 12.34506527]),
                 index=pd.Index(['first', 'second'], dtype='object', name='group')
-            )
+            ).rename('sharpe_ratio')
         )
         pd.testing.assert_series_equal(
             portfolio_shared.sharpe_ratio(group_by=False),
             pd.Series(
                 np.array([-11.058998255347488, -21.39151322377427, 10.257634695847853]),
                 index=price_na.columns
-            )
+            ).rename('sharpe_ratio')
         )
 
     def test_stats(self):
@@ -4474,7 +4480,7 @@ class TestPortfolio:
                     'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
                     'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
                 ], dtype='object'),
-                name='<lambda>')
+                name='stats_mean')
         )
         pd.testing.assert_series_equal(
             portfolio['a'].stats(),
@@ -4633,7 +4639,7 @@ class TestPortfolio:
                     'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
                     'Alpha', 'Beta'
                 ], dtype='object'),
-                name='<lambda>')
+                name='stats_mean')
         )
         pd.testing.assert_series_equal(
             portfolio['a'].returns_stats(),

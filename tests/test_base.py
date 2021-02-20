@@ -721,11 +721,11 @@ class TestArrayWrapper:
             pd.Series(np.array([0, 1]), name=sr2.name)
         )
         pd.testing.assert_series_equal(
-            sr2_wrapper.wrap_reduced(np.array([0, 1]), index=['x', 'y']),
+            sr2_wrapper.wrap_reduced(np.array([0, 1]), name_or_index=['x', 'y']),
             pd.Series(np.array([0, 1]), index=['x', 'y'], name=sr2.name)
         )
         pd.testing.assert_series_equal(
-            sr2_wrapper.wrap_reduced(np.array([0, 1]), index=['x', 'y'], columns=[0]),
+            sr2_wrapper.wrap_reduced(np.array([0, 1]), name_or_index=['x', 'y'], columns=[0]),
             pd.Series(np.array([0, 1]), index=['x', 'y'], name=None)
         )
         # df to value
@@ -733,20 +733,22 @@ class TestArrayWrapper:
         assert df4_wrapper.wrap_reduced(0) == 0
         # df to value per column
         pd.testing.assert_series_equal(
-            df4_wrapper.wrap_reduced(np.array([0, 1, 2])),
-            pd.Series(np.array([0, 1, 2]), index=df4.columns)
+            df4_wrapper.wrap_reduced(np.array([0, 1, 2]), name_or_index='test'),
+            pd.Series(np.array([0, 1, 2]), index=df4.columns, name='test')
         )
         pd.testing.assert_series_equal(
-            df4_wrapper.wrap_reduced(np.array([0, 1, 2]), columns=['m', 'n', 'l']),
-            pd.Series(np.array([0, 1, 2]), index=['m', 'n', 'l'])
+            df4_wrapper.wrap_reduced(np.array([0, 1, 2]), columns=['m', 'n', 'l'], name_or_index='test'),
+            pd.Series(np.array([0, 1, 2]), index=['m', 'n', 'l'], name='test')
         )
         # df to array per column
         pd.testing.assert_frame_equal(
-            df4_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y']),
+            df4_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), name_or_index=['x', 'y']),
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=df4.columns)
         )
         pd.testing.assert_frame_equal(
-            df4_wrapper.wrap_reduced(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=['m', 'n', 'l']),
+            df4_wrapper.wrap_reduced(
+                np.array([[0, 1, 2], [3, 4, 5]]),
+                name_or_index=['x', 'y'], columns=['m', 'n', 'l']),
             pd.DataFrame(np.array([[0, 1, 2], [3, 4, 5]]), index=['x', 'y'], columns=['m', 'n', 'l'])
         )
 
@@ -2558,11 +2560,11 @@ class TestCommon:
         def reduced_dim1_1d_nb(a): return np.zeros(a.shape[0] - 1)
 
         @class_helpers.add_nb_methods([
-            same_shape_1d_nb,
-            wkw_1d_nb,
-            reduced_dim0_1d_nb,
-            reduced_dim1_one_1d_nb,
-            reduced_dim1_1d_nb
+            (same_shape_1d_nb, False),
+            (wkw_1d_nb, False),
+            (reduced_dim0_1d_nb, True, 'reduced_dim0'),
+            (reduced_dim1_one_1d_nb, True, 'reduced_dim1_one'),
+            (reduced_dim1_1d_nb, True)
         ])
         class H_1d(accessors.BaseAccessor):
             def __init__(self, sr):
@@ -2592,11 +2594,11 @@ class TestCommon:
         def reduced_dim2_nb(a): return np.zeros((a.shape[0] - 1, a.shape[1]))
 
         @class_helpers.add_nb_methods([
-            same_shape_nb,
-            wkw_nb,
-            reduced_dim0_nb,
-            reduced_dim1_nb,
-            reduced_dim2_nb
+            (same_shape_nb, False),
+            (wkw_nb, False),
+            (reduced_dim0_nb, True, 'reduced_dim0'),
+            (reduced_dim1_nb, True, 'reduced_dim1'),
+            (reduced_dim2_nb, True),
         ])
         class H(accessors.BaseAccessor):
             pass
@@ -2605,7 +2607,10 @@ class TestCommon:
         pd.testing.assert_frame_equal(H(df3).wkw(), df3 ** 3 + 10)
         pd.testing.assert_frame_equal(H(df3).wkw(b=20), df3 ** 3 + 20)
         assert H(df3).reduced_dim0() == 0
-        pd.testing.assert_series_equal(H(df3).reduced_dim1(), pd.Series(np.zeros(df3.shape[1]), index=df3.columns))
+        pd.testing.assert_series_equal(
+            H(df3).reduced_dim1(),
+            pd.Series(np.zeros(df3.shape[1]), index=df3.columns, name='reduced_dim1')
+        )
         pd.testing.assert_frame_equal(
             H(df3).reduced_dim2(),
             pd.DataFrame(np.zeros((df3.shape[0] - 1, df3.shape[1])), columns=df3.columns)

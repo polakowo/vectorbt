@@ -384,19 +384,19 @@ def concat_ranges_nb(a, start_idxs, end_idxs):
 
 
 @njit(cache=True)
-def rolling_min_1d_nb(a, period, minp=None):
+def rolling_min_1d_nb(a, window, minp=None):
     """Return rolling min.
 
-    Numba equivalent to `pd.Series(a).rolling(period, min_periods=minp).min()`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).min()`."""
     if minp is None:
-        minp = period
-    if minp > period:
-        raise ValueError("minp must be <= period")
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
     out = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
         minv = a[i]
         cnt = 0
-        for j in range(max(i - period + 1, 0), i + 1):
+        for j in range(max(i - window + 1, 0), i + 1):
             if np.isnan(a[j]):
                 continue
             if np.isnan(minv) or a[j] < minv:
@@ -410,28 +410,28 @@ def rolling_min_1d_nb(a, period, minp=None):
 
 
 @njit(cache=True)
-def rolling_min_nb(a, period, minp=None):
+def rolling_min_nb(a, window, minp=None):
     """2-dim version of `rolling_min_1d_nb`."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        out[:, col] = rolling_min_1d_nb(a[:, col], period, minp=minp)
+        out[:, col] = rolling_min_1d_nb(a[:, col], window, minp=minp)
     return out
 
 
 @njit(cache=True)
-def rolling_max_1d_nb(a, period, minp=None):
+def rolling_max_1d_nb(a, window, minp=None):
     """Return rolling max.
 
-    Numba equivalent to `pd.Series(a).rolling(period, min_periods=minp).max()`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).max()`."""
     if minp is None:
-        minp = period
-    if minp > period:
-        raise ValueError("minp must be <= period")
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
     out = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
         maxv = a[i]
         cnt = 0
-        for j in range(max(i - period + 1, 0), i + 1):
+        for j in range(max(i - window + 1, 0), i + 1):
             if np.isnan(a[j]):
                 continue
             if np.isnan(maxv) or a[j] > maxv:
@@ -445,23 +445,23 @@ def rolling_max_1d_nb(a, period, minp=None):
 
 
 @njit(cache=True)
-def rolling_max_nb(a, period, minp=None):
+def rolling_max_nb(a, window, minp=None):
     """2-dim version of `rolling_max_1d_nb`."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        out[:, col] = rolling_max_1d_nb(a[:, col], period, minp=minp)
+        out[:, col] = rolling_max_1d_nb(a[:, col], window, minp=minp)
     return out
 
 
 @njit(cache=True)
-def rolling_mean_1d_nb(a, period, minp=None):
+def rolling_mean_1d_nb(a, window, minp=None):
     """Return rolling mean.
 
-    Numba equivalent to `pd.Series(a).rolling(period, min_periods=minp).mean()`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).mean()`."""
     if minp is None:
-        minp = period
-    if minp > period:
-        raise ValueError("minp must be <= period")
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
     out = np.empty_like(a, dtype=np.float_)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -474,12 +474,12 @@ def rolling_mean_1d_nb(a, period, minp=None):
             cumsum = cumsum + a[i]
         nancnt_arr[i] = nancnt
         cumsum_arr[i] = cumsum
-        if i < period:
+        if i < window:
             window_len = i + 1 - nancnt
             window_cumsum = cumsum
         else:
-            window_len = period - (nancnt - nancnt_arr[i - period])
-            window_cumsum = cumsum - cumsum_arr[i - period]
+            window_len = window - (nancnt - nancnt_arr[i - window])
+            window_cumsum = cumsum - cumsum_arr[i - window]
         if window_len < minp:
             out[i] = np.nan
         else:
@@ -488,23 +488,23 @@ def rolling_mean_1d_nb(a, period, minp=None):
 
 
 @njit(cache=True)
-def rolling_mean_nb(a, period, minp=None):
+def rolling_mean_nb(a, window, minp=None):
     """2-dim version of `rolling_mean_1d_nb`."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        out[:, col] = rolling_mean_1d_nb(a[:, col], period, minp=minp)
+        out[:, col] = rolling_mean_1d_nb(a[:, col], window, minp=minp)
     return out
 
 
 @njit(cache=True)
-def rolling_std_1d_nb(a, period, minp=None, ddof=0):
+def rolling_std_1d_nb(a, window, minp=None, ddof=0):
     """Return rolling standard deviation.
 
-    Numba equivalent to `pd.Series(a).rolling(period, min_periods=minp).std(ddof=ddof)`."""
+    Numba equivalent to `pd.Series(a).rolling(window, min_periods=minp).std(ddof=ddof)`."""
     if minp is None:
-        minp = period
-    if minp > period:
-        raise ValueError("minp must be <= period")
+        minp = window
+    if minp > window:
+        raise ValueError("minp must be <= window")
     out = np.empty_like(a, dtype=np.float_)
     cumsum_arr = np.zeros_like(a)
     cumsum = 0
@@ -522,14 +522,14 @@ def rolling_std_1d_nb(a, period, minp=None, ddof=0):
         nancnt_arr[i] = nancnt
         cumsum_arr[i] = cumsum
         cumsum_sq_arr[i] = cumsum_sq
-        if i < period:
+        if i < window:
             window_len = i + 1 - nancnt
             window_cumsum = cumsum
             window_cumsum_sq = cumsum_sq
         else:
-            window_len = period - (nancnt - nancnt_arr[i - period])
-            window_cumsum = cumsum - cumsum_arr[i - period]
-            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - period]
+            window_len = window - (nancnt - nancnt_arr[i - window])
+            window_cumsum = cumsum - cumsum_arr[i - window]
+            window_cumsum_sq = cumsum_sq - cumsum_sq_arr[i - window]
         if window_len < minp or window_len == ddof:
             out[i] = np.nan
         else:
@@ -540,11 +540,11 @@ def rolling_std_1d_nb(a, period, minp=None, ddof=0):
 
 
 @njit(cache=True)
-def rolling_std_nb(a, period, minp=None, ddof=0):
+def rolling_std_nb(a, window, minp=None, ddof=0):
     """2-dim version of `rolling_std_1d_nb`."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
-        out[:, col] = rolling_std_1d_nb(a[:, col], period, minp=minp, ddof=ddof)
+        out[:, col] = rolling_std_1d_nb(a[:, col], window, minp=minp, ddof=ddof)
     return out
 
 
@@ -807,7 +807,7 @@ def apply_along_1_nb(a, apply_func_nb, *args):
 
 
 @njit
-def rolling_apply_nb(a, period, apply_func_nb, *args):
+def rolling_apply_nb(a, window, apply_func_nb, *args):
     """Provide rolling window calculations.
 
     `apply_func_nb` should accept index of the row, index of the column,
@@ -815,20 +815,20 @@ def rolling_apply_nb(a, period, apply_func_nb, *args):
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
         for i in range(a.shape[0]):
-            window_a = a[max(0, i + 1 - period):i + 1, col]
+            window_a = a[max(0, i + 1 - window):i + 1, col]
             out[i, col] = apply_func_nb(i, col, window_a, *args)
     return out
 
 
 @njit
-def rolling_apply_matrix_nb(a, period, apply_func_nb, *args):
+def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
     `apply_func_nb` should accept index of the row, the 2-dim array, and `*args`.
     Should return a single value or an array of shape `a.shape[1]`."""
     out = np.empty_like(a, dtype=np.float_)
     for i in range(a.shape[0]):
-        window_a = a[max(0, i + 1 - period):i + 1, :]
+        window_a = a[max(0, i + 1 - window):i + 1, :]
         out[i, :] = apply_func_nb(i, window_a, *args)
     return out
 

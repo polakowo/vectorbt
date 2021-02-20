@@ -802,23 +802,23 @@ class TestAccessors:
             pd.Series(np.array([False, False, False, True, False, False]))
         )
 
-    def test_generate_adv_stop_exits(self):
+    def test_generate_ohlc_stop_exits(self):
         pd.testing.assert_frame_equal(
             sig.vbt.signals.generate_stop_exits(ts, -0.1),
-            sig.vbt.signals.generate_adv_stop_exits(ts, sl_stop=0.1)
+            sig.vbt.signals.generate_ohlc_stop_exits(ts, sl_stop=0.1)
         )
         pd.testing.assert_frame_equal(
             sig.vbt.signals.generate_stop_exits(ts, -0.1, trailing=True),
-            sig.vbt.signals.generate_adv_stop_exits(ts, ts_stop=0.1)
+            sig.vbt.signals.generate_ohlc_stop_exits(ts, ts_stop=0.1)
         )
         pd.testing.assert_frame_equal(
             sig.vbt.signals.generate_stop_exits(ts, 0.1),
-            sig.vbt.signals.generate_adv_stop_exits(ts, tp_stop=0.1)
+            sig.vbt.signals.generate_ohlc_stop_exits(ts, tp_stop=0.1)
         )
 
-        def _test_adv_stop_exits(**kwargs):
+        def _test_ohlc_stop_exits(**kwargs):
             out_dict = {'hit_price': np.nan, 'stop_type': -1}
-            result = sig.vbt.signals.generate_adv_stop_exits(
+            result = sig.vbt.signals.generate_ohlc_stop_exits(
                 price['open'], price['high'], price['low'], price['close'],
                 out_dict=out_dict, **kwargs
             )
@@ -828,7 +828,7 @@ class TestAccessors:
                 ex = result
             return result, out_dict['hit_price'], out_dict['stop_type']
 
-        ex, hit_price, stop_type = _test_adv_stop_exits()
+        ex, hit_price, stop_type = _test_ohlc_stop_exits()
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -859,7 +859,7 @@ class TestAccessors:
                 [-1, -1, -1]
             ]), index=sig.index, columns=sig.columns)
         )
-        ex, hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1)
+        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -890,7 +890,7 @@ class TestAccessors:
                 [0, -1, -1]
             ]), index=sig.index, columns=sig.columns)
         )
-        ex, hit_price, stop_type = _test_adv_stop_exits(ts_stop=0.1)
+        ex, hit_price, stop_type = _test_ohlc_stop_exits(ts_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -921,7 +921,7 @@ class TestAccessors:
                 [1, -1, -1]
             ]), index=sig.index, columns=sig.columns)
         )
-        ex, hit_price, stop_type = _test_adv_stop_exits(tp_stop=0.1)
+        ex, hit_price, stop_type = _test_ohlc_stop_exits(tp_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -952,7 +952,7 @@ class TestAccessors:
                 [-1, -1, -1]
             ]), index=sig.index, columns=sig.columns)
         )
-        ex, hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1)
+        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -983,7 +983,7 @@ class TestAccessors:
                 [0, -1, -1]
             ]), index=sig.index, columns=sig.columns)
         )
-        ex, hit_price, stop_type = _test_adv_stop_exits(
+        ex, hit_price, stop_type = _test_ohlc_stop_exits(
             sl_stop=[0., 0.1, 0.2], ts_stop=[0., 0.1, 0.2], tp_stop=[0., 0.1, 0.2])
         pd.testing.assert_frame_equal(
             ex,
@@ -1015,7 +1015,7 @@ class TestAccessors:
                 [-1, -1, 0]
             ]), index=sig.index, columns=sig.columns)
         )
-        ex, hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1, exit_wait=0)
+        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1, exit_wait=0)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1046,7 +1046,7 @@ class TestAccessors:
                 [0, 0, -1]
             ]), index=sig.index, columns=sig.columns)
         )
-        (en, ex), hit_price, stop_type = _test_adv_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1, iteratively=True)
+        (en, ex), hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, ts_stop=0.1, tp_stop=0.1, iteratively=True)
         pd.testing.assert_frame_equal(
             en,
             pd.DataFrame(np.array([
@@ -1114,7 +1114,7 @@ class TestAccessors:
                 map_func_nb=distance_map_nb,
                 reduce_func_nb=mean_reduce_nb
             ),
-            pd.Series([3., 3., np.nan], index=sig.columns)
+            pd.Series([3., 3., np.nan], index=sig.columns).rename('map_reduce_between')
         )
         assert sig['a'].vbt.signals.map_reduce_between(
             other=other_sig['b'],
@@ -1127,7 +1127,7 @@ class TestAccessors:
                 map_func_nb=distance_map_nb,
                 reduce_func_nb=mean_reduce_nb
             ),
-            pd.Series([1.5, 2., 2.], index=sig.columns)
+            pd.Series([1.5, 2., 2.], index=sig.columns).rename('map_reduce_between')
         )
 
     def test_map_reduce_partitions(self):
@@ -1148,21 +1148,21 @@ class TestAccessors:
                 map_func_nb=distance_map_nb,
                 reduce_func_nb=mean_reduce_nb
             ),
-            pd.Series([1.5, 1.5, 2.], index=sig.columns)
+            pd.Series([1.5, 1.5, 2.], index=sig.columns).rename('map_reduce_partitions')
         )
 
     def test_num_signals(self):
         assert sig['a'].vbt.signals.num_signals() == 2
         pd.testing.assert_series_equal(
             sig.vbt.signals.num_signals(),
-            pd.Series([2, 2, 1], index=sig.columns)
+            pd.Series([2, 2, 1], index=sig.columns).rename('num_signals')
         )
 
     def test_avg_distance(self):
         assert sig['a'].vbt.signals.avg_distance() == 3.
         pd.testing.assert_series_equal(
             sig.vbt.signals.avg_distance(),
-            pd.Series([3., 3., np.nan], index=sig.columns)
+            pd.Series([3., 3., np.nan], index=sig.columns).rename('avg_distance')
         )
         other_sig = pd.DataFrame([
             [False, False, False],
@@ -1174,7 +1174,7 @@ class TestAccessors:
         assert sig['a'].vbt.signals.avg_distance(to=other_sig['a']) == 1.5
         pd.testing.assert_series_equal(
             sig.vbt.signals.avg_distance(to=other_sig),
-            pd.Series([1.5, 2., 2.], index=sig.columns)
+            pd.Series([1.5, 2., 2.], index=sig.columns).rename('avg_distance')
         )
 
     def test_rank(self):
@@ -2106,13 +2106,13 @@ class TestBasic:
             )
         )
 
-    def test_ADVSTEX(self):
-        advstex = vbt.ADVSTEX.run(
+    def test_OHLCSTEX(self):
+        ohlcstex = vbt.OHLCSTEX.run(
             sig, price['open'], price['high'], price['low'], price['close'],
             sl_stop=0.1
         )
         pd.testing.assert_frame_equal(
-            advstex.exits,
+            ohlcstex.exits,
             pd.DataFrame(np.array([
                 [False, False, False],
                 [False, False, False],
@@ -2123,11 +2123,11 @@ class TestBasic:
                 (0.1, 'a'),
                 (0.1, 'b'),
                 (0.1, 'c')
-            ], names=['advstex_sl_stop', None])
+            ], names=['ohlcstex_sl_stop', None])
             )
         )
         pd.testing.assert_frame_equal(
-            advstex.hit_price,
+            ohlcstex.hit_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -2138,11 +2138,11 @@ class TestBasic:
                 (0.1, 'a'),
                 (0.1, 'b'),
                 (0.1, 'c')
-            ], names=['advstex_sl_stop', None])
+            ], names=['ohlcstex_sl_stop', None])
             )
         )
         pd.testing.assert_frame_equal(
-            advstex.stop_type,
+            ohlcstex.stop_type,
             pd.DataFrame(np.array([
                 [-1, -1, -1],
                 [-1, -1, -1],
@@ -2153,15 +2153,15 @@ class TestBasic:
                 (0.1, 'a'),
                 (0.1, 'b'),
                 (0.1, 'c')
-            ], names=['advstex_sl_stop', None])
+            ], names=['ohlcstex_sl_stop', None])
             )
         )
-        advstex = vbt.ADVSTEX.run(
+        ohlcstex = vbt.OHLCSTEX.run(
             sig, price['open'], price['high'], price['low'], price['close'],
             sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
         )
         pd.testing.assert_frame_equal(
-            advstex.exits,
+            ohlcstex.exits,
             pd.DataFrame(np.array([
                 [False, False, False, False, False, False, False, False, False],
                 [False, False, False, False, False, False, True, False, False],
@@ -2178,11 +2178,11 @@ class TestBasic:
                 (0., 0., 0.1, 'a'),
                 (0., 0., 0.1, 'b'),
                 (0., 0., 0.1, 'c')
-            ], names=['advstex_sl_stop', 'advstex_ts_stop', 'advstex_tp_stop', None])
+            ], names=['ohlcstex_sl_stop', 'ohlcstex_ts_stop', 'ohlcstex_tp_stop', None])
             )
         )
         pd.testing.assert_frame_equal(
-            advstex.hit_price,
+            ohlcstex.hit_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11., np.nan, np.nan],
@@ -2199,11 +2199,11 @@ class TestBasic:
                 (0., 0., 0.1, 'a'),
                 (0., 0., 0.1, 'b'),
                 (0., 0., 0.1, 'c')
-            ], names=['advstex_sl_stop', 'advstex_ts_stop', 'advstex_tp_stop', None])
+            ], names=['ohlcstex_sl_stop', 'ohlcstex_ts_stop', 'ohlcstex_tp_stop', None])
             )
         )
         pd.testing.assert_frame_equal(
-            advstex.stop_type,
+            ohlcstex.stop_type,
             pd.DataFrame(np.array([
                 [-1, -1, -1, -1, -1, -1, -1, -1, -1],
                 [-1, -1, -1, -1, -1, -1, 2, -1, -1],
@@ -2220,17 +2220,17 @@ class TestBasic:
                 (0., 0., 0.1, 'a'),
                 (0., 0., 0.1, 'b'),
                 (0., 0., 0.1, 'c')
-            ], names=['advstex_sl_stop', 'advstex_ts_stop', 'advstex_tp_stop', None])
+            ], names=['ohlcstex_sl_stop', 'ohlcstex_ts_stop', 'ohlcstex_tp_stop', None])
             )
         )
 
-    def test_IADVSTEX(self):
-        iadvstex = vbt.IADVSTEX.run(
+    def test_IOHLCSTEX(self):
+        iohlcstex = vbt.IOHLCSTEX.run(
             sig, price['open'], price['high'], price['low'], price['close'],
             sl_stop=[0.1, 0., 0.], ts_stop=[0., 0.1, 0.], tp_stop=[0., 0., 0.1]
         )
         pd.testing.assert_frame_equal(
-            iadvstex.exits,
+            iohlcstex.exits,
             pd.DataFrame(np.array([
                 [False, False, False, False, False, False, False, False, False],
                 [False, False, False, False, False, False, True, False, False],
@@ -2247,11 +2247,11 @@ class TestBasic:
                 (0., 0., 0.1, 'a'),
                 (0., 0., 0.1, 'b'),
                 (0., 0., 0.1, 'c')
-            ], names=['iadvstex_sl_stop', 'iadvstex_ts_stop', 'iadvstex_tp_stop', None])
+            ], names=['iohlcstex_sl_stop', 'iohlcstex_ts_stop', 'iohlcstex_tp_stop', None])
             )
         )
         pd.testing.assert_frame_equal(
-            iadvstex.hit_price,
+            iohlcstex.hit_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11., np.nan, np.nan],
@@ -2268,11 +2268,11 @@ class TestBasic:
                 (0., 0., 0.1, 'a'),
                 (0., 0., 0.1, 'b'),
                 (0., 0., 0.1, 'c')
-            ], names=['iadvstex_sl_stop', 'iadvstex_ts_stop', 'iadvstex_tp_stop', None])
+            ], names=['iohlcstex_sl_stop', 'iohlcstex_ts_stop', 'iohlcstex_tp_stop', None])
             )
         )
         pd.testing.assert_frame_equal(
-            iadvstex.stop_type,
+            iohlcstex.stop_type,
             pd.DataFrame(np.array([
                 [-1, -1, -1, -1, -1, -1, -1, -1, -1],
                 [-1, -1, -1, -1, -1, -1, 2, -1, -1],
@@ -2289,7 +2289,7 @@ class TestBasic:
                 (0., 0., 0.1, 'a'),
                 (0., 0., 0.1, 'b'),
                 (0., 0., 0.1, 'c')
-            ], names=['iadvstex_sl_stop', 'iadvstex_ts_stop', 'iadvstex_tp_stop', None])
+            ], names=['iohlcstex_sl_stop', 'iohlcstex_ts_stop', 'iohlcstex_tp_stop', None])
             )
         )
 

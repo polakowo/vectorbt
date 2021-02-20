@@ -94,7 +94,7 @@ fig.show()
 ![rand_scatter.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.png)
 
 For fans of hyperparameter optimization, here is a snippet for testing 10000 window combinations of a 
-dual SMA crossover strategy on BTC, USD and XRP:
+dual SMA crossover strategy on BTC, USD and LTC:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "LTC-USD"]
@@ -182,14 +182,14 @@ def plot(bbands):
     fig.update_layout(template=vbt.settings.dark_template, showlegend=False, width=750, height=650)
     for i, symbol in enumerate(symbols):
         bbands.close[symbol].vbt.lineplot(add_trace_kwargs=dict(row=i + 1, col=1), fig=fig)
-    bbands.percent_b.iloc[:, ::-1].vbt.heatmap(
+    bbands.percent_b.vbt.ts_heatmap(
         trace_kwargs=dict(zmin=0, zmid=0.5, zmax=1, colorscale='Spectral', colorbar=dict(
             y=(fig.layout.yaxis4.domain[0] + fig.layout.yaxis4.domain[1]) / 2, len=0.2
-        )), add_trace_kwargs=dict(row=4, col=1), horizontal=True, fig=fig)
-    bbands.bandwidth.iloc[:, ::-1].vbt.heatmap(
+        )), add_trace_kwargs=dict(row=4, col=1), fig=fig)
+    bbands.bandwidth.vbt.ts_heatmap(
         trace_kwargs=dict(colorbar=dict(
             y=(fig.layout.yaxis5.domain[0] + fig.layout.yaxis5.domain[1]) / 2, len=0.2
-        )), add_trace_kwargs=dict(row=5, col=1), horizontal=True, fig=fig)
+        )), add_trace_kwargs=dict(row=5, col=1), fig=fig)
     return fig
 
 with imageio.get_writer(gif_fname, fps=gif_fps) as writer:
@@ -394,7 +394,7 @@ sma_timeperiod    2    3
 ``` 
     
 - Interactive Plotly-based widgets to visualize backtest results
-    - Full integration with ipywidgets for displaying interactive dashboards in Jupyter
+    - Support of ipywidgets for displaying interactive dashboards in Jupyter
 
 ## Resources
 

@@ -4,7 +4,7 @@ import pandas as pd
 from numba import njit
 from datetime import datetime
 import pytest
-from itertools import product, combinations
+from itertools import product
 from collections import namedtuple
 
 seed = 42
@@ -25,26 +25,6 @@ ts = pd.DataFrame({
 
 
 class TestFactory:
-    def test_create_param_combs(self):
-        assert vbt.indicators.create_param_combs(
-            (combinations, [0, 1, 2, 3], 2)) == [
-                   [0, 0, 0, 1, 1, 2],
-                   [1, 2, 3, 2, 3, 3]
-               ]
-        assert vbt.indicators.create_param_combs(
-            (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
-                   [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
-                   [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
-               ]
-        assert vbt.indicators.create_param_combs(
-            (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
-                   [0, 0, 0, 0, 0, 0, 1, 1, 1],
-                   [1, 1, 1, 2, 2, 2, 2, 2, 2],
-                   [3, 3, 4, 3, 3, 4, 3, 3, 4],
-                   [4, 5, 5, 4, 5, 5, 4, 5, 5]
-               ]
-
     def test_from_custom_func(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 

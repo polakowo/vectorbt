@@ -75,6 +75,7 @@ except ImportError:
 @add_nb_methods([
     (nb.shuffle_nb, False),
     (nb.fillna_nb, False),
+    (nb.bshift_nb, False),
     (nb.fshift_nb, False),
     (nb.diff_nb, False),
     (nb.pct_change_nb, False),
@@ -100,9 +101,9 @@ class GenericAccessor(BaseAccessor):
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
-    def rolling_std(self, period, minp=1, ddof=1, wrap_kwargs=None):  # pragma: no cover
+    def rolling_std(self, window, minp=1, ddof=1, wrap_kwargs=None):  # pragma: no cover
         """See `vectorbt.generic.nb.rolling_std_nb`."""
-        out = nb.rolling_std_nb(self.to_2d_array(), period, minp=minp, ddof=ddof)
+        out = nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
     def expanding_std(self, minp=1, ddof=1, wrap_kwargs=None):  # pragma: no cover
@@ -225,7 +226,7 @@ class GenericAccessor(BaseAccessor):
             raise ValueError("Only axes 0 and 1 are supported")
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def rolling_apply(self, period, apply_func_nb, *args, on_matrix=False, wrap_kwargs=None):
+    def rolling_apply(self, window, apply_func_nb, *args, on_matrix=False, wrap_kwargs=None):
         """See `vectorbt.generic.nb.rolling_apply_nb` and
         `vectorbt.generic.nb.rolling_apply_matrix_nb` for `on_matrix=True`.
 
@@ -254,9 +255,9 @@ class GenericAccessor(BaseAccessor):
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
-            out = nb.rolling_apply_matrix_nb(self.to_2d_array(), period, apply_func_nb, *args)
+            out = nb.rolling_apply_matrix_nb(self.to_2d_array(), window, apply_func_nb, *args)
         else:
-            out = nb.rolling_apply_nb(self.to_2d_array(), period, apply_func_nb, *args)
+            out = nb.rolling_apply_nb(self.to_2d_array(), window, apply_func_nb, *args)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
     def expanding_apply(self, apply_func_nb, *args, on_matrix=False, wrap_kwargs=None):

@@ -4,9 +4,10 @@ from numba import njit
 import pytest
 import os
 from collections import namedtuple
+from itertools import product, combinations
 
 from vectorbt import settings
-from vectorbt.utils import checks, config, decorators, math, array, random, enum, data
+from vectorbt.utils import checks, config, decorators, math, array, random, enum, data, params
 
 from tests.utils import hash
 
@@ -973,6 +974,18 @@ class TestChecks:
         assert checks.is_namedtuple(namedtuple('Hello', ['world'])(*range(1)))
         assert not checks.is_namedtuple((0,))
 
+    def test_method_accepts_argument(self):
+        def test(a, *args, b=2, **kwargs):
+            pass
+
+        assert checks.method_accepts_argument(test, 'a')
+        assert not checks.method_accepts_argument(test, 'args')
+        assert checks.method_accepts_argument(test, '*args')
+        assert checks.method_accepts_argument(test, 'b')
+        assert not checks.method_accepts_argument(test, 'kwargs')
+        assert checks.method_accepts_argument(test, '**kwargs')
+        assert not checks.method_accepts_argument(test, 'c')
+
     def test_assert_in(self):
         checks.assert_in(0, (0, 1))
         with pytest.raises(Exception) as e_info:
@@ -1480,3 +1493,27 @@ class TestData:
                 'b': np.concatenate((np.array([np.nan]), np.arange(1, 6)))
             }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
         )
+
+
+# ############# params.py ############# #
+
+class TestParams:
+    def test_create_param_combs(self):
+        assert params.create_param_combs(
+            (combinations, [0, 1, 2, 3], 2)) == [
+                   [0, 0, 0, 1, 1, 2],
+                   [1, 2, 3, 2, 3, 3]
+               ]
+        assert params.create_param_combs(
+            (product, (combinations, [0, 1, 2, 3], 2), [4, 5])) == [
+                   [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2],
+                   [1, 1, 2, 2, 3, 3, 2, 2, 3, 3, 3, 3],
+                   [4, 5, 4, 5, 4, 5, 4, 5, 4, 5, 4, 5]
+               ]
+        assert params.create_param_combs(
+            (product, (combinations, [0, 1, 2], 2), (combinations, [3, 4, 5], 2))) == [
+                   [0, 0, 0, 0, 0, 0, 1, 1, 1],
+                   [1, 1, 1, 2, 2, 2, 2, 2, 2],
+                   [3, 3, 4, 3, 3, 4, 3, 3, 4],
+                   [4, 5, 5, 4, 5, 5, 4, 5, 5]
+               ]
