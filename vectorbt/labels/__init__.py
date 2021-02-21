@@ -1,8 +1,8 @@
-"""Modules for building and running look-ahead indicators and labelers.
+"""Modules for building and running look-ahead indicators and label generators.
 
 ## Basic
 
-Module `vectorbt.labels.basic` provides a collection of basic look-ahead indicators and labelers.
+Module `vectorbt.labels.basic` provides a collection of basic look-ahead indicators and label generators.
 
 You can access all the indicators either by `vbt.*` or `vbt.labels.*`.
 
@@ -16,6 +16,7 @@ classes. These only accept NumPy arrays and other Numba-compatible types.
 Module `vectorbt.labels.enums` defines enums and other schemas for `vectorbt.labels`.
 """
 
+from vectorbt.labels.enums import *
 from vectorbt.labels.basic import (
     FMEAN,
     FSTD,

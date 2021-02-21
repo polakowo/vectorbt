@@ -11,23 +11,21 @@ seed = 42
 
 day_dt = np.timedelta64(86400000000000)
 
-index = pd.Index([
-    datetime(2020, 1, 1),
-    datetime(2020, 1, 2),
-    datetime(2020, 1, 3),
-    datetime(2020, 1, 4),
-    datetime(2020, 1, 5)
-])
-columns = ['a', 'b', 'c']
 sig = pd.DataFrame([
     [True, False, False],
     [False, True, False],
     [False, False, True],
     [True, False, False],
     [False, True, False]
-], index=index, columns=columns)
+], index=pd.Index([
+    datetime(2020, 1, 1),
+    datetime(2020, 1, 2),
+    datetime(2020, 1, 3),
+    datetime(2020, 1, 4),
+    datetime(2020, 1, 5)
+]), columns=['a', 'b', 'c'])
 
-ts = pd.Series([1., 2., 3., 2., 1.], index=index)
+ts = pd.Series([1., 2., 3., 2., 1.], index=sig.index)
 
 price = pd.DataFrame({
     'open': [10, 11, 12, 11, 10],
@@ -1103,7 +1101,7 @@ class TestAccessors:
             [True, False, False],
             [False, True, False],
             [True, False, True]
-        ], index=index, columns=columns)
+        ], index=sig.index, columns=sig.columns)
 
         assert sig['a'].vbt.signals.map_reduce_between(
             map_func_nb=distance_map_nb,
@@ -1170,7 +1168,7 @@ class TestAccessors:
             [True, False, False],
             [False, True, False],
             [True, False, True]
-        ], index=index, columns=columns)
+        ], index=sig.index, columns=sig.columns)
         assert sig['a'].vbt.signals.avg_distance(to=other_sig['a']) == 1.5
         pd.testing.assert_series_equal(
             sig.vbt.signals.avg_distance(to=other_sig),

@@ -127,7 +127,7 @@ class SignalFactory(IndicatorFactory):
             class_name, 'new_entries' if exit_only and iteratively else 'entries'
         )
 
-        setattr(self.CustomIndicator, 'plot', plot)
+        setattr(self.Indicator, 'plot', plot)
 
     def from_choice_func(
             self,

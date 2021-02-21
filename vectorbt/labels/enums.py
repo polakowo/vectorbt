@@ -3,6 +3,10 @@
 from collections import namedtuple
 import json
 
+__all__ = [
+    'TrendMode'
+]
+
 __pdoc__ = {}
 
 TrendMode = namedtuple('TrendMode', [

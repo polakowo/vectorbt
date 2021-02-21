@@ -9,6 +9,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.widgets import FigureWidget
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
+from vectorbt.generic.plotting import clean_labels
 
 
 def add_px_methods(cls):
@@ -34,10 +35,13 @@ def add_px_methods(cls):
                                 kwargs = merge_dicts(dict(category_orders=category_orders), kwargs)
 
                 # Fix Series name
-                obj = self._obj
+                obj = self._obj.copy(deep=False)
                 if isinstance(obj, pd.Series):
                     if obj.name is not None:
                         obj = obj.rename(str(obj.name))
+                else:
+                    obj.columns = clean_labels(obj.columns)
+                obj.index = clean_labels(obj.index)
 
                 if px_func_name == 'imshow':
                     return FigureWidget(px_func(

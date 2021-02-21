@@ -261,7 +261,7 @@ This makes accessing rows and columns by labels, integer positions, and paramete
 
 ```python-repl
 >>> myma[(2, 'b')]
-<vectorbt.indicators.factory.CustomIndicator at 0x7fa4b3e0c4e0>
+<vectorbt.indicators.factory.Indicator at 0x7fa4b3e0c4e0>
 
 >>> myma[(2, 'b')].ma
 2020-01-01    NaN
@@ -947,9 +947,9 @@ class IndicatorFactory:
 
         # Set up class
         ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
-        CustomIndicator = type(self.class_name, (Wrapping, ParamIndexer), {})
-        CustomIndicator.__module__ = self.module_name
-        CustomIndicator.__doc__ = self.class_docstring
+        Indicator = type(self.class_name, (Wrapping, ParamIndexer), {})
+        Indicator.__module__ = self.module_name
+        Indicator.__doc__ = self.class_docstring
 
         # Add indexing methods
         def _indexing_func(obj, pd_indexing_func):
@@ -987,37 +987,37 @@ class IndicatorFactory:
                 mapper_list=mapper_list
             )
 
-        setattr(CustomIndicator, '_indexing_func', _indexing_func)
+        setattr(Indicator, '_indexing_func', _indexing_func)
 
         # Create read-only properties
         prop = property(lambda _self: _self._short_name)
         prop.__doc__ = "Name of the indicator (read-only)."
-        setattr(CustomIndicator, 'short_name', prop)
+        setattr(Indicator, 'short_name', prop)
 
         prop = property(lambda _self: _self._level_names)
         prop.__doc__ = "Column level names corresponding to each parameter (read-only)."
-        setattr(CustomIndicator, 'level_names', prop)
+        setattr(Indicator, 'level_names', prop)
 
         prop = classproperty(lambda _self: input_names)
         prop.__doc__ = "Names of the input time series (read-only)."
-        setattr(CustomIndicator, 'input_names', prop)
+        setattr(Indicator, 'input_names', prop)
 
         prop = classproperty(lambda _self: param_names)
         prop.__doc__ = "Names of the parameters (read-only)."
-        setattr(CustomIndicator, 'param_names', prop)
+        setattr(Indicator, 'param_names', prop)
 
         prop = classproperty(lambda _self: output_names)
         prop.__doc__ = "Names of the output time series (read-only)."
-        setattr(CustomIndicator, 'output_names', prop)
+        setattr(Indicator, 'output_names', prop)
 
         prop = classproperty(lambda _self: output_flags)
         prop.__doc__ = "Dictionary of output flags (read-only)."
-        setattr(CustomIndicator, 'output_flags', prop)
+        setattr(Indicator, 'output_flags', prop)
 
         for param_name in param_names:
             prop = property(lambda _self, param_name=param_name: getattr(_self, f'_{param_name}_array'))
             prop.__doc__ = f"Array of `{param_name}` combinations (read-only)."
-            setattr(CustomIndicator, f'{param_name}_array', prop)
+            setattr(Indicator, f'{param_name}_array', prop)
 
         for input_name in input_names:
             def input_prop(_self, input_name=input_name):
@@ -1031,7 +1031,7 @@ class IndicatorFactory:
                 return _self.wrapper.wrap(old_input[:, input_mapper])
 
             input_prop.__name__ = input_name
-            setattr(CustomIndicator, input_name, cached_property(input_prop))
+            setattr(Indicator, input_name, cached_property(input_prop))
 
         for output_name in output_names:
             def output_prop(_self, output_name=output_name):
@@ -1044,7 +1044,7 @@ class IndicatorFactory:
                 if isinstance(_output_flags, (tuple, list)):
                     _output_flags = ', '.join(_output_flags)
                 output_prop.__doc__ += "\n\n" + _output_flags
-            setattr(CustomIndicator, output_name, property(output_prop))
+            setattr(Indicator, output_name, property(output_prop))
 
         # Add __init__ method
         def __init__(_self, wrapper, input_list, input_mapper, output_list, param_list,
@@ -1098,7 +1098,7 @@ class IndicatorFactory:
                 level_names=[*level_names, tuple(level_names)]
             )
 
-        setattr(CustomIndicator, '__init__', __init__)
+        setattr(Indicator, '__init__', __init__)
 
         # Add user-defined outputs
         for prop_name, prop in custom_output_funcs.items():
@@ -1107,7 +1107,7 @@ class IndicatorFactory:
             if not isinstance(prop, (property, cached_property)):
                 prop.__name__ = prop_name
                 prop = cached_property(prop)
-            setattr(CustomIndicator, prop_name, prop)
+            setattr(Indicator, prop_name, prop)
 
         # Add comparison & combination methods for all inputs, outputs, and user-defined properties
         for attr_name in all_attr_names:
@@ -1121,9 +1121,9 @@ class IndicatorFactory:
                         return getattr(_self, attr_name).map(lambda x: '' if x == -1 else enum._fields[x])
                     return getattr(_self, attr_name).applymap(lambda x: '' if x == -1 else enum._fields[x])
 
-                attr_readable.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_readable'
+                attr_readable.__qualname__ = f'{Indicator.__name__}.{attr_name}_readable'
                 attr_readable.__doc__ = f"""{attr_name} in readable format based on enum {dtype}."""
-                setattr(CustomIndicator, f'{attr_name}_readable', property(attr_readable))
+                setattr(Indicator, f'{attr_name}_readable', property(attr_readable))
 
             elif np.issubdtype(dtype, np.number):
                 def assign_numeric_method(func_name, combine_func, attr_name=attr_name):
@@ -1150,14 +1150,14 @@ class IndicatorFactory:
                             return out.vbt.signals.nst(wait + 1, after_false=after_false)
                         return out
 
-                    numeric_method.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_{func_name}'
+                    numeric_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'
                     numeric_method.__doc__ = f"""Return True for each element where `{attr_name}` is {func_name} `other`. 
     
                     Set `crossover` to True to return the first True after crossover. Specify `wait` to return 
                     True only when `{attr_name}` is {func_name} for a number of time steps in a row after crossover.
                 
                     See `vectorbt.indicators.factory.combine_objs`."""
-                    setattr(CustomIndicator, f'{attr_name}_{func_name}', numeric_method)
+                    setattr(Indicator, f'{attr_name}_{func_name}', numeric_method)
 
                 assign_numeric_method('above', np.greater)
                 assign_numeric_method('below', np.less)
@@ -1184,17 +1184,17 @@ class IndicatorFactory:
                             **kwargs
                         )
 
-                    bool_method.__qualname__ = f'{CustomIndicator.__name__}.{attr_name}_{func_name}'
+                    bool_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'
                     bool_method.__doc__ = f"""Return `{attr_name} {func_name.upper()} other`. 
 
                         See `vectorbt.indicators.factory.combine_objs`."""
-                    setattr(CustomIndicator, f'{attr_name}_{func_name}', bool_method)
+                    setattr(Indicator, f'{attr_name}_{func_name}', bool_method)
 
                 assign_bool_method('and', np.logical_and)
                 assign_bool_method('or', np.logical_or)
                 assign_bool_method('xor', np.logical_xor)
 
-            self.CustomIndicator = CustomIndicator
+            self.Indicator = Indicator
 
     def from_custom_func(self,
                          custom_func,
@@ -1246,7 +1246,7 @@ class IndicatorFactory:
                     Default parameters should be on the right in `param_names`.
 
         Returns:
-            `CustomIndicator`, and optionally other objects that are returned by `custom_func`
+            `Indicator`, and optionally other objects that are returned by `custom_func`
             and exceed `output_names`.
 
         ## Example
@@ -1290,7 +1290,7 @@ class IndicatorFactory:
         2020-01-05  130.0  106.0  140.0  108.0
         ```
         """
-        CustomIndicator = self.CustomIndicator
+        Indicator = self.Indicator
 
         short_name = self.short_name
         prepend_name = self.prepend_name
@@ -1400,7 +1400,7 @@ class IndicatorFactory:
                 return (obj, *tuple(other_list))
             return obj
 
-        setattr(CustomIndicator, '_run', _run)
+        setattr(Indicator, '_run', _run)
 
         # Add public run method
         # Create function dynamically to provide user with a proper signature
@@ -1473,7 +1473,7 @@ class IndicatorFactory:
 
         run_docstring = create_run_docstring(run_docstring_func)
         run = compile_run_function('run', run_docstring, def_run_kwargs)
-        setattr(CustomIndicator, 'run', run)
+        setattr(Indicator, 'run', run)
 
         if len(param_names) > 0:
             # Add private run_combs method
@@ -1573,7 +1573,7 @@ class IndicatorFactory:
                     ))
                 return tuple(instances)
 
-            setattr(CustomIndicator, '_run_combs', _run_combs)
+            setattr(Indicator, '_run_combs', _run_combs)
 
             # Add public run_combs method
             def run_combs_docstring_func(class_name, in_ts_str, param_str, out_ts_str):
@@ -1596,9 +1596,9 @@ class IndicatorFactory:
 
             run_combs_docstring = create_run_docstring(run_combs_docstring_func)
             run_combs = compile_run_function('run_combs', run_combs_docstring, def_run_combs_kwargs)
-            setattr(CustomIndicator, 'run_combs', run_combs)
+            setattr(Indicator, 'run_combs', run_combs)
 
-        return CustomIndicator
+        return Indicator
 
     def from_apply_func(self, apply_func, cache_func=None, pass_kwargs=None, **kwargs):
         """Build indicator class around a custom apply function.
@@ -1644,7 +1644,7 @@ class IndicatorFactory:
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
         Returns:
-            CustomIndicator
+            Indicator
 
         ## Example
 
@@ -1817,7 +1817,7 @@ class IndicatorFactory:
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
 
         Returns:
-            CustomIndicator
+            Indicator
 
         ## Example
 

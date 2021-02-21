@@ -1137,11 +1137,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 fig.update_layout(width=layout['width'] + 150)
         fig.update_layout(**layout_kwargs)
 
-        other.vbt.ts_heatmap(
-            **heatmap_kwargs,
-            add_trace_kwargs=add_trace_kwargs,
-            fig=fig
-        )
+        other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         self.plot(
             trace_kwargs=merge_dicts(dict(line_color=color_schema['blue']), trace_kwargs),
             add_trace_kwargs=merge_dicts(dict(secondary_y=True), add_trace_kwargs),

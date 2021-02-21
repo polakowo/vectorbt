@@ -11,18 +11,17 @@ from tests.utils import isclose
 
 day_dt = np.timedelta64(86400000000000)
 
-index = pd.DatetimeIndex([
+ts = pd.DataFrame({
+    'a': [1, 2, 3, 4, 5],
+    'b': [5, 4, 3, 2, 1],
+    'c': [1, 2, 3, 2, 1]
+}, index=pd.DatetimeIndex([
     datetime(2018, 1, 1),
     datetime(2018, 1, 2),
     datetime(2018, 1, 3),
     datetime(2018, 1, 4),
     datetime(2018, 1, 5)
-])
-ts = pd.DataFrame({
-    'a': [1, 2, 3, 4, 5],
-    'b': [5, 4, 3, 2, 1],
-    'c': [1, 2, 3, 2, 1]
-}, index=index)
+]))
 ret = ts.pct_change()
 
 settings.returns['year_freq'] = '252 days'  # same as empyrical

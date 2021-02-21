@@ -4,6 +4,7 @@
     In case of errors, it won't be visible in the notebook cell, but in the logs."""
 
 import numpy as np
+import pandas as pd
 import plotly.graph_objects as go
 import math
 
@@ -13,6 +14,17 @@ from vectorbt.utils.array import renormalize
 from vectorbt.utils.colors import rgb_from_cmap
 from vectorbt.utils.config import Configured
 from vectorbt.base import reshape_fns
+
+
+def clean_labels(labels):
+    """Clean labels.
+
+    Plotly doesn't support multi-indexes."""
+    if isinstance(labels, pd.MultiIndex):
+        labels = labels.to_flat_index()
+    if isinstance(labels[0], tuple):
+        labels = list(map(str, labels))
+    return labels
 
 
 class TraceUpdater:
@@ -181,6 +193,8 @@ class Bar(Configured, TraceUpdater):
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
+        if x_labels is not None:
+            x_labels = clean_labels(x_labels)
 
         if fig is None:
             fig = FigureWidget()
@@ -276,6 +290,8 @@ class Scatter(Configured, TraceUpdater):
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
+        if x_labels is not None:
+            x_labels = clean_labels(x_labels)
 
         if fig is None:
             fig = FigureWidget()
@@ -570,6 +586,10 @@ class Heatmap(Configured, TraceUpdater):
                 raise ValueError("At least x_labels and y_labels must be passed")
         else:
             data = reshape_fns.to_2d(np.array(data))
+        if x_labels is not None:
+            x_labels = clean_labels(x_labels)
+        if y_labels is not None:
+            y_labels = clean_labels(y_labels)
 
         if fig is None:
             fig = FigureWidget()
@@ -693,10 +713,16 @@ class Volume(Configured, TraceUpdater):
             x_len, y_len, z_len = data.shape
         if x_labels is None:
             x_labels = np.arange(x_len)
+        else:
+            x_labels = clean_labels(x_labels)
         if y_labels is None:
             y_labels = np.arange(y_len)
+        else:
+            y_labels = clean_labels(y_labels)
         if z_labels is None:
             z_labels = np.arange(z_len)
+        else:
+            z_labels = clean_labels(z_labels)
         x_labels = np.asarray(x_labels)
         y_labels = np.asarray(y_labels)
         z_labels = np.asarray(z_labels)
