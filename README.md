@@ -13,9 +13,9 @@
 ![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-128x128.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
-accelerated by [Numba](https://github.com/numba/numba) to analyze trading strategies at speed and scale :fire:
+accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale :fire:
 
-In contrast to conventional libraries, vectorbt represents trading data as nd-arrays.
+In contrast to conventional libraries, vectorbt represents any data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but compiled 
 operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
 [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
@@ -26,7 +26,7 @@ data-hungry widgets without significant delays.
 With vectorbt you can
 * Analyze time series and engineer features
 * Supercharge pandas and your favorite tools to run much faster
-* Test many strategies, configurations, assets, and time ranges in one go
+* Test many trading strategies, configurations, assets, and time ranges in one go
 * Test machine learning models
 * Build interactive charts/dashboards without leaving Jupyter
 
@@ -270,7 +270,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 3.32 ms ± 19.7 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
     
-- Helper functions for combining, transforming, and indexing NumPy and pandas objects
+- Functions for combining, transforming, and indexing NumPy and pandas objects
     - NumPy-like broadcasting for pandas, among other features
     
 ```python-repl
@@ -322,7 +322,7 @@ dtype: bool
 ```
 
 - Signal factory for building iterative signal generators
-    - Also includes a range of basic generators such for random signals
+    - Also includes a range of basic generators such as random signal generator
 
 ```python-repl
 >>> rand = vbt.RAND.run(n=[0, 1, 2], input_shape=(6,), seed=42)
@@ -367,8 +367,9 @@ rand_n      0      1      2
 ```
 
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.png)
-    
-- A range of basic technical indicators with full Numba support
+
+- Indicator factory for building complex technical indicators with ease
+- Technical indicators with full Numba support
     - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
     - Each offers methods for generating signals and plotting
     - Each allows arbitrary parameter combinations, from arrays to Cartesian products
@@ -382,9 +383,8 @@ ma_ewm    False      True
 2           2.5  2.428571
 ``` 
 
-- Indicator factory for building complex technical indicators with ease
-    - Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
-    
+- Support for [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
+
 ```python-repl
 >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
 >>> SMA.run([1., 2., 3.], timeperiod=[2, 3]).real
@@ -393,9 +393,18 @@ sma_timeperiod    2    3
 1               1.5  NaN
 2               2.5  2.0
 ``` 
-    
-- Interactive Plotly-based widgets to visualize backtest results
-    - Support of ipywidgets for displaying interactive dashboards in Jupyter
+
+- Look-ahead indicators and label generators
+    - Search for local extrema, breakout detection, and more
+
+```python-repl
+>>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
+>>> vbt.LEXLB.run(price, 0.2, 0.2).plot().show()
+``` 
+
+![local_extrema.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.png)
+
+- Interactive Plotly-based widgets for visual data analysis
 
 ## Resources
 

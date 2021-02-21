@@ -32,9 +32,9 @@ of any complexity. By providing it with information such as entry and exit funct
 of your inputs, parameters, and outputs, it will create a stand-alone class capable of generating
 signals for an arbitrary combination of your inputs and parameters.
 
-## Basic
+## Generators
 
-`vectorbt.signals.basic` provides a collection of basic signal generators, such as
+`vectorbt.signals.generators` provides a collection of signal generators, such as
 random signal generator, all built with `vectorbt.signals.factory.SignalFactory`.
 
 ## Numba-compiled functions
@@ -56,7 +56,7 @@ Module `vectorbt.signals.enums` defines enums and other schemas for `vectorbt.si
 
 from vectorbt.signals.enums import *
 from vectorbt.signals.factory import SignalFactory
-from vectorbt.signals.basic import (
+from vectorbt.signals.generators import (
     RAND,
     RPROB,
     RPROBEX,

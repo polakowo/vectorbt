@@ -294,7 +294,7 @@ from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.signals.basic import RAND, RPROB
+from vectorbt.signals.generators import RAND, RPROB
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
@@ -485,8 +485,8 @@ class Portfolio(Wrapping):
         Generates signals based either on the number of signals `n` or the probability
         of encountering a signal `prob`.
 
-        If `n` is set, see `vectorbt.signals.basic.RAND`.
-        If `prob` is set, see `vectorbt.signals.basic.RPROB`.
+        If `n` is set, see `vectorbt.signals.generators.RAND`.
+        If `prob` is set, see `vectorbt.signals.generators.RPROB`.
 
         Based on `Portfolio.from_signals`."""
         from vectorbt import settings

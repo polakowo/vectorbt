@@ -20,7 +20,7 @@ pos_ths = [np.array([1, 1 / 2]), np.array([2, 1 / 2]), np.array([3, 1 / 2])]
 neg_ths = [np.array([1 / 2, 1 / 3]), np.array([1 / 2, 2 / 3]), np.array([1 / 2, 3 / 4])]
 
 
-# ############# basic.py ############# #
+# ############# generators.py ############# #
 
 class TestBasic:
     def test_FMEAN(self):

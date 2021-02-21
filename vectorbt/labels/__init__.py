@@ -1,8 +1,8 @@
 """Modules for building and running look-ahead indicators and label generators.
 
-## Basic
+## Generators
 
-Module `vectorbt.labels.basic` provides a collection of basic look-ahead indicators and label generators.
+Module `vectorbt.labels.generators` provides a collection of look-ahead indicators and label generators.
 
 You can access all the indicators either by `vbt.*` or `vbt.labels.*`.
 
@@ -17,7 +17,7 @@ Module `vectorbt.labels.enums` defines enums and other schemas for `vectorbt.lab
 """
 
 from vectorbt.labels.enums import *
-from vectorbt.labels.basic import (
+from vectorbt.labels.generators import (
     FMEAN,
     FSTD,
     FMIN,
