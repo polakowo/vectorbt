@@ -404,6 +404,7 @@ def run_pipeline(
         param_product=False,
         param_settings=None,
         level_names=None,
+        keep_pd=False,
         to_2d=True,
         pass_lists=False,
         forward_input_shape=None,
@@ -458,6 +459,7 @@ def run_pipeline(
         level_names (list of str): A list of column level names corresponding to each parameter.
 
             Should have the same length as `param_list`.
+        keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
         to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
         pass_lists (bool): Whether to pass inputs and parameters to `custom_func` as lists.
 
@@ -623,7 +625,8 @@ def run_pipeline(
         )
         if len(input_list) == 1:
             bc_input_list = (bc_input_list,)
-        input_list = list(map(np.asarray, bc_input_list))
+        if not keep_pd:
+            input_list = list(map(np.asarray, bc_input_list))
     bc_in_output_list = []
     if len(in_output_idxs) > 0:
         bc_in_output_list = input_list[-len(in_output_idxs):]
@@ -657,29 +660,41 @@ def run_pipeline(
     # Reshape inputs
     input_list_passed = input_list
     input_shape_passed = input_shape
+    input_shape_2d = input_shape
+    if input_shape is not None:
+        input_shape_2d = input_shape if len(input_shape) > 1 else (input_shape[0], 1)
     if to_2d:
         input_list_passed = list(map(reshape_fns.to_2d, input_list))
         if input_shape is not None:
-            input_shape_passed = input_shape if len(input_shape) > 1 else (input_shape[0], 1)
+            input_shape_passed = input_shape_2d
 
     # Reshape in-place outputs
     in_output_list_passed = []
     j = 0
     for i in range(len(in_output_list)):
+        if input_shape_2d is None:
+            raise ValueError("input_shape is required")
         if i in in_output_idxs:
-            in_output = bc_in_output_list[j]
-            in_output = reshape_fns.tile(in_output, n_param_values, axis=1)
+            in_output_wide = np.asarray(bc_in_output_list[j])
+            in_output_wide = reshape_fns.tile(in_output_wide, n_param_values, axis=1)
             j += 1
         else:
             _in_output_settings = in_output_settings if isinstance(in_output_settings, dict) else in_output_settings[i]
             checks.assert_dict_valid(_in_output_settings, [['dtype']])
             dtype = _in_output_settings.get('dtype', None)
-            in_output_shape = (input_shape_passed[0], input_shape_passed[1] * n_param_values)
-            in_output = np.empty(in_output_shape, dtype=dtype)
-        in_output_list[i] = in_output
+            in_output_shape = (input_shape_2d[0], input_shape_2d[1] * n_param_values)
+            in_output_wide = np.empty(in_output_shape, dtype=dtype)
+        in_output_list[i] = in_output_wide
         in_outputs = []
         for i in range(n_param_values):
-            in_outputs.append(in_output[:, i * input_shape_passed[1]: (i + 1) * input_shape_passed[1]])
+            in_output = in_output_wide[:, i * input_shape_2d[1]: (i + 1) * input_shape_2d[1]]
+            if keep_pd:
+                array_wrapper = ArrayWrapper(input_index, input_columns, len(input_shape_passed))
+                in_output = array_wrapper.wrap(in_output)
+            else:
+                if len(input_shape_passed) == 1:
+                    in_output = in_output[:, 0]
+            in_outputs.append(in_output)
         in_output_list_passed.append(in_outputs)
     if checks.is_numba_func(custom_func):
         in_output_list_passed = [to_typed_list(in_outputs) for in_outputs in in_output_list_passed]
@@ -747,13 +762,20 @@ def run_pipeline(
         output_list = output_list[:num_ret_outputs]
         if len(output_list) != num_ret_outputs:
             raise ValueError("Number of returned outputs other than expected")
-        output_list = list(map(reshape_fns.to_2d, output_list))
+        output_list = list(map(lambda x: reshape_fns.to_2d(x, raw=True), output_list))
         # In-place outputs are treated as outputs from here
         output_list += in_output_list
 
         # Return raw results if needed
         param_map = list(zip(*param_list))
-        n_input_cols = output_list[0].shape[1] // n_param_values
+        output_shape = output_list[0].shape
+        for output in output_list:
+            if output.shape != output_shape:
+                raise ValueError("All outputs must have the same shape")
+        n_input_cols = output_shape[1] // n_param_values
+        if input_shape_2d is not None:
+            if n_input_cols != input_shape_2d[1]:
+                raise ValueError("All outputs must have the number of columns = #input columns x #parameters")
         if return_raw:
             return output_list, param_map, n_input_cols, other_list
 

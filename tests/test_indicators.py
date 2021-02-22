@@ -870,6 +870,57 @@ class TestFactory:
             target
         )
 
+    @pytest.mark.parametrize(
+        "test_to_2d,test_keep_pd",
+        [
+            (False, False),
+            (False, True),
+            (True, False),
+            (True, True)
+        ]
+    )
+    def test_to_2d_and_keep_pd(self, test_to_2d, test_keep_pd):
+        F = vbt.IndicatorFactory(input_names=['ts'], in_output_names=['ts_out'], output_names=['out'])
+
+        def custom_func(ts, ts_out):
+            if test_to_2d:
+                assert ts.ndim == 2
+                for _ts_out in ts_out:
+                    assert _ts_out.ndim == 2
+                if test_keep_pd:
+                    assert isinstance(ts, pd.DataFrame)
+                    for _ts_out in ts_out:
+                        assert isinstance(_ts_out, pd.DataFrame)
+            else:
+                assert ts.ndim == 1
+                for _ts_out in ts_out:
+                    assert _ts_out.ndim == 1
+                if test_keep_pd:
+                    assert isinstance(ts, pd.Series)
+                    for _ts_out in ts_out:
+                        assert isinstance(_ts_out, pd.Series)
+            return ts
+
+        def apply_func(ts, ts_out):
+            if test_to_2d:
+                assert ts.ndim == 2
+                assert ts_out.ndim == 2
+                if test_keep_pd:
+                    assert isinstance(ts, pd.DataFrame)
+                    assert isinstance(ts_out, pd.DataFrame)
+            else:
+                assert ts.ndim == 1
+                assert ts_out.ndim == 1
+                if test_keep_pd:
+                    assert isinstance(ts, pd.Series)
+                    assert isinstance(ts_out, pd.Series)
+            return ts
+
+        _ = F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True)\
+            .run(ts['a'])
+        _ = F.from_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
+            .run(ts['a'])
+
     def test_pass_lists(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
