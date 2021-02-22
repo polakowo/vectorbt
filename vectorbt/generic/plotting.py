@@ -607,7 +607,7 @@ class Heatmap(Configured, TraceUpdater):
                     [0, 1],
                     [0.3 * max_width, max_width]
                 ))
-                width = min(width + 150, max_width)  # account for colorbar
+                width = min(width + 100, max_width)  # account for colorbar
                 height = math.ceil(renormalize(
                     y_len / (x_len + y_len),
                     [0, 1],

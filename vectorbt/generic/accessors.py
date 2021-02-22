@@ -1134,7 +1134,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
             if 'width' in layout:
-                fig.update_layout(width=layout['width'] + 150)
+                fig.update_layout(width=layout['width'] + 100)
         fig.update_layout(**layout_kwargs)
 
         other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
