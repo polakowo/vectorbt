@@ -2,6 +2,7 @@
 
 import numpy as np
 from collections import namedtuple
+from typing import NamedTuple, Any
 import json
 
 __all__ = [
@@ -39,20 +40,20 @@ __pdoc__ = {}
 
 # ############# Portfolio ############# #
 
-SimulationContext = namedtuple('SimulationContext', [
-    'target_shape',
-    'close',
-    'group_lens',
-    'init_cash',
-    'cash_sharing',
-    'call_seq',
-    'active_mask',
-    'order_records',
-    'log_records',
-    'last_cash',
-    'last_shares',
-    'last_val_price'
-])
+class SimulationContext(NamedTuple):
+    target_shape: Any
+    close: Any
+    group_lens: Any
+    init_cash: Any
+    cash_sharing: Any
+    call_seq: Any
+    active_mask: Any
+    order_records: Any
+    log_records: Any
+    last_cash: Any
+    last_shares: Any
+    last_val_price: Any
+
 
 __pdoc__['SimulationContext'] = "A named tuple representing context of the simulation."
 __pdoc__['SimulationContext.target_shape'] = """Target shape.
@@ -69,13 +70,13 @@ Even if columns are not grouped, `group_lens` contains ones - one column per gro
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column, or per group if cash sharing is enabled.
 
-If `cash_sharing` is True, has shape `(target_shape[0], group_lens.shape[0])`. 
+If `cash_sharing` is True, has shape `(target_shape[0], group_lens.shape[0])`.
 Otherwise, has shape `target_shape`.
 """
 __pdoc__['SimulationContext.cash_sharing'] = """Whether cash sharing is enabled."""
 __pdoc__['SimulationContext.call_seq'] = """Default sequence of calls per segment.
 
-Controls the sequence in which `order_func_nb` is executed within a segment. 
+Controls the sequence in which `order_func_nb` is executed within a segment.
 
 Has shape `target_shape` and each value must exist in the range `[0, group_len)`.
 
@@ -130,7 +131,7 @@ Has range `[0, target_shape[1])`.
 """
 __pdoc__['GroupContext.to_col'] = """Index of the first column in the next group.
 
-Has range `[1, target_shape[1] + 1)`. 
+Has range `[1, target_shape[1] + 1)`.
 
 If columns are not grouped, equals `from_col + 1`.
 """
@@ -166,7 +167,7 @@ __pdoc__['SegmentContext.from_col'] = "See `GroupContext.from_col`."
 __pdoc__['SegmentContext.to_col'] = "See `GroupContext.to_col`."
 __pdoc__['SegmentContext.call_seq_now'] = """Current sequence of calls.
 
-Has shape `(group_len,)`. 
+Has shape `(group_len,)`.
 """
 
 OrderContext = namedtuple('OrderContext', [
