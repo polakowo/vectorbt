@@ -25,6 +25,9 @@ setup(
         'ipywidgets>=7.0.0',
         'numba>=0.51.2'
     ],
+    extras_require={
+        "empyrical":["empyrical"]
+    },
     python_requires='>=3.6, <3.9',
     license='Apache 2.0',
     classifiers=[
