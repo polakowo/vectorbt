@@ -1,4 +1,7 @@
+from vectorbt.signals.enums import StopType
 import vectorbt as vbt
+from enum import Enum, IntEnum
+from typing import Union
 import numpy as np
 import pandas as pd
 from numba import njit
@@ -2290,4 +2293,13 @@ class TestBasic:
             ], names=['iohlcstex_sl_stop', 'iohlcstex_ts_stop', 'iohlcstex_tp_stop', None])
             )
         )
+
+def test_enum_in_numba():
+    @njit
+    def try_enum(my_enum:StopType) -> int:
+        return my_enum.value + 1
+
+    assert try_enum(StopType.StopLoss) == 1
+    assert try_enum(StopType.TrailStop) == 2
+    assert try_enum(StopType.TakeProfit) == 3
 
