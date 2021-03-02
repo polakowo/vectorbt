@@ -16,7 +16,7 @@ FMEAN = IndicatorFactory(
     output_names=['fmean']
 ).from_apply_func(
     nb.future_mean_apply_nb,
-    pass_kwargs=['wait', 'adjust'],
+    kwargs_to_args=['wait', 'adjust'],
     ewm=False,
     wait=1,
     adjust=False
@@ -31,7 +31,7 @@ FSTD = IndicatorFactory(
     output_names=['fstd']
 ).from_apply_func(
     nb.future_std_apply_nb,
-    pass_kwargs=['wait', 'adjust', 'ddof'],
+    kwargs_to_args=['wait', 'adjust', 'ddof'],
     ewm=False,
     wait=1,
     adjust=False,
@@ -47,7 +47,7 @@ FMIN = IndicatorFactory(
     output_names=['fmin']
 ).from_apply_func(
     nb.future_min_apply_nb,
-    pass_kwargs=['wait'],
+    kwargs_to_args=['wait'],
     wait=1
 )
 """Look-ahead indicator based on `future_min_apply_nb`."""
@@ -60,7 +60,7 @@ FMAX = IndicatorFactory(
     output_names=['fmax']
 ).from_apply_func(
     nb.future_max_apply_nb,
-    pass_kwargs=['wait'],
+    kwargs_to_args=['wait'],
     wait=1
 )
 """Look-ahead indicator based on `future_max_apply_nb`."""
@@ -104,7 +104,7 @@ MEANLB = IndicatorFactory(
     output_names=['labels']
 ).from_apply_func(
     nb.mean_labels_apply_nb,
-    pass_kwargs=['wait', 'adjust'],
+    kwargs_to_args=['wait', 'adjust'],
     ewm=False,
     wait=1,
     adjust=False
@@ -131,8 +131,7 @@ LEXLB = IndicatorFactory(
         pos_th=flex_elem_param_config,
         neg_th=flex_elem_param_config
     ),
-    forward_flex_2d=True,
-    pass_kwargs=['flex_2d']
+    pass_flex_2d=True
 )
 
 
@@ -157,8 +156,7 @@ TRENDLB = IndicatorFactory(
         neg_th=flex_elem_param_config,
         mode=dict(dtype=TrendMode)
     ),
-    forward_flex_2d=True,
-    pass_kwargs=['flex_2d'],
+    pass_flex_2d=True,
     mode=TrendMode.Binary
 )
 
@@ -183,8 +181,8 @@ BOLB = IndicatorFactory(
         pos_th=flex_elem_param_config,
         neg_th=flex_elem_param_config
     ),
-    forward_flex_2d=True,
-    pass_kwargs=['wait', 'flex_2d'],
+    pass_flex_2d=True,
+    kwargs_to_args=['wait'],
     pos_th=0.,
     neg_th=0.,
     wait=1

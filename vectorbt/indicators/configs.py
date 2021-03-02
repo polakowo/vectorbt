@@ -14,6 +14,7 @@ flex_elem_param_config = Config(
 flex_col_param_config = Config(
     array_like=True,
     bc_to_input=1,  # broadcast to axis 1 (columns)
+    per_column=True,  # display one parameter per column
     broadcast_kwargs=dict(
         keep_raw=True
     )

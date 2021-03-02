@@ -299,7 +299,7 @@ def assert_dict_valid(arg, lvl_keys):
     set1 = set(arg.keys())
     set2 = set(lvl_keys[0])
     if not set1.issubset(set2):
-        raise AssertionError(f"Not all keys from {set1} are in {set2}")
+        raise AssertionError(f"Keys {set1.difference(set2)} are not recognized. Possible keys are {set2}.")
     for k, v in arg.items():
         if isinstance(v, dict):
             assert_dict_valid(v, lvl_keys[1:])

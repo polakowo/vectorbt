@@ -63,21 +63,20 @@ def create_param_combs(op_tree, depth=0):
     return out
 
 
-def broadcast_params(param_list):
+def broadcast_params(param_list, to_n=None):
     """Broadcast parameters in `param_list`."""
-    max_len = max(list(map(len, param_list)))
+    if to_n is None:
+        to_n = max(list(map(len, param_list)))
     new_param_list = []
     for i in range(len(param_list)):
         params = param_list[i]
-        if len(params) < max_len:
-            if len(params) > 1:
-                raise ValueError("shape mismatch: objects cannot be broadcast to a single shape")
-            new_params = []
-            for j in range(max_len):
-                new_params.append(params[0])
-            new_param_list.append(list(new_params))
+        if len(params) in [1, to_n]:
+            if len(params) < to_n:
+                new_param_list.append(list(params * to_n))
+            else:
+                new_param_list.append(list(params))
         else:
-            new_param_list.append(list(params))
+            raise ValueError(f"Parameters at index {i} have length {len(params)} that cannot be broadcast to {to_n}")
     return new_param_list
 
 
@@ -86,7 +85,7 @@ def create_param_product(param_list):
     return list(map(list, zip(*list(itertools.product(*param_list)))))
 
 
-class Default:
+class DefaultParam:
     """Class for wrapping default values."""
 
     def __repr__(self):

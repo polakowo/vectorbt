@@ -222,7 +222,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=Non
                 if maxlen > 1 and len(new_index) > 1:
                     raise ValueError("Indexes could not be broadcast together")
                 new_index = index_fns.repeat_index(new_index, maxlen)
-        elif index_from is not None:
+        else:
             # new_index=None can mean two things: 1) take original metadata or 2) reset index/columns
             # In case when index_from is not None, we choose 2)
             new_index = pd.RangeIndex(start=0, stop=maxlen, step=1)

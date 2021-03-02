@@ -596,6 +596,12 @@ class TestArrayWrapper:
         assert array_wrapper.ArrayWrapper.from_obj(sr2, column_only_select=True) == sr2_wrapper_co
         assert array_wrapper.ArrayWrapper.from_obj(df4, column_only_select=True) == df4_wrapper_co
 
+    def test_from_shape(self):
+        assert array_wrapper.ArrayWrapper.from_shape((3,)) == \
+               array_wrapper.ArrayWrapper.from_obj(pd.Series(np.empty((3,))))
+        assert array_wrapper.ArrayWrapper.from_shape((3, 3)) == \
+               array_wrapper.ArrayWrapper.from_obj(pd.DataFrame(np.empty((3, 3))))
+
     def test_columns(self):
         pd.testing.assert_index_equal(df4_wrapper.columns, df4.columns)
         pd.testing.assert_index_equal(df4_grouped_wrapper.columns, df4.columns)

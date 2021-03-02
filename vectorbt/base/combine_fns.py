@@ -7,6 +7,28 @@ from numba.typed import List
 from vectorbt.base import reshape_fns
 
 
+def apply_and_concat_none(n, apply_func, *args, **kwargs):
+    """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`,
+    and output nothing. Meant for in-place outputs.
+
+    `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
+    for i in range(n):
+        apply_func(i, *args, **kwargs)
+
+
+@njit
+def apply_and_concat_none_nb(n, apply_func_nb, *args):
+    """A Numba-compiled version of `apply_and_concat_none`.
+
+    !!! note
+        * `apply_func_nb` must be Numba-compiled
+        * `*args` must be Numba-compatible
+        * No support for `**kwargs`
+    """
+    for i in range(n):
+        apply_func_nb(i, *args)
+
+
 def apply_and_concat_one(n, apply_func, *args, **kwargs):
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`, 
     and concat the results along axis 1. 
@@ -29,7 +51,7 @@ def to_2d_one_nb(a):
 
 
 @njit
-def apply_and_concat_one_nb(n, apply_func_nb, *args):  # numba doesn't accepts **kwargs
+def apply_and_concat_one_nb(n, apply_func_nb, *args):
     """A Numba-compiled version of `apply_and_concat_one`.
     
     !!! note

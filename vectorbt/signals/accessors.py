@@ -832,7 +832,7 @@ class SignalsAccessor(GenericAccessor):
     # ############# Logical operations ############# #
 
     def AND(self, *others, **kwargs):
-        """Combine with each in `*others` using logical AND.
+        """Combine with each in `others` using logical AND.
 
         See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`.
 
@@ -840,7 +840,7 @@ class SignalsAccessor(GenericAccessor):
         return self.combine_with_multiple(others, combine_func=np.logical_and, **kwargs)
 
     def OR(self, *others, **kwargs):
-        """Combine with each in `*others` using logical OR.
+        """Combine with each in `others` using logical OR.
 
         See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`.
 
@@ -862,7 +862,7 @@ class SignalsAccessor(GenericAccessor):
         return self.combine_with_multiple(others, combine_func=np.logical_or, **kwargs)
 
     def XOR(self, *others, **kwargs):
-        """Combine with each in `*others` using logical XOR.
+        """Combine with each in `others` using logical XOR.
 
         See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`."""
         return self.combine_with_multiple(others, combine_func=np.logical_xor, **kwargs)

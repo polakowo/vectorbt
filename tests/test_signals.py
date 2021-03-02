@@ -1799,7 +1799,7 @@ class TestFactory:
 
 # ############# generators.py ############# #
 
-class TestBasic:
+class TestGenerators:
     def test_RAND(self):
         rand = vbt.RAND.run(n=1, input_shape=(6,), seed=seed)
         pd.testing.assert_series_equal(
@@ -1848,10 +1848,10 @@ class TestBasic:
                 [False, False, False, True],
                 [False, False, False, False]
             ]), columns=pd.MultiIndex.from_tuples([
-                ('mix_0', 0),
-                ('mix_0', 1),
-                ('mix_1', 0),
-                ('mix_1', 1)
+                (1, 0),
+                (2, 1),
+                (3, 0),
+                (4, 1)
             ], names=['rand_n', None])
             )
         )
@@ -1867,10 +1867,10 @@ class TestBasic:
                 [False, False, True, False],
                 [False, True, False, True]
             ]), columns=pd.MultiIndex.from_tuples([
-                ('mix_0', 0),
-                ('mix_0', 1),
-                ('mix_1', 0),
-                ('mix_1', 1)
+                (1, 0),
+                (2, 1),
+                (3, 0),
+                (4, 1)
             ], names=['rand_n', None])
             )
         )

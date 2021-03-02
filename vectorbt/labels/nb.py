@@ -59,13 +59,13 @@ def future_max_apply_nb(close, window, wait=1):
 
 @njit(cache=True)
 def fixed_labels_apply_nb(close, n):
-    """Get percentage change from current point to future point."""
+    """Get percentage change from the current value to a future value."""
     return (generic_nb.bshift_nb(close, n) - close) / close
 
 
 @njit(cache=True)
 def mean_labels_apply_nb(close, window, ewm, wait=1, adjust=False):
-    """Get the percentage change from the current to the average of the next period."""
+    """Get the percentage change from the current value to the average of the next period."""
     return (future_mean_apply_nb(close, window, ewm, wait, adjust) - close) / close
 
 
@@ -204,8 +204,8 @@ def bn_cont_trend_labels_nb(close, local_extrema):
 
 @njit(cache=True)
 def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=True):
-    """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0/1
-    if the percentage change to the next extremum exceeds a threshold set for this value.
+    """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0 or 1
+    if the percentage change to the next extremum exceeds the threshold set for this range.
     """
     pos_th = np.asarray(pos_th)
     neg_th = np.asarray(neg_th)
@@ -253,7 +253,7 @@ def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=Tr
 
 @njit(cache=True)
 def pct_trend_labels_nb(close, local_extrema, normalize):
-    """Compute the percentage change of each close value to the next extremum."""
+    """Compute the percentage change of the current value to the next extremum."""
     out = np.empty_like(close, dtype=np.float_)
 
     for col in range(close.shape[1]):

@@ -2,7 +2,7 @@
 [![Code Coverage](https://img.shields.io/codecov/c/github/polakowo/vectorbt?style=for-the-badge)](https://codecov.io/gh/polakowo/vectorbt)
 [![Website](https://img.shields.io/website?style=for-the-badge&url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet&style=for-the-badge)](https://pypi.org/project/vectorbt)
-[![Downloads](https://img.shields.io/pypi/dd/vectorbt?color=orange&style=for-the-badge)](https://pepy.tech/project/vectorbt)
+[![Downloads](https://img.shields.io/pypi/dm/vectorbt?color=orange&style=for-the-badge)](https://pepy.tech/project/vectorbt)
 [![License](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
 [![Gitter](https://img.shields.io/gitter/room/polakowo/vectorbt?color=9cf&style=for-the-badge)](https://gitter.im/vectorbt/community)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)

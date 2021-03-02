@@ -240,6 +240,14 @@ class ArrayWrapper(Configured, PandasIndexer):
         ndim = obj.ndim
         return cls(index, columns, ndim, *args, **kwargs)
 
+    @classmethod
+    def from_shape(cls, shape, *args, **kwargs):
+        """Derive metadata from shape."""
+        index = pd.RangeIndex(start=0, step=1, stop=shape[0])
+        columns = pd.RangeIndex(start=0, step=1, stop=shape[1] if len(shape) > 1 else 1)
+        ndim = len(shape)
+        return cls(index, columns, ndim, *args, **kwargs)
+
     @property
     def index(self):
         """Index."""

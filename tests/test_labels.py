@@ -22,7 +22,7 @@ neg_ths = [np.array([1 / 2, 1 / 3]), np.array([1 / 2, 2 / 3]), np.array([1 / 2, 
 
 # ############# generators.py ############# #
 
-class TestBasic:
+class TestGenerators:
     def test_FMEAN(self):
         pd.testing.assert_frame_equal(
             vbt.FMEAN.run(close_ts, window=(2, 3), ewm=False).fmean,

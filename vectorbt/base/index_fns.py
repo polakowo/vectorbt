@@ -32,28 +32,40 @@ def index_from_values(values, name=None):
 
     value_names = []
     for i, v in enumerate(values):
-        v = np.asarray(v)
-        if np.all(v == v.item(0)):
-            value_names.append(v.item(0))
+        if isinstance(v, np.ndarray):
+            if np.all(v == v.item(0)):
+                value_names.append(v.item(0))
+            else:
+                value_names.append('mix_%d' % i)
         else:
-            value_names.append('mix_%d' % i)
+            value_names.append(v)
     return pd.Index(value_names, name=name)
 
 
-def repeat_index(index, n):
+def repeat_index(index, n, ignore_default=None):
     """Repeat each element in `index` `n` times."""
+    from vectorbt import settings
+
+    if ignore_default is None:
+        ignore_default = settings.broadcasting['ignore_default']
+
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if checks.is_default_index(index):  # ignore simple ranges without name
+    if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     return np.repeat(index, n)
 
 
-def tile_index(index, n):
+def tile_index(index, n, ignore_default=None):
     """Tile the whole `index` `n` times."""
+    from vectorbt import settings
+
+    if ignore_default is None:
+        ignore_default = settings.broadcasting['ignore_default']
+
     if not isinstance(index, pd.Index):
         index = pd.Index(index)
-    if checks.is_default_index(index):  # ignore simple ranges without name
+    if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
         return pd.RangeIndex(start=0, stop=len(index) * n, step=1)
     if isinstance(index, pd.MultiIndex):
         return pd.MultiIndex.from_tuples(np.tile(index, n), names=index.names)
@@ -88,31 +100,16 @@ def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None
     return new_index
 
 
-def combine_indexes(*indexes, **kwargs):
+def combine_indexes(*indexes, ignore_default=None, **kwargs):
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""
     new_index = indexes[0]
     for i in range(1, len(indexes)):
         index1, index2 = new_index, indexes[i]
-        if not isinstance(index1, pd.Index):
-            index1 = pd.Index(index1)
-        if not isinstance(index2, pd.Index):
-            index2 = pd.Index(index2)
-
-        tuples1 = np.repeat(index1.to_numpy(), len(index2))
-        tuples2 = np.tile(index2.to_numpy(), len(index1))
-
-        if isinstance(index1, pd.MultiIndex):
-            index1 = pd.MultiIndex.from_tuples(tuples1, names=index1.names)
-        else:
-            index1 = pd.Index(tuples1, name=index1.name)
-        if isinstance(index2, pd.MultiIndex):
-            index2 = pd.MultiIndex.from_tuples(tuples2, names=index2.names)
-        else:
-            index2 = pd.Index(tuples2, name=index2.name)
-
-        new_index = stack_indexes(index1, index2, **kwargs)
+        new_index1 = repeat_index(index1, len(index2), ignore_default=ignore_default)
+        new_index2 = tile_index(index2, len(index1), ignore_default=ignore_default)
+        new_index = stack_indexes(new_index1, new_index2, **kwargs)
     return new_index
 
 

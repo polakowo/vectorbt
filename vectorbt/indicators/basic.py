@@ -66,7 +66,7 @@ MA = IndicatorFactory(
 ).from_apply_func(
     nb.ma_apply_nb,
     cache_func=nb.ma_cache_nb,
-    pass_kwargs=['adjust'],
+    kwargs_to_args=['adjust'],
     ewm=False,
     adjust=False
 )
@@ -155,7 +155,7 @@ MSTD = IndicatorFactory(
 ).from_apply_func(
     nb.mstd_apply_nb,
     cache_func=nb.mstd_cache_nb,
-    pass_kwargs=['adjust', 'ddof'],
+    kwargs_to_args=['adjust', 'ddof'],
     ewm=False,
     adjust=False,
     ddof=0
@@ -224,7 +224,7 @@ BBANDS = IndicatorFactory(
     input_names=['close'],
     param_names=['window', 'ewm', 'alpha'],
     output_names=['middle', 'upper', 'lower'],
-    custom_output_funcs=dict(
+    custom_output_props=dict(
         percent_b=lambda self: self.wrapper.wrap(
             (self.close.values - self.lower.values) / (self.upper.values - self.lower.values)),
         bandwidth=lambda self: self.wrapper.wrap(
@@ -233,7 +233,7 @@ BBANDS = IndicatorFactory(
 ).from_apply_func(
     nb.bb_apply_nb,
     cache_func=nb.bb_cache_nb,
-    pass_kwargs=['adjust', 'ddof'],
+    kwargs_to_args=['adjust', 'ddof'],
     window=20,
     ewm=False,
     alpha=2,
@@ -351,7 +351,7 @@ RSI = IndicatorFactory(
 ).from_apply_func(
     nb.rsi_apply_nb,
     cache_func=nb.rsi_cache_nb,
-    pass_kwargs=['adjust'],
+    kwargs_to_args=['adjust'],
     window=14,
     ewm=False,
     adjust=False
@@ -450,7 +450,7 @@ STOCH = IndicatorFactory(
 ).from_apply_func(
     nb.stoch_apply_nb,
     cache_func=nb.stoch_cache_nb,
-    pass_kwargs=['adjust'],
+    kwargs_to_args=['adjust'],
     k_window=14,
     d_window=3,
     d_ewm=False,
@@ -562,13 +562,13 @@ MACD = IndicatorFactory(
     input_names=['close'],
     param_names=['fast_window', 'slow_window', 'signal_window', 'macd_ewm', 'signal_ewm'],
     output_names=['macd', 'signal'],
-    custom_output_funcs=dict(
+    custom_output_props=dict(
         hist=lambda self: self.wrapper.wrap(self.macd.values - self.signal.values),
     )
 ).from_apply_func(
     nb.macd_apply_nb,
     cache_func=nb.macd_cache_nb,
-    pass_kwargs=['adjust'],
+    kwargs_to_args=['adjust'],
     fast_window=12,
     slow_window=26,
     signal_window=9,
@@ -680,7 +680,7 @@ ATR = IndicatorFactory(
 ).from_apply_func(
     nb.atr_apply_nb,
     cache_func=nb.atr_cache_nb,
-    pass_kwargs=['adjust'],
+    kwargs_to_args=['adjust'],
     window=14,
     ewm=True,
     adjust=False

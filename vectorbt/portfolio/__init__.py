@@ -12,7 +12,6 @@ An example of how to assess performance of a random strategy on Bitcoin:
 ```python-repl
 >>> import vectorbt as vbt
 >>> import pandas as pd
->>> import yfinance as yf
 
 >>> ohlcv = vbt.utils.data.download("BTC-USD", period="max")
 >>> entries, exits = pd.Series.vbt.signals.generate_random_both(

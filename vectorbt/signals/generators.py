@@ -26,13 +26,13 @@ RAND = SignalFactory(
     param_names=['n']
 ).from_apply_func(  # apply_func since function is (almost) vectorized
     rand_enex_apply_nb,
+    require_input_shape=True,
     param_settings=dict(
         n=flex_col_param_config
     ),
-    pass_kwargs=[
-        ('entry_wait', 1),
-        ('exit_wait', 1)
-    ],
+    kwargs_to_args=['entry_wait', 'exit_wait'],
+    entry_wait=1,
+    exit_wait=1,
     seed=None
 )
 
@@ -52,7 +52,10 @@ class RAND(RAND):
     ```python-repl
     >>> import vectorbt as vbt
 
-    >>> rand = vbt.RAND.run(n=[1, 2, 3], input_shape=(6,), seed=42)
+    >>> rand = vbt.RAND.run(
+    ...     input_shape=(6,),
+    ...     n=[1, 2, 3],
+    ...     seed=42)
 
     >>> rand.entries
     rand_n      1      2      3
@@ -78,11 +81,12 @@ class RAND(RAND):
     >>> import numpy as np
 
     >>> rand = vbt.RAND.run(
+    ...     input_shape=(8, 2),
     ...     n=[np.array([1, 2]), np.array([3, 4])],
-    ...     input_shape=(8, 2), seed=42)
+    ...     seed=42)
 
     >>> rand.entries
-    rand_n         mix_0         mix_1
+    rand_n      1      2      3      4
                 0      1      0      1
     0       False   True   True   True
     1        True  False  False  False
@@ -94,7 +98,7 @@ class RAND(RAND):
     7       False  False  False  False
 
     >>> rand.exits
-    rand_n         mix_0         mix_1
+    rand_n      1      2      3      4
                 0      1      0      1
     0       False  False  False  False
     1       False  False   True   True
@@ -117,6 +121,7 @@ RPROB = SignalFactory(
     short_name='rprob',
     param_names=['entry_prob', 'exit_prob']
 ).from_choice_func(
+    require_input_shape=True,
     entry_choice_func=rand_by_prob_choice_nb,
     entry_settings=dict(
         pass_params=['entry_prob'],
@@ -127,7 +132,7 @@ RPROB = SignalFactory(
         pass_params=['exit_prob'],
         pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
     ),
-    forward_flex_2d=True,
+    pass_flex_2d=True,
     param_settings=dict(
         entry_prob=flex_elem_param_config,
         exit_prob=flex_elem_param_config
@@ -152,8 +157,11 @@ class RPROB(RPROB):
     >>> import vectorbt as vbt
 
     >>> rprob = vbt.RPROB.run(
-    ...     entry_prob=[0.5, 1.], exit_prob=[0.5, 1.],
-    ...     input_shape=(5,), param_product=True, seed=42)
+    ...     input_shape=(5,),
+    ...     entry_prob=[0.5, 1.],
+    ...     exit_prob=[0.5, 1.],
+    ...     param_product=True,
+    ...     seed=42)
 
     >>> rprob.entries
     rprob_entry_prob           0.5           1.0
@@ -181,8 +189,10 @@ class RPROB(RPROB):
     >>> entry_prob1 = np.asarray([1., 0., 1., 0., 1.])
     >>> entry_prob2 = np.asarray([0., 1., 0., 1., 0.])
     >>> rprob = vbt.RPROB.run(
-    ...     entry_prob=[entry_prob1, entry_prob2], exit_prob=1.,
-    ...     input_shape=(5,), seed=42)
+    ...     input_shape=(5,),
+    ...     entry_prob=[entry_prob1, entry_prob2],
+    ...     exit_prob=1.,
+    ...     seed=42)
 
     >>> rprob.entries
     rprob_entry_prob  mix_0  mix_1
@@ -224,7 +234,7 @@ rprobex_func_config = Config(
         pass_params=['prob'],
         pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
     ),
-    forward_flex_2d=True,
+    pass_flex_2d=True,
     param_settings=dict(
         prob=flex_elem_param_config
     ),
@@ -295,7 +305,7 @@ stex_func_config = Config(
         pass_params=['stop', 'trailing'],
         pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
     ),
-    forward_flex_2d=True,
+    pass_flex_2d=True,
     param_settings=dict(
         stop=flex_elem_param_config,
         trailing=flex_elem_param_config
@@ -375,7 +385,7 @@ ohlcstex_func_config = Config(
         pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
         pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
     ),
-    forward_flex_2d=True,
+    pass_flex_2d=True,
     in_output_settings=dict(
         hit_price=dict(
             dtype=np.float_
@@ -384,7 +394,11 @@ ohlcstex_func_config = Config(
             dtype=np.int_
         )
     ),
-    param_settings=dict(stop=flex_elem_param_config),  # param per frame/row/col/element
+    param_settings=dict(
+        sl_stop=flex_elem_param_config,
+        ts_stop=flex_elem_param_config,
+        tp_stop=flex_elem_param_config
+    ),
     sl_stop=0.,
     ts_stop=0.,
     tp_stop=0.,

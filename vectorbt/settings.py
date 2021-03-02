@@ -179,7 +179,8 @@ broadcasting = Config(
         ignore_sr_names=True,
         drop_duplicates=True,
         keep='last',
-        drop_redundant=True
+        drop_redundant=True,
+        ignore_default=True
     ),
     frozen=True
 )

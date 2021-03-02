@@ -349,9 +349,13 @@ class BaseAccessor:
             out.columns = pd.RangeIndex(start=0, stop=len(out.columns), step=1)
         return out
 
-    def apply_and_concat(self, ntimes, *args, apply_func=None, to_2d=False, keys=None, wrap_kwargs=None, **kwargs):
+    def apply_and_concat(self, ntimes, *args, apply_func=None, to_2d=False,
+                         numba_loop=False, keys=None, wrap_kwargs=None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
         See `vectorbt.base.combine_fns.apply_and_concat_one`.
+
+        Set `numba_loop` to True when iterating large number of times over small input,
+        but note that Numba doesn't support variable keyword arguments.
 
         Arguments `*args` and `**kwargs` will be directly passed to `apply_func`.
         If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
@@ -381,7 +385,7 @@ class BaseAccessor:
             obj_arr = reshape_fns.to_2d(self._obj, raw=True)
         else:
             obj_arr = np.asarray(self._obj)
-        if checks.is_numba_func(apply_func):
+        if checks.is_numba_func(apply_func) and numba_loop:
             result = combine_fns.apply_and_concat_one_nb(ntimes, apply_func, obj_arr, *args, **kwargs)
         else:
             result = combine_fns.apply_and_concat_one(ntimes, apply_func, obj_arr, *args, **kwargs)
@@ -439,8 +443,8 @@ class BaseAccessor:
         result = combine_func(new_obj_arr, new_other_arr, *args, **kwargs)
         return new_obj.vbt.wrapper.wrap(result, **merge_dicts({}, wrap_kwargs))
 
-    def combine_with_multiple(self, others, *args, combine_func=None, to_2d=False,
-                              concat=False, broadcast_kwargs=None, keys=None, wrap_kwargs=None, **kwargs):
+    def combine_with_multiple(self, others, *args, combine_func=None, to_2d=False, concat=False,
+                              numba_loop=False, broadcast_kwargs=None, keys=None, wrap_kwargs=None, **kwargs):
         """Combine with `others` using `combine_func`.
 
         All arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
@@ -450,6 +454,9 @@ class BaseAccessor:
         see `vectorbt.base.combine_fns.combine_and_concat`.
         Otherwise, pairwise combine into a Series/DataFrame of the same shape, 
         see `vectorbt.base.combine_fns.combine_multiple`.
+
+        Set `numba_loop` to True when iterating large number of times over small input,
+        but note that Numba doesn't support variable keyword arguments.
 
         Arguments `*args` and `**kwargs` will be directly passed to `combine_func`. 
         If `to_2d` is True, 2-dimensional NumPy arrays will be passed, otherwise as is.
@@ -503,7 +510,7 @@ class BaseAccessor:
             bc_arrays = tuple(map(lambda x: np.asarray(x), (new_obj, *new_others)))
         if concat:
             # Concat the results horizontally
-            if checks.is_numba_func(combine_func):
+            if checks.is_numba_func(combine_func) and numba_loop:
                 for i in range(1, len(bc_arrays)):
                     checks.assert_meta_equal(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_and_concat_nb(bc_arrays[0], bc_arrays[1:], combine_func, *args, **kwargs)
@@ -518,7 +525,7 @@ class BaseAccessor:
             return new_obj.vbt.wrapper.wrap(result, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
         else:
             # Combine arguments pairwise into one object
-            if checks.is_numba_func(combine_func):
+            if checks.is_numba_func(combine_func) and numba_loop:
                 for i in range(1, len(bc_arrays)):
                     checks.assert_dtype_equal(bc_arrays[i - 1], bc_arrays[i])
                 result = combine_fns.combine_multiple_nb(bc_arrays, combine_func, *args, **kwargs)

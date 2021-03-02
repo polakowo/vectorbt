@@ -512,7 +512,6 @@ def rolling_std_1d_nb(a, window, minp=None, ddof=0):
     cumsum_sq = 0
     nancnt_arr = np.zeros_like(a)
     nancnt = 0
-    mean = 0
     for i in range(a.shape[0]):
         if np.isnan(a[i]):
             nancnt = nancnt + 1
