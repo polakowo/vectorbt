@@ -232,7 +232,7 @@ class ParamIndexerFactory:
     ```
     """
 
-    def __new__(self, param_names, class_name='ParamIndexer', module_name='vectorbt.base.indexing'):
+    def __new__(self, param_names, class_name='ParamIndexer', module_name=None):
 
         class ParamIndexer:
             def __init__(self, param_mappers, level_names=None, **kwargs):
@@ -264,6 +264,7 @@ class ParamIndexerFactory:
 
         ParamIndexer.__name__ = class_name
         ParamIndexer.__qualname__ = class_name
-        ParamIndexer.__module__ = module_name
+        if module_name is not None:
+            ParamIndexer.__module__ = module_name
 
         return ParamIndexer

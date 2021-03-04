@@ -48,10 +48,10 @@ class TraceUpdater:
         raise NotImplementedError
 
 
-class Indicator(Configured, TraceUpdater):
+class Gauge(Configured, TraceUpdater):
     def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral',
                  trace_kwargs=None, add_trace_kwargs=None, fig=None, **layout_kwargs):
-        """Create an indicator plot.
+        """Create a gauge plot.
 
         Args:
             value (int or float): The value to be displayed.
@@ -70,14 +70,14 @@ class Indicator(Configured, TraceUpdater):
         ```python-repl
         >>> import vectorbt as vbt
 
-        >>> indicator = vbt.plotting.Indicator(
+        >>> gauge = vbt.plotting.Gauge(
         ...     value=2,
         ...     value_range=(1, 3),
-        ...     label='My Indicator'
+        ...     label='My Gauge'
         ... )
-        >>> indicator.fig
+        >>> gauge.fig
         ```
-        ![](/vectorbt/docs/img/Indicator.png)
+        ![](/vectorbt/docs/img/Gauge.png)
         """
         Configured.__init__(
             self,

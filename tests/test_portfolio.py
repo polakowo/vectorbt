@@ -2822,6 +2822,10 @@ portfolio_shared = vbt.Portfolio.from_orders(
 
 
 class TestPortfolio:
+    def test_config(self):
+        assert vbt.Portfolio.loads(portfolio['a'].dumps()) == portfolio['a']
+        assert vbt.Portfolio.loads(portfolio.dumps()) == portfolio
+
     def test_wrapper(self):
         pd.testing.assert_index_equal(
             portfolio.wrapper.index,

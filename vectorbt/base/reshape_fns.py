@@ -10,7 +10,7 @@ from vectorbt.base import index_fns, array_wrapper
 
 def soft_to_ndim(arg, ndim):
     """Try to softly bring `arg` to the specified number of dimensions `ndim` (max 2)."""
-    if not checks.is_array(arg):
+    if not checks.is_any_array(arg):
         arg = np.asarray(arg)
     if ndim == 1:
         if arg.ndim == 2:
@@ -31,7 +31,7 @@ def to_1d(arg, raw=False):
 
     If `raw` is True, returns NumPy array.
     If 2-dim, will collapse along axis 1 (i.e., DataFrame with one column to Series)."""
-    if raw or not checks.is_array(arg):
+    if raw or not checks.is_any_array(arg):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         if arg.shape[1] == 1:
@@ -50,7 +50,7 @@ def to_2d(arg, raw=False, expand_axis=1):
 
     If `raw` is True, returns NumPy array.
     If 1-dim, will expand along axis 1 (i.e., Series to DataFrame with one column)."""
-    if raw or not checks.is_array(arg):
+    if raw or not checks.is_any_array(arg):
         arg = np.asarray(arg)
     if arg.ndim == 2:
         return arg
@@ -68,7 +68,7 @@ def to_2d(arg, raw=False, expand_axis=1):
 
 def repeat(arg, n, axis=1):
     """Repeat each element in `arg` `n` times along the specified axis."""
-    if not checks.is_array(arg):
+    if not checks.is_any_array(arg):
         arg = np.asarray(arg)
     if axis == 0:
         if checks.is_pandas(arg):
@@ -87,7 +87,7 @@ def repeat(arg, n, axis=1):
 
 def tile(arg, n, axis=1):
     """Repeat the whole `arg` `n` times along the specified axis."""
-    if not checks.is_array(arg):
+    if not checks.is_any_array(arg):
         arg = np.asarray(arg)
     if axis == 0:
         if arg.ndim == 2:
@@ -421,7 +421,7 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
     # Convert to np.ndarray object if not numpy or pandas
     # Also check whether we broadcast to pandas and whether work on 2-dim data
     for i in range(len(args)):
-        if not checks.is_array(args[i]):
+        if not checks.is_any_array(args[i]):
             args[i] = np.asarray(args[i])
         if args[i].ndim > 1:
             is_2d = True
@@ -563,9 +563,9 @@ def broadcast_to(arg1, arg2, to_pd=None, index_from=None, columns_from=None, **k
     array([4, 5, 6])
     ```
     """
-    if not checks.is_array(arg1):
+    if not checks.is_any_array(arg1):
         arg1 = np.asarray(arg1)
-    if not checks.is_array(arg2):
+    if not checks.is_any_array(arg2):
         arg2 = np.asarray(arg2)
     if to_pd is None:
         to_pd = checks.is_pandas(arg2)
@@ -622,7 +622,7 @@ def broadcast_to_axis_of(arg1, arg2, axis, require_kwargs=None):
     For other keyword arguments, see `broadcast`."""
     if require_kwargs is None:
         require_kwargs = {}
-    if not checks.is_array(arg2):
+    if not checks.is_any_array(arg2):
         arg2 = np.asarray(arg2)
     if arg2.ndim < axis + 1:
         return np.broadcast_to(arg1, (1,))[0]  # to a single number

@@ -47,7 +47,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.utils.widgets import FigureWidget
 from vectorbt.generic import nb as generic_nb
 from vectorbt.indicators.factory import IndicatorFactory
@@ -72,15 +71,13 @@ MA = IndicatorFactory(
 )
 
 
-class MA(MA):
+class _MA(MA):
     """Moving Average (MA).
 
     A moving average is a widely used indicator in technical analysis that helps smooth out
     price action by filtering out the “noise” from random short-term price fluctuations. 
 
-    See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp).
-
-    Use `MA.run` or `MA.run_combs` to run the indicator."""
+    See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp)."""
 
     def plot(self,
              column=None,
@@ -140,7 +137,8 @@ class MA(MA):
         return fig
 
 
-fix_class_for_docs(MA)
+setattr(MA, '__doc__', _MA.__doc__)
+setattr(MA, 'plot', _MA.plot)
 
 # ############# MSTD ############# #
 
@@ -162,13 +160,11 @@ MSTD = IndicatorFactory(
 )
 
 
-class MSTD(MSTD):
+class _MSTD(MSTD):
     """Moving Standard Deviation (MSTD).
 
     Standard deviation is an indicator that measures the size of an assets recent price moves
-    in order to predict how volatile the price may be in the future.
-
-    Use `MSTD.run` or `MSTD.run_combs` to run the indicator."""
+    in order to predict how volatile the price may be in the future."""
 
     def plot(self,
              column=None,
@@ -212,7 +208,8 @@ class MSTD(MSTD):
         return fig
 
 
-fix_class_for_docs(MSTD)
+setattr(MSTD, '__doc__', _MSTD.__doc__)
+setattr(MSTD, 'plot', _MSTD.plot)
 
 # ############# BBANDS ############# #
 
@@ -242,16 +239,14 @@ BBANDS = IndicatorFactory(
 )
 
 
-class BBANDS(BBANDS):
+class _BBANDS(BBANDS):
     """Bollinger Bands (BBANDS).
 
     A Bollinger Band® is a technical analysis tool defined by a set of lines plotted two standard
     deviations (positively and negatively) away from a simple moving average (SMA) of the security's
     price, but can be adjusted to user preferences.
 
-    See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp).
-
-    Use `BBANDS.run` or `BBANDS.run_combs` to run the indicator."""
+    See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp)."""
 
     def plot(self,
              column=None,
@@ -336,7 +331,8 @@ class BBANDS(BBANDS):
         return fig
 
 
-fix_class_for_docs(BBANDS)
+setattr(BBANDS, '__doc__', _BBANDS.__doc__)
+setattr(BBANDS, 'plot', _BBANDS.plot)
 
 # ############# RSI ############# #
 
@@ -358,7 +354,7 @@ RSI = IndicatorFactory(
 )
 
 
-class RSI(RSI):
+class _RSI(RSI):
     """Relative Strength Index (RSI).
 
     Compares the magnitude of recent gains and losses over a specified time
@@ -366,9 +362,7 @@ class RSI(RSI):
     primarily used to attempt to identify overbought or oversold conditions in
     the trading of an asset.
 
-    See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp).
-
-    Use `RSI.run` or `RSI.run_combs` to run the indicator."""
+    See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp)."""
 
     def plot(self,
              column=None,
@@ -435,7 +429,8 @@ class RSI(RSI):
         return fig
 
 
-fix_class_for_docs(RSI)
+setattr(RSI, '__doc__', _RSI.__doc__)
+setattr(RSI, 'plot', _RSI.plot)
 
 # ############# STOCH ############# #
 
@@ -458,16 +453,14 @@ STOCH = IndicatorFactory(
 )
 
 
-class STOCH(STOCH):
+class _STOCH(STOCH):
     """Stochastic Oscillator (STOCH).
 
     A stochastic oscillator is a momentum indicator comparing a particular closing price
     of a security to a range of its prices over a certain period of time. It is used to
     generate overbought and oversold trading signals, utilizing a 0-100 bounded range of values.
 
-    See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp).
-
-    Use `STOCH.run` or `STOCH.run_combs` to run the indicator."""
+    See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp)."""
 
     def plot(self,
              column=None,
@@ -550,7 +543,8 @@ class STOCH(STOCH):
         return fig
 
 
-fix_class_for_docs(STOCH)
+setattr(STOCH, '__doc__', _STOCH.__doc__)
+setattr(STOCH, 'plot', _STOCH.plot)
 
 # ############# MACD ############# #
 
@@ -578,15 +572,13 @@ MACD = IndicatorFactory(
 )
 
 
-class MACD(MACD):
+class _MACD(MACD):
     """Moving Average Convergence Divergence (MACD).
 
     Is a trend-following momentum indicator that shows the relationship between
     two moving averages of prices.
 
-    See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp).
-
-    Use `MACD.run` or `MACD.run_combs` to run the indicator."""
+    See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp)."""
 
     def plot(self,
              column=None,
@@ -665,7 +657,8 @@ class MACD(MACD):
         return fig
 
 
-fix_class_for_docs(MACD)
+setattr(MACD, '__doc__', _MACD.__doc__)
+setattr(MACD, 'plot', _MACD.plot)
 
 # ############# ATR ############# #
 
@@ -687,7 +680,7 @@ ATR = IndicatorFactory(
 )
 
 
-class ATR(ATR):
+class _ATR(ATR):
     """Average True Range (ATR).
 
     The indicator provide an indication of the degree of price volatility.
@@ -695,8 +688,6 @@ class ATR(ATR):
     or large True Ranges.
 
     See [Average True Range - ATR](https://www.investopedia.com/terms/a/atr.asp).
-
-    Use `ATR.run` or `ATR.run_combs` to run the indicator.
 
     !!! note
         Uses Simple MA and Exponential MA as compared to Wilder.
@@ -754,7 +745,8 @@ class ATR(ATR):
         return fig
 
 
-fix_class_for_docs(ATR)
+setattr(ATR, '__doc__', _ATR.__doc__)
+setattr(ATR, 'plot', _ATR.plot)
 
 # ############# OBV ############# #
 
@@ -769,14 +761,12 @@ OBV = IndicatorFactory(
 ).from_custom_func(nb.obv_custom_nb)
 
 
-class OBV(OBV):
+class _OBV(OBV):
     """On-balance volume (OBV).
 
     It relates price and volume in the stock market. OBV is based on a cumulative total volume.
 
-    See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp).
-
-    Use `OBV.run` to run the indicator."""
+    See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp)."""
 
     def plot(self,
              column=None,
@@ -820,4 +810,5 @@ class OBV(OBV):
         return fig
 
 
-fix_class_for_docs(OBV)
+setattr(OBV, '__doc__', _OBV.__doc__)
+setattr(OBV, 'plot', _OBV.plot)

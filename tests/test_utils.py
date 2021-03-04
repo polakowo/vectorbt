@@ -903,10 +903,10 @@ class TestChecks:
         assert checks.is_frame(pd.DataFrame([1, 2, 3]))
 
     def test_is_array(self):
-        assert not checks.is_array(0)
-        assert checks.is_array(np.array([0]))
-        assert checks.is_array(pd.Series([1, 2, 3]))
-        assert checks.is_array(pd.DataFrame([1, 2, 3]))
+        assert not checks.is_any_array(0)
+        assert checks.is_any_array(np.array([0]))
+        assert checks.is_any_array(pd.Series([1, 2, 3]))
+        assert checks.is_any_array(pd.DataFrame([1, 2, 3]))
 
     def test_is_numba_func(self):
         def test_func(x):
@@ -985,6 +985,103 @@ class TestChecks:
         assert not checks.method_accepts_argument(test, 'kwargs')
         assert checks.method_accepts_argument(test, '**kwargs')
         assert not checks.method_accepts_argument(test, 'c')
+
+    def test_is_deep_equal(self):
+        sr = pd.Series([1, 2, 3], index=pd.Index(['a', 'b', 'c'], name='index'), name='name')
+        sr2 = pd.Series([1., 2., 3.], index=sr.index, name=sr.name)
+        sr3 = pd.Series([np.nan, 2., 3.], index=sr.index, name=sr.name)
+        sr4 = pd.Series([np.nan, 2., 3. + 1e-15], index=sr.index, name=sr.name)
+        assert checks.is_deep_equal(sr, sr.copy())
+        assert checks.is_deep_equal(sr2, sr2.copy())
+        assert checks.is_deep_equal(sr3, sr3.copy())
+        assert checks.is_deep_equal(sr4, sr4.copy())
+        assert not checks.is_deep_equal(sr, sr2)
+        assert checks.is_deep_equal(sr3, sr4)
+        assert not checks.is_deep_equal(sr3, sr4, rtol=0, atol=1e-16)
+        assert not checks.is_deep_equal(sr3, sr4, check_exact=True)
+        assert not checks.is_deep_equal(sr, sr.rename('name2'))
+        assert checks.is_deep_equal(sr.index, sr.copy().index)
+        assert not checks.is_deep_equal(sr.index, sr.copy().index[:-1])
+        assert not checks.is_deep_equal(sr.index, sr.copy().rename('indx2'))
+        assert checks.is_deep_equal(sr.to_frame(), sr.to_frame().copy())
+        assert not checks.is_deep_equal(sr, sr.to_frame().copy())
+        assert not checks.is_deep_equal(sr.to_frame(), sr.copy())
+
+        arr = np.array([1, 2, 3])
+        arr2 = np.array([1., 2., 3.])
+        arr3 = np.array([np.nan, 2., 3.])
+        arr4 = np.array([np.nan, 2., 3 + 1e-15])
+        assert checks.is_deep_equal(arr, arr.copy())
+        assert checks.is_deep_equal(arr2, arr2.copy())
+        assert checks.is_deep_equal(arr3, arr3.copy())
+        assert checks.is_deep_equal(arr4, arr4.copy())
+        assert not checks.is_deep_equal(arr, arr2)
+        assert checks.is_deep_equal(arr3, arr4)
+        assert not checks.is_deep_equal(arr3, arr4, rtol=0, atol=1e-16)
+        assert not checks.is_deep_equal(arr3, arr4, check_exact=True)
+
+        records_arr = np.asarray([
+            (1, 1.),
+            (2, 2.),
+            (3, 3.),
+        ], dtype=np.dtype([
+            ('a', np.int32),
+            ('b', np.float64)
+        ]))
+        records_arr2 = np.asarray([
+            (1., 1.),
+            (2., 2.),
+            (3., 3.),
+        ], dtype=np.dtype([
+            ('a', np.float64),
+            ('b', np.float64)
+        ]))
+        records_arr3 = np.asarray([
+            (np.nan, 1.),
+            (2., 2.),
+            (3., 3.),
+        ], dtype=np.dtype([
+            ('a', np.float64),
+            ('b', np.float64)
+        ]))
+        records_arr4 = np.asarray([
+            (np.nan, 1.),
+            (2., 2.),
+            (3. + 1e-15, 3.),
+        ], dtype=np.dtype([
+            ('a', np.float64),
+            ('b', np.float64)
+        ]))
+        assert checks.is_deep_equal(records_arr, records_arr.copy())
+        assert checks.is_deep_equal(records_arr2, records_arr2.copy())
+        assert checks.is_deep_equal(records_arr3, records_arr3.copy())
+        assert checks.is_deep_equal(records_arr4, records_arr4.copy())
+        assert not checks.is_deep_equal(records_arr, records_arr2)
+        assert checks.is_deep_equal(records_arr3, records_arr4)
+        assert not checks.is_deep_equal(records_arr3, records_arr4, rtol=0, atol=1e-16)
+        assert not checks.is_deep_equal(records_arr3, records_arr4, check_exact=True)
+
+        assert checks.is_deep_equal([sr, arr, records_arr], [sr, arr, records_arr])
+        assert not checks.is_deep_equal([sr, arr, records_arr], [sr, arr, records_arr2])
+        assert not checks.is_deep_equal([sr, arr, records_arr], [sr, records_arr, arr])
+        assert checks.is_deep_equal(
+            {'sr': sr, 'arr': arr, 'records_arr': records_arr},
+            {'sr': sr, 'arr': arr, 'records_arr': records_arr}
+        )
+        assert not checks.is_deep_equal(
+            {'sr': sr, 'arr': arr, 'records_arr': records_arr},
+            {'sr': sr, 'arr': arr, 'records_arr2': records_arr}
+        )
+        assert not checks.is_deep_equal(
+            {'sr': sr, 'arr': arr, 'records_arr': records_arr},
+            {'sr': sr, 'arr': arr, 'records_arr': records_arr2}
+        )
+
+        assert checks.is_deep_equal(0, 0)
+        assert not checks.is_deep_equal(0, False)
+        assert not checks.is_deep_equal(0, 1)
+        assert checks.is_deep_equal(lambda x: x, lambda x: x)
+        assert not checks.is_deep_equal(lambda x: x, lambda x: 2 * x)
 
     def test_assert_in(self):
         checks.assert_in(0, (0, 1))

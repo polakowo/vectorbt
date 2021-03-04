@@ -1,8 +1,10 @@
 """Utilities for configuration."""
 
-import numpy as np
-import pandas as pd
 from copy import copy
+from collections import namedtuple
+import dill
+
+from vectorbt.utils.checks import is_deep_equal
 
 
 def merge_dicts(*dicts):
@@ -50,8 +52,36 @@ def copy_dict(dct):
 
 _RaiseKeyError = object()
 
+DumpTuple = namedtuple('DumpTuple', ('cls', 'dumps'))
 
-class Config(dict):
+
+class Pickleable:
+    """Superclass that defines abstract properties and methods for pickle-able classes."""
+
+    def dumps(self, **kwargs):
+        """Pickle to a string."""
+        raise NotImplementedError
+
+    @classmethod
+    def loads(cls, dumps, **kwargs):
+        """Unpickle from a string."""
+        raise NotImplementedError
+
+    def save(self, fname, **kwargs):
+        """Save dumps to a file."""
+        dumps = self.dumps(**kwargs)
+        with open(fname, "wb") as f:
+            f.write(dumps)
+
+    @classmethod
+    def load(cls, fname, **kwargs):
+        """Load dumps from a file and create new instance."""
+        with open(fname, "rb") as f:
+            dumps = f.read()
+        return cls.loads(dumps, **kwargs)
+
+
+class Config(dict, Pickleable):
     """Extends dict with config features."""
 
     def __init__(self, *args, frozen=False, read_only=False, **kwargs):
@@ -125,14 +155,45 @@ class Config(dict):
         return self.__class__(merge_dicts(self, other), **kwargs)
 
     def reset(self):
-        """Reset config to initial config."""
+        """Reset to the initial config."""
         if self.read_only:
             raise TypeError("Config is read-only")
         self.update(copy_dict(self.init_config), force_update=True)
 
+    def dumps(self, **kwargs):
+        """Pickle to a string."""
+        config = dict(frozen=self.frozen, read_only=self.read_only)
+        for k, v in self.items():
+            if k in ('frozen', 'readonly'):
+                raise ValueError(f"Keyword argument repeated: {k}")
+            if isinstance(v, Pickleable):
+                config[k] = DumpTuple(cls=v.__class__, dumps=v.dumps(**kwargs))
+            else:
+                config[k] = v
+        return dill.dumps(config, **kwargs)
 
-class Configured:
-    """Class with an initialization config."""
+    @classmethod
+    def loads(cls, dumps, **kwargs):
+        """Unpickle from a string."""
+        config = dill.loads(dumps, **kwargs)
+        for k, v in config.items():
+            if isinstance(v, DumpTuple):
+                config[k] = v.cls.loads(v.dumps, **kwargs)
+        return cls(**config)
+
+    def __eq__(self, other):
+        return is_deep_equal(dict(self), dict(other))
+
+
+class Configured(Pickleable):
+    """Class with an initialization config.
+
+    All operations are done using config rather than the instance, which makes it easier to pickle.
+
+    !!! warning
+        If the instance has writable attributes or depends upon global defaults,
+        their values won't be copied over. Make sure to pass them explicitly to
+        make the saved & loaded / copied instance resilient to changes in globals."""
 
     def __init__(self, **config):
         self._config = Config(config, read_only=True)
@@ -147,50 +208,20 @@ class Configured:
 
         !!! warning
             This "copy" operation won't return a copy of the instance but a new instance
-            initialized with the same config. If the instance has writable attributes,
-            their values won't be copied over."""
+            initialized with the same config."""
         return self.__class__(**self.config.merge_with(new_config))
 
+    def dumps(self, **kwargs):
+        """Pickle to a string."""
+        return self.config.dumps(**kwargs)
+
+    @classmethod
+    def loads(cls, dumps, **kwargs):
+        """Unpickle from a string."""
+        return cls(**Config.loads(dumps, **kwargs))
+
     def __eq__(self, other):
-        """Objects are equals if their configs are equal."""
+        """Objects are equal if their configs are equal."""
         if type(self) != type(other):
             return False
-        my_config = self.config
-        other_config = other.config
-        if my_config.keys() != other_config.keys():
-            return False
-        for k, v in my_config.items():
-            other_v = other_config[k]
-            if isinstance(v, pd.Series) or isinstance(other_v, pd.Series):
-                try:
-                    pd.testing.assert_series_equal(v, other_v)
-                except:
-                    return False
-            elif isinstance(v, pd.DataFrame) or isinstance(other_v, pd.DataFrame):
-                try:
-                    pd.testing.assert_frame_equal(v, other_v)
-                except:
-                    return False
-            elif isinstance(v, pd.Index) or isinstance(other_v, pd.Index):
-                try:
-                    pd.testing.assert_index_equal(v, other_v)
-                except:
-                    return False
-            elif isinstance(v, np.ndarray) or isinstance(other_v, np.ndarray):
-                if v.dtype.fields is not None and other_v.dtype.fields is not None:  # records
-                    if v.dtype.fields != other_v.dtype.fields:
-                        return False
-                    for field in v.dtype.names:
-                        try:
-                            np.testing.assert_array_equal(v[field], other_v[field])
-                        except:
-                            return False
-                else:
-                    try:
-                        np.testing.assert_array_equal(v, other_v)
-                    except:
-                        return False
-            else:
-                if v != other_v:
-                    return False
-        return True
+        return self.config == other.config

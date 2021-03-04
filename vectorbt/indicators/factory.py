@@ -2,11 +2,11 @@
 
 Each indicator is basically a pipeline that:
 
-* Accepts a list of input time series arrays (for example, OHLCV data)
+* Accepts a list of input arrays (for example, OHLCV data)
 * Accepts a list of parameter arrays (for example, window size)
 * Accepts other relevant arguments and keyword arguments
 * For each parameter combination, performs calculation on the input arrays
-* Concatenates results into new output time series arrays (for example, rolling average)
+* Concatenates results into new output arrays (for example, rolling average)
 
 This pipeline can be well standardized, which is done by `run_pipeline`.
 
@@ -15,8 +15,8 @@ a new Python class with various class methods for running the indicator.
 
 Each generated class includes the following features:
 
-* Accepts input time series of any compatible shape thanks to broadcasting
-* Accepts output time series that can be written in-place instead of returning
+* Accepts input arrays of any compatible shape thanks to broadcasting
+* Accepts output arrays written in-place instead of returning
 * Accepts arbitrary parameter grids
 * Supports caching and other optimizations out of the box
 * Supports pandas and parameter indexing
@@ -94,8 +94,6 @@ ma_window              2             3
 2020-01-05  False  False  False  False
 ```
 
-## IndicatorFactory
-
 Now the same using `IndicatorFactory`:
 
 ```python-repl
@@ -116,35 +114,16 @@ of inputs, parameters, and outputs, and the actual calculation function. The fac
 self-contained indicator class capable of running arbitrary configurations of inputs and parameters.
 To run any configuration, we can either use the `run` method (as we did above) or the `run_combs` method.
 
-### Class methods
+## run and run_combs methods
 
-To get details on what arguments are accepted by any of the following methods, use `help`:
-
-```python-repl
->>> help(MyInd.run)
-Help on method run:
-
-run(price, window, short_name='myind', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
-    Run `MyInd` indicator using inputs ['price'], in-place outputs [], and parameters ['window'], to produce outputs ['ma'].
-
-    Pass a list of parameter names `hide_params` to hide their column levels.
-    Set `hide_default` to False to show column levels of parameters with the default value passed.
-
-    Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
-```
-
-#### run method
-
-The main method to run an indicator is `run` that accepts arguments based on the indicator config,
-which can include input time series, in-place output time series, parameters, and other arguments
-for `run_pipeline` (see the example above).
-
-#### run_combs method
+The main method to run an indicator is `run`, which accepts arguments based on the config
+provided to the `IndicatorFactory` (see the example above). These arguments include input arrays,
+in-place output arrays, parameters, and arguments for `run_pipeline`.
 
 The `run_combs` method takes the same inputs as the method above, but computes all combinations
 of passed parameters based on a combinatorial function and returns multiple instances that
-can be compared with each other. This is useful, for example, to generate crossover signals
-of multiple moving averages.
+can be compared with each other. For example, this is useful to generate crossover signals
+of multiple moving averages:
 
 ```python-repl
 >>> myind1, myind2 = MyInd.run_combs(price, [2, 3, 4])
@@ -178,16 +157,35 @@ myind_2_window            3             4             4
 2020-01-05     False  False  False  False  False  False
 ```
 
-The main advantage is that it doesn't re-compute each combination thanks to built-in caching.
+Its main advantage is that it doesn't need to re-compute each combination thanks to smart caching.
 
-### Parameters
+To get details on what arguments are accepted by any of the class methods, use `help`:
+
+```python-repl
+>>> help(MyInd.run)
+Help on method run:
+
+run(price, window, short_name='custom', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
+    Run `Indicator` indicator.
+
+    * Inputs: `price`
+    * Parameters: `window`
+    * Outputs: `ma`
+
+    Pass a list of parameter names as `hide_params` to hide their column levels.
+    Set `hide_default` to False to show the column levels of the parameters with a default value.
+
+    Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
+```
+
+## Parameters
 
 `IndicatorFactory` allows definition of arbitrary parameter grids.
 
 Parameters are variables that can hold one or more values. A single value can be passed as a
 scalar, an array, or any other object. Multiple values are passed as a list or an array
-(if the flag `array_like` is set to False for that parameter). If there are multiple parameters,
-and each is having multiple values, those values will broadcast to a single shape:
+(if the flag `array_like` is set to False for that parameter). If there are multiple parameters
+and each is having multiple values, their values will broadcast to a single shape:
 
 ```plaintext
        p1      p2            result
@@ -197,7 +195,7 @@ and each is having multiple values, those values will broadcast to a single shap
 ```
 
 To illustrate the usage of parameters in indicators, let's build a basic indicator that returns 1
-if the rolling mean is within some bounds (lower and upper) and -1 if it's outside:
+if the rolling mean is within upper and lower bounds, and -1 if it's outside:
 
 ```python-repl
 >>> @njit
@@ -326,10 +324,10 @@ Some parameters are meant to be defined per row, column, or element of the input
 By default, if we pass the parameter value as an array, the indicator will treat this array
 as a list of multiple values - one per input. To make the indicator view this array as a single
 value, set the flag `array_like` to True in `param_settings`. Also, to automatically broadcast
-the passed scalar/array to the shape of the input, set `bc_to_input` to True, 0 (index axis), or 1 (column axis).
+the passed scalar/array to the input shape, set `bc_to_input` to True, 0 (index axis), or 1 (column axis).
 
-In our example, the parameter `window` can be broadcast per column, and both parameters
-`lower` and `upper` can be broadcast per element:
+In our example, the parameter `window` can broadcast per column, and both parameters
+`lower` and `upper` can broadcast per element:
 
 ```python-repl
 >>> @njit
@@ -377,7 +375,7 @@ which preserves the original dimensions of the parameter. This requires two chan
 setting `keep_raw` to True in `broadcast_kwargs` and passing `flex_2d` to the apply function.
 
 There are two configs in `vectorbt.indicators.configs` exactly for this purpose: one for column-wise
-broadcasting and the other one for element-wise broadcasting.
+broadcasting and one for element-wise broadcasting:
 
 ```python-repl
 >>> from vectorbt.base.reshape_fns import flex_select_auto_nb
@@ -413,8 +411,10 @@ broadcasting and the other one for element-wise broadcasting.
 Both bound parameters can now be passed as a scalar (value per whole input), a 1-dimensional
 array (value per row or column, depending upon whether input is a Series or a DataFrame),
 a 2-dimensional array (value per element), or a list of any of those. This allows for the
-highest parameter flexibility at the lowest memory cost. For example, let's build a grid of two
-parameter combinations: one window size per column and both lower and upper bounds per element, each.
+highest parameter flexibility at the lowest memory cost.
+
+For example, let's build a grid of two parameter combinations, each being one window size per column
+and both bounds per element:
 
 ```python-repl
 >>> MyInd.run(
@@ -436,7 +436,7 @@ custom_upper  mix_0 mix_0 mix_1 mix_1
 
 Indicators can also be parameterless. See `vectorbt.indicators.basic.OBV`.
 
-### Inputs
+## Inputs
 
 `IndicatorFactory` supports passing none, one, or multiple inputs. If multiple inputs are passed,
 it tries to broadcast them into a single shape.
@@ -480,11 +480,11 @@ To demonstrate broadcasting, let's pass high as a DataFrame, low as a Series, an
 4  0.529012  0.652602
 ```
 
-By default, if a Series was passed, it is automatically expanded into a 2-dimensional array.
+By default, if a Series was passed, it's automatically expanded into a 2-dimensional array.
 To keep it as 1-dimensional, set `to_2d` to False.
 
 Similar to parameters, we can also define defaults for inputs. In addition to using scalars
-and arrays as default values, we can reference other (required) inputs:
+and arrays as default values, we can reference other inputs:
 
 ```python-repl
 >>> @njit
@@ -513,8 +513,9 @@ and arrays as default values, we can reference other (required) inputs:
 2020-01-05  20.0   4.0
 ```
 
-What if an indicator should not take any time series? In that case, we can provide the input shape.
-Let's define a generator that emulates random returns and generates synthetic price:
+What if an indicator doesn't take any input arrays? In that case, we can force the user to
+at least provide the input shape. Let's define a generator that emulates random returns and
+generates synthetic price:
 
 ```python-repl
 >>> @njit
@@ -588,14 +589,14 @@ custom_p  1  2  3  4  5
 4         0  0  0  0  1
 ```
 
-### Outputs
+## Outputs
 
 There are two types of outputs: regular and in-place outputs:
 
 * Regular outputs are one or more arrays returned by the function. Each should have an exact
 same shape and match the number of columns in the input multiplied by the number of parameter values.
 * In-place outputs are not returned but modified in-place. They broadcast together with inputs
-and are passed as a list, one per parameter.
+and are passed to the calculation function as a list, one per parameter.
 
 Two regular outputs:
 
@@ -652,7 +653,7 @@ Two in-place outputs:
 ```
 
 By default, in-place outputs are created as empty arrays with uninitialized values.
-This allows creation of optional outputs that if not written do not occupy much memory.
+This allows creation of optional outputs that, if not written, do not occupy much memory.
 Since not all outputs are meant to be of data type `float`, we can pass `dtype` in the `in_output_settings`.
 
 ```python-repl
@@ -677,7 +678,7 @@ Since not all outputs are meant to be of data type `float`, we can pass `dtype` 
 2020-01-05   True  False
 ```
 
-Another advantage of in-place outputs is that we can define their default value.
+Another advantage of in-place outputs is that we can provide their initial state:
 
 ```python-repl
 >>> @njit
@@ -711,11 +712,15 @@ Another advantage of in-place outputs is that we can define their default value.
 2020-01-05  10.0   2.0
 ```
 
-### Without Numba
+## Without Numba
 
-It's also possible to supply a function that is not Numba-compiled, for example, to be able to use
-third-party libraries (see the implementation of `IndicatorFactory.from_talib`.). Additionally,
-we can set `keep_pd` to True to pass all inputs as pandas objects.
+It's also possible to supply a function that is not Numba-compiled. This is handy when working with
+third-party libraries (see the implementation of `IndicatorFactory.from_talib`). Additionally,
+we can set `keep_pd` to True to pass all inputs as pandas objects instead of raw NumPy arrays.
+
+!!! note
+    Already broadcasted pandas meta will be provided; that is, each input array will have the
+    same index and columns.
 
 Let's demonstrate this by wrapping a basic composed [pandas_ta](https://github.com/twopirllc/pandas-ta) strategy:
 
@@ -767,11 +772,19 @@ date
 2021-03-02         47984.395969  47956.885953  48150.929668
 ```
 
-### Raw outputs and caching
+In the example above, only one Series per open, high, low, close, and volume can be passed.
+To enable the indicator to process two-dimensional data, set `to_2d` to True and create a loop
+over each column in the `apply_func`.
+
+!!! hint
+    Writing a native Numba-compiled code may provide a performance that is magnitudes higher
+    than that offered by libraries that work on pandas.
+
+## Raw outputs and caching
 
 `IndicatorFactory` re-uses calculation artifacts whenever possible. Since it was originally designed
 for hyperparameter optimization and there are times when parameter values gets repeated,
-prevention of calculation of the same parameter over and over again is inevitable for good performance.
+prevention of processing the same parameter over and over again is inevitable for good performance.
 For instance, when the `run_combs` method is being used and `speedup` is set to True, it first calculates
 the raw outputs of all unique parameter combinations and then uses them to build outputs for
 the whole parameter grid.
@@ -792,10 +805,10 @@ Let's first take a look at a typical raw output by setting `return_raw` to True:
 ```
 
 It consists of a list of the returned output arrays, a list of the zipped parameter combinations,
-the number of columns in the input, and other objects if returned along with output arrays.
-The next time, if we decide to run an indicator on a subset of the parameters above, we can simply
-pass this tuple as `use_raw` argument. This won't call the calculation function and will throw an error
-if some of the requested parameter combinations cannot be found in `raw`.
+the number of input columns, and other objects returned along with output arrays but not listed
+in `output_names`. The next time we decide to run the indicator on a subset of the parameters above,
+we can simply pass this tuple as the `use_raw` argument. This won't call the calculation function and
+will throw an error if some of the requested parameter combinations cannot be found in `raw`.
 
 ```python-repl
 >>> vbt.MA.run(price, 2, True, use_raw=raw).ma
@@ -822,17 +835,21 @@ with and without speedup:
 8.99 ms ± 114 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
-Disable `speedup` if two identical parameter combinations can lead to different results,
-or when requesting raw output, cache, or additional outputs outside of `output_names`.
+!!! note
+    `speedup` is disabled by default.
 
-Another optimization can be introduced by utilizing caching, which has to be implemented by the user.
-The class method `IndicatorFactory.from_apply_func` has an argument `cache_func` for a caching function,
-which is called prior to the main calculation.
+Enable `speedup` if input arrays have few columns and there are tons of repeated parameter combinations.
+Disable `speedup` if input arrays are very wide, if two identical parameter combinations can lead to
+different results, or when requesting raw output, cache, or additional outputs outside of `output_names`.
 
-Consider the following scenario: we want to compute a relative distance between two expensive
+Another performance enhancement can be introduced by caching, which has to be implemented by the user.
+The class method `IndicatorFactory.from_apply_func` has an argument `cache_func`, which is called
+prior to the main calculation.
+
+Consider the following scenario: we want to compute the relative distance between two expensive
 rolling windows. We have already decided on the value for the first window, and want to test
-thousands of values for the second window. Without caching, we would re-calculate the first rolling
-window over and over again and waste our resources:
+thousands of values for the second window. Without caching, and even with `speedup` enabled,
+the first rolling window will be re-calculated over and over again and waste our resources:
 
 ```python-repl
 >>> @njit
@@ -905,9 +922,9 @@ custom_w2                    3
 145 ms ± 4.55 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```
 
-This way, we have cut the processing time almost in half.
+We have cut down the processing time almost in half.
 
-Similar to raw outputs, we can force `IndicatorFactory` to return the cache so it can be used
+Similar to raw outputs, we can force `IndicatorFactory` to return the cache, so it can be used
 in other calculations or even indicators. The clear advantage of this approach is that we don't
 rely on some fixed set of parameter combinations anymore, but on the values of each parameter,
 which gives us more granularity in managing performance.
@@ -919,12 +936,12 @@ which gives us more granularity in managing performance.
 30.1 ms ± 2 ms per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```
 
-### Custom properties and methods
+## Custom properties and methods
 
-Use `custom_output_props` argument when constructing an indicator to define lazy outputs,
-that is, those that are processed only when called. They will become cached properties
-and, in contrast to regular outputs, can have an arbitrary shape. For example, let's
-attach a property that will calculate the distance between each moving average and the price.
+Use `custom_output_props` argument when constructing an indicator to define lazy outputs -
+outputs that are processed only when explicitly called. They will become cached properties
+and, in contrast to regular outputs, they can have an arbitrary shape. For example, let's
+attach a property that will calculate the distance between the moving average and the price.
 
 ```python-repl
 >>> MyInd = vbt.IndicatorFactory(
@@ -944,23 +961,23 @@ custom_window                   2                   3
 2020-01-05     0.111111 -0.333333  0.250000 -0.500000
 ```
 
-Another way of defining own properties and methods is to subclass the indicator.
+Another way of defining own properties and methods is subclassing:
 
 ```python-repl
->>> class MyInd(MyInd):
+>>> class MyIndExtended(MyInd):
 ...     def plot(self, column=None, **kwargs):
 ...         self_col = self.select_series(column=column, group_by=False)
 ...         return self.ma.vbt.plot(**kwargs)
 
->>> MyInd.run(price, [2, 3])[(2, 'a')].plot()
+>>> MyIndExtended.run(price, [2, 3])[(2, 'a')].plot()
 ```
 
 ![](/vectorbt/docs/img/MyInd_plot.png)
 
-### Helper properties and methods
+## Helper properties and methods
 
 For all in `input_names`, `in_output_names`, `output_names`, and `custom_output_props`,
-`IndicatorFactory` creates a bunch of comparison and combination methods, such as for generating signals.
+`IndicatorFactory` will create a bunch of comparison and combination methods, such as for generating signals.
 What kind of methods are created can be regulated using `dtype` in the `attr_settings` dictionary.
 
 ```python-repl
@@ -1006,12 +1023,13 @@ What kind of methods are created can be regulated using `dtype` in the `attr_set
 ]
 ```
 
-Each of these methods and properties were created for sheer convenience - to easily combine
-boolean arrays using logical rules and to compare numeric arrays. All operations are done using NumPy.
-Another advantage is utilization of vectorbt's own broadcasting, such that one can combine inputs
-and outputs with an arbitrary array-like object, given their shapes can broadcast together.
+Each of these methods and properties are created for sheer convenience: to easily combine
+boolean arrays using logical rules and to compare numeric arrays. All operations are done
+strictly using NumPy. Another advantage is utilization of vectorbt's own broadcasting, such
+that one can combine inputs and outputs with an arbitrary array-like object, given their
+shapes can broadcast together.
 
-We can also do comparison with multiple objects at once, given they are provided as a tuple/list:
+We can also do comparison with multiple objects at once by passing them as a tuple/list:
 
 ```python-repl
 >>> myind.price_above([1.5, 2.5])
@@ -1024,10 +1042,11 @@ custom_price_above           1.5           2.5
 2020-01-05           True  False   True  False
 ```
 
-### Indexing
+## Indexing
 
-`IndicatorFactory` also attaches pandas indexing to the indicator class thanks to
-`vectorbt.base.array_wrapper.ArrayWrapper`. Supported are `iloc`, `loc`, `window_loc`, `xs`, and `__getitem__`.
+`IndicatorFactory` attaches pandas indexing to the indicator class thanks to
+`vectorbt.base.array_wrapper.ArrayWrapper`. Supported are `iloc`, `loc`,
+`*param_name*_loc`, `xs`, and `__getitem__`.
 
 This makes possible accessing rows and columns by labels, integer positions, and parameters.
 
@@ -1044,11 +1063,7 @@ This makes possible accessing rows and columns by labels, integer positions, and
 2020-01-04    2.5
 2020-01-05    1.5
 Name: (2, b), dtype: float64
-```
 
-To select the columns according to a parameter value, use `*param_name*_loc[*value*]`.
-
-```python-repl
 >>> ma.window_loc[2].ma
               a    b
 2020-01-01  NaN  NaN
@@ -1273,8 +1288,8 @@ def run_pipeline(
         input_columns (any): Sets columns of each input.
 
             Can be used to label columns if no inputs passed.
-        input_list (list of array_like): A list of time series objects.
-        in_output_list (list of array_like): A list of in-place outputs.
+        input_list (list of array_like): A list of input arrays.
+        in_output_list (list of array_like): A list of in-place output arrays.
             
             If an array should be generated, pass None.
         in_output_settings (dict or list of dict): Settings corresponding to each in-place output.
@@ -1350,7 +1365,7 @@ def run_pipeline(
 
     Here is a subset of tasks that the function `run_pipeline` does:
 
-    * Takes one or multiple time series objects in `input_list` and broadcasts them.
+    * Takes one or multiple array objects in `input_list` and broadcasts them.
 
     ```python-repl
     >>> sr = pd.Series([1, 2], index=['x', 'y'])
@@ -1792,7 +1807,7 @@ def run_pipeline(
             output_list, other_list = _split_output(output)
 
         # In-place outputs are treated as outputs from here
-        output_list += in_output_list
+        output_list = in_output_list + output_list
 
         # Prepare raw
         param_map = list(zip(*param_list_unique))  # account for use_speedup
@@ -1864,17 +1879,24 @@ def run_pipeline(
     # Return artifacts: no pandas objects, just a wrapper and NumPy arrays
     new_ndim = len(input_shape) if output_list[0].shape[1] == 1 else output_list[0].ndim
     wrapper = ArrayWrapper(input_index, new_columns, new_ndim, **wrapper_kwargs)
-    return wrapper, input_list, input_mapper, output_list, param_list, mapper_list, other_list
+    return wrapper, \
+           input_list, \
+           input_mapper, \
+           output_list[:len(in_output_list)], \
+           output_list[len(in_output_list):], \
+           param_list, \
+           mapper_list, \
+           other_list
 
 
-def perform_init_checks(wrapper, input_list, input_mapper, output_list, param_list,
-                        mapper_list, short_name, level_names):
+def perform_init_checks(wrapper, input_list, input_mapper, in_output_list, output_list,
+                        param_list, mapper_list, short_name, level_names):
     """Perform checks on objects created by running or slicing an indicator."""
     if input_mapper is not None:
         checks.assert_equal(input_mapper.shape[0], wrapper.shape_2d[1])
     for ts in input_list:
         checks.assert_equal(ts.shape[0], wrapper.shape_2d[0])
-    for ts in output_list:
+    for ts in in_output_list + output_list:
         checks.assert_equal(ts.shape, wrapper.shape_2d)
     for params in param_list:
         checks.assert_len_equal(param_list[0], params)
@@ -1899,11 +1921,15 @@ def combine_objs(obj, other, *args, level_name=None, keys=None, **kwargs):
     return obj.vbt.combine_with(other, *args, **kwargs)
 
 
+def f(*args):
+    return type(*args)
+
+
 class IndicatorFactory:
     def __init__(self,
                  class_name='Indicator',
                  class_docstring='',
-                 module_name=__name__,
+                 module_name=None,
                  short_name=None,
                  prepend_name=True,
                  input_names=None,
@@ -1926,9 +1952,9 @@ class IndicatorFactory:
 
                 Defaults to lower-case `class_name`.
             prepend_name (bool): Whether to prepend `short_name` to each parameter level.
-            input_names (list of str): A list of names of input time series objects.
+            input_names (list of str): A list of names of input arrays.
             param_names (list of str): A list of names of parameters.
-            in_output_names (list of str): A list of names of in-place output time series objects.
+            in_output_names (list of str): A list of names of in-place output arrays.
 
                 An in-place output is an output that is not returned but modified in-place.
                 Some advantages of such outputs include:
@@ -1937,8 +1963,8 @@ class IndicatorFactory:
                 2) they can be passed between functions as easily as inputs,
                 3) they can be provided with already allocated data to safe memory,
                 4) if data or default value are not provided, they are created empty to not occupy memory.
-            output_names (list of str): A list of names of output time series objects.
-            output_flags (dict): A dictionary of output flags.
+            output_names (list of str): A list of names of output arrays.
+            output_flags (dict): A dictionary of in-place and regular output flags.
             custom_output_props (dict): A dictionary with user-defined functions that will be
                 bound to the indicator class and (if not a property) wrapped with `@cached_property`.
             attr_settings (dict): A dictionary of settings by attribute name.
@@ -1965,7 +1991,8 @@ class IndicatorFactory:
         checks.assert_type(class_docstring, str)
 
         self.module_name = module_name
-        checks.assert_type(module_name, str)
+        if module_name is not None:
+            checks.assert_type(module_name, str)
 
         if short_name is None:
             if class_name == 'Indicator':
@@ -1996,16 +2023,17 @@ class IndicatorFactory:
         if output_names is None:
             output_names = []
         checks.assert_type(output_names, (tuple, list))
-        output_names += in_output_names
-        if len(output_names) == 0:
-            raise ValueError("Must have at least one in-place or regular output")
         self.output_names = output_names
+
+        all_output_names = in_output_names + output_names
+        if len(all_output_names) == 0:
+            raise ValueError("Must have at least one in-place or regular output")
 
         if output_flags is None:
             output_flags = {}
         checks.assert_type(output_flags, dict)
         if len(output_flags) > 0:
-            checks.assert_dict_valid(output_flags, [output_names])
+            checks.assert_dict_valid(output_flags, [all_output_names])
         self.output_flags = output_flags
 
         if custom_output_props is None:
@@ -2016,16 +2044,20 @@ class IndicatorFactory:
         if attr_settings is None:
             attr_settings = {}
         checks.assert_type(attr_settings, dict)
-        all_attr_names = input_names + output_names + list(custom_output_props.keys())
+        all_attr_names = input_names + all_output_names + list(custom_output_props.keys())
         if len(attr_settings) > 0:
             checks.assert_dict_valid(attr_settings, [all_attr_names])
         self.attr_settings = attr_settings
 
         # Set up class
-        ParamIndexer = ParamIndexerFactory(param_names + (['tuple'] if len(param_names) > 1 else []))
+        ParamIndexer = ParamIndexerFactory(
+            param_names + (['tuple'] if len(param_names) > 1 else []),
+            module_name=module_name
+        )
         Indicator = type(self.class_name, (Wrapping, ParamIndexer), {})
-        Indicator.__module__ = self.module_name
         Indicator.__doc__ = self.class_docstring
+        if module_name is not None:
+            Indicator.__module__ = self.module_name
 
         # Add indexing methods
         def _indexing_func(obj, pd_indexing_func):
@@ -2043,6 +2075,9 @@ class IndicatorFactory:
             input_list = []
             for input_name in input_names:
                 input_list.append(getattr(obj, f'_{input_name}')[idx_idxs_arr])
+            in_output_list = []
+            for in_output_name in in_output_names:
+                in_output_list.append(getattr(obj, f'_{in_output_name}')[idx_idxs_arr, :][:, col_idxs_arr])
             output_list = []
             for output_name in output_names:
                 output_list.append(getattr(obj, f'_{output_name}')[idx_idxs_arr, :][:, col_idxs_arr])
@@ -2058,6 +2093,7 @@ class IndicatorFactory:
                 wrapper=new_wrapper,
                 input_list=input_list,
                 input_mapper=input_mapper,
+                in_output_list=in_output_list,
                 output_list=output_list,
                 param_list=param_list,
                 mapper_list=mapper_list
@@ -2075,15 +2111,19 @@ class IndicatorFactory:
         setattr(Indicator, 'level_names', prop)
 
         prop = classproperty(lambda _self: input_names)
-        prop.__doc__ = "Names of the input time series (read-only)."
+        prop.__doc__ = "Names of the input arrays (read-only)."
         setattr(Indicator, 'input_names', prop)
 
         prop = classproperty(lambda _self: param_names)
         prop.__doc__ = "Names of the parameters (read-only)."
         setattr(Indicator, 'param_names', prop)
 
+        prop = classproperty(lambda _self: in_output_names)
+        prop.__doc__ = "Names of the in-place output arrays (read-only)."
+        setattr(Indicator, 'in_output_names', prop)
+
         prop = classproperty(lambda _self: output_names)
-        prop.__doc__ = "Names of the output time series (read-only)."
+        prop.__doc__ = "Names of the regular output arrays (read-only)."
         setattr(Indicator, 'output_names', prop)
 
         prop = classproperty(lambda _self: output_flags)
@@ -2097,9 +2137,7 @@ class IndicatorFactory:
 
         for input_name in input_names:
             def input_prop(_self, input_name=input_name):
-                """Input time series (read-only).
-
-                Will broadcast to match the shape of outputs."""
+                """Input array (read-only)."""
                 old_input = reshape_fns.to_2d(getattr(_self, '_' + input_name), raw=True)
                 input_mapper = getattr(_self, '_input_mapper')
                 if input_mapper is None:
@@ -2109,10 +2147,14 @@ class IndicatorFactory:
             input_prop.__name__ = input_name
             setattr(Indicator, input_name, cached_property(input_prop))
 
-        for output_name in output_names:
-            def output_prop(_self, output_name=output_name):
-                """Output time series (read-only)."""
-                return _self.wrapper.wrap(getattr(_self, '_' + output_name))
+        for output_name in all_output_names:
+            def output_prop(_self, _output_name=output_name):
+                return _self.wrapper.wrap(getattr(_self, '_' + _output_name))
+
+            if output_name in in_output_names:
+                output_prop.__doc__ = """In-place output array (read-only)."""
+            else:
+                output_prop.__doc__ = """Output array (read-only)."""
 
             output_prop.__name__ = output_name
             if output_name in output_flags:
@@ -2123,12 +2165,13 @@ class IndicatorFactory:
             setattr(Indicator, output_name, property(output_prop))
 
         # Add __init__ method
-        def __init__(_self, wrapper, input_list, input_mapper, output_list, param_list,
-                     mapper_list, short_name, level_names):
+        def __init__(_self, wrapper, input_list, input_mapper, in_output_list, output_list,
+                     param_list, mapper_list, short_name, level_names):
             perform_init_checks(
                 wrapper,
                 input_list,
                 input_mapper,
+                in_output_list,
                 output_list,
                 param_list,
                 mapper_list,
@@ -2140,6 +2183,7 @@ class IndicatorFactory:
                 wrapper,
                 input_list=input_list,
                 input_mapper=input_mapper,
+                in_output_list=in_output_list,
                 output_list=output_list,
                 param_list=param_list,
                 mapper_list=mapper_list,
@@ -2150,6 +2194,8 @@ class IndicatorFactory:
             for i, ts_name in enumerate(input_names):
                 setattr(_self, f'_{ts_name}', input_list[i])
             setattr(_self, '_input_mapper', input_mapper)
+            for i, in_output_name in enumerate(in_output_names):
+                setattr(_self, f'_{in_output_name}', in_output_list[i])
             for i, output_name in enumerate(output_names):
                 setattr(_self, f'_{output_name}', output_list[i])
             for i, param_name in enumerate(param_names):
@@ -2288,11 +2334,11 @@ class IndicatorFactory:
         It's up to we to handle caching and concatenate columns for each parameter (for example,
         by using `vectorbt.base.combine_fns.apply_and_concat_one`). Also, you should ensure that
         each output array has an appropriate number of columns, which is the number of columns in
-        input time series multiplied by the number of parameter combinations.
+        input arrays multiplied by the number of parameter combinations.
 
         Args:
-            custom_func (callable): A function that takes broadcast time series corresponding
-                to `input_names`, broadcast in-place output time series corresponding to `in_output_names`,
+            custom_func (callable): A function that takes broadcast arrays corresponding
+                to `input_names`, broadcast in-place output arrays corresponding to `in_output_names`,
                 broadcast parameter arrays corresponding to `param_names`, and other arguments and
                 keyword arguments, and returns outputs corresponding to `output_names` and other objects
                 that are then returned with the indicator instance.
@@ -2376,9 +2422,9 @@ class IndicatorFactory:
         ```
 
         The difference between `apply_func_nb` here and in `IndicatorFactory.from_apply_func` is that
-        here it takes the index of the current parameter combination that you should use to select
-        the parameters. You can also remove the entire `apply_func_nb` and define your logic in
-        `custom_func` (which shouldn't necessarily be Numba-compiled):
+        here it takes the index of the current parameter combination that can be used for parameter selection.
+        You can also remove the entire `apply_func_nb` and define your logic in `custom_func`
+        (which shouldn't necessarily be Numba-compiled):
 
         ```python-repl
         >>> @njit
@@ -2519,7 +2565,7 @@ class IndicatorFactory:
 
             # Run the pipeline
             results = run_pipeline(
-                len(output_names) - len(in_output_names),  # number of returned outputs
+                len(output_names),  # number of returned outputs
                 custom_func,
                 *args,
                 require_input_shape=require_input_shape,
@@ -2538,13 +2584,21 @@ class IndicatorFactory:
                 return results
 
             # Unpack the result
-            wrapper, new_input_list, input_mapper, output_list, new_param_list, mapper_list, other_list = results
+            wrapper, \
+            new_input_list, \
+            input_mapper, \
+            in_output_list, \
+            output_list, \
+            new_param_list, \
+            mapper_list, \
+            other_list = results
 
             # Create a new instance
             obj = cls(
                 wrapper,
                 new_input_list,
                 input_mapper,
+                in_output_list,
                 output_list,
                 new_param_list,
                 mapper_list,
@@ -2604,18 +2658,23 @@ class IndicatorFactory:
             exec(code, scope)
             return scope[func_name]
 
-        run_docstring = """Run `{0}` indicator using inputs {1}, in-place outputs {2}, and parameters {3}, to produce outputs {4}.
+        _0 = self.class_name
+        _1 = ''
+        if len(self.input_names) > 0:
+            _1 += '\n* Inputs: ' + ', '.join(map(lambda x: f'`{x}`', self.input_names))
+        if len(self.in_output_names) > 0:
+            _1 += '\n* In-place outputs: ' + ', '.join(map(lambda x: f'`{x}`', self.in_output_names))
+        if len(self.param_names) > 0:
+            _1 += '\n* Parameters: ' + ', '.join(map(lambda x: f'`{x}`', self.param_names))
+        if len(self.output_names) > 0:
+            _1 += '\n* Outputs: ' + ', '.join(map(lambda x: f'`{x}`', self.output_names))
+        run_docstring = """Run `{0}` indicator.
+{1}
 
-            Pass a list of parameter names `hide_params` to hide their column levels.
-            Set `hide_default` to False to show column levels of parameters with the default value passed.
-            
-            Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.""".format(
-            self.class_name,
-            self.input_names,
-            self.in_output_names,
-            self.param_names,
-            self.output_names
-        )
+Pass a list of parameter names as `hide_params` to hide their column levels.
+Set `hide_default` to False to show the column levels of the parameters with a default value.
+
+Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.""".format(_0, _1)
         run = compile_run_function('run', run_docstring, def_run_kwargs)
         setattr(Indicator, 'run', run)
 
@@ -2716,23 +2775,27 @@ class IndicatorFactory:
             setattr(Indicator, '_run_combs', _run_combs)
 
             # Add public run_combs method
-            run_combs_docstring = """Create a combination of multiple `{0}` indicators using function `comb_func`. 
-                Run each indicator using inputs {1}, in-place outputs {2}, and parameters {3}, to produce outputs {4}.
-                
-                `comb_func` must accept an iterable of parameter tuples and `r`. 
-                Also accepts all combinatoric iterators from itertools such as `itertools.combinations`.
-                Pass `r` to specify how many indicators to run. 
-                Pass `short_names` to specify the short name for each indicator. 
-                Set `speedup` to True to first compute raw outputs for all parameters, 
-                and then use them to build each indicator (faster).
-                
-                Other keyword arguments are passed to `{0}.run`.""".format(
-                self.class_name,
-                self.input_names,
-                self.in_output_names,
-                self.param_names,
-                self.output_names
-            )
+            _0 = self.class_name
+            _1 = ''
+            if len(self.input_names) > 0:
+                _1 += '\n* Inputs: ' + ', '.join(map(lambda x: f'`{x}`', self.input_names))
+            if len(self.in_output_names) > 0:
+                _1 += '\n* In-place outputs: ' + ', '.join(map(lambda x: f'`{x}`', self.in_output_names))
+            if len(self.param_names) > 0:
+                _1 += '\n* Parameters: ' + ', '.join(map(lambda x: f'`{x}`', self.param_names))
+            if len(self.output_names) > 0:
+                _1 += '\n* Outputs: ' + ', '.join(map(lambda x: f'`{x}`', self.output_names))
+            run_combs_docstring = """Create a combination of multiple `{0}` indicators using function `comb_func`.
+{1}
+
+`comb_func` must accept an iterable of parameter tuples and `r`. 
+Also accepts all combinatoric iterators from itertools such as `itertools.combinations`.
+Pass `r` to specify how many indicators to run. 
+Pass `short_names` to specify the short name for each indicator. 
+Set `speedup` to True to first compute raw outputs for all parameters, 
+and then use them to build each indicator (faster).
+
+Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             run_combs = compile_run_function('run_combs', run_combs_docstring, def_run_combs_kwargs)
             setattr(Indicator, 'run_combs', run_combs)
 
@@ -2849,7 +2912,7 @@ class IndicatorFactory:
         in_output_names = self.in_output_names
         param_names = self.param_names
 
-        num_ret_outputs = len(output_names) - len(in_output_names)
+        num_ret_outputs = len(output_names)
 
         # Build a function that selects a parameter tuple
         _0 = "i"
@@ -2896,6 +2959,7 @@ class IndicatorFactory:
 
         def custom_func(input_list, in_output_list, param_list, *args, input_shape=None,
                         col=None, flex_2d=None, return_cache=False, use_cache=None, **_kwargs):
+            """Custom function that forwards inputs and parameters to `apply_func`."""
 
             n_params = len(param_list[0]) if len(param_list) > 0 else 1
             input_tuple = tuple(input_list)
@@ -3009,10 +3073,14 @@ class IndicatorFactory:
         Help on method run:
 
         run(close, timeperiod=30, short_name='sma', hide_params=None, hide_default=True, **kwargs) method of builtins.type instance
-            Run `SMA` indicator using inputs ['close'], in-place outputs [], and parameters ['timeperiod'], to produce outputs ['real'].
+            Run `SMA` indicator.
 
-            Pass a list of parameter names `hide_params` to hide their column levels.
-            Set `hide_default` to False to show column levels of parameters with the default value passed.
+            * Inputs: `close`
+            * Parameters: `timeperiod`
+            * Outputs: `real`
+
+            Pass a list of parameter names as `hide_params` to hide their column levels.
+            Set `hide_default` to False to show the column levels of the parameters with a default value.
 
             Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
         ```
@@ -3030,6 +3098,7 @@ class IndicatorFactory:
                 input_names.append(in_names)
 
         def custom_func(input_list, _, param_list):
+            """Custom function that forwards inputs and parameters to talib."""
             # TA-Lib functions can only process 1-dim arrays
             # TODO: Find ways to call talib from within Numba
             if len(param_list) == 0:

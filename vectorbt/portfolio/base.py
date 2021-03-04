@@ -275,6 +275,45 @@ To reset caching:
 ```python-repl
 >>> vbt.settings.caching.reset()
 ```
+
+## Saving
+
+`Portfolio` subclasses `vectorbt.utils.config.Configured` through `vectorbt.base.array_wrapper.Wrapping`
+intermediary, which gives it an ability to save/load the configuration (that is, all arguments passed
+during initialization) to/from a file.
+
+```python-repl
+>>> portfolio = vbt.Portfolio.from_orders(
+...     ohlcv['Close'], size, price=ohlcv['Open'],
+...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='1D')
+>>> portfolio.sharpe_ratio()
+symbol
+BTC-USD    1.613945
+ETH-USD    2.569913
+XRP-USD    1.379594
+BNB-USD    1.522481
+BCH-USD   -0.015007
+LTC-USD    0.929495
+Name: sharpe_ratio, dtype: float64
+
+>>> portfolio.save('portfolio_config')
+>>> portfolio = vbt.Portfolio.load('portfolio_config')
+>>> portfolio.sharpe_ratio()
+symbol
+BTC-USD    1.613945
+ETH-USD    2.569913
+XRP-USD    1.379594
+BNB-USD    1.522481
+BCH-USD   -0.015007
+LTC-USD    0.929495
+Name: sharpe_ratio, dtype: float64
+```
+
+!!! note
+    Save files won't include neither cached results nor global defaults. For example,
+    passing `incl_unrealized` as None will also use None when the portfolio is loaded from disk.
+
+    Make sure to either pass all arguments explicitly or to save and load the `vectorbt.settings` config.
 """
 
 import numpy as np
@@ -874,7 +913,7 @@ class Portfolio(Wrapping):
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if checks.is_array(call_seq):
+        if checks.is_any_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
@@ -1230,7 +1269,7 @@ class Portfolio(Wrapping):
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if checks.is_array(call_seq):
+        if checks.is_any_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)
@@ -1509,7 +1548,7 @@ class Portfolio(Wrapping):
         from vectorbt import settings
 
         if not checks.is_pandas(close):
-            if not checks.is_array(close):
+            if not checks.is_any_array(close):
                 close = np.asarray(close)
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
         if target_shape is None:
@@ -1576,7 +1615,7 @@ class Portfolio(Wrapping):
                 to_pd=False,
                 **require_kwargs
             )
-        if checks.is_array(call_seq):
+        if checks.is_any_array(call_seq):
             call_seq = nb.require_call_seq(broadcast(call_seq, to_shape=target_shape_2d, to_pd=False))
         else:
             call_seq = nb.build_call_seq(target_shape_2d, group_lens, call_seq_type=call_seq)

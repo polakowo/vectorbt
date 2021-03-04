@@ -3,9 +3,12 @@
 import os
 import numpy as np
 import pandas as pd
+from pandas.core.dtypes.common import is_categorical_dtype, is_number
+from pandas.core.algorithms import safe_sort, take_1d
 from numba.core.registry import CPUDispatcher
 from collections.abc import Iterable
 from inspect import signature
+import dill
 
 # ############# Checks ############# #
 
@@ -25,7 +28,7 @@ def is_pandas(arg):
     return is_series(arg) or is_frame(arg)
 
 
-def is_array(arg):
+def is_any_array(arg):
     """Check whether `arg` is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
@@ -70,17 +73,6 @@ def is_default_index(arg):
     return is_index_equal(arg, pd.RangeIndex(start=0, stop=len(arg), step=1))
 
 
-def is_equal(arg1, arg2, equality_func):
-    """Check whether two objects are equal."""
-    if arg1 is None or arg2 is None:
-        if arg1 is not None or arg2 is not None:
-            return False
-    else:
-        if not equality_func(arg1, arg2):
-            return False
-    return True
-
-
 def is_namedtuple(x):
     """Check whether object is an instance of namedtuple."""
     t = type(x)
@@ -94,7 +86,7 @@ def is_namedtuple(x):
 
 
 def method_accepts_argument(method, arg_name):
-    """Check whether method accepts a positional or keyword argument with name `arg_name`."""
+    """Check whether `method` accepts a positional or keyword argument with name `arg_name`."""
     sig = signature(method)
     if arg_name.startswith('**'):
         return arg_name[2:] in [
@@ -112,7 +104,83 @@ def method_accepts_argument(method, arg_name):
     ]
 
 
+def is_equal(arg1, arg2, equality_func=lambda x, y: x == y):
+    """Check whether two objects are equal."""
+    try:
+        return equality_func(arg1, arg2)
+    except:
+        pass
+    return False
+
+
+def is_deep_equal(arg1, arg2, check_exact=False, **kwargs):
+    """Check whether two objects are equal (deep check)."""
+    def _select_kwargs(_method, _kwargs):
+        __kwargs = dict()
+        if len(kwargs) > 0:
+            for k, v in _kwargs.items():
+                if method_accepts_argument(_method, k):
+                    __kwargs[k] = v
+        return __kwargs
+
+    def _check_array(assert_method):
+        __kwargs = _select_kwargs(assert_method, kwargs)
+        safe_assert(arg1.dtype == arg2.dtype)
+        if arg1.dtype.fields is not None:
+            for field in arg1.dtype.names:
+                assert_method(arg1[field], arg2[field], **__kwargs)
+        else:
+            assert_method(arg1, arg2, **__kwargs)
+
+    try:
+        safe_assert(type(arg1) == type(arg2))
+        if isinstance(arg1, pd.Series):
+            _kwargs = _select_kwargs(pd.testing.assert_series_equal, kwargs)
+            pd.testing.assert_series_equal(arg1, arg2, check_exact=check_exact, **_kwargs)
+        elif isinstance(arg1, pd.DataFrame):
+            _kwargs = _select_kwargs(pd.testing.assert_frame_equal, kwargs)
+            pd.testing.assert_frame_equal(arg1, arg2, check_exact=check_exact, **_kwargs)
+        elif isinstance(arg1, pd.Index):
+            _kwargs = _select_kwargs(pd.testing.assert_index_equal, kwargs)
+            pd.testing.assert_index_equal(arg1, arg2, check_exact=check_exact, **_kwargs)
+        elif isinstance(arg1, np.ndarray):
+            try:
+                _check_array(np.testing.assert_array_equal)
+            except:
+                if check_exact:
+                    return False
+                _check_array(np.testing.assert_allclose)
+        else:
+            if isinstance(arg1, (tuple, list)):
+                for i in range(len(arg1)):
+                    safe_assert(is_deep_equal(arg1[i], arg2[i], **kwargs))
+            elif isinstance(arg1, dict):
+                for k in arg1.keys():
+                    safe_assert(is_deep_equal(arg1[k], arg2[k], **kwargs))
+            else:
+                try:
+                    if arg1 == arg2:
+                        return True
+                except:
+                    pass
+                try:
+                    _kwargs = _select_kwargs(dill.dumps, kwargs)
+                    if dill.dumps(arg1, **_kwargs) == dill.dumps(arg2, **_kwargs):
+                        return True
+                except:
+                    pass
+                return False
+    except:
+        return False
+    return True
+
+
 # ############# Asserts ############# #
+
+def safe_assert(arg, msg='None'):
+    if not arg:
+        raise AssertionError(msg)
+
 
 def assert_in(arg1, arg2):
     """Raise exception if `arg1` is not in `arg2`."""
@@ -158,7 +226,7 @@ def assert_type_equal(arg1, arg2):
 
 def assert_dtype(arg, dtype):
     """Raise exception if `arg` is not of data type `dtype`."""
-    if not is_array(arg):
+    if not is_any_array(arg):
         arg = np.asarray(arg)
     if is_frame(arg):
         for i, col_dtype in enumerate(arg.dtypes):
@@ -171,7 +239,7 @@ def assert_dtype(arg, dtype):
 
 def assert_subdtype(arg, dtype):
     """Raise exception if `arg` is not a sub data type of `dtype`."""
-    if not is_array(arg):
+    if not is_any_array(arg):
         arg = np.asarray(arg)
     if is_frame(arg):
         for i, col_dtype in enumerate(arg.dtypes):
@@ -184,9 +252,9 @@ def assert_subdtype(arg, dtype):
 
 def assert_dtype_equal(arg1, arg2):
     """Raise exception if `arg1` and `arg2` have different data types."""
-    if not is_array(arg1):
+    if not is_any_array(arg1):
         arg1 = np.asarray(arg1)
-    if not is_array(arg2):
+    if not is_any_array(arg2):
         arg2 = np.asarray(arg2)
     if is_frame(arg1):
         dtypes1 = arg1.dtypes.to_numpy()
@@ -207,7 +275,7 @@ def assert_dtype_equal(arg1, arg2):
 
 def assert_ndim(arg, ndims):
     """Raise exception if `arg` has a different number of dimensions than `ndims`."""
-    if not is_array(arg):
+    if not is_any_array(arg):
         arg = np.asarray(arg)
     if isinstance(ndims, Iterable):
         if arg.ndim not in ndims:
@@ -222,14 +290,14 @@ def assert_len_equal(arg1, arg2):
 
     Does not transform arguments to NumPy arrays."""
     if len(arg1) != len(arg2):
-        raise AssertionError(f"Lengths {len(arg1)} and {len(arg2)} do not match")
+        raise AssertionError(f"Lengths of {arg1} and {arg2} do not match")
 
 
 def assert_shape_equal(arg1, arg2, axis=None):
     """Raise exception if `arg1` and `arg2` have different shapes along `axis`."""
-    if not is_array(arg1):
+    if not is_any_array(arg1):
         arg1 = np.asarray(arg1)
-    if not is_array(arg2):
+    if not is_any_array(arg2):
         arg2 = np.asarray(arg2)
     if axis is None:
         if arg1.shape != arg2.shape:
@@ -271,7 +339,7 @@ def assert_array_equal(arg1, arg2):
         arg2 = np.asarray(arg2)
         if np.array_equal(arg1, arg2):
             return
-    raise AssertionError(f"Arrays do not match")
+    raise AssertionError(f"Arrays {arg1} and {arg2} do not match")
 
 
 def assert_level_not_exists(arg, level_name):
@@ -284,10 +352,14 @@ def assert_level_not_exists(arg, level_name):
         raise AssertionError(f"Level {level_name} already exists in {names}")
 
 
-def assert_equal(arg1, arg2):
+def assert_equal(arg1, arg2, deep=False):
     """Raise exception if `arg1` and `arg2` are different."""
-    if arg1 != arg2:
-        raise AssertionError(f"{arg1} and {arg2} do not match")
+    if deep:
+        if not is_deep_equal(arg1, arg2):
+            raise AssertionError(f"{arg1} and {arg2} do not match (deep check)")
+    else:
+        if not is_equal(arg1, arg2):
+            raise AssertionError(f"{arg1} and {arg2} do not match")
 
 
 def assert_dict_valid(arg, lvl_keys):
@@ -303,4 +375,3 @@ def assert_dict_valid(arg, lvl_keys):
     for k, v in arg.items():
         if isinstance(v, dict):
             assert_dict_valid(v, lvl_keys[1:])
-

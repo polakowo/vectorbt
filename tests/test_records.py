@@ -172,6 +172,9 @@ mapped_array_nosort = mapped_array.copy(
 
 
 class TestMappedArray:
+    def test_config(self):
+        assert vbt.MappedArray.loads(mapped_array.dumps()) == mapped_array
+
     def test_mapped_arr(self):
         np.testing.assert_array_equal(
             mapped_array['a'].values,
@@ -910,6 +913,10 @@ class TestMappedArray:
 # ############# base.py ############# #
 
 class TestRecords:
+    def test_config(self):
+        assert vbt.Records.loads(records['a'].dumps()) == records['a']
+        assert vbt.Records.loads(records.dumps()) == records
+
     def test_records(self):
         pd.testing.assert_frame_equal(
             records.records,

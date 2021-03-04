@@ -25,6 +25,16 @@ ts = pd.DataFrame({
 
 
 class TestFactory:
+    def test_config(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
+        def apply_func(ts, p, a, b=10):
+            return ts * p + a + b
+
+        I = F.from_apply_func(apply_func, var_args=True)
+        indicator = I.run(ts, [0, 1], 10, b=100)
+        assert I.loads(indicator.dumps()) == indicator
+
     def test_from_custom_func(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
@@ -881,16 +891,16 @@ class TestFactory:
     def test_in_outputs(self):
         F = vbt.IndicatorFactory(
             input_names=['ts'], param_names=['p'],
-            output_names=['out'], in_output_names=['ts_out']
+            output_names=['out'], in_output_names=['in_out']
         )
 
-        def apply_func(ts, ts_out, p):
-            ts_out[:, 0] = p
+        def apply_func(ts, in_out, p):
+            in_out[:, 0] = p
             return ts * p
 
         @njit
-        def apply_func_nb(ts, ts_out, p):
-            ts_out[:, 0] = p
+        def apply_func_nb(ts, in_out, p):
+            in_out[:, 0] = p
             return ts * p
 
         target = pd.DataFrame(
@@ -911,31 +921,31 @@ class TestFactory:
                 (1, 'c')
             ], names=['custom_p', None])
         )
-        assert F.from_apply_func(apply_func).run(ts, [0, 1])._ts_out.dtype == np.float_
-        assert F.from_apply_func(apply_func, in_output_settings={'ts_out': {'dtype': np.int_}}) \
-                   .run(ts, [0, 1])._ts_out.dtype == np.int_
+        assert F.from_apply_func(apply_func).run(ts, [0, 1])._in_out.dtype == np.float_
+        assert F.from_apply_func(apply_func, in_output_settings={'in_out': {'dtype': np.int_}}) \
+                   .run(ts, [0, 1])._in_out.dtype == np.int_
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, ts_out=-1).run(ts, [0, 1]).ts_out,
+            F.from_apply_func(apply_func, in_out=-1).run(ts, [0, 1]).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, ts_out=-1).run(ts, [0, 1]).ts_out,
+            F.from_apply_func(apply_func_nb, in_out=-1).run(ts, [0, 1]).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts, [0, 1], ts_out=-1).ts_out,
+            F.from_apply_func(apply_func).run(ts, [0, 1], in_out=-1).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb).run(ts, [0, 1], ts_out=-1).ts_out,
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1], in_out=-1).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts, [0, 1], ts_out=np.full(ts.shape, -1, dtype=int)).ts_out,
+            F.from_apply_func(apply_func).run(ts, [0, 1], in_out=np.full(ts.shape, -1, dtype=int)).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb).run(ts, [0, 1], ts_out=np.full(ts.shape, -1, dtype=int)).ts_out,
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1], in_out=np.full(ts.shape, -1, dtype=int)).in_out,
             target
         )
         target = pd.DataFrame(
@@ -954,35 +964,35 @@ class TestFactory:
             ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts, [0, 1, 2], ts_out=-1, per_column=True).ts_out,
+            F.from_apply_func(apply_func).run(ts, [0, 1, 2], in_out=-1, per_column=True).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb).run(ts, [0, 1, 2], ts_out=-1, per_column=True).ts_out,
+            F.from_apply_func(apply_func_nb).run(ts, [0, 1, 2], in_out=-1, per_column=True).in_out,
             target
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func)
-                .run(ts, [0, 1, 2], ts_out=np.full(ts.shape, -1, dtype=int), per_column=True).ts_out,
+                .run(ts, [0, 1, 2], in_out=np.full(ts.shape, -1, dtype=int), per_column=True).in_out,
             target
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func_nb)
-                .run(ts, [0, 1, 2], ts_out=np.full(ts.shape, -1, dtype=int), per_column=True).ts_out,
+                .run(ts, [0, 1, 2], in_out=np.full(ts.shape, -1, dtype=int), per_column=True).in_out,
             target
         )
 
     def test_no_outputs(self):
         F = vbt.IndicatorFactory(
-            param_names=['p'], in_output_names=['ts_out']
+            param_names=['p'], in_output_names=['in_out']
         )
 
-        def apply_func(ts_out, p):
-            ts_out[:] = p
+        def apply_func(in_out, p):
+            in_out[:] = p
 
         @njit
-        def apply_func_nb(ts_out, p):
-            ts_out[:] = p
+        def apply_func_nb(in_out, p):
+            in_out[:] = p
 
         target = pd.DataFrame(
             np.array([
@@ -1003,13 +1013,13 @@ class TestFactory:
             ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, in_output_settings=dict(ts_out=dict(dtype=np.int_)))
-                .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).ts_out,
+            F.from_apply_func(apply_func, in_output_settings=dict(in_out=dict(dtype=np.int_)))
+                .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).in_out,
             target
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func_nb, in_output_settings=dict(ts_out=dict(dtype=np.int_)))
-                .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).ts_out,
+            F.from_apply_func(apply_func_nb, in_output_settings=dict(in_out=dict(dtype=np.int_)))
+                .run([0, 1], input_shape=ts.shape, input_index=ts.index, input_columns=ts.columns).in_out,
             target
         )
 
@@ -1289,79 +1299,79 @@ class TestFactory:
         ]
     )
     def test_to_2d_and_keep_pd(self, test_to_2d, test_keep_pd):
-        F = vbt.IndicatorFactory(input_names=['ts'], in_output_names=['ts_out'], output_names=['out'])
+        F = vbt.IndicatorFactory(input_names=['ts'], in_output_names=['in_out'], output_names=['out'])
 
-        def custom_func(_ts, _ts_out):
+        def custom_func(_ts, _in_out):
             if test_to_2d:
                 assert _ts.ndim == 2
-                for __ts_out in _ts_out:
-                    assert __ts_out.ndim == 2
+                for __in_out in _in_out:
+                    assert __in_out.ndim == 2
                 if test_keep_pd:
                     pd.testing.assert_frame_equal(_ts, ts[['a']].vbt.wrapper.wrap(_ts.values))
-                    for __ts_out in _ts_out:
-                        pd.testing.assert_frame_equal(__ts_out, ts[['a']].vbt.wrapper.wrap(__ts_out.values))
+                    for __in_out in _in_out:
+                        pd.testing.assert_frame_equal(__in_out, ts[['a']].vbt.wrapper.wrap(__in_out.values))
             else:
                 assert _ts.ndim == 1
-                for __ts_out in _ts_out:
-                    assert __ts_out.ndim == 1
+                for __in_out in _in_out:
+                    assert __in_out.ndim == 1
                 if test_keep_pd:
                     pd.testing.assert_series_equal(_ts, ts['a'].vbt.wrapper.wrap(_ts.values))
-                    for __ts_out in _ts_out:
-                        pd.testing.assert_series_equal(__ts_out, ts['a'].vbt.wrapper.wrap(__ts_out.values))
+                    for __in_out in _in_out:
+                        pd.testing.assert_series_equal(__in_out, ts['a'].vbt.wrapper.wrap(__in_out.values))
             return _ts
 
-        def apply_func(_ts, _ts_out):
+        def apply_func(_ts, _in_out):
             if test_to_2d:
                 assert _ts.ndim == 2
-                assert _ts_out.ndim == 2
+                assert _in_out.ndim == 2
                 if test_keep_pd:
                     pd.testing.assert_frame_equal(_ts, ts[['a']].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_frame_equal(_ts_out, ts[['a']].vbt.wrapper.wrap(_ts_out.values))
+                    pd.testing.assert_frame_equal(_in_out, ts[['a']].vbt.wrapper.wrap(_in_out.values))
             else:
                 assert _ts.ndim == 1
-                assert _ts_out.ndim == 1
+                assert _in_out.ndim == 1
                 if test_keep_pd:
                     pd.testing.assert_series_equal(_ts, ts['a'].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_series_equal(_ts_out, ts['a'].vbt.wrapper.wrap(_ts_out.values))
+                    pd.testing.assert_series_equal(_in_out, ts['a'].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
-        _ = F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True)\
+        _ = F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
             .run(ts['a'])
         _ = F.from_apply_func(apply_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
             .run(ts['a'])
 
-        def custom_func(_ts, _ts_out, col=None):
+        def custom_func(_ts, _in_out, col=None):
             if test_to_2d:
                 assert _ts.ndim == 2
-                for __ts_out in _ts_out:
-                    assert __ts_out.ndim == 2
+                for __in_out in _in_out:
+                    assert __in_out.ndim == 2
                 if test_keep_pd:
                     pd.testing.assert_frame_equal(_ts, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts.values))
-                    for __ts_out in _ts_out:
-                        pd.testing.assert_frame_equal(__ts_out, ts.iloc[:, [col]].vbt.wrapper.wrap(__ts_out.values))
+                    for __in_out in _in_out:
+                        pd.testing.assert_frame_equal(__in_out, ts.iloc[:, [col]].vbt.wrapper.wrap(__in_out.values))
             else:
                 assert _ts.ndim == 1
-                for __ts_out in _ts_out:
-                    assert __ts_out.ndim == 1
+                for __in_out in _in_out:
+                    assert __in_out.ndim == 1
                 if test_keep_pd:
                     pd.testing.assert_series_equal(_ts, ts.iloc[:, col].vbt.wrapper.wrap(_ts.values))
-                    for __ts_out in _ts_out:
-                        pd.testing.assert_series_equal(__ts_out, ts.iloc[:, col].vbt.wrapper.wrap(__ts_out.values))
+                    for __in_out in _in_out:
+                        pd.testing.assert_series_equal(__in_out, ts.iloc[:, col].vbt.wrapper.wrap(__in_out.values))
             return _ts
 
-        def apply_func(col, _ts, _ts_out):
+        def apply_func(col, _ts, _in_out):
             if test_to_2d:
                 assert _ts.ndim == 2
-                assert _ts_out.ndim == 2
+                assert _in_out.ndim == 2
                 if test_keep_pd:
                     pd.testing.assert_frame_equal(_ts, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_frame_equal(_ts_out, ts.iloc[:, [col]].vbt.wrapper.wrap(_ts_out.values))
+                    pd.testing.assert_frame_equal(_in_out, ts.iloc[:, [col]].vbt.wrapper.wrap(_in_out.values))
             else:
                 assert _ts.ndim == 1
-                assert _ts_out.ndim == 1
+                assert _in_out.ndim == 1
                 if test_keep_pd:
                     pd.testing.assert_series_equal(_ts, ts.iloc[:, col].vbt.wrapper.wrap(_ts.values))
-                    pd.testing.assert_series_equal(_ts_out, ts.iloc[:, col].vbt.wrapper.wrap(_ts_out.values))
+                    pd.testing.assert_series_equal(_in_out, ts.iloc[:, col].vbt.wrapper.wrap(_in_out.values))
             return _ts
 
         _ = F.from_custom_func(custom_func, to_2d=test_to_2d, keep_pd=test_keep_pd, var_args=True) \
@@ -1708,21 +1718,23 @@ class TestFactory:
             input_names=['ts1', 'ts2'],
             param_names=['p1', 'p2'],
             output_names=['o1', 'o2'],
-            in_output_names=['ts_o1', 'ts_o2'],
+            in_output_names=['in_o1', 'in_o2'],
             output_flags={'o1': 'Hello'}
         )
-        obj = F.from_apply_func(lambda ts1, ts2, p1, p2, ts_o1, ts_o2: (ts1, ts2)).run(ts, ts, [0, 1], 2)
+        obj = F.from_apply_func(lambda ts1, ts2, p1, p2, in_o1, in_o2: (ts1, ts2)).run(ts, ts, [0, 1], 2)
 
         # Class properties
         assert F.input_names == ['ts1', 'ts2']
         assert F.param_names == ['p1', 'p2']
-        assert F.output_names == ['o1', 'o2', 'ts_o1', 'ts_o2']
+        assert F.output_names == ['o1', 'o2']
+        assert F.in_output_names == ['in_o1', 'in_o2']
         assert F.output_flags == {'o1': 'Hello'}
 
         # Instance properties
         assert obj.input_names == ['ts1', 'ts2']
         assert obj.param_names == ['p1', 'p2']
-        assert obj.output_names == ['o1', 'o2', 'ts_o1', 'ts_o2']
+        assert obj.output_names == ['o1', 'o2']
+        assert obj.in_output_names == ['in_o1', 'in_o2']
         assert obj.output_flags == {'o1': 'Hello'}
         assert obj.short_name == 'custom'
         assert obj.level_names == ['custom_p1', 'custom_p2']
@@ -1731,19 +1743,19 @@ class TestFactory:
 
     @pytest.mark.parametrize(
         "test_attr",
-        ['ts1', 'ts2', 'o1', 'o2', 'ts_o1', 'ts_o2', 'co1', 'co2']
+        ['ts1', 'ts2', 'o1', 'o2', 'in_o1', 'in_o2', 'co1', 'co2']
     )
     def test_indexing(self, test_attr):
         obj = vbt.IndicatorFactory(
             input_names=['ts1', 'ts2'],
             param_names=['p1', 'p2'],
             output_names=['o1', 'o2'],
-            in_output_names=['ts_o1', 'ts_o2'],
+            in_output_names=['in_o1', 'in_o2'],
             custom_output_props={
                 'co1': lambda self: self.ts1 + self.ts2,
                 'co2': property(lambda self: self.o1 + self.o2)
             }
-        ).from_apply_func(lambda ts1, ts2, p1, p2, ts_o1, ts_o2: (ts1, ts2)).run(ts, ts + 1, [1, 2], 3)
+        ).from_apply_func(lambda ts1, ts2, p1, p2, in_o1, in_o2: (ts1, ts2)).run(ts, ts + 1, [1, 2], 3)
 
         pd.testing.assert_frame_equal(
             getattr(obj.iloc[np.arange(3), np.arange(3)], test_attr),
@@ -1916,15 +1928,15 @@ class TestFactory:
     def test_dir(self):
         TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
         F = vbt.IndicatorFactory(
-            input_names=['ts'], output_names=['o1', 'o2'], in_output_names=['ts_out'],
+            input_names=['ts'], output_names=['o1', 'o2'], in_output_names=['in_out'],
             attr_settings={
                 'ts': {'dtype': None},
                 'o1': {'dtype': np.float_},
                 'o2': {'dtype': np.bool_},
-                'ts_out': {'dtype': TestEnum}
+                'in_out': {'dtype': TestEnum}
             }
         )
-        test_attr_list = dir(F.from_apply_func(lambda ts, ts_out: (ts + ts_out, ts + ts_out)).run(ts))
+        test_attr_list = dir(F.from_apply_func(lambda ts, in_out: (ts + in_out, ts + in_out)).run(ts))
         assert test_attr_list == [
             '__class__',
             '__delattr__',
@@ -1955,6 +1967,7 @@ class TestFactory:
             '__weakref__',
             '_config',
             '_iloc',
+            '_in_out',
             '_indexing_func',
             '_indexing_kwargs',
             '_input_mapper',
@@ -1965,15 +1978,20 @@ class TestFactory:
             '_run',
             '_short_name',
             '_ts',
-            '_ts_out',
             '_wrapper',
             'apply_func',
             'config',
             'copy',
             'custom_func',
+            'dumps',
             'iloc',
+            'in_out',
+            'in_out_readable',
+            'in_output_names',
             'input_names',
             'level_names',
+            'load',
+            'loads',
             'loc',
             'o1',
             'o1_above',
@@ -1988,14 +2006,13 @@ class TestFactory:
             'param_names',
             'regroup',
             'run',
+            'save',
             'select_series',
             'short_name',
             'ts',
             'ts_above',
             'ts_below',
             'ts_equal',
-            'ts_out',
-            'ts_out_readable',
             'wrapper',
             'xs'
         ]

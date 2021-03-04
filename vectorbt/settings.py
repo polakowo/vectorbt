@@ -8,13 +8,63 @@ For example, you can change default width and height of each plot:
 >>> vbt.settings.layout['height'] = 400
 ```
 
-Changes take effect immediately."""
+Changes take effect immediately.
+
+## Saving
+
+Settings can be saved using `save` and then loaded using `load`.
+
+```python-repl
+>>> vbt.settings.save('my_settings')
+>>> vbt.settings.caching['enabled'] = False
+>>> vbt.settings.caching['enabled']
+False
+
+>>> vbt.settings.load('my_settings')
+>>> vbt.settings.caching['enabled']
+True
+```
+"""
 
 import numpy as np
 import json
+import sys
 import pkgutil
 
 from vectorbt.utils.config import Config
+
+this_module = sys.modules[__name__]
+
+__all__ = [
+    'color_schema',
+    'contrast_color_schema',
+    'light_template',
+    'dark_template',
+    'seaborn_template',
+    'layout',
+    'ohlcv',
+    'array_wrapper',
+    'broadcasting',
+    'caching',
+    'returns',
+    'portfolio'
+]
+
+
+def save(fname, names=__all__, **kwargs):
+    """Save settings to a file."""
+    settings = dict()
+    for k in names:
+        settings[k] = getattr(this_module, k)
+    Config(settings).save(fname, **kwargs)
+
+
+def load(fname, names=__all__, **kwargs):
+    """Load settings from a file."""
+    settings = Config.load(fname, **kwargs)
+    for k in names:
+        setattr(this_module, k, settings[k])
+
 
 __pdoc__ = {}
 

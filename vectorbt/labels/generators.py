@@ -1,6 +1,5 @@
 """Basic look-ahead indicators and label generators."""
 
-from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators.configs import flex_elem_param_config
 from vectorbt.labels import nb
@@ -21,7 +20,8 @@ FMEAN = IndicatorFactory(
     wait=1,
     adjust=False
 )
-"""Look-ahead indicator based on `future_mean_apply_nb`."""
+
+FMEAN.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_mean_apply_nb`."""
 
 FSTD = IndicatorFactory(
     class_name='FSTD',
@@ -37,7 +37,8 @@ FSTD = IndicatorFactory(
     adjust=False,
     ddof=0
 )
-"""Look-ahead indicator based on `future_std_apply_nb`."""
+
+FSTD.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_std_apply_nb`."""
 
 FMIN = IndicatorFactory(
     class_name='FMIN',
@@ -50,7 +51,8 @@ FMIN = IndicatorFactory(
     kwargs_to_args=['wait'],
     wait=1
 )
-"""Look-ahead indicator based on `future_min_apply_nb`."""
+
+FMIN.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_min_apply_nb`."""
 
 FMAX = IndicatorFactory(
     class_name='FMAX',
@@ -63,7 +65,8 @@ FMAX = IndicatorFactory(
     kwargs_to_args=['wait'],
     wait=1
 )
-"""Look-ahead indicator based on `future_max_apply_nb`."""
+
+FMAX.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_max_apply_nb`."""
 
 
 # ############# Label generators ############# #
@@ -88,13 +91,14 @@ FIXLB = IndicatorFactory(
 )
 
 
-class FIXLB(FIXLB):
-    """Label generator based on `fixed_labels_apply_nb`."""
+class _FIXLB(FIXLB):
+    """Label generator based on `vectorbt.labels.nb.fixed_labels_apply_nb`."""
 
     plot = _plot
 
 
-fix_class_for_docs(FIXLB)
+setattr(FIXLB, '__doc__', _FIXLB.__doc__)
+setattr(FIXLB, 'plot', _FIXLB.plot)
 
 MEANLB = IndicatorFactory(
     class_name='MEANLB',
@@ -111,13 +115,14 @@ MEANLB = IndicatorFactory(
 )
 
 
-class MEANLB(MEANLB):
-    """Label generator based on `mean_labels_apply_nb`."""
+class _MEANLB(MEANLB):
+    """Label generator based on `vectorbt.labels.nb.mean_labels_apply_nb`."""
 
     plot = _plot
 
 
-fix_class_for_docs(MEANLB)
+setattr(MEANLB, '__doc__', _MEANLB.__doc__)
+setattr(MEANLB, 'plot', _MEANLB.plot)
 
 LEXLB = IndicatorFactory(
     class_name='LEXLB',
@@ -135,13 +140,14 @@ LEXLB = IndicatorFactory(
 )
 
 
-class LEXLB(LEXLB):
-    """Label generator based on `local_extrema_apply_nb`."""
+class _LEXLB(LEXLB):
+    """Label generator based on `vectorbt.labels.nb.local_extrema_apply_nb`."""
 
     plot = _plot
 
 
-fix_class_for_docs(LEXLB)
+setattr(LEXLB, '__doc__', _LEXLB.__doc__)
+setattr(LEXLB, 'plot', _LEXLB.plot)
 
 TRENDLB = IndicatorFactory(
     class_name='TRENDLB',
@@ -161,13 +167,14 @@ TRENDLB = IndicatorFactory(
 )
 
 
-class TRENDLB(TRENDLB):
-    """Label generator based on `trend_labels_apply_nb`."""
+class _TRENDLB(TRENDLB):
+    """Label generator based on `vectorbt.labels.nb.trend_labels_apply_nb`."""
 
     plot = _plot
 
 
-fix_class_for_docs(TRENDLB)
+setattr(TRENDLB, '__doc__', _TRENDLB.__doc__)
+setattr(TRENDLB, 'plot', _TRENDLB.plot)
 
 BOLB = IndicatorFactory(
     class_name='BOLB',
@@ -189,10 +196,11 @@ BOLB = IndicatorFactory(
 )
 
 
-class BOLB(BOLB):
-    """Label generator based on `breakout_labels_nb`."""
+class _BOLB(BOLB):
+    """Label generator based on `vectorbt.labels.nb.breakout_labels_nb`."""
 
     plot = _plot
 
 
-fix_class_for_docs(BOLB)
+setattr(BOLB, '__doc__', _BOLB.__doc__)
+setattr(BOLB, 'plot', _BOLB.plot)

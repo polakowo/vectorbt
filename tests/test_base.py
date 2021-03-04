@@ -338,6 +338,11 @@ df4_grouped_wrapper_co = df4_grouped_wrapper.copy(column_only_select=True, group
 
 
 class TestArrayWrapper:
+    def test_config(self):
+        assert array_wrapper.ArrayWrapper.loads(sr2_wrapper.dumps()) == sr2_wrapper
+        assert array_wrapper.ArrayWrapper.loads(sr2_wrapper_co.dumps()) == sr2_wrapper_co
+        assert array_wrapper.ArrayWrapper.loads(sr2_grouped_wrapper.dumps()) == sr2_grouped_wrapper
+        assert array_wrapper.ArrayWrapper.loads(sr2_grouped_wrapper_co.dumps()) == sr2_grouped_wrapper_co
 
     def test_indexing_func_meta(self):
         # not grouped
@@ -598,7 +603,8 @@ class TestArrayWrapper:
 
     def test_from_shape(self):
         assert array_wrapper.ArrayWrapper.from_shape((3,)) == \
-               array_wrapper.ArrayWrapper.from_obj(pd.Series(np.empty((3,))))
+               array_wrapper.ArrayWrapper(
+                   pd.RangeIndex(start=0, stop=3, step=1), pd.RangeIndex(start=0, stop=1, step=1), 1)
         assert array_wrapper.ArrayWrapper.from_shape((3, 3)) == \
                array_wrapper.ArrayWrapper.from_obj(pd.DataFrame(np.empty((3, 3))))
 

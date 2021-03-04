@@ -4,7 +4,6 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt.utils.config import Config
-from vectorbt.utils.docs import fix_class_for_docs
 from vectorbt.utils.widgets import FigureWidget
 from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbt.signals.enums import StopType
@@ -37,7 +36,7 @@ RAND = SignalFactory(
 )
 
 
-class RAND(RAND):
+class _RAND(RAND):
     """Random entry and exit signal generator based on the number of signals.
 
     Generates `entries` and `exits` based on `vectorbt.signals.nb.rand_enex_apply_nb`.
@@ -113,7 +112,7 @@ class RAND(RAND):
     pass
 
 
-fix_class_for_docs(RAND)
+setattr(RAND, '__doc__', _RAND.__doc__)
 
 RPROB = SignalFactory(
     class_name='RPROB',
@@ -141,7 +140,7 @@ RPROB = SignalFactory(
 )
 
 
-class RPROB(RPROB):
+class _RPROB(RPROB):
     """Random entry and exit signal generator based on probabilities.
 
     Generates `entries` and `exits` based on `vectorbt.signals.nb.rand_by_prob_choice_nb`.
@@ -216,7 +215,7 @@ class RPROB(RPROB):
     pass
 
 
-fix_class_for_docs(RPROB)
+setattr(RPROB, '__doc__', _RPROB.__doc__)
 
 rprobex_config = Config(
     class_name='RPROBEX',
@@ -249,7 +248,7 @@ RPROBEX = SignalFactory(
 )
 
 
-class RPROBEX(RPROBEX):
+class _RPROBEX(RPROBEX):
     """Random exit signal generator based on probabilities.
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.rand_by_prob_choice_nb`.
@@ -258,7 +257,7 @@ class RPROBEX(RPROBEX):
     pass
 
 
-fix_class_for_docs(RPROBEX)
+setattr(RPROBEX, '__doc__', _RPROBEX.__doc__)
 
 IRPROBEX = SignalFactory(
     **rprobex_config.merge_with(
@@ -273,7 +272,7 @@ IRPROBEX = SignalFactory(
 )
 
 
-class IRPROBEX(IRPROBEX):
+class _IRPROBEX(IRPROBEX):
     """Random exit signal generator based on probabilities.
 
     Iteratively generates `new_entries` and `exits` based on `entries` and
@@ -283,7 +282,7 @@ class IRPROBEX(IRPROBEX):
     pass
 
 
-fix_class_for_docs(IRPROBEX)
+setattr(IRPROBEX, '__doc__', _IRPROBEX.__doc__)
 
 # ############# Stop signals ############# #
 
@@ -321,7 +320,7 @@ STEX = SignalFactory(
 )
 
 
-class STEX(STEX):
+class _STEX(STEX):
     """Exit signal generator based on stop values.
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.stop_choice_nb`.
@@ -332,7 +331,7 @@ class STEX(STEX):
     pass
 
 
-fix_class_for_docs(STEX)
+setattr(STEX, '__doc__', _STEX.__doc__)
 
 ISTEX = SignalFactory(
     **stex_config.merge_with(
@@ -347,7 +346,7 @@ ISTEX = SignalFactory(
 )
 
 
-class ISTEX(ISTEX):
+class _ISTEX(ISTEX):
     """Exit signal generator based on stop values.
 
     Iteratively generates `new_entries` and `exits` based on `entries` and
@@ -357,8 +356,7 @@ class ISTEX(ISTEX):
     pass
 
 
-fix_class_for_docs(ISTEX)
-
+setattr(ISTEX, '__doc__', _ISTEX.__doc__)
 
 # ############# OHLC stop signals ############# #
 
@@ -493,7 +491,7 @@ def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
     return plot
 
 
-class OHLCSTEX(OHLCSTEX):
+class _OHLCSTEX(OHLCSTEX):
     """Advanced exit signal generator based on stop values.
 
     Generates `exits` based on `entries` and `vectorbt.signals.nb.ohlc_stop_choice_nb`.
@@ -565,7 +563,8 @@ class OHLCSTEX(OHLCSTEX):
     plot = _generate_ohlcstex_plot(OHLCSTEX, 'entries')
 
 
-fix_class_for_docs(OHLCSTEX)
+setattr(OHLCSTEX, '__doc__', _OHLCSTEX.__doc__)
+setattr(OHLCSTEX, 'plot', _OHLCSTEX.plot)
 
 IOHLCSTEX = SignalFactory(
     **ohlcstex_config.merge_with(
@@ -580,7 +579,7 @@ IOHLCSTEX = SignalFactory(
 )
 
 
-class IOHLCSTEX(IOHLCSTEX):
+class _IOHLCSTEX(IOHLCSTEX):
     """Advanced exit signal generator based on stop values.
 
     Iteratively generates `new_entries` and `exits` based on `entries` and
@@ -591,4 +590,5 @@ class IOHLCSTEX(IOHLCSTEX):
     plot = _generate_ohlcstex_plot(IOHLCSTEX, 'new_entries')
 
 
-fix_class_for_docs(IOHLCSTEX)
+setattr(IOHLCSTEX, '__doc__', _IOHLCSTEX.__doc__)
+setattr(IOHLCSTEX, 'plot', _IOHLCSTEX.plot)

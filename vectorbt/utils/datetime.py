@@ -18,6 +18,6 @@ def freq_delta(freq):
 
 def to_time_units(obj, freq):
     """Multiply each element with `freq_delta` to get result in time units."""
-    if not checks.is_array(obj):
+    if not checks.is_any_array(obj):
         obj = np.asarray(obj)
     return obj * freq_delta(freq)
