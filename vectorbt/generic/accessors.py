@@ -101,26 +101,6 @@ class GenericAccessor(BaseAccessor):
 
         BaseAccessor.__init__(self, obj, **kwargs)
 
-    def rolling_std(self, window, minp=1, ddof=1, wrap_kwargs=None):  # pragma: no cover
-        """See `vectorbt.generic.nb.rolling_std_nb`."""
-        out = nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof)
-        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
-
-    def expanding_std(self, minp=1, ddof=1, wrap_kwargs=None):  # pragma: no cover
-        """See `vectorbt.generic.nb.expanding_std_nb`."""
-        out = nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof)
-        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
-
-    def ewm_mean(self, span, minp=0, adjust=True, wrap_kwargs=None):  # pragma: no cover
-        """See `vectorbt.generic.nb.ewm_mean_nb`."""
-        out = nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust)
-        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
-
-    def ewm_std(self, span, minp=0, adjust=True, ddof=1, wrap_kwargs=None):  # pragma: no cover
-        """See `vectorbt.generic.nb.ewm_std_nb`."""
-        out = nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof)
-        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
-
     def split_into_ranges(self, n=None, range_len=None, start_idxs=None, end_idxs=None):
         """Either split into `n` ranges each `range_len` long, or split into ranges between
         `start_idxs` and `end_idxs`.
@@ -214,6 +194,26 @@ class GenericAccessor(BaseAccessor):
         new_columns = index_fns.combine_indexes(self.wrapper.columns, range_columns)
         return pd.DataFrame(matrix, columns=new_columns)
 
+    def rolling_std(self, window, minp=None, ddof=1, wrap_kwargs=None):  # pragma: no cover
+        """See `vectorbt.generic.nb.rolling_std_nb`."""
+        out = nb.rolling_std_nb(self.to_2d_array(), window, minp=minp, ddof=ddof)
+        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
+
+    def expanding_std(self, minp=1, ddof=1, wrap_kwargs=None):  # pragma: no cover
+        """See `vectorbt.generic.nb.expanding_std_nb`."""
+        out = nb.expanding_std_nb(self.to_2d_array(), minp=minp, ddof=ddof)
+        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
+
+    def ewm_mean(self, span, minp=0, adjust=True, wrap_kwargs=None):  # pragma: no cover
+        """See `vectorbt.generic.nb.ewm_mean_nb`."""
+        out = nb.ewm_mean_nb(self.to_2d_array(), span, minp=minp, adjust=adjust)
+        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
+
+    def ewm_std(self, span, minp=0, adjust=True, ddof=1, wrap_kwargs=None):  # pragma: no cover
+        """See `vectorbt.generic.nb.ewm_std_nb`."""
+        out = nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof)
+        return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
+
     def apply_along_axis(self, apply_func_nb, *args, axis=0, wrap_kwargs=None):
         """Apply a function `apply_func_nb` along an axis."""
         checks.assert_numba_func(apply_func_nb)
@@ -226,9 +226,9 @@ class GenericAccessor(BaseAccessor):
             raise ValueError("Only axes 0 and 1 are supported")
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def rolling_apply(self, window, apply_func_nb, *args, on_matrix=False, wrap_kwargs=None):
+    def rolling_apply(self, window, apply_func_nb, *args, minp=None, on_matrix=False, wrap_kwargs=None):
         """See `vectorbt.generic.nb.rolling_apply_nb` and
-        `vectorbt.generic.nb.rolling_apply_matrix_nb` for `on_matrix=True`.
+        `vectorbt.generic.nb.rolling_matrix_apply_nb` for `on_matrix=True`.
 
         ## Example
 
@@ -255,14 +255,14 @@ class GenericAccessor(BaseAccessor):
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
-            out = nb.rolling_apply_matrix_nb(self.to_2d_array(), window, apply_func_nb, *args)
+            out = nb.rolling_matrix_apply_nb(self.to_2d_array(), window, minp, apply_func_nb, *args)
         else:
-            out = nb.rolling_apply_nb(self.to_2d_array(), window, apply_func_nb, *args)
+            out = nb.rolling_apply_nb(self.to_2d_array(), window, minp, apply_func_nb, *args)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def expanding_apply(self, apply_func_nb, *args, on_matrix=False, wrap_kwargs=None):
+    def expanding_apply(self, apply_func_nb, *args, minp=1, on_matrix=False, wrap_kwargs=None):
         """See `vectorbt.generic.nb.expanding_apply_nb` and
-        `vectorbt.generic.nb.expanding_apply_matrix_nb` for `on_matrix=True`.
+        `vectorbt.generic.nb.expanding_matrix_apply_nb` for `on_matrix=True`.
 
         ## Example
 
@@ -289,9 +289,9 @@ class GenericAccessor(BaseAccessor):
         checks.assert_numba_func(apply_func_nb)
 
         if on_matrix:
-            out = nb.expanding_apply_matrix_nb(self.to_2d_array(), apply_func_nb, *args)
+            out = nb.expanding_matrix_apply_nb(self.to_2d_array(), minp, apply_func_nb, *args)
         else:
-            out = nb.expanding_apply_nb(self.to_2d_array(), apply_func_nb, *args)
+            out = nb.expanding_apply_nb(self.to_2d_array(), minp, apply_func_nb, *args)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
     def groupby_apply(self, by, apply_func_nb, *args, on_matrix=False, wrap_kwargs=None, **kwargs):

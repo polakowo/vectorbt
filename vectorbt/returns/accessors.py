@@ -79,9 +79,7 @@ class ReturnsAccessor(GenericAccessor):
         """Cumulative returns.
 
         Args:
-            start_value (float or array_like): The starting returns.
-                Will broadcast per column."""
-        start_value = np.broadcast_to(start_value, (len(self.wrapper.columns),))
+            start_value (float or array_like): The starting returns."""
         cumulative = nb.cum_returns_nb(self.to_2d_array(), start_value)
         return self.wrapper.wrap(cumulative, **merge_dicts({}, wrap_kwargs))
 
@@ -89,8 +87,14 @@ class ReturnsAccessor(GenericAccessor):
         """Total return."""
         wrap_kwargs = merge_dicts(dict(name_or_index='total_return'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.cum_returns_final_nb(
-            self.to_2d_array(), np.full(len(self.wrapper.columns), 0.)
+            self.to_2d_array(), 0.
         ), **wrap_kwargs)
+
+    def rolling_total(self, window, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.total`."""
+        return self.wrapper.wrap(nb.rolling_cum_returns_final_nb(
+            self.to_2d_array(), window, minp, 0.
+        ), **merge_dicts({}, wrap_kwargs))
 
     def annualized(self, wrap_kwargs=None):
         """Mean annual growth rate of returns.
@@ -101,17 +105,27 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array(), self.ann_factor
         ), **wrap_kwargs)
 
-    def annualized_volatility(self, levy_alpha=2.0, wrap_kwargs=None):
+    def rolling_annualized(self, window, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.annualized`."""
+        return self.wrapper.wrap(nb.rolling_annualized_return_nb(
+            self.to_2d_array(), window, minp, self.ann_factor
+        ), **merge_dicts({}, wrap_kwargs))
+
+    def annualized_volatility(self, levy_alpha=2.0, ddof=1, wrap_kwargs=None):
         """Annualized volatility of a strategy.
 
         Args:
-            levy_alpha (float or array_like): Scaling relation (Levy stability exponent).
-                Will broadcast per column."""
-        levy_alpha = np.broadcast_to(levy_alpha, (len(self.wrapper.columns),))
+            levy_alpha (float or array_like): Scaling relation (Levy stability exponent)."""
         wrap_kwargs = merge_dicts(dict(name_or_index='annualized_volatility'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.annualized_volatility_nb(
-            self.to_2d_array(), self.ann_factor, levy_alpha
+            self.to_2d_array(), self.ann_factor, levy_alpha, ddof
         ), **wrap_kwargs)
+
+    def rolling_annualized_volatility(self, window, minp=None, levy_alpha=2.0, ddof=1, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.annualized_volatility`."""
+        return self.wrapper.wrap(nb.rolling_annualized_volatility_nb(
+            self.to_2d_array(), window, minp, self.ann_factor, levy_alpha, ddof
+        ), **merge_dicts({}, wrap_kwargs))
 
     def calmar_ratio(self, wrap_kwargs=None):
         """Calmar ratio, or drawdown ratio, of a strategy."""
@@ -120,32 +134,44 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array(), self.ann_factor
         ), **wrap_kwargs)
 
+    def rolling_calmar_ratio(self, window, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.calmar_ratio`."""
+        return self.wrapper.wrap(nb.rolling_calmar_ratio_nb(
+            self.to_2d_array(), window, minp, self.ann_factor
+        ), **merge_dicts({}, wrap_kwargs))
+
     def omega_ratio(self, risk_free=0., required_return=0., wrap_kwargs=None):
         """Omega ratio of a strategy.
 
         Args:
             risk_free (float or array_like): Constant risk-free return throughout the period.
-                Will broadcast per column.
-            required_return (float or array_like): Minimum acceptance return of the investor.
-                Will broadcast per column."""
-        risk_free = np.broadcast_to(risk_free, (len(self.wrapper.columns),))
-        required_return = np.broadcast_to(required_return, (len(self.wrapper.columns),))
+            required_return (float or array_like): Minimum acceptance return of the investor."""
         wrap_kwargs = merge_dicts(dict(name_or_index='omega_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.omega_ratio_nb(
             self.to_2d_array(), self.ann_factor, risk_free, required_return
         ), **wrap_kwargs)
 
-    def sharpe_ratio(self, risk_free=0., wrap_kwargs=None):
+    def rolling_omega_ratio(self, window, minp=None, risk_free=0., required_return=0., wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.omega_ratio`."""
+        return self.wrapper.wrap(nb.rolling_omega_ratio_nb(
+            self.to_2d_array(), window, minp, self.ann_factor, risk_free, required_return
+        ), **merge_dicts({}, wrap_kwargs))
+
+    def sharpe_ratio(self, risk_free=0., ddof=1, wrap_kwargs=None):
         """Sharpe ratio of a strategy.
 
         Args:
-            risk_free (float or array_like): Constant risk-free return throughout the period.
-                Will broadcast per column."""
-        risk_free = np.broadcast_to(risk_free, (len(self.wrapper.columns),))
+            risk_free (float or array_like): Constant risk-free return throughout the period."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sharpe_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.sharpe_ratio_nb(
-            self.to_2d_array(), self.ann_factor, risk_free
+            self.to_2d_array(), self.ann_factor, risk_free, ddof
         ), **wrap_kwargs)
+
+    def rolling_sharpe_ratio(self, window, minp=None, risk_free=0., ddof=1, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.sharpe_ratio`."""
+        return self.wrapper.wrap(nb.rolling_sharpe_ratio_nb(
+            self.to_2d_array(), window, minp, self.ann_factor, risk_free, ddof
+        ), **merge_dicts({}, wrap_kwargs))
 
     def deflated_sharpe_ratio(self, risk_free=0., var_sharpe=None, nb_trials=None,
                               ddof=0, bias=True, wrap_kwargs=None):
@@ -179,13 +205,17 @@ class ReturnsAccessor(GenericAccessor):
         """Downside deviation below a threshold.
 
         Args:
-            required_return (float or array_like): Minimum acceptance return of the investor.
-                Will broadcast per column."""
-        required_return = np.broadcast_to(required_return, (len(self.wrapper.columns),))
+            required_return (float or array_like): Minimum acceptance return of the investor."""
         wrap_kwargs = merge_dicts(dict(name_or_index='downside_risk'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.downside_risk_nb(
             self.to_2d_array(), self.ann_factor, required_return
         ), **wrap_kwargs)
+
+    def rolling_downside_risk(self, window, minp=None, required_return=0., wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.downside_risk`."""
+        return self.wrapper.wrap(nb.rolling_downside_risk_nb(
+            self.to_2d_array(), window, minp, self.ann_factor, required_return
+        ), **merge_dicts({}, wrap_kwargs))
 
     def sortino_ratio(self, required_return=0., wrap_kwargs=None):
         """Sortino ratio of a strategy.
@@ -193,32 +223,44 @@ class ReturnsAccessor(GenericAccessor):
         Args:
             required_return (float or array_like): Minimum acceptance return of the investor.
                 Will broadcast per column."""
-        required_return = np.broadcast_to(required_return, (len(self.wrapper.columns),))
         wrap_kwargs = merge_dicts(dict(name_or_index='sortino_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.sortino_ratio_nb(
             self.to_2d_array(), self.ann_factor, required_return
         ), **wrap_kwargs)
 
-    def information_ratio(self, benchmark_rets, wrap_kwargs=None):
+    def rolling_sortino_ratio(self, window, minp=None, required_return=0., wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.sortino_ratio`."""
+        return self.wrapper.wrap(nb.rolling_sortino_ratio_nb(
+            self.to_2d_array(), window, minp, self.ann_factor, required_return
+        ), **merge_dicts({}, wrap_kwargs))
+
+    def information_ratio(self, benchmark_rets, ddof=1, wrap_kwargs=None):
         """Information ratio of a strategy.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
         benchmark_rets = reshape_fns.broadcast_to(
             reshape_fns.to_2d(benchmark_rets, raw=True),
             reshape_fns.to_2d(self._obj, raw=True))
         wrap_kwargs = merge_dicts(dict(name_or_index='information_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.information_ratio_nb(
-            self.to_2d_array(), benchmark_rets
+            self.to_2d_array(), benchmark_rets, ddof
         ), **wrap_kwargs)
+
+    def rolling_information_ratio(self, window, benchmark_rets, minp=None, ddof=1, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.information_ratio`."""
+        benchmark_rets = reshape_fns.broadcast_to(
+            reshape_fns.to_2d(benchmark_rets, raw=True),
+            reshape_fns.to_2d(self._obj, raw=True))
+        return self.wrapper.wrap(nb.rolling_information_ratio_nb(
+            self.to_2d_array(), window, minp, benchmark_rets, ddof
+        ), **merge_dicts({}, wrap_kwargs))
 
     def beta(self, benchmark_rets, wrap_kwargs=None):
         """Beta.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
         benchmark_rets = reshape_fns.broadcast_to(
             reshape_fns.to_2d(benchmark_rets, raw=True),
             reshape_fns.to_2d(self._obj, raw=True))
@@ -227,22 +269,37 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array(), benchmark_rets
         ), **wrap_kwargs)
 
+    def rolling_beta(self, window, benchmark_rets, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.beta`."""
+        benchmark_rets = reshape_fns.broadcast_to(
+            reshape_fns.to_2d(benchmark_rets, raw=True),
+            reshape_fns.to_2d(self._obj, raw=True))
+        return self.wrapper.wrap(nb.rolling_beta_nb(
+            self.to_2d_array(), window, minp, benchmark_rets
+        ), **merge_dicts({}, wrap_kwargs))
+
     def alpha(self, benchmark_rets, risk_free=0., wrap_kwargs=None):
         """Annualized alpha.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element.
-            risk_free (float or array_like): Constant risk-free return throughout the period.
-                Will broadcast per column."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast.
+            risk_free (float or array_like): Constant risk-free return throughout the period."""
         benchmark_rets = reshape_fns.broadcast_to(
             reshape_fns.to_2d(benchmark_rets, raw=True),
             reshape_fns.to_2d(self._obj, raw=True))
-        risk_free = np.broadcast_to(risk_free, (len(self.wrapper.columns),))
         wrap_kwargs = merge_dicts(dict(name_or_index='alpha'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.alpha_nb(
             self.to_2d_array(), benchmark_rets, self.ann_factor, risk_free
         ), **wrap_kwargs)
+
+    def rolling_alpha(self, window, benchmark_rets, minp=None, risk_free=0., wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.alpha`."""
+        benchmark_rets = reshape_fns.broadcast_to(
+            reshape_fns.to_2d(benchmark_rets, raw=True),
+            reshape_fns.to_2d(self._obj, raw=True))
+        return self.wrapper.wrap(nb.rolling_alpha_nb(
+            self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor, risk_free
+        ), **merge_dicts({}, wrap_kwargs))
 
     def tail_ratio(self, wrap_kwargs=None):
         """Ratio between the right (95%) and left tail (5%)."""
@@ -251,6 +308,12 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array()
         ), **wrap_kwargs)
 
+    def rolling_tail_ratio(self, window, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.tail_ratio`."""
+        return self.wrapper.wrap(nb.rolling_tail_ratio_nb(
+            self.to_2d_array(), window, minp
+        ), **merge_dicts({}, wrap_kwargs))
+
     def common_sense_ratio(self, wrap_kwargs=None):
         """Common Sense Ratio."""
         wrap_kwargs = merge_dicts(dict(name_or_index='common_sense_ratio'), wrap_kwargs)
@@ -258,36 +321,51 @@ class ReturnsAccessor(GenericAccessor):
             self.tail_ratio() * (1 + self.annualized()), raw=True
         ), **wrap_kwargs)
 
+    def rolling_common_sense_ratio(self, window, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.common_sense_ratio`."""
+        return self.wrapper.wrap(reshape_fns.to_1d(
+            self.rolling_tail_ratio(window, minp=minp) * (1 + self.rolling_annualized(window, minp=minp)), raw=True
+        ), **merge_dicts({}, wrap_kwargs))
+
     def value_at_risk(self, cutoff=0.05, wrap_kwargs=None):
         """Value at risk (VaR) of a returns stream.
 
         Args:
             cutoff (float or array_like): Decimal representing the percentage cutoff for the
-                bottom percentile of returns. Will broadcast per column."""
-        cutoff = np.broadcast_to(cutoff, (len(self.wrapper.columns),))
+                bottom percentile of returns."""
         wrap_kwargs = merge_dicts(dict(name_or_index='value_at_risk'), wrap_kwargs)
         return self.wrapper.wrap_reduced(nb.value_at_risk_nb(
             self.to_2d_array(), cutoff
         ), **wrap_kwargs)
 
-    def conditional_value_at_risk(self, cutoff=0.05, wrap_kwargs=None):
+    def rolling_value_at_risk(self, window, minp=None, cutoff=0.05, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.value_at_risk`."""
+        return self.wrapper.wrap(nb.rolling_value_at_risk_nb(
+            self.to_2d_array(), window, minp, cutoff
+        ), **merge_dicts({}, wrap_kwargs))
+
+    def cond_value_at_risk(self, cutoff=0.05, wrap_kwargs=None):
         """Conditional value at risk (CVaR) of a returns stream.
 
         Args:
             cutoff (float or array_like): Decimal representing the percentage cutoff for the
-                bottom percentile of returns. Will broadcast per column."""
-        cutoff = np.broadcast_to(cutoff, (len(self.wrapper.columns),))
-        wrap_kwargs = merge_dicts(dict(name_or_index='conditional_value_at_risk'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(nb.conditional_value_at_risk_nb(
+                bottom percentile of returns."""
+        wrap_kwargs = merge_dicts(dict(name_or_index='cond_value_at_risk'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(nb.cond_value_at_risk_nb(
             self.to_2d_array(), cutoff
         ), **wrap_kwargs)
+
+    def rolling_cond_value_at_risk(self, window, minp=None, cutoff=0.05, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.cond_value_at_risk`."""
+        return self.wrapper.wrap(nb.rolling_cond_value_at_risk_nb(
+            self.to_2d_array(), window, minp, cutoff
+        ), **merge_dicts({}, wrap_kwargs))
 
     def capture(self, benchmark_rets, wrap_kwargs=None):
         """Capture ratio.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
         benchmark_rets = reshape_fns.broadcast_to(
             reshape_fns.to_2d(benchmark_rets, raw=True),
             reshape_fns.to_2d(self._obj, raw=True))
@@ -296,12 +374,20 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array(), benchmark_rets, self.ann_factor
         ), **wrap_kwargs)
 
+    def rolling_capture(self, window, benchmark_rets, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.capture`."""
+        benchmark_rets = reshape_fns.broadcast_to(
+            reshape_fns.to_2d(benchmark_rets, raw=True),
+            reshape_fns.to_2d(self._obj, raw=True))
+        return self.wrapper.wrap(nb.rolling_capture_nb(
+            self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor
+        ), **merge_dicts({}, wrap_kwargs))
+
     def up_capture(self, benchmark_rets, wrap_kwargs=None):
         """Capture ratio for periods when the benchmark return is positive.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
         benchmark_rets = reshape_fns.broadcast_to(
             reshape_fns.to_2d(benchmark_rets, raw=True),
             reshape_fns.to_2d(self._obj, raw=True))
@@ -310,12 +396,20 @@ class ReturnsAccessor(GenericAccessor):
             self.to_2d_array(), benchmark_rets, self.ann_factor
         ), **wrap_kwargs)
 
+    def rolling_up_capture(self, window, benchmark_rets, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.up_capture`."""
+        benchmark_rets = reshape_fns.broadcast_to(
+            reshape_fns.to_2d(benchmark_rets, raw=True),
+            reshape_fns.to_2d(self._obj, raw=True))
+        return self.wrapper.wrap(nb.rolling_up_capture_nb(
+            self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor
+        ), **merge_dicts({}, wrap_kwargs))
+
     def down_capture(self, benchmark_rets, wrap_kwargs=None):
         """Capture ratio for periods when the benchmark return is negative.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against.
-                Will broadcast per element."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
         benchmark_rets = reshape_fns.broadcast_to(
             reshape_fns.to_2d(benchmark_rets, raw=True),
             reshape_fns.to_2d(self._obj, raw=True))
@@ -323,6 +417,15 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(nb.down_capture_nb(
             self.to_2d_array(), benchmark_rets, self.ann_factor
         ), **wrap_kwargs)
+
+    def rolling_down_capture(self, window, benchmark_rets, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.down_capture`."""
+        benchmark_rets = reshape_fns.broadcast_to(
+            reshape_fns.to_2d(benchmark_rets, raw=True),
+            reshape_fns.to_2d(self._obj, raw=True))
+        return self.wrapper.wrap(nb.rolling_down_capture_nb(
+            self.to_2d_array(), window, minp, benchmark_rets, self.ann_factor
+        ), **merge_dicts({}, wrap_kwargs))
 
     def drawdown(self, wrap_kwargs=None):
         """Relative decline from a peak."""
@@ -334,6 +437,12 @@ class ReturnsAccessor(GenericAccessor):
         return self.wrapper.wrap_reduced(nb.max_drawdown_nb(
             self.to_2d_array()
         ), **wrap_kwargs)
+
+    def rolling_max_drawdown(self, window, minp=None, wrap_kwargs=None):
+        """Rolling version of `ReturnsAccessor.max_drawdown`."""
+        return self.wrapper.wrap(nb.rolling_max_drawdown_nb(
+            self.to_2d_array(), window, minp
+        ), **merge_dicts({}, wrap_kwargs))
 
     @cached_property
     def drawdowns(self):

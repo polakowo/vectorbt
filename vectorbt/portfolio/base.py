@@ -394,7 +394,7 @@ def add_returns_methods(func_names):
             if isinstance(func_name, tuple):
                 func_name = func_name[1]
             returns_method.__name__ = func_name
-            returns_method.__qualname__ = f"Portfolio.{func_name}"
+            returns_method.__qualname__ = f"{cls.__name__}.{func_name}"
             returns_method.__doc__ = f"See `vectorbt.returns.accessors.ReturnsAccessor.{ret_func_name}`."
             setattr(cls, func_name, cached_method(returns_method))
         return cls
@@ -419,7 +419,7 @@ def add_returns_methods(func_names):
     'alpha',
     'tail_ratio',
     'value_at_risk',
-    'conditional_value_at_risk',
+    'cond_value_at_risk',
     'capture',
     'up_capture',
     'down_capture',

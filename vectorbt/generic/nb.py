@@ -215,7 +215,7 @@ def product_1d_nb(a):
     Numba equivalent to `pd.Series(a).prod()`."""
     out = a[0]
     for i in range(1, a.shape[0]):
-        if ~np.isnan(a[i]):
+        if not np.isnan(a[i]):
             if np.isnan(out):
                 out = a[i]
             else:
@@ -240,7 +240,7 @@ def cumsum_1d_nb(a):
     out = np.empty_like(a, dtype=np.float_)
     cumsum = 0
     for i in range(a.shape[0]):
-        if ~np.isnan(a[i]):
+        if not np.isnan(a[i]):
             cumsum += a[i]
             out[i] = cumsum
         else:
@@ -265,7 +265,7 @@ def cumprod_1d_nb(a):
     out = np.empty_like(a, dtype=np.float_)
     cumprod = 1
     for i in range(a.shape[0]):
-        if ~np.isnan(a[i]):
+        if not np.isnan(a[i]):
             cumprod *= a[i]
             out[i] = cumprod
         else:
@@ -548,7 +548,7 @@ def rolling_std_nb(a, window, minp=None, ddof=0):
 
 
 @njit(cache=True)
-def ewm_mean_1d_nb(a, span, minp=None, adjust=False):
+def ewm_mean_1d_nb(a, span, minp=0, adjust=False):
     """Return exponential weighted average.
 
     Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp, adjust=adjust).mean()`.
@@ -593,7 +593,7 @@ def ewm_mean_1d_nb(a, span, minp=None, adjust=False):
 
 
 @njit(cache=True)
-def ewm_mean_nb(a, span, minp=None, adjust=False):
+def ewm_mean_nb(a, span, minp=0, adjust=False):
     """2-dim version of `ewm_mean_1d_nb`."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
@@ -602,7 +602,7 @@ def ewm_mean_nb(a, span, minp=None, adjust=False):
 
 
 @njit(cache=True)
-def ewm_std_1d_nb(a, span, minp=None, adjust=False, ddof=0):
+def ewm_std_1d_nb(a, span, minp=0, adjust=False, ddof=0):
     """Return exponential weighted standard deviation.
 
     Numba equivalent to `pd.Series(a).ewm(span=span, min_periods=minp).std(ddof=ddof)`.
@@ -683,7 +683,7 @@ def ewm_std_1d_nb(a, span, minp=None, adjust=False, ddof=0):
 
 
 @njit(cache=True)
-def ewm_std_nb(a, span, minp=None, adjust=False, ddof=0):
+def ewm_std_nb(a, span, minp=0, adjust=False, ddof=0):
     """2-dim version of `ewm_std_1d_nb`."""
     out = np.empty_like(a, dtype=np.float_)
     for col in range(a.shape[1]):
@@ -705,7 +705,7 @@ def expanding_min_1d_nb(a, minp=1):
     for i in range(a.shape[0]):
         if np.isnan(minv) or a[i] < minv:
             minv = a[i]
-        if ~np.isnan(a[i]):
+        if not np.isnan(a[i]):
             cnt += 1
         if cnt < minp:
             out[i] = np.nan
@@ -734,7 +734,7 @@ def expanding_max_1d_nb(a, minp=1):
     for i in range(a.shape[0]):
         if np.isnan(maxv) or a[i] > maxv:
             maxv = a[i]
-        if ~np.isnan(a[i]):
+        if not np.isnan(a[i]):
             cnt += 1
         if cnt < minp:
             out[i] = np.nan
@@ -806,42 +806,71 @@ def apply_along_1_nb(a, apply_func_nb, *args):
 
 
 @njit
-def rolling_apply_nb(a, window, apply_func_nb, *args):
+def rolling_apply_nb(a, window, minp, apply_func_nb, *args):
     """Provide rolling window calculations.
 
     `apply_func_nb` should accept index of the row, index of the column,
     the array, and `*args`. Should return a single value."""
+    if minp is None:
+        minp = window
     out = np.empty_like(a, dtype=np.float_)
+    nancnt_arr = np.empty((a.shape[0],), dtype=np.int_)
     for col in range(a.shape[1]):
+        nancnt = 0
         for i in range(a.shape[0]):
-            window_a = a[max(0, i + 1 - window):i + 1, col]
-            out[i, col] = apply_func_nb(i, col, window_a, *args)
+            if np.isnan(a[i, col]):
+                nancnt = nancnt + 1
+            nancnt_arr[i] = nancnt
+            if i < window:
+                valid_cnt = i + 1 - nancnt
+            else:
+                valid_cnt = window - (nancnt - nancnt_arr[i - window])
+            if valid_cnt < minp:
+                out[i, col] = np.nan
+            else:
+                window_a = a[max(0, i + 1 - window):i + 1, col]
+                out[i, col] = apply_func_nb(i, col, window_a, *args)
     return out
 
 
 @njit
-def rolling_apply_matrix_nb(a, window, apply_func_nb, *args):
+def rolling_matrix_apply_nb(a, window, minp, apply_func_nb, *args):
     """`rolling_apply_nb` with `apply_func_nb` being applied on all columns at once.
 
     `apply_func_nb` should accept index of the row, the 2-dim array, and `*args`.
     Should return a single value or an array of shape `a.shape[1]`."""
+    if minp is None:
+        minp = window
     out = np.empty_like(a, dtype=np.float_)
+    nancnt_arr = np.empty((a.shape[0],), dtype=np.int_)
     for i in range(a.shape[0]):
-        window_a = a[max(0, i + 1 - window):i + 1, :]
-        out[i, :] = apply_func_nb(i, window_a, *args)
+        nancnt = 0
+        for col in range(a.shape[1]):
+            if np.isnan(a[i, col]):
+                nancnt = nancnt + 1
+        nancnt_arr[i] = nancnt
+        if i < window:
+            valid_cnt = i + 1 - nancnt
+        else:
+            valid_cnt = window - (nancnt - nancnt_arr[i - window])
+        if valid_cnt < minp:
+            out[i, :] = np.nan
+        else:
+            window_a = a[max(0, i + 1 - window):i + 1, :]
+            out[i, :] = apply_func_nb(i, window_a, *args)
     return out
 
 
 @njit
-def expanding_apply_nb(a, apply_func_nb, *args):
+def expanding_apply_nb(a, minp, apply_func_nb, *args):
     """Expanding version of `rolling_apply_nb`."""
-    return rolling_apply_nb(a, a.shape[0], apply_func_nb, *args)
+    return rolling_apply_nb(a, a.shape[0], minp, apply_func_nb, *args)
 
 
 @njit
-def expanding_apply_matrix_nb(a, apply_func_nb, *args):
-    """Expanding version of `rolling_apply_matrix_nb`."""
-    return rolling_apply_matrix_nb(a, a.shape[0], apply_func_nb, *args)
+def expanding_matrix_apply_nb(a, minp, apply_func_nb, *args):
+    """Expanding version of `rolling_matrix_apply_nb`."""
+    return rolling_matrix_apply_nb(a, a.shape[0], minp, apply_func_nb, *args)
 
 
 @njit
@@ -880,8 +909,8 @@ def groupby_apply_matrix_nb(a, groups, apply_func_nb, *args):
 def applymap_nb(a, map_func_nb, *args):
     """Map non-NA elements elementwise using `map_func_nb`.
 
-    `map_func_nb` should accept index of the row, index of the column,
-    the element itself, and `*args`. Should return an array of same size."""
+    `map_func_nb` should accept the element itself, and `*args`.
+    Should return an array of same size."""
     out = np.full_like(a, np.nan, dtype=np.float_)
 
     for col in range(out.shape[1]):
@@ -1075,7 +1104,7 @@ def flatten_grouped_nb(a, group_lens, in_c_order):
 
 
 @njit(cache=True)
-def nst_reduce_nb(col, a, n, *args):
+def nst_reduce_nb(col, a, n):
     """Return nst element."""
     if n >= a.shape[0]:
         raise ValueError("index is out of bounds")
@@ -1083,49 +1112,49 @@ def nst_reduce_nb(col, a, n, *args):
 
 
 @njit(cache=True)
-def min_reduce_nb(col, a, *args):
+def min_reduce_nb(col, a):
     """Return min (ignores NaNs)."""
     return np.nanmin(a)
 
 
 @njit(cache=True)
-def max_reduce_nb(col, a, *args):
+def max_reduce_nb(col, a):
     """Return max (ignores NaNs)."""
     return np.nanmax(a)
 
 
 @njit(cache=True)
-def mean_reduce_nb(col, a, *args):
+def mean_reduce_nb(col, a):
     """Return mean (ignores NaNs)."""
     return np.nanmean(a)
 
 
 @njit(cache=True)
-def median_reduce_nb(col, a, *args):
+def median_reduce_nb(col, a):
     """Return median (ignores NaNs)."""
     return np.nanmedian(a)
 
 
 @njit(cache=True)
-def sum_reduce_nb(col, a, *args):
+def sum_reduce_nb(col, a):
     """Return sum (ignores NaNs)."""
     return np.nansum(a)
 
 
 @njit(cache=True)
-def count_reduce_nb(col, a, *args):
+def count_reduce_nb(col, a):
     """Return count (ignores NaNs)."""
     return np.sum(~np.isnan(a))
 
 
 @njit(cache=True)
-def std_reduce_nb(col, a, ddof, *args):
+def std_reduce_nb(col, a, ddof):
     """Return std (ignores NaNs)."""
     return nanstd_1d_nb(a, ddof=ddof)
 
 
 @njit(cache=True)
-def argmin_reduce_nb(col, a, *args):
+def argmin_reduce_nb(col, a):
     """Return position of min."""
     a = np.copy(a)
     mask = np.isnan(a)
@@ -1136,7 +1165,7 @@ def argmin_reduce_nb(col, a, *args):
 
 
 @njit(cache=True)
-def argmax_reduce_nb(col, a, *args):
+def argmax_reduce_nb(col, a):
     """Return position of max."""
     a = np.copy(a)
     mask = np.isnan(a)
@@ -1147,7 +1176,7 @@ def argmax_reduce_nb(col, a, *args):
 
 
 @njit(cache=True)
-def describe_reduce_nb(col, a, perc, ddof, *args):
+def describe_reduce_nb(col, a, perc, ddof):
     """Return descriptive statistics (ignores NaNs).
 
     Numba equivalent to `pd.Series(a).describe(perc)`."""

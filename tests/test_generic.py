@@ -303,6 +303,10 @@ class TestAccessors:
             df.vbt.rolling_min(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).min()
         )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_min(test_window),
+            df.rolling(test_window).min()
+        )
 
     @pytest.mark.parametrize(
         "test_window,test_minp",
@@ -318,6 +322,10 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.rolling_max(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_max(test_window),
+            df.rolling(test_window).max()
         )
 
     @pytest.mark.parametrize(
@@ -335,6 +343,10 @@ class TestAccessors:
             df.vbt.rolling_mean(test_window, minp=test_minp),
             df.rolling(test_window, min_periods=test_minp).mean()
         )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_mean(test_window),
+            df.rolling(test_window).mean()
+        )
 
     @pytest.mark.parametrize(
         "test_window,test_minp,test_ddof",
@@ -350,6 +362,10 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             df.vbt.rolling_std(test_window, minp=test_minp, ddof=test_ddof),
             df.rolling(test_window, min_periods=test_minp).std(ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_std(test_window),
+            df.rolling(test_window).std()
         )
 
     @pytest.mark.parametrize(
@@ -367,6 +383,10 @@ class TestAccessors:
             df.vbt.ewm_mean(test_window, minp=test_minp, adjust=test_adjust),
             df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).mean()
         )
+        pd.testing.assert_frame_equal(
+            df.vbt.ewm_mean(test_window),
+            df.ewm(span=test_window).mean()
+        )
 
     @pytest.mark.parametrize(
         "test_window,test_minp,test_adjust,test_ddof",
@@ -383,31 +403,81 @@ class TestAccessors:
             df.vbt.ewm_std(test_window, minp=test_minp, adjust=test_adjust, ddof=test_ddof),
             df.ewm(span=test_window, min_periods=test_minp, adjust=test_adjust).std(ddof=test_ddof)
         )
-
-    def test_expanding_min(self):
-        pd.testing.assert_series_equal(df['a'].vbt.expanding_min(), df['a'].expanding().min())
-        pd.testing.assert_frame_equal(df.vbt.expanding_min(), df.expanding().min())
-
-    def test_expanding_max(self):
-        pd.testing.assert_series_equal(df['a'].vbt.expanding_max(), df['a'].expanding().max())
-        pd.testing.assert_frame_equal(df.vbt.expanding_max(), df.expanding().max())
-
-    def test_expanding_mean(self):
-        pd.testing.assert_series_equal(df['a'].vbt.expanding_mean(), df['a'].expanding().mean())
-        pd.testing.assert_frame_equal(df.vbt.expanding_mean(), df.expanding().mean())
+        pd.testing.assert_frame_equal(
+            df.vbt.ewm_std(test_window),
+            df.ewm(span=test_window).std()
+        )
 
     @pytest.mark.parametrize(
-        "test_ddof",
-        [0, 1]
+        "test_minp",
+        [1, 3]
     )
-    def test_expanding_std(self, test_ddof):
+    def test_expanding_min(self, test_minp):
         pd.testing.assert_series_equal(
-            df['a'].vbt.expanding_std(ddof=test_ddof),
-            df['a'].expanding().std(ddof=test_ddof)
+            df['a'].vbt.expanding_min(minp=test_minp),
+            df['a'].expanding(min_periods=test_minp).min()
         )
         pd.testing.assert_frame_equal(
-            df.vbt.expanding_std(ddof=test_ddof),
-            df.expanding().std(ddof=test_ddof)
+            df.vbt.expanding_min(minp=test_minp),
+            df.expanding(min_periods=test_minp).min()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_min(),
+            df.expanding().min()
+        )
+
+    @pytest.mark.parametrize(
+        "test_minp",
+        [1, 3]
+    )
+    def test_expanding_max(self, test_minp):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_max(minp=test_minp),
+            df['a'].expanding(min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_max(minp=test_minp),
+            df.expanding(min_periods=test_minp).max()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_max(),
+            df.expanding().max()
+        )
+
+    @pytest.mark.parametrize(
+        "test_minp",
+        [1, 3]
+    )
+    def test_expanding_mean(self, test_minp):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_mean(minp=test_minp),
+            df['a'].expanding(min_periods=test_minp).mean()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_mean(minp=test_minp),
+            df.expanding(min_periods=test_minp).mean()
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_mean(),
+            df.expanding().mean()
+        )
+
+    @pytest.mark.parametrize(
+        "test_minp,test_ddof",
+        list(product([1, 3], [0, 1]))
+    )
+    def test_expanding_std(self, test_minp, test_ddof):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.expanding_std(minp=test_minp, ddof=test_ddof),
+            df['a'].expanding(min_periods=test_minp).std(ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_std(minp=test_minp, ddof=test_ddof),
+            df.expanding(min_periods=test_minp).std(ddof=test_ddof)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_std(),
+            df.expanding().std()
         )
 
     def test_apply_along_axis(self):
@@ -421,51 +491,65 @@ class TestAccessors:
         )
 
     @pytest.mark.parametrize(
-        "test_window",
-        [1, 2, 3, 4, 5],
+        "test_window,test_minp",
+        list(product([1, 2, 3, 4, 5], [1, None]))
     )
-    def test_rolling_apply(self, test_window):
+    def test_rolling_apply(self, test_window, test_minp):
+        if test_minp is None:
+            test_minp = test_window
         pd.testing.assert_series_equal(
-            df['a'].vbt.rolling_apply(test_window, i_col_nanmean_nb),
-            df['a'].rolling(test_window, min_periods=1).apply(nanmean_nb, raw=True)
+            df['a'].vbt.rolling_apply(test_window, i_col_nanmean_nb, minp=test_minp),
+            df['a'].rolling(test_window, min_periods=test_minp).apply(nanmean_nb, raw=True)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.rolling_apply(test_window, i_col_nanmean_nb, minp=test_minp),
+            df.rolling(test_window, min_periods=test_minp).apply(nanmean_nb, raw=True)
         )
         pd.testing.assert_frame_equal(
             df.vbt.rolling_apply(test_window, i_col_nanmean_nb),
-            df.rolling(test_window, min_periods=1).apply(nanmean_nb, raw=True)
+            df.rolling(test_window).apply(nanmean_nb, raw=True)
         )
         pd.testing.assert_frame_equal(
             df.vbt.rolling_apply(3, i_nanmean_nb, on_matrix=True),
             pd.DataFrame(
                 np.array([
-                    [1., 1., 1.],
-                    [2., 2., 2.],
-                    [2.28571429, 2.28571429, 2.28571429],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
                     [2.75, 2.75, 2.75],
-                    [2.28571429, 2.28571429, 2.28571429]
+                    [np.nan, np.nan, np.nan]
                 ]),
                 index=df.index,
                 columns=df.columns
             )
         )
 
-    def test_expanding_apply(self):
+    @pytest.mark.parametrize(
+        "test_minp",
+        [1, 3]
+    )
+    def test_expanding_apply(self, test_minp):
         pd.testing.assert_series_equal(
-            df['a'].vbt.expanding_apply(i_col_nanmean_nb),
-            df['a'].expanding(min_periods=1).apply(nanmean_nb, raw=True)
+            df['a'].vbt.expanding_apply(i_col_nanmean_nb, minp=test_minp),
+            df['a'].expanding(min_periods=test_minp).apply(nanmean_nb, raw=True)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.expanding_apply(i_col_nanmean_nb, minp=test_minp),
+            df.expanding(min_periods=test_minp).apply(nanmean_nb, raw=True)
         )
         pd.testing.assert_frame_equal(
             df.vbt.expanding_apply(i_col_nanmean_nb),
-            df.expanding(min_periods=1).apply(nanmean_nb, raw=True)
+            df.expanding().apply(nanmean_nb, raw=True)
         )
         pd.testing.assert_frame_equal(
             df.vbt.expanding_apply(i_nanmean_nb, on_matrix=True),
             pd.DataFrame(
                 np.array([
-                    [1., 1., 1.],
-                    [2., 2., 2.],
-                    [2.28571429, 2.28571429, 2.28571429],
+                    [np.nan, np.nan, np.nan],
+                    [2.0, 2.0, 2.0],
+                    [2.2857142857142856, 2.2857142857142856, 2.2857142857142856],
                     [2.4, 2.4, 2.4],
-                    [2.16666667, 2.16666667, 2.16666667]
+                    [2.1666666666666665, 2.1666666666666665, 2.1666666666666665]
                 ]),
                 index=df.index,
                 columns=df.columns
