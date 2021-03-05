@@ -3,6 +3,7 @@
 import numpy as np
 from numba import njit
 from numba.typed import List
+import ray
 
 from vectorbt.base import reshape_fns
 
@@ -36,7 +37,7 @@ def apply_and_concat_one(n, apply_func, *args, **kwargs):
     The result of `apply_func` must be a single 1-dim or 2-dim array.
     
     `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
-    return np.hstack([reshape_fns.to_2d(apply_func(i, *args, **kwargs)) for i in range(n)])
+    return np.column_stack([reshape_fns.to_2d(apply_func(i, *args, **kwargs)) for i in range(n)])
 
 
 @njit
@@ -75,7 +76,7 @@ def apply_and_concat_multiple(n, apply_func, *args, **kwargs):
     multiple 1-dim or 2-dim arrays. Each of these arrays at `i` will be concatenated with the
     array at the same position at `i+1`."""
     outputs = [tuple(map(reshape_fns.to_2d, apply_func(i, *args, **kwargs))) for i in range(n)]
-    return list(map(np.hstack, list(zip(*outputs))))
+    return list(map(np.column_stack, list(zip(*outputs))))
 
 
 @njit
@@ -172,3 +173,56 @@ def combine_multiple_nb(objs, combine_func_nb, *args):
         else:
             result = combine_func_nb(result, objs[i], *args)
     return result
+
+
+def ray_apply(n, apply_func, *args, ray_force_init=False, ray_func_kwargs=None,
+              ray_init_kwargs=None, ray_shutdown=False, **kwargs):
+    """Run `apply_func` in distributed manner.
+
+    Set `ray_reinit` to True to terminate the Ray runtime and initialize a new one.
+    `ray_func_kwargs` will be passed to `ray.remote` and `ray_init_kwargs` to `ray.init`.
+    Set `ray_shutdown` to True to terminate the Ray runtime upon the job end.
+
+    """
+    if ray_init_kwargs is None:
+        ray_init_kwargs = {}
+    if ray_func_kwargs is None:
+        ray_func_kwargs = {}
+    if ray_force_init:
+        if ray.is_initialized():
+            ray.shutdown()
+    if not ray.is_initialized():
+        ray.init(**ray_init_kwargs)
+    if len(ray_func_kwargs) > 0:
+        apply_func = ray.remote(**ray_func_kwargs)(apply_func)
+    else:
+        apply_func = ray.remote(apply_func)
+    # args and kwargs don't change -> put to object store
+    arg_refs = ()
+    for v in args:
+        arg_refs += (ray.put(v),)
+    kwarg_refs = {}
+    for k, v in kwargs.items():
+        kwarg_refs[k] = ray.put(v)
+    futures = [apply_func.remote(i, *arg_refs, **kwarg_refs) for i in range(n)]
+    results = ray.get(futures)
+    if ray_shutdown:
+        ray.shutdown()
+    return results
+
+
+def apply_and_concat_one_ray(*args, **kwargs):
+    """Distributed version of `apply_and_concat_one`."""
+    results = ray_apply(*args, **kwargs)
+    return np.column_stack(list(map(reshape_fns.to_2d, results)))
+
+
+def apply_and_concat_multiple_ray(*args, **kwargs):
+    """Distributed version of `apply_and_concat_multiple`."""
+    results = ray_apply(*args, **kwargs)
+    return list(map(np.column_stack, list(zip(*results))))
+
+
+def combine_and_concat_ray(obj, others, combine_func, *args, **kwargs):
+    """Distributed version of `combine_and_concat`."""
+    return apply_and_concat_one_ray(len(others), select_and_combine, obj, others, combine_func, *args, **kwargs)

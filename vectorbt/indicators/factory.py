@@ -1929,7 +1929,7 @@ class IndicatorFactory:
     def __init__(self,
                  class_name='Indicator',
                  class_docstring='',
-                 module_name=None,
+                 module_name=__name__,
                  short_name=None,
                  prepend_name=True,
                  input_names=None,
@@ -2801,7 +2801,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         return Indicator
 
-    def from_apply_func(self, apply_func, cache_func=None, kwargs_to_args=None, numba_loop=False, **kwargs):
+    def from_apply_func(self, apply_func, cache_func=None, pass_packed=False, kwargs_to_args=None,
+                        numba_loop=False, use_ray=False, ray_kwargs=None, **kwargs):
         """Build indicator class around a custom apply function.
 
         In contrast to `IndicatorFactory.from_custom_func`, this method handles a lot of things for you,
@@ -2848,6 +2849,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 All returned objects will be passed unpacked as last arguments to `apply_func`.
 
                 Can be Numba-compiled.
+            pass_packed (bool): Whether to pass packed tuples for inputs, in-place outputs, and parameters.
             kwargs_to_args (list of str): Keyword arguments from `kwargs` dict to pass as
                 positional arguments to the apply function.
 
@@ -2863,6 +2865,10 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         Returns:
             Indicator
+
+        Additionally, each run method now supports `use_ray` argument, which indicates
+        whether to use Ray to execute `apply_func` in parallel. Only works with `numba_loop` set to False.
+        See `vectorbt.base.combine_fns.ray_apply` for related keyword arguments.
 
         ## Example
 
@@ -2908,6 +2914,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         if kwargs_to_args is None:
             kwargs_to_args = []
+
+        module_name = self.module_name
         output_names = self.output_names
         in_output_names = self.in_output_names
         param_names = self.param_names
@@ -2915,6 +2923,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         num_ret_outputs = len(output_names)
 
         # Build a function that selects a parameter tuple
+        # Do it here to avoid compilation with Numba every time custom_func is run
         _0 = "i"
         _0 += ", args_before"
         _0 += ", input_tuple"
@@ -2926,11 +2935,22 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         if not numba_loop:
             _0 += ", **_kwargs"
         _1 = "*args_before"
-        _1 += ", *input_tuple"
-        if len(in_output_names) > 0:
-            _1 += ", *in_output_tuples[i]"
-        if len(param_names) > 0:
-            _1 += ", *param_tuples[i]"
+        if pass_packed:
+            _1 += ", input_tuple"
+            if len(in_output_names) > 0:
+                _1 += ", in_output_tuples[i]"
+            else:
+                _1 += ", ()"
+            if len(param_names) > 0:
+                _1 += ", param_tuples[i]"
+            else:
+                _1 += ", ()"
+        else:
+            _1 += ", *input_tuple"
+            if len(in_output_names) > 0:
+                _1 += ", *in_output_tuples[i]"
+            if len(param_names) > 0:
+                _1 += ", *param_tuples[i]"
         _1 += ", *args"
         if not numba_loop:
             _1 += ", **_kwargs"
@@ -2940,26 +2960,42 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         code = compile(func_str, filename, 'single')
         exec(code, scope)
         select_params_func = scope['select_params_func']
-
+        if module_name is not None:
+            select_params_func.__module__ = module_name
         if numba_loop:
             select_params_func = njit(select_params_func)
-            if num_ret_outputs > 1:
-                apply_and_concat_func = combine_fns.apply_and_concat_multiple_nb
-            elif num_ret_outputs == 1:
-                apply_and_concat_func = combine_fns.apply_and_concat_one_nb
-            else:
-                apply_and_concat_func = combine_fns.apply_and_concat_none_nb
-        else:
-            if num_ret_outputs > 1:
-                apply_and_concat_func = combine_fns.apply_and_concat_multiple
-            elif num_ret_outputs == 1:
-                apply_and_concat_func = combine_fns.apply_and_concat_one
-            else:
-                apply_and_concat_func = combine_fns.apply_and_concat_none
 
         def custom_func(input_list, in_output_list, param_list, *args, input_shape=None,
-                        col=None, flex_2d=None, return_cache=False, use_cache=None, **_kwargs):
+                        col=None, flex_2d=None, return_cache=False, use_cache=None, use_ray=False, **_kwargs):
             """Custom function that forwards inputs and parameters to `apply_func`."""
+
+            if use_ray:
+                if len(in_output_names) > 0:
+                    raise ValueError("Ray doesn't support in-place outputs")
+            if numba_loop:
+                if use_ray:
+                    raise ValueError("Ray cannot be used within Numba")
+                if num_ret_outputs > 1:
+                    apply_and_concat_func = combine_fns.apply_and_concat_multiple_nb
+                elif num_ret_outputs == 1:
+                    apply_and_concat_func = combine_fns.apply_and_concat_one_nb
+                else:
+                    apply_and_concat_func = combine_fns.apply_and_concat_none_nb
+            else:
+                if num_ret_outputs > 1:
+                    if use_ray:
+                        apply_and_concat_func = combine_fns.apply_and_concat_multiple_ray
+                    else:
+                        apply_and_concat_func = combine_fns.apply_and_concat_multiple
+                elif num_ret_outputs == 1:
+                    if use_ray:
+                        apply_and_concat_func = combine_fns.apply_and_concat_one_ray
+                    else:
+                        apply_and_concat_func = combine_fns.apply_and_concat_one
+                else:
+                    if use_ray:
+                        raise ValueError("Ray requires regular outputs")
+                    apply_and_concat_func = combine_fns.apply_and_concat_none
 
             n_params = len(param_list[0]) if len(param_list) > 0 else 1
             input_tuple = tuple(input_list)
@@ -3036,7 +3072,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         return self.from_custom_func(custom_func, as_lists=True, **kwargs)
 
     @classmethod
-    def from_talib(cls, func_name, module_name=__name__, **kwargs):
+    def from_talib(cls, func_name, init_kwargs=None, **kwargs):
         """Build indicator class around a TA-Lib function.
 
         Requires [TA-Lib](https://github.com/mrjbq7/ta-lib) installed.
@@ -3045,7 +3081,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         Args:
             func_name (str): Function name.
-            **kwargs: Keyword arguments passed to `IndicatorFactory.from_apply_func`.
+            init_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
+            **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
         Returns:
             Indicator
@@ -3096,42 +3133,43 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
                 input_names.extend(list(in_names))
             else:
                 input_names.append(in_names)
+        class_name = info['name']
+        class_docstring = "{}, {}".format(info['display_name'], info['group'])
+        short_name = info['name'].lower()
+        param_names = list(info['parameters'].keys())
+        output_names = info['output_names']
+        output_flags = info['output_flags']
 
-        def custom_func(input_list, _, param_list):
-            """Custom function that forwards inputs and parameters to talib."""
+        def apply_func(input_list, _, param_tuple):
             # TA-Lib functions can only process 1-dim arrays
-            # TODO: Find ways to call talib from within Numba
-            if len(param_list) == 0:
-                # No parameters
-                outputs = []
-                for col in range(input_list[0].shape[1]):
-                    outputs.append(talib_func(*map(lambda x: x[:, col], input_list)))
-            else:
-                outputs = []
-                param_tuples = list(zip(*param_list))
-                for param_tuple in param_tuples:
-                    for col in range(input_list[0].shape[1]):
-                        outputs.append(talib_func(
-                            *map(lambda x: x[:, col], input_list),
-                            *param_tuple
-                        ))
+            n_input_cols = input_list[0].shape[1]
+            outputs = []
+            for col in range(n_input_cols):
+                outputs.append(talib_func(
+                    *map(lambda x: x[:, col], input_list),
+                    *param_tuple
+                ))
             if isinstance(outputs[0], tuple):  # multiple outputs
                 outputs = list(zip(*outputs))
                 return list(map(np.column_stack, outputs))
             return np.column_stack(outputs)
 
         TALibIndicator = cls(
-            class_name=info['name'],
-            class_docstring="{}, {}".format(info['display_name'], info['group']),
-            module_name=module_name,
-            short_name=info['name'].lower(),
-            input_names=input_names,
-            param_names=list(info['parameters'].keys()),
-            output_names=info['output_names'],
-            output_flags=info['output_flags']
-        ).from_custom_func(
-            custom_func,
-            as_lists=True,
+            **merge_dicts(
+                dict(
+                    class_name=class_name,
+                    class_docstring=class_docstring,
+                    short_name=short_name,
+                    input_names=input_names,
+                    param_names=param_names,
+                    output_names=output_names,
+                    output_flags=output_flags
+                ),
+                init_kwargs
+            )
+        ).from_apply_func(
+            apply_func,
+            pass_packed=True,
             **info['parameters'],
             **kwargs
         )

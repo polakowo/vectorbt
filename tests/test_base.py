@@ -3007,6 +3007,13 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
+                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
+                keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
+            ),
+            target
+        )
+        pd.testing.assert_frame_equal(
+            sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100
             ),
             pd.DataFrame(
@@ -3059,6 +3066,13 @@ class TestAccessors:
             df2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
                 keys=['a', 'b', 'c']
+            ),
+            target2
+        )
+        pd.testing.assert_frame_equal(
+            df2.vbt.apply_and_concat(
+                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
+                keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
             ),
             target2
         )
@@ -3205,6 +3219,16 @@ class TestAccessors:
                 [10, df4], 10, 100,
                 combine_func=combine_func_nb,
                 concat=True
+            ),
+            target2
+        )
+        pd.testing.assert_frame_equal(
+            sr2.vbt.combine_with_multiple(
+                [10, df4], 10, b=100,
+                combine_func=combine_func,
+                concat=True,
+                use_ray=True,
+                ray_shutdown=True
             ),
             target2
         )

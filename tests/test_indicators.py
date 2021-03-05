@@ -280,6 +280,19 @@ class TestFactory:
             target
         )
 
+    def test_use_ray(self):
+        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+
+        def apply_func(ts, p, a, b=10):
+            return ts * p + a + b
+
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func, var_args=True)
+                .run(ts, np.arange(10), 10, b=100).out,
+            F.from_apply_func(apply_func, var_args=True)
+                .run(ts, np.arange(10), 10, b=100, use_ray=True, ray_shutdown=True).out,
+        )
+
     def test_no_inputs(self):
         F = vbt.IndicatorFactory(param_names=['p'], output_names=['out'])
 
