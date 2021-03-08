@@ -27,7 +27,7 @@ setup(
         'dill'
     ],
     extras_require={
-        "extras": ["empyrical", "scikit-learn", "TA-Lib", "ray"]
+        "full": ["empyrical", "scikit-learn", "TA-Lib", "ray"]
     },
     python_requires='>=3.6, <3.9',
     license='Apache 2.0',
