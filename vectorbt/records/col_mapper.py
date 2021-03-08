@@ -6,6 +6,8 @@ from vectorbt.records import nb
 
 
 class ColumnMapper:
+    """Used by `vectorbt.records.base.Records` and `vectorbt.records.mapped_array.MappedArray`
+    classes to make use of column and group metadata."""
     def __init__(self, wrapper, col_arr):
         self._wrapper = wrapper
         self._col_arr = col_arr

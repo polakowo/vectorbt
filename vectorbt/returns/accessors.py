@@ -1,5 +1,30 @@
 """Custom pandas accessors.
 
+Methods can be accessed as follows:
+
+* `ReturnsSRAccessor` -> `pd.Series.vbt.returns.*`
+* `ReturnsDFAccessor` -> `pd.DataFrame.vbt.returns.*`
+
+```python-repl
+>>> import numpy as np
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> # vectorbt.returns.accessors.ReturnsAccessor.total
+>>> price = pd.Series([1.1, 1.2, 1.3, 1.2, 1.1])
+>>> returns = price.pct_change()
+>>> returns.vbt.returns.total()
+0.0
+```
+
+The accessors extend `vectorbt.generic.accessors`.
+
+```python-repl
+>>> # inherited from GenericAccessor
+>>> returns.vbt.returns.max()
+0.09090909090909083
+```
+
 !!! note
     The underlying Series/DataFrame must already be a return series.
 """

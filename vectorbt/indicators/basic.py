@@ -1,5 +1,29 @@
 """Indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
+Provides a collection of basic technical indicators, such as Bollinger Bands,
+all built with `vectorbt.indicators.factory.IndicatorFactory`.
+
+You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
+
+```python-repl
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> # vectorbt.indicators.basic.MA
+>>> vbt.MA.run(pd.Series([1, 2, 3]), [2, 3]).ma
+ma_window     2     3
+ma_ewm    False False
+0           NaN   NaN
+1           1.5   NaN
+2           2.5   2.0
+```
+
+The advantage of these indicators over TA-Lib's is that they work primarily on 2-dimensional arrays
+and utilize caching, which makes them faster for matrices with huge number of columns. They also
+have plotting methods.
+
+Run for the examples below:
+
 ```python-repl
 >>> import vectorbt as vbt
 >>> from datetime import datetime

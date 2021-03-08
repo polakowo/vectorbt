@@ -1,4 +1,7 @@
-"""Functions for reshaping arrays."""
+"""Functions for reshaping arrays.
+
+Reshape functions transform a pandas object/NumPy array in some way, such as tiling, broadcasting,
+and unstacking."""
 
 import numpy as np
 import pandas as pd

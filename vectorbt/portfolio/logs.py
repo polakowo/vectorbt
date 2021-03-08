@@ -1,4 +1,7 @@
-"""Base class for working with log records."""
+"""Base class for working with log records.
+
+Class `Logs` wraps log records to analyze logs. Logs are mainly populated when
+simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio.logs`."""
 
 import pandas as pd
 

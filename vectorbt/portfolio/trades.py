@@ -1,5 +1,13 @@
 """Base class for working with trade records.
 
+Class `Trades` wraps trade records and the corresponding time series
+(such as open or close) to analyze trades. Use `vectorbt.portfolio.trades.Trades.from_orders`
+to generate trade records from order records. This is done automatically in the
+`vectorbt.portfolio.base.Portfolio` class, available as `vectorbt.portfolio.base.Portfolio.trades`.
+
+Class `Positions` has the same properties as trades and is also
+provided by `vectorbt.portfolio.base.Portfolio` as `vectorbt.portfolio.base.Portfolio.positions`.
+
 !!! warning
     Both record types return both closed AND open trades, which may skew your performance results.
     To only consider closed trades, you should explicitly query `closed` attribute."""

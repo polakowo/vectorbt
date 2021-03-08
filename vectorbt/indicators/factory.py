@@ -1,5 +1,11 @@
 """A factory for building new indicators with ease.
 
+The indicator factory class `IndicatorFactory` offers a convenient way to create technical
+indicators of any complexity. By providing it with information such as calculation functions and
+the names of your inputs, parameters, and outputs, it will create a stand-alone indicator class
+capable of running the indicator for an arbitrary combination of your inputs and parameters. It also
+creates methods for signal generation and supports common pandas and parameter indexing operations.
+
 Each indicator is basically a pipeline that:
 
 * Accepts a list of input arrays (for example, OHLCV data)
@@ -1072,6 +1078,12 @@ Name: (2, b), dtype: float64
 2020-01-04  3.5  2.5
 2020-01-05  4.5  1.5
 ```
+
+## TA-Lib
+
+Indicator factory also provides a class method `IndicatorFactory.from_talib`
+that can be used to wrap any function from TA-Lib. It automatically fills all the
+neccessary information, such as input, parameter and output names.
 """
 import numpy as np
 import pandas as pd

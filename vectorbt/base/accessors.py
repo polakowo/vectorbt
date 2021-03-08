@@ -1,6 +1,60 @@
 """Custom pandas accessors.
 
+Methods can be accessed as follows:
+
+* `BaseSRAccessor` -> `pd.Series.vbt.*`
+* `BaseDFAccessor` -> `pd.DataFrame.vbt.*`
+
+For example:
+
+```python-repl
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> # vectorbt.base.accessors.BaseAccessor.make_symmetric
+>>> pd.Series([1, 2, 3]).vbt.make_symmetric()
+     0    1    2
+0  1.0  2.0  3.0
+1  2.0  NaN  NaN
+2  3.0  NaN  NaN
+```
+
+It contains base methods for working with pandas objects. Most of these methods are adaptations
+of combine/reshape/index functions that can work with pandas objects. For example,
+`vectorbt.base.reshape_fns.broadcast` can take an arbitrary number of pandas objects, thus
+you can find its variations as accessor methods.
+
+```python-repl
+>>> sr = pd.Series([1])
+>>> df = pd.DataFrame([1, 2, 3])
+
+>>> vbt.base.reshape_fns.broadcast_to(sr, df)
+   0
+0  1
+1  1
+2  1
+>>> sr.vbt.broadcast_to(df)
+   0
+0  1
+1  1
+2  1
+```
+
+Additionally, `BaseAccessor` implements arithmetic (such as `+`), comparison (such as `>`) and
+logical operators (such as `&`) by doing 1) NumPy-like broadcasting and 2) the compuation with NumPy
+under the hood, which is mostly much faster than with pandas.
+
+```python-repl
+>>> df = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
+>>> %timeit df * 2
+296 ms ± 27.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+>>> %timeit df.vbt * 2
+5.48 ms ± 1.12 ms per loop (mean ± std. dev. of 7 runs, 100 loops each)
+```
+
 !!! note
+    You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
+
     Accessors do not utilize caching."""
 
 import numpy as np
@@ -290,7 +344,7 @@ class BaseAccessor:
                 Can be Numba-compiled.
             keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
             to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
-            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.array_wrapper.ArrayWrapper.wrap`.
+            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
             **kwargs: Keyword arguments passed to `combine_func`.
 
         !!! note
@@ -384,7 +438,7 @@ class BaseAccessor:
                 Only works with `numba_loop` set to False and `concat` is set to True.
                 See `vectorbt.base.combine_fns.ray_apply` for related keyword arguments.
             keys (list of str or pd.Index): Outermost column level.
-            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.array_wrapper.ArrayWrapper.wrap`.
+            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
             **kwargs: Keyword arguments passed to `combine_func`.
 
         !!! note
@@ -461,7 +515,7 @@ class BaseAccessor:
             to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
             broadcast (bool): Whether to broadcast all inputs.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.array_wrapper.ArrayWrapper.wrap`.
+            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
             **kwargs: Keyword arguments passed to `combine_func`.
 
         !!! note
@@ -533,7 +587,7 @@ class BaseAccessor:
             broadcast (bool): Whether to broadcast all inputs.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             keys (list of str or pd.Index): Outermost column level.
-            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.array_wrapper.ArrayWrapper.wrap`.
+            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
             **kwargs: Keyword arguments passed to `combine_func`.
 
         !!! note

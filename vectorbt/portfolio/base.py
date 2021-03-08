@@ -1,5 +1,10 @@
 """Base class for modeling portfolio and measuring its performance.
 
+Provides the class `vectorbt.portfolio.base.Portfolio` for modeling portfolio performance
+and calculating various risk and performance metrics. It uses Numba-compiled
+functions from `vectorbt.portfolio.nb` for most computations and record classes based on
+`vectorbt.records.base.Records` for evaluating events such as orders, logs, trades, positions and drawdowns.
+
 The job of the `Portfolio` class is to create a series of positions allocated 
 against a cash component, produce an equity curve, incorporate basic transaction costs
 and produce a set of statistics about its performance. In particular it outputs

@@ -1,4 +1,9 @@
-"""Classes for indexing."""
+"""Classes for indexing.
+
+The main purpose of indexing classes is to provide pandas-like indexing to user-defined classes
+holding objects that have rows and/or columns. This is done by forwarding indexing commands
+to each structured object and constructing the new user-defined class using them. This way,
+one can manipulate complex classes with dozens of pandas objects using a single command."""
 
 import numpy as np
 import pandas as pd

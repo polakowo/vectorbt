@@ -1,5 +1,20 @@
 """Numba-compiled functions.
 
+Provides an arsenal of Numba-compiled functions that are used by accessors and for measuring
+portfolio performance. These only accept NumPy arrays and other Numba-compatible types.
+
+```python-repl
+>>> import numpy as np
+>>> import vectorbt as vbt
+
+>>> price = np.array([1.1, 1.2, 1.3, 1.2, 1.1])
+>>> returns = vbt.generic.nb.pct_change_1d_nb(price)
+
+>>> # vectorbt.returns.nb.cum_returns_1d_nb
+>>> vbt.returns.nb.cum_returns_1d_nb(returns, 0)
+array([0., 0.09090909, 0.18181818, 0.09090909, 0.])
+```
+
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.

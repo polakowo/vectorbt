@@ -1,9 +1,32 @@
 """Custom pandas accessors.
 
+Methods can be accessed as follows:
+
+* `SignalsSRAccessor` -> `pd.Series.vbt.signals.*`
+* `SignalsDFAccessor` -> `pd.DataFrame.vbt.signals.*`
+
+```python-repl
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> # vectorbt.signals.accessors.SignalsAccessor.rank
+>>> pd.Series([False, True, True, True, False]).vbt.signals.rank()
+0    0
+1    1
+2    2
+3    3
+4    0
+dtype: int64
+```
+
+The accessors extend `vectorbt.generic.accessors`.
+
 !!! note
     The underlying Series/DataFrame should already be a signal series.
 
     Input arrays should be `np.bool`.
+
+Run for the examples below:
     
 ```python-repl
 >>> import vectorbt as vbt

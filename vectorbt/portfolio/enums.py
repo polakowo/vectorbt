@@ -1,4 +1,6 @@
-"""Named tuples and enumerated types."""
+"""Named tuples and enumerated types.
+
+Defines enums and other schemas for `vectorbt.portfolio`."""
 
 import numpy as np
 from collections import namedtuple

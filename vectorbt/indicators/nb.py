@@ -1,5 +1,8 @@
 """Numba-compiled functions.
 
+Provides an arsenal of Numba-compiled functions that are used by indicator
+classes. These only accept NumPy arrays and other Numba-compatible types.
+
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function.

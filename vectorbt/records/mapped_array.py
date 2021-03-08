@@ -284,7 +284,8 @@ def combine_mapped_with_other(self, other, np_func):
     lambda self, np_func: self.copy(mapped_arr=np_func(self.values))
 )
 class MappedArray(Wrapping):
-    """Exposes methods and properties for working with records.
+    """Exposes methods for reducing, converting, and plotting arrays mapped by
+    `vectorbt.records.base.Records` class.
 
     Args:
         wrapper (ArrayWrapper): Array wrapper.

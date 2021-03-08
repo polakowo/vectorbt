@@ -1,6 +1,6 @@
 """Custom pandas accessors.
 
-You can access methods listed in `vectorbt.generic.accessors` as follows:
+Methods can be accessed as follows:
 
 * `GenericSRAccessor` -> `pd.Series.vbt.*`
 * `GenericDFAccessor` -> `pd.DataFrame.vbt.*`

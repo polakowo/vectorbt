@@ -1,3 +1,5 @@
+"""Other metrics that are not compiled with Numba."""
+
 import numpy as np
 from scipy.stats import norm
 

@@ -1,4 +1,7 @@
-"""Class decorators and other helpers."""
+"""Class decorators and other helpers.
+
+Contains class decorators and other helper functions, for example,
+to quickly add a range of Numba-compiled functions to the class."""
 
 import numpy as np
 import inspect

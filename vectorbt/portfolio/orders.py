@@ -1,4 +1,9 @@
-"""Base class for working with order records."""
+"""Base class for working with order records.
+
+Class `Orders` wraps order records and the corresponding time series (such as open or close)
+to analyze orders. Orders are mainly populated when simulating a portfolio and can be
+accessed as `vectorbt.portfolio.base.Portfolio.orders`.
+"""
 
 import numpy as np
 import pandas as pd

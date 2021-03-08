@@ -1,5 +1,11 @@
 """Custom pandas accessors.
 
+Methods can be accessed as follows:
+
+* `OHLCVDFAccessor` -> `pd.DataFrame.vbt.ohlcv.*`
+
+The accessors inherit `vectorbt.base.accessors`.
+
 !!! note
     Accessors do not utilize caching."""
 

@@ -1,4 +1,10 @@
-"""A factory for building new signal generators with ease."""
+"""A factory for building new signal generators with ease.
+
+The signal factory class `SignalFactory` extends `vectorbt.indicators.factory.IndicatorFactory`
+to offer a convenient way to create signal generators of any complexity. By providing it with information
+such as entry and exit functions and the names of inputs, parameters, and outputs, it will create a
+stand-alone class capable of generating signals for an arbitrary combination of inputs and parameters.
+"""
 
 import numpy as np
 from numba import njit

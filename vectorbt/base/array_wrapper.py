@@ -1,4 +1,86 @@
-"""Class for wrapping NumPy arrays into Series/DataFrames."""
+"""Class for wrapping NumPy arrays into Series/DataFrames.
+
+vectorbt's functionality is based upon the ability to perform the most essential pandas operations
+using NumPy+Numba stack. One has to convert the Series/DataFrame into the NumPy format, perform
+the computation, and put the array back into the pandas format. The last step is done using
+`ArrayWrapper`.
+
+It stores metadata of the original pandas object and offers methods `wrap` and `wrap_reduced`
+for wrapping NumPy arrays to match the stored metadata as closest as possible.
+
+```python-repl
+>>> import numpy as np
+>>> import pandas as pd
+>>> import vectorbt as vbt
+>>> from vectorbt.base.array_wrapper import ArrayWrapper
+
+>>> aw = ArrayWrapper(index=['x', 'y', 'z'], columns=['a', 'b', 'c'], ndim=2)
+>>> aw._config
+{
+    'columns': Index(['a', 'b', 'c'], dtype='object'),
+    'group_select': None,
+    'ndim': 2,
+    'freq': None,
+    'column_only_select': None,
+    'grouped_ndim': None,
+    'index': ['x', 'y', 'z'],
+    'allow_modify': True,
+    'allow_enable': True,
+    'group_by': None,
+    'allow_disable': True
+}
+
+>>> np.random.seed(42)
+>>> a = np.random.uniform(size=(3, 3))
+>>> aw.wrap(a)
+          a         b         c
+x  0.374540  0.950714  0.731994
+y  0.598658  0.156019  0.155995
+z  0.058084  0.866176  0.601115
+
+>>> aw.wrap_reduced(np.sum(a, axis=0))
+a    1.031282
+b    1.972909
+c    1.489103
+dtype: float64
+```
+
+It can also be indexed as a regular pandas object and integrates `vectorbt.base.column_grouper.ColumnGrouper`:
+
+```python-repl
+>>> aw.loc['x':'y', 'a']._config
+{
+    'columns': Index(['a'], dtype='object'),
+    'group_select': None,
+    'ndim': 1,
+    'freq': None,
+    'column_only_select': None,
+    'grouped_ndim': None,
+    'index': Index(['x', 'y'], dtype='object'),
+    'allow_modify': True,
+    'allow_enable': True,
+    'group_by': None,
+    'allow_disable': True
+}
+
+>>> aw.regroup(np.array([0, 0, 1]))._config
+{
+    'columns': Index(['a', 'b', 'c'], dtype='object'),
+    'group_select': None,
+    'ndim': 2,
+    'freq': None,
+    'column_only_select': None,
+    'grouped_ndim': None,
+    'index': ['x', 'y', 'z'],
+    'allow_modify': True,
+    'allow_enable': True,
+    'group_by': array([0, 0, 1]),
+    'allow_disable': True
+}
+```
+
+Class `Wrapping` is a convenience class meant to be subclassed by classes that do not want to subclass
+`ArrayWrapper` but rather use it as an attribute (which is a better SE design pattern anyway!)."""
 
 import numpy as np
 import pandas as pd

@@ -249,7 +249,8 @@ from vectorbt.records.col_mapper import ColumnMapper
 
 
 class Records(Wrapping):
-    """Exposes methods and properties for working with records.
+    """Wraps the actual records array (such as trades) and exposes methods for mapping
+    it to some array of values (such as P&L of each trade).
 
     Args:
         wrapper (ArrayWrapper): Array wrapper.

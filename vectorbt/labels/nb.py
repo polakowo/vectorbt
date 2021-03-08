@@ -1,5 +1,8 @@
 """Numba-compiled functions.
 
+Provides an arsenal of Numba-compiled functions that are used by indicator
+classes. These only accept NumPy arrays and other Numba-compatible types.
+
 !!! note
     Set `wait` to 1 to exclude the current value from calculation of future values.
 

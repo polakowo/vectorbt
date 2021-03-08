@@ -1,5 +1,18 @@
 """Numba-compiled functions.
 
+Provides an arsenal of Numba-compiled functions that are used by accessors
+and in many other parts of the backtesting pipeline, such as technical indicators.
+These only accept NumPy arrays and other Numba-compatible types.
+
+```python-repl
+>>> import numpy as np
+>>> import vectorbt as vbt
+
+>>> # vectorbt.signals.nb.rank_1d_nb
+>>> vbt.signals.nb.rank_1d_nb(np.array([False, True, True, True, False]))
+array([0, 1, 2, 3, 0])
+```
+
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 

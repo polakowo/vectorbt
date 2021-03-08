@@ -1,4 +1,7 @@
-"""Functions for working with index/columns."""
+"""Functions for working with index/columns.
+
+Index functions perform operations on index objects, such as stacking, combining,
+and cleansing MultiIndex levels. "Index" in pandas context is referred to both index and columns."""
 
 import numpy as np
 import pandas as pd

@@ -1,4 +1,9 @@
-"""Class that exposes methods to group columns."""
+"""Class that exposes methods to group columns.
+
+Class `ColumnGrouper` stores metadata related to grouping columns. It can return, for example,
+the number of groups, the start indices of groups, and other information useful for reducing
+operations that utilize grouping. It also allows to dynamically enable/disable/modify groups
+and checks whether a certain operation is permitted."""
 
 import numpy as np
 import pandas as pd
