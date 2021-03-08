@@ -8,7 +8,6 @@ a single DataFrame is important. All functions are available in both Python and 
 import numpy as np
 from numba import njit
 from numba.typed import List
-import ray
 
 from vectorbt.base import reshape_fns
 
@@ -189,6 +188,8 @@ def ray_apply(n, apply_func, *args, ray_force_init=False, ray_func_kwargs=None,
     Set `ray_shutdown` to True to terminate the Ray runtime upon the job end.
 
     """
+    import ray
+
     if ray_init_kwargs is None:
         ray_init_kwargs = {}
     if ray_func_kwargs is None:
