@@ -244,11 +244,7 @@ Date
 2018-12-31    3742.700439
 2019-01-01    3843.520020
 2019-01-02    3943.409424
-2019-01-03    3836.741211
-2019-01-04    3857.717529
-                 ...
-2019-12-27    7290.088379
-2019-12-28    7317.990234
+...                   ...
 2019-12-29    7422.652832
 2019-12-30    7292.995117
 2019-12-31    7193.599121
@@ -271,11 +267,7 @@ Date
 2018-12-31    False
 2019-01-01    False
 2019-01-02    False
-2019-01-03    False
-2019-01-04    False
-              ...
-2019-12-27     True
-2019-12-28    False
+...             ...
 2019-12-29    False
 2019-12-30    False
 2019-12-31    False
@@ -287,11 +279,7 @@ Date
 2018-12-31    False
 2019-01-01    False
 2019-01-02    False
-2019-01-03    False
-2019-01-04    False
-              ...
-2019-12-27    False
-2019-12-28    False
+...             ...
 2019-12-29    False
 2019-12-30    False
 2019-12-31    False
@@ -321,11 +309,7 @@ Date
 2018-12-31   False  False
 2019-01-01   False  False
 2019-01-02   False  False
-2019-01-03   False  False
-2019-01-04   False  False
 ...            ...    ...
-2019-12-27   False  False
-2019-12-28   False  False
 2019-12-29    True  False
 2019-12-30   False  False
 2019-12-31   False  False
@@ -340,11 +324,7 @@ Date
 2018-12-31   False  False
 2019-01-01   False  False
 2019-01-02   False  False
-2019-01-03   False  False
-2019-01-04   False  False
 ...            ...    ...
-2019-12-27   False  False
-2019-12-28   False  False
 2019-12-29   False  False
 2019-12-30   False  False
 2019-12-31   False  False
@@ -375,17 +355,13 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 >>> comb_price = btc_price.vbt.concat(eth_price,
 ...     keys=pd.Index(['BTC', 'ETH'], name='symbol'))
 >>> comb_price.vbt.drop_levels(-1, inplace=True)
->>> print(comb_price)
+>>> comb_price
 symbol              BTC         ETH
 Date
 2018-12-31  3742.700439  133.368256
 2019-01-01  3843.520020  140.819412
 2019-01-02  3943.409424  155.047684
-2019-01-03  3836.741211  149.135010
-2019-01-04  3857.717529  154.581940
 ...                 ...         ...
-2019-12-27  7290.088379  127.214607
-2019-12-28  7317.990234  128.322708
 2019-12-29  7422.652832  134.757980
 2019-12-30  7292.995117  132.633484
 2019-12-31  7193.599121  129.610855
@@ -404,11 +380,7 @@ Date
 2018-12-31   False  False  False  False
 2019-01-01   False  False  False  False
 2019-01-02   False  False  False  False
-2019-01-03   False  False  False  False
-2019-01-04   False  False  False  False
 ...            ...    ...    ...    ...
-2019-12-27   False  False  False  False
-2019-12-28   False  False  False  False
 2019-12-29    True  False  False  False
 2019-12-30   False  False  False  False
 2019-12-31   False  False  False  False
@@ -424,11 +396,7 @@ Date
 2018-12-31   False  False  False  False
 2019-01-01   False  False  False  False
 2019-01-02   False  False  False  False
-2019-01-03   False  False  False  False
-2019-01-04   False  False  False  False
 ...            ...    ...    ...    ...
-2019-12-27   False  False  False  False
-2019-12-28   False  False  False  False
 2019-12-29   False  False  False  False
 2019-12-30   False  False  False  False
 2019-12-31   False  False  False  False
@@ -458,22 +426,17 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 
 ```python-repl
 >>> # Multiple strategy instances, instruments and time periods
->>> mult_comb_price = comb_price.vbt.split_into_ranges(n=2)
+>>> mult_comb_price, _ = comb_price.vbt.range_split(n=2)
 >>> mult_comb_price
-symbol                              BTC                     ETH
-range_start    2018-12-31    2019-07-02  2018-12-31  2019-07-02
-range_end      2019-07-01    2019-12-31  2019-07-01  2019-12-31
-0             3742.700439  10801.677734  133.368256  291.596436
-1             3843.520020  11961.269531  140.819412  303.099976
-2             3943.409424  11215.437500  155.047684  284.523224
-3             3836.741211  10978.459961  149.135010  287.997528
-4             3857.717529  11208.550781  154.581940  287.547119
-..                    ...           ...         ...         ...
-178          11182.806641   7290.088379  294.267639  127.214607
-179          12407.332031   7317.990234  311.226105  128.322708
-180          11959.371094   7422.652832  320.058899  134.757980
-181          10817.155273   7292.995117  290.695984  132.633484
-182          10583.134766   7193.599121  293.641113  129.610855
+split_idx                         0                         1
+symbol              BTC         ETH           BTC         ETH
+0           3742.700439  133.368256  10801.677734  291.596436
+1           3843.520020  140.819412  11961.269531  303.099976
+2           3943.409424  155.047684  11215.437500  284.523224
+...                 ...         ...           ...         ...
+180        11959.371094  320.058899   7422.652832  134.757980
+181        10817.155273  290.695984   7292.995117  132.633484
+182        10583.134766  293.641113   7193.599121  129.610855
 
 [183 rows x 4 columns]
 
@@ -485,16 +448,16 @@ range_end      2019-07-01    2019-12-31  2019-07-01  2019-12-31
 
 >>> portfolio = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
 >>> portfolio.total_return()
-fast_window  slow_window  symbol  range_start  range_end
-10           30           BTC     2018-12-31   2019-07-01    1.579002
-                                  2019-07-02   2019-12-31   -0.289369
-                          ETH     2018-12-31   2019-07-01    0.960437
-                                  2019-07-02   2019-12-31   -0.308387
-20           30           BTC     2018-12-31   2019-07-01    1.666387
-                                  2019-07-02   2019-12-31   -0.418280
-                          ETH     2018-12-31   2019-07-01    0.352693
-                                  2019-07-02   2019-12-31   -0.257947
-dtype: float64
+fast_window  slow_window  split_idx  symbol
+10           30           0          BTC       1.579002
+                                     ETH       0.960437
+                          1          BTC      -0.289369
+                                     ETH      -0.308387
+20           30           0          BTC       1.666387
+                                     ETH       0.352693
+                          1          BTC      -0.418280
+                                     ETH      -0.257947
+Name: total_return, dtype: float64
 ```
 
 Notice how index is no more datetime-like, since it captures multiple time periods.
@@ -505,9 +468,9 @@ The index hierarchy of the final performance series can be then used to group pe
 by any feature, such as window pair, symbol, and time period.
 
 ```python-repl
->>> mean_return = portfolio.total_return().groupby(['range_end', 'symbol']).mean()
->>> mean_return = mean_return.unstack(level=-1).vbt.barplot(
-...     xaxis_title='End date',
+>>> mean_return = portfolio.total_return().groupby(['split_idx', 'symbol']).mean()
+>>> mean_return.unstack(level=-1).vbt.barplot(
+...     xaxis_title='Split index',
 ...     yaxis_title='Mean total return',
 ...     legend_title_text='Symbol')
 ```
@@ -527,8 +490,9 @@ modeling portfolio performance and visualizing results.
 - [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TradingSessions.ipynb)
 - [Portfolio optimization](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/PortfolioOptimization.ipynb)
 - [Plotting MACD parameters as 3D volume](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/MACDVolume.ipynb)
+- [Walk-forward optimization](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/WalkForwardOptimization.ipynb)
 
-Note: you need to run the notebook to play with widgets.
+Note: you must run the notebook to play with the widgets.
 
 ### Dashboards
 

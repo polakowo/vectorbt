@@ -1,5 +1,20 @@
 """Numba-compiled functions.
 
+Provides an arsenal of Numba-compiled functions that are used by accessors
+and in many other parts of the backtesting pipeline, such as technical indicators.
+These only accept NumPy arrays and other Numba-compatible types.
+
+The module can be accessed directly via `vbt.nb`.
+
+```python-repl
+>>> import numpy as np
+>>> import vectorbt as vbt
+
+>>> # vectorbt.generic.nb.rolling_mean_1d_nb
+>>> vbt.nb.rolling_mean_1d_nb(np.array([1, 2, 3, 4]), 2)
+array([nan, 1.5, 2.5, 3.5])
+```
+
 !!! note
     vectorbt treats matrices as first-class citizens and expects input arrays to be
     2-dim, unless function has suffix `_1d` or is meant to be input to another function. 
@@ -353,30 +368,6 @@ def nanstd_nb(a, ddof=0):
     out = np.empty(a.shape[1], dtype=np.float_)
     for col in range(a.shape[1]):
         out[col] = nanstd_1d_nb(a[:, col], ddof=ddof)
-    return out
-
-
-# ############# Range functions ############# #
-
-
-@njit(cache=True)
-def concat_ranges_1d_nb(a, start_idxs, end_idxs):
-    """Roll a window.
-
-    For each index pair from `start_idxs` and `end_idxs`, slices `a` along index and concatenates."""
-    out = np.empty((end_idxs[0] - start_idxs[0], start_idxs.shape[0]), dtype=a.dtype)
-    for idx in range(start_idxs.shape[0]):
-        out[:, idx] = a[start_idxs[idx]:end_idxs[idx]]
-    return out
-
-
-@njit(cache=True)
-def concat_ranges_nb(a, start_idxs, end_idxs):
-    """2-dim version of `range_1d_nb`."""
-    out = np.empty((end_idxs[0] - start_idxs[0], start_idxs.shape[0] * a.shape[1]), dtype=a.dtype)
-    for col in range(a.shape[1]):
-        out[:, col * start_idxs.shape[0]:(col + 1) * start_idxs.shape[0]] = \
-            concat_ranges_1d_nb(a[:, col], start_idxs, end_idxs)
     return out
 
 

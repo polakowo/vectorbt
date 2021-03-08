@@ -336,3 +336,14 @@ def pick_levels(index, required_levels=[], optional_levels=[]):
 
     return _required_levels, _optional_levels
 
+
+def find_first_occurrence(index_value, index):
+    """Return index of the first occurrence in `index`."""
+    loc = index.get_loc(index_value)
+    if isinstance(loc, slice):
+        return loc.start
+    elif isinstance(loc, list):
+        return loc[0]
+    elif isinstance(loc, np.ndarray):
+        return np.flatnonzero(loc)[0]
+    return loc

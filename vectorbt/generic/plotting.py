@@ -1,5 +1,12 @@
 """Base plotting functions.
 
+Provides functions for visualizing data in an efficient and convenient way.
+Each creates a figure widget that is compatible with ipywidgets and enables interactive
+data visualization in Jupyter Notebook and JupyterLab environments. For more details
+on using Plotly, see [Getting Started with Plotly in Python](https://plotly.com/python/getting-started/).
+
+The module can be accessed directly via `vbt.plotting`.
+
 !!! warning
     In case of errors, it won't be visible in the notebook cell, but in the logs."""
 
@@ -535,8 +542,8 @@ class Box(Configured, TraceUpdater):
 
 
 class Heatmap(Configured, TraceUpdater):
-    def __init__(self, data=None, x_labels=None, y_labels=None,trace_kwargs=None,
-                 add_trace_kwargs=None, fig=None, **layout_kwargs):
+    def __init__(self, data=None, x_labels=None, y_labels=None, is_x_category=False, is_y_category=False,
+                 trace_kwargs=None, add_trace_kwargs=None, fig=None, **layout_kwargs):
         """Create a heatmap plot.
 
         Args:
@@ -545,6 +552,8 @@ class Heatmap(Configured, TraceUpdater):
                 Must be of shape (`y_labels`, `x_labels`).
             x_labels (array_like): X-axis labels, corresponding to columns in pandas.
             y_labels (array_like): Y-axis labels, corresponding to index in pandas.
+            is_x_category (bool): Whether X-axis is a categorical axis.
+            is_y_category (bool): Whether Y-axis is a categorical axis.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Heatmap`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             fig (plotly.graph_objects.Figure): Figure to add traces to.
@@ -619,8 +628,6 @@ class Heatmap(Configured, TraceUpdater):
                     height=height
                 )
 
-        fig.update_layout(**layout_kwargs)
-
         heatmap = go.Heatmap(
             hoverongaps=False,
             colorscale='Plasma',
@@ -629,6 +636,20 @@ class Heatmap(Configured, TraceUpdater):
         )
         heatmap.update(**trace_kwargs)
         fig.add_trace(heatmap, **add_trace_kwargs)
+
+        axis_kwargs = dict()
+        if is_x_category:
+            if fig.data[-1]['xaxis'] is not None:
+                axis_kwargs['xaxis' + fig.data[-1]['xaxis'][1:]] = dict(type='category')
+            else:
+                axis_kwargs['xaxis'] = dict(type='category')
+        if is_y_category:
+            if fig.data[-1]['yaxis'] is not None:
+                axis_kwargs['yaxis' + fig.data[-1]['yaxis'][1:]] = dict(type='category')
+            else:
+                axis_kwargs['yaxis'] = dict(type='category')
+        fig.update_layout(**axis_kwargs)
+        fig.update_layout(**layout_kwargs)
 
         TraceUpdater.__init__(self, fig, [fig.data[-1]])
 
@@ -742,15 +763,33 @@ class Volume(Configured, TraceUpdater):
         if not np.issubdtype(x_labels.dtype, np.number):
             x_ticktext = x_labels
             x_labels = np.arange(x_len)
-            more_layout[scene_name] = dict(xaxis=dict(ticktext=x_ticktext, tickvals=x_labels, tickmode='array'))
+            more_layout[scene_name] = dict(
+                xaxis=dict(
+                    ticktext=x_ticktext,
+                    tickvals=x_labels,
+                    tickmode='array'
+                )
+            )
         if not np.issubdtype(y_labels.dtype, np.number):
             y_ticktext = y_labels
             y_labels = np.arange(y_len)
-            more_layout[scene_name] = dict(yaxis=dict(ticktext=y_ticktext, tickvals=y_labels, tickmode='array'))
+            more_layout[scene_name] = dict(
+                yaxis=dict(
+                    ticktext=y_ticktext,
+                    tickvals=y_labels,
+                    tickmode='array'
+                )
+            )
         if not np.issubdtype(z_labels.dtype, np.number):
             z_ticktext = z_labels
             z_labels = np.arange(z_len)
-            more_layout[scene_name] = dict(zaxis=dict(ticktext=z_ticktext, tickvals=z_labels, tickmode='array'))
+            more_layout[scene_name] = dict(
+                zaxis=dict(
+                    ticktext=z_ticktext,
+                    tickvals=z_labels,
+                    tickmode='array'
+                )
+            )
         fig.update_layout(**more_layout)
         fig.update_layout(**layout_kwargs)
 

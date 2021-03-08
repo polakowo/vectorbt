@@ -4,6 +4,7 @@ from numba import njit
 from datetime import datetime
 import pytest
 from itertools import product
+from sklearn.model_selection import TimeSeriesSplit
 
 from vectorbt.generic import nb
 from vectorbt.generic.drawdowns import Drawdowns
@@ -60,148 +61,6 @@ def col_nanmean_nb(col, x):
 
 
 class TestAccessors:
-    def test_split_into_ranges(self):
-        pd.testing.assert_frame_equal(
-            df['a'].vbt.split_into_ranges(n=2),
-            pd.DataFrame(
-                np.array([
-                    [1., 4.],
-                    [2., np.nan]
-                ]),
-                index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-04'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-02', '2018-01-05'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            df['a'].vbt.split_into_ranges(range_len=2),
-            pd.DataFrame(
-                np.array([
-                    [1., 2., 3., 4.],
-                    [2., 3., 4., np.nan]
-                ]),
-                index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-02', '2018-01-03', '2018-01-04'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-02', '2018-01-03', '2018-01-04', '2018-01-05'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            df['a'].vbt.split_into_ranges(range_len=2, n=3),
-            pd.DataFrame(
-                np.array([
-                    [1., 3., 4.],
-                    [2., 4., np.nan]
-                ]),
-                index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-03', '2018-01-04'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-02', '2018-01-04', '2018-01-05'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            df['a'].vbt.split_into_ranges(range_len=3, n=2),
-            pd.DataFrame(
-                np.array([
-                    [1., 3.],
-                    [2., 4.],
-                    [3., np.nan]
-                ]),
-                index=pd.RangeIndex(start=0, stop=3, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-03'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-03', '2018-01-05'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.split_into_ranges(n=2),
-            pd.DataFrame(
-                np.array([
-                    [1., 4., np.nan, 2., 1., 2.],
-                    [2., np.nan, 4., 1., 2., 1.]
-                ]),
-                index=pd.RangeIndex(start=0, stop=2, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.Index(['a', 'a', 'b', 'b', 'c', 'c'], dtype='object'),
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-04', '2018-01-01', '2018-01-04', '2018-01-01', '2018-01-04'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-02', '2018-01-05', '2018-01-02', '2018-01-05', '2018-01-02', '2018-01-05'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[3, 4]),
-            pd.DataFrame(
-                np.array([
-                    [1., 2., np.nan, 4., 1., 2.],
-                    [2., 3., 4., 3., 2., np.nan],
-                    [3., 4., 3., 2., np.nan, 2.]
-                ]),
-                index=pd.RangeIndex(start=0, stop=3, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.Index(['a', 'a', 'b', 'b', 'c', 'c'], dtype='object'),
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-02', '2018-01-01', '2018-01-02', '2018-01-01', '2018-01-02'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-03', '2018-01-04', '2018-01-03', '2018-01-04', '2018-01-03', '2018-01-04'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        pd.testing.assert_frame_equal(
-            df.vbt.split_into_ranges(start_idxs=df.index[[0, 1]], end_idxs=df.index[[2, 3]]),
-            pd.DataFrame(
-                np.array([
-                    [1., 2., np.nan, 4., 1., 2.],
-                    [2., 3., 4., 3., 2., np.nan],
-                    [3., 4., 3., 2., np.nan, 2.]
-                ]),
-                index=pd.RangeIndex(start=0, stop=3, step=1),
-                columns=pd.MultiIndex.from_arrays([
-                    pd.Index(['a', 'a', 'b', 'b', 'c', 'c'], dtype='object'),
-                    pd.DatetimeIndex([
-                        '2018-01-01', '2018-01-02', '2018-01-01', '2018-01-02', '2018-01-01', '2018-01-02'
-                    ], dtype='datetime64[ns]', name='range_start', freq=None),
-                    pd.DatetimeIndex([
-                        '2018-01-03', '2018-01-04', '2018-01-03', '2018-01-04', '2018-01-03', '2018-01-04'
-                    ], dtype='datetime64[ns]', name='range_end', freq=None)
-                ])
-            )
-        )
-        with pytest.raises(Exception) as e_info:
-            df.vbt.split_into_ranges()
-        with pytest.raises(Exception) as e_info:
-            df.vbt.split_into_ranges(start_idxs=[0, 1])
-        with pytest.raises(Exception) as e_info:
-            df.vbt.split_into_ranges(end_idxs=[2, 4])
-        with pytest.raises(Exception) as e_info:
-            df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[2, 4])
-
     def test_shuffle(self):
         pd.testing.assert_series_equal(
             df['a'].vbt.shuffle(seed=seed),
@@ -934,3 +793,633 @@ class TestAccessors:
             df.vbt.to_mapped_array(dropna=False).idx_arr,
             np.array([0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
         )
+
+    def test_split(self):
+        splitter = TimeSeriesSplit(n_splits=2)
+        (train_df, train_indexes), (test_df, test_indexes) = df['a'].vbt.split(splitter)
+        pd.testing.assert_frame_equal(
+            train_df,
+            pd.DataFrame(
+                np.array([
+                    [1.0, 1.0],
+                    [2.0, 2.0],
+                    [3.0, 3.0],
+                    [np.nan, 4.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=4, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03', '2018-01-04'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                train_indexes[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            test_df,
+            pd.DataFrame(
+                np.array([
+                    [4.0, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                test_indexes[i],
+                target[i]
+            )
+        (train_df, train_indexes), (test_df, test_indexes) = df.vbt.split(splitter)
+        pd.testing.assert_frame_equal(
+            train_df,
+            pd.DataFrame(
+                np.array([
+                    [1.0, np.nan, 1.0, 1.0, np.nan, 1.0],
+                    [2.0, 4.0, 2.0, 2.0, 4.0, 2.0],
+                    [3.0, 3.0, np.nan, 3.0, 3.0, np.nan],
+                    [np.nan, np.nan, np.nan, 4.0, 2.0, 2.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=4, step=1),
+                columns=pd.MultiIndex.from_tuples([
+                    (0, 'a'),
+                    (0, 'b'),
+                    (0, 'c'),
+                    (1, 'a'),
+                    (1, 'b'),
+                    (1, 'c')
+                ], names=['split_idx', None])
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03', '2018-01-04'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                train_indexes[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            test_df,
+            pd.DataFrame(
+                np.array([
+                    [4.0, 2.0, 2.0, np.nan, 1.0, 1.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.MultiIndex.from_tuples([
+                    (0, 'a'),
+                    (0, 'b'),
+                    (0, 'c'),
+                    (1, 'a'),
+                    (1, 'b'),
+                    (1, 'c')
+                ], names=['split_idx', None])
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                test_indexes[i],
+                target[i]
+            )
+
+    def test_range_split(self):
+        pd.testing.assert_frame_equal(
+            df['a'].vbt.range_split(n=2)[0],
+            pd.DataFrame(
+                np.array([
+                    [1., 4.],
+                    [2., np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-04', '2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df['a'].vbt.range_split(n=2)[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df['a'].vbt.range_split(range_len=2)[0],
+            pd.DataFrame(
+                np.array([
+                    [1., 2., 3., 4.],
+                    [2., 3., 4., np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1, 2, 3], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02', '2018-01-03'], dtype='datetime64[ns]', name='split_1', freq=None),
+            pd.DatetimeIndex(['2018-01-03', '2018-01-04'], dtype='datetime64[ns]', name='split_2', freq=None),
+            pd.DatetimeIndex(['2018-01-04', '2018-01-05'], dtype='datetime64[ns]', name='split_3', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df['a'].vbt.range_split(range_len=2)[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df['a'].vbt.range_split(range_len=2, n=3)[0],
+            pd.DataFrame(
+                np.array([
+                    [1., 3., 4.],
+                    [2., 4., np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1, 2], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-03', '2018-01-04'], dtype='datetime64[ns]', name='split_1', freq=None),
+            pd.DatetimeIndex(['2018-01-04', '2018-01-05'], dtype='datetime64[ns]', name='split_2', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df['a'].vbt.range_split(range_len=2, n=3)[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df['a'].vbt.range_split(range_len=3, n=2)[0],
+            pd.DataFrame(
+                np.array([
+                    [1., 3.],
+                    [2., 4.],
+                    [3., np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=3, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-03', '2018-01-04', '2018-01-05'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df['a'].vbt.range_split(range_len=3, n=2)[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df.vbt.range_split(n=2)[0],
+            pd.DataFrame(
+                np.array([
+                    [1.0, np.nan, 1.0, 4.0, 2.0, 2.0],
+                    [2.0, 4.0, 2.0, np.nan, 1.0, 1.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.MultiIndex.from_arrays([
+                    pd.Int64Index([0, 0, 0, 1, 1, 1], dtype='int64', name='split_idx'),
+                    pd.Index(['a', 'b', 'c', 'a', 'b', 'c'], dtype='object')
+                ])
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-04', '2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df.vbt.range_split(n=2)[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df.vbt.range_split(start_idxs=[0, 1], end_idxs=[2, 3])[0],
+            pd.DataFrame(
+                np.array([
+                    [1.0, np.nan, 1.0, 2.0, 4.0, 2.0],
+                    [2.0, 4.0, 2.0, 3.0, 3.0, np.nan],
+                    [3.0, 3.0, np.nan, 4.0, 2.0, 2.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=3, step=1),
+                columns=pd.MultiIndex.from_arrays([
+                    pd.Int64Index([0, 0, 0, 1, 1, 1], dtype='int64', name='split_idx'),
+                    pd.Index(['a', 'b', 'c', 'a', 'b', 'c'], dtype='object')
+                ])
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02', '2018-01-03', '2018-01-04'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df.vbt.range_split(start_idxs=[0, 1], end_idxs=[2, 3])[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df.vbt.range_split(start_idxs=df.index[[0, 1]], end_idxs=df.index[[2, 3]])[0],
+            pd.DataFrame(
+                np.array([
+                    [1.0, np.nan, 1.0, 2.0, 4.0, 2.0],
+                    [2.0, 4.0, 2.0, 3.0, 3.0, np.nan],
+                    [3.0, 3.0, np.nan, 4.0, 2.0, 2.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=3, step=1),
+                columns=pd.MultiIndex.from_arrays([
+                    pd.Int64Index([0, 0, 0, 1, 1, 1], dtype='int64', name='split_idx'),
+                    pd.Index(['a', 'b', 'c', 'a', 'b', 'c'], dtype='object')
+                ])
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02', '2018-01-03', '2018-01-04'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df.vbt.range_split(start_idxs=df.index[[0, 1]], end_idxs=df.index[[2, 3]])[1][i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df.vbt.range_split(start_idxs=df.index[[0]], end_idxs=df.index[[2, 3]])[0],
+            pd.DataFrame(
+                np.array([
+                    [1.0, np.nan, 1.0, 1.0, np.nan, 1.0],
+                    [2.0, 4.0, 2.0, 2.0, 4.0, 2.0],
+                    [3.0, 3.0, np.nan, 3.0, 3.0, np.nan],
+                    [np.nan, np.nan, np.nan, 4.0, 2.0, 2.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=4, step=1),
+                columns=pd.MultiIndex.from_arrays([
+                    pd.Int64Index([0, 0, 0, 1, 1, 1], dtype='int64', name='split_idx'),
+                    pd.Index(['a', 'b', 'c', 'a', 'b', 'c'], dtype='object')
+                ])
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03', '2018-01-04'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                df.vbt.range_split(start_idxs=df.index[[0]], end_idxs=df.index[[2, 3]])[1][i],
+                target[i]
+            )
+        with pytest.raises(Exception) as e_info:
+            df.vbt.range_split()
+        with pytest.raises(Exception) as e_info:
+            df.vbt.range_split(start_idxs=[0, 1])
+        with pytest.raises(Exception) as e_info:
+            df.vbt.range_split(end_idxs=[2, 4])
+        with pytest.raises(Exception) as e_info:
+            df.vbt.range_split(min_len=10)
+        with pytest.raises(Exception) as e_info:
+            df.vbt.range_split(n=10)
+
+    def test_rolling_split(self):
+        (df1, indexes1), (df2, indexes2), (df3, indexes3) = df['a'].vbt.rolling_split(
+            window_len=4, set_lens=(1, 1), left_to_right=False)
+        pd.testing.assert_frame_equal(
+            df1,
+            pd.DataFrame(
+                np.array([
+                    [1.0, 2.0],
+                    [2.0, 3.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02', '2018-01-03'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes1[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df2,
+            pd.DataFrame(
+                np.array([
+                    [3.0, 4.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-03'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes2[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df3,
+            pd.DataFrame(
+                np.array([
+                    [4.0, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes3[i],
+                target[i]
+            )
+        (df1, indexes1), (df2, indexes2), (df3, indexes3) = df['a'].vbt.rolling_split(
+            window_len=4, set_lens=(1, 1), left_to_right=True)
+        pd.testing.assert_frame_equal(
+            df1,
+            pd.DataFrame(
+                np.array([
+                    [1.0, 2.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes1[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df2,
+            pd.DataFrame(
+                np.array([
+                    [2.0, 3.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-03'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes2[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df3,
+            pd.DataFrame(
+                np.array([
+                    [3.0, 4.0],
+                    [4.0, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-03', '2018-01-04'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-04', '2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes3[i],
+                target[i]
+            )
+        (df1, indexes1), (df2, indexes2), (df3, indexes3) = df['a'].vbt.rolling_split(
+            window_len=4, set_lens=(1, 1), left_to_right=[False, True])
+        pd.testing.assert_frame_equal(
+            df1,
+            pd.DataFrame(
+                np.array([
+                    [1.0, 2.0],
+                    [2.0, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes1[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df2,
+            pd.DataFrame(
+                np.array([
+                    [3.0, 3.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-03'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-03'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes2[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df3,
+            pd.DataFrame(
+                np.array([
+                    [4.0, 4.0],
+                    [np.nan, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=2, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-04', '2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes3[i],
+                target[i]
+            )
+        with pytest.raises(Exception) as e_info:
+            df.vbt.rolling_split()
+        with pytest.raises(Exception) as e_info:
+            df.vbt.rolling_split(window_len=3, set_lens=(3, 1))
+        with pytest.raises(Exception) as e_info:
+            df.vbt.rolling_split(window_len=1, set_lens=(1, 1))
+        with pytest.raises(Exception) as e_info:
+            df.vbt.rolling_split(n=2, min_len=10)
+        with pytest.raises(Exception) as e_info:
+            df.vbt.rolling_split(n=10)
+
+    def test_expanding_split(self):
+        (df1, indexes1), (df2, indexes2), (df3, indexes3) = df['a'].vbt.expanding_split(
+            min_len=4, set_lens=(1, 1), left_to_right=False)
+        pd.testing.assert_frame_equal(
+            df1,
+            pd.DataFrame(
+                np.array([
+                    [1.0, 1.0],
+                    [2.0, 2.0],
+                    [np.nan, 3.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=3, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-01', '2018-01-02', '2018-01-03'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes1[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df2,
+            pd.DataFrame(
+                np.array([
+                    [3.0, 4.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-03'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes2[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df3,
+            pd.DataFrame(
+                np.array([
+                    [4.0, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-04'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-05'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes3[i],
+                target[i]
+            )
+        (df1, indexes1), (df2, indexes2), (df3, indexes3) = df['a'].vbt.expanding_split(
+            min_len=4, set_lens=(1, 1), left_to_right=True)
+        pd.testing.assert_frame_equal(
+            df1,
+            pd.DataFrame(
+                np.array([
+                    [1.0, 1.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-01'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes1[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df2,
+            pd.DataFrame(
+                np.array([
+                    [2.0, 2.0]
+                ]),
+                index=pd.RangeIndex(start=0, stop=1, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-02'], dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-02'], dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes2[i],
+                target[i]
+            )
+        pd.testing.assert_frame_equal(
+            df3,
+            pd.DataFrame(
+                np.array([
+                    [3.0, 3.0],
+                    [4.0, 4.0],
+                    [np.nan, np.nan]
+                ]),
+                index=pd.RangeIndex(start=0, stop=3, step=1),
+                columns=pd.Int64Index([0, 1], dtype='int64', name='split_idx')
+            )
+        )
+        target = [
+            pd.DatetimeIndex(['2018-01-03', '2018-01-04'],
+                             dtype='datetime64[ns]', name='split_0', freq=None),
+            pd.DatetimeIndex(['2018-01-03', '2018-01-04', '2018-01-05'],
+                             dtype='datetime64[ns]', name='split_1', freq=None)
+        ]
+        for i in range(len(target)):
+            pd.testing.assert_index_equal(
+                indexes3[i],
+                target[i]
+            )
+        with pytest.raises(Exception) as e_info:
+            df.vbt.expanding_split(n=2, min_len=10)
+        with pytest.raises(Exception) as e_info:
+            df.vbt.expanding_split(n=10)

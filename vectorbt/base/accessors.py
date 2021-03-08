@@ -99,7 +99,7 @@ class BaseAccessor:
                 obj.index = obj_index
             return obj
 
-    def stack_index(self, index, on_top=True, axis=1, inplace=False):
+    def stack_index(self, index, on_top=True, axis=1, inplace=False, **kwargs):
         """See `vectorbt.base.index_fns.stack_indexes`.
 
         Set `on_top` to False to stack at bottom.
@@ -108,8 +108,8 @@ class BaseAccessor:
 
         def apply_func(obj_index):
             if on_top:
-                return index_fns.stack_indexes(index, obj_index)
-            return index_fns.stack_indexes(obj_index, index)
+                return index_fns.stack_indexes(index, obj_index, **kwargs)
+            return index_fns.stack_indexes(obj_index, index, **kwargs)
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
@@ -331,6 +331,7 @@ class BaseAccessor:
             others (list of array_like): List of objects to be concatenated with this array.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             keys (list of str or pd.Index): Outermost column level.
+            convert_dtypes (bool): Whether to convert to inferred data types.
 
         ## Example
 

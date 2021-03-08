@@ -1,16 +1,39 @@
 """Custom pandas accessors.
 
+You can access methods listed in `vectorbt.generic.accessors` as follows:
+
+* `GenericSRAccessor` -> `pd.Series.vbt.*`
+* `GenericDFAccessor` -> `pd.DataFrame.vbt.*`
+
+```python-repl
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> # vectorbt.generic.accessors.GenericAccessor.rolling_mean
+>>> pd.Series([1, 2, 3, 4]).vbt.rolling_mean(2)
+0    NaN
+1    1.5
+2    2.5
+3    3.5
+dtype: float64
+```
+
+The accessors inherit `vectorbt.base.accessors` and are inherited by more
+specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.returns.accessors`.
+
 !!! note
     Input arrays can be of any type, but most output arrays are `np.float64`.
 
     Grouping is only supported by the methods that accept the `group_by` argument.
+
+Run for the examples below:
     
 ```python-repl
 >>> import vectorbt as vbt
 >>> import numpy as np
 >>> import pandas as pd
 >>> from numba import njit
->>> from datetime import datetime
+>>> from datetime import datetime, timedelta
 
 >>> df = pd.DataFrame({
 ...     'a': [1, 2, 3, 4, 5],
@@ -30,6 +53,21 @@
 2020-01-03  3  3  3
 2020-01-04  4  2  2
 2020-01-05  5  1  1
+
+>>> index = [datetime(2020, 1, 1) + timedelta(days=i) for i in range(10)]
+>>> sr = pd.Series(np.arange(len(index)), index=index)
+>>> sr
+2020-01-01    0
+2020-01-02    1
+2020-01-03    2
+2020-01-04    3
+2020-01-05    4
+2020-01-06    5
+2020-01-07    6
+2020-01-08    7
+2020-01-09    8
+2020-01-10    9
+dtype: int64
 ```"""
 
 import numpy as np
@@ -37,6 +75,7 @@ import pandas as pd
 from scipy import stats
 from numba.typed import Dict
 import warnings
+from datetime import datetime, timedelta
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
@@ -47,6 +86,7 @@ from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
+from vectorbt.generic.splitters import RangeSplitter, RollingSplitter, ExpandingSplitter
 
 try:  # pragma: no cover
     # Adapted from https://github.com/quantopian/empyrical/blob/master/empyrical/utils.py
@@ -100,99 +140,6 @@ class GenericAccessor(BaseAccessor):
             obj = obj._obj
 
         BaseAccessor.__init__(self, obj, **kwargs)
-
-    def split_into_ranges(self, n=None, range_len=None, start_idxs=None, end_idxs=None):
-        """Either split into `n` ranges each `range_len` long, or split into ranges between
-        `start_idxs` and `end_idxs`.
-
-        At least one of `range_len`, `n`, or `start_idxs` and `end_idxs` must be set.
-        If `range_len` is None, will split evenly into `n` ranges.
-        If `n` is None, will return the maximum number of ranges of length `range_len`.
-        If `start_idxs` and `end_idxs`, will split into ranges between both arrays.
-        Both index arrays must be either NumPy arrays with positions (last exclusive)
-        or pandas indexes with labels (last inclusive).
-
-        Created levels `range_start` and `range_end` will contain labels (last inclusive).
-
-        !!! note
-            Ranges must have the same length.
-
-            The datetime-like format of the index will be lost as result of this operation.
-            Make sure to store the index metadata such as frequency information beforehand.
-
-        ## Example
-
-        ```python-repl
-        >>> df.vbt.split_into_ranges(n=2)
-                                        a                     b                     c
-        range_start 2020-01-01 2020-01-04 2020-01-01 2020-01-04 2020-01-01 2020-01-04
-        range_end   2020-01-02 2020-01-05 2020-01-02 2020-01-05 2020-01-02 2020-01-05
-        0                  1.0        4.0        5.0        2.0        1.0        2.0
-        1                  2.0        5.0        4.0        1.0        2.0        1.0
-
-        >>> df.vbt.split_into_ranges(range_len=4)
-                                        a                     b                     c
-        range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
-        range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
-        0                  1.0        2.0        5.0        4.0        1.0        2.0
-        1                  2.0        3.0        4.0        3.0        2.0        3.0
-        2                  3.0        4.0        3.0        2.0        3.0        2.0
-        3                  4.0        5.0        2.0        1.0        2.0        1.0
-
-        >>> df.vbt.split_into_ranges(start_idxs=[0, 1], end_idxs=[4, 5])
-                                        a                     b                     c
-        range_start 2020-01-01 2020-01-02 2020-01-01 2020-01-02 2020-01-01 2020-01-02
-        range_end   2020-01-04 2020-01-05 2020-01-04 2020-01-05 2020-01-04 2020-01-05
-        0                    1          2          5          4          1          2
-        1                    2          3          4          3          2          3
-        2                    3          4          3          2          3          2
-        3                    4          5          2          1          2          1
-
-        >>> df.vbt.split_into_ranges(
-        ...     start_idxs=pd.Index(['2020-01-01', '2020-01-03']),
-        ...     end_idxs=pd.Index(['2020-01-02', '2020-01-04'])
-        ... )
-                                        a                     b                     c
-        range_start 2020-01-01 2020-01-03 2020-01-01 2020-01-03 2020-01-01 2020-01-03
-        range_end   2020-01-02 2020-01-04 2020-01-02 2020-01-04 2020-01-02 2020-01-04
-        0                    1          3          5          3          1          3
-        1                    2          4          4          2          2          2
-        ```
-        """
-        if start_idxs is None and end_idxs is None:
-            if range_len is None and n is None:
-                raise ValueError("At least range_len, n, or start_idxs and end_idxs must be set")
-            if range_len is None:
-                range_len = len(self.wrapper.index) // n
-            start_idxs = np.arange(len(self.wrapper.index) - range_len + 1)
-            end_idxs = np.arange(range_len, len(self.wrapper.index) + 1)
-        elif start_idxs is None or end_idxs is None:
-            raise ValueError("Both start_idxs and end_idxs must be set")
-        else:
-            if isinstance(start_idxs, pd.Index):
-                start_idxs = np.where(self.wrapper.index.isin(start_idxs))[0]
-            else:
-                start_idxs = np.asarray(start_idxs)
-            if isinstance(end_idxs, pd.Index):
-                end_idxs = np.where(self.wrapper.index.isin(end_idxs))[0] + 1
-            else:
-                end_idxs = np.asarray(end_idxs)
-
-        if np.any((end_idxs - start_idxs) != (end_idxs - start_idxs).item(0)):
-            raise ValueError("Ranges must have the same length")
-
-        if n is not None:
-            if n > len(start_idxs):
-                raise ValueError(f"n cannot be bigger than the maximum number of ranges {len(start_idxs)}")
-            idxs = np.round(np.linspace(0, len(start_idxs) - 1, n)).astype(int)
-            start_idxs = start_idxs[idxs]
-            end_idxs = end_idxs[idxs]
-        matrix = nb.concat_ranges_nb(self.to_2d_array(), start_idxs, end_idxs)
-        range_starts = pd.Index(self.wrapper.index[start_idxs], name='range_start')
-        range_ends = pd.Index(self.wrapper.index[end_idxs - 1], name='range_end')
-        range_columns = index_fns.stack_indexes(range_starts, range_ends)
-        new_columns = index_fns.combine_indexes(self.wrapper.columns, range_columns)
-        return pd.DataFrame(matrix, columns=new_columns)
 
     def rolling_std(self, window, minp=None, ddof=1, wrap_kwargs=None):  # pragma: no cover
         """See `vectorbt.generic.nb.rolling_std_nb`."""
@@ -368,8 +315,8 @@ class GenericAccessor(BaseAccessor):
         out_obj = self.wrapper.wrap(out, index=list(resampled.indices.keys()))
         resampled_arr = np.full((resampled.ngroups, self.to_2d_array().shape[1]), np.nan)
         resampled_obj = self.wrapper.wrap(
-            resampled_arr, 
-            index=pd.Index(list(resampled.groups.keys()), freq=freq), 
+            resampled_arr,
+            index=pd.Index(list(resampled.groups.keys()), freq=freq),
             **merge_dicts({}, wrap_kwargs)
         )
         resampled_obj.loc[out_obj.index] = out_obj.values
@@ -832,6 +779,272 @@ class GenericAccessor(BaseAccessor):
         if group_by is None:
             group_by = self.wrapper.grouper.group_by
         return MappedArray(self.wrapper, mapped_arr, col_arr, idx_arr=idx_arr, **kwargs).regroup(group_by)
+
+    # ############# Splitting ############# #
+
+    def split(self, splitter, stack_kwargs=None, keys=None, plot=False,
+              trace_names=None, heatmap_kwargs=None, **kwargs):
+        """Split using a splitter.
+
+        Returns a tuple of tuples, each corresponding to a set and composed of a dataframe and split indexes.
+
+        A splitter can be any class instance that has `split` method, such as
+        `sklearn.model_selection.BaseCrossValidator` or `vectorbt.generic.splitters.BaseSplitter`.
+
+        `heatmap_kwargs` will be passed to `vectorbt.generic.plotting.Heatmap` if `plot` is True,
+        can be a dictionary or a list per set, for example, to set trace name for each set ('train', 'test', etc.).
+
+        `**kwargs` will be passed to the `splitter.split` method.
+
+        !!! note
+            The datetime-like format of the index will be lost as result of this operation.
+            Make sure to store the index metadata such as frequency information beforehand.
+
+        ## Example
+
+        ```python-repl
+        >>> from sklearn.model_selection import TimeSeriesSplit
+
+        >>> splitter = TimeSeriesSplit(n_splits=3)
+        >>> (train_df, train_indexes), (test_df, test_indexes) = sr.vbt.split(splitter)
+
+        >>> train_df
+        split_idx    0    1  2
+        0          0.0  0.0  0
+        1          1.0  1.0  1
+        2          2.0  2.0  2
+        3          3.0  3.0  3
+        4          NaN  4.0  4
+        5          NaN  5.0  5
+        6          NaN  NaN  6
+        7          NaN  NaN  7
+        >>> train_indexes
+        [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-01', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_1'),
+         DatetimeIndex(['2020-01-01', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_2')]
+        >>> test_df
+        split_idx  0  1  2
+        0          4  6  8
+        1          5  7  9
+        >>> test_indexes
+        [DatetimeIndex(['2020-01-05', '2020-01-06'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-07', '2020-01-08'], dtype='datetime64[ns]', name='split_1'),
+         DatetimeIndex(['2020-01-09', '2020-01-10'], dtype='datetime64[ns]', name='split_2')]
+
+        >>> sr.vbt.split(splitter, plot=True, trace_names=['train', 'test'])
+        ```
+
+        ![](/vectorbt/docs/img/split_plot.png)
+        """
+        total_range_sr = pd.Series(np.arange(len(self.wrapper.index)), index=self.wrapper.index)
+        set_ranges = list(splitter.split(total_range_sr, **kwargs))
+        if len(set_ranges) == 0:
+            raise ValueError("No splits were generated")
+        idxs_by_split_and_set = list(zip(*set_ranges))
+
+        results = []
+        for idxs_by_split in idxs_by_split_and_set:
+            split_dfs = []
+            split_indexes = []
+            for split_idx, idxs in enumerate(idxs_by_split):
+                split_dfs.append(self._obj.iloc[idxs].reset_index(drop=True))
+                if keys is not None:
+                    split_name = keys[split_idx]
+                else:
+                    split_name = str(split_idx)
+                split_indexes.append(pd.Index(self.wrapper.index[idxs], name='split_' + split_name))
+            set_df = pd.concat(split_dfs, axis=1).reset_index(drop=True)
+            if keys is not None:
+                split_columns = keys
+            else:
+                split_columns = pd.Index(np.arange(len(split_indexes)), name='split_idx')
+            split_columns = index_fns.repeat_index(split_columns, len(self.wrapper.columns))
+            if stack_kwargs is None:
+                stack_kwargs = {}
+            set_df = set_df.vbt.stack_index(split_columns, **stack_kwargs)
+            results.append((set_df, split_indexes))
+
+        if plot:  # pragma: no cover
+            if heatmap_kwargs is None:
+                heatmap_kwargs = {}
+            if trace_names is None:
+                trace_names = list(range(len(results)))
+            nan_df = pd.DataFrame(np.nan, columns=pd.RangeIndex(stop=len(results[0][1])), index=self.wrapper.index)
+            fig = None
+            for i, (_, split_indexes) in enumerate(results):
+                heatmap_df = nan_df.copy()
+                for j in range(len(split_indexes)):
+                    heatmap_df.loc[split_indexes[j], j] = i
+                _heatmap_kwargs = heatmap_kwargs if isinstance(heatmap_kwargs, dict) else heatmap_kwargs[i]
+                fig = heatmap_df.vbt.ts_heatmap(fig=fig, **merge_dicts(
+                    dict(
+                        trace_kwargs=dict(
+                            showscale=False,
+                            name=str(trace_names[i]),
+                            showlegend=True
+                        )
+                    ),
+                    _heatmap_kwargs
+                ))
+                if fig.layout.colorway is not None:
+                    colorway = fig.layout.colorway
+                else:
+                    colorway = fig.layout.template.layout.colorway
+                if 'colorscale' not in _heatmap_kwargs:
+                    fig.data[-1].update(colorscale=[colorway[i], colorway[i]])
+            return fig
+
+        if len(results) == 1:
+            return results[0]
+        return tuple(results)
+
+    def range_split(self, **kwargs):
+        """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.RangeSplitter`.
+
+        ## Example
+
+        ```python-repl
+        >>> range_df, range_indexes = sr.vbt.range_split(n=2)
+        >>> range_df
+        split_idx  0  1
+        0          0  5
+        1          1  6
+        2          2  7
+        3          3  8
+        4          4  9
+        >>> range_indexes
+        [DatetimeIndex(['2020-01-01', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-06', ..., '2020-01-10'], dtype='datetime64[ns]', name='split_1')]
+
+        >>> range_df, range_indexes = sr.vbt.range_split(range_len=4)
+        >>> range_df
+        split_idx  0  1  2  3  4  5  6
+        0          0  1  2  3  4  5  6
+        1          1  2  3  4  5  6  7
+        2          2  3  4  5  6  7  8
+        3          3  4  5  6  7  8  9
+        >>> range_indexes
+        [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1'),
+         DatetimeIndex(['2020-01-03', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_2'),
+         DatetimeIndex(['2020-01-04', ..., '2020-01-07'], dtype='datetime64[ns]', name='split_3'),
+         DatetimeIndex(['2020-01-05', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_4'),
+         DatetimeIndex(['2020-01-06', ..., '2020-01-09'], dtype='datetime64[ns]', name='split_5'),
+         DatetimeIndex(['2020-01-07', ..., '2020-01-10'], dtype='datetime64[ns]', name='split_6')]
+
+        >>> range_df, range_indexes = sr.vbt.range_split(start_idxs=[0, 2], end_idxs=[5, 7])
+        >>> range_df
+        split_idx  0  1
+        0          0  2
+        1          1  3
+        2          2  4
+        3          3  5
+        4          4  6
+        5          5  7
+        >>> range_indexes
+        [DatetimeIndex(['2020-01-01', ..., '2020-01-06'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-03', ..., '2020-01-08'], dtype='datetime64[ns]', name='split_1')]
+
+        >>> range_df, range_indexes = sr.vbt.range_split(start_idxs=[0], end_idxs=[2, 3, 4])
+        >>> range_df
+        split_idx    0    1  2
+        0          0.0  0.0  0
+        1          1.0  1.0  1
+        2          2.0  2.0  2
+        3          NaN  3.0  3
+        4          NaN  NaN  4
+        >>> range_indexes
+        [DatetimeIndex(['2020-01-01', ..., '2020-01-03'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_1'),
+         DatetimeIndex(['2020-01-01', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_2')]
+
+        >>> range_df, range_indexes = sr.vbt.range_split(
+        ...     start_idxs=pd.Index(['2020-01-01', '2020-01-02']),
+        ...     end_idxs=pd.Index(['2020-01-04', '2020-01-05'])
+        ... )
+        >>> range_df
+        split_idx  0  1
+        0          0  1
+        1          1  2
+        2          2  3
+        3          3  4
+        >>> range_indexes
+        [DatetimeIndex(['2020-01-01', ..., '2020-01-04'], dtype='datetime64[ns]', name='split_0'),
+         DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1')]
+
+         >>> sr.vbt.range_split(
+         ...     start_idxs=pd.Index(['2020-01-01', '2020-01-02', '2020-01-01']),
+         ...     end_idxs=pd.Index(['2020-01-08', '2020-01-04', '2020-01-07']),
+         ...     plot=True
+         ... )
+        ```
+
+        ![](/vectorbt/docs/img/range_split_plot.png)
+        """
+        return self.split(RangeSplitter(), **kwargs)
+
+    def rolling_split(self, **kwargs):
+        """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.RollingSplitter`.
+
+        ## Example
+
+        ```python-repl
+        >>> train_set, valid_set, test_set = sr.vbt.rolling_split(
+        ...     window_len=5, set_lens=(1, 1), left_to_right=False)
+        >>> train_set[0]
+        split_idx  0  1  2  3  4  5
+        0          0  1  2  3  4  5
+        1          1  2  3  4  5  6
+        2          2  3  4  5  6  7
+        >>> valid_set[0]
+        split_idx  0  1  2  3  4  5
+        0          3  4  5  6  7  8
+        >>> test_set[0]
+        split_idx  0  1  2  3  4  5
+        0          4  5  6  7  8  9
+
+        >>> sr.vbt.rolling_split(
+        ...     window_len=5, set_lens=(1, 1), left_to_right=False,
+        ...     plot=True, trace_names=['train', 'valid', 'test'])
+        ```
+
+        ![](/vectorbt/docs/img/rolling_split_plot.png)
+        """
+        return self.split(RollingSplitter(), **kwargs)
+
+    def expanding_split(self, **kwargs):
+        """Split using `GenericAccessor.split` on `vectorbt.generic.splitters.ExpandingSplitter`.
+
+        ## Example
+
+        ```python-repl
+        >>> train_set, valid_set, test_set = sr.vbt.expanding_split(
+        ...     n=5, set_lens=(1, 1), min_len=3, left_to_right=False)
+        >>> train_set[0]
+        split_idx    0    1    2    3    4    5    6  7
+        0          0.0  0.0  0.0  0.0  0.0  0.0  0.0  0
+        1          NaN  1.0  1.0  1.0  1.0  1.0  1.0  1
+        2          NaN  NaN  2.0  2.0  2.0  2.0  2.0  2
+        3          NaN  NaN  NaN  3.0  3.0  3.0  3.0  3
+        4          NaN  NaN  NaN  NaN  4.0  4.0  4.0  4
+        5          NaN  NaN  NaN  NaN  NaN  5.0  5.0  5
+        6          NaN  NaN  NaN  NaN  NaN  NaN  6.0  6
+        7          NaN  NaN  NaN  NaN  NaN  NaN  NaN  7
+        >>> valid_set[0]
+        split_idx  0  1  2  3  4  5  6  7
+        0          1  2  3  4  5  6  7  8
+        >>> test_set[0]
+        split_idx  0  1  2  3  4  5  6  7
+        0          2  3  4  5  6  7  8  9
+
+        >>> sr.vbt.expanding_split(
+        ...     set_lens=(1, 1), min_len=3, left_to_right=False,
+        ...     plot=True, trace_names=['train', 'valid', 'test'])
+        ```
+
+        ![](/vectorbt/docs/img/rolling_split_plot.png)
+        """
+        return self.split(ExpandingSplitter(), **kwargs)
 
     # ############# Plotting ############# #
 
@@ -1520,6 +1733,6 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             return heatmap.fig
         return heatmap
 
-    def ts_heatmap(self, **kwargs):
+    def ts_heatmap(self, is_y_category=True, **kwargs):
         """Heatmap of time-series data."""
-        return self._obj.transpose().iloc[::-1].vbt.heatmap(**kwargs)
+        return self._obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)

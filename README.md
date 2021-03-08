@@ -300,6 +300,19 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 86.2 ms ± 7.97 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
 
+- Splitting functions for cross-validation in time series
+    - Supports [scikit-learn](https://github.com/scikit-learn/scikit-learn) splitters
+
+```python-repl
+>>> pd.Series([1, 2, 3, 4, 5]).vbt.expanding_split()[0]
+split_idx    0    1    2    3  4
+0          1.0  1.0  1.0  1.0  1
+1          NaN  2.0  2.0  2.0  2
+2          NaN  NaN  3.0  3.0  3
+3          NaN  NaN  NaN  4.0  4
+4          NaN  NaN  NaN  NaN  5
+```
+
 - Drawdown analysis
 
 ```python-repl
@@ -309,7 +322,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 ![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.png)
 
 - Functions for working with signals
-    - Entry, exit and random signal generation
+    - Entry, exit, and random signal generators
     - Ranking and distance functions
     
 ```python-repl
@@ -322,7 +335,7 @@ dtype: bool
 ```
 
 - Signal factory for building iterative signal generators
-    - Also includes a range of basic generators such as random signal generator
+    - Includes basic generators such for random signals
 
 ```python-repl
 >>> rand = vbt.RAND.run(n=[0, 1, 2], input_shape=(6,), seed=42)
@@ -345,7 +358,8 @@ rand_n      0      1      2
 ```
     
 - Functions for working with returns
-    - Compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
+    - Numba-compiled versions of metrics found in [empyrical](https://github.com/quantopian/empyrical)
+    - Rolling versions of most metrics
 
 ```python-repl
 >>> pd.Series([0.01, -0.01, 0.01]).vbt.returns(freq='1D').sharpe_ratio()
@@ -356,7 +370,8 @@ rand_n      0      1      2
     - Accepts signals, orders, and custom order function
     - Supports long and short positions
     - Supports individual and multi-asset mixed portfolios
-    - Provides metrics and tools for analyzing returns, orders, trades and positions
+    - Has metrics and tools for analyzing returns, orders, trades and positions
+    - Allows saving and loading from disk using [dill](https://github.com/uqfoundation/dill)
     
 ```python-repl
 >>> price = [1., 2., 3., 2., 1.]
@@ -369,10 +384,12 @@ rand_n      0      1      2
 ![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.png)
 
 - Indicator factory for building complex technical indicators with ease
-- Technical indicators with full Numba support
-    - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
-    - Each offers methods for generating signals and plotting
-    - Each allows arbitrary parameter combinations, from arrays to Cartesian products
+    - Includes technical indicators with full Numba support
+        - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
+    - Each indicator has methods for generating signals and plotting
+    - Each indicator takes arbitrary parameter combinations, from arrays to Cartesian products
+    - Can integrate third-party indicators, such as [pandas-ta](https://github.com/twopirllc/pandas-ta)
+    - Supports parallelization with [Ray](https://github.com/ray-project/ray)
     
 ```python-repl
 >>> vbt.MA.run([1, 2, 3], window=[2, 3], ewm=[False, True]).ma
@@ -383,7 +400,7 @@ ma_ewm    False      True
 2           2.5  2.428571
 ``` 
 
-- Support for [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
+- Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
 
 ```python-repl
 >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
@@ -394,7 +411,7 @@ sma_timeperiod    2    3
 2               2.5  2.0
 ``` 
 
-- Look-ahead indicators and label generators
+- Look-ahead indicators and label generators for machine learning
     - Search for local extrema, breakout detection, and more
 
 ```python-repl
@@ -417,8 +434,9 @@ Head over to the [documentation](https://polakowo.io/vectorbt) to get started.
 - [Backtesting per trading session](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TradingSessions.ipynb)
 - [Portfolio optimization](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/PortfolioOptimization.ipynb)
 - [Plotting MACD parameters as 3D volume](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/MACDVolume.ipynb)
+- [Walk-forward optimization](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/WalkForwardOptimization.ipynb)
 
-Note: you need to run the notebook to play with widgets.
+Note: you must run the notebook to play with the widgets.
 
 ### Dashboards
 

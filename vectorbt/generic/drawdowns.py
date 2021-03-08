@@ -1,4 +1,20 @@
-"""Base class for working with drawdown records."""
+"""Base class for working with drawdown records.
+
+Class `Drawdowns` accepts drawdown records and the corresponding time series
+to analyze the periods of drawdown. Using `Drawdowns.from_ts`, you can generate
+drawdown records for any time series and analyze them right away.
+
+Moreover, all time series accessors have a method `drawdowns`:
+
+```python-repl
+>>> import pandas as pd
+>>> import vectorbt as vbt
+
+>>> # vectorbt.generic.accessors.GenericAccessor.drawdowns.current_drawdown
+>>> pd.Series([5, 4, 3, 4]).vbt.drawdowns.current_drawdown()
+-0.2
+```
+"""
 
 import numpy as np
 import pandas as pd

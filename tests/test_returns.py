@@ -360,7 +360,7 @@ class TestAccessors:
         [0.05, 0.06, 0.07],
     )
     def test_value_at_risk(self, test_cutoff):
-        # empyrical can't tolerate NaNs here
+        # empyrical can't tolerate NaN here
         res_a = empyrical.value_at_risk(ret['a'].iloc[1:], cutoff=test_cutoff)
         res_b = empyrical.value_at_risk(ret['b'].iloc[1:], cutoff=test_cutoff)
         res_c = empyrical.value_at_risk(ret['c'].iloc[1:], cutoff=test_cutoff)
@@ -380,7 +380,7 @@ class TestAccessors:
         [0.05, 0.06, 0.07],
     )
     def test_cond_value_at_risk(self, test_cutoff):
-        # empyrical can't tolerate NaNs here
+        # empyrical can't tolerate NaN here
         res_a = empyrical.conditional_value_at_risk(ret['a'].iloc[1:], cutoff=test_cutoff)
         res_b = empyrical.conditional_value_at_risk(ret['b'].iloc[1:], cutoff=test_cutoff)
         res_c = empyrical.conditional_value_at_risk(ret['c'].iloc[1:], cutoff=test_cutoff)
