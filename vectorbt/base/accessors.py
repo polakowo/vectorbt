@@ -106,7 +106,7 @@ class BaseAccessor:
 
     @property
     def wrapper(self):
-        """Array wrapper (read-only)."""
+        """Array wrapper."""
         return self._wrapper
 
     # ############# Creation ############# #

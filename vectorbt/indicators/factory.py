@@ -2115,41 +2115,41 @@ class IndicatorFactory:
 
         # Create read-only properties
         prop = property(lambda _self: _self._short_name)
-        prop.__doc__ = "Name of the indicator (read-only)."
+        prop.__doc__ = "Name of the indicator."
         setattr(Indicator, 'short_name', prop)
 
         prop = property(lambda _self: _self._level_names)
-        prop.__doc__ = "Column level names corresponding to each parameter (read-only)."
+        prop.__doc__ = "Column level names corresponding to each parameter."
         setattr(Indicator, 'level_names', prop)
 
         prop = classproperty(lambda _self: input_names)
-        prop.__doc__ = "Names of the input arrays (read-only)."
+        prop.__doc__ = "Names of the input arrays."
         setattr(Indicator, 'input_names', prop)
 
         prop = classproperty(lambda _self: param_names)
-        prop.__doc__ = "Names of the parameters (read-only)."
+        prop.__doc__ = "Names of the parameters."
         setattr(Indicator, 'param_names', prop)
 
         prop = classproperty(lambda _self: in_output_names)
-        prop.__doc__ = "Names of the in-place output arrays (read-only)."
+        prop.__doc__ = "Names of the in-place output arrays."
         setattr(Indicator, 'in_output_names', prop)
 
         prop = classproperty(lambda _self: output_names)
-        prop.__doc__ = "Names of the regular output arrays (read-only)."
+        prop.__doc__ = "Names of the regular output arrays."
         setattr(Indicator, 'output_names', prop)
 
         prop = classproperty(lambda _self: output_flags)
-        prop.__doc__ = "Dictionary of output flags (read-only)."
+        prop.__doc__ = "Dictionary of output flags."
         setattr(Indicator, 'output_flags', prop)
 
         for param_name in param_names:
             prop = property(lambda _self, param_name=param_name: getattr(_self, f'_{param_name}_array'))
-            prop.__doc__ = f"Array of `{param_name}` combinations (read-only)."
+            prop.__doc__ = f"Array of `{param_name}` combinations."
             setattr(Indicator, f'{param_name}_array', prop)
 
         for input_name in input_names:
             def input_prop(_self, input_name=input_name):
-                """Input array (read-only)."""
+                """Input array."""
                 old_input = reshape_fns.to_2d(getattr(_self, '_' + input_name), raw=True)
                 input_mapper = getattr(_self, '_input_mapper')
                 if input_mapper is None:
@@ -2164,9 +2164,9 @@ class IndicatorFactory:
                 return _self.wrapper.wrap(getattr(_self, '_' + _output_name))
 
             if output_name in in_output_names:
-                output_prop.__doc__ = """In-place output array (read-only)."""
+                output_prop.__doc__ = """In-place output array."""
             else:
-                output_prop.__doc__ = """Output array (read-only)."""
+                output_prop.__doc__ = """Output array."""
 
             output_prop.__name__ = output_name
             if output_name in output_flags:

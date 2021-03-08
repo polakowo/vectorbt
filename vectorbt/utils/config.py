@@ -200,7 +200,7 @@ class Configured(Pickleable):
 
     @property
     def config(self):
-        """Initialization config (read-only)."""
+        """Initialization config."""
         return self._config
 
     def copy(self, **new_config):

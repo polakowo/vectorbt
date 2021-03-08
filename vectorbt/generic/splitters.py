@@ -1,4 +1,4 @@
-"""Splitters.
+"""Splitters for cross-validation.
 
 Defines splitter classes similar (but may not compatible) to `sklearn.model_selection.BaseCrossValidator`."""
 
