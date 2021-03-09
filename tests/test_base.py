@@ -338,11 +338,13 @@ df4_grouped_wrapper_co = df4_grouped_wrapper.copy(column_only_select=True, group
 
 
 class TestArrayWrapper:
-    def test_config(self):
+    def test_config(self, tmp_path):
         assert array_wrapper.ArrayWrapper.loads(sr2_wrapper.dumps()) == sr2_wrapper
         assert array_wrapper.ArrayWrapper.loads(sr2_wrapper_co.dumps()) == sr2_wrapper_co
         assert array_wrapper.ArrayWrapper.loads(sr2_grouped_wrapper.dumps()) == sr2_grouped_wrapper
         assert array_wrapper.ArrayWrapper.loads(sr2_grouped_wrapper_co.dumps()) == sr2_grouped_wrapper_co
+        sr2_grouped_wrapper_co.save(tmp_path / 'sr2_grouped_wrapper_co')
+        assert array_wrapper.ArrayWrapper.load(tmp_path / 'sr2_grouped_wrapper_co') == sr2_grouped_wrapper_co
 
     def test_indexing_func_meta(self):
         # not grouped
@@ -3000,11 +3002,16 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
+                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb, numba_loop=True,
                 keys=['a', 'b', 'c']
             ),
             target
         )
+        with pytest.raises(Exception) as e_info:
+            sr2.vbt.apply_and_concat(
+                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb, numba_loop=True, use_ray=True,
+                keys=['a', 'b', 'c']
+            )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
@@ -3064,7 +3071,7 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             df2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb,
+                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb, numba_loop=True,
                 keys=['a', 'b', 'c']
             ),
             target2
@@ -3167,10 +3174,15 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.combine_with_multiple(
                 [10, df4], 10, 100,
-                combine_func=combine_func_nb
+                combine_func=combine_func_nb, numba_loop=True
             ),
             target
         )
+        with pytest.raises(Exception) as e_info:
+            sr2.vbt.combine_with_multiple(
+                [10, df4], 10, 100,
+                combine_func=combine_func_nb, numba_loop=True, use_ray=True
+            )
         pd.testing.assert_frame_equal(
             df4.vbt.combine_with_multiple(
                 [10, sr2], 10, b=100,
@@ -3217,7 +3229,7 @@ class TestAccessors:
         pd.testing.assert_frame_equal(
             sr2.vbt.combine_with_multiple(
                 [10, df4], 10, 100,
-                combine_func=combine_func_nb,
+                combine_func=combine_func_nb, numba_loop=True,
                 concat=True
             ),
             target2

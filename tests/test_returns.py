@@ -4,8 +4,8 @@ from datetime import datetime
 import pytest
 import empyrical
 
+import vectorbt as vbt
 from vectorbt import settings
-from vectorbt.generic.drawdowns import Drawdowns
 
 from tests.utils import isclose
 
@@ -486,7 +486,7 @@ class TestAccessors:
         )
 
     def test_drawdowns(self):
-        assert type(ret['a'].vbt.returns.drawdowns) is Drawdowns
+        assert type(ret['a'].vbt.returns.drawdowns) is vbt.Drawdowns
         assert ret['a'].vbt.returns.drawdowns.wrapper.freq == ret['a'].vbt.wrapper.freq
         assert ret['a'].vbt.returns.drawdowns.wrapper.ndim == ret['a'].ndim
         assert ret.vbt.returns.drawdowns.wrapper.ndim == ret.ndim

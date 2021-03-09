@@ -220,12 +220,12 @@ class TestGenerators:
             vbt.LEXLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths).labels,
             pd.DataFrame(
                 np.array([
-                    [-1, 1, -1, 1, -1, 1],
+                    [-1, 1, -1, 1, 0, 0],
                     [1, -1, 0, 0, 0, 0],
                     [-1, 1, 0, 0, 0, 0],
                     [0, 0, 0, 0, 0, 0],
                     [1, -1, 1, -1, 0, 0],
-                    [-1, 1, -1, 1, 1, -1]
+                    [0, 1, 0, 1, 0, 0]
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
@@ -244,12 +244,12 @@ class TestGenerators:
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode='Binary').labels,
             pd.DataFrame(
                 np.array([
-                    [1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
-                    [0.0, 1.0, 1.0, 0.0, 1.0, 0.0],
-                    [1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
-                    [1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
-                    [0.0, 1.0, 0.0, 1.0, 1.0, 0.0],
-                    [0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [0.0, 1.0, 1.0, 0.0, np.nan, np.nan],
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [np.nan, 1.0, np.nan, 1.0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
@@ -266,12 +266,12 @@ class TestGenerators:
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode='BinaryCont').labels,
             pd.DataFrame(
                 np.array([
-                    [1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
-                    [0.0, 1.0, 0.5, 0.5, 0.5, 0.5],
-                    [1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
-                    [0.5, 0.5, 0.5, 0.5, 0.5, 0.5],
-                    [0.0, 1.0, 0.0, 1.0, 0.0, 1.0],
-                    [1.0, 0.0, 1.0, 0.0, 0.5, 0.5]
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [0.0, 1.0, 0.5, 0.5, np.nan, np.nan],
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [0.5, 0.5, 0.5, 0.5, np.nan, np.nan],
+                    [np.nan, 1.0, np.nan, 1.0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
@@ -288,12 +288,12 @@ class TestGenerators:
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode='BinaryContSat').labels,
             pd.DataFrame(
                 np.array([
-                    [1.0, 0.0, 1.0, 0.0, 0.8888888888888888, 0.33333333333333337],
-                    [0.0, 1.0, 0.5, 0.4999999999999999, 0.4444444444444444, 0.6666666666666667],
-                    [1.0, 0.0, 1.0, 0.0, 0.8888888888888888, 0.33333333333333337],
-                    [0.6666666666666667, 0.0, 0.5, 0.4999999999999999, 0.4444444444444444, 0.6666666666666667],
-                    [0.5, 1.0, 0.5, 1.0, 0.0, 1.0],
-                    [1.0, 0.0, 1.0, 0.0, 0.4444444444444444, 0.6666666666666667]
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [0.0, 1.0, 0.5, 0.4999999999999999, np.nan, np.nan],
+                    [1.0, 0.0, 1.0, 0.0, np.nan, np.nan],
+                    [0.6666666666666667, 0.0, 0.5, 0.4999999999999999, np.nan, np.nan],
+                    [np.nan, 1.0, np.nan, 1.0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
@@ -310,12 +310,12 @@ class TestGenerators:
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode='PctChange').labels,
             pd.DataFrame(
                 np.array([
-                    [1.0, -0.3333333333333333, 2.0, -0.6666666666666666, 1.0, -0.3333333333333333],
-                    [-0.5, 0.5, 0.5, -0.5, 0.0, 0.0],
-                    [2.0, -0.6666666666666666, 2.0, -0.6666666666666666, 1.0, -0.3333333333333333],
-                    [0.5, -0.5, 0.5, -0.5, 0.0, 0.0],
-                    [-0.3333333333333333, 1.0, -0.3333333333333333, 1.0, -0.3333333333333333, 1.0],
-                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                    [1.0, -0.3333333333333333, 2.0, -0.6666666666666666, np.nan, np.nan],
+                    [-0.5, 0.5, 0.5, -0.5, np.nan, np.nan],
+                    [2.0, -0.6666666666666666, 2.0, -0.6666666666666666, np.nan, np.nan],
+                    [0.5, -0.5, 0.5, -0.5, np.nan, np.nan],
+                    [np.nan, 1.0, np.nan, 1.0, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
@@ -332,13 +332,13 @@ class TestGenerators:
             vbt.TRENDLB.run(close_ts, pos_th=pos_ths, neg_th=neg_ths, mode='PctChangeNorm').labels,
             pd.DataFrame(
                 np.array([
-                    [0.5, -0.3333333333333333, 0.6666666666666666, -0.6666666666666666, 0.5, -0.3333333333333333],
-                    [-0.5, 0.3333333333333333, 0.3333333333333333, -0.5, 0.0, 0.0],
+                    [0.5, -0.3333333333333333, 0.6666666666666666, -0.6666666666666666, np.nan, np.nan],
+                    [-0.5, 0.3333333333333333, 0.3333333333333333, -0.5, np.nan, np.nan],
                     [0.6666666666666666, -0.6666666666666666, 0.6666666666666666,
-                     -0.6666666666666666, 0.5, -0.3333333333333333],
-                    [0.3333333333333333, -0.5, 0.3333333333333333, -0.5, 0.0, 0.0],
-                    [-0.3333333333333333, 0.5, -0.3333333333333333, 0.5, -0.5, 1.0],
-                    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                     -0.6666666666666666, np.nan, np.nan],
+                    [0.3333333333333333, -0.5, 0.3333333333333333, -0.5, np.nan, np.nan],
+                    [np.nan, 0.5, np.nan, 0.5, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan]
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([

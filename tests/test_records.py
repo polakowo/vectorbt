@@ -5,7 +5,6 @@ from numba import njit
 from datetime import datetime
 import pytest
 
-from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.enums import drawdown_dt
 from vectorbt.portfolio.enums import order_dt, trade_dt, position_dt, log_dt
 
@@ -35,7 +34,7 @@ records_arr = np.asarray([
 
 group_by = pd.Index(['g1', 'g1', 'g2', 'g2'])
 
-wrapper = ArrayWrapper(
+wrapper = vbt.ArrayWrapper(
     index=['x', 'y', 'z'],
     columns=['a', 'b', 'c', 'd'],
     ndim=2,
@@ -172,8 +171,10 @@ mapped_array_nosort = mapped_array.copy(
 
 
 class TestMappedArray:
-    def test_config(self):
+    def test_config(self, tmp_path):
         assert vbt.MappedArray.loads(mapped_array.dumps()) == mapped_array
+        mapped_array.save(tmp_path / 'mapped_array')
+        assert vbt.MappedArray.load(tmp_path / 'mapped_array') == mapped_array
 
     def test_mapped_arr(self):
         np.testing.assert_array_equal(
@@ -913,9 +914,11 @@ class TestMappedArray:
 # ############# base.py ############# #
 
 class TestRecords:
-    def test_config(self):
+    def test_config(self, tmp_path):
         assert vbt.Records.loads(records['a'].dumps()) == records['a']
         assert vbt.Records.loads(records.dumps()) == records
+        records.save(tmp_path / 'records')
+        assert vbt.Records.load(tmp_path / 'records') == records
 
     def test_records(self):
         pd.testing.assert_frame_equal(

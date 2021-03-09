@@ -140,43 +140,29 @@ def local_extrema_apply_nb(close, pos_th, neg_th, flex_2d=True):
 
             if i == close.shape[0] - 1:
                 # Find last high/low
-                if direction == 0:
-                    if close[i, col] > close[prev_i, col]:
-                        direction = 1
-                    elif close[i, col] < close[prev_i, col]:
-                        direction = -1
-                out[prev_i, col] = -direction
-                if i != prev_i:
-                    out[i, col] = direction
+                if direction != 0:
+                    out[prev_i, col] = -direction
     return out
 
 
 @njit(cache=True)
 def bn_trend_labels_nb(close, local_extrema):
     """Return 0 for H-L and 1 for L-H."""
-    out = np.empty_like(close, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float_)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
         if idxs.shape[0] == 0:
-            if close[-1, col] > close[0, col]:
-                out[:, col] = 1
-            elif close[-1, col] < close[0, col]:
-                out[:, col] = 0
-            else:
-                out[:, col] = np.nan
             continue
 
         for k in range(1, idxs.shape[0]):
-            start_i = prev_i = idxs[k - 1]
-            end_i = next_i = idxs[k]
-            if k == idxs.shape[0] - 1:
-                end_i += 1
+            prev_i = idxs[k - 1]
+            next_i = idxs[k]
 
             if close[next_i, col] > close[prev_i, col]:
-                out[start_i:end_i, col] = 1
+                out[prev_i:next_i, col] = 1
             else:
-                out[start_i:end_i, col] = 0
+                out[prev_i:next_i, col] = 0
 
     return out
 
@@ -184,23 +170,20 @@ def bn_trend_labels_nb(close, local_extrema):
 @njit(cache=True)
 def bn_cont_trend_labels_nb(close, local_extrema):
     """Normalize each range between two extrema between 0 (will go up) and 1 (will go down)."""
-    out = np.empty_like(close, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float_)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
         if idxs.shape[0] == 0:
-            out[:, col] = np.nan
             continue
 
         for k in range(1, idxs.shape[0]):
-            start_i = prev_i = idxs[k - 1]
-            end_i = next_i = idxs[k]
-            if k == idxs.shape[0] - 1:
-                end_i += 1
+            prev_i = idxs[k - 1]
+            next_i = idxs[k]
 
             _min = np.min(close[prev_i:next_i + 1, col])
             _max = np.max(close[prev_i:next_i + 1, col])
-            out[start_i:end_i, col] = 1 - (close[start_i:end_i, col] - _min) / (_max - _min)
+            out[prev_i:next_i, col] = 1 - (close[prev_i:next_i, col] - _min) / (_max - _min)
 
     return out
 
@@ -212,19 +195,16 @@ def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=Tr
     """
     pos_th = np.asarray(pos_th)
     neg_th = np.asarray(neg_th)
-    out = np.empty_like(close, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float_)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
         if idxs.shape[0] == 0:
-            out[:, col] = np.nan
             continue
 
         for k in range(1, idxs.shape[0]):
-            start_i = prev_i = idxs[k - 1]
-            end_i = next_i = idxs[k]
-            if k == idxs.shape[0] - 1:
-                end_i += 1
+            prev_i = idxs[k - 1]
+            next_i = idxs[k]
 
             _pos_th = abs(flex_select_auto_nb(prev_i, col, pos_th, flex_2d))
             _neg_th = abs(flex_select_auto_nb(prev_i, col, neg_th, flex_2d))
@@ -235,7 +215,7 @@ def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=Tr
             _min = np.min(close[prev_i:next_i + 1, col])
             _max = np.max(close[prev_i:next_i + 1, col])
 
-            for i in range(start_i, end_i):
+            for i in range(prev_i, next_i):
                 if close[next_i, col] > close[prev_i, col]:
                     _start = _max / (1 + _pos_th)
                     _end = _min * (1 + _pos_th)
@@ -257,21 +237,18 @@ def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=Tr
 @njit(cache=True)
 def pct_trend_labels_nb(close, local_extrema, normalize):
     """Compute the percentage change of the current value to the next extremum."""
-    out = np.empty_like(close, dtype=np.float_)
+    out = np.full_like(close, np.nan, dtype=np.float_)
 
     for col in range(close.shape[1]):
         idxs = np.flatnonzero(local_extrema[:, col])
         if idxs.shape[0] == 0:
-            out[:, col] = np.nan
             continue
 
         for k in range(1, idxs.shape[0]):
-            start_i = prev_i = idxs[k - 1]
-            end_i = next_i = idxs[k]
-            if k == idxs.shape[0] - 1:
-                end_i += 1
+            prev_i = idxs[k - 1]
+            next_i = idxs[k]
 
-            for i in range(start_i, end_i):
+            for i in range(prev_i, next_i):
                 if close[next_i, col] > close[prev_i, col] and normalize:
                     out[i, col] = (close[next_i, col] - close[i, col]) / close[next_i, col]
                 else:

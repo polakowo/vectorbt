@@ -55,24 +55,6 @@ def shuffle_nb(a, seed=None):
 
 
 @njit(cache=True)
-def prepend_1d_nb(a, n, value):
-    """Prepend value `n` times."""
-    out = np.empty(a.shape[0] + n, dtype=np.float_)
-    out[:n] = value
-    out[n:] = a
-    return out
-
-
-@njit(cache=True)
-def prepend_nb(a, n, value):
-    """2-dim version of `prepend_1d_nb`."""
-    out = np.empty((a.shape[0] + n, a.shape[1]), dtype=np.float_)
-    out[:n, :] = value
-    out[n:, :] = a
-    return out
-
-
-@njit(cache=True)
 def set_by_mask_1d_nb(a, mask, value):
     """Set each element to a value by boolean mask."""
     out = a.astype(np.float_)

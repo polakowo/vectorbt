@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name='vectorbt',
-    version='0.17.0',
+    version='0.17.1',
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
@@ -27,7 +27,7 @@ setup(
         'dill'
     ],
     extras_require={
-        "full": ["empyrical", "scikit-learn", "TA-Lib", "ray"]
+        "full": ["yfinance", "empyrical", "scikit-learn", "ray", "TA-Lib"]
     },
     python_requires='>=3.6, <3.9',
     license='Apache 2.0',
