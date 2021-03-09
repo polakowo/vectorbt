@@ -20,8 +20,8 @@ This enables superfast computation using vectorized operations with NumPy and no
 operations with Numba. It also integrates [plotly.py](https://github.com/plotly/plotly.py) and 
 [ipywidgets](https://github.com/jupyter-widgets/ipywidgets) to display complex charts and dashboards akin 
 to Tableau right in the Jupyter notebook. Due to high performance, vectorbt is able to process large amounts of 
-data even without GPU and parallelization (both are work in progress), and enable the user to interact with 
-data-hungry widgets without significant delays.
+data even without GPU and parallelization, and enable the user to interact with data-hungry widgets 
+without significant delays.
 
 With vectorbt you can
 * Analyze time series and engineer features
@@ -36,8 +36,16 @@ With vectorbt you can
 pip install vectorbt
 ```
 
-See [Jupyter Notebook and JupyterLab Support](https://plotly.com/python/getting-started/#jupyter-notebook-support) 
-for Plotly figures.
+To also install optional dependencies:
+
+```bash
+pip install vectorbt[full]
+```
+
+Troubleshooting:
+
+* [TA-Lib dependencies](https://github.com/mrjbq7/ta-lib#dependencies)
+* [Jupyter Notebook and JupyterLab support](https://plotly.com/python/getting-started/#jupyter-notebook-support)
 
 ## Examples
 

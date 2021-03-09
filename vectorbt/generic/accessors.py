@@ -1074,7 +1074,7 @@ class GenericAccessor(BaseAccessor):
             return scatter.fig
         return scatter
 
-    def lineplot(self, **kwargs):
+    def lineplot(self, **kwargs):  # pragma: no cover
         """`GenericAccessor.plot` with 'lines' mode.
 
         ## Example
@@ -1087,7 +1087,7 @@ class GenericAccessor(BaseAccessor):
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='lines')), kwargs))
 
-    def scatterplot(self, **kwargs):
+    def scatterplot(self, **kwargs):  # pragma: no cover
         """`GenericAccessor.plot` with 'markers' mode.
 
         ## Example
@@ -1506,7 +1506,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         )
         return fig
 
-    def ts_heatmap(self, **kwargs):
+    def ts_heatmap(self, **kwargs):  # pragma: no cover
         """Heatmap of time-series data."""
         return self._obj.to_frame().vbt.ts_heatmap(**kwargs)
 
@@ -1733,6 +1733,6 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
             return heatmap.fig
         return heatmap
 
-    def ts_heatmap(self, is_y_category=True, **kwargs):
+    def ts_heatmap(self, is_y_category=True, **kwargs):  # pragma: no cover
         """Heatmap of time-series data."""
         return self._obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)

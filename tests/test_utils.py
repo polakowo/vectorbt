@@ -1492,33 +1492,6 @@ class TestEnum:
 
 
 class TestData:
-    def test_yf_downloader(self):
-        result = data.yf_downloader(['BTC-USD', 'ETH-USD'], start='2020-1-1', end='2020-1-2')
-        pd.testing.assert_frame_equal(
-            result['BTC-USD'].astype(float),
-            pd.DataFrame([
-                [7294.43896484375, 7335.2900390625, 7169.77783203125,
-                 7193.59912109375, 21167946112.0, 0.0, 0.0],
-                [7194.89208984375, 7254.33056640625, 7174.9443359375,
-                 7200.17431640625, 18565664997.0, 0.0, 0.0]
-            ], index=pd.DatetimeIndex(['2019-12-31', '2020-01-01'], dtype='datetime64[ns]', name='Date', freq=None),
-                columns=pd.Index(['Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits'],
-                                 dtype='object')
-            )
-        )
-        pd.testing.assert_frame_equal(
-            result['ETH-USD'].astype(float),
-            pd.DataFrame([
-                [132.61227416992188, 133.73268127441406, 128.79815673828125,
-                 129.61085510253906, 8936866397.0, 0.0, 0.0],
-                [129.6306610107422, 132.83535766601562, 129.1982879638672,
-                 130.802001953125, 7935230330.0, 0.0, 0.0]
-            ], index=pd.DatetimeIndex(['2019-12-31', '2020-01-01'], dtype='datetime64[ns]', name='Date', freq=None),
-                columns=pd.Index(['Open', 'High', 'Low', 'Close', 'Volume', 'Dividends', 'Stock Splits'],
-                                 dtype='object')
-            )
-        )
-
     def test_download(self):
         def downloader(symbols, kw=None):
             return {s: pd.DataFrame({

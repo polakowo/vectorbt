@@ -27,7 +27,9 @@ setup(
         'dill'
     ],
     extras_require={
-        "full": ["yfinance", "empyrical", "scikit-learn", "ray", "TA-Lib"]
+        "full": ["yfinance", "empyrical", "scikit-learn", "ray", "TA-Lib"],
+        "cov": ["pytest-cov", "codecov"],
+        "docs": ["pdoc3"]
     },
     python_requires='>=3.6, <3.9',
     license='Apache 2.0',

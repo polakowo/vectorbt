@@ -2,7 +2,7 @@ import pandas as pd
 import warnings
 
 
-def yf_downloader(symbols, **kwargs):
+def yf_downloader(symbols, **kwargs):  # pragma: no cover
     """Downloader that uses `yfinance`."""
     import yfinance as yf
 

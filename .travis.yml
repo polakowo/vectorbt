@@ -1,9 +1,5 @@
 language: python
 install:
-  - pip install .
-  - pip install yfinance empyrical ray scikit-learn
-  - pip install pytest-cov codecov
-  - pip install pdoc3
   - curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
   - tar -xzf ta-lib-0.4.0-src.tar.gz
   - cd ta-lib/
@@ -11,7 +7,7 @@ install:
   - make
   - sudo make install
   - cd ..
-  - pip install TA-Lib
+  - pip install .[full,cov,docs]
 script:
   - export NUMBA_BOUNDSCHECK=1
   - pytest tests/
