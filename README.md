@@ -295,7 +295,7 @@ method is flexible towards inputs and can work on both Series and DataFrames.
 86.2 ms ± 7.97 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 ```
 
-- Splitting functions for cross-validation in time series
+- Splitting functions for time series cross-validation
     - Supports [scikit-learn](https://github.com/scikit-learn/scikit-learn) splitters
 
 ```python-repl
@@ -330,7 +330,7 @@ dtype: bool
 ```
 
 - Signal factory for building iterative signal generators
-    - Includes basic generators such for random signals
+    - Includes basic generators such for random signal generation
 
 ```python-repl
 >>> rand = vbt.RAND.run(n=[0, 1, 2], input_shape=(6,), seed=42)
@@ -365,7 +365,7 @@ rand_n      0      1      2
     - Accepts signals, orders, and custom order function
     - Supports long and short positions
     - Supports individual and multi-asset mixed portfolios
-    - Has metrics and tools for analyzing returns, orders, trades and positions
+    - Offers metrics and tools for analyzing returns, orders, trades and positions
     - Allows saving and loading from disk using [dill](https://github.com/uqfoundation/dill)
     
 ```python-repl
@@ -383,31 +383,23 @@ rand_n      0      1      2
         - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
     - Each indicator has methods for generating signals and plotting
     - Each indicator takes arbitrary parameter combinations, from arrays to Cartesian products
+    - Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
     - Can integrate third-party indicators, such as [pandas-ta](https://github.com/twopirllc/pandas-ta)
     - Supports parallelization with [Ray](https://github.com/ray-project/ray)
-    
-```python-repl
->>> vbt.MA.run([1, 2, 3], window=[2, 3], ewm=[False, True]).ma
-ma_window     2         3
-ma_ewm    False      True 
-0           NaN       NaN
-1           1.5       NaN
-2           2.5  2.428571
-``` 
-
-- Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
 
 ```python-repl
 >>> SMA = vbt.IndicatorFactory.from_talib('SMA')
->>> SMA.run([1., 2., 3.], timeperiod=[2, 3]).real
+>>> SMA.run([1., 2., 3., 4., 5.], timeperiod=[2, 3]).real
 sma_timeperiod    2    3
 0               NaN  NaN
 1               1.5  NaN
 2               2.5  2.0
+3               3.5  3.0
+4               4.5  4.0
 ``` 
 
-- Look-ahead indicators and label generators for machine learning
-    - Search for local extrema, breakout detection, and more
+- Label generation for machine learning
+    - Labeling based on local extrema, breakouts, and more
 
 ```python-repl
 >>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
