@@ -1,7 +1,5 @@
 """Basic look-ahead indicators and label generators.
 
-Provides a collection of look-ahead indicators and label generators.
-
 You can access all the indicators either by `vbt.*` or `vbt.labels.*`."""
 
 from vectorbt.indicators.factory import IndicatorFactory

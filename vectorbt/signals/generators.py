@@ -1,7 +1,4 @@
-"""Signal generators built with `vectorbt.signals.factory.SignalFactory`.
-
-Provides a collection of signal generators, such as random signal generator,
-all built with `vectorbt.signals.factory.SignalFactory`."""
+"""Signal generators built with `vectorbt.signals.factory.SignalFactory`."""
 
 import numpy as np
 import plotly.graph_objects as go

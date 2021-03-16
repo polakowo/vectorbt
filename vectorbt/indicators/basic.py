@@ -1,8 +1,5 @@
 """Indicators built with `vectorbt.indicators.factory.IndicatorFactory`.
 
-Provides a collection of basic technical indicators, such as Bollinger Bands,
-all built with `vectorbt.indicators.factory.IndicatorFactory`.
-
 You can access all the indicators either by `vbt.*` or `vbt.indicators.*`.
 
 ```python-repl
