@@ -364,15 +364,15 @@ In our example, the parameter `window` can broadcast per column, and both parame
 ...     lower=np.array([1, 2]),
 ...     upper=np.array([3, 4]),
 ... ).output
-custom_window     2           3     4
-custom_lower  mix_0 mix_0 mix_1 mix_1
-custom_upper  mix_0 mix_0 mix_1 mix_1
-                  a     b     a     b
-2020-01-01      NaN   NaN   NaN   NaN
-2020-01-02      NaN   NaN   NaN   NaN
-2020-01-03      1.0   NaN   NaN   NaN
-2020-01-04      1.0   0.0   1.0   NaN
-2020-01-05      0.0   1.0   0.0   1.0
+custom_window       2       3               4
+custom_lower  array_0 array_0 array_1 array_1
+custom_upper  array_0 array_0 array_1 array_1
+                    a       b       a       b
+2020-01-01        NaN     NaN     NaN     NaN
+2020-01-02        NaN     NaN     NaN     NaN
+2020-01-03        1.0     NaN     NaN     NaN
+2020-01-04        1.0     0.0     1.0     NaN
+2020-01-05        0.0     1.0     0.0     1.0
 ```
 
 Broadcasting a huge number of parameters to the input shape can consume lots of memory,
@@ -429,15 +429,15 @@ and both bounds per element:
 ...     lower=price.values - 3,
 ...     upper=price.values + 3,
 ... ).output
-custom_window     2           3     4
-custom_lower  mix_0 mix_0 mix_1 mix_1
-custom_upper  mix_0 mix_0 mix_1 mix_1
-                  a     b     a     b
-2020-01-01      NaN   NaN   NaN   NaN
-2020-01-02      NaN   NaN   NaN   NaN
-2020-01-03      1.0   NaN   NaN   NaN
-2020-01-04      1.0   1.0   1.0   NaN
-2020-01-05      1.0   1.0   1.0   1.0
+custom_window       2       3               4
+custom_lower  array_0 array_0 array_1 array_1
+custom_upper  array_0 array_0 array_1 array_1
+                    a       b       a       b
+2020-01-01        NaN     NaN     NaN     NaN
+2020-01-02        NaN     NaN     NaN     NaN
+2020-01-03        1.0     NaN     NaN     NaN
+2020-01-04        1.0     1.0     1.0     NaN
+2020-01-05        1.0     1.0     1.0     1.0
 ```
 
 Indicators can also be parameterless. See `vectorbt.indicators.basic.OBV`.

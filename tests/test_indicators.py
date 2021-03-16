@@ -629,9 +629,9 @@ class TestFactory:
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
-                ('mix_0', 'a'),
-                ('mix_0', 'b'),
-                ('mix_0', 'c'),
+                ('array_0', 'a'),
+                ('array_0', 'b'),
+                ('array_0', 'c'),
             ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
@@ -695,9 +695,9 @@ class TestFactory:
             ]),
             index=ts.index,
             columns=pd.MultiIndex.from_tuples([
-                ('mix_0', 'a'),
-                ('mix_0', 'b'),
-                ('mix_0', 'c'),
+                ('array_0', 'a'),
+                ('array_0', 'b'),
+                ('array_0', 'c'),
             ], names=['custom_p', None])
         )
         pd.testing.assert_frame_equal(
@@ -2004,6 +2004,7 @@ class TestFactory:
             'copy',
             'custom_func',
             'dumps',
+            'getattr',
             'iloc',
             'in_out',
             'in_out_readable',

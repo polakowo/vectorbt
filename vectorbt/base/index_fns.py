@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from numba import njit
 from collections.abc import Iterable
+from datetime import datetime, timedelta
 
 from vectorbt.utils import checks
 
@@ -33,15 +34,19 @@ def index_from_values(values, name=None):
     Each in `values` will correspond to an element in the new index."""
     checks.assert_type(values, Iterable)
 
+    scalar_types = (int, float, complex, str, bool, datetime, timedelta, np.generic)
     value_names = []
-    for i, v in enumerate(values):
-        if isinstance(v, np.ndarray):
+    for i in range(len(values)):
+        v = values[i]
+        if v is None or isinstance(v, scalar_types):
+            value_names.append(v)
+        elif isinstance(v, np.ndarray):
             if np.all(v == v.item(0)):
                 value_names.append(v.item(0))
             else:
-                value_names.append('mix_%d' % i)
+                value_names.append('array_%d' % i)
         else:
-            value_names.append(v)
+            value_names.append('%s_%d' % (str(type(v).__name__), i))
     return pd.Index(value_names, name=name)
 
 

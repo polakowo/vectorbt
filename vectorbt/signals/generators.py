@@ -197,22 +197,22 @@ class _RPROB(RPROB):
     ...     seed=42)
 
     >>> rprob.entries
-    rprob_entry_prob  mix_0  mix_1
-    rprob_exit_prob     1.0    1.0
-    0                  True  False
-    1                 False   True
-    2                  True  False
-    3                 False   True
-    4                  True  False
+    rprob_entry_prob array_0 array_1
+    rprob_exit_prob      1.0     1.0
+    0                   True   False
+    1                  False    True
+    2                   True   False
+    3                  False    True
+    4                   True   False
 
     >>> rprob.exits
-    rprob_entry_prob  mix_0  mix_1
-    rprob_exit_prob     1.0    1.0
-    0                 False  False
-    1                  True  False
-    2                 False   True
-    3                  True  False
-    4                 False   True
+    rprob_entry_prob array_0 array_1
+    rprob_exit_prob      1.0     1.0
+    0                  False   False
+    1                   True   False
+    2                  False    True
+    3                   True   False
+    4                  False    True
     ```
     """
     pass

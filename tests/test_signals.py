@@ -1891,11 +1891,11 @@ class TestGenerators:
             input_shape=(5,), seed=seed)
         pd.testing.assert_series_equal(
             rprob.entries,
-            pd.Series(np.array([True, False, True, False, True]), name=('mix_0', 'mix_0'))
+            pd.Series(np.array([True, False, True, False, True]), name=('array_0', 'array_0'))
         )
         pd.testing.assert_series_equal(
             rprob.exits,
-            pd.Series(np.array([False, True, False, True, False]), name=('mix_0', 'mix_0'))
+            pd.Series(np.array([False, True, False, True, False]), name=('array_0', 'array_0'))
         )
         rprob = vbt.RPROB.run(entry_prob=[0.5, 1.], exit_prob=[1., 0.5], input_shape=(5,), seed=seed)
         pd.testing.assert_frame_equal(
@@ -2021,9 +2021,9 @@ class TestGenerators:
                 [False, False, True],
                 [True, False, False]
             ]), index=sig.index, columns=pd.MultiIndex.from_tuples([
-                ('mix_0', 'a'),
-                ('mix_0', 'b'),
-                ('mix_0', 'c')
+                ('array_0', 'a'),
+                ('array_0', 'b'),
+                ('array_0', 'c')
             ], names=['stex_stop', None])
             )
         )

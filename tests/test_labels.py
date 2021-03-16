@@ -229,12 +229,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    ('mix_0', 'mix_0', 'a'),
-                    ('mix_0', 'mix_0', 'b'),
-                    ('mix_1', 'mix_1', 'a'),
-                    ('mix_1', 'mix_1', 'b'),
-                    ('mix_2', 'mix_2', 'a'),
-                    ('mix_2', 'mix_2', 'b')
+                    ('array_0', 'array_0', 'a'),
+                    ('array_0', 'array_0', 'b'),
+                    ('array_1', 'array_1', 'a'),
+                    ('array_1', 'array_1', 'b'),
+                    ('array_2', 'array_2', 'a'),
+                    ('array_2', 'array_2', 'b')
                 ], names=['lexlb_pos_th', 'lexlb_neg_th', None])
             )
         )
@@ -253,12 +253,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    ('mix_0', 'mix_0', 0, 'a'),
-                    ('mix_0', 'mix_0', 0, 'b'),
-                    ('mix_1', 'mix_1', 0, 'a'),
-                    ('mix_1', 'mix_1', 0, 'b'),
-                    ('mix_2', 'mix_2', 0, 'a'),
-                    ('mix_2', 'mix_2', 0, 'b')
+                    ('array_0', 'array_0', 0, 'a'),
+                    ('array_0', 'array_0', 0, 'b'),
+                    ('array_1', 'array_1', 0, 'a'),
+                    ('array_1', 'array_1', 0, 'b'),
+                    ('array_2', 'array_2', 0, 'a'),
+                    ('array_2', 'array_2', 0, 'b')
                 ], names=['trendlb_pos_th', 'trendlb_neg_th', 'trendlb_mode', None])
             )
         )
@@ -275,12 +275,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    ('mix_0', 'mix_0', 1, 'a'),
-                    ('mix_0', 'mix_0', 1, 'b'),
-                    ('mix_1', 'mix_1', 1, 'a'),
-                    ('mix_1', 'mix_1', 1, 'b'),
-                    ('mix_2', 'mix_2', 1, 'a'),
-                    ('mix_2', 'mix_2', 1, 'b')
+                    ('array_0', 'array_0', 1, 'a'),
+                    ('array_0', 'array_0', 1, 'b'),
+                    ('array_1', 'array_1', 1, 'a'),
+                    ('array_1', 'array_1', 1, 'b'),
+                    ('array_2', 'array_2', 1, 'a'),
+                    ('array_2', 'array_2', 1, 'b')
                 ], names=['trendlb_pos_th', 'trendlb_neg_th', 'trendlb_mode', None])
             )
         )
@@ -297,12 +297,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    ('mix_0', 'mix_0', 2, 'a'),
-                    ('mix_0', 'mix_0', 2, 'b'),
-                    ('mix_1', 'mix_1', 2, 'a'),
-                    ('mix_1', 'mix_1', 2, 'b'),
-                    ('mix_2', 'mix_2', 2, 'a'),
-                    ('mix_2', 'mix_2', 2, 'b')
+                    ('array_0', 'array_0', 2, 'a'),
+                    ('array_0', 'array_0', 2, 'b'),
+                    ('array_1', 'array_1', 2, 'a'),
+                    ('array_1', 'array_1', 2, 'b'),
+                    ('array_2', 'array_2', 2, 'a'),
+                    ('array_2', 'array_2', 2, 'b')
                 ], names=['trendlb_pos_th', 'trendlb_neg_th', 'trendlb_mode', None])
             )
         )
@@ -319,12 +319,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    ('mix_0', 'mix_0', 3, 'a'),
-                    ('mix_0', 'mix_0', 3, 'b'),
-                    ('mix_1', 'mix_1', 3, 'a'),
-                    ('mix_1', 'mix_1', 3, 'b'),
-                    ('mix_2', 'mix_2', 3, 'a'),
-                    ('mix_2', 'mix_2', 3, 'b')
+                    ('array_0', 'array_0', 3, 'a'),
+                    ('array_0', 'array_0', 3, 'b'),
+                    ('array_1', 'array_1', 3, 'a'),
+                    ('array_1', 'array_1', 3, 'b'),
+                    ('array_2', 'array_2', 3, 'a'),
+                    ('array_2', 'array_2', 3, 'b')
                 ], names=['trendlb_pos_th', 'trendlb_neg_th', 'trendlb_mode', None])
             )
         )
@@ -342,12 +342,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    ('mix_0', 'mix_0', 4, 'a'),
-                    ('mix_0', 'mix_0', 4, 'b'),
-                    ('mix_1', 'mix_1', 4, 'a'),
-                    ('mix_1', 'mix_1', 4, 'b'),
-                    ('mix_2', 'mix_2', 4, 'a'),
-                    ('mix_2', 'mix_2', 4, 'b')
+                    ('array_0', 'array_0', 4, 'a'),
+                    ('array_0', 'array_0', 4, 'b'),
+                    ('array_1', 'array_1', 4, 'a'),
+                    ('array_1', 'array_1', 4, 'b'),
+                    ('array_2', 'array_2', 4, 'a'),
+                    ('array_2', 'array_2', 4, 'b')
                 ], names=['trendlb_pos_th', 'trendlb_neg_th', 'trendlb_mode', None])
             )
         )
@@ -366,12 +366,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    (1, 'mix_0', 'mix_0', 'a'),
-                    (1, 'mix_0', 'mix_0', 'b'),
-                    (1, 'mix_1', 'mix_1', 'a'),
-                    (1, 'mix_1', 'mix_1', 'b'),
-                    (1, 'mix_2', 'mix_2', 'a'),
-                    (1, 'mix_2', 'mix_2', 'b')
+                    (1, 'array_0', 'array_0', 'a'),
+                    (1, 'array_0', 'array_0', 'b'),
+                    (1, 'array_1', 'array_1', 'a'),
+                    (1, 'array_1', 'array_1', 'b'),
+                    (1, 'array_2', 'array_2', 'a'),
+                    (1, 'array_2', 'array_2', 'b')
                 ], names=['bolb_window', 'bolb_pos_th', 'bolb_neg_th', None])
             )
         )
@@ -388,12 +388,12 @@ class TestGenerators:
                 ]),
                 index=close_ts.index,
                 columns=pd.MultiIndex.from_tuples([
-                    (2, 'mix_0', 'mix_0', 'a'),
-                    (2, 'mix_0', 'mix_0', 'b'),
-                    (2, 'mix_1', 'mix_1', 'a'),
-                    (2, 'mix_1', 'mix_1', 'b'),
-                    (2, 'mix_2', 'mix_2', 'a'),
-                    (2, 'mix_2', 'mix_2', 'b')
+                    (2, 'array_0', 'array_0', 'a'),
+                    (2, 'array_0', 'array_0', 'b'),
+                    (2, 'array_1', 'array_1', 'a'),
+                    (2, 'array_1', 'array_1', 'b'),
+                    (2, 'array_2', 'array_2', 'a'),
+                    (2, 'array_2', 'array_2', 'b')
                 ], names=['bolb_window', 'bolb_pos_th', 'bolb_neg_th', None])
             )
         )

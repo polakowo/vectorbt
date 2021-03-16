@@ -963,7 +963,25 @@ class TestIndexFns:
         )
         pd.testing.assert_index_equal(
             index_fns.index_from_values(np.random.uniform(size=(3, 3, 3)), name='c'),
-            pd.Index(['mix_0', 'mix_1', 'mix_2'], dtype='object', name='c')
+            pd.Index(['array_0', 'array_1', 'array_2'], dtype='object', name='c')
+        )
+        pd.testing.assert_index_equal(
+            index_fns.index_from_values([(1, 2), (3, 4), (5, 6)], name='c'),
+            pd.Index(['tuple_0', 'tuple_1', 'tuple_2'], dtype='object', name='c')
+        )
+
+        class A:
+            pass
+
+        class B:
+            pass
+
+        class C:
+            pass
+
+        pd.testing.assert_index_equal(
+            index_fns.index_from_values([A(), B(), C()], name='c'),
+            pd.Index(['A_0', 'B_1', 'C_2'], dtype='object', name='c')
         )
 
     def test_repeat_index(self):
