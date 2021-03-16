@@ -3,4 +3,5 @@ __pycache__
 .vscode
 .idea
 data
+!vectorbt/data
 ds_pipeline
