@@ -24,9 +24,9 @@ data even without GPU and parallelization, and enable the user to interact with 
 without significant delays.
 
 With vectorbt you can
-* Analyze time series and engineer features
+* Analyze time series and engineer new features
 * Supercharge pandas and your favorite tools to run much faster
-* Test many trading strategies, configurations, assets, and time ranges in one go
+* Test many trading strategies, configurations, assets, and periods in one go
 * Test machine learning models
 * Build interactive charts/dashboards without leaving Jupyter
 
@@ -44,7 +44,7 @@ pip install vectorbt[full]
 
 Troubleshooting:
 
-* [TA-Lib dependencies](https://github.com/mrjbq7/ta-lib#dependencies)
+* [TA-Lib support](https://github.com/mrjbq7/ta-lib#dependencies)
 * [Jupyter Notebook and JupyterLab support](https://plotly.com/python/getting-started/#jupyter-notebook-support)
 
 ## Examples
@@ -83,7 +83,7 @@ portfolio.total_profit()
 12642.617149066731
 ```
 
-Quickly assessing the performance of 1000 random strategies on BTC and ETH:
+Quickly assessing the performance of 1000 random signal strategies on BTC and ETH:
 
 ```python
 import numpy as np
@@ -166,7 +166,7 @@ portfolio[(10, 20, 'ETH-USD')].plot().show()
 ![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.png)
 
 It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
-Let's generate a GIF for comparing %B and bandwidth of Bollinger Bands for different symbols:
+Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for different symbols:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "ADA-USD"]
@@ -203,18 +203,10 @@ vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, s
 
 ## Motivation
 
-While there are [many other great backtesting packages for Python](https://github.com/mementum/backtrader#alternatives), 
-vectorbt is more of a data science tool: it excels at processing performance and offers interactive tools to explore 
-complex phenomena in trading. With it you can traverse a huge number of strategy configurations, time periods and 
-instruments in little time, to explore where your strategy performs best and to uncover hidden patterns in data.
-
-Take a simple [Dual Moving Average Crossover](https://en.wikipedia.org/wiki/Moving_average_crossover) strategy 
-as example. By calculating the performance of each reasonable window combination and plotting the whole thing 
-as a heatmap (as we do above), we can analyze how performance depends upon window size. If we additionally 
-compute the same heatmap over multiple time periods, we may observe how performance varies with downtrends 
-and uptrends. Finally, by running the same pipeline over other strategies such as holding and trading randomly, 
-we can compare them and decide whether our strategy is worth executing. With vectorbt, this analysis can 
-be done in minutes and save time and cost of getting the same insights elsewhere.
+While there are [many great backtesting packages for Python](https://github.com/mementum/backtrader#alternatives), 
+vectorbt combines an extremely fast backtester and a data science tool: it excels at processing performance and offers 
+interactive tools to explore complex phenomena in trading. With it, you can traverse a huge number of strategy configurations, 
+time periods, and instruments in little time, to explore where your strategy performs best and to uncover hidden patterns in data.
 
 ## How it works?
 
