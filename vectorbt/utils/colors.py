@@ -1,4 +1,4 @@
-"""Functions for working with colors."""
+"""Utilities for working with colors."""
 
 import numpy as np
 

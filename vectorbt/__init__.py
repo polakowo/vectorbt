@@ -237,17 +237,17 @@ Let's start with fetching the daily price of Bitcoin:
 >>> # Prepare data
 >>> start = datetime(2019, 1, 1)
 >>> end = datetime(2020, 1, 1)
->>> btc_price = vbt.utils.data.download("BTC-USD", start=start, end=end)['Close']
+>>> btc_price = vbt.YFData.download('BTC-USD', start=start, end=end).get('Close')
 
 >>> btc_price
 Date
-2018-12-31    3742.700439
 2019-01-01    3843.520020
 2019-01-02    3943.409424
+2019-01-03    3836.741211
 ...                   ...
-2019-12-29    7422.652832
 2019-12-30    7292.995117
 2019-12-31    7193.599121
+2020-01-01    7200.174316
 Name: Close, Length: 366, dtype: float64
 ```
 
@@ -264,30 +264,30 @@ average, and sell when the opposite happens.
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
 Date
-2018-12-31    False
 2019-01-01    False
 2019-01-02    False
+2019-01-03    False
 ...             ...
-2019-12-29    False
 2019-12-30    False
 2019-12-31    False
+2020-01-01    False
 Length: 366, dtype: bool
 
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
 Date
-2018-12-31    False
 2019-01-01    False
 2019-01-02    False
+2019-01-03    False
 ...             ...
-2019-12-29    False
 2019-12-30    False
 2019-12-31    False
+2020-01-01    False
 Length: 366, dtype: bool
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
-0.6351860771192923
+0.636680693047752
 ```
 
 One strategy instance of DMAC produced one column in signals and one performance value.
@@ -306,13 +306,13 @@ average over the entire price series and stores it as a distinct column.
 fast_window     10     20
 slow_window     30     30
 Date
-2018-12-31   False  False
 2019-01-01   False  False
 2019-01-02   False  False
+2019-01-03   False  False
 ...            ...    ...
-2019-12-29    True  False
 2019-12-30   False  False
 2019-12-31   False  False
+2020-01-01   False  False
 
 [366 rows x 2 columns]
 
@@ -321,22 +321,22 @@ Date
 fast_window     10     20
 slow_window     30     30
 Date
-2018-12-31   False  False
 2019-01-01   False  False
 2019-01-02   False  False
+2019-01-03   False  False
 ...            ...    ...
-2019-12-29   False  False
 2019-12-30   False  False
 2019-12-31   False  False
+2020-01-01   False  False
 
 [366 rows x 2 columns]
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
 fast_window  slow_window
-10           30             0.847151
+10           30             0.848840
 20           30             0.543411
-dtype: float64
+Name: total_return, dtype: float64
 ```
 
 For the sake of convenience, vectorbt has created column levels `fast_window` and `slow_window` for you
@@ -351,20 +351,20 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 
 ```python-repl
 >>> # Multiple strategy instances and instruments
->>> eth_price = vbt.utils.data.download("ETH-USD", start=start, end=end)['Close']
+>>> eth_price = vbt.YFData.download('ETH-USD', start=start, end=end).get('Close')
 >>> comb_price = btc_price.vbt.concat(eth_price,
 ...     keys=pd.Index(['BTC', 'ETH'], name='symbol'))
 >>> comb_price.vbt.drop_levels(-1, inplace=True)
 >>> comb_price
 symbol              BTC         ETH
 Date
-2018-12-31  3742.700439  133.368256
 2019-01-01  3843.520020  140.819412
 2019-01-02  3943.409424  155.047684
+2019-01-03  3836.741211  149.135010
 ...                 ...         ...
-2019-12-29  7422.652832  134.757980
 2019-12-30  7292.995117  132.633484
 2019-12-31  7193.599121  129.610855
+2020-01-01  7200.174316  130.802002
 
 [366 rows x 2 columns]
 
@@ -377,13 +377,13 @@ fast_window            10            20
 slow_window            30            30
 symbol         BTC    ETH    BTC    ETH
 Date
-2018-12-31   False  False  False  False
 2019-01-01   False  False  False  False
 2019-01-02   False  False  False  False
+2019-01-03   False  False  False  False
 ...            ...    ...    ...    ...
-2019-12-29    True  False  False  False
 2019-12-30   False  False  False  False
 2019-12-31   False  False  False  False
+2020-01-01   False  False  False  False
 
 [366 rows x 4 columns]
 
@@ -393,24 +393,24 @@ fast_window            10            20
 slow_window            30            30
 symbol         BTC    ETH    BTC    ETH
 Date
-2018-12-31   False  False  False  False
 2019-01-01   False  False  False  False
 2019-01-02   False  False  False  False
+2019-01-03   False  False  False  False
 ...            ...    ...    ...    ...
-2019-12-29   False  False  False  False
 2019-12-30   False  False  False  False
 2019-12-31   False  False  False  False
+2020-01-01   False  False  False  False
 
 [366 rows x 4 columns]
 
 >>> portfolio = vbt.Portfolio.from_signals(comb_price, entries, exits)
 >>> portfolio.total_return()
 fast_window  slow_window  symbol
-10           30           BTC       0.847151
+10           30           BTC       0.848840
                           ETH       0.244204
 20           30           BTC       0.543411
                           ETH      -0.319102
-dtype: float64
+Name: total_return, dtype: float64
 
 >>> mean_return = portfolio.total_return().groupby('symbol').mean()
 >>> mean_return.vbt.barplot(xaxis_title='Symbol', yaxis_title='Mean total return')
@@ -430,13 +430,13 @@ them as distinct columns. For example, let's split `[2019-1-1, 2020-1-1]` into t
 >>> mult_comb_price
 split_idx                         0                         1
 symbol              BTC         ETH           BTC         ETH
-0           3742.700439  133.368256  10801.677734  291.596436
-1           3843.520020  140.819412  11961.269531  303.099976
-2           3943.409424  155.047684  11215.437500  284.523224
+0           3843.520020  140.819412  11961.269531  303.099976
+1           3943.409424  155.047684  11215.437500  284.523224
+2           3836.741211  149.135010  10978.459961  287.997528
 ...                 ...         ...           ...         ...
-180        11959.371094  320.058899   7422.652832  134.757980
-181        10817.155273  290.695984   7292.995117  132.633484
-182        10583.134766  293.641113   7193.599121  129.610855
+180        10817.155273  290.695984   7292.995117  132.633484
+181        10583.134766  293.641113   7193.599121  129.610855
+182        10801.677734  291.596436   7200.174316  130.802002
 
 [183 rows x 4 columns]
 
@@ -449,12 +449,12 @@ symbol              BTC         ETH           BTC         ETH
 >>> portfolio = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
 >>> portfolio.total_return()
 fast_window  slow_window  split_idx  symbol
-10           30           0          BTC       1.579002
-                                     ETH       0.960437
-                          1          BTC      -0.289369
+10           30           0          BTC       1.632259
+                                     ETH       0.946786
+                          1          BTC      -0.288720
                                      ETH      -0.308387
-20           30           0          BTC       1.666387
-                                     ETH       0.352693
+20           30           0          BTC       1.721449
+                                     ETH       0.343274
                           1          BTC      -0.418280
                                      ETH      -0.257947
 Name: total_return, dtype: float64
@@ -517,6 +517,7 @@ from vectorbt.generic import nb, plotting
 # Most important classes
 from vectorbt.utils import *
 from vectorbt.base import *
+from vectorbt.data import *
 from vectorbt.generic import *
 from vectorbt.indicators import *
 from vectorbt.signals import *

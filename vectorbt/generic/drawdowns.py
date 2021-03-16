@@ -48,22 +48,22 @@ class Drawdowns(Records):
 
     >>> start = datetime(2019, 1, 1)
     >>> end = datetime(2020, 1, 1)
-    >>> price = vbt.utils.data.download("BTC-USD", start=start, end=end)['Close']
+    >>> price = vbt.YFData.download('BTC-USD', start=start, end=end).get('Close')
     >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
 
     >>> drawdowns.records.head()
        id  col  start_idx  valley_idx  end_idx  status
-    0   0    0          2           3        6       1
-    1   1    0          6          38       54       1
-    2   2    0         54          63       91       1
-    3   3    0         93          94       95       1
-    4   4    0         98          99      100       1
+    0   0    0          1           2        5       1
+    1   1    0          5          37       53       1
+    2   2    0         53          62       90       1
+    3   3    0         92          93       94       1
+    4   4    0         97          98       99       1
 
     >>> drawdowns.drawdown
     <vectorbt.records.base.MappedArray at 0x7fafa6a11160>
 
     >>> drawdowns.drawdown.min()
-    -0.48982769972565016
+    -0.48982813000684766
 
     >>> drawdowns.drawdown.histplot(trace_kwargs=dict(nbinsx=50))
     ```
@@ -85,10 +85,10 @@ class Drawdowns(Records):
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
             raise TypeError("Records array must match drawdown_dt")
 
-    def _indexing_func(self, pd_indexing_func):
+    def _indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Drawdowns`."""
         new_wrapper, new_records_arr, _, col_idxs = \
-            Records._indexing_func_meta(self, pd_indexing_func)
+            Records._indexing_func_meta(self, pd_indexing_func, **kwargs)
         new_ts = new_wrapper.wrap(self.ts.values[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,

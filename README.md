@@ -5,8 +5,8 @@
 [![Downloads](https://img.shields.io/pypi/dm/vectorbt?color=orange&style=for-the-badge)](https://pepy.tech/project/vectorbt)
 [![License](https://img.shields.io/pypi/l/vectorbt?color=yellow&style=for-the-badge)](https://github.com/polakowo/vectorbt/blob/master/LICENSE)
 [![Gitter](https://img.shields.io/gitter/room/polakowo/vectorbt?color=9cf&style=for-the-badge)](https://gitter.im/vectorbt/community)
-[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)
 [![Binder](https://img.shields.io/badge/launch-binder-d6604a?style=for-the-badge)](https://mybinder.org/v2/gh/polakowo/vectorbt/HEAD)
+[![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?style=for-the-badge)](https://www.patreon.com/vectorbt)
 
 # vectorbt
 
@@ -57,7 +57,7 @@ Here is how much profit we would have made if we invested $100 into Bitcoin in 2
 ```python
 import vectorbt as vbt
 
-price = vbt.utils.data.download('BTC-USD', period='max')['Close']
+price = vbt.YFData.download('BTC-USD').get('Close')
 
 portfolio = vbt.Portfolio.from_holding(price, init_cash=100)
 portfolio.total_profit()
@@ -89,11 +89,10 @@ Quickly assessing the performance of 1000 random strategies on BTC and ETH:
 import numpy as np
 
 symbols = ["BTC-USD", "ETH-USD"]
-price_by_symbol = vbt.utils.data.download(symbols, period='max', cols='Close')
-price = vbt.utils.data.concat_symbols(price_by_symbol, treat_missing='drop')
+price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
 
 n = np.random.randint(10, 101, size=1000).tolist()
-portfolio = vbt.Portfolio.from_random(price, n=n, init_cash=100, seed=42)
+portfolio = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
 
 mean_expectancy = portfolio.trades.expectancy().groupby(['rand_n', 'symbol']).mean()
 fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='rand_n', yaxis_title='mean_expectancy')
@@ -107,8 +106,7 @@ dual SMA crossover strategy on BTC, USD and LTC:
 
 ```python
 symbols = ["BTC-USD", "ETH-USD", "LTC-USD"]
-price_by_symbol = vbt.utils.data.download(symbols, period='max', cols='Close')
-price = vbt.utils.data.concat_symbols(price_by_symbol, treat_missing='drop')
+price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
 
 windows = np.arange(2, 101)
 fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=['fast', 'slow'])
@@ -134,30 +132,30 @@ portfolio[(10, 20, 'ETH-USD')].stats()
 
 ```plaintext
 Start                            2015-08-07 00:00:00
-End                              2021-02-09 00:00:00
-Duration                          2010 days 00:00:00
+End                              2021-03-12 00:00:00
+Duration                          2041 days 00:00:00
 Init. Cash                                       100
-Total Profit                                  852058
-Total Return [%]                              852058
-Benchmark Return [%]                         62649.5
-Position Coverage [%]                        55.4229
+Total Profit                                  679765
+Total Return [%]                              679765
+Benchmark Return [%]                         63250.5
+Position Coverage [%]                         55.463
 Max. Drawdown [%]                             70.735
-Avg. Drawdown [%]                            11.8845
+Avg. Drawdown [%]                            12.0311
 Max. Drawdown Duration             760 days 00:00:00
-Avg. Drawdown Duration    29 days 07:23:04.615384615
-Num. Trades                                       48
-Win Rate [%]                                 54.1667
+Avg. Drawdown Duration    28 days 20:03:34.925373134
+Num. Trades                                       49
+Win Rate [%]                                  55.102
 Best Trade [%]                                1075.8
 Worst Trade [%]                             -29.5934
-Avg. Trade [%]                               47.5687
+Avg. Trade [%]                               49.0573
 Max. Trade Duration                 80 days 00:00:00
-Avg. Trade Duration                 22 days 02:00:00
-Expectancy                                   6687.62
-SQN                                          1.90991
-Gross Exposure                              0.554229
-Sharpe Ratio                                 2.23221
-Sortino Ratio                                3.95263
-Calmar Ratio                                 5.89963
+Avg. Trade Duration       23 days 01:28:09.795918367
+Expectancy                                   14440.6
+SQN                                          1.70339
+Gross Exposure                               0.55463
+Sharpe Ratio                                 2.16534
+Sortino Ratio                                3.81088
+Calmar Ratio                                 5.43694
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
@@ -171,19 +169,12 @@ It's not all about backtesting - vectorbt can be used to facilitate financial da
 Let's generate a GIF for comparing %B and bandwidth of Bollinger Bands for different symbols:
 
 ```python
-import imageio
-from tqdm import tqdm
-
 symbols = ["BTC-USD", "ETH-USD", "ADA-USD"]
-gif_delta, gif_step, gif_fps = 90, 3, 3
-gif_fname = 'bbands.gif'
-
-price_by_symbol = vbt.utils.data.download(symbols, period='6mo', cols='Close')
-price = vbt.utils.data.concat_symbols(price_by_symbol, treat_missing='drop')
-
+price = vbt.YFData.download(symbols, period='6mo', missing_index='drop').get('Close')
 bbands = vbt.BBANDS.run(price)
 
-def plot(bbands):
+def plot(index, bbands):
+    bbands = bbands.loc[index]
     fig = vbt.make_subplots(
             rows=5, cols=1, shared_xaxes=True, 
             row_heights=[*[0.5 / 3] * len(symbols), 0.25, 0.25], vertical_spacing=0.05,
@@ -201,11 +192,7 @@ def plot(bbands):
         )), add_trace_kwargs=dict(row=5, col=1), fig=fig)
     return fig
 
-with imageio.get_writer(gif_fname, fps=gif_fps) as writer:
-    for i in tqdm(range(0, len(bbands.wrapper.index) - gif_delta, gif_step)):
-        fig = plot(bbands.iloc[i:i + gif_delta])
-        fig_np = imageio.imread(fig.to_image(format="png"))
-        writer.append_data(fig_np)
+vbt.save_animation('bbands.gif', bbands.wrapper.index, plot, bbands, delta=90, step=3, fps=3)
 ```
 
 ```plaintext
@@ -429,6 +416,7 @@ sma_timeperiod    2    3
 
 ![local_extrema.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.png)
 
+- Supports [yfinance](https://github.com/ranaroussi/yfinance), [python-binance](https://github.com/sammchardy/python-binance), and synthetic data generation
 - Interactive Plotly-based widgets for visual data analysis
 
 ## Resources

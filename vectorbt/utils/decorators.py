@@ -322,37 +322,3 @@ def cached_method(*args, maxsize=128, typed=False, **kwargs):
         return decorator(args[0])
     else:
         raise ValueError("Either function or keyword arguments must be passed")
-
-
-def traverse_attr_kwargs(cls, key=None, value=None):
-    """Traverse `cls` and its children for properties/methods with `kwargs`,
-    and optionally a specific `key` and `value`.
-
-    Class attributes acting as children should have a key `child_cls`.
-
-    Returns a nested dict of attributes."""
-    checks.assert_type(cls, type)
-
-    if value is not None and not isinstance(value, tuple):
-        value = (value,)
-    attrs = {}
-    for attr in dir(cls):
-        prop = getattr(cls, attr)
-        if hasattr(prop, 'kwargs'):
-            kwargs = getattr(prop, 'kwargs')
-            if key is None:
-                attrs[attr] = kwargs
-            else:
-                if key in kwargs:
-                    if value is None:
-                        attrs[attr] = kwargs
-                    else:
-                        _value = kwargs[key]
-                        if _value in value:
-                            attrs[attr] = kwargs
-            if 'child_cls' in kwargs:
-                child_cls = kwargs['child_cls']
-                checks.assert_type(child_cls, type)
-                attrs[attr] = kwargs
-                attrs[attr]['child_attrs'] = traverse_attr_kwargs(child_cls, key, value)
-    return attrs

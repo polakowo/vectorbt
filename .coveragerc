@@ -13,4 +13,6 @@ omit =
     */utils/colors.py
     */utils/docs.py
     */utils/widgets.py
+    */utils/image.py
     */px_accessors.py
+    */data/custom.py

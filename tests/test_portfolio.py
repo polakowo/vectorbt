@@ -1246,11 +1246,11 @@ class TestFromHolding:
         )
 
 
-# ############# from_random ############# #
+# ############# from_random_signals ############# #
 
 class TestFromRandom:
     def test_from_random_n(self):
-        result = vbt.Portfolio.from_random(price, n=2, seed=seed)
+        result = vbt.Portfolio.from_random_signals(price, n=2, seed=seed)
         record_arrays_close(
             result.order_records,
             vbt.Portfolio.from_signals(
@@ -1267,7 +1267,7 @@ class TestFromRandom:
             result.wrapper.columns,
             price.vbt.wrapper.columns
         )
-        result = vbt.Portfolio.from_random(price, n=[1, 2], seed=seed)
+        result = vbt.Portfolio.from_random_signals(price, n=[1, 2], seed=seed)
         record_arrays_close(
             result.order_records,
             vbt.Portfolio.from_signals(
@@ -1288,7 +1288,7 @@ class TestFromRandom:
         )
 
     def test_from_random_prob(self):
-        result = vbt.Portfolio.from_random(price, prob=0.5, seed=seed)
+        result = vbt.Portfolio.from_random_signals(price, prob=0.5, seed=seed)
         record_arrays_close(
             result.order_records,
             vbt.Portfolio.from_signals(
@@ -1305,7 +1305,7 @@ class TestFromRandom:
             result.wrapper.columns,
             price.vbt.wrapper.columns
         )
-        result = vbt.Portfolio.from_random(price, prob=[0.25, 0.5], seed=seed)
+        result = vbt.Portfolio.from_random_signals(price, prob=[0.25, 0.5], seed=seed)
         record_arrays_close(
             result.order_records,
             vbt.Portfolio.from_signals(

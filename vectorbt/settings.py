@@ -47,7 +47,8 @@ __all__ = [
     'broadcasting',
     'caching',
     'returns',
-    'portfolio'
+    'portfolio',
+    'data'
 ]
 
 
@@ -320,5 +321,23 @@ __pdoc__['portfolio'] = f"""Parameters for portfolio.
 
 ```plaintext
 {json.dumps(portfolio, indent=2, default=str)}
+```
+"""
+
+# Data
+data = Config(
+    dict(
+        tz_convert=None,
+        missing_index='nan',
+        missing_columns='raise'
+    ),
+    frozen=True
+)
+"""_"""
+
+__pdoc__['data'] = f"""Parameters for data.
+
+```plaintext
+{json.dumps(data, indent=2, default=str)}
 ```
 """

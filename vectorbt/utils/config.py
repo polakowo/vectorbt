@@ -4,7 +4,13 @@ from copy import copy
 from collections import namedtuple
 import dill
 
-from vectorbt.utils.checks import is_deep_equal
+from vectorbt.utils import checks
+from vectorbt.utils.attr import deep_getattr
+
+
+class atomic_dict(dict):
+    """Dict that behaves like a single value when merging."""
+    pass
 
 
 def merge_dicts(*dicts):
@@ -14,6 +20,8 @@ def merge_dicts(*dicts):
         x = {}
     if y is None:
         y = {}
+    checks.assert_type(x, dict)
+    checks.assert_type(y, dict)
 
     if len(x) == 0:
         z = y.copy()
@@ -21,15 +29,15 @@ def merge_dicts(*dicts):
         z = x.copy()
     else:
         z = {}
-        overlapping_keys = x.keys() & y.keys()
+        overlapping_keys = [k for k in x if k in y]  # order matters
         for k in overlapping_keys:
-            if isinstance(x[k], dict) and isinstance(y[k], dict):
+            if isinstance(x[k], dict) and isinstance(y[k], dict) and not isinstance(y[k], atomic_dict):
                 z[k] = merge_dicts(x[k], y[k])
             else:
                 z[k] = y[k]
-        for k in x.keys() - overlapping_keys:
+        for k in [k for k in x if k not in y]:
             z[k] = x[k]
-        for k in y.keys() - overlapping_keys:
+        for k in [k for k in y if k not in x]:
             z[k] = y[k]
 
     if len(dicts) > 2:
@@ -182,7 +190,12 @@ class Config(dict, Pickleable):
         return cls(**config)
 
     def __eq__(self, other):
-        return is_deep_equal(dict(self), dict(other))
+        return checks.is_deep_equal(dict(self), dict(other))
+
+
+class AtomicConfig(Config, atomic_dict):
+    """Config that behaves like a single value when merging."""
+    pass
 
 
 class Configured(Pickleable):
@@ -225,3 +238,7 @@ class Configured(Pickleable):
         if type(self) != type(other):
             return False
         return self.config == other.config
+
+    def getattr(self, attr_chain):
+        """See `vectorbt.utils.attr.deep_getattr`."""
+        return deep_getattr(self, attr_chain)

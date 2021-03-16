@@ -84,15 +84,15 @@ class _RAND(RAND):
 
     >>> rand = vbt.RAND.run(
     ...     input_shape=(8, 2),
-    ...     n=[np.array([1, 2]), np.array([3, 4])],
+    ...     n=[np.array([1, 2]), 3],
     ...     seed=42)
 
     >>> rand.entries
-    rand_n      1      2      3      4
+    rand_n      1      2             3
                 0      1      0      1
     0       False   True   True   True
     1        True  False  False  False
-    2       False  False  False   True
+    2       False  False  False  False
     3       False  False   True  False
     4       False   True  False   True
     5       False  False   True  False
@@ -100,12 +100,12 @@ class _RAND(RAND):
     7       False  False  False  False
 
     >>> rand.exits
-    rand_n      1      2      3      4
+    rand_n      1      2             3
                 0      1      0      1
     0       False  False  False  False
-    1       False  False   True   True
-    2       False  False  False  False
-    3       False   True  False   True
+    1       False  False   True  False
+    2       False  False  False   True
+    3       False   True  False  False
     4       False  False   True  False
     5        True  False  False   True
     6       False  False   True  False

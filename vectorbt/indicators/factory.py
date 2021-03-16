@@ -1201,21 +1201,14 @@ def build_columns(param_list, input_columns, level_names=None, hide_levels=None,
             if _per_column:
                 param_index = None
                 for param in params:
-                    param = np.asarray(param)
-                    if param.ndim == 0:
-                        param = param[None]
-                    if param.ndim == 1:
-                        param = param[None]
-                    col_params = []
-                    for j in range(param.shape[1]):
-                        col_params.append(param[:, j])
-                    _param_index = index_fns.index_from_values(col_params, name=level_name)
+                    bc_param = np.broadcast_to(param, len(input_columns))
+                    _param_index = index_fns.index_from_values(bc_param, name=level_name)
                     if param_index is None:
                         param_index = _param_index
                     else:
                         param_index = param_index.append(_param_index)
                 if len(param_index) == 1 and len(input_columns) > 1:
-                    # This can happen when using flexible column-wise parameters
+                    # When using flexible column-wise parameters
                     param_index = index_fns.repeat_index(
                         param_index,
                         len(input_columns),
@@ -2072,8 +2065,8 @@ class IndicatorFactory:
             Indicator.__module__ = self.module_name
 
         # Add indexing methods
-        def _indexing_func(obj, pd_indexing_func):
-            new_wrapper, idx_idxs, _, col_idxs = obj.wrapper._indexing_func_meta(pd_indexing_func)
+        def _indexing_func(obj, pd_indexing_func, **kwargs):
+            new_wrapper, idx_idxs, _, col_idxs = obj.wrapper._indexing_func_meta(pd_indexing_func, **kwargs)
             idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
             col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
             if np.array_equal(idx_idxs_arr, np.arange(obj.wrapper.shape_2d[0])):

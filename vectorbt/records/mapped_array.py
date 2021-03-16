@@ -214,8 +214,8 @@ operations (such as addition) on mapped arrays as if they were NumPy arrays.
 
 ## Indexing
 
-You can use pandas indexing on the `MappedArray` class, which will forward the indexing operation
-to each `__init__` argument with index:
+Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can do pandas indexing
+on a `MappedArray` instance, which forwards indexing operation to each object with columns:
 
 ```python-repl
 >>> ma['a'].values
@@ -242,6 +242,11 @@ respectively. Caching can be disabled globally via `vectorbt.settings`.
 !!! note
     Because of caching, class is meant to be immutable and all properties are read-only.
     To change any attribute, use the `copy` method and pass the attribute as keyword argument.
+
+## Saving and loading
+
+Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save a `MappedArray`
+instance to the disk with `MappedArray.save` and load it with `MappedArray.load`.
 """
 
 import numpy as np
@@ -337,10 +342,10 @@ class MappedArray(Wrapping):
         self._value_map = value_map
         self._col_mapper = ColumnMapper(wrapper, col_arr)
 
-    def _indexing_func_meta(self, pd_indexing_func):
+    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
         """Perform indexing on `MappedArray` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True)
+            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs)
         new_mapped_arr = self.values[new_indices]
         new_id_arr = self.id_arr[new_indices]
@@ -350,10 +355,10 @@ class MappedArray(Wrapping):
             new_idx_arr = None
         return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func):
+    def _indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
-            self._indexing_func_meta(pd_indexing_func)
+            self._indexing_func_meta(pd_indexing_func, **kwargs)
         return self.copy(
             wrapper=new_wrapper,
             mapped_arr=new_mapped_arr,

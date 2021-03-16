@@ -7,7 +7,7 @@ from collections import namedtuple
 from itertools import product, combinations
 
 from vectorbt import settings
-from vectorbt.utils import checks, config, decorators, math, array, random, enum, data, params
+from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr
 
 from tests.utils import hash
 
@@ -856,6 +856,50 @@ class TestDecorators:
         cached_number = g.cache_me(b=np.zeros(1))
         assert g.cache_me(b=np.zeros(1)) != cached_number
 
+
+# ############# attr.py ############# #
+
+class TestAttrs:
+    def test_deep_getattr(self):
+        class A:
+            def a(self, x, y=None):
+                return x + y
+
+        class B:
+            def a(self):
+                return A()
+
+            def b(self, x):
+                return x
+
+            @property
+            def b_prop(self):
+                return 1
+
+        class C:
+            @property
+            def b(self):
+                return B()
+
+            @property
+            def c(self):
+                return 0
+
+        with pytest.raises(Exception) as e_info:
+            _ = attr.deep_getattr(A(), 'a')
+        with pytest.raises(Exception) as e_info:
+            _ = attr.deep_getattr(A(), ('a',))
+        with pytest.raises(Exception) as e_info:
+            _ = attr.deep_getattr(A(), ('a', 1))
+        with pytest.raises(Exception) as e_info:
+            _ = attr.deep_getattr(A(), ('a', (1,)))
+        assert attr.deep_getattr(A(), ('a', (1,), {'y': 1})) == 2
+        assert attr.deep_getattr(C(), 'c') == 0
+        assert attr.deep_getattr(C(), ['c']) == 0
+        assert attr.deep_getattr(C(), ['b', ('b', (1,))]) == 1
+        assert attr.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
+        assert attr.deep_getattr(C(), 'b.b_prop') == 1
+
     def test_traverse_attr_kwargs(self):
         class A:
             @decorators.custom_property(some_key=0)
@@ -875,10 +919,10 @@ class TestDecorators:
             @decorators.custom_property(some_key=1)
             def c(self): pass
 
-        assert hash(str(decorators.traverse_attr_kwargs(C))) == 16728515581653529580
-        assert hash(str(decorators.traverse_attr_kwargs(C, key='some_key'))) == 16728515581653529580
-        assert hash(str(decorators.traverse_attr_kwargs(C, key='some_key', value=1))) == 703070484833749378
-        assert hash(str(decorators.traverse_attr_kwargs(C, key='some_key', value=(0, 1)))) == 16728515581653529580
+        assert hash(str(attr.traverse_attr_kwargs(C))) == 2963162802907041721
+        assert hash(str(attr.traverse_attr_kwargs(C, key='some_key'))) == 2963162802907041721
+        assert hash(str(attr.traverse_attr_kwargs(C, key='some_key', value=1))) == 8774823009175420311
+        assert hash(str(attr.traverse_attr_kwargs(C, key='some_key', value=(0, 1)))) == 2963162802907041721
 
 
 # ############# checks.py ############# #
@@ -1486,110 +1530,6 @@ class TestEnum:
 
     def test_to_value_map(self):
         assert enum.to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}
-
-
-# ############# data.py ############# #
-
-
-class TestData:
-    def test_download(self):
-        def downloader(symbols, kw=None):
-            return {s: pd.DataFrame({
-                'feat1': np.arange(i, 5 + i),
-                'feat2': np.arange(i, 5 + i) + kw,
-            }, index=pd.Index(np.arange(i, 5 + i))) for i, s in enumerate(symbols)}
-
-        result = data.download('a', kw=10, downloader=downloader)
-        pd.testing.assert_frame_equal(
-            result,
-            pd.DataFrame({
-                'feat1': np.arange(5),
-                'feat2': np.arange(5) + 10
-            }, index=pd.Index(np.arange(5)))
-        )
-        result = data.download('a', kw=10, downloader=downloader, cols='feat1')
-        pd.testing.assert_series_equal(
-            result,
-            pd.Series(np.arange(5), name='feat1', index=pd.Index(np.arange(5)))
-        )
-        result = data.download('a', kw=10, downloader=downloader, cols=['feat1'])
-        pd.testing.assert_frame_equal(
-            result,
-            pd.DataFrame(np.arange(5), columns=['feat1'], index=pd.Index(np.arange(5)))
-        )
-        result = data.download(['a', 'b'], kw=10, downloader=downloader)
-        pd.testing.assert_frame_equal(
-            result['a'],
-            pd.DataFrame({
-                'feat1': np.arange(5),
-                'feat2': np.arange(5) + 10
-            }, index=pd.Index(np.arange(5)))
-        )
-        pd.testing.assert_frame_equal(
-            result['b'],
-            pd.DataFrame({
-                'feat1': np.arange(1, 6),
-                'feat2': np.arange(1, 6) + 10
-            }, index=pd.Index(np.arange(1, 6)))
-        )
-        result = data.download(['a', 'b'], kw=10, downloader=downloader, cols='feat1')
-        pd.testing.assert_series_equal(
-            result['a'],
-            pd.Series(np.arange(5), name='feat1', index=pd.Index(np.arange(5)))
-        )
-        pd.testing.assert_series_equal(
-            result['b'],
-            pd.Series(np.arange(1, 6), name='feat1', index=pd.Index(np.arange(1, 6)))
-        )
-
-    def test_concat_symbols(self):
-        def downloader(symbols, kw=None):
-            return {s: pd.DataFrame({
-                'feat1': np.arange(i, 5 + i),
-                'feat2': np.arange(i, 5 + i) + kw,
-            }, index=pd.Index(np.arange(i, 5 + i))) for i, s in enumerate(symbols)}
-
-        downloaded = data.download(['a', 'b'], kw=10, downloader=downloader)
-        result = data.concat_symbols(downloaded, treat_missing='nan')
-        pd.testing.assert_frame_equal(
-            result['feat1'],
-            pd.DataFrame({
-                'a': np.concatenate((np.arange(5), np.array([np.nan]))),
-                'b': np.concatenate((np.array([np.nan]), np.arange(1, 6)))
-            }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
-        )
-        pd.testing.assert_frame_equal(
-            result['feat2'],
-            pd.DataFrame({
-                'a': np.concatenate((np.arange(5), np.array([np.nan]))) + 10,
-                'b': np.concatenate((np.array([np.nan]), np.arange(1, 6))) + 10
-            }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
-        )
-        result = data.concat_symbols(downloaded, treat_missing='drop')
-        pd.testing.assert_frame_equal(
-            result['feat1'],
-            pd.DataFrame({
-                'a': np.arange(1, 5),
-                'b': np.arange(1, 5)
-            }, index=pd.Index(np.arange(1, 5)), columns=pd.Index(['a', 'b'], name='symbol'))
-        )
-        pd.testing.assert_frame_equal(
-            result['feat2'],
-            pd.DataFrame({
-                'a': np.arange(1, 5) + 10,
-                'b': np.arange(1, 5) + 10
-            }, index=pd.Index(np.arange(1, 5)), columns=pd.Index(['a', 'b'], name='symbol'))
-        )
-
-        downloaded = data.download(['a', 'b'], kw=10, downloader=downloader, cols='feat1')
-        result = data.concat_symbols(downloaded, treat_missing='nan')
-        pd.testing.assert_frame_equal(
-            result,
-            pd.DataFrame({
-                'a': np.concatenate((np.arange(5), np.array([np.nan]))),
-                'b': np.concatenate((np.array([np.nan]), np.arange(1, 6)))
-            }, index=pd.Index(np.arange(6)), columns=pd.Index(['a', 'b'], name='symbol'))
-        )
 
 
 # ############# params.py ############# #

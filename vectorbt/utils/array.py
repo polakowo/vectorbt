@@ -1,4 +1,4 @@
-"""Numba-compiled utility functions for working with arrays."""
+"""Utilities for working with arrays."""
 
 import numpy as np
 from numba import njit

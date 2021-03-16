@@ -8,16 +8,17 @@ a single DataFrame is important. All functions are available in both Python and 
 import numpy as np
 from numba import njit
 from numba.typed import List
+from tqdm import tqdm
 
 from vectorbt.base import reshape_fns
 
 
-def apply_and_concat_none(n, apply_func, *args, **kwargs):
+def apply_and_concat_none(n, apply_func, *args, show_progress=False, **kwargs):
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`,
     and output nothing. Meant for in-place outputs.
 
     `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
-    for i in range(n):
+    for i in tqdm(range(n), disable=not show_progress):
         apply_func(i, *args, **kwargs)
 
 
@@ -34,14 +35,17 @@ def apply_and_concat_none_nb(n, apply_func_nb, *args):
         apply_func_nb(i, *args)
 
 
-def apply_and_concat_one(n, apply_func, *args, **kwargs):
+def apply_and_concat_one(n, apply_func, *args, show_progress=False, **kwargs):
     """For each value `i` from 0 to `n`, apply `apply_func` with arguments `*args` and `**kwargs`, 
     and concat the results along axis 1. 
     
     The result of `apply_func` must be a single 1-dim or 2-dim array.
     
     `apply_func` must accept arguments `i`, `*args` and `**kwargs`."""
-    return np.column_stack([reshape_fns.to_2d(apply_func(i, *args, **kwargs)) for i in range(n)])
+    outputs = []
+    for i in tqdm(range(n), disable=not show_progress):
+        outputs.append(reshape_fns.to_2d(apply_func(i, *args, **kwargs)))
+    return np.column_stack(outputs)
 
 
 @njit
@@ -75,11 +79,13 @@ def apply_and_concat_one_nb(n, apply_func_nb, *args):
     return output
 
 
-def apply_and_concat_multiple(n, apply_func, *args, **kwargs):
+def apply_and_concat_multiple(n, apply_func, *args, show_progress=False, **kwargs):
     """Identical to `apply_and_concat_one`, except that the result of `apply_func` must be 
     multiple 1-dim or 2-dim arrays. Each of these arrays at `i` will be concatenated with the
     array at the same position at `i+1`."""
-    outputs = [tuple(map(reshape_fns.to_2d, apply_func(i, *args, **kwargs))) for i in range(n)]
+    outputs = []
+    for i in tqdm(range(n), disable=not show_progress):
+        outputs.append(tuple(map(reshape_fns.to_2d, apply_func(i, *args, **kwargs))))
     return list(map(np.column_stack, list(zip(*outputs))))
 
 

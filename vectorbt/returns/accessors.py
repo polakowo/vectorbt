@@ -504,29 +504,28 @@ class ReturnsAccessor(GenericAccessor):
         >>> import vectorbt as vbt
 
         >>> symbols = ["BTC-USD", "SPY"]
-        >>> price_by_symbol = vbt.utils.data.download(symbols, cols='Close')
-        >>> price = vbt.utils.data.concat_symbols(price_by_symbol)
+        >>> price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
         >>> returns = price.pct_change()
         >>> returns["BTC-USD"].vbt.returns(freq='D').stats(returns["SPY"])
-        Start                    2021-01-06 00:00:00
-        End                      2021-02-07 00:00:00
-        Duration                    32 days 00:00:00
-        Total Return [%]                   -0.418286
-        Benchmark Return [%]                 3.79066
-        Annual Return [%]                   -4.66859
-        Annual Volatility [%]                 97.232
-        Sharpe Ratio                        0.423346
-        Calmar Ratio                       -0.183759
-        Max. Drawdown [%]                   -25.4061
-        Omega Ratio                          1.05892
-        Sortino Ratio                       0.601933
-        Skew                               -0.317326
-        Kurtosis                            0.436989
-        Tail Ratio                           1.12418
-        Common Sense Ratio                    1.0717
-        Value at Risk                     -0.0695332
-        Alpha                               0.180043
-        Beta                                0.859574
+        Start                    2014-09-17 00:00:00
+        End                      2021-03-12 00:00:00
+        Duration                  1629 days 00:00:00
+        Total Return [%]                     12296.6
+        Benchmark Return [%]                 122.857
+        Annual Return [%]                    194.465
+        Annual Volatility [%]                88.4466
+        Sharpe Ratio                         1.66841
+        Calmar Ratio                         2.34193
+        Max. Drawdown [%]                   -83.0363
+        Omega Ratio                          1.31107
+        Sortino Ratio                        2.54018
+        Skew                               0.0101324
+        Kurtosis                              6.6453
+        Tail Ratio                           1.19828
+        Common Sense Ratio                    3.5285
+        Value at Risk                     -0.0664826
+        Alpha                                2.90175
+        Beta                                0.548808
         Name: BTC-USD, dtype: object
         ```
         """

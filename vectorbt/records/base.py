@@ -196,8 +196,8 @@ dtype: float64
 
 ## Indexing
 
-You can use pandas indexing on the `Records` class, which will forward the indexing operation
-to each `__init__` argument with index:
+Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can do pandas indexing
+on a `Records` instance, which forwards indexing operation to each object with columns:
 
 ```python-repl
 >>> records['a'].records
@@ -233,6 +233,11 @@ respectively. Caching can be disabled globally via `vectorbt.settings`.
 !!! note
     Because of caching, class is meant to be immutable and all properties are read-only.
     To change any attribute, use the `copy` method and pass the attribute as keyword argument.
+
+## Saving and loading
+
+Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save a `Records`
+instance to the disk with `Records.save` and load it with `Records.load`.
 """
 
 import numpy as np
@@ -302,16 +307,16 @@ class Records(Wrapping):
                 self.values, self.col_mapper.col_map, to_1d(col_idxs))
         return new_records_arr
 
-    def _indexing_func_meta(self, pd_indexing_func):
+    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Records` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True)
+            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_records_arr = self._col_idxs_records(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func):
+    def _indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Records`."""
-        new_wrapper, new_records_arr, _, _ = self._indexing_func_meta(pd_indexing_func)
+        new_wrapper, new_records_arr, _, _ = self._indexing_func_meta(pd_indexing_func, **kwargs)
         return self.copy(
             wrapper=new_wrapper,
             records_arr=new_records_arr

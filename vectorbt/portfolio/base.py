@@ -43,27 +43,25 @@ in 2020 against every single pattern found in TA-Lib, and translates them into s
 >>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
 >>> start = datetime(2020, 1, 1)
 >>> end = datetime(2020, 9, 1)
->>> ohlcv_by_symbol = vbt.utils.data.download(symbols, start=start, end=end)
-
->>> # Put assets into a single dataframe by price type
->>> ohlcv = vbt.utils.data.concat_symbols(ohlcv_by_symbol)
+>>> # OHLCV by column
+>>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
 
 >>> ohlcv['Open'].head()
 symbol          BTC-USD     ETH-USD   XRP-USD    BNB-USD     BCH-USD  \
 Date
-2019-12-31  7294.438965  132.612274  0.194518  13.952087  209.301987
 2020-01-01  7194.892090  129.630661  0.192912  13.730962  204.671295
 2020-01-02  7202.551270  130.820038  0.192708  13.698126  204.354538
 2020-01-03  6984.428711  127.411263  0.187948  13.035329  196.007690
 2020-01-04  7345.375488  134.168518  0.193521  13.667442  222.536560
+2020-01-05  7410.451660  135.072098  0.194367  13.888340  225.779831
 
 symbol        LTC-USD
 Date
-2019-12-31  42.766113
 2020-01-01  41.326534
 2020-01-02  42.018085
 2020-01-03  39.863129
 2020-01-04  42.383526
+2020-01-05  43.291382
 
 >>> # Run every single pattern recognition indicator and combine results
 >>> result = pd.DataFrame.vbt.empty_like(ohlcv['Open'], fill_value=0.)
@@ -121,9 +119,9 @@ For example, let's divide our portfolio into two groups sharing the same cash:
 >>> # Get total profit per group
 >>> comb_portfolio.total_profit()
 group
-first     21891.431061
-second     7575.676246
-dtype: float64
+first     26221.571200
+second    10141.952674
+Name: total_profit, dtype: float64
 ```
 
 Not only can you analyze each group, but also each column in the group:
@@ -132,13 +130,13 @@ Not only can you analyze each group, but also each column in the group:
 >>> # Get total profit per column
 >>> comb_portfolio.total_profit(group_by=False)
 symbol
-BTC-USD     5163.844396
-ETH-USD    13368.521326
-XRP-USD     3359.065339
-BNB-USD     4724.565229
-BCH-USD     -259.592709
-LTC-USD     3110.703726
-dtype: float64
+BTC-USD     5792.120252
+ETH-USD    16380.039692
+XRP-USD     4049.411256
+BNB-USD     6081.253551
+BCH-USD      400.573418
+LTC-USD     3660.125705
+Name: total_profit, dtype: float64
 ```
 
 In the same way, you can introduce new grouping to the method itself:
@@ -147,9 +145,9 @@ In the same way, you can introduce new grouping to the method itself:
 >>> # Get total profit per group
 >>> portfolio.total_profit(group_by=group_by)
 group
-first     21891.431061
-second     7575.676246
-dtype: float64
+first     26221.571200
+second    10141.952674
+Name: total_profit, dtype: float64
 ```
 
 !!! note
@@ -157,15 +155,15 @@ dtype: float64
 
 ## Indexing
 
-In addition, you can use pandas indexing on the `Portfolio` class itself, which forwards
-indexing operation to each argument with index:
+Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can do pandas indexing
+on a `Portfolio` instance, which forwards indexing operation to each object with columns:
 
 ```python-repl
 >>> portfolio['BTC-USD']
 <vectorbt.portfolio.base.Portfolio at 0x7fac7517ac88>
 
 >>> portfolio['BTC-USD'].total_profit()
-5163.844396244112
+5792.120252189081
 ```
 
 Combined portfolio is indexed by group:
@@ -175,7 +173,7 @@ Combined portfolio is indexed by group:
 <vectorbt.portfolio.base.Portfolio at 0x7fac5756b828>
 
 >>> comb_portfolio['first'].total_profit()
-21891.43106080097
+26221.57120014546
 ```
 
 !!! note
@@ -199,19 +197,31 @@ simulation from the beginning to the end, you can turn on logging.
 
 >>> portfolio.logs.records
         id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \
-0        0    0    0      0       inf    0.000000    7294.438965        inf
+0        0    0    0      0       inf    0.000000    7194.892090        inf
+1        1    1    0      0       inf    0.000000    7202.551270        inf
+2        2    2    0      0       inf    0.000000    6984.428711        inf
 ...    ...  ...  ...    ...       ...         ...            ...        ...
-1463  1463  243    5      5       inf  271.629075      62.844059        inf
+1461  1461  241    5      5       inf  272.389644      57.207737        inf
+1462  1462  242    5      5       inf  274.137659      62.844059        inf
+1463  1463  243    5      5       inf  282.093860      61.105076        inf
 
           size  size_type  ...   log  new_cash  new_shares  res_size  \
 0          NaN          0  ...  True       inf    0.000000       NaN
+1     0.000000          0  ...  True       inf    0.000000       NaN
+2     0.000000          0  ...  True       inf    0.000000       NaN
 ...        ...        ...  ...   ...       ...         ...       ...
-1463  7.956202          0  ...  True       inf  279.585277  7.956202
+1461  1.748015          0  ...  True       inf  274.137659  1.748015
+1462  7.956202          0  ...  True       inf  282.093860  7.956202
+1463 -1.636525          0  ...  True       inf  280.457335  1.636525
 
         res_price  res_fees  res_side  res_status  res_status_info  order_id
 0             NaN       NaN        -1           1                0        -1
+1             NaN       NaN        -1           1                5        -1
+2             NaN       NaN        -1           1                5        -1
 ...           ...       ...       ...         ...              ...       ...
-1463    62.906903    0.5005         0           0               -1      1075
+1461    57.264945    0.1001         0           0               -1      1070
+1462    62.906903    0.5005         0           0               -1      1071
+1463    61.043971    0.0999         1           0               -1      1072
 
 [1464 rows x 30 columns]
 ```
@@ -223,8 +233,8 @@ Just as orders, logs are also records and thus can be easily analyzed:
 
 >>> portfolio.logs.map_field('res_status', value_map=OrderStatus).value_counts()
 symbol   BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
-Ignored       59       72       66       66       66       59
-Filled       185      172      178      178      178      185
+Ignored       60       72       67       66       67       59
+Filled       184      172      177      178      177      185
 ```
 
 Logging can also be turned on just for one order, row, or column, since as many other
@@ -281,11 +291,10 @@ To reset caching:
 >>> vbt.settings.caching.reset()
 ```
 
-## Saving
+## Saving and loading
 
-`Portfolio` subclasses `vectorbt.utils.config.Configured` through `vectorbt.base.array_wrapper.Wrapping`
-intermediary, which gives it an ability to save/load the configuration (that is, all arguments passed
-during initialization) to/from a file.
+Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save a `Portfolio`
+instance to the disk with `Portfolio.save` and load it with `Portfolio.load`:
 
 ```python-repl
 >>> portfolio = vbt.Portfolio.from_orders(
@@ -293,31 +302,30 @@ during initialization) to/from a file.
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='1D')
 >>> portfolio.sharpe_ratio()
 symbol
-BTC-USD    1.613945
-ETH-USD    2.569913
-XRP-USD    1.379594
-BNB-USD    1.522481
-BCH-USD   -0.015007
-LTC-USD    0.929495
+BTC-USD    1.743437
+ETH-USD    2.800903
+XRP-USD    1.607904
+BNB-USD    1.805373
+BCH-USD    0.269392
+LTC-USD    1.040494
 Name: sharpe_ratio, dtype: float64
 
 >>> portfolio.save('portfolio_config')
 >>> portfolio = vbt.Portfolio.load('portfolio_config')
 >>> portfolio.sharpe_ratio()
 symbol
-BTC-USD    1.613945
-ETH-USD    2.569913
-XRP-USD    1.379594
-BNB-USD    1.522481
-BCH-USD   -0.015007
-LTC-USD    0.929495
+BTC-USD    1.743437
+ETH-USD    2.800903
+XRP-USD    1.607904
+BNB-USD    1.805373
+BCH-USD    0.269392
+LTC-USD    1.040494
 Name: sharpe_ratio, dtype: float64
 ```
 
 !!! note
     Save files won't include neither cached results nor global defaults. For example,
     passing `incl_unrealized` as None will also use None when the portfolio is loaded from disk.
-
     Make sure to either pass all arguments explicitly or to save and load the `vectorbt.settings` config.
 """
 
@@ -490,10 +498,10 @@ class Portfolio(Wrapping):
         self._incl_unrealized = incl_unrealized
         self._use_filled_close = use_filled_close
 
-    def _indexing_func(self, pd_indexing_func):
+    def _indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Portfolio`."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True)
+            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
         new_order_records = self.orders._col_idxs_records(col_idxs)
         new_log_records = self.logs._col_idxs_records(col_idxs)
@@ -522,8 +530,8 @@ class Portfolio(Wrapping):
         return cls.from_signals(close, True, False, accumulate=False, **kwargs)
 
     @classmethod
-    def from_random(cls, close, n=None, prob=None, entry_prob=None, exit_prob=None,
-                    param_product=False, seed=None, **kwargs):
+    def from_random_signals(cls, close, n=None, prob=None, entry_prob=None, exit_prob=None,
+                            param_product=False, seed=None, run_kwargs=None, **kwargs):
         """Simulate portfolio from random entry and exit signals.
 
         Generates signals based either on the number of signals `n` or the probability
@@ -541,6 +549,8 @@ class Portfolio(Wrapping):
             exit_prob = prob
         if seed is None:
             seed = settings.portfolio['seed']
+        if run_kwargs is None:
+            run_kwargs = {}
 
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or entry_prob and exit_prob should be set")
@@ -550,7 +560,8 @@ class Portfolio(Wrapping):
                 input_shape=close.shape,
                 input_index=close.vbt.wrapper.index,
                 input_columns=close.vbt.wrapper.columns,
-                seed=seed
+                seed=seed,
+                **run_kwargs
             )
             entries = rand.entries
             exits = rand.exits
@@ -562,7 +573,8 @@ class Portfolio(Wrapping):
                 input_shape=close.shape,
                 input_index=close.vbt.wrapper.index,
                 input_columns=close.vbt.wrapper.columns,
-                seed=seed
+                seed=seed,
+                **run_kwargs
             )
             entries = rprob.entries
             exits = rprob.exits
@@ -2364,7 +2376,7 @@ class Portfolio(Wrapping):
 
         >>> start = datetime(2020, 1, 1)
         >>> end = datetime(2020, 9, 1)
-        >>> close = vbt.utils.data.download("BTC-USD", start=start, end=end)['Close']
+        >>> close = vbt.YFData.download("BTC-USD", start=start, end=end).get('Close')
 
         >>> np.random.seed(42)
         >>> size = pd.Series.vbt.empty_like(close, fill_value=0.)

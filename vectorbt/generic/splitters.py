@@ -5,7 +5,6 @@ Defines splitter classes similar (but may not compatible) to `sklearn.model_sele
 import numpy as np
 import pandas as pd
 import math
-from abc import abstractmethod
 
 from vectorbt.base.index_fns import find_first_occurrence
 
@@ -13,9 +12,8 @@ from vectorbt.base.index_fns import find_first_occurrence
 class BaseSplitter:
     """Abstract splitter class."""
 
-    @abstractmethod
     def split(self, X, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 def split_ranges_into_sets(start_idxs, end_idxs, set_lens=(), left_to_right=True):
