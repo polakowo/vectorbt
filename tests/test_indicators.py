@@ -636,13 +636,13 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
-                'array_like': True
+                'is_array_like': True
             }}).out,
             target
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
-                'array_like': True
+                'is_array_like': True
             }}).out,
             target
         )
@@ -663,7 +663,7 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
-                'array_like': True,
+                'is_array_like': True,
                 'bc_to_input': 1,
                 'per_column': True
             }}).out,
@@ -671,7 +671,7 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func_nb, numba_loop=True).run(ts, np.asarray([0, 1, 2]), param_settings={'p': {
-                'array_like': True,
+                'is_array_like': True,
                 'bc_to_input': 1,
                 'per_column': True
             }}).out,
@@ -702,15 +702,50 @@ class TestFactory:
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func2).run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={'p': {
-                'array_like': True,
+                'is_array_like': True,
                 'bc_to_input': 0
             }}).out,
             target
         )
         pd.testing.assert_frame_equal(
             F.from_apply_func(apply_func2_nb).run(ts, np.asarray([0, 1, 2, 3, 4]), param_settings={'p': {
-                'array_like': True,
+                'is_array_like': True,
                 'bc_to_input': 0
+            }}).out,
+            target
+        )
+
+        def apply_func3(ts, p):
+            return ts * (p[0] + p[1])
+
+        @njit
+        def apply_func3_nb(ts, p):
+            return ts * (p[0] + p[1])
+
+        target = pd.DataFrame(
+            np.array([
+                [1., 5., 1.],
+                [2., 4., 2.],
+                [3., 3., 3.],
+                [4., 2., 2.],
+                [5., 1., 1.]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                ('tuple_0', 'a'),
+                ('tuple_0', 'b'),
+                ('tuple_0', 'c'),
+            ], names=['custom_p', None])
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func3).run(ts, (0, 1), param_settings={'p': {
+                'is_tuple': True
+            }}).out,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            F.from_apply_func(apply_func3_nb).run(ts, (0, 1), param_settings={'p': {
+                'is_tuple': True
             }}).out,
             target
         )

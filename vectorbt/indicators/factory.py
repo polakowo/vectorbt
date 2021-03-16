@@ -190,7 +190,7 @@ run(price, window, short_name='custom', hide_params=None, hide_default=True, **k
 
 Parameters are variables that can hold one or more values. A single value can be passed as a
 scalar, an array, or any other object. Multiple values are passed as a list or an array
-(if the flag `array_like` is set to False for that parameter). If there are multiple parameters
+(if the flag `is_array_like` is set to False for that parameter). If there are multiple parameters
 and each is having multiple values, their values will broadcast to a single shape:
 
 ```plaintext
@@ -329,7 +329,7 @@ custom_upper          5
 Some parameters are meant to be defined per row, column, or element of the input.
 By default, if we pass the parameter value as an array, the indicator will treat this array
 as a list of multiple values - one per input. To make the indicator view this array as a single
-value, set the flag `array_like` to True in `param_settings`. Also, to automatically broadcast
+value, set the flag `is_array_like` to True in `param_settings`. Also, to automatically broadcast
 the passed scalar/array to the input shape, set `bc_to_input` to True, 0 (index axis), or 1 (column axis).
 
 In our example, the parameter `window` can broadcast per column, and both parameters
@@ -352,9 +352,9 @@ In our example, the parameter `window` can broadcast per column, and both parame
 ... ).from_apply_func(
 ...     apply_func_nb,
 ...     param_settings=dict(
-...         window=dict(array_like=True, bc_to_input=1, per_column=True),
-...         lower=dict(array_like=True, bc_to_input=True),
-...         upper=dict(array_like=True, bc_to_input=True)
+...         window=dict(is_array_like=True, bc_to_input=1, per_column=True),
+...         lower=dict(is_array_like=True, bc_to_input=True),
+...         upper=dict(is_array_like=True, bc_to_input=True)
 ...     )
 ... )
 
@@ -1110,14 +1110,14 @@ from vectorbt.base.indexing import ParamIndexerFactory
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 
 
-def params_to_list(params, is_array_like):
+def params_to_list(params, is_tuple, is_array_like):
     """Cast parameters to a list."""
-    if is_array_like:
-        # Array is treated as one value
-        check_against = (list, tuple, List)
-    else:
-        # Array is treated as multiple values
-        check_against = (list, tuple, List, np.ndarray)
+    check_against = [list, List]
+    if not is_tuple:
+        check_against.append(tuple)
+    if not is_array_like:
+        check_against.append(np.ndarray)
+    check_against = tuple(check_against)
     if isinstance(params, check_against):
         new_params = list(params)
     else:
@@ -1130,16 +1130,19 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
     new_param_list = []
     for i, params in enumerate(param_list):
         _param_settings = param_settings if isinstance(param_settings, dict) else param_settings[i]
+        is_tuple = _param_settings.get('is_tuple', False)
         dtype = _param_settings.get('dtype', None)
         if checks.is_namedtuple(dtype):
             params = convert_str_enum_value(dtype, params)
-        is_array_like = _param_settings.get('array_like', False)
+        is_array_like = _param_settings.get('is_array_like', False)
         bc_to_input = _param_settings.get('bc_to_input', False)
         broadcast_kwargs = _param_settings.get('broadcast_kwargs', dict(require_kwargs=dict(requirements='W')))
 
-        new_params = params_to_list(params, is_array_like)
+        new_params = params_to_list(params, is_tuple, is_array_like)
         if bc_to_input is not False:
             # Broadcast to input or its axis
+            if is_tuple:
+                raise ValueError("Tuples cannot be broadcast to input")
             if input_shape is None:
                 raise ValueError("Cannot broadcast to input if input shape is unknown. Pass input_shape.")
             if bc_to_input is True:
@@ -1314,7 +1317,9 @@ def run_pipeline(
 
             * `dtype`: If data type is enumerated type and a string as parameter value was passed,
                 will convert it to integer first.
-            * `array_like`: If array-like object was passed, it will be considered as a single value.
+            * `is_tuple`: If tuple was passed, it will be considered as a single value.
+                To treat it as multiple values, pack it into a list.
+            * `is_array_like`: If array-like object was passed, it will be considered as a single value.
                 To treat it as multiple values, pack it into a list.
             * `bc_to_input`: Whether to broadcast parameter to input size. You can also broadcast
                 parameter to an axis by passing an integer.
@@ -1480,7 +1485,8 @@ def run_pipeline(
         param_settings = {}
     param_settings_keys = [
         'dtype',
-        'array_like',
+        'is_tuple',
+        'is_array_like',
         'bc_to_input',
         'broadcast_kwargs',
         'per_column'
@@ -2735,8 +2741,9 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 # Prepare params
                 param_settings_list = [_param_settings.get(n, {}) for n in param_names]
                 for i in range(len(param_list)):
-                    is_array_like = param_settings_list[i].get('array_like', False)
-                    param_list[i] = params_to_list(param_list[i], is_array_like)
+                    is_tuple = param_settings_list[i].get('is_tuple', False)
+                    is_array_like = param_settings_list[i].get('is_array_like', False)
+                    param_list[i] = params_to_list(param_list[i], is_tuple, is_array_like)
                 if _param_product:
                     param_list = create_param_product(param_list)
                 else:
