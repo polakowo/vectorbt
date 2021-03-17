@@ -27,14 +27,14 @@ setup(
         'dill',
         'tqdm',
         'dateparser',
-        'imageio'
+        'imageio',
+        "scikit-learn"
     ],
     extras_require={
         "full": [
             "yfinance",
             "python-binance",
             "empyrical",
-            "scikit-learn",
             "ray",
             "TA-Lib"
         ],

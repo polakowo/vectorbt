@@ -76,6 +76,18 @@ from scipy import stats
 from numba.typed import Dict
 import warnings
 from datetime import datetime, timedelta
+from sklearn.utils.validation import check_is_fitted
+from sklearn.exceptions import NotFittedError
+from sklearn.preprocessing import (
+    Binarizer,
+    MinMaxScaler,
+    MaxAbsScaler,
+    Normalizer,
+    RobustScaler,
+    StandardScaler,
+    QuantileTransformer,
+    PowerTransformer
+)
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
@@ -112,6 +124,21 @@ except ImportError:
     nanargmin = np.nanargmin
 
 
+def add_transform_methods(transformers):
+    """Class decorator to add scikit-learn transformers as transform methods."""
+
+    def wrapper(cls):
+        for fname, transformer in transformers:
+            def transform(self, wrap_kwargs=None, _transformer=transformer, **kwargs):
+                return self.transform(_transformer(**kwargs), wrap_kwargs=wrap_kwargs)
+
+            transform.__doc__ = f"Transform using `sklearn.preprocessing.{transformer.__name__}`."
+            setattr(cls, fname, transform)
+        return cls
+
+    return wrapper
+
+
 @add_nb_methods([
     (nb.shuffle_nb, False),
     (nb.fillna_nb, False),
@@ -130,6 +157,16 @@ except ImportError:
     (nb.expanding_mean_nb, False),
     (nb.product_nb, True, 'product')
 ], module_name='vectorbt.generic.nb')
+@add_transform_methods([
+    ('binarize', Binarizer),
+    ('minmax_scale', MinMaxScaler),
+    ('maxabs_scale', MaxAbsScaler),
+    ('normalize', Normalizer),
+    ('robust_scale', RobustScaler),
+    ('scale', StandardScaler),
+    ('quantile_transform', QuantileTransformer),
+    ('power_transform', PowerTransformer)
+])
 class GenericAccessor(BaseAccessor):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
@@ -780,6 +817,55 @@ class GenericAccessor(BaseAccessor):
             group_by = self.wrapper.grouper.group_by
         return MappedArray(self.wrapper, mapped_arr, col_arr, idx_arr=idx_arr, **kwargs).regroup(group_by)
 
+    # ############# Transforming ############# #
+
+    def transform(self, transformer, wrap_kwargs=None, **kwargs):
+        """Transform using a transformer.
+
+        A transformer can be any class instance that has `transform` and `fit_transform` methods,
+        ideally subclassing `sklearn.base.TransformerMixin` and `sklearn.base.BaseEstimator`.
+
+        Will fit `transformer` if not fitted.
+
+        `**kwargs` will be passed to the `transform` or `fit_transform` method.
+
+        ## Example
+
+        ```python-repl
+        >>> from sklearn.preprocessing import MinMaxScaler
+
+        >>> df.vbt.transform(MinMaxScaler((-1, 1)))
+                      a    b    c
+        2020-01-01 -1.0  1.0 -1.0
+        2020-01-02 -0.5  0.5  0.0
+        2020-01-03  0.0  0.0  1.0
+        2020-01-04  0.5 -0.5  0.0
+        2020-01-05  1.0 -1.0 -1.0
+
+        >>> fitted_scaler = MinMaxScaler((-1, 1)).fit(np.array([[2], [4]]))
+        >>> df.vbt.transform(fitted_scaler)
+                      a    b    c
+        2020-01-01 -2.0  2.0 -2.0
+        2020-01-02 -1.0  1.0 -1.0
+        2020-01-03  0.0  0.0  0.0
+        2020-01-04  1.0 -1.0 -1.0
+        2020-01-05  2.0 -2.0 -2.0
+        ```"""
+        is_fitted = True
+        try:
+            check_is_fitted(transformer)
+        except NotFittedError:
+            is_fitted = False
+        if not is_fitted:
+            result = transformer.fit_transform(self.to_2d_array(), **kwargs)
+        else:
+            result = transformer.transform(self.to_2d_array(), **kwargs)
+        return self.wrapper.wrap(result, **merge_dicts({}, wrap_kwargs))
+
+    def zscore(self, **kwargs):
+        """Compute z-score using `sklearn.preprocessing.StandardScaler`."""
+        return self.scale(with_mean=True, with_std=True, **kwargs)
+
     # ############# Splitting ############# #
 
     def split(self, splitter, stack_kwargs=None, keys=None, plot=False,
@@ -788,13 +874,13 @@ class GenericAccessor(BaseAccessor):
 
         Returns a tuple of tuples, each corresponding to a set and composed of a dataframe and split indexes.
 
-        A splitter can be any class instance that has `split` method, such as
+        A splitter can be any class instance that has `split` method, ideally subclassing
         `sklearn.model_selection.BaseCrossValidator` or `vectorbt.generic.splitters.BaseSplitter`.
 
         `heatmap_kwargs` will be passed to `vectorbt.generic.plotting.Heatmap` if `plot` is True,
         can be a dictionary or a list per set, for example, to set trace name for each set ('train', 'test', etc.).
 
-        `**kwargs` will be passed to the `splitter.split` method.
+        `**kwargs` will be passed to the `split` method.
 
         !!! note
             The datetime-like format of the index will be lost as result of this operation.

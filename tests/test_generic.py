@@ -794,6 +794,16 @@ class TestAccessors:
             np.array([0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
         )
 
+    def test_zscore(self):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.zscore(),
+            (df['a'] - df['a'].mean()) / df['a'].std(ddof=0)
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.zscore(),
+            (df - df.mean()) / df.std(ddof=0)
+        )
+
     def test_split(self):
         splitter = TimeSeriesSplit(n_splits=2)
         (train_df, train_indexes), (test_df, test_indexes) = df['a'].vbt.split(splitter)

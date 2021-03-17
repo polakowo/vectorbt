@@ -380,7 +380,7 @@ def add_returns_methods(func_names):
                     *args,
                     group_by=None,
                     year_freq=None,
-                    ret_func_name=ret_func_name,
+                    _ret_func_name=ret_func_name,
                     active_returns=False,
                     in_sim_order=False,
                     reuse_returns=None,
@@ -395,7 +395,7 @@ def add_returns_methods(func_names):
                 returns_acc = returns.vbt.returns(freq=self.wrapper.freq, year_freq=year_freq)
                 # Select only those arguments in kwargs that are also in the method's signature
                 # This is done for Portfolio.stats which passes the same kwargs to multiple methods
-                method = getattr(returns_acc, ret_func_name)
+                method = getattr(returns_acc, _ret_func_name)
                 sig = signature(method)
                 arg_names = [p.name for p in sig.parameters.values() if p.kind == p.POSITIONAL_OR_KEYWORD]
                 new_kwargs = {}
