@@ -7,7 +7,8 @@ from collections import namedtuple
 from itertools import product, combinations
 
 from vectorbt import settings
-from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr
+from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr, datetime
+from datetime import datetime as _datetime, timedelta as _timedelta, time as _time, timezone as _timezone
 
 from tests.utils import hash
 
@@ -1554,3 +1555,140 @@ class TestParams:
                    [3, 3, 4, 3, 3, 4, 3, 3, 4],
                    [4, 5, 5, 4, 5, 5, 4, 5, 5]
                ]
+
+
+# ############# datetime.py ############# #
+
+class TestDatetime:
+    def test_to_timedelta(self):
+        assert datetime.to_timedelta('d') == pd.to_timedelta('1d')
+
+    def test_to_time_units(self):
+        assert datetime.to_time_units(10, 'd') == datetime.to_timedelta('10d')
+        a = np.array([[1], [2], [3]])
+        np.testing.assert_array_equal(datetime.to_time_units(a, 'd'), a * datetime.to_timedelta('d'))
+
+    def test_get_utc_tz(self):
+        assert datetime.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)
+
+    def test_get_local_tz(self):
+        assert datetime.get_local_tz().utcoffset(_datetime.now()) == _datetime.now().astimezone(None).utcoffset()
+
+    def test_convert_tzaware_time(self):
+        assert datetime.convert_tzaware_time(
+            _time(12, 0, 0, tzinfo=datetime.get_utc_tz()), _timezone(_timedelta(hours=2))) == \
+               _time(14, 0, 0, tzinfo=_timezone(_timedelta(hours=2)))
+
+    def test_tzaware_to_naive_time(self):
+        assert datetime.tzaware_to_naive_time(
+            _time(12, 0, 0, tzinfo=datetime.get_utc_tz()), _timezone(_timedelta(hours=2))) == _time(14, 0, 0)
+
+    def test_naive_to_tzaware_time(self):
+        assert datetime.naive_to_tzaware_time(
+            _time(12, 0, 0), _timezone(_timedelta(hours=2))) == \
+               datetime.convert_tzaware_time(
+                   _time(12, 0, 0, tzinfo=datetime.get_local_tz()), _timezone(_timedelta(hours=2)))
+
+    def test_convert_naive_time(self):
+        assert datetime.convert_naive_time(
+            _time(12, 0, 0), _timezone(_timedelta(hours=2))) == \
+               datetime.tzaware_to_naive_time(
+                   _time(12, 0, 0, tzinfo=datetime.get_local_tz()), _timezone(_timedelta(hours=2)))
+
+    def test_to_tzaware_datetime(self):
+        assert datetime.to_tzaware_datetime(0.5) == \
+               _datetime(1970, 1, 1, 0, 0, 0, 500000, tzinfo=datetime.get_utc_tz())
+        assert datetime.to_tzaware_datetime(0) == \
+               _datetime(1970, 1, 1, 0, 0, 0, 0, tzinfo=datetime.get_utc_tz())
+        assert datetime.to_tzaware_datetime(pd.Timestamp('2020-01-01').value) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_utc_tz())
+        assert datetime.to_tzaware_datetime('2020-01-01') == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_local_tz())
+        assert datetime.to_tzaware_datetime(pd.Timestamp('2020-01-01')) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_local_tz())
+        assert datetime.to_tzaware_datetime(pd.Timestamp('2020-01-01', tz=datetime.get_utc_tz())) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_utc_tz())
+        assert datetime.to_tzaware_datetime(_datetime(2020, 1, 1)) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_local_tz())
+        assert datetime.to_tzaware_datetime(_datetime(2020, 1, 1, tzinfo=datetime.get_utc_tz())) == \
+               _datetime(2020, 1, 1).replace(tzinfo=datetime.get_utc_tz())
+        assert datetime.to_tzaware_datetime(
+            _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()), tz=datetime.get_local_tz()) == \
+               _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()).astimezone(datetime.get_local_tz())
+
+    def test_datetime_to_ms(self):
+        assert datetime.datetime_to_ms(_datetime(2020, 1, 1)) == 1577833200000
+        assert datetime.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime.get_utc_tz())) == 1577836800000
+
+
+class TestScheduleManager:
+    def test_every(self):
+        manager = datetime.ScheduleManager()
+        job = manager.every()
+        assert job.interval == 1
+        assert job.unit == 'seconds'
+        assert job.at_time is None
+        assert job.start_day is None
+
+        job = manager.every(10, 'minutes')
+        assert job.interval == 10
+        assert job.unit == 'minutes'
+        assert job.at_time is None
+        assert job.start_day is None
+
+        job = manager.every('hour')
+        assert job.interval == 1
+        assert job.unit == 'hours'
+        assert job.at_time is None
+        assert job.start_day is None
+
+        job = manager.every('10:30')
+        assert job.interval == 1
+        assert job.unit == 'days'
+        assert job.at_time == _time(10, 30)
+        assert job.start_day is None
+
+        job = manager.every('day', '10:30')
+        assert job.interval == 1
+        assert job.unit == 'days'
+        assert job.at_time == _time(10, 30)
+        assert job.start_day is None
+
+        job = manager.every('day', _time(9, 30, tzinfo=datetime.get_utc_tz()))
+        assert job.interval == 1
+        assert job.unit == 'days'
+        assert job.at_time == datetime.tzaware_to_naive_time(
+            _time(9, 30, tzinfo=datetime.get_utc_tz()), datetime.get_local_tz())
+        assert job.start_day is None
+
+        job = manager.every('monday')
+        assert job.interval == 1
+        assert job.unit == 'weeks'
+        assert job.at_time is None
+        assert job.start_day == 'monday'
+
+        job = manager.every('wednesday', '13:15')
+        assert job.interval == 1
+        assert job.unit == 'weeks'
+        assert job.at_time == _time(13, 15)
+        assert job.start_day == 'wednesday'
+
+        job = manager.every('minute', ':17')
+        assert job.interval == 1
+        assert job.unit == 'minutes'
+        assert job.at_time == _time(0, 0, 17)
+        assert job.start_day is None
+
+    def test_start(self):
+        kwargs = dict(call_count=0)
+
+        class MyManager(datetime.ScheduleManager):
+            def job_func(self, kwargs):
+                kwargs['call_count'] += 1
+                if kwargs['call_count'] == 5:
+                    raise KeyboardInterrupt
+
+        manager = MyManager()
+        manager.every(kwargs=kwargs)
+        manager.start()
+        assert kwargs['call_count'] == 5

@@ -5,6 +5,7 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.widgets import Figure, FigureWidget, make_subplots
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.image import save_animation
+from vectorbt.utils.datetime import ScheduleManager
 
 __all__ = [
     'atomic_dict',
@@ -18,7 +19,8 @@ __all__ = [
     'FigureWidget',
     'make_subplots',
     'set_seed',
-    'save_animation'
+    'save_animation',
+    'ScheduleManager'
 ]
 
 __pdoc__ = {k: False for k in __all__}

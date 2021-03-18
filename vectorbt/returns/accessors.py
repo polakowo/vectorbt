@@ -44,7 +44,7 @@ from vectorbt.generic.accessors import (
     GenericSRAccessor,
     GenericDFAccessor
 )
-from vectorbt.utils.datetime import freq_delta, DatetimeTypes
+from vectorbt.utils.datetime import to_timedelta, DatetimeTypes
 from vectorbt.returns import nb, metrics
 
 
@@ -75,7 +75,7 @@ class ReturnsAccessor(GenericAccessor):
         year_freq = self._year_freq
         if year_freq is None:
             year_freq = settings.returns['year_freq']
-        return freq_delta(year_freq)
+        return to_timedelta(year_freq)
 
     @property
     def ann_factor(self):

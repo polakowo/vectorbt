@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-with open("README.md", "r") as fh:
+with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 setup(
@@ -10,7 +10,7 @@ setup(
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
     long_description=long_description,
-    long_description_content_type="text/markdown",
+    long_description_content_type='text/markdown',
     url='https://github.com/polakowo/vectorbt',
     packages=find_packages(),
     package_data={
@@ -28,22 +28,23 @@ setup(
         'tqdm',
         'dateparser',
         'imageio',
-        "scikit-learn"
+        'scikit-learn',
+        'schedule'
     ],
     extras_require={
-        "full": [
-            "yfinance",
-            "python-binance",
-            "empyrical",
-            "ray",
-            "TA-Lib"
+        'full': [
+            'yfinance',
+            'python-binance',
+            'empyrical',
+            'ray',
+            'TA-Lib'
         ],
-        "cov": [
-            "pytest-cov",
-            "codecov"
+        'cov': [
+            'pytest-cov',
+            'codecov'
         ],
-        "docs": [
-            "pdoc3"
+        'docs': [
+            'pdoc3'
         ]
     },
     python_requires='>=3.6, <3.9',

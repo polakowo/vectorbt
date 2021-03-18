@@ -827,7 +827,7 @@ class GenericAccessor(BaseAccessor):
 
         Will fit `transformer` if not fitted.
 
-        `**kwargs` will be passed to the `transform` or `fit_transform` method.
+        `**kwargs` are passed to the `transform` or `fit_transform` method.
 
         ## Example
 
@@ -877,10 +877,10 @@ class GenericAccessor(BaseAccessor):
         A splitter can be any class instance that has `split` method, ideally subclassing
         `sklearn.model_selection.BaseCrossValidator` or `vectorbt.generic.splitters.BaseSplitter`.
 
-        `heatmap_kwargs` will be passed to `vectorbt.generic.plotting.Heatmap` if `plot` is True,
+        `heatmap_kwargs` are passed to `vectorbt.generic.plotting.Heatmap` if `plot` is True,
         can be a dictionary or a list per set, for example, to set trace name for each set ('train', 'test', etc.).
 
-        `**kwargs` will be passed to the `split` method.
+        `**kwargs` are passed to the `split` method.
 
         !!! note
             The datetime-like format of the index will be lost as result of this operation.
@@ -1745,7 +1745,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                xref='x', yref='y', fig=None, **kwargs):  # pragma: no cover
         """Plot probability plot using `scipy.stats.probplot`.
 
-        `**kwargs` will be passed to `GenericAccessor.scatterplot`.
+        `**kwargs` are passed to `GenericAccessor.scatterplot`.
 
         ## Example
 
