@@ -48,7 +48,8 @@ __all__ = [
     'caching',
     'returns',
     'portfolio',
-    'data'
+    'data',
+    'messaging'
 ]
 
 
@@ -329,7 +330,13 @@ data = Config(
     dict(
         tz_convert=None,
         missing_index='nan',
-        missing_columns='raise'
+        missing_columns='raise',
+        binance=Config(
+            dict(
+                api_key=None,
+                api_secret=None
+            )
+        )
     ),
     frozen=True
 )
@@ -340,4 +347,40 @@ __pdoc__['data'] = f"""Parameters for data.
 ```plaintext
 {json.dumps(data, indent=2, default=str)}
 ```
+
+For `data['binance']`, see `binance.client.Client`.
+"""
+
+# Messaging
+messaging = Config(
+    dict(
+        telegram=Config(
+            token=None,
+            use_context=True,
+            persistence='telegram_bot.pickle',
+            defaults=Config()
+        ),
+        giphy=Config(
+            dict(
+                api_key=None,
+                weirdness=5
+            ),
+            frozen=True
+        ),
+    ),
+    frozen=True
+)
+"""_"""
+
+__pdoc__['messaging'] = f"""Parameters for messaging.
+
+```plaintext
+{json.dumps(messaging, indent=2, default=str)}
+```
+
+For `messaging['telegram']`:
+
+* Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
+* For `messaging['telegram']['defaults']`, see `telegram.ext.Defaults`.
+* For other keyword arguments, see `telegram.ext.Updater`.
 """

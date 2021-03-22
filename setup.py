@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='vectorbt',
-    version='0.17.2',
+    version='0.17.3',
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
@@ -29,7 +29,8 @@ setup(
         'dateparser',
         'imageio',
         'scikit-learn',
-        'schedule'
+        'schedule',
+        'requests'
     ],
     extras_require={
         'full': [
@@ -37,14 +38,15 @@ setup(
             'python-binance',
             'empyrical',
             'ray',
-            'TA-Lib'
+            'TA-Lib',
+            'python-telegram-bot'  # LGPLv3
         ],
         'cov': [
             'pytest-cov',
             'codecov'
         ],
         'docs': [
-            'pdoc3'
+            'pdoc3'  # AGPL-3.0
         ]
     },
     python_requires='>=3.6, <3.9',

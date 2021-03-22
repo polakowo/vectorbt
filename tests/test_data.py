@@ -14,8 +14,8 @@ seed = 42
 
 class MyData(vbt.Data):
     @classmethod
-    def downloader(cls, symbol, shape=(5, 3), start_date=datetime(2020, 1, 1), columns=None, index_mask=None,
-                   column_mask=None, return_arr=False, tz_localize=None, seed=seed):
+    def download_symbol(cls, symbol, shape=(5, 3), start_date=datetime(2020, 1, 1), columns=None, index_mask=None,
+                        column_mask=None, return_arr=False, tz_localize=None, seed=seed):
         np.random.seed(seed)
         a = np.random.uniform(size=shape) + symbol
         if return_arr:
@@ -37,14 +37,14 @@ class MyData(vbt.Data):
             df = df.tz_localize(tz_localize)
         return df
 
-    def updater(self, symbol, n=1, **kwargs):
+    def update_symbol(self, symbol, n=1, **kwargs):
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
         download_kwargs['start_date'] = self.data[symbol].index[-1]
         shape = download_kwargs.pop('shape', (5, 3))
         new_shape = (n, shape[1]) if len(shape) > 1 else (n,)
         new_seed = download_kwargs.pop('seed', seed) + 1
         kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.downloader(symbol, shape=new_shape, seed=new_seed, **kwargs)
+        return self.download_symbol(symbol, shape=new_shape, seed=new_seed, **kwargs)
 
 
 class TestData:
@@ -923,3 +923,32 @@ class TestData:
                MyData.download([0, 1], shape=(5,), columns='feat0').wrapper
         assert MyData.download([0, 1], shape=(5, 3), columns=['feat0', 'feat1', 'feat2'])[['feat0']].wrapper == \
                MyData.download([0, 1], shape=(5, 1), columns=['feat0']).wrapper
+
+
+# ############# updater.py ############# #
+
+class TestDataUpdater:
+    def test_update(self):
+        data = MyData.download(0, shape=(5,), return_arr=True)
+        updater = vbt.DataUpdater(data)
+        updater.update()
+        assert updater.data == data.update()
+        assert updater.config['data'] == data.update()
+
+    def test_update_every(self):
+        data = MyData.download(0, shape=(5,), return_arr=True)
+        kwargs = dict(call_count=0)
+
+        class DataUpdater(vbt.DataUpdater):
+            def update(self, kwargs):
+                super().update()
+                kwargs['call_count'] += 1
+                if kwargs['call_count'] == 5:
+                    raise vbt.CancelledError
+
+        updater = DataUpdater(data)
+        updater.update_every(kwargs=kwargs)
+        for i in range(5):
+            data = data.update()
+        assert updater.data == data
+        assert updater.config['data'] == data

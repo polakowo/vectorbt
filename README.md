@@ -42,6 +42,8 @@ To also install optional dependencies:
 pip install vectorbt[full]
 ```
 
+See [License](https://github.com/polakowo/vectorbt#license) notes on optional dependencies.
+
 Troubleshooting:
 
 * [TA-Lib support](https://github.com/mrjbq7/ta-lib#dependencies)
@@ -400,7 +402,9 @@ sma_timeperiod    2    3
 
 ![local_extrema.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.png)
 
-- Supports [yfinance](https://github.com/ranaroussi/yfinance), [python-binance](https://github.com/sammchardy/python-binance), and synthetic data generation
+- Classes for downloading and (periodically) updating data
+    - Includes data sources such as [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
+- Telegram bot based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 - Interactive Plotly-based widgets for visual data analysis
 
 ## Resources
@@ -446,6 +450,10 @@ pytest
 ```
 
 Please make sure to update tests as appropriate.
+
+## License
+
+This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
 
 ## Disclaimer
 

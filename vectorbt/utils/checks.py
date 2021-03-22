@@ -3,8 +3,6 @@
 import os
 import numpy as np
 import pandas as pd
-from pandas.core.dtypes.common import is_categorical_dtype, is_number
-from pandas.core.algorithms import safe_sort, take_1d
 from numba.core.registry import CPUDispatcher
 from collections.abc import Iterable
 from inspect import signature

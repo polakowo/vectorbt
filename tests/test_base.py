@@ -669,7 +669,7 @@ class TestArrayWrapper:
     def test_to_time_units(self):
         sr = pd.Series([1, 2, np.nan], index=['x', 'y', 'z'], name='name')
         pd.testing.assert_series_equal(
-            array_wrapper.to_time_units(sr, '1 days'),
+            array_wrapper.ArrayWrapper.from_obj(sr, freq='1 days').to_time_units(sr),
             pd.Series(
                 np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=sr.index,
@@ -678,18 +678,13 @@ class TestArrayWrapper:
         )
         df = sr.to_frame()
         pd.testing.assert_frame_equal(
-            array_wrapper.to_time_units(df, '1 days'),
+            array_wrapper.ArrayWrapper.from_obj(df, freq='1 days').to_time_units(df),
             pd.DataFrame(
                 np.array([86400000000000, 172800000000000, 'NaT'], dtype='timedelta64[ns]'),
                 index=df.index,
                 columns=df.columns
             )
         )
-        np.testing.assert_array_equal(
-            array_wrapper.to_time_units([1, 2], '1 days'),
-            np.array([86400000000000, 172800000000000], dtype='timedelta64[ns]')
-        )
-        assert array_wrapper.to_time_units(1, '1 days') == day_dt
 
     def test_wrap(self):
         pd.testing.assert_series_equal(

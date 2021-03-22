@@ -6,7 +6,7 @@ all pandas objects have the same index and columns by aligning them.
 
 ## Downloading
 
-Data can be downloaded by overriding the `Data.downloader` class method. What `Data` does
+Data can be downloaded by overriding the `Data.download_symbol` class method. What `Data` does
 under the hood is iterating over all symbols and calling this method.
 
 Let's create a simple data class `RandomData` that generates price based on
@@ -19,8 +19,8 @@ random returns with provided mean and standard deviation:
 
 >>> class RandomData(vbt.Data):
 ...     @classmethod
-...     def downloader(cls, symbol, mean=0., stdev=0.1, start_value=100,
-...                    start_dt='2021-01-01', end_dt='2021-01-10'):
+...     def download_symbol(cls, symbol, mean=0., stdev=0.1, start_value=100,
+...                         start_dt='2021-01-01', end_dt='2021-01-10'):
 ...         index = pd.date_range(start_dt, end_dt)
 ...         rand_returns = np.random.normal(mean, stdev, size=len(index))
 ...         rand_price = start_value + np.cumprod(rand_returns + 1)
@@ -85,14 +85,14 @@ symbol           RAND1       RAND2
 
 ## Updating
 
-Updating can be implemented by overriding the `Data.updater` instance method, which takes
-the same arguments as `Data.downloader`. In contrast to the downloader, the updater is an
-instance method and can access the data downloaded earlier. It can also access the keyword
-arguments initially passed to the downloader, accessible under `Data.download_kwargs`.
+Updating can be implemented by overriding the `Data.update_symbol` instance method, which takes
+the same arguments as `Data.download_symbol`. In contrast to the download method, the update
+method is an instance method and can access the data downloaded earlier. It can also access the
+keyword arguments initially passed to the download method, accessible under `Data.download_kwargs`.
 These arguments can be used as default arguments and overriden by arguments passed directly
-to the updater, using `vectorbt.utils.config.merge_dicts`.
+to the update method, using `vectorbt.utils.config.merge_dicts`.
 
-Let's define an updater that updates the latest data point and adds two news data points.
+Let's define an update method that updates the latest data point and adds two news data points.
 Note that updating data always returns a new `Data` instance.
 
 ```python-repl
@@ -101,19 +101,19 @@ Note that updating data always returns a new `Data` instance.
 
 >>> class RandomData(vbt.Data):
 ...     @classmethod
-...     def downloader(cls, symbol, mean=0., stdev=0.1, start_value=100,
-...                    start_dt='2021-01-01', end_dt='2021-01-10'):
+...     def download_symbol(cls, symbol, mean=0., stdev=0.1, start_value=100,
+...                         start_dt='2021-01-01', end_dt='2021-01-10'):
 ...         index = pd.date_range(start_dt, end_dt)
 ...         rand_returns = np.random.normal(mean, stdev, size=len(index))
 ...         rand_price = start_value + np.cumprod(rand_returns + 1)
 ...         return pd.Series(rand_price, index=index)
 ...
-...     def updater(self, symbol, **kwargs):
+...     def update_symbol(self, symbol, **kwargs):
 ...         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
 ...         download_kwargs['start_dt'] = self.data[symbol].index[-1]
 ...         download_kwargs['end_dt'] = download_kwargs['start_dt'] + timedelta(days=2)
 ...         kwargs = merge_dicts(download_kwargs, kwargs)
-...         return self.downloader(symbol, **kwargs)
+...         return self.download_symbol(symbol, **kwargs)
 
 >>> rand_data = RandomData.download(['RAND1', 'RAND2'], end_dt='2021-01-05')
 >>> rand_data.get()
@@ -152,7 +152,7 @@ symbol           RAND1       RAND2
 ## Merging
 
 You can merge symbols from different `Data` instances either by subclassing `Data` and
-defining custom downloader and updater methods, or by manually merging their data dicts
+defining custom download and update methods, or by manually merging their data dicts
 into one data dict and passing it to the `Data.from_data` class method.
 
 ```python-repl
@@ -271,28 +271,23 @@ class Data(Wrapping):
 
     @property
     def tz_convert(self):
-        """`tz_convert` initially passed to `Data.downloader`."""
+        """`tz_convert` initially passed to `Data.download_symbol`."""
         return self._tz_convert
 
     @property
     def missing_index(self):
-        """`missing_index` initially passed to `Data.downloader`."""
+        """`missing_index` initially passed to `Data.download_symbol`."""
         return self._missing_index
 
     @property
     def missing_columns(self):
-        """`missing_columns` initially passed to `Data.downloader`."""
+        """`missing_columns` initially passed to `Data.download_symbol`."""
         return self._missing_columns
 
     @property
     def download_kwargs(self):
-        """Keyword arguments initially passed to `Data.downloader`."""
+        """Keyword arguments initially passed to `Data.download_symbol`."""
         return self._download_kwargs
-
-    @classmethod
-    def downloader(cls, symbol, **kwargs):
-        """Abstract downloader method."""
-        raise NotImplementedError
 
     @classmethod
     def align_index(cls, data, missing='nan'):
@@ -453,9 +448,14 @@ class Data(Wrapping):
         )
 
     @classmethod
+    def download_symbol(cls, symbol, **kwargs):
+        """Abstract method to download a symbol."""
+        raise NotImplementedError
+
+    @classmethod
     def download(cls, symbols, tz_convert=None, missing_index=None,
                  missing_columns=None, wrapper_kwargs=None, **kwargs):
-        """Download data using `Data.downloader`.
+        """Download data using `Data.download_symbol`.
 
         Args:
             symbols (any or list of any): One or multiple symbols.
@@ -466,7 +466,7 @@ class Data(Wrapping):
             missing_index (str): See `Data.from_data`.
             missing_columns (str): See `Data.from_data`.
             wrapper_kwargs (dict): See `Data.from_data`.
-            **kwargs: Passed to `Data.downloader`.
+            **kwargs: Passed to `Data.download_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
         """
@@ -479,7 +479,7 @@ class Data(Wrapping):
             _kwargs = cls.select_symbol_kwargs(s, kwargs)
 
             # Download data for this symbol
-            data[s] = cls.downloader(s, **_kwargs)
+            data[s] = cls.download_symbol(s, **_kwargs)
 
         # Create new instance from data
         return cls.from_data(
@@ -491,15 +491,15 @@ class Data(Wrapping):
             download_kwargs=kwargs
         )
 
-    def updater(self, symbol, **kwargs):
-        """Abstract updater method."""
+    def update_symbol(self, symbol, **kwargs):
+        """Abstract method to update a symbol."""
         raise NotImplementedError
 
     def update(self, **kwargs):
-        """Update the data using `Data.updater`.
+        """Update the data using `Data.update_symbol`.
 
         Args:
-            **kwargs: Passed to `Data.updater`.
+            **kwargs: Passed to `Data.update_symbol`.
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
 
@@ -511,7 +511,7 @@ class Data(Wrapping):
             _kwargs = self.select_symbol_kwargs(k, kwargs)
 
             # Download new data for this symbol
-            new_obj = self.updater(k, **_kwargs)
+            new_obj = self.update_symbol(k, **_kwargs)
 
             # Convert array to pandas
             if not isinstance(new_obj, (pd.Series, pd.DataFrame)):

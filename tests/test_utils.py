@@ -5,9 +5,10 @@ import pytest
 import os
 from collections import namedtuple
 from itertools import product, combinations
+import asyncio
 
 from vectorbt import settings
-from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr, datetime
+from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr, datetime, schedule
 from datetime import datetime as _datetime, timedelta as _timedelta, time as _time, timezone as _timezone
 
 from tests.utils import hash
@@ -65,6 +66,12 @@ class TestConfig:
         assert conf == {'a': 1, 'b': {'c': [1, 2, 3], 'd': 2}}
         conf.reset()
         assert conf == {'a': 0, 'b': {'c': [1, 2]}}
+
+    def test_get_func_kwargs(self):
+        def f(a, *args, b=2, **kwargs):
+            pass
+
+        assert config.get_func_kwargs(f) == {'b': 2}
 
     def test_merge_dicts(self):
         assert config.merge_dicts({'a': 1}, {'b': 2}) == {'a': 1, 'b': 2}
@@ -1563,11 +1570,6 @@ class TestDatetime:
     def test_to_timedelta(self):
         assert datetime.to_timedelta('d') == pd.to_timedelta('1d')
 
-    def test_to_time_units(self):
-        assert datetime.to_time_units(10, 'd') == datetime.to_timedelta('10d')
-        a = np.array([[1], [2], [3]])
-        np.testing.assert_array_equal(datetime.to_time_units(a, 'd'), a * datetime.to_timedelta('d'))
-
     def test_get_utc_tz(self):
         assert datetime.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)
 
@@ -1621,9 +1623,12 @@ class TestDatetime:
         assert datetime.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime.get_utc_tz())) == 1577836800000
 
 
+# ############# schedule.py ############# #
+
+
 class TestScheduleManager:
     def test_every(self):
-        manager = datetime.ScheduleManager()
+        manager = schedule.ScheduleManager()
         job = manager.every()
         assert job.interval == 1
         assert job.unit == 'seconds'
@@ -1682,13 +1687,25 @@ class TestScheduleManager:
     def test_start(self):
         kwargs = dict(call_count=0)
 
-        class MyManager(datetime.ScheduleManager):
-            def job_func(self, kwargs):
-                kwargs['call_count'] += 1
-                if kwargs['call_count'] == 5:
-                    raise KeyboardInterrupt
+        def job_func(kwargs):
+            kwargs['call_count'] += 1
+            if kwargs['call_count'] == 5:
+                raise KeyboardInterrupt
 
-        manager = MyManager()
-        manager.every(kwargs=kwargs)
+        manager = schedule.ScheduleManager()
+        manager.every().do(job_func, kwargs)
         manager.start()
+        assert kwargs['call_count'] == 5
+
+    def test_async_start(self):
+        kwargs = dict(call_count=0)
+
+        def job_func(kwargs):
+            kwargs['call_count'] += 1
+            if kwargs['call_count'] == 5:
+                raise asyncio.CancelledError
+
+        manager = schedule.ScheduleManager()
+        manager.every().do(job_func, kwargs)
+        asyncio.run(manager.async_start())
         assert kwargs['call_count'] == 5

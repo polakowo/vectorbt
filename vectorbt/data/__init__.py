@@ -2,6 +2,7 @@
 
 from vectorbt.data.base import symbol_dict, Data
 from vectorbt.data.custom import SyntheticData, GBMData, YFData, BinanceData
+from vectorbt.data.updater import DataUpdater
 
 __all__ = [
     'symbol_dict',
@@ -9,7 +10,8 @@ __all__ = [
     'SyntheticData',
     'GBMData',
     'YFData',
-    'BinanceData'
+    'BinanceData',
+    'DataUpdater'
 ]
 
 __pdoc__ = {k: False for k in __all__}

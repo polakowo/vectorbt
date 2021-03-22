@@ -13,7 +13,7 @@ from vectorbt.utils.datetime import (
     datetime_to_ms,
     interval_to_ms
 )
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.config import merge_dicts, get_func_kwargs
 from vectorbt.data.base import Data
 
 
@@ -21,13 +21,13 @@ class SyntheticData(Data):
     """`Data` for synthetically generated data."""
 
     @classmethod
-    def generator(cls, symbol, index, **kwargs):
-        """Generates data based on symbol and datetime-like index."""
+    def generate_symbol(cls, symbol, index, **kwargs):
+        """Abstract method to generate a symbol."""
         raise NotImplementedError
 
     @classmethod
-    def downloader(cls, symbol, start=0, end='now', freq=None, date_range_kwargs=None, **kwargs):
-        """Downloader for `SyntheticData`."""
+    def download_symbol(cls, symbol, start=0, end='now', freq=None, date_range_kwargs=None, **kwargs):
+        """Download the symbol using `SyntheticData`."""
         if date_range_kwargs is None:
             date_range_kwargs = {}
         index = pd.date_range(
@@ -38,14 +38,14 @@ class SyntheticData(Data):
         )
         if len(index) == 0:
             raise ValueError("Date range is empty")
-        return cls.generator(symbol, index, **kwargs)
+        return cls.generate_symbol(symbol, index, **kwargs)
 
-    def updater(self, symbol, **kwargs):
-        """Updater for `SyntheticData`."""
+    def update_symbol(self, symbol, **kwargs):
+        """Update the symbol using `SyntheticData`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
         download_kwargs['start'] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.downloader(symbol, **kwargs)
+        return self.download_symbol(symbol, **kwargs)
 
 
 def generate_gbm_paths(S0, mu, sigma, T, M, I, seed=None):
@@ -99,9 +99,10 @@ class GBMData(SyntheticData):
     2021-03-15 19:57:59.174370+01:00     54.725304
     Freq: T, Length: 122, dtype: float64
     ```"""
+
     @classmethod
-    def generator(cls, symbol, index, S0=100., mu=0., sigma=0.05, T=None, I=1, seed=None):
-        """Generator that uses `generate_gbm_paths`."""
+    def generate_symbol(cls, symbol, index, S0=100., mu=0., sigma=0.05, T=None, I=1, seed=None):
+        """Generate the symbol using `generate_gbm_paths`."""
         if T is None:
             T = len(index)
         out = generate_gbm_paths(S0, mu, sigma, T, len(index), I, seed=seed)[1:]
@@ -110,8 +111,8 @@ class GBMData(SyntheticData):
         columns = pd.RangeIndex(stop=out.shape[1], name='path')
         return pd.DataFrame(out, index=index, columns=columns)
 
-    def updater(self, symbol, **kwargs):
-        """Updater for `GBMData`."""
+    def update_symbol(self, symbol, **kwargs):
+        """Update the symbol using `GBMData`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
         download_kwargs['start'] = self.data[symbol].index[-1]
         _ = download_kwargs.pop('S0', None)
@@ -119,7 +120,7 @@ class GBMData(SyntheticData):
         _ = download_kwargs.pop('T', None)
         download_kwargs['seed'] = None
         kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.downloader(symbol, S0=S0, **kwargs)
+        return self.download_symbol(symbol, S0=S0, **kwargs)
 
 
 class YFData(Data):
@@ -188,8 +189,8 @@ class YFData(Data):
     """
 
     @classmethod
-    def downloader(cls, symbol, period='max', start=None, end=None, **kwargs):
-        """Downloader for `YFData`."""
+    def download_symbol(cls, symbol, period='max', start=None, end=None, **kwargs):
+        """Download the symbol using `YFData`."""
         import yfinance as yf
 
         # yfinance still uses mktime, which assumes that the passed date is in local time
@@ -200,12 +201,12 @@ class YFData(Data):
 
         return yf.Ticker(symbol).history(period=period, start=start, end=end, **kwargs)
 
-    def updater(self, symbol, **kwargs):
-        """Updater for `YFData`."""
+    def update_symbol(self, symbol, **kwargs):
+        """Update the symbol using `YFData`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
         download_kwargs['start'] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.downloader(symbol, **kwargs)
+        return self.download_symbol(symbol, **kwargs)
 
 
 class BinanceData(Data):
@@ -300,11 +301,26 @@ class BinanceData(Data):
     ```"""
 
     @classmethod
-    def downloader(cls, symbol, client=None, interval=None, start=0, end='now UTC',
-                   limit=500, sleep_each=3, show_progress=False, **kwargs):
-        """Downloader for `BinanceData`."""
+    def download(cls, symbols, client=None, **kwargs):
+        """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
+        from binance.client import Client
+        from vectorbt import settings
+
+        client_kwargs = dict()
+        for k in get_func_kwargs(Client):
+            if k in kwargs:
+                client_kwargs[k] = kwargs.pop(k)
+        client_kwargs = merge_dicts(settings.data['binance'], client_kwargs)
         if client is None:
-            raise ValueError("client is required")
+            client = Client(**client_kwargs)
+        return super(BinanceData, cls).download(symbols, client=client, **kwargs)
+
+    @classmethod
+    def download_symbol(cls, symbol, client=None, interval=None, start=0, end='now UTC',
+                        limit=500, sleep_each=3, show_progress=False, **kwargs):
+        """Download the symbol using `BinanceData`."""
+        if client is None:
+            raise ValueError("client must be provided")
 
         data = []
 
@@ -382,9 +398,9 @@ class BinanceData(Data):
 
         return df
 
-    def updater(self, symbol, **kwargs):
-        """Updater for `BinanceData`."""
+    def update_symbol(self, symbol, **kwargs):
+        """Update the symbol using `BinanceData`."""
         download_kwargs = self.select_symbol_kwargs(symbol, self.download_kwargs)
         download_kwargs['start'] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
-        return self.downloader(symbol, **kwargs)
+        return self.download_symbol(symbol, **kwargs)

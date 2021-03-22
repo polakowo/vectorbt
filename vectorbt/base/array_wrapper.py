@@ -88,7 +88,7 @@ import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import Configured, merge_dicts
-from vectorbt.utils.datetime import to_timedelta, DatetimeTypes, to_time_units
+from vectorbt.utils.datetime import to_timedelta, DatetimeTypes
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
 from vectorbt.base import index_fns, reshape_fns
@@ -415,7 +415,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Convert array to time units."""
         if self.freq is None:
             raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
-        return to_time_units(a, self.freq)
+        return a * to_timedelta(self.freq)
 
     @property
     def column_only_select(self):

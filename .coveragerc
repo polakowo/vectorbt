@@ -16,3 +16,4 @@ omit =
     */utils/image.py
     */px_accessors.py
     */data/custom.py
+    */utils/messaging.py

@@ -3,9 +3,20 @@
 from copy import copy
 from collections import namedtuple
 import dill
+import inspect
 
 from vectorbt.utils import checks
 from vectorbt.utils.attr import deep_getattr
+
+
+def get_func_kwargs(func):
+    """Get keyword arguments of the function."""
+    signature = inspect.signature(func)
+    return {
+        k: v.default
+        for k, v in signature.parameters.items()
+        if v.default is not inspect.Parameter.empty
+    }
 
 
 class atomic_dict(dict):
@@ -147,6 +158,7 @@ class Config(dict, Pickleable):
         other = dict(*args, **kwargs)
         if force_update:
             super().update(other)
+            return
         if self.read_only:
             raise TypeError("Config is read-only")
         if self.frozen:
@@ -242,3 +254,7 @@ class Configured(Pickleable):
     def getattr(self, attr_chain):
         """See `vectorbt.utils.attr.deep_getattr`."""
         return deep_getattr(self, attr_chain)
+
+    def update_config(self, *args, **kwargs):
+        """Force-update the config."""
+        self.config.update(*args, **kwargs, force_update=True)
