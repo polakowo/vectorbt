@@ -1360,9 +1360,9 @@ class TestAccessors:
     @pytest.mark.parametrize(
         "test_func,test_func_pd",
         [
-            (lambda x, *args, **kwargs: x.AND(*args, **kwargs), lambda x, y: x & y),
-            (lambda x, *args, **kwargs: x.OR(*args, **kwargs), lambda x, y: x | y),
-            (lambda x, *args, **kwargs: x.XOR(*args, **kwargs), lambda x, y: x ^ y)
+            (lambda x, *args, **kwargs: x.AND(args, **kwargs), lambda x, y: x & y),
+            (lambda x, *args, **kwargs: x.OR(args, **kwargs), lambda x, y: x | y),
+            (lambda x, *args, **kwargs: x.XOR(args, **kwargs), lambda x, y: x ^ y)
         ],
     )
     def test_logical_funcs(self, test_func, test_func_pd):

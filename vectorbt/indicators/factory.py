@@ -1235,11 +1235,7 @@ def build_columns(param_list, input_columns, level_names=None, hide_levels=None,
                 n_param_values,
                 ignore_default=ignore_default
             )
-        stacked_columns = index_fns.stack_indexes(
-            *shown_param_indexes,
-            input_columns,
-            **kwargs
-        )
+        stacked_columns = index_fns.stack_indexes([*shown_param_indexes, input_columns], **kwargs)
         return param_indexes, stacked_columns
     return param_indexes, input_columns
 
@@ -1428,8 +1424,8 @@ def run_pipeline(
     >>> p1_columns = pd.Index(param_list[0], name='p1')
     >>> p2_columns = pd.Index(param_list[1], name='p2')
     >>> p3_columns = pd.Index(param_list[2], name='p3')
-    >>> p_columns = vbt.base.index_fns.stack_indexes(p1_columns, p2_columns, p3_columns)
-    >>> new_columns = vbt.base.index_fns.combine_indexes(p_columns, input_list[0].columns)
+    >>> p_columns = vbt.base.index_fns.stack_indexes([p1_columns, p2_columns, p3_columns])
+    >>> new_columns = vbt.base.index_fns.combine_indexes([p_columns, input_list[0].columns])
 
     >>> output_df = pd.DataFrame(output, columns=new_columns)
     >>> output_df
@@ -1924,12 +1920,11 @@ def combine_objs(obj, other, *args, level_name=None, keys=None, **kwargs):
     Pass `other` as a tuple or a list to compare with multiple arguments.
     In this case, a new column level will be created with the name `level_name`.
 
-    See `vectorbt.base.accessors.BaseAccessor.combine_with`."""
+    See `vectorbt.base.accessors.BaseAccessor.combine`."""
     if isinstance(other, (tuple, list)):
         if keys is None:
             keys = index_fns.index_from_values(other, name=level_name)
-        return obj.vbt.combine_with_multiple(other, *args, keys=keys, concat=True, **kwargs)
-    return obj.vbt.combine_with(other, *args, **kwargs)
+    return obj.vbt.combine(other, *args, keys=keys, concat=True, **kwargs)
 
 
 def f(*args):

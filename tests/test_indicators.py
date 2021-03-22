@@ -2069,6 +2069,7 @@ class TestFactory:
             'ts_above',
             'ts_below',
             'ts_equal',
+            'update_config',
             'wrapper',
             'xs'
         ]

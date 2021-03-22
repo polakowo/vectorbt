@@ -46,9 +46,10 @@ under the hood, which is mostly much faster than with pandas.
 
 ```python-repl
 >>> df = pd.DataFrame(np.random.uniform(size=(1000, 1000)))
->>> %timeit df * 2
+
+>>> %timeit df * 2  # pandas
 296 ms ± 27.4 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
->>> %timeit df.vbt * 2
+>>> %timeit df.vbt * 2  # vectorbt
 5.48 ms ± 1.12 ms per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
@@ -76,7 +77,7 @@ from vectorbt.base.class_helpers import (
 
 @add_binary_magic_methods(
     binary_magic_methods,
-    lambda self, other, np_func: self.combine_with(other, combine_func=np_func)
+    lambda self, other, np_func: self.combine(other, allow_multiple=False, combine_func=np_func)
 )
 @add_unary_magic_methods(
     unary_magic_methods,
@@ -162,8 +163,8 @@ class BaseAccessor:
 
         def apply_func(obj_index):
             if on_top:
-                return index_fns.stack_indexes(index, obj_index, **kwargs)
-            return index_fns.stack_indexes(obj_index, index, **kwargs)
+                return index_fns.stack_indexes([index, obj_index], **kwargs)
+            return index_fns.stack_indexes([obj_index, index], **kwargs)
 
         return self.apply_on_index(apply_func, axis=axis, inplace=inplace)
 
@@ -239,11 +240,11 @@ class BaseAccessor:
         tiled = reshape_fns.tile(self._obj, n, axis=axis)
         if keys is not None:
             if axis == 1:
-                new_columns = index_fns.combine_indexes(keys, self.wrapper.columns)
+                new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
                 return tiled.vbt.wrapper.wrap(
                     tiled.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
             else:
-                new_index = index_fns.combine_indexes(keys, self.wrapper.index)
+                new_index = index_fns.combine_indexes([keys, self.wrapper.index])
                 return tiled.vbt.wrapper.wrap(
                     tiled.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
         return tiled
@@ -256,11 +257,11 @@ class BaseAccessor:
         repeated = reshape_fns.repeat(self._obj, n, axis=axis)
         if keys is not None:
             if axis == 1:
-                new_columns = index_fns.combine_indexes(self.wrapper.columns, keys)
+                new_columns = index_fns.combine_indexes([self.wrapper.columns, keys])
                 return repeated.vbt.wrapper.wrap(
                     repeated.values, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
             else:
-                new_index = index_fns.combine_indexes(self.wrapper.index, keys)
+                new_index = index_fns.combine_indexes([self.wrapper.index, keys])
                 return repeated.vbt.wrapper.wrap(
                     repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
         return repeated
@@ -495,77 +496,21 @@ class BaseAccessor:
                 result = combine_fns.apply_and_concat_one(ntimes, apply_func, obj, *args, **kwargs)
         # Build column hierarchy
         if keys is not None:
-            new_columns = index_fns.combine_indexes(keys, self.wrapper.columns)
+            new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
         else:
             top_columns = pd.Index(np.arange(ntimes), name='apply_idx')
-            new_columns = index_fns.combine_indexes(top_columns, self.wrapper.columns)
+            new_columns = index_fns.combine_indexes([top_columns, self.wrapper.columns])
         return self.wrapper.wrap(result, group_by=False, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
 
-    def combine_with(self, other, *args, combine_func=None, keep_pd=False, to_2d=False,
-                     broadcast=True, broadcast_kwargs=None, wrap_kwargs=None, **kwargs):
-        """Combine both using `combine_func` into a Series/DataFrame of the same shape.
+    def combine(self, other, *args, allow_multiple=True, combine_func=None, keep_pd=False, to_2d=False,
+                concat=False, numba_loop=False, use_ray=False, broadcast=True, broadcast_kwargs=None,
+                keys=None, wrap_kwargs=None, **kwargs):
+        """Combine with `other` using `combine_func`.
 
         Args:
-            other (array_like): Object to be combined with this array.
+            other (array_like or tuple of array_like): Object to combine this array with.
             *args: Variable arguments passed to `combine_func`.
-            combine_func (callable): Function to combine two arrays.
-
-                Can be Numba-compiled.
-            keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
-            to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
-            broadcast (bool): Whether to broadcast all inputs.
-            broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
-            **kwargs: Keyword arguments passed to `combine_func`.
-
-        !!! note
-            The resulted array must have the same shape as broadcast input arrays.
-
-        ## Example
-
-        ```python-repl
-        >>> import vectorbt as vbt
-        >>> import pandas as pd
-
-        >>> sr = pd.Series([1, 2], index=['x', 'y'])
-        >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
-        >>> sr.vbt.combine_with(df, combine_func=lambda x, y: x + y)
-           a  b
-        x  4  5
-        y  7  8
-        ```
-        """
-        if isinstance(other, BaseAccessor):
-            other = other._obj
-        checks.assert_not_none(combine_func)
-        if broadcast:
-            if broadcast_kwargs is None:
-                broadcast_kwargs = {}
-            if checks.is_numba_func(combine_func):
-                # Numba requires writable arrays
-                broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-            new_obj, new_other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
-        else:
-            new_obj, new_other = self._obj, other
-        # Optionally cast to 2d array
-        if to_2d:
-            inputs = tuple(map(lambda x: reshape_fns.to_2d(x, raw=not keep_pd), (new_obj, new_other)))
-        else:
-            if not keep_pd:
-                inputs = tuple(map(lambda x: np.asarray(x), (new_obj, new_other)))
-            else:
-                inputs = new_obj, new_other
-        result = combine_func(inputs[0], inputs[1], *args, **kwargs)
-        return new_obj.vbt.wrapper.wrap(result, **merge_dicts({}, wrap_kwargs))
-
-    def combine_with_multiple(self, others, *args, combine_func=None, keep_pd=False, to_2d=False, concat=False,
-                              numba_loop=False, use_ray=False, broadcast=True, broadcast_kwargs=None, keys=None,
-                              wrap_kwargs=None, **kwargs):
-        """Combine with `others` using `combine_func`.
-
-        Args:
-            others (list of array_like): List of objects to be combined with this array.
-            *args: Variable arguments passed to `combine_func`.
+            allow_multiple (bool): Whether a tuple/list will be considered as multiple objects in `other`.
             combine_func (callable): Function to combine two arrays.
 
                 Can be Numba-compiled.
@@ -606,14 +551,17 @@ class BaseAccessor:
         >>> sr = pd.Series([1, 2], index=['x', 'y'])
         >>> df = pd.DataFrame([[3, 4], [5, 6]], index=['x', 'y'], columns=['a', 'b'])
 
-        >>> sr.vbt.combine_with_multiple([df, df*2],
-        ...     combine_func=lambda x, y: x + y)
+        >>> sr.vbt.combine(df, combine_func=lambda x, y: x + y)
+           a  b
+        x  4  5
+        y  7  8
+
+        >>> sr.vbt.combine([df, df*2], combine_func=lambda x, y: x + y)
             a   b
         x  10  13
         y  17  20
 
-        >>> sr.vbt.combine_with_multiple([df, df*2],
-        ...     combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd'])
+        >>> sr.vbt.combine([df, df*2], combine_func=lambda x, y: x + y, concat=True, keys=['c', 'd'])
               c       d
            a  b   a   b
         x  4  5   7   9
@@ -629,15 +577,17 @@ class BaseAccessor:
 
         >>> sr = pd.Series([1, 2, 3])
 
-        >>> %timeit sr.vbt.combine_with_multiple(\
-        ...     [1, 1, 1], combine_func=combine_func)
+        >>> %timeit sr.vbt.combine([1, 1, 1], combine_func=combine_func)
         3.01 s ± 2.98 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
-        >>> %timeit sr.vbt.combine_with_multiple(\
-        ...     [1, 1, 1], combine_func=combine_func, concat=True, use_ray=True)
+        >>> %timeit sr.vbt.combine([1, 1, 1], combine_func=combine_func, concat=True, use_ray=True)
         1.02 s ± 2.32 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
         ```
         """
+        if not allow_multiple or not isinstance(other, (tuple, list)):
+            others = (other,)
+        else:
+            others = other
         others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
         checks.assert_not_none(combine_func)
         checks.assert_type(others, Iterable)
@@ -660,6 +610,9 @@ class BaseAccessor:
                 inputs = tuple(map(lambda x: np.asarray(x), (new_obj, *new_others)))
             else:
                 inputs = new_obj, *new_others
+        if len(inputs) == 2:
+            result = combine_func(inputs[0], inputs[1], *args, **kwargs)
+            return new_obj.vbt.wrapper.wrap(result, **merge_dicts({}, wrap_kwargs))
         if concat:
             # Concat the results horizontally
             if checks.is_numba_func(combine_func) and numba_loop:
@@ -678,10 +631,10 @@ class BaseAccessor:
                         inputs[0], inputs[1:], combine_func, *args, **kwargs)
             columns = new_obj.vbt.wrapper.columns
             if keys is not None:
-                new_columns = index_fns.combine_indexes(keys, columns)
+                new_columns = index_fns.combine_indexes([keys, columns])
             else:
                 top_columns = pd.Index(np.arange(len(new_others)), name='combine_idx')
-                new_columns = index_fns.combine_indexes(top_columns, columns)
+                new_columns = index_fns.combine_indexes([top_columns, columns])
             return new_obj.vbt.wrapper.wrap(result, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
         else:
             # Combine arguments pairwise into one object

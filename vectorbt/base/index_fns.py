@@ -80,7 +80,7 @@ def tile_index(index, n, ignore_default=None):
     return pd.Index(np.tile(index, n), name=index.name)
 
 
-def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None):
+def stack_indexes(indexes, drop_duplicates=None, keep=None, drop_redundant=None):
     """Stack each index in `indexes` on top of each other, from top to bottom."""
     from vectorbt import settings
 
@@ -108,7 +108,7 @@ def stack_indexes(*indexes, drop_duplicates=None, keep=None, drop_redundant=None
     return new_index
 
 
-def combine_indexes(*indexes, ignore_default=None, **kwargs):
+def combine_indexes(indexes, ignore_default=None, **kwargs):
     """Combine each index in `indexes` using Cartesian product.
 
     Keyword arguments will be passed to `stack_indexes`."""
@@ -117,7 +117,7 @@ def combine_indexes(*indexes, ignore_default=None, **kwargs):
         index1, index2 = new_index, indexes[i]
         new_index1 = repeat_index(index1, len(index2), ignore_default=ignore_default)
         new_index2 = tile_index(index2, len(index1), ignore_default=ignore_default)
-        new_index = stack_indexes(new_index1, new_index2, **kwargs)
+        new_index = stack_indexes([new_index1, new_index2], **kwargs)
     return new_index
 
 
@@ -277,7 +277,7 @@ def align_index_to(index1, index2):
     return pd.IndexSlice[_align_index_to_nb(unique1, unique2)]
 
 
-def align_indexes(*indexes):
+def align_indexes(indexes):
     """Align multiple indexes to each other."""
     max_len = max(map(len, indexes))
     indices = []
@@ -299,10 +299,14 @@ def align_indexes(*indexes):
     return indices
 
 
-def pick_levels(index, required_levels=[], optional_levels=[]):
+def pick_levels(index, required_levels=None, optional_levels=None):
     """Pick optional and required levels and return their indices.
 
     Raises an exception if index has less or more levels than expected."""
+    if required_levels is None:
+        required_levels = []
+    if optional_levels is None:
+        optional_levels = []
     checks.assert_type(index, pd.MultiIndex)
 
     n_opt_set = len(list(filter(lambda x: x is not None, optional_levels)))

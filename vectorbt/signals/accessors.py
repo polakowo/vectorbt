@@ -854,25 +854,25 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Logical operations ############# #
 
-    def AND(self, *others, **kwargs):
-        """Combine with each in `others` using logical AND.
+    def AND(self, other, **kwargs):
+        """Combine with `other` using logical AND.
 
-        See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`.
+        See `vectorbt.base.accessors.BaseAccessor.combine`.
 
         """
-        return self.combine_with_multiple(others, combine_func=np.logical_and, **kwargs)
+        return self.combine(other, combine_func=np.logical_and, **kwargs)
 
-    def OR(self, *others, **kwargs):
-        """Combine with each in `others` using logical OR.
+    def OR(self, other, **kwargs):
+        """Combine with `other` using logical OR.
 
-        See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`.
+        See `vectorbt.base.accessors.BaseAccessor.combine`.
 
         ## Example
 
         Perform two OR operations and concatenate them:
         ```python-repl
         >>> ts = pd.Series([1, 2, 3, 2, 1])
-        >>> sig.vbt.signals.OR(ts > 1, ts > 2, concat=True, keys=['>1', '>2'])
+        >>> sig.vbt.signals.OR([ts > 1, ts > 2], concat=True, keys=['>1', '>2'])
                                     >1                   >2
                         a     b      c      a      b      c
         2020-01-01   True  True   True   True   True   True
@@ -882,13 +882,13 @@ class SignalsAccessor(GenericAccessor):
         2020-01-05  False  True  False  False   True  False
         ```
         """
-        return self.combine_with_multiple(others, combine_func=np.logical_or, **kwargs)
+        return self.combine(other, combine_func=np.logical_or, **kwargs)
 
-    def XOR(self, *others, **kwargs):
-        """Combine with each in `others` using logical XOR.
+    def XOR(self, other, **kwargs):
+        """Combine with `other` using logical XOR.
 
-        See `vectorbt.base.accessors.BaseAccessor.combine_with_multiple`."""
-        return self.combine_with_multiple(others, combine_func=np.logical_xor, **kwargs)
+        See `vectorbt.base.accessors.BaseAccessor.combine`."""
+        return self.combine(other, combine_func=np.logical_xor, **kwargs)
 
     def plot(self, yref='y', **kwargs):  # pragma: no cover
         """Plot signals.

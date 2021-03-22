@@ -211,7 +211,7 @@ def broadcast_index(args, to_shape, index_from=None, axis=0, ignore_sr_names=Non
                                         new_index = index_fns.repeat_index(new_index, len(index))
                                     elif len(index) < len(new_index):
                                         index = index_fns.repeat_index(index, len(new_index))
-                                new_index = index_fns.stack_indexes(new_index, index, **kwargs)
+                                new_index = index_fns.stack_indexes([new_index, index], **kwargs)
             else:
                 raise ValueError(f"Invalid value {index_from} for {'columns' if axis == 1 else 'index'}_from")
         else:
@@ -459,7 +459,7 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
         if len(index_to_align) > 1:
             indexes = [args[i].index for i in index_to_align]
             if len(set(map(len, indexes))) > 1:
-                index_indices = index_fns.align_indexes(*indexes)
+                index_indices = index_fns.align_indexes(indexes)
                 for i in range(len(args)):
                     if i in index_to_align:
                         args[i] = args[i].iloc[index_indices[index_to_align.index(i)]]
@@ -471,7 +471,7 @@ def broadcast(*args, to_shape=None, to_pd=None, to_frame=None, align_index=None,
         if len(cols_to_align) > 1:
             indexes = [args[i].columns for i in cols_to_align]
             if len(set(map(len, indexes))) > 1:
-                col_indices = index_fns.align_indexes(*indexes)
+                col_indices = index_fns.align_indexes(indexes)
                 for i in range(len(args)):
                     if i in cols_to_align:
                         args[i] = args[i].iloc[:, col_indices[cols_to_align.index(i)]]
