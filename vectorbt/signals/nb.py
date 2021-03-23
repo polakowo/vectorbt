@@ -30,7 +30,7 @@ from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.signals.enums import StopType
 
 
-# ############# Signal generation ############# #
+# ############# Generation ############# #
 
 
 @njit
@@ -153,6 +153,44 @@ def generate_enex_nb(shape, entry_wait, exit_wait, entry_choice_func_nb,
             prev_i = found_i
             i += 1
     return entries, exits
+
+
+# ############# Filtering ############# #
+
+
+@njit(cache=True)
+def clean_enex_1d_nb(entries, exits, entry_first):
+    """Clean entry and exit arrays by picking the first signal out of each.
+
+    Entry signal must be picked first. If both signals are present, selects none."""
+    entries_out = np.full(entries.shape, False, dtype=np.bool_)
+    exits_out = np.full(entries.shape, False, dtype=np.bool_)
+
+    phase = -1
+    for i in range(entries.shape[0]):
+        if entries[i] and exits[i]:
+            continue
+        if entries[i]:
+            if phase == -1 or phase == 0:
+                phase = 1
+                entries_out[i] = True
+        if exits[i]:
+            if (not entry_first and phase == -1) or phase == 1:
+                phase = 0
+                exits_out[i] = True
+
+    return entries_out, exits_out
+
+
+@njit(cache=True)
+def clean_enex_nb(entries, exits, entry_first):
+    """2-dim version of `clean_enex_1d_nb`."""
+    entries_out = np.empty(entries.shape, dtype=np.bool_)
+    exits_out = np.empty(entries.shape, dtype=np.bool_)
+
+    for col in range(entries.shape[1]):
+        entries_out[:, col], exits_out[:, col] = clean_enex_1d_nb(entries[:, col], exits[:, col], entry_first)
+    return entries_out, exits_out
 
 
 # ############# Random ############# #

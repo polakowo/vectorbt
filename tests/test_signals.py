@@ -260,6 +260,130 @@ class TestAccessors:
             )
         )
 
+    def test_clean(self):
+        entries = pd.DataFrame([
+            [True, False, True],
+            [True, False, False],
+            [True, True, True],
+            [False, True, False],
+            [False, True, True]
+        ], index=sig.index, columns=sig.columns)
+        exits = pd.Series([True, False, True, False, True], index=sig.index)
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(),
+            pd.DataFrame(
+                np.array([
+                    [True, False, True],
+                    [False, False, False],
+                    [False, True, True],
+                    [False, False, False],
+                    [False, False, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.clean(entries),
+            pd.DataFrame(
+                np.array([
+                    [True, False, True],
+                    [False, False, False],
+                    [False, True, True],
+                    [False, False, False],
+                    [False, False, True]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits)[0],
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, False, False],
+                    [False, False, False],
+                    [False, True, False],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits)[1],
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [True, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits, entry_first=False)[0],
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, False, False],
+                    [False, False, False],
+                    [False, True, False],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            entries.vbt.signals.clean(exits, entry_first=False)[1],
+            pd.DataFrame(
+                np.array([
+                    [False, True, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [True, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.clean(entries, exits)[0],
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [True, False, False],
+                    [False, False, False],
+                    [False, True, False],
+                    [False, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            pd.DataFrame.vbt.signals.clean(entries, exits)[1],
+            pd.DataFrame(
+                np.array([
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [False, False, False],
+                    [True, False, False]
+                ]),
+                index=sig.index,
+                columns=sig.columns
+            )
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = pd.Series.vbt.signals.clean(entries, entries, entries)
+
     def test_generate_random(self):
         pd.testing.assert_series_equal(
             pd.Series.vbt.signals.generate_random(

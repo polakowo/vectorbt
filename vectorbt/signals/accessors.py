@@ -60,10 +60,12 @@ import pandas as pd
 
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
+from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.base import reshape_fns
 from vectorbt.base.class_helpers import add_nb_methods
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
 from vectorbt.signals import nb
 
@@ -136,7 +138,7 @@ class SignalsAccessor(GenericAccessor):
         """
         return GenericAccessor.empty_like(*args, fill_value=fill_value, dtype=bool, **kwargs)
 
-    # ############# Signal generation ############# #
+    # ############# Generation ############# #
 
     @classmethod
     def generate(cls, shape, choice_func_nb, *args, **kwargs):
@@ -272,6 +274,38 @@ class SignalsAccessor(GenericAccessor):
 
         exits = nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args)
         return self.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
+
+    # ############# Filtering ############# #
+
+    @class_or_instancemethod
+    def clean(self_or_cls, *args, entry_first=True, broadcast_kwargs=None, wrap_kwargs=None):
+        """Clean signals.
+
+        If one array passed, see `SignalsAccessor.first`.
+        If two arrays passed, entries and exits, see `vectorbt.signals.nb.clean_enex_nb`."""
+        if not isinstance(self_or_cls, type):
+            args = (self_or_cls._obj, *args)
+        if len(args) == 1:
+            obj = args[0]
+            if not isinstance(obj, (pd.Series, pd.DataFrame)):
+                wrapper = ArrayWrapper.from_shape(np.asarray(obj).shape)
+                obj = wrapper.wrap(obj, **merge_dicts({}, wrap_kwargs))
+            return obj.vbt.signals.first()
+        elif len(args) == 2:
+            if broadcast_kwargs is None:
+                broadcast_kwargs = {}
+            entries, exits = reshape_fns.broadcast(*args, **broadcast_kwargs)
+            entries_out, exits_out = nb.clean_enex_nb(
+                entries.vbt.to_2d_array(),
+                exits.vbt.to_2d_array(),
+                entry_first
+            )
+            return (
+                entries.vbt.wrapper.wrap(entries_out, **merge_dicts({}, wrap_kwargs)),
+                entries.vbt.wrapper.wrap(exits_out, **merge_dicts({}, wrap_kwargs))
+            )
+        else:
+            raise ValueError("Either one or two arrays must be passed")
 
     # ############# Random ############# #
 
