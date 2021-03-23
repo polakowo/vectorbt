@@ -74,8 +74,90 @@ def self_decorator(self, func):
     return command_func
 
 
+try:
+    from telegram.ext import Handler
+    from telegram.utils.helpers import effective_message_type
+
+
+    class LogHandler(Handler):
+        """Handler to log user updates."""
+        def check_update(self, update):
+            message = update.effective_message
+            message_type = effective_message_type(message)
+            if message_type is not None:
+                if message_type == 'text':
+                    logger.info(f"{message.chat_id} - User: \"%s\"", message.text)
+                else:
+                    logger.info(f"{message.chat_id} - User: %s", message_type)
+            return False
+except ImportError:
+    LogHandler = None
+
+
 class TelegramBot(Configured):
-    """Telegram bot."""
+    """Telegram bot.
+
+    `**kwargs` are passed to `telegram.ext.updater.Updater` and override settings
+    under `telegram` in `vectorbt.settings.messaging`.
+
+    ## Example
+
+    Let's extend `TelegramBot` to track cryptocurrency prices:
+
+    ```python-repl
+    >>> from telegram.ext import CommandHandler
+    >>> import ccxt
+    >>> import logging
+    >>> import vectorbt as vbt
+
+    >>> logging.basicConfig(level=logging.INFO)  # enable logging
+
+    >>> class MyTelegramBot(vbt.TelegramBot):
+    ...     @property
+    ...     def custom_handlers(self):
+    ...         return (CommandHandler('get', self.get),)
+    ...
+    ...     @property
+    ...     def help_message(self):
+    ...         return "Type /get [symbol] [exchange id (optional)] to get the latest price."
+    ...
+    ...     def get(self, update, context):
+    ...         chat_id = update.effective_message.chat_id
+    ...
+    ...         if len(context.args) == 1:
+    ...             symbol = context.args[0]
+    ...             exchange = 'binance'
+    ...         elif len(context.args) == 2:
+    ...             symbol = context.args[0]
+    ...             exchange = context.args[1]
+    ...         else:
+    ...             self.send_message(chat_id, "This command requires symbol and optionally exchange id.")
+    ...             return
+    ...         try:
+    ...             ticker = getattr(ccxt, exchange)().fetchTicker(symbol)
+    ...         except Exception as e:
+    ...             self.send_message(chat_id, str(e))
+    ...             return
+    ...         self.send_message(chat_id, str(ticker['last']))
+
+    >>> bot = MyTelegramBot(token='YOUR_TOKEN')
+    >>> bot.start()
+    INFO:vectorbt.utils.messaging:Initializing bot
+    INFO:vectorbt.utils.messaging:Loaded chat ids [447924619]
+    INFO:vectorbt.utils.messaging:Running bot vectorbt_bot
+    INFO:apscheduler.scheduler:Scheduler started
+    INFO:vectorbt.utils.messaging:447924619 - Bot: "I'm back online!"
+    INFO:vectorbt.utils.messaging:447924619 - User: "/start"
+    INFO:vectorbt.utils.messaging:447924619 - Bot: "Hello!"
+    INFO:vectorbt.utils.messaging:447924619 - User: "/help"
+    INFO:vectorbt.utils.messaging:447924619 - Bot: "Type /get [symbol] [exchange id (optional)] to get the latest price."
+    INFO:vectorbt.utils.messaging:447924619 - User: "/get BTC/USDT"
+    INFO:vectorbt.utils.messaging:447924619 - Bot: "55530.55"
+    INFO:vectorbt.utils.messaging:447924619 - User: "/get BTC/USD bitmex"
+    INFO:vectorbt.utils.messaging:447924619 - Bot: "55509.0"
+    INFO:telegram.ext.updater:Received signal 2 (SIGINT), stopping...
+    INFO:apscheduler.scheduler:Scheduler has been shut down
+    ```"""
 
     def __init__(self, giphy_kwargs=None, **kwargs):
         from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, PicklePersistence, Defaults
@@ -87,35 +169,33 @@ class TelegramBot(Configured):
             **kwargs
         )
 
-        # Resolve defaults
+        # Resolve kwargs
         giphy_kwargs = merge_dicts(settings.messaging['giphy'], giphy_kwargs)
         self.giphy_kwargs = giphy_kwargs
-
-        # Create the (persistent) Updater and pass it your bot's token.
-        logger.info("Initializing bot")
-        updater_kwargs = dict()
+        default_kwargs = dict()
+        passed_kwargs = dict()
         for k in get_func_kwargs(Updater):
+            if k in settings.messaging['telegram']:
+                default_kwargs[k] = settings.messaging['telegram'][k]
             if k in kwargs:
-                updater_kwargs[k] = kwargs.pop(k)
-        updater_kwargs = merge_dicts(settings.messaging['telegram'], updater_kwargs)
+                passed_kwargs[k] = kwargs.pop(k)
+        updater_kwargs = merge_dicts(default_kwargs, passed_kwargs)
         persistence = updater_kwargs.pop('persistence', None)
         if isinstance(persistence, str):
             persistence = PicklePersistence(persistence)
         defaults = updater_kwargs.pop('defaults', None)
         if isinstance(defaults, dict):
             defaults = Defaults(**defaults)
+
+        # Create the (persistent) Updater and pass it your bot's token.
+        logger.info("Initializing bot")
         self._updater = Updater(persistence=persistence, defaults=defaults, **updater_kwargs)
 
         # Get the dispatcher to register handlers
         self._dispatcher = self.updater.dispatcher
 
-        # Set up data
-        if 'chat_ids' not in self.dispatcher.bot_data:
-            self.dispatcher.bot_data['chat_ids'] = []
-        else:
-            logger.info("Loaded chat ids %s", str(self.dispatcher.bot_data['chat_ids']))
-
         # Register handlers
+        self.dispatcher.add_handler(self.log_handler)
         self.dispatcher.add_handler(CommandHandler('start', self.start_callback))
         self.dispatcher.add_handler(CommandHandler("help", self.help_callback))
         for handler in self.custom_handlers:
@@ -123,6 +203,12 @@ class TelegramBot(Configured):
         self.dispatcher.add_handler(MessageHandler(Filters.status_update.migrate, self.chat_migration_callback))
         self.dispatcher.add_handler(MessageHandler(Filters.command, self.unknown_callback))
         self.dispatcher.add_error_handler(self_decorator(self, self.__class__.error_callback))
+
+        # Set up data
+        if 'chat_ids' not in self.dispatcher.bot_data:
+            self.dispatcher.bot_data['chat_ids'] = []
+        else:
+            logger.info("Loaded chat ids %s", str(self.dispatcher.bot_data['chat_ids']))
 
     @property
     def updater(self):
@@ -135,28 +221,57 @@ class TelegramBot(Configured):
         return self._dispatcher
 
     @property
+    def log_handler(self):
+        """Log handler."""
+        return LogHandler(lambda update, context: None)
+
+    @property
     def custom_handlers(self):
         """Custom handlers to add.
 
-        Override this property to add custom handlers. Order counts."""
+        Override to add custom handlers. Order counts."""
         return ()
 
     @property
     def chat_ids(self):
-        """Chat ids that interacted with this bot."""
+        """Chat ids that ever interacted with this bot.
+
+        A chat id is added upon receiving the "/start" command."""
         return self.dispatcher.bot_data['chat_ids']
 
-    def start(self, in_background=False):
-        """Start the bot."""
-        logger.info("Running bot %s", str(self.updater.bot.get_me().username))
+    def start(self, in_background=False, **kwargs):
+        """Start the bot.
+
+        `**kwargs` are passed to `telegram.ext.updater.Updater.start_polling`
+        and override settings under `telegram` in `vectorbt.settings.messaging`."""
+        from vectorbt import settings
+
+        # Resolve kwargs
+        default_kwargs = dict()
+        passed_kwargs = dict()
+        for k in get_func_kwargs(self.updater.start_polling):
+            if k in settings.messaging['telegram']:
+                default_kwargs[k] = settings.messaging['telegram'][k]
+            if k in kwargs:
+                passed_kwargs[k] = kwargs.pop(k)
+        polling_kwargs = merge_dicts(default_kwargs, passed_kwargs)
 
         # Start the Bot
-        self.updater.start_polling()
+        logger.info("Running bot %s", str(self.updater.bot.get_me().username))
+        self.updater.start_polling(**polling_kwargs)
+        self.started_callback()
+
         if not in_background:
             # Run the bot until you press Ctrl-C or the process receives SIGINT,
             # SIGTERM or SIGABRT. This should be used most of the time, since
             # start_polling() is non-blocking and will stop the bot gracefully.
             self.updater.idle()
+
+    def started_callback(self):
+        """Callback once the bot has been started.
+
+        Override to execute custom commands upon starting the bot."""
+        self.send_message_to_all("I'm back online!")
 
     def send(self, kind, chat_id, *args, log_msg=None, **kwargs):
         """Send message of any kind to `chat_id`."""
@@ -211,12 +326,13 @@ class TelegramBot(Configured):
 
     @property
     def start_message(self):
-        """Start message."""
+        """Message to be sent upon "/start" command.
+
+        Override to define your own message."""
         return "Hello!"
 
     def start_callback(self, update, context):
         """Start command callback."""
-        logger.info(f"{update.effective_message.chat_id} - User: \"/start\"")
         chat_id = update.effective_chat.id
         if chat_id not in self.chat_ids:
             self.chat_ids.append(chat_id)
@@ -224,13 +340,15 @@ class TelegramBot(Configured):
 
     @property
     def help_message(self):
-        """Help message."""
+        """Message to be sent upon "/help" command.
+
+        Override to define your own message."""
         return "Can't help you here, buddy."
 
     def help_callback(self, update, context):
         """Help command callback."""
-        logger.info(f"{update.effective_message.chat_id} - User: \"/help\"")
-        self.send_message(update.effective_message.chat_id, self.help_message)
+        chat_id = update.effective_chat.id
+        self.send_message(chat_id, self.help_message)
 
     def chat_migration_callback(self, update, context):
         """Chat migration callback."""

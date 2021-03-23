@@ -55,7 +55,9 @@ def convert_naive_time(t, tz_out):
 
 
 def to_tzaware_datetime(dt, tz=None):
-    """Convert value to a timezone-aware `datetime.datetime`.
+    """Convert any value to a timezone-aware `datetime.datetime`.
+
+    See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats.
 
     Timestamps are localized to UTC, while naive datetime is localized to the local time.
     To explicitly convert the datetime to a timezone, use `tz`."""

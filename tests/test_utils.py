@@ -1703,7 +1703,7 @@ class TestScheduleManager:
         def job_func(kwargs):
             kwargs['call_count'] += 1
             if kwargs['call_count'] == 5:
-                raise asyncio.CancelledError
+                raise schedule.CancelledError
 
         manager = schedule.ScheduleManager()
         manager.every().do(job_func, kwargs)

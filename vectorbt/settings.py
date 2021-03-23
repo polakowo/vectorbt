@@ -336,6 +336,9 @@ data = Config(
                 api_key=None,
                 api_secret=None
             )
+        ),
+        ccxt=Config(
+            enableRateLimit=True
         )
     ),
     frozen=True
@@ -349,6 +352,12 @@ __pdoc__['data'] = f"""Parameters for data.
 ```
 
 For `data['binance']`, see `binance.client.Client`.
+
+For `data['ccxt']`:
+
+* See [Configuring API Keys](https://ccxt.readthedocs.io/en/latest/manual.html#configuring-api-keys).
+* Keys can be defined per exchange.
+* If a key is defined at the root, it applies to all exchanges.
 """
 
 # Messaging
@@ -358,7 +367,8 @@ messaging = Config(
             token=None,
             use_context=True,
             persistence='telegram_bot.pickle',
-            defaults=Config()
+            defaults=Config(),
+            drop_pending_updates=True
         ),
         giphy=Config(
             dict(
@@ -382,5 +392,5 @@ For `messaging['telegram']`:
 
 * Set `persistence` to string to use as `filename` in `telegram.ext.PicklePersistence`.
 * For `messaging['telegram']['defaults']`, see `telegram.ext.Defaults`.
-* For other keyword arguments, see `telegram.ext.Updater`.
+* For other keyword arguments, see `telegram.ext.Updater` and `telegram.ext.updater.Updater.start_polling`.
 """

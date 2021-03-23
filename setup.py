@@ -36,10 +36,11 @@ setup(
         'full': [
             'yfinance',
             'python-binance',
+            'ccxt',
             'empyrical',
             'ray',
             'TA-Lib',
-            'python-telegram-bot'  # LGPLv3
+            'python-telegram-bot>=13.4'  # LGPLv3
         ],
         'cov': [
             'pytest-cov',

@@ -482,7 +482,7 @@ def generate_stop_ex_iter_nb(entries, ts, stop, trailing, entry_wait, exit_wait,
 
 @njit(cache=True)
 def ohlc_stop_choice_nb(from_i, to_i, col, open, high, low, close, hit_price_out, stop_type_out,
-                       sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d):
+                        sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d):
     """`choice_func_nb` that returns the indices of the stop price being reached.
 
     Compared to `stop_choice_nb`, takes into account the whole bar, can check for both
@@ -652,8 +652,8 @@ def generate_ohlc_stop_ex_nb(entries, open, high, low, close, hit_price_out, sto
 
 @njit
 def generate_ohlc_stop_ex_iter_nb(entries, open, high, low, close, hit_price_out, stop_type_out,
-                                 sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
-                                 exit_wait, first, flex_2d):
+                                  sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
+                                  exit_wait, first, flex_2d):
     """Generate iteratively using `generate_enex_nb` and `ohlc_stop_choice_nb`.
 
     Returns two arrays: new entries and exits."""

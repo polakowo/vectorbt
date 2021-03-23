@@ -4,13 +4,17 @@ from datetime import datetime, timedelta, time as dt_time
 import time
 from schedule import Scheduler, Job, CancelJob
 import asyncio
-from asyncio import CancelledError
 import logging
 import inspect
 
 from vectorbt.utils.datetime import tzaware_to_naive_time
 
 logger = logging.getLogger(__name__)
+
+
+class CancelledError(asyncio.CancelledError):
+    """Thrown for the operation to be cancelled."""
+    pass
 
 
 class AsyncJob(Job):
@@ -234,7 +238,7 @@ class ScheduleManager:
             while True:
                 self.scheduler.run_pending()
                 time.sleep(sleep)
-        except (KeyboardInterrupt, CancelledError):
+        except (KeyboardInterrupt, asyncio.CancelledError):
             logger.info("Stopping schedule manager")
 
     async def async_start(self, sleep=1):
@@ -245,7 +249,7 @@ class ScheduleManager:
             while True:
                 await self.scheduler.async_run_pending()
                 await asyncio.sleep(sleep)
-        except CancelledError:
+        except asyncio.CancelledError:
             logger.info("Stopping schedule manager")
 
     def done_callback(self, async_task):

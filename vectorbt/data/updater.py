@@ -131,7 +131,7 @@ class DataUpdater(Configured):
         For `*args`, `to`, `until` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
 
         If `in_background` is set to True, starts in the background as an `asyncio` task.
-        The task can be stopped with `DataUpdater.schedule_manager.stop`.
+        The task can be stopped with `vectorbt.utils.schedule.ScheduleManager.stop`.
 
         `**kwargs` are passed to `DataUpdater.update`."""
         if start_kwargs is None:
