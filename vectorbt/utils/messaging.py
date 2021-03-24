@@ -97,6 +97,8 @@ except ImportError:
 class TelegramBot(Configured):
     """Telegram bot.
 
+    See [Extensions – Your first Bot](https://github.com/python-telegram-bot/python-telegram-bot/wiki/Extensions-%E2%80%93-Your-first-Bot).
+
     `**kwargs` are passed to `telegram.ext.updater.Updater` and override settings
     under `telegram` in `vectorbt.settings.messaging`.
 

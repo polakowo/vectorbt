@@ -148,6 +148,11 @@ class GBMData(SyntheticData):
 class YFData(Data):
     """`Data` for data coming from `yfinance`.
 
+    !!! note
+        Sometimes `yfinance` returns a tz-naive datetime index. To produce a
+        tz-aware datetime index, pass `tz_localize` to `YFData.download`. In this case,
+        you would need to find a timezone that fits the data (+0500, +0000, etc.)
+
     ## Example
 
     Fetch the business day except the last 5 minutes of trading data, and then update with the missing 5 minutes:
@@ -216,10 +221,10 @@ class YFData(Data):
 
         Args:
             symbol (str): Symbol.
-            start (any): Start datetime, converted to UTC.
+            start (any): Start datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            end (any): End datetime, converted to UTC.
+            end (any): End datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
             **kwargs: Keyword arguments passed to `yfinance.base.TickerBase.history`.
@@ -370,7 +375,7 @@ class BinanceData(Data):
 
     @classmethod
     def download_symbol(cls, symbol, client=None, interval=None, start=0, end='now UTC',
-                        sleep=2, limit=500, show_progress=True):
+                        delay=500, limit=500, show_progress=True):
         """Download the symbol.
 
         Args:
@@ -381,13 +386,13 @@ class BinanceData(Data):
             interval (str): Kline interval.
 
                 See `binance.enums`.
-            start (any): Start datetime, converted to UTC.
+            start (any): Start datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            end (any): End datetime, converted to UTC.
+            end (any): End datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            sleep (int or float): Seconds to sleep after each request.
+            delay (int or float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
         """
@@ -423,7 +428,7 @@ class BinanceData(Data):
                     symbol=symbol,
                     interval=interval,
                     limit=limit,
-                    startTime=start_ts,
+                    startTime=next_start_ts,
                     endTime=end_ts
                 )
                 if len(data) > 0:
@@ -441,8 +446,8 @@ class BinanceData(Data):
                 ))
                 pbar.update(1)
                 next_start_ts = next_data[-1][0]
-                if sleep is not None:
-                    time.sleep(sleep)  # be kind to api
+                if delay is not None:
+                    time.sleep(delay / 1000)  # be kind to api
 
         # Convert data to a DataFrame
         df = pd.DataFrame(data, columns=[
@@ -537,7 +542,7 @@ class CCXTData(Data):
 
     @classmethod
     def download_symbol(cls, symbol, exchange='binance', config=None, timeframe='1d', start=0,
-                        end='now UTC', sleep=None, limit=500, retries=3, show_progress=True, params=None):
+                        end='now UTC', delay=None, limit=500, retries=3, show_progress=True, params=None):
         """Download the symbol.
 
         Args:
@@ -550,13 +555,13 @@ class CCXTData(Data):
 
                 Will raise an exception if exchange has been already instantiated.
             timeframe (str): Timeframe supported by the exchange.
-            start (any): Start datetime, converted to UTC.
+            start (any): Start datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            end (any): End datetime, converted to UTC.
+            end (any): End datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            sleep (int or float): Seconds to sleep after each request.
+            delay (int or float): Time to sleep after each request (in milliseconds).
 
                 !!! note
                     Use only if `enableRateLimit` is not set.
@@ -605,8 +610,8 @@ class CCXTData(Data):
                     except (ccxt.NetworkError, ccxt.ExchangeError) as e:
                         if i == retries - 1:
                             raise e
-                    if sleep is not None:
-                        time.sleep(sleep)
+                    if delay is not None:
+                        time.sleep(delay / 1000)
 
             return retry_method
 
@@ -655,8 +660,8 @@ class CCXTData(Data):
                 ))
                 pbar.update(1)
                 next_start_ts = next_data[-1][0]
-                if sleep is not None:
-                    time.sleep(sleep)  # be kind to api
+                if delay is not None:
+                    time.sleep(delay / 1000)  # be kind to api
 
         # Convert data to a DataFrame
         df = pd.DataFrame(data, columns=[

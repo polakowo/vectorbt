@@ -328,6 +328,7 @@ __pdoc__['portfolio'] = f"""Parameters for portfolio.
 # Data
 data = Config(
     dict(
+        tz_localize=None,
         tz_convert=None,
         missing_index='nan',
         missing_columns='raise',

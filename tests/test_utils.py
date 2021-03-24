@@ -6,6 +6,8 @@ import os
 from collections import namedtuple
 from itertools import product, combinations
 import asyncio
+import pytz
+import dateparser
 
 from vectorbt import settings
 from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr, datetime, schedule
@@ -1597,6 +1599,21 @@ class TestDatetime:
                datetime.tzaware_to_naive_time(
                    _time(12, 0, 0, tzinfo=datetime.get_local_tz()), _timezone(_timedelta(hours=2)))
 
+    def test_is_tz_aware(self):
+        assert not datetime.is_tz_aware(pd.Timestamp('2020-01-01'))
+        assert datetime.is_tz_aware(pd.Timestamp('2020-01-01', tz=datetime.get_utc_tz()))
+
+    def test_to_timezone(self):
+        assert datetime.to_timezone('UTC') == pytz.UTC
+        assert datetime.to_timezone('Europe/Berlin') == pytz.timezone('Europe/Berlin')
+        assert datetime.to_timezone('+0500') == _timezone(_timedelta(hours=5))
+        assert datetime.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
+        assert datetime.to_timezone(pytz.timezone('Europe/Berlin')) == pytz.timezone('Europe/Berlin')
+        assert datetime.to_timezone(1) == _timezone(_timedelta(hours=1))
+        assert datetime.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
+        with pytest.raises(Exception) as e_info:
+            _ = datetime.to_timezone('+05')
+
     def test_to_tzaware_datetime(self):
         assert datetime.to_tzaware_datetime(0.5) == \
                _datetime(1970, 1, 1, 0, 0, 0, 500000, tzinfo=datetime.get_utc_tz())
@@ -1617,6 +1634,8 @@ class TestDatetime:
         assert datetime.to_tzaware_datetime(
             _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()), tz=datetime.get_local_tz()) == \
                _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()).astimezone(datetime.get_local_tz())
+        with pytest.raises(Exception) as e_info:
+            _ = datetime.to_tzaware_datetime('2020-01-001')
 
     def test_datetime_to_ms(self):
         assert datetime.datetime_to_ms(_datetime(2020, 1, 1)) == \
