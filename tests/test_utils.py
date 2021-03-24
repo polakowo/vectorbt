@@ -1619,7 +1619,8 @@ class TestDatetime:
                _datetime(2020, 1, 1, 12, 0, 0, tzinfo=datetime.get_utc_tz()).astimezone(datetime.get_local_tz())
 
     def test_datetime_to_ms(self):
-        assert datetime.datetime_to_ms(_datetime(2020, 1, 1)) == 1577833200000
+        assert datetime.datetime_to_ms(_datetime(2020, 1, 1)) == \
+               1577836800000 - _datetime(2020, 1, 1).astimezone(None).utcoffset().total_seconds() * 1000
         assert datetime.datetime_to_ms(_datetime(2020, 1, 1, tzinfo=datetime.get_utc_tz())) == 1577836800000
 
 
@@ -1707,5 +1708,6 @@ class TestScheduleManager:
 
         manager = schedule.ScheduleManager()
         manager.every().do(job_func, kwargs)
-        asyncio.run(manager.async_start())
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(manager.async_start())
         assert kwargs['call_count'] == 5
