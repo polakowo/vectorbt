@@ -403,7 +403,7 @@ sma_timeperiod    2    3
 ![local_extrema.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.png)
 
 - Classes for downloading and (periodically) updating data
-    - Includes data sources such as [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
+    - Includes APIs such as [ccxt](https://github.com/ccxt/ccxt), [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)
 - Telegram bot based on [python-telegram-bot](https://github.com/python-telegram-bot/python-telegram-bot)
 - Interactive Plotly-based widgets for visual data analysis
 
