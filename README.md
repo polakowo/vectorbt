@@ -420,6 +420,7 @@ Head over to the [documentation](https://polakowo.io/vectorbt) to get started.
 - [Plotting MACD parameters as 3D volume](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/MACDVolume.ipynb)
 - [Walk-forward optimization](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/WalkForwardOptimization.ipynb)
 - [Running Telegram bot to send signals](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/TelegramSignals.ipynb)
+- [Porting a backtrader strategy](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/PortingBTStrategy.ipynb)
 
 Note: you must run the notebook to play with the widgets.
 
