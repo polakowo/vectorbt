@@ -292,7 +292,8 @@ class SignalsAccessor(GenericAccessor):
                 obj = wrapper.wrap(obj, **merge_dicts({}, wrap_kwargs))
             return obj.vbt.signals.first()
         elif len(args) == 2:
-            broadcast_kwargs = merge_dicts(dict(columns_from=None), broadcast_kwargs)
+            if broadcast_kwargs is None:
+                broadcast_kwargs = {}
             entries, exits = reshape_fns.broadcast(*args, **broadcast_kwargs)
             entries_out, exits_out = nb.clean_enex_nb(
                 entries.vbt.to_2d_array(),

@@ -322,7 +322,7 @@ class TestAccessors:
                     [True, False, False]
                 ]),
                 index=sig.index,
-                columns=pd.RangeIndex(start=0, stop=3, step=1)
+                columns=sig.columns
             )
         )
         pd.testing.assert_frame_equal(
@@ -350,7 +350,7 @@ class TestAccessors:
                     [True, False, False]
                 ]),
                 index=sig.index,
-                columns=pd.RangeIndex(start=0, stop=3, step=1)
+                columns=sig.columns
             )
         )
         pd.testing.assert_frame_equal(
@@ -378,7 +378,7 @@ class TestAccessors:
                     [True, False, False]
                 ]),
                 index=sig.index,
-                columns=pd.RangeIndex(start=0, stop=3, step=1)
+                columns=sig.columns
             )
         )
         with pytest.raises(Exception) as e_info:
