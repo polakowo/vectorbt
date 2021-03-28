@@ -316,8 +316,8 @@ class SignalsAccessor(GenericAccessor):
         If `n` is set, see `vectorbt.signals.nb.generate_rand_nb`.
         If `prob` is set, see `vectorbt.signals.nb.generate_rand_by_prob_nb`.
 
-        `n` should be either a scalar or an array that will be broadcast to the number of columns.
-        `prob` should be either a single number or an array that will be broadcast to match `shape`.
+        `n` should be either a scalar or an array that will broadcast to the number of columns.
+        `prob` should be either a single number or an array that will broadcast to match `shape`.
         `**kwargs` will be passed to pandas constructor.
 
         ## Example
@@ -492,11 +492,12 @@ class SignalsAccessor(GenericAccessor):
                             first=True, iteratively=False, broadcast_kwargs=None, wrap_kwargs=None):
         """Generate exits based on when `ts` hits the stop.
 
+        For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
         If `iteratively` is True, see `vectorbt.signals.nb.generate_stop_ex_iter_nb`.
         Otherwise, see `vectorbt.signals.nb.generate_stop_ex_nb`.
 
-        Arguments `entries`, `ts` and `stop` will be broadcast using
-        `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`.
+        Arguments `entries`, `ts` and `stop` will broadcast using `vectorbt.base.reshape_fns.broadcast`
+        with `broadcast_kwargs`.
 
         For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
 
@@ -546,20 +547,25 @@ class SignalsAccessor(GenericAccessor):
     def generate_ohlc_stop_exits(self, open, high=None, low=None, close=None, is_open_safe=True,
                                 out_dict=None, sl_stop=0., ts_stop=0., tp_stop=0., entry_wait=1,
                                 exit_wait=1, first=True, iteratively=False, broadcast_kwargs=None, wrap_kwargs=None):
-        """Generate exits based on when price hits (trailing) stop loss or take profit.
+        """Generate exits based on when the price hits (trailing) stop loss or take profit.
 
         If any of `high`, `low` or `close` is None, it will be set to `open`.
 
         Use `out_dict` as a dict to pass `hit_price` and `stop_type` arrays. You can also
         set `out_dict` to {} to produce these arrays automatically and still have access to them.
 
+        For arguments, see `vectorbt.signals.nb.ohlc_stop_choice_nb`.
         If `iteratively` is True, see `vectorbt.signals.nb.generate_ohlc_stop_ex_iter_nb`.
         Otherwise, see `vectorbt.signals.nb.generate_ohlc_stop_ex_nb`.
 
-        All array-like arguments including stops and `out_dict` will be broadcast using
+        All array-like arguments including stops and `out_dict` will broadcast using
         `vectorbt.base.reshape_fns.broadcast` with `broadcast_kwargs`.
 
         For arguments, see `vectorbt.signals.nb.ohlc_stop_choice_nb`.
+
+        !!! note
+            `open` isn't necessarily open price, but can be any entry price (even previous close).
+            Stop price is calculated based solely upon `open`.
 
         ## Example
 
@@ -669,7 +675,7 @@ class SignalsAccessor(GenericAccessor):
         """See `vectorbt.signals.nb.map_reduce_between_nb`.
 
         If `other` specified, see `vectorbt.signals.nb.map_reduce_between_two_nb`.
-        Both will be broadcast using `vectorbt.base.reshape_fns.broadcast`
+        Both will broadcast using `vectorbt.base.reshape_fns.broadcast`
         with `broadcast_kwargs`.
 
         Note that `map_args` and `reduce_args` won't be broadcast.

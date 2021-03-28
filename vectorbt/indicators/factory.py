@@ -1334,7 +1334,7 @@ def run_pipeline(
         per_column (bool): Whether to split the DataFrame into Series, one per column, and run `custom_func`
             on each Series.
 
-            Each list of parameter values will be broadcast to the number of columns and
+            Each list of parameter values will broadcast to the number of columns and
             each parameter value will be applied per Series rather than per DataFrame.
             Input shape must be known beforehand.
         pass_col (bool): Whether to pass column index as keyword argument if `per_column` is set to True.
@@ -1916,7 +1916,7 @@ def perform_init_checks(wrapper, input_list, input_mapper, in_output_list, outpu
 def combine_objs(obj, other, *args, level_name=None, keys=None, **kwargs):
     """Combines/compares `obj` to `other`, for example, to generate signals.
 
-    Both will be broadcast together.
+    Both will broadcast together.
     Pass `other` as a tuple or a list to compare with multiple arguments.
     In this case, a new column level will be created with the name `level_name`.
 

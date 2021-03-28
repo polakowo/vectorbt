@@ -705,7 +705,7 @@ class Portfolio(Wrapping):
             freq (any): Index frequency in case `close.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
+        All broadcastable arguments will broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
         For defaults, see `vectorbt.settings.portfolio`.
@@ -1093,7 +1093,7 @@ class Portfolio(Wrapping):
             freq (any): Index frequency in case `close.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        All broadcastable arguments will be broadcast using `vectorbt.base.reshape_fns.broadcast`
+        All broadcastable arguments will broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
         For defaults, see `vectorbt.settings.portfolio`.

@@ -405,7 +405,7 @@ def first_choice_nb(from_i, to_i, col, a):
 
 @njit(cache=True)
 def stop_choice_nb(from_i, to_i, col, ts, stop, trailing, wait, first, temp_idx_arr, flex_2d):
-    """`choice_func_nb` that returns the indices of the stop being reached.
+    """`choice_func_nb` that returns the indices of the stop being hit.
 
     Args:
         col (int): Current column.
@@ -521,7 +521,7 @@ def generate_stop_ex_iter_nb(entries, ts, stop, trailing, entry_wait, exit_wait,
 @njit(cache=True)
 def ohlc_stop_choice_nb(from_i, to_i, col, open, high, low, close, hit_price_out, stop_type_out,
                         sl_stop, ts_stop, tp_stop, is_open_safe, wait, first, temp_idx_arr, flex_2d):
-    """`choice_func_nb` that returns the indices of the stop price being reached.
+    """`choice_func_nb` that returns the indices of the stop price being hit within OHLC.
 
     Compared to `stop_choice_nb`, takes into account the whole bar, can check for both
     (trailing) stop loss and take profit simultaneously, and tracks hit price and stop type.
