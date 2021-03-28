@@ -2428,9 +2428,9 @@ class TestFromOrderFunc:
             order_size = np.copy(target_hold_value[sc.i, sc.from_col:sc.to_col])
             order_size_type = np.full(sc.group_len, SizeType.TargetValue)
             direction = np.full(sc.group_len, Direction.All)
-            temp_float_arr = np.empty(sc.group_len, dtype=np.float_)
+            order_value_out = np.empty(sc.group_len, dtype=np.float_)
             sc.last_val_price[sc.from_col:sc.to_col] = sc.close[sc.i, sc.from_col:sc.to_col]
-            nb.auto_call_seq_ctx_nb(sc, order_size, order_size_type, direction, temp_float_arr)
+            nb.sort_call_seq_nb(sc, order_size, order_size_type, direction, order_value_out)
             return order_size, order_size_type, direction
 
         @njit

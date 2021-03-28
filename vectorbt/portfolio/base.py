@@ -855,15 +855,7 @@ class Portfolio(Wrapping):
         if close_first is None:
             close_first = settings.portfolio['close_first']
         if val_price is None:
-            if price is None:
-                if checks.is_pandas(close):
-                    val_price = close.vbt.fshift(1)
-                else:
-                    val_price = np.require(close, dtype=np.float_)
-                    val_price = np.roll(val_price, 1, axis=0)
-                    val_price[0] = np.nan
-            else:
-                val_price = price
+            val_price = price
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
         init_cash = convert_str_enum_value(InitCashMode, init_cash)
@@ -1368,7 +1360,7 @@ class Portfolio(Wrapping):
 
                 !!! note
                     CallSeqType.Auto should be implemented manually.
-                    Use `auto_call_seq_ctx_nb` in `segment_prep_func_nb`.
+                    Use `sort_call_seq_nb` in `segment_prep_func_nb`.
             active_mask (int or array_like of bool): Mask of whether a particular segment should be executed.
 
                 Supplying an integer will activate every n-th row (just for convenience).
@@ -1505,40 +1497,36 @@ class Portfolio(Wrapping):
 
         Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
         ```python-repl
-        >>> from vectorbt.portfolio.nb import auto_call_seq_ctx_nb
+        >>> from vectorbt.portfolio.nb import sort_call_seq_nb
         >>> from vectorbt.portfolio.enums import SizeType, Direction
 
         >>> @njit
         ... def group_prep_func_nb(gc):
         ...     '''Define empty arrays for each group.'''
-        ...     size = np.empty(gc.group_len, dtype=np.float_)
-        ...     size_type = np.empty(gc.group_len, dtype=np.int_)
-        ...     direction = np.empty(gc.group_len, dtype=np.int_)
-        ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
-        ...     return size, size_type, direction, temp_float_arr
+        ...     order_value_out = np.empty(gc.group_len, dtype=np.float_)
+        ...     return (order_value_out,)
 
         >>> @njit
-        ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
+        ... def segment_prep_func_nb(sc, order_value_out):
         ...     '''Perform rebalancing at each segment.'''
         ...     for k in range(sc.group_len):
         ...         col = sc.from_col + k
-        ...         size[k] = 1 / sc.group_len
-        ...         size_type[k] = SizeType.TargetPercent
-        ...         direction[k] = Direction.LongOnly
         ...         sc.last_val_price[col] = sc.close[sc.i, col]
-        ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
+        ...     size = 1 / sc.group_len
+        ...     size_type = SizeType.TargetPercent
+        ...     direction = Direction.LongOnly  # long positions only
+        ...     sort_call_seq_nb(sc, size, size_type, direction, order_value_out)
         ...     return size, size_type, direction
 
         >>> @njit
         ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
         ...     '''Place an order.'''
-        ...     col_i = oc.call_seq_now[oc.call_idx]
         ...     return create_order_nb(
-        ...         size=size[col_i],
-        ...         size_type=size_type[col_i],
+        ...         size=size,
+        ...         size_type=size_type,
+        ...         direction=direction,
         ...         price=oc.close[oc.i, oc.col],
-        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage,
-        ...         direction=direction[col_i]
+        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage
         ...     )
 
         >>> np.random.seed(42)
@@ -1586,7 +1574,7 @@ class Portfolio(Wrapping):
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually. "
-                                 "Use auto_call_seq_ctx_nb in segment_prep_func_nb.")
+                                 "Use sort_call_seq_nb in segment_prep_func_nb.")
         if active_mask is None:
             active_mask = True
         if row_wise is None:
@@ -2260,58 +2248,74 @@ class Portfolio(Wrapping):
     subplot_settings = OrderedDict(
         orders=dict(
             title="Orders",
+            yaxis_title="Price",
             can_plot_groups=False
         ),
         trades=dict(
             title="Trades",
+            yaxis_title="Price",
             can_plot_groups=False
         ),
         positions=dict(
             title="Positions",
+            yaxis_title="Price",
             can_plot_groups=False
         ),
         trade_pnl=dict(
-            title="Trade PnL",
+            title="Trade P&L",
+            yaxis_title="P&L",
             can_plot_groups=False
         ),
         position_pnl=dict(
-            title="Position PnL",
+            title="Position P&L",
+            yaxis_title="P&L",
             can_plot_groups=False
         ),
         cum_returns=dict(
-            title="Cumulative Returns"
+            title="Cumulative Returns",
+            yaxis_title="Cumulative returns"
         ),
         share_flow=dict(
             title="Share Flow",
+            yaxis_title="Share flow",
             can_plot_groups=False
         ),
         cash_flow=dict(
-            title="Cash Flow"
+            title="Cash Flow",
+            yaxis_title="Cash flow"
         ),
         shares=dict(
             title="Shares",
+            yaxis_title="Shares",
             can_plot_groups=False
         ),
         cash=dict(
-            title="Cash"
+            title="Cash",
+            yaxis_title="Cash"
         ),
         holding_value=dict(
-            title="Holding Value"
+            title="Holding Value",
+            yaxis_title="Holding value"
         ),
         value=dict(
-            title="Value"
+            title="Value",
+            yaxis_title="Value"
         ),
         drawdowns=dict(
-            title="Drawdowns"
+            title="Drawdowns",
+            yaxis_title="Price"
         ),
         underwater=dict(
-            title="Underwater"
+            title="Underwater",
+            yaxis_title="Underwater"
         ),
         gross_exposure=dict(
-            title="Gross Exposure"
+            title="Gross Exposure",
+            yaxis_title="Gross exposure"
         ),
         net_exposure=dict(
-            title="Net Exposure"
+            title="Net Exposure",
+            yaxis_title="Net exposure"
         )
     )
     """Settings of subplots supported by `Portfolio.plot`."""
@@ -2595,9 +2599,6 @@ class Portfolio(Wrapping):
                         custom_kwargs['y_domain'] = y_domain
                     custom_kwargs = merge_dicts(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
                     plot_func(self_col, **custom_kwargs, fig=fig)
-
-                fig.layout[xaxis]['title'] = 'Date'
-                fig.layout[yaxis]['title'] = settings.get('title', None)
                     
             else:
                 settings = self.subplot_settings[name]
@@ -2611,8 +2612,6 @@ class Portfolio(Wrapping):
                     self_col.get_orders(**method_kwargs).plot(
                         **orders_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Price'
     
                 elif name == 'trades':
                     trades_kwargs = kwargs.pop('trades_kwargs', {})
@@ -2620,8 +2619,6 @@ class Portfolio(Wrapping):
                     self_col.get_trades(**method_kwargs).plot(
                         **trades_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Price'
     
                 elif name == 'positions':
                     positions_kwargs = kwargs.pop('positions_kwargs', {})
@@ -2629,8 +2626,6 @@ class Portfolio(Wrapping):
                     self_col.get_positions(**method_kwargs).plot(
                         **positions_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Price'
     
                 elif name == 'trade_pnl':
                     trade_pnl_kwargs = merge_dicts(dict(
@@ -2640,8 +2635,6 @@ class Portfolio(Wrapping):
                     self_col.get_trades(**method_kwargs).plot_pnl(
                         **trade_pnl_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'PnL'
     
                 elif name == 'position_pnl':
                     position_pnl_kwargs = kwargs.pop('position_pnl_kwargs', {})
@@ -2649,8 +2642,6 @@ class Portfolio(Wrapping):
                     self_col.get_positions(**method_kwargs).plot_pnl(
                         **position_pnl_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'PnL'
     
                 elif name == 'cum_returns':
                     cum_returns_kwargs = merge_dicts(dict(
@@ -2672,8 +2663,6 @@ class Portfolio(Wrapping):
                     returns.vbt.returns.plot_cum_returns(
                         **cum_returns_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Cumulative Returns'
     
                 elif name == 'drawdowns':
                     drawdowns_kwargs = merge_dicts(dict(
@@ -2686,8 +2675,6 @@ class Portfolio(Wrapping):
                     self_col.get_drawdowns(**method_kwargs).plot(
                         **drawdowns_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Value'
     
                 elif name == 'underwater':
                     underwater_kwargs = merge_dicts(dict(
@@ -2703,8 +2690,6 @@ class Portfolio(Wrapping):
                         **underwater_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Drawdown'
                     fig.layout[yaxis]['tickformat'] = '%'
     
                 elif name == 'share_flow':
@@ -2719,8 +2704,6 @@ class Portfolio(Wrapping):
                         **share_flow_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Share Flow'
     
                 elif name == 'cash_flow':
                     cash_flow_kwargs = merge_dicts(dict(
@@ -2734,8 +2717,6 @@ class Portfolio(Wrapping):
                         **cash_flow_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Cash Flow'
     
                 elif name == 'shares':
                     shares_kwargs = merge_dicts(dict(
@@ -2756,8 +2737,6 @@ class Portfolio(Wrapping):
                         0, **shares_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Shares'
     
                 elif name == 'cash':
                     cash_kwargs = merge_dicts(dict(
@@ -2778,8 +2757,6 @@ class Portfolio(Wrapping):
                         0, **cash_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(self_col.init_cash, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Cash'
     
                 elif name == 'holding_value':
                     holding_value_kwargs = merge_dicts(dict(
@@ -2800,8 +2777,6 @@ class Portfolio(Wrapping):
                         0, **holding_value_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Holding Value'
     
                 elif name == 'value':
                     value_kwargs = merge_dicts(dict(
@@ -2816,8 +2791,6 @@ class Portfolio(Wrapping):
                         self_col.init_cash, **value_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(self_col.init_cash, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Value'
     
                 elif name == 'gross_exposure':
                     gross_exposure_kwargs = merge_dicts(dict(
@@ -2838,8 +2811,6 @@ class Portfolio(Wrapping):
                         1, **gross_exposure_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(1, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Gross Exposure'
     
                 elif name == 'net_exposure':
                     net_exposure_kwargs = merge_dicts(dict(
@@ -2860,8 +2831,9 @@ class Portfolio(Wrapping):
                         0, **net_exposure_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-                    fig.layout[xaxis]['title'] = 'Date'
-                    fig.layout[yaxis]['title'] = 'Net Exposure'
+
+            fig.layout[xaxis]['title'] = 'Date'
+            fig.layout[yaxis]['title'] = settings.get('yaxis_title', settings.get('title', None))
 
         # Remove duplicate legend labels
         found_ids = dict()

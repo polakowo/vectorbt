@@ -369,8 +369,8 @@ class Trades(Records):
 
     def plot_pnl(self,
                  column=None,
-                 marker_size_range=[7, 14],
-                 opacity_range=[0.75, 0.9],
+                 marker_size_range=(7, 14),
+                 opacity_range=(0.75, 0.9),
                  closed_profit_trace_kwargs=None,
                  closed_loss_trace_kwargs=None,
                  open_trace_kwargs=None,
@@ -383,6 +383,8 @@ class Trades(Records):
 
         Args:
             column (str): Name of the column to plot.
+            marker_size_range (tuple): Range of marker size.
+            opacity_range (tuple): Range of marker opacity.
             closed_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Profit" markers.
             closed_loss_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Loss" markers.
             open_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Open" markers.

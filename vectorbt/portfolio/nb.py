@@ -687,13 +687,15 @@ def approx_order_value_nb(size, size_type, cash_now, shares_now, val_price_now, 
 
 
 @njit(cache=True)
-def auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr):
-    """Generate call sequence based on order value dynamically, for example, to rebalance.
+def sort_call_seq_nb(sc, size, size_type, direction, order_value_out):
+    """Sort call sequence based on order value dynamically, for example, to rebalance.
 
     Accepts `vectorbt.portfolio.enums.SegmentContext`.
 
-    Arrays `size`, `size_type`, `direction` and `temp_float_arr` should match the number
-    of columns in the group. Array `temp_float_arr` should be empty and will contain
+    `size`, `size_type` and `direction` utilize flexible broadcasting.
+
+    Arrays `size`, `size_type`, `direction` and `order_value_out` should match the number
+    of columns in the group. Array `order_value_out` should be empty and will contain
     sorted order values after execution.
 
     Best called once from `segment_prep_func_nb`.
@@ -702,6 +704,10 @@ def auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr):
         Cash sharing must be enabled and `call_seq_now` should follow `CallSeqType.Default`."""
     if not sc.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
+    size_arr = np.asarray(size)
+    size_type_arr = np.asarray(size_type)
+    direction_arr = np.asarray(direction)
+
     group_value_now = get_group_value_ctx_nb(sc)
     group_len = sc.to_col - sc.from_col
     for k in range(group_len):
@@ -712,17 +718,17 @@ def auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr):
             cash_now = sc.last_cash[sc.group]
         else:
             cash_now = sc.last_cash[col]
-        temp_float_arr[k] = approx_order_value_nb(
-            size[k],
-            size_type[k],
+        order_value_out[k] = approx_order_value_nb(
+            flex_select_auto_nb(k, 0, size_arr, False),
+            flex_select_auto_nb(k, 0, size_type_arr, False),
             cash_now,
             sc.last_shares[col],
             sc.last_val_price[col],
             group_value_now,
-            direction[k]
+            flex_select_auto_nb(k, 0, direction_arr, False)
         )
     # Sort by order value
-    insert_argsort_nb(temp_float_arr, sc.call_seq_now)
+    insert_argsort_nb(order_value_out, sc.call_seq_now)
 
 
 @njit
@@ -763,7 +769,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
             Should have shape `target_shape` and each value indicate the index of a column in a group.
 
             !!! note
-                To use `auto_call_seq_ctx_nb`, should be of `CallSeqType.Default`.
+                To use `sort_call_seq_nb`, should be of `CallSeqType.Default`.
         active_mask (array_like of bool): Mask of whether a particular segment should be executed.
 
             A segment is simply a sequence of `order_func_nb` calls under the same group and row.
@@ -846,7 +852,7 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     ...     create_order_nb,
     ...     simulate_nb,
     ...     build_call_seq,
-    ...     auto_call_seq_ctx_nb,
+    ...     sort_call_seq_nb,
     ...     share_flow_nb,
     ...     shares_nb,
     ...     holding_value_nb
@@ -862,36 +868,32 @@ def simulate_nb(target_shape, close, group_lens, init_cash, cash_sharing, call_s
     ...     '''Define empty arrays for each group.'''
     ...     print('\\tpreparing group', gc.group)
     ...     # Try to create new arrays as rarely as possible
-    ...     size = np.empty(gc.group_len, dtype=np.float_)
-    ...     size_type = np.empty(gc.group_len, dtype=np.int_)
-    ...     direction = np.empty(gc.group_len, dtype=np.int_)
-    ...     temp_float_arr = np.empty(gc.group_len, dtype=np.float_)
-    ...     return size, size_type, direction, temp_float_arr
+    ...     order_value_out = np.empty(gc.group_len, dtype=np.float_)
+    ...     return (order_value_out,)
 
     >>> @njit
-    ... def segment_prep_func_nb(sc, size, size_type, direction, temp_float_arr):
+    ... def segment_prep_func_nb(sc, order_value_out):
     ...     '''Perform rebalancing at each segment.'''
     ...     print('\\t\\tpreparing segment', sc.i, '(row)')
     ...     for k in range(sc.group_len):
     ...         col = sc.from_col + k
-    ...         size[k] = 1 / sc.group_len
-    ...         size_type[k] = SizeType.TargetPercent
-    ...         direction[k] = Direction.LongOnly  # long positions only
-    ...         # Here we use order price instead of previous close to valuate the assets
+    ...         # Here we use order price for group valuation
     ...         sc.last_val_price[col] = sc.close[sc.i, col]
     ...     # Reorder call sequence such that selling orders come first and buying last
-    ...     auto_call_seq_ctx_nb(sc, size, size_type, direction, temp_float_arr)
-    ...     return size, size_type, direction
+    ...     size = 1 / sc.group_len
+    ...     size_type = SizeType.TargetPercent
+    ...     direction = Direction.LongOnly  # long positions only
+    ...     sort_call_seq_nb(sc, size, size_type, direction, order_value_out)
+    ...     return (size, size_type, direction)
 
     >>> @njit
     ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
     ...     '''Place an order.'''
     ...     print('\\t\\t\\trunning order', oc.call_idx, 'at column', oc.col)
-    ...     col_i = oc.call_seq_now[oc.call_idx]  # or col - from_col
     ...     return create_order_nb(
-    ...         size=size[col_i],
-    ...         size_type=size_type[col_i],
-    ...         direction=direction[col_i],
+    ...         size=size,
+    ...         size_type=size_type,
+    ...         direction=direction,
     ...         price=oc.close[oc.i, oc.col],
     ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage
     ...     )
@@ -1923,7 +1925,7 @@ def orders_to_trades_nb(close, order_records, col_map):
 
     >>> col_map = col_map_nb(order_records['col'], target_shape[1])
     >>> trade_records = orders_to_trades_nb(close, order_records, col_map)
-    >>> print(pd.DataFrame.from_records(trade_records))
+    >>> pd.DataFrame.from_records(trade_records)
        id  col  size  entry_idx  entry_price  entry_fees  exit_idx  exit_price  \\
     0   0    0   1.0          0     1.101818    0.011018         2        2.97
     1   1    0   0.1          0     1.101818    0.001102         3        3.96

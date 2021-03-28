@@ -108,9 +108,9 @@ def to_tzaware_datetime(dt, tz=None):
         dt = dt.astype(datetime)
 
     if not is_tz_aware(dt):
-        dt = dt.astimezone()
+        dt = dt.replace(tzinfo=get_local_tz())
     else:
-        dt = dt.replace(tzinfo=timezone(dt.tzinfo.utcoffset(dt)))
+        dt = dt.replace(tzinfo=to_timezone(dt.tzinfo))
     if tz is not None:
         dt = dt.astimezone(to_timezone(tz))
     return dt

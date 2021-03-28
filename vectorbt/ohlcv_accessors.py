@@ -4,7 +4,7 @@ Methods can be accessed as follows:
 
 * `OHLCVDFAccessor` -> `pd.DataFrame.vbt.ohlcv.*`
 
-The accessors inherit `vectorbt.base.accessors`.
+The accessors inherit `vectorbt.generic.accessors`.
 
 !!! note
     Accessors do not utilize caching."""

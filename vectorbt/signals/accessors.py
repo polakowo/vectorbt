@@ -292,8 +292,7 @@ class SignalsAccessor(GenericAccessor):
                 obj = wrapper.wrap(obj, **merge_dicts({}, wrap_kwargs))
             return obj.vbt.signals.first()
         elif len(args) == 2:
-            if broadcast_kwargs is None:
-                broadcast_kwargs = {}
+            broadcast_kwargs = merge_dicts(dict(columns_from=None), broadcast_kwargs)
             entries, exits = reshape_fns.broadcast(*args, **broadcast_kwargs)
             entries_out, exits_out = nb.clean_enex_nb(
                 entries.vbt.to_2d_array(),
@@ -302,7 +301,7 @@ class SignalsAccessor(GenericAccessor):
             )
             return (
                 entries.vbt.wrapper.wrap(entries_out, **merge_dicts({}, wrap_kwargs)),
-                entries.vbt.wrapper.wrap(exits_out, **merge_dicts({}, wrap_kwargs))
+                exits.vbt.wrapper.wrap(exits_out, **merge_dicts({}, wrap_kwargs))
             )
         else:
             raise ValueError("Either one or two arrays must be passed")
