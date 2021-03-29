@@ -1,4 +1,9 @@
 language: python
+python:
+  - "3.6"
+  - "3.7"
+  - "3.8"
+  - "3.9"
 install:
   - curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
   - tar -xzf ta-lib-0.4.0-src.tar.gz

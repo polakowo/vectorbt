@@ -167,7 +167,7 @@ class YFData(Data):
     ...     interval='1m'
     ... )
     >>> yf_data.get()
-                                     Open        High         Low       Close  \
+                                     Open        High         Low       Close  \\
     Datetime
     2021-03-12 09:30:00-05:00  670.000000  674.455811  667.510010  673.445007
     2021-03-12 09:31:00-05:00  673.424988  674.455811  668.099976  669.599976
@@ -191,7 +191,7 @@ class YFData(Data):
 
     >>> yf_data = yf_data.update(end='2021-03-12 16:00:00 -0500')
     >>> yf_data.get()
-                                     Open        High         Low       Close  \
+                                     Open        High         Low       Close  \\
     Datetime
     2021-03-12 09:30:00-05:00  670.000000  674.455811  667.510010  673.445007
     2021-03-12 09:31:00-05:00  673.424988  674.455811  668.099976  669.599976

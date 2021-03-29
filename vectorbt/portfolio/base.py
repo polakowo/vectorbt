@@ -47,7 +47,7 @@ in 2020 against every single pattern found in TA-Lib, and translates them into s
 >>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
 
 >>> ohlcv['Open'].head()
-symbol          BTC-USD     ETH-USD   XRP-USD    BNB-USD     BCH-USD  \
+symbol          BTC-USD     ETH-USD   XRP-USD    BNB-USD     BCH-USD  \\
 Date
 2020-01-01  7194.892090  129.630661  0.192912  13.730962  204.671295
 2020-01-02  7202.551270  130.820038  0.192708  13.698126  204.354538
@@ -196,7 +196,7 @@ simulation from the beginning to the end, you can turn on logging.
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
 
 >>> portfolio.logs.records
-        id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \
+        id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \\
 0        0    0    0      0       inf    0.000000    7194.892090        inf
 1        1    1    0      0       inf    0.000000    7202.551270        inf
 2        2    2    0      0       inf    0.000000    6984.428711        inf
@@ -205,7 +205,7 @@ simulation from the beginning to the end, you can turn on logging.
 1462  1462  242    5      5       inf  274.137659      62.844059        inf
 1463  1463  243    5      5       inf  282.093860      61.105076        inf
 
-          size  size_type  ...   log  new_cash  new_shares  res_size  \
+          size  size_type  ...   log  new_cash  new_shares  res_size  \\
 0          NaN          0  ...  True       inf    0.000000       NaN
 1     0.000000          0  ...  True       inf    0.000000       NaN
 2     0.000000          0  ...  True       inf    0.000000       NaN

@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='vectorbt',
-    version='0.17.5',
+    version='0.17.6',
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
@@ -23,7 +23,7 @@ setup(
         'matplotlib',
         'plotly>=4.12.0',
         'ipywidgets>=7.0.0',
-        'numba>=0.51.2',
+        'numba>=0.53.1',
         'dill',
         'tqdm',
         'dateparser',
@@ -51,7 +51,7 @@ setup(
             'pdoc3'  # AGPL-3.0
         ]
     },
-    python_requires='>=3.6, <3.9',
+    python_requires='>=3.6, <3.10',
     license='Apache 2.0',
     classifiers=[
         'Development Status :: 5 - Production/Stable',
@@ -61,6 +61,7 @@ setup(
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Operating System :: OS Independent',
         'Intended Audience :: Science/Research',
         'Topic :: Software Development',
