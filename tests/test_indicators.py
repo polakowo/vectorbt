@@ -2152,6 +2152,40 @@ class TestFactory:
             )
         )
 
+    def test_from_pandas_ta(self):
+        pd.testing.assert_frame_equal(
+            vbt.IndicatorFactory.from_pandas_ta('SMA').run(ts, 2).sma,
+            pd.DataFrame(
+                ts.rolling(2).mean().values,
+                index=ts.index,
+                columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['sma_length', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            vbt.IndicatorFactory.from_pandas_ta('SMA').run(ts['a'], [2, 3, 4]).sma,
+            pd.DataFrame(
+                np.column_stack((
+                    ts['a'].rolling(2).mean().values,
+                    ts['a'].rolling(3).mean().values,
+                    ts['a'].rolling(4).mean().values
+                )),
+                index=ts.index,
+                columns=pd.Int64Index([2, 3, 4], dtype='int64', name='sma_length')
+            )
+        )
+        pd.testing.assert_series_equal(
+            vbt.IndicatorFactory.from_pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochk,
+            pd.Series([np.nan, np.nan, np.nan, 33.333333333333336, 0.0], index=ts.index, name=(2, 2))
+        )
+        pd.testing.assert_series_equal(
+            vbt.IndicatorFactory.from_pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochd,
+            pd.Series([np.nan, np.nan, np.nan, np.nan, 16.666666666666668], index=ts.index, name=(2, 2))
+        )
+        pd.testing.assert_series_equal(
+            vbt.IndicatorFactory.from_pandas_ta('PVR').run(ts['a'], ts['b']).pvr,
+            pd.Series([1.0, 2.0, 2.0, 2.0, 2.0], index=ts.index)
+        )
+
 
 # ############# basic.py ############# #
 
