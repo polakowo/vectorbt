@@ -16,6 +16,12 @@ from vectorbt.base import (
     reshape_fns
 )
 
+ray_available = True
+try:
+    import ray
+except ImportError:
+    ray_available = False
+
 settings.broadcasting['index_from'] = 'stack'
 settings.broadcasting['columns_from'] = 'stack'
 
@@ -3020,18 +3026,19 @@ class TestAccessors:
             ),
             target
         )
-        with pytest.raises(Exception) as e_info:
-            sr2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb, numba_loop=True, use_ray=True,
-                keys=['a', 'b', 'c']
+        if ray_available:
+            with pytest.raises(Exception) as e_info:
+                sr2.vbt.apply_and_concat(
+                    3, np.array([1, 2, 3]), 10, 100, apply_func=apply_func_nb, numba_loop=True, use_ray=True,
+                    keys=['a', 'b', 'c']
+                )
+            pd.testing.assert_frame_equal(
+                sr2.vbt.apply_and_concat(
+                    3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
+                    keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
+                ),
+                target
             )
-        pd.testing.assert_frame_equal(
-            sr2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
-            ),
-            target
-        )
         pd.testing.assert_frame_equal(
             sr2.vbt.apply_and_concat(
                 3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100
@@ -3089,13 +3096,14 @@ class TestAccessors:
             ),
             target2
         )
-        pd.testing.assert_frame_equal(
-            df2.vbt.apply_and_concat(
-                3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
-                keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
-            ),
-            target2
-        )
+        if ray_available:
+            pd.testing.assert_frame_equal(
+                df2.vbt.apply_and_concat(
+                    3, np.array([1, 2, 3]), 10, apply_func=apply_func, d=100,
+                    keys=['a', 'b', 'c'], use_ray=True, ray_shutdown=True
+                ),
+                target2
+            )
 
     def test_combine(self):
         def combine_func(x, y, a, b=1):
@@ -3183,11 +3191,12 @@ class TestAccessors:
             ),
             target
         )
-        with pytest.raises(Exception) as e_info:
-            sr2.vbt.combine(
-                [10, df4], 10, 100,
-                combine_func=combine_func_nb, numba_loop=True, use_ray=True
-            )
+        if ray_available:
+            with pytest.raises(Exception) as e_info:
+                sr2.vbt.combine(
+                    [10, df4], 10, 100,
+                    combine_func=combine_func_nb, numba_loop=True, use_ray=True
+                )
         pd.testing.assert_frame_equal(
             df4.vbt.combine(
                 [10, sr2], 10, b=100,
@@ -3239,16 +3248,17 @@ class TestAccessors:
             ),
             target2
         )
-        pd.testing.assert_frame_equal(
-            sr2.vbt.combine(
-                [10, df4], 10, b=100,
-                combine_func=combine_func,
-                concat=True,
-                use_ray=True,
-                ray_shutdown=True
-            ),
-            target2
-        )
+        if ray_available:
+            pd.testing.assert_frame_equal(
+                sr2.vbt.combine(
+                    [10, df4], 10, b=100,
+                    combine_func=combine_func,
+                    concat=True,
+                    use_ray=True,
+                    ray_shutdown=True
+                ),
+                target2
+            )
         pd.testing.assert_frame_equal(
             sr2.vbt.combine(
                 [10, df4], 10, b=100,

@@ -7,6 +7,30 @@ import pytest
 from itertools import product
 from collections import namedtuple
 
+ray_available = True
+try:
+    import ray
+except ImportError:
+    ray_available = False
+
+ta_available = True
+try:
+    import ta
+except ImportError:
+    ta_available = False
+
+pandas_ta_available = True
+try:
+    import pandas_ta
+except ImportError:
+    pandas_ta_available = False
+
+talib_available = True
+try:
+    import talib
+except ImportError:
+    talib_available = False
+
 seed = 42
 
 # ############# factory.py ############# #
@@ -285,17 +309,18 @@ class TestFactory:
         )
 
     def test_use_ray(self):
-        F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
+        if ray_available:
+            F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p'], output_names=['out'])
 
-        def apply_func(ts, p, a, b=10):
-            return ts * p + a + b
+            def apply_func(ts, p, a, b=10):
+                return ts * p + a + b
 
-        pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func, var_args=True)
-                .run(ts, np.arange(10), 10, b=100).out,
-            F.from_apply_func(apply_func, var_args=True)
-                .run(ts, np.arange(10), 10, b=100, use_ray=True, ray_shutdown=True).out,
-        )
+            pd.testing.assert_frame_equal(
+                F.from_apply_func(apply_func, var_args=True)
+                    .run(ts, np.arange(10), 10, b=100).out,
+                F.from_apply_func(apply_func, var_args=True)
+                    .run(ts, np.arange(10), 10, b=100, use_ray=True, ray_shutdown=True).out,
+            )
 
     def test_no_inputs(self):
         F = vbt.IndicatorFactory(param_names=['p'], output_names=['out'])
@@ -2075,166 +2100,169 @@ class TestFactory:
         ]
 
     def test_from_talib(self):
-        # with params
-        target = pd.DataFrame(
-            np.array([
-                [np.nan, np.nan, np.nan],
-                [2.5, 5.5, 2.5],
-                [3.5, 4.5, 3.5],
-                [4.5, 3.5, 3.5],
-                [5.5, 2.5, 2.5]
-            ]),
-            index=ts.index,
-            columns=pd.MultiIndex.from_tuples([
-                (2, 2, 2, 'a'),
-                (2, 2, 2, 'b'),
-                (2, 2, 2, 'c')
-            ], names=['bbands_timeperiod', 'bbands_nbdevup', 'bbands_nbdevdn', None])
-        )
-        BBANDS = vbt.IndicatorFactory.from_talib('BBANDS')
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).upperband,
-            target
-        )
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).middleband,
-            target - 1
-        )
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).lowerband,
-            target - 2
-        )
-        target = pd.DataFrame(
-            np.array([
-                [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
-                [2.5, 5.5, 2.5, 2.5, 5.5, 2.5],
-                [3.5, 4.5, 3.5, 3.5, 4.5, 3.5],
-                [4.5, 3.5, 3.5, 4.5, 3.5, 3.5],
-                [5.5, 2.5, 2.5, 5.5, 2.5, 2.5]
-            ]),
-            index=ts.index,
-            columns=pd.MultiIndex.from_tuples([
-                (2, 2, 2, 'a'),
-                (2, 2, 2, 'b'),
-                (2, 2, 2, 'c'),
-                (2, 2, 2, 'a'),
-                (2, 2, 2, 'b'),
-                (2, 2, 2, 'c')
-            ], names=['bbands_timeperiod', 'bbands_nbdevup', 'bbands_nbdevdn', None])
-        )
-        BBANDS = vbt.IndicatorFactory.from_talib('BBANDS')
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).upperband,
-            target
-        )
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).middleband,
-            target - 1
-        )
-        pd.testing.assert_frame_equal(
-            BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).lowerband,
-            target - 2
-        )
-        # without params
-        OBV = vbt.IndicatorFactory.from_talib('OBV')
-        pd.testing.assert_frame_equal(
-            OBV.run(ts, ts * 2).real,
-            pd.DataFrame(
+        if talib_available:
+            # with params
+            target = pd.DataFrame(
                 np.array([
-                    [2., 10., 2.],
-                    [6., 2., 6.],
-                    [12., -4., 12.],
-                    [20., -8., 8.],
-                    [30., -10., 6.]
+                    [np.nan, np.nan, np.nan],
+                    [2.5, 5.5, 2.5],
+                    [3.5, 4.5, 3.5],
+                    [4.5, 3.5, 3.5],
+                    [5.5, 2.5, 2.5]
                 ]),
                 index=ts.index,
-                columns=ts.columns
+                columns=pd.MultiIndex.from_tuples([
+                    (2, 2, 2, 'a'),
+                    (2, 2, 2, 'b'),
+                    (2, 2, 2, 'c')
+                ], names=['bbands_timeperiod', 'bbands_nbdevup', 'bbands_nbdevdn', None])
             )
-        )
+            BBANDS = vbt.IndicatorFactory.from_talib('BBANDS')
+            pd.testing.assert_frame_equal(
+                BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).upperband,
+                target
+            )
+            pd.testing.assert_frame_equal(
+                BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).middleband,
+                target - 1
+            )
+            pd.testing.assert_frame_equal(
+                BBANDS.run(ts, timeperiod=2, nbdevup=2, nbdevdn=2).lowerband,
+                target - 2
+            )
+            target = pd.DataFrame(
+                np.array([
+                    [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
+                    [2.5, 5.5, 2.5, 2.5, 5.5, 2.5],
+                    [3.5, 4.5, 3.5, 3.5, 4.5, 3.5],
+                    [4.5, 3.5, 3.5, 4.5, 3.5, 3.5],
+                    [5.5, 2.5, 2.5, 5.5, 2.5, 2.5]
+                ]),
+                index=ts.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (2, 2, 2, 'a'),
+                    (2, 2, 2, 'b'),
+                    (2, 2, 2, 'c'),
+                    (2, 2, 2, 'a'),
+                    (2, 2, 2, 'b'),
+                    (2, 2, 2, 'c')
+                ], names=['bbands_timeperiod', 'bbands_nbdevup', 'bbands_nbdevdn', None])
+            )
+            BBANDS = vbt.IndicatorFactory.from_talib('BBANDS')
+            pd.testing.assert_frame_equal(
+                BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).upperband,
+                target
+            )
+            pd.testing.assert_frame_equal(
+                BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).middleband,
+                target - 1
+            )
+            pd.testing.assert_frame_equal(
+                BBANDS.run(ts, timeperiod=[2, 2], nbdevup=2, nbdevdn=2).lowerband,
+                target - 2
+            )
+            # without params
+            OBV = vbt.IndicatorFactory.from_talib('OBV')
+            pd.testing.assert_frame_equal(
+                OBV.run(ts, ts * 2).real,
+                pd.DataFrame(
+                    np.array([
+                        [2., 10., 2.],
+                        [6., 2., 6.],
+                        [12., -4., 12.],
+                        [20., -8., 8.],
+                        [30., -10., 6.]
+                    ]),
+                    index=ts.index,
+                    columns=ts.columns
+                )
+            )
 
     def test_from_pandas_ta(self):
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory.from_pandas_ta('SMA').run(ts, 2).sma,
-            pd.DataFrame(
-                ts.rolling(2).mean().values,
-                index=ts.index,
-                columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['sma_length', None])
+        if pandas_ta_available:
+            pd.testing.assert_frame_equal(
+                vbt.IndicatorFactory.from_pandas_ta('SMA').run(ts, 2).sma,
+                pd.DataFrame(
+                    ts.rolling(2).mean().values,
+                    index=ts.index,
+                    columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['sma_length', None])
+                )
             )
-        )
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory.from_pandas_ta('SMA').run(ts['a'], [2, 3, 4]).sma,
-            pd.DataFrame(
-                np.column_stack((
-                    ts['a'].rolling(2).mean().values,
-                    ts['a'].rolling(3).mean().values,
-                    ts['a'].rolling(4).mean().values
-                )),
-                index=ts.index,
-                columns=pd.Int64Index([2, 3, 4], dtype='int64', name='sma_length')
+            pd.testing.assert_frame_equal(
+                vbt.IndicatorFactory.from_pandas_ta('SMA').run(ts['a'], [2, 3, 4]).sma,
+                pd.DataFrame(
+                    np.column_stack((
+                        ts['a'].rolling(2).mean().values,
+                        ts['a'].rolling(3).mean().values,
+                        ts['a'].rolling(4).mean().values
+                    )),
+                    index=ts.index,
+                    columns=pd.Int64Index([2, 3, 4], dtype='int64', name='sma_length')
+                )
             )
-        )
-        pd.testing.assert_series_equal(
-            vbt.IndicatorFactory.from_pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochk,
-            pd.Series([np.nan, np.nan, np.nan, 33.333333333333336, 0.0], index=ts.index, name=(2, 2))
-        )
-        pd.testing.assert_series_equal(
-            vbt.IndicatorFactory.from_pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochd,
-            pd.Series([np.nan, np.nan, np.nan, np.nan, 16.666666666666668], index=ts.index, name=(2, 2))
-        )
-        pd.testing.assert_series_equal(
-            vbt.IndicatorFactory.from_pandas_ta('PVR').run(ts['a'], ts['b']).pvr,
-            pd.Series([1.0, 2.0, 2.0, 2.0, 2.0], index=ts.index)
-        )
+            pd.testing.assert_series_equal(
+                vbt.IndicatorFactory.from_pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochk,
+                pd.Series([np.nan, np.nan, np.nan, 33.333333333333336, 0.0], index=ts.index, name=(2, 2))
+            )
+            pd.testing.assert_series_equal(
+                vbt.IndicatorFactory.from_pandas_ta('STOCH').run(ts['a'], ts['b'], ts['c'], k=2, d=2).stochd,
+                pd.Series([np.nan, np.nan, np.nan, np.nan, 16.666666666666668], index=ts.index, name=(2, 2))
+            )
+            pd.testing.assert_series_equal(
+                vbt.IndicatorFactory.from_pandas_ta('PVR').run(ts['a'], ts['b']).pvr,
+                pd.Series([1.0, 2.0, 2.0, 2.0, 2.0], index=ts.index)
+            )
 
     def test_from_ta(self):
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory.from_ta('SMAIndicator').run(ts, 2).sma_indicator,
-            pd.DataFrame(
-                ts.rolling(2).mean().values,
-                index=ts.index,
-                columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['smaindicator_window', None])
+        if ta_available:
+            pd.testing.assert_frame_equal(
+                vbt.IndicatorFactory.from_ta('SMAIndicator').run(ts, 2).sma_indicator,
+                pd.DataFrame(
+                    ts.rolling(2).mean().values,
+                    index=ts.index,
+                    columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['smaindicator_window', None])
+                )
             )
-        )
-        pd.testing.assert_frame_equal(
-            vbt.IndicatorFactory.from_ta('SMAIndicator').run(ts['a'], [2, 3, 4]).sma_indicator,
-            pd.DataFrame(
-                np.column_stack((
-                    ts['a'].rolling(2).mean().values,
-                    ts['a'].rolling(3).mean().values,
-                    ts['a'].rolling(4).mean().values
-                )),
-                index=ts.index,
-                columns=pd.Int64Index([2, 3, 4], dtype='int64', name='smaindicator_window')
+            pd.testing.assert_frame_equal(
+                vbt.IndicatorFactory.from_ta('SMAIndicator').run(ts['a'], [2, 3, 4]).sma_indicator,
+                pd.DataFrame(
+                    np.column_stack((
+                        ts['a'].rolling(2).mean().values,
+                        ts['a'].rolling(3).mean().values,
+                        ts['a'].rolling(4).mean().values
+                    )),
+                    index=ts.index,
+                    columns=pd.Int64Index([2, 3, 4], dtype='int64', name='smaindicator_window')
+                )
             )
-        )
-        target = pd.DataFrame(
-            np.array([
-                [np.nan, np.nan, np.nan],
-                [2.5, 5.5, 2.5],
-                [3.5, 4.5, 3.5],
-                [4.5, 3.5, 3.5],
-                [5.5, 2.5, 2.5]
-            ]),
-            index=ts.index,
-            columns=pd.MultiIndex.from_tuples([
-                (2, 2, 'a'),
-                (2, 2, 'b'),
-                (2, 2, 'c')
-            ], names=['bollingerbands_window', 'bollingerbands_window_dev', None])
-        )
-        BollingerBands = vbt.IndicatorFactory.from_ta('BollingerBands')
-        pd.testing.assert_frame_equal(
-            BollingerBands.run(ts, window=2, window_dev=2).bollinger_hband,
-            target
-        )
-        pd.testing.assert_frame_equal(
-            BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg,
-            target - 1
-        )
-        pd.testing.assert_frame_equal(
-            BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband,
-            target - 2
-        )
+            target = pd.DataFrame(
+                np.array([
+                    [np.nan, np.nan, np.nan],
+                    [2.5, 5.5, 2.5],
+                    [3.5, 4.5, 3.5],
+                    [4.5, 3.5, 3.5],
+                    [5.5, 2.5, 2.5]
+                ]),
+                index=ts.index,
+                columns=pd.MultiIndex.from_tuples([
+                    (2, 2, 'a'),
+                    (2, 2, 'b'),
+                    (2, 2, 'c')
+                ], names=['bollingerbands_window', 'bollingerbands_window_dev', None])
+            )
+            BollingerBands = vbt.IndicatorFactory.from_ta('BollingerBands')
+            pd.testing.assert_frame_equal(
+                BollingerBands.run(ts, window=2, window_dev=2).bollinger_hband,
+                target
+            )
+            pd.testing.assert_frame_equal(
+                BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg,
+                target - 1
+            )
+            pd.testing.assert_frame_equal(
+                BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband,
+                target - 2
+            )
 
 
 # ############# basic.py ############# #
