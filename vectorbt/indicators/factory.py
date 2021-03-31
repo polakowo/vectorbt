@@ -3124,7 +3124,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         2020-01-05      4.5  1.5  4.0  2.0
         ```
 
-        To get help on a function, use the `help` command:
+        To get help on running the indicator, use the `help` command:
 
         ```python-repl
         >>> help(SMA.run)
@@ -3333,7 +3333,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         2020-01-05  4.5  1.5  4.0  2.0
         ```
 
-        To get help on a function, use the `help` command:
+        To get help on running the indicator, use the `help` command:
 
         ```python-repl
         >>> help(SMA.run)
@@ -3352,7 +3352,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
         ```
 
-        To get docstring for this indicator, use the `help` command or print the `__doc__` attribute:
+        To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
 
         ```python-repl
         >>> print(SMA.__doc__)
@@ -3514,7 +3514,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
     @classmethod
     def from_ta(cls, cls_name, init_kwargs=None, **kwargs):
-        """Build an indicator class around a ta function.
+        """Build an indicator class around a ta class.
 
         Requires [ta](https://github.com/bukosabino/ta) installed.
 
@@ -3542,7 +3542,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         2020-01-05           4.5  1.5  4.0  2.0
         ```
 
-        To get help on a function, use the `help` command:
+        To get help on running the indicator, use the `help` command:
 
         ```python-repl
         >>> help(SMAIndicator.run)
@@ -3561,7 +3561,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`.
         ```
 
-        To get docstring for this indicator, use the `help` command or print the `__doc__` attribute:
+        To get the indicator docstring, use the `help` command or print the `__doc__` attribute:
 
         ```python-repl
         >>> print(SMAIndicator.__doc__)

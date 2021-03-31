@@ -15,8 +15,27 @@ from vectorbt.indicators.basic import (
     OBV
 )
 
+
+def talib(*args, **kwargs):
+    """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_talib`."""
+    return IndicatorFactory.from_talib(*args, **kwargs)
+
+
+def pandas_ta(*args, **kwargs):
+    """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_pandas_ta`."""
+    return IndicatorFactory.from_pandas_ta(*args, **kwargs)
+
+
+def ta(*args, **kwargs):
+    """Shortcut for `vectorbt.indicators.factory.IndicatorFactory.from_ta`."""
+    return IndicatorFactory.from_ta(*args, **kwargs)
+
+
 __all__ = [
     'IndicatorFactory',
+    'talib',
+    'pandas_ta',
+    'ta',
     'MA',
     'MSTD',
     'BBANDS',
@@ -26,5 +45,10 @@ __all__ = [
     'ATR',
     'OBV'
 ]
+__whitelist__ = [
+    'talib',
+    'pandas_ta',
+    'ta'
+]
 
-__pdoc__ = {k: False for k in __all__}
+__pdoc__ = {k: k in __whitelist__ for k in __all__}

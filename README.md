@@ -377,13 +377,36 @@ rand_n      0      1      2
         - Moving average, Bollinger Bands, RSI, Stochastic, MACD, and more
     - Each indicator has methods for generating signals and plotting
     - Each indicator takes arbitrary parameter combinations, from arrays to Cartesian products
-    - Supports [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
-    - Can integrate third-party indicators, such as [pandas-ta](https://github.com/twopirllc/pandas-ta)
+    - Supports [ta](https://github.com/bukosabino/ta), [pandas-ta](https://github.com/twopirllc/pandas-ta), and [TA-Lib](https://github.com/mrjbq7/ta-lib) indicators out of the box
     - Supports parallelization with [Ray](https://github.com/ray-project/ray)
 
 ```python-repl
->>> SMA = vbt.IndicatorFactory.from_talib('SMA')
->>> SMA.run([1., 2., 3., 4., 5.], timeperiod=[2, 3]).real
+>>> price = pd.Series([1, 2, 3, 4, 5], dtype=float)
+>>> vbt.MA.run(price, [2, 3]).ma  # vectorbt
+ma_window    2    3
+0          NaN  NaN
+1          1.5  NaN
+2          2.5  2.0
+3          3.5  3.0
+4          4.5  4.0
+
+>>> vbt.ta('SMAIndicator').run(price, [2, 3]).sma_indicator  # ta
+smaindicator_window    2    3
+0                    NaN  NaN
+1                    1.5  NaN
+2                    2.5  2.0
+3                    3.5  3.0
+4                    4.5  4.0
+
+>>> vbt.pandas_ta('SMA').run(price, [2, 3]).sma  # pandas-ta
+sma_length    2    3
+0           NaN  NaN
+1           1.5  NaN
+2           2.5  2.0
+3           3.5  3.0
+4           4.5  4.0
+
+>>> vbt.talib('SMA').run(price, [2, 3]).real  # TA-Lib
 sma_timeperiod    2    3
 0               NaN  NaN
 1               1.5  NaN
