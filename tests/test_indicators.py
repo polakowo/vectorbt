@@ -2186,6 +2186,56 @@ class TestFactory:
             pd.Series([1.0, 2.0, 2.0, 2.0, 2.0], index=ts.index)
         )
 
+    def test_from_ta(self):
+        pd.testing.assert_frame_equal(
+            vbt.IndicatorFactory.from_ta('SMAIndicator').run(ts, 2).sma_indicator,
+            pd.DataFrame(
+                ts.rolling(2).mean().values,
+                index=ts.index,
+                columns=pd.MultiIndex.from_tuples([(2, 'a'), (2, 'b'), (2, 'c')], names=['smaindicator_window', None])
+            )
+        )
+        pd.testing.assert_frame_equal(
+            vbt.IndicatorFactory.from_ta('SMAIndicator').run(ts['a'], [2, 3, 4]).sma_indicator,
+            pd.DataFrame(
+                np.column_stack((
+                    ts['a'].rolling(2).mean().values,
+                    ts['a'].rolling(3).mean().values,
+                    ts['a'].rolling(4).mean().values
+                )),
+                index=ts.index,
+                columns=pd.Int64Index([2, 3, 4], dtype='int64', name='smaindicator_window')
+            )
+        )
+        target = pd.DataFrame(
+            np.array([
+                [np.nan, np.nan, np.nan],
+                [2.5, 5.5, 2.5],
+                [3.5, 4.5, 3.5],
+                [4.5, 3.5, 3.5],
+                [5.5, 2.5, 2.5]
+            ]),
+            index=ts.index,
+            columns=pd.MultiIndex.from_tuples([
+                (2, 2, 'a'),
+                (2, 2, 'b'),
+                (2, 2, 'c')
+            ], names=['bollingerbands_window', 'bollingerbands_window_dev', None])
+        )
+        BollingerBands = vbt.IndicatorFactory.from_ta('BollingerBands')
+        pd.testing.assert_frame_equal(
+            BollingerBands.run(ts, window=2, window_dev=2).bollinger_hband,
+            target
+        )
+        pd.testing.assert_frame_equal(
+            BollingerBands.run(ts, window=2, window_dev=2).bollinger_mavg,
+            target - 1
+        )
+        pd.testing.assert_frame_equal(
+            BollingerBands.run(ts, window=2, window_dev=2).bollinger_lband,
+            target - 2
+        )
+
 
 # ############# basic.py ############# #
 

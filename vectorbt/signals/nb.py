@@ -546,19 +546,19 @@ def ohlc_stop_choice_nb(from_i, to_i, col, open, high, low, close, hit_price_out
             0 for stop loss, 1 for take profit.
         sl_stop (float or array_like): Percentage value for stop loss.
 
-            Can be per frame, column, row, or element-wise. Set to 0. to disable.
+            Can be per frame, column, row, or element-wise. Set to 0 to disable.
         ts_stop (bool or array_like): Percentage value for trailing stop.
 
             Can be per frame, column, row, or element-wise.
         tp_stop (float or array_like): Percentage value for take profit.
 
-            Can be per frame, column, row, or element-wise. Set to 0. to disable.
+            Can be per frame, column, row, or element-wise. Set to 0 to disable.
         is_open_safe (bool): Whether entry price comes right at or before open.
 
-            If True and wait is 0, can use high/low at entry tick. Otherwise uses close.
+            If True and wait is 0, can use high/low at entry bar. Otherwise uses only close.
         wait (bool or int): Number of ticks to wait before placing exits.
 
-            Setting False or 0 may result in two signals at one tick.
+            Setting False or 0 may result in entry and exit signal at one bar.
         first (bool): Whether to stop as soon as the first exit signal is found.
         temp_idx_arr (array_like of int): Empty integer array used to temporarily store indices.
         flex_2d (bool): See `vectorbt.base.reshape_fns.flex_choose_i_and_col_nb`.

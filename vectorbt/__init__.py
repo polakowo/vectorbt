@@ -511,9 +511,6 @@ This software is for educational purposes only. Do not risk money which you are 
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
 """
 
-import importlib
-import pkgutil
-
 # Most important modules
 from vectorbt.generic import nb, plotting
 
@@ -528,23 +525,13 @@ from vectorbt.records import *
 from vectorbt.portfolio import *
 from vectorbt.labels import *
 
+# Import all submodules
+from vectorbt.utils.module import import_submodules
+
 # silence NumbaExperimentalFeatureWarning
 import warnings
 from numba.core.errors import NumbaExperimentalFeatureWarning
 
 warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
-
-
-def import_submodules(package):
-    """Import all submodules of a module, recursively, including subpackages."""
-    if isinstance(package, str):
-        package = importlib.import_module(package)
-    results = {}
-    for _, name, is_pkg in pkgutil.walk_packages(package.__path__, package.__name__ + '.'):
-        results[name] = importlib.import_module(name)
-        if is_pkg:
-            results.update(import_submodules(name))
-    return results
-
 
 import_submodules(__name__)

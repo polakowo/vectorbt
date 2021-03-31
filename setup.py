@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='vectorbt',
-    version='0.17.6',
+    version='0.17.7',
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
@@ -38,8 +38,10 @@ setup(
             'yfinance',
             'python-binance',
             'ccxt',
-            'empyrical',
             'ray',
+            'empyrical',
+            'ta',
+            'pandas_ta',
             'TA-Lib',
             'python-telegram-bot>=13.4'  # LGPLv3
         ],
