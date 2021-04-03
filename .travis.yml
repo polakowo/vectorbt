@@ -28,6 +28,8 @@ jobs:
       after_success:
         - codecov
     - stage: deploy-pypi
+      language: python
+      python: "3.7"
       deploy:
         - provider: pypi
           username: "__token__"
@@ -56,9 +58,9 @@ jobs:
             branch: master
 stages:
   - name: test
-    if: commit_message !~ /(travis skip-test)/
+    if: commit_message !~ /([ci skip-test])/
   - name: deploy-pypi
-    if: commit_message !~ /(travis skip-deploy-pypi)/
+    if: commit_message !~ /([ci skip-deploy-pypi])/
   - name: deploy-pages
-    if: commit_message !~ /(travis skip-deploy-pages)/
+    if: commit_message !~ /([ci skip-deploy-pages])/
 
