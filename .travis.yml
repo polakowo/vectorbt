@@ -58,9 +58,9 @@ jobs:
             branch: master
 stages:
   - name: test
-    if: commit_message !~ /([ci skip-test])/
+    if: commit_message !~ /(\[ci skip-test\]|\[travis skip-test\])/
   - name: deploy-pypi
-    if: commit_message !~ /([ci skip-deploy-pypi])/
+    if: commit_message !~ /(\[ci skip-deploy-pypi\]|\[travis skip-deploy-pypi\])/
   - name: deploy-pages
-    if: commit_message !~ /([ci skip-deploy-pages])/
+    if: commit_message !~ /(\[ci skip-deploy-pages\]|\[travis skip-deploy-pages\])/
 
