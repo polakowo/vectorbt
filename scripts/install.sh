@@ -10,3 +10,4 @@ pip install ray || true
 pip install ta || true
 pip install pandas_ta || true
 pip install TA-Lib || true
+pip install twine

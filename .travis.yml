@@ -22,7 +22,7 @@ jobs:
         - export NUMBA_DISABLE_JIT=1
         - pytest --cov=vectorbt tests/
         - codecov
-        - pip install twine
+        - python setup.py sdist bdist_wheel
         - twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
         - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
         - rm -rf !(docs)
