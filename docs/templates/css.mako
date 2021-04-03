@@ -80,7 +80,7 @@ a {
 }
 
 a:hover {
-    color: #31353f;
+    color: #e82;
 }
 
 .title code {
@@ -155,7 +155,7 @@ h1 code {
 
 #index h3 {
     padding-bottom: .5em;
-    border-bottom: 1px solid #31353f;
+    border-bottom: 1px solid #e82;
 }
 
 #index ul {
@@ -537,7 +537,7 @@ a.badge-dark.focus {
     background: #282c34 !important;
     border: none;
     border-radius: 6px;
-    border-bottom: 1px solid #31353f;
+    border-bottom: 1px solid #e82;
     outline: none;
 }
 
@@ -561,11 +561,11 @@ a.badge-dark.focus {
 }
 
 #index a:hover, .toc a:hover {
-    color: #31353f;
+    color: #e82;
 }
 
 #sidebar {
-    background: #3B4556;
+    background: #393f4a;
 }
 
 .toc ul ul, #index ul {

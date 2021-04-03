@@ -9,7 +9,7 @@
         color: white;
     }
     .homelink:hover {
-        color: #31353f;
+        color: #e82;
     }
     .homelink img {
         max-width: 128px;
@@ -25,5 +25,5 @@
 <link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-16x16.png">
 <link rel="manifest" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/site.webmanifest">
 <link rel="icon" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon.ico">
-<meta name="msapplication-TileColor" content="#31353f">
-<meta name="theme-color" content="#31353f">
+<meta name="msapplication-TileColor" content="#282c34">
+<meta name="theme-color" content="#282c34">
