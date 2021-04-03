@@ -1,47 +1,62 @@
-language: python
-python:
-  - "3.6"
-  - "3.7"
-  - "3.8"
-  - "3.9"
-install:
-  - curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
-  - tar -xzf ta-lib-0.4.0-src.tar.gz
-  - cd ta-lib/
-  - "./configure --prefix=/usr"
-  - make
-  - sudo make install
-  - cd ..
-  - pip install .[cov,docs] empyrical
-  - pip install ray || true
-  - pip install ta || true
-  - pip install pandas_ta || true
-  - pip install TA-Lib || true
-script:
-  - export NUMBA_BOUNDSCHECK=1
-  - pytest tests/
-  - export NUMBA_DISABLE_JIT=1
-  - pytest --cov=vectorbt tests/
-after_success:
-  - codecov
-  - twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
-  - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
-  - mv docs/vectorbt/* docs
-  - rmdir docs/vectorbt
-  - rm -rf !(docs)
-  - echo "<meta http-equiv=\"refresh\" content=\"0; url=./docs/index.html\" />" > index.html
-deploy:
-  - provider: pages
-    skip_cleanup: true
-    github_token: "$GITHUB_TOKEN"
-    keep_history: true
-    on:
-      branch: master
-  - provider: pypi
-    username: "__token__"
-    password:
-      secure: k+1Rs3iUivAanltzMx+SrMoXOv6dvsY2kxzCbLUN2vD3umaM2b6UECbnGnYEb3Y0Mmj0mxu37k9znvOSvbLsXYTZqk7KBFy9XPI+b6tSj7u7O+GlTAZta6VixnsZWlyuwUIbPTcNd82HqfLbhU/pOo9ZNzWDhg37LASKrIz//orJoJjYGfAEDU9u8BA7k7pcCcGp5N1a7O5Ab5Ecko5Q993oyxi+ernU/HBmvW6XZHKwub3TFXzUJBMeiCMVUtRdlEEteG32ydHcX2F+gKjLRQNE0hXicqUERyQ65ceCJlks+pgpCsvu9snR4MniKTfolZrrK4b8BRQ1S7OEk32qZ9ldOcjpVCruEyz8PxEGuAVU7J817tn6QjZdA5EBWg3RXnxZAcqyyNtFd1KK6hMfvUmQkgAeyG8UGP8XP9vmf8bqJnYAPhwCAavCcc6SHM72MF8WIOb5Lbgw39toFwNgPJAZUCWBRA7In2vP9Z1WC7HK3bcRmdIjZVAs2N55yFsQHOw6DO0sJwjmFyxgsG92K0hZ4rftRi2eRkq8JB6ZliFgUfjUlZrc8jTMB0pSDp2zzZaK/tj1lKFZ72f/jeS08B8g+34wNfhvfH8BW4fLkne2YuUKV9sPfaCPLUzN3odyVRLrpFetrwabBR7F/fg5N6VzpsxbUguQNXDBURrHlUo=
-    skip_existing: true
-    on:
-      branch: master
+jobs:
+  include:
+    - stage: test
+      language: python
+      python:
+        - "3.6"
+        - "3.7"
+        - "3.8"
+        - "3.9"
+      install:
+        - curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
+        - tar -xzf ta-lib-0.4.0-src.tar.gz
+        - cd ta-lib/
+        - "./configure --prefix=/usr"
+        - make
+        - sudo make install
+        - cd ..
+        - pip install .[cov,docs] empyrical
+        - pip install ray || true
+        - pip install ta || true
+        - pip install pandas_ta || true
+        - pip install TA-Lib || true
+      script:
+        - export NUMBA_BOUNDSCHECK=1
+        - pytest tests/
+        - export NUMBA_DISABLE_JIT=1
+        - pytest --cov=vectorbt tests/
+    - stage: deploy
+      language: python
+      python: "3.7"
+      install:
+        - pip install .[cov]
+      script:
+        - export NUMBA_DISABLE_JIT=1
+        - pytest --cov=vectorbt tests/
+        - codecov
+        - twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
+        - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
+        - rm -rf !(docs)
+        - mv docs/vectorbt/* docs
+        - rmdir docs/vectorbt
+        - mv docs/site/* .
+      deploy:
+        - provider: pages
+          skip_cleanup: true
+          github_token: "$GITHUB_TOKEN"
+          keep_history: true
+          on:
+            branch: master
+        - provider: pypi
+          username: "__token__"
+          password:
+            secure: k+1Rs3iUivAanltzMx+SrMoXOv6dvsY2kxzCbLUN2vD3umaM2b6UECbnGnYEb3Y0Mmj0mxu37k9znvOSvbLsXYTZqk7KBFy9XPI+b6tSj7u7O+GlTAZta6VixnsZWlyuwUIbPTcNd82HqfLbhU/pOo9ZNzWDhg37LASKrIz//orJoJjYGfAEDU9u8BA7k7pcCcGp5N1a7O5Ab5Ecko5Q993oyxi+ernU/HBmvW6XZHKwub3TFXzUJBMeiCMVUtRdlEEteG32ydHcX2F+gKjLRQNE0hXicqUERyQ65ceCJlks+pgpCsvu9snR4MniKTfolZrrK4b8BRQ1S7OEk32qZ9ldOcjpVCruEyz8PxEGuAVU7J817tn6QjZdA5EBWg3RXnxZAcqyyNtFd1KK6hMfvUmQkgAeyG8UGP8XP9vmf8bqJnYAPhwCAavCcc6SHM72MF8WIOb5Lbgw39toFwNgPJAZUCWBRA7In2vP9Z1WC7HK3bcRmdIjZVAs2N55yFsQHOw6DO0sJwjmFyxgsG92K0hZ4rftRi2eRkq8JB6ZliFgUfjUlZrc8jTMB0pSDp2zzZaK/tj1lKFZ72f/jeS08B8g+34wNfhvfH8BW4fLkne2YuUKV9sPfaCPLUzN3odyVRLrpFetrwabBR7F/fg5N6VzpsxbUguQNXDBURrHlUo=
+          skip_existing: true
+          on:
+            branch: master
+
+stages:
+  - name: test
+    if: commit_message !~ /(skip-test)/
+  - deploy
 

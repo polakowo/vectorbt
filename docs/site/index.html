@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="">
+    <meta name="author" content="Oleg Polakow">
+    <title>vectorbt · Hyperfast quantitative analysis</title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.6.0/css/bootstrap.min.css" integrity="sha512-P5MgMn1jBN01asBgU0z60Qk4QxiXo86+wlFahKrsQf37c9cro517WzVSPPV1tDKzhku2iJ2FVgL67wG03SGnNA==" crossorigin="anonymous" />
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    
+    <!-- Favicons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-16x16.png">
+    <link rel="manifest" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/site.webmanifest">
+    <link rel="icon" href="https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon.ico">
+    <meta name="msapplication-TileColor" content="#31353f">
+    <meta name="theme-color" content="#31353f">
+
+    <!-- Custom styles -->
+    <link href="assets/style.css" rel="stylesheet">
+</head>
+
+<body class="text-center">
+    <div id="particles-js"></div>
+    <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
+        <header class="masthead mb-auto">
+            <div class="inner">
+                <h3 class="masthead-brand">vectorbt</h3>
+                <nav class="nav nav-masthead justify-content-center">
+                    <a class="nav-link" href="https://www.patreon.com/vectorbt">Sponsor</a>
+                    <a class="nav-link active" href="#">Home</a>
+                    <a class="nav-link" href="https://polakowo.io/vectorbt/docs/index.html">Docs</a>
+                    <a class="nav-link" href="https://github.com/polakowo/vectorbt">GitHub</a>
+                </nav>
+            </div>
+        </header>
+
+        <main role="main" class="inner cover">
+            <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAACXBIWXMAAAOwAAADsAEnxA+tAAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAADSJJREFUeJztXVtzW9UV/vY58k12Lo0dWwRIWgZaWlqgtMND3/vU1z73pTP9BX3oU2lpC0wIBAKEXKAJEC4l3KETSoaQYYAUW0qcxIotx0loxgRy9U2+STpn98FxKtuSzpH2d46W3fM9ZEbK0Tpn5E9rrb3WXt9W8MAlINEAfON1nR803gfEf8OwBOAeAN/lmPrV736Ms980U2z99u5v8fv7hxe++Ut0I477TW3n8mr23l/fN65dtd7UFgAopf9geV1kA+2MmwGAirMsAWjkmRqZjNFsdcbzC9+I42vE8TOG7T1vJ5KsPz6AiSbb2elJAAvoIN0Qqo1lCTQCuC4wnrU5xgAkWnML37gXQwAoN9j9ZuI7DDtz0Dt7e3tHPQmgmAQQ6AEmJmNwXMUxBiDRVkQAG9NYj58w7B45vqpvcsr+EcMWgLyt8RQAeBIAzBDQyrIEGgFGJnjuHwAS8SICfB9JAOsYdv+2Y9M4ww4AQKlX0unUecAHAVyiB7AEEmB0nEcAW2m0xwv/e+N2dDLsXh6JXTkz3EzJIwBo11Vb51/4CQE8D8DKAWLw57t8YIRIgM7WPGyl514k0AsLP2DYfWjXpj4ATQxbGjgwmO4+Pv/az9coLwcgrgBGiSFgQQJ4F2YYNguOyh/8Yu2dDFsAoIBHi1+HmwOwPABzCUj0ADcI0IKLaOMs/fZ90NnjuCrBsAUgOdCXPFz8hicBNMsDNACK9YdjegAiAbrmawB3ox9AA8Pm9tc2rGLYAQCt9ObF74W2DJSYAAIBeAALs+jCXQx7x061DUxkbcoyEsDZzJ23vbX4zdBCgMQlIACMTvCKQF1tOeB29ECBUq17cMfGKww7AKCht2D/fmfx+xUJoOfc2BrGA1AJQMmH5zAyRvHUAIBEax64g7PuvzYWuzZwLv5zhi0AV5us/Iul/qMiASbnihiUMhmVALy/GUaJZeCOm/MZxECp1m1+/tYTADgdKqW2nThxYrLUf1UkwKzUIhDRA4ySPICtNBK/yF1l2HJc5fzz03W3M2wBmHJn3e3l/rMiAaiNIIEeQGtgjOQB2tfkdWytprjs1w+sTxYcdQvDFjT+PjiYKptLeCWBMvsAJA+QnbJRcDiNoERXXoGUnm57ZQPH9QNOQeknKl1QkQDUTqDAVQBzCXhTR877Ih84NRQfGh2P3U0xBuwf6kudqXRBRQKs9EYQkwBdJAI8sH3TNyAl3q7GVq9rvDyAvBBgg9YIolYB2/PeF3lgPGuP9Z1uvY/wONAaHw+mk91e1y2/HIBZA2BWAdvNPcCWPbf2AqB8Uwruo95XeRNAXg4gtBNoGgJcF+47H7ffRnqckwPpox/5udCrEsghQAxQrF+uUAIkOsxCwDuHOpJ5R93KeBYNtRmA9nNtKDmA1CLQyBiHAJYFdK4z8wBbX7iZxcbhtib3H34vDiUESCwCAcBolvOdt6/NoyHm6wdXEmfOt3x1ZbThp4xnURqPp1Ip3+6oLAH03MYreY0gZiuY5AFME8A/PrPpPChLPzXiFpqeq+YTZQkwOef+OY0ggfMAAG8ZaJIAZqfs7LH+NsqvH9DPZjKfT1TzibIEoDaCmPMAzByAlAQmDGoAT+zbkNIajF0/s8rRT1f7obIEsCTuBQSoOcAYiQC1egCtofcf6NxIeQilX+zvT1U9w1kpCZS3GxigeYCJKRv5AqkRVCMBPvi0PZUrqO8RHkE7WnuWfUuhLAGojSCBHoBZBq61BrBlzy21Lx2KoIF3T/cd7a/ls2UJ4K7wqWBqI6iGVcDZ4ebzl642ULaOKyhfZd9SqOQBaASwmBNBpB1crCqgUkDnuuo9wJ+f3XQOhLaWAj4b6Ov5otbPL68cgFkEInmAdasLaGp0q/rMzKw11XNy1T2M+7saNf/6gbAIwPIAzL2AdawBPP3qhqTWWEu4fSaTTn5gYiD4EGATG0FMD8CqAdRAgJff77yJce/rc37VuZ9FqFQK5kwEMVcAAvcCVOsBDn6x9thMzrqDcOuL09m2l02NBB4CqCsAogdgEaDaKuAjz2/k7B1T+omvvjpsPIFckgDURpBQD1CPEDD8bdOFC5caGVvHJ5ptZwfBTmkCUBtBQlvBrE5gNTWAB3duPA3KQlbt6u3tHTW3U4YA/xcTQaS9AH6rgDM5a/qz1BrGpG/e1u42gh0AZQhAbQQJ3QtAWwb69AC7X08ktaYMjr46L/DEQLkkUN5mUIBGgMlpG7m8eYRbu7qA5iZ/q7C97yYo36mtVU1Nn3IoSQCxE0GkEBB2Avhpcs2JqRnrh6b3UxoH0umeXlM7xShJAGojSGASyFsC+iPAQ7s3lhzNrhYutFHZtxTKeQBeI4g5EURqBNH2AvpIAL+93HDxPxeaGEu/ZCad+oRgZwGWTw4gcB6g04cH+OuuTRTBKG3Q8q2E5UMAgWVgLw+QL6jcoe41DMGoczd1tC4ReGIg2BAgtRFEI0BlD7D37UQPQ95daTx2+PDhgveV1aNcKZgnDccS4qYWgTjJhBcBdr2RYLR8rzbYub0EOyURaAiQuAIAgNEQysBfHl+Vzk7ZDPf/VDmBJwaWEEDsRJCweYDVbQ7izeWLQH/ZtZFRq58qNDhlBZ4YWEIAsY0gYWXgSjWAyyOxK2fOt5gv/RT2DB07dtnYTgUsIcCs1CKQNAJUiP8P76bIuzu261YUeGJgCQGY0nASdYEATh2g3E6ggqPyH31uLu+ugTfS6aNDpna8UCoJlFcDAGgEmJ6xMJMzFxkqpwnEkne33domfarFkm9CpDAUIG4gpFwIoMi7K3Xo1KnUl8Z2fGAJAZjScBIJEGQnkCXvrl2zvf7VIFAPQNsRzGwEBbgZlCTvfjKT7vkXwY4vBJsDSDwjKKDt4Cx59+t7/SlDo35QigDydAGYsjCEENDa4qAtvvDsBZK8+7Clp30LPDFQKgRwPACzESTMAyTWL/z10+Tdld6aTqc5cwM+UaoULK8RJI0Ai+L//g/X9xDk3cdzjXje0EbVCCwESFwBAJwQsNgDbHuZIe+unzmbSo2Z26kOCwhwvRHEaGHKJQChE1jcBzg1FB8aGY+ZjnrPKmfuMOewsYAAWalnBAkbCCmuAv6JIO+uoV6qReCJgQUEyEktAgkbCZtfAo5n7bGT5vLuOqatUMq+pWAteiGzESRsKHS+CvjYC7cYy7srjffS6S9PGT9UjVicBMrsA5A8wEzOwsyseSMo0Z6D68J9+2CHsby7i/DKvqWw4NtY8RNBhCVgS7OL1W0ORd5dAd2ZdPJz44cywAICiG0ECdIGnD8ciiLvrvTDxjYMsdgDyJsIsjC3OCWAUQPoas+x5N0z/SdT7xk/kCHk5wDSagAdOYq8u9J6CwwFnhhYTAB5IUCYNFxLs84R5N0vTk+u2mf8MAQEkwRagGKdfUn0AGOT5psKDh5ZkyXIu29jCDwxsLgUzOsDCGwEXRs1zyYvX2s0VfmYRMHaafwgJAQSAlZyEcgYGjsHBropp4wzcIMAYhtBArUBDZC3oZ+s90MU4wYBxDaChM0DmEADrzEFnhi4QQCxjSDmMrDOHiCm1eN1fYASuEEAkUUgQNxuoJqh8CFb4ImBYgKsaA8wm7MwNUM6drwGaNffYc5hQz4BhEnD1QZ9PJM+Shd4YuAGAcRKwwkbCasFCtbDCHGvfzUo9onyCGCBd0bQOMlQ9TjX1dH6Zr1u7oVAQgBtJIyqCkIsKFQDhceDEnhioNgDyBsJoyqD1cUDXGtUuT31uLFf8JeBFqBaKJZWQhk4UIEnBopLwbwjYliNIIHagFVgqtDgPBP2TasFPQRIPSQqbAJo6L1BCzwxYAGAnsu1OdJwUg+JCjcEOLEaD3MOGxYAZOfiP6VMJvWQKJZCuB8oqLfCEHhiwALI0nBCPUCoSaDliGv6lIN1/R95NQBApEK4D3zSf+Lov8O6mSksgNwHEHhUfL6gMDUTTh3AVfWd9KkW8wSQJwsD8JTBxmPQ4VTi+wZPJj8M5U4kWIDgiSBWIyik+K90uAJPDMx/MzIbQaS/Wzg1AP21hZnXQrgRFfQcgLYbaPltBQtd4ImB+bW/PA+wvAgwnmvCc0HfJAhwPQCzEbSc9gJqtb0eAk8MzJeC5TWCls928FldKNRF4IkBagiQOhEUZAjQwL5M5tiFwG4QMKzrjaAVPREUoAfQMW0vm7JvKVjXJ4I4jSCBNQAgwBxA4f16CjwxYM1KLQItg91Arss/zDlsWMxGkNQQEEQrWAHdg+nUZ3TDIcMSOxJG8gAFRyE7HUQjyHokAKOhwxI7ESS5EaQx2N/X/S7Zal1grfRGUCAJoKUegwCBJwYscEMA57dGnAjidwLVpWxb7CWy0bqBmgOodkxQDDWCVlEcGYuRf6n6yeEjR6a5NuuHmAYOAbhEsebABuB4XueFGGzMuVhjj5KdtBytFS0LjCG2g2UrQoQIESJEiBAhQoQIESJEiBAhQoQIESJEiBAhQoQIESJECAj/BQOpOG9o03XTAAAAAElFTkSuQmCC"/>
+            <h1 class="cover-heading">Hyperfast quantitative analysis.</h1>
+            <p class="lead">Ultimate Python library for time series analysis and backtesting at speed and scale.</p>
+            <p class="lead">
+                <a href="https://polakowo.io/vectorbt/docs/index.html" class="btn btn-lg btn-secondary">Documentation</a>
+            </p>
+        </main>
+
+        <footer class="mastfoot mt-auto">
+            <div class="inner">
+                <p>Built with <span style="color: #ED3833;">♥</span> by <a href="https://github.com/polakowo">@polakowo</a>. Licensed under the Apache 2.0 License.</p>
+            </div>
+        </footer>
+    </div>
+
+    <script src="assets/main.js"></script>
+
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-870JWHF40H"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+
+        gtag('config', 'G-870JWHF40H');
+    </script>
+</body>
+
+</html>

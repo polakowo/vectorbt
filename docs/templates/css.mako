@@ -80,7 +80,7 @@ a {
 }
 
 a:hover {
-    color: #e82;
+    color: #31353f;
 }
 
 .title code {
@@ -155,7 +155,7 @@ h1 code {
 
 #index h3 {
     padding-bottom: .5em;
-    border-bottom: 1px solid #e82;
+    border-bottom: 1px solid #31353f;
 }
 
 #index ul {
@@ -537,7 +537,7 @@ a.badge-dark.focus {
     background: #282c34 !important;
     border: none;
     border-radius: 6px;
-    border-bottom: 1px solid #e82;
+    border-bottom: 1px solid #31353f;
     outline: none;
 }
 
@@ -561,7 +561,7 @@ a.badge-dark.focus {
 }
 
 #index a:hover, .toc a:hover {
-    color: #e82;
+    color: #31353f;
 }
 
 #sidebar {

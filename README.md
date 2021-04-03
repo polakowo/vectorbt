@@ -10,7 +10,7 @@
 
 # vectorbt
 
-![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-128x128.png)
+![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-100x100.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
 accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale :fire:
@@ -432,7 +432,7 @@ sma_timeperiod    2    3
 
 ## Resources
 
-Head over to the [documentation](https://polakowo.io/vectorbt) to get started.
+Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
 
 ### Notebooks
 
