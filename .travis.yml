@@ -12,17 +12,17 @@ jobs:
       script:
         - export NUMBA_BOUNDSCHECK=1
         - pytest tests/
-        - export NUMBA_DISABLE_JIT=1
-        - pytest --cov=vectorbt tests/
     - stage: deploy
       language: python
       python: "3.7"
       install:
         - bash scripts/install.sh
       script:
+        - export NUMBA_BOUNDSCHECK=1
         - export NUMBA_DISABLE_JIT=1
         - pytest --cov=vectorbt tests/
         - codecov
+        - pip install twine
         - twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
         - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
         - rm -rf !(docs)
