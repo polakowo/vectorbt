@@ -28,9 +28,7 @@ a:hover {
 html,
 body {
     height: 100%;
-}
-
-body {
+    background-color: #282C34;
     color: #fff;
 }
 
@@ -93,6 +91,10 @@ body {
 .cover .btn-lg {
     padding: .75rem 1.25rem;
     font-weight: 700;
+}
+
+img.logo {
+    margin-top: 15px;
 }
 
 
