@@ -30,6 +30,7 @@ jobs:
     - stage: deploy-pypi
       language: python
       python: "3.7"
+      script: skip
       deploy:
         - provider: pypi
           skip_existing: true
