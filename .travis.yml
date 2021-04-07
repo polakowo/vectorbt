@@ -52,8 +52,8 @@ jobs:
         - mv docs/site/* .
       deploy:
         - provider: pages
-          cleanup: false
-          token: "$GITHUB_TOKEN"
+          skip_cleanup: true
+          github_token: "$GITHUB_TOKEN"
           keep_history: true
           on:
             branch: master
