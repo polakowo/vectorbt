@@ -30,6 +30,8 @@ jobs:
     - stage: deploy-pypi
       language: python
       python: "3.7"
+      install:
+        - pip --version
       deploy:
         - provider: pypi
           username: "__token__"
@@ -51,8 +53,8 @@ jobs:
         - mv docs/site/* .
       deploy:
         - provider: pages
-          skip_cleanup: true
-          github_token: "$GITHUB_TOKEN"
+          cleanup: false
+          token: "$GITHUB_TOKEN"
           keep_history: true
           on:
             branch: master
