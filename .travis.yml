@@ -36,6 +36,7 @@ jobs:
       deploy:
         - provider: pypi
           distributions: sdist bdist_wheel
+          skip_existing: true
           cleanup: false
           username: "__token__"
           password:
