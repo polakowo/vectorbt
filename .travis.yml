@@ -30,7 +30,7 @@ jobs:
     - stage: deploy-pypi
       language: python
       python: "3.7"
-      before_deploy:
+      install:
         - python setup.py sdist bdist_wheel
         - ls -l dist/
       deploy:
