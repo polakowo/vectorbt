@@ -1,7 +1,9 @@
 """Enum utilities."""
 
+from vectorbt.utils import typing as tp
 
-def caseins_getattr(enum, attr):
+
+def get_caseins_enum_attr(enum: tp.NamedTuple, attr: str) -> tp.Any:
     """Case-insensitive `getattr` for enumerated types."""
     lower_attr_keys = list(map(lambda x: x.lower(), enum._fields))
     attr_idx = lower_attr_keys.index(attr.lower())
@@ -9,15 +11,15 @@ def caseins_getattr(enum, attr):
     return getattr(enum, orig_attr)
 
 
-def convert_str_enum_value(enum, value):
-    """Converts any enumerated value of type string into integer.
+def prepare_enum_value(enum: tp.NamedTuple, value: tp.Any) -> tp.Any:
+    """Make sure that `value` is a proper enumerated value.
 
     `enum` is expected to be an instance of `collections.namedtuple`.
-    `value` can a string of any case, or a tuple/list of such."""
+    `value` can a string of any case or a tuple/list of such, otherwise returns unmodified value."""
 
     def _converter(x):
         if isinstance(x, str):
-            return caseins_getattr(enum, str(x))
+            return get_caseins_enum_attr(enum, str(x))
         return x
 
     if isinstance(value, str):
@@ -29,14 +31,14 @@ def convert_str_enum_value(enum, value):
         value = list(value)
         for i in range(len(value)):
             if isinstance(value[i], (tuple, list)):
-                value[i] = convert_str_enum_value(enum, value[i])
+                value[i] = prepare_enum_value(enum, value[i])
             else:
                 value[i] = _converter(value[i])
         return value_type(value)
     return value
 
 
-def to_value_map(enum):
+def to_value_map(enum: tp.NamedTuple) -> dict:
     """Create value map from enumerated type."""
     value_map = dict(zip(tuple(enum), enum._fields))
     if -1 not in value_map:

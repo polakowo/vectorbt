@@ -2,8 +2,10 @@
 
 import numpy as np
 
+from vectorbt.utils import typing as tp
 
-def rgb_from_cmap(cmap_name, value, value_range):
+
+def rgb_from_cmap(cmap_name: str, value: float, value_range: tp.Tuple[float, float]) -> str:
     """Map `value_range` to colormap with name `cmap_name` and get RGB of the `value` from that range."""
     import matplotlib.pyplot as plt
 
@@ -15,7 +17,7 @@ def rgb_from_cmap(cmap_name, value, value_range):
     return "rgb(%d,%d,%d)" % tuple(np.round(np.asarray(cmap(norm_value))[:3] * 255))
 
 
-def adjust_opacity(color, opacity):
+def adjust_opacity(color: tp.Any, opacity: float) -> str:
     """Adjust opacity of color."""
     import matplotlib.colors as mc
 
@@ -23,7 +25,7 @@ def adjust_opacity(color, opacity):
     return 'rgba(%d,%d,%d,%.4f)' % (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255), opacity)
 
 
-def adjust_lightness(color, amount=0.7):
+def adjust_lightness(color: tp.Any, amount: float = 0.7) -> str:
     """Lightens the given color by multiplying (1-luminosity) by the given amount.
 
     Input can be matplotlib color string, hex string, or RGB tuple.

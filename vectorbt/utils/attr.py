@@ -3,9 +3,10 @@
 import inspect
 
 from vectorbt.utils import checks
+from vectorbt.utils import typing as tp
 
 
-def deep_getattr(obj, attr_chain):
+def deep_getattr(obj: tp.Any, attr_chain: tp.Union[str, tuple, list]) -> tp.Any:
     """Retrieve attribute consecutively.
 
     `attr_chain` can be:
@@ -44,7 +45,9 @@ def deep_getattr(obj, attr_chain):
     return result
 
 
-def traverse_attr_kwargs(cls, key=None, value=None):
+def traverse_attr_kwargs(cls,
+                         key: tp.Optional[str] = None,
+                         value: tp.Optional[tp.Any] = None) -> tp.Dict[str, tp.Dict[str, tp.Any]]:
     """Traverse the class `cls` and its attributes for properties/methods with attribute `kwargs`,
     and optionally a specific `key` and `value`.
 
@@ -61,7 +64,7 @@ def traverse_attr_kwargs(cls, key=None, value=None):
         if hasattr(prop, 'kwargs'):
             kwargs = getattr(prop, 'kwargs')
             if key is None:
-                attrs[attr] = kwargs
+                attrs[attr] = kwargs.copy()
             else:
                 if key in kwargs:
                     if value is None:
@@ -73,7 +76,6 @@ def traverse_attr_kwargs(cls, key=None, value=None):
             if 'child_cls' in kwargs:
                 child_cls = kwargs['child_cls']
                 checks.assert_type(child_cls, type)
-                attrs[attr] = kwargs
+                attrs[attr] = kwargs.copy()
                 attrs[attr]['child_attrs'] = traverse_attr_kwargs(child_cls, key, value)
     return attrs
-

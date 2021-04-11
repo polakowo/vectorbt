@@ -8,6 +8,7 @@ import logging
 import inspect
 
 from vectorbt.utils.datetime import tzaware_to_naive_time
+from vectorbt.utils import checks, typing as tp
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ class CancelledError(asyncio.CancelledError):
 
 
 class AsyncJob(Job):
-    async def async_run(self):
+    async def async_run(self) -> tp.Any:
         """Async `Job.run`."""
         logger.info('Running job %s', self)
         ret = self.job_func()
@@ -30,12 +31,12 @@ class AsyncJob(Job):
 
 
 class AsyncScheduler(Scheduler):
-    async def async_run_pending(self):
+    async def async_run_pending(self) -> None:
         """Async `Scheduler.run_pending`."""
         runnable_jobs = (job for job in self.jobs if job.should_run)
         await asyncio.gather(*[self._async_run_job(job) for job in runnable_jobs])
 
-    async def async_run_all(self, delay_seconds=0):
+    async def async_run_all(self, delay_seconds: int = 0) -> None:
         """Async `Scheduler.run_all`."""
         logger.info('Running *all* %i jobs with %is delay in-between',
                     len(self.jobs), delay_seconds)
@@ -43,22 +44,26 @@ class AsyncScheduler(Scheduler):
             await self._async_run_job(job)
             await asyncio.sleep(delay_seconds)
 
-    async def _async_run_job(self, job):
+    async def _async_run_job(self, job: AsyncJob) -> None:
         """Async `Scheduler.run_job`."""
         ret = await job.async_run()
         if isinstance(ret, CancelJob) or ret is CancelJob:
             self.cancel_job(job)
 
-    def every(self, interval=1):
+    def every(self, interval: int = 1) -> AsyncJob:
         """Schedule a new periodic job of type `AsyncJob`."""
         job = AsyncJob(interval, self)
         return job
 
 
+AJT = tp.TypeVar('AJT', bound=AsyncJob)
+AST = tp.TypeVar('AST', bound=AsyncScheduler)
+
+
 class ScheduleManager:
     """Class that manages `schedule.Scheduler`."""
 
-    units = (
+    units: tp.ClassVar[tp.Tuple[str, ...]] = (
         "second",
         "seconds",
         "minute",
@@ -71,7 +76,7 @@ class ScheduleManager:
         "weeks"
     )
 
-    weekdays = (
+    weekdays: tp.ClassVar[tp.Tuple[str, ...]] = (
         "monday",
         "tuesday",
         "wednesday",
@@ -81,23 +86,25 @@ class ScheduleManager:
         "sunday",
     )
 
-    def __init__(self, scheduler=None):
+    def __init__(self, scheduler: tp.Optional[AsyncScheduler] = None) -> None:
         if scheduler is None:
             scheduler = AsyncScheduler()
+        checks.assert_type(scheduler, AsyncScheduler)
+
         self._scheduler = scheduler
         self._async_task = None
 
     @property
-    def scheduler(self):
+    def scheduler(self) -> AST:
         """Scheduler."""
         return self._scheduler
 
     @property
-    def async_task(self):
+    def async_task(self) -> tp.Optional[asyncio.Task]:
         """Current async task."""
         return self._async_task
 
-    def every(self, *args, to=None, until=None, tags=None):
+    def every(self, *args, to: int = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> AJT:
         """Create a new job that runs every `interval` units of time.
 
         `*args` can include at most four different arguments: `interval`, `unit`, `start_day`, and `at`,
@@ -222,8 +229,6 @@ class ScheduleManager:
             job = job.at(at)
         if to is not None:
             job = job.to(to)
-        if until is not None:
-            job = job.until(until)
         if tags is not None:
             if not isinstance(tags, tuple):
                 tags = (tags,)
@@ -231,7 +236,7 @@ class ScheduleManager:
 
         return job
 
-    def start(self, sleep=1):
+    def start(self, sleep: int = 1) -> None:
         """Run pending jobs in a loop."""
         logger.info("Starting schedule manager with jobs %s", str(self.scheduler.jobs))
         try:
@@ -241,7 +246,7 @@ class ScheduleManager:
         except (KeyboardInterrupt, asyncio.CancelledError):
             logger.info("Stopping schedule manager")
 
-    async def async_start(self, sleep=1):
+    async def async_start(self, sleep: int = 1) -> None:
         """Async run pending jobs in a loop."""
         logger.info("Starting schedule manager in the background with jobs %s", str(self.scheduler.jobs))
         logger.info("Jobs: %s", str(self.scheduler.jobs))
@@ -252,11 +257,11 @@ class ScheduleManager:
         except asyncio.CancelledError:
             logger.info("Stopping schedule manager")
 
-    def done_callback(self, async_task):
+    def done_callback(self, async_task: asyncio.Task) -> None:
         """Callback run when the async task is finished."""
         logger.info(async_task)
 
-    def start_in_background(self, **kwargs):
+    def start_in_background(self, **kwargs) -> None:
         """Run `ScheduleManager.async_start` in the background."""
         async_task = asyncio.create_task(self.async_start(**kwargs))
         async_task.add_done_callback(self.done_callback)
@@ -264,11 +269,11 @@ class ScheduleManager:
         self._async_task = async_task
 
     @property
-    def async_task_running(self):
+    def async_task_running(self) -> bool:
         """Whether the async task is running."""
         return self.async_task is not None and not self.async_task.done()
 
-    def stop(self):
+    def stop(self) -> None:
         """Stop the async task."""
         if self.async_task_running:
             self.async_task.cancel()

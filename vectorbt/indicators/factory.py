@@ -1107,7 +1107,7 @@ from vectorbt.utils.params import (
     create_param_product,
     DefaultParam
 )
-from vectorbt.utils.enum import convert_str_enum_value
+from vectorbt.utils.enum import prepare_enum_value
 from vectorbt.base import index_fns, reshape_fns, combine_fns
 from vectorbt.base.indexing import ParamIndexerFactory
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
@@ -1136,7 +1136,7 @@ def prepare_params(param_list, param_settings, input_shape=None, to_2d=False):
         is_tuple = _param_settings.get('is_tuple', False)
         dtype = _param_settings.get('dtype', None)
         if checks.is_namedtuple(dtype):
-            params = convert_str_enum_value(dtype, params)
+            params = prepare_enum_value(dtype, params)
         is_array_like = _param_settings.get('is_array_like', False)
         bc_to_input = _param_settings.get('bc_to_input', False)
         broadcast_kwargs = _param_settings.get('broadcast_kwargs', dict(require_kwargs=dict(requirements='W')))

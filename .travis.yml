@@ -29,7 +29,7 @@ jobs:
         - codecov
     - stage: deploy-pypi
       language: python
-      python: "3.7"
+      python: "3.6"
       script: skip
       deploy:
         - provider: pypi
@@ -41,9 +41,9 @@ jobs:
             branch: master
     - stage: deploy-pages
       language: python
-      python: "3.7"
+      python: "3.6"
       install:
-        - pip install .[docs]
+        - pip install .[full,docs]
       script:
         - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
         - rm -rf !(docs)
@@ -64,4 +64,6 @@ stages:
     if: commit_message !~ /(\[ci skip-deploy-pypi\]|\[travis skip-deploy-pypi\])/
   - name: deploy-pages
     if: commit_message !~ /(\[ci skip-deploy-pages\]|\[travis skip-deploy-pages\])/
-
+branches:
+  only:
+  - master

@@ -3,6 +3,9 @@
 %>
 
 <%def name="mobile()" filter="minify_css">
+:root {
+    --highlight-color: #e82;
+}
 .flex {
     display: flex !important;
 }
@@ -71,6 +74,16 @@ h3 {
 h4 {
     margin: 0;
     font-size: 105%;
+}
+
+h1:target,
+h2:target,
+h3:target,
+h4:target,
+h5:target,
+h6:target {
+    background: var(--highlight-color);
+    padding: .2em 0;
 }
 
 a {
@@ -220,6 +233,10 @@ dd p {
     background: #e0e0e0;
 }
 
+dt:target .name {
+    background: var(--highlight-color);
+}
+
 .name>span:first-child {
     white-space: nowrap;
 }
@@ -309,6 +326,10 @@ dd p {
 
 img {
     max-width: 100%;
+}
+
+td {
+    padding: 0 .5em;
 }
 
 .admonition {

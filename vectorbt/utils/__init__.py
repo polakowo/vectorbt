@@ -6,7 +6,6 @@ from vectorbt.utils.widgets import Figure, FigureWidget, make_subplots
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.image import save_animation
 from vectorbt.utils.schedule import AsyncJob, AsyncScheduler, CancelledError, ScheduleManager
-from vectorbt.utils.messaging import TelegramBot
 
 __all__ = [
     'atomic_dict',
@@ -24,8 +23,7 @@ __all__ = [
     'AsyncJob',
     'AsyncScheduler',
     'CancelledError',
-    'ScheduleManager',
-    'TelegramBot'
+    'ScheduleManager'
 ]
 
 __pdoc__ = {k: False for k in __all__}

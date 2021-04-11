@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.datetime import DatetimeTypes
+from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.widgets import FigureWidget
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
@@ -643,7 +643,7 @@ class Trades(Records):
             status = self_col.values['status']
 
             def get_duration_str(from_idx, to_idx):
-                if isinstance(self_col.wrapper.index, DatetimeTypes):
+                if isinstance(self_col.wrapper.index, DatetimeIndexes):
                     duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
                 elif self_col.wrapper.freq is not None:
                     duration = self_col.wrapper.to_time_units(to_idx - from_idx)

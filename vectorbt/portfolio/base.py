@@ -337,7 +337,7 @@ import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.enum import convert_str_enum_value
+from vectorbt.utils.enum import prepare_enum_value
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
@@ -823,10 +823,10 @@ class Portfolio(Wrapping):
             size = settings.portfolio['size']
         if size_type is None:
             size_type = settings.portfolio['signal_size_type']
-        size_type = convert_str_enum_value(SizeType, size_type)
+        size_type = prepare_enum_value(SizeType, size_type)
         if direction is None:
             direction = settings.portfolio['signal_direction']
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
@@ -851,14 +851,14 @@ class Portfolio(Wrapping):
             accumulate = settings.portfolio['accumulate']
         if conflict_mode is None:
             conflict_mode = settings.portfolio['conflict_mode']
-        conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
+        conflict_mode = prepare_enum_value(ConflictMode, conflict_mode)
         if close_first is None:
             close_first = settings.portfolio['close_first']
         if val_price is None:
             val_price = price
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
-        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -868,7 +868,7 @@ class Portfolio(Wrapping):
             cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = settings.portfolio['call_seq']
-        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        call_seq = prepare_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1191,10 +1191,10 @@ class Portfolio(Wrapping):
             size = settings.portfolio['size']
         if size_type is None:
             size_type = settings.portfolio['size_type']
-        size_type = convert_str_enum_value(SizeType, size_type)
+        size_type = prepare_enum_value(SizeType, size_type)
         if direction is None:
             direction = settings.portfolio['order_direction']
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
@@ -1219,7 +1219,7 @@ class Portfolio(Wrapping):
             val_price = price
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
-        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1229,7 +1229,7 @@ class Portfolio(Wrapping):
             cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = settings.portfolio['call_seq']
-        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        call_seq = prepare_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1560,7 +1560,7 @@ class Portfolio(Wrapping):
             target_shape = close.shape
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
-        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1570,7 +1570,7 @@ class Portfolio(Wrapping):
             cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = settings.portfolio['call_seq']
-        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        call_seq = prepare_enum_value(CallSeqType, call_seq)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually. "
@@ -1836,7 +1836,7 @@ class Portfolio(Wrapping):
     @cached_method
     def share_flow(self, direction='all', wrap_kwargs=None):
         """Get share flow series per column."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         share_flow = nb.share_flow_nb(
             self.wrapper.shape_2d,
             self.orders.values,
@@ -1848,7 +1848,7 @@ class Portfolio(Wrapping):
     @cached_method
     def shares(self, direction='all', wrap_kwargs=None):
         """Get share series per column."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         share_flow = to_2d(self.share_flow(direction='all'), raw=True)
         shares = nb.shares_nb(share_flow)
         if direction == Direction.LongOnly:
@@ -1860,7 +1860,7 @@ class Portfolio(Wrapping):
     @cached_method
     def pos_mask(self, direction='all', group_by=None, wrap_kwargs=None):
         """Get position mask per column/group."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         shares = to_2d(self.shares(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             pos_mask = to_2d(self.pos_mask(direction=direction, group_by=False), raw=True)
@@ -1873,7 +1873,7 @@ class Portfolio(Wrapping):
     @cached_method
     def pos_coverage(self, direction='all', group_by=None, wrap_kwargs=None):
         """Get position coverage per column/group."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         shares = to_2d(self.shares(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             pos_mask = to_2d(self.pos_mask(direction=direction, group_by=False), raw=True)
@@ -1967,7 +1967,7 @@ class Portfolio(Wrapping):
     @cached_method
     def holding_value(self, direction='all', group_by=None, wrap_kwargs=None):
         """Get holding value series per column/group."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         close = to_2d(self.close, raw=True).copy()
         shares = to_2d(self.shares(direction=direction), raw=True)
         close[shares == 0] = 0.  # for price being NaN

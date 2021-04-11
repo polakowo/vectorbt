@@ -88,7 +88,7 @@ import warnings
 
 from vectorbt.utils import checks
 from vectorbt.utils.config import Configured, merge_dicts
-from vectorbt.utils.datetime import to_timedelta, DatetimeTypes
+from vectorbt.utils.datetime import to_timedelta, DatetimeIndexes
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
 from vectorbt.base import index_fns, reshape_fns
@@ -398,7 +398,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             freq = settings.array_wrapper['freq']
         if freq is not None:
             return to_timedelta(freq)
-        if isinstance(self.index, DatetimeTypes):
+        if isinstance(self.index, DatetimeIndexes):
             if self.index.freq is not None:
                 try:
                     return to_timedelta(self.index.freq)

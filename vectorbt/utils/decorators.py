@@ -1,31 +1,35 @@
 """Class and function decorators."""
 
-from functools import wraps, lru_cache, RLock
+from functools import wraps, lru_cache
+from threading import RLock
 import inspect
 
-from vectorbt.utils import checks
+from vectorbt.utils import checks, typing as tp
 
 
 class class_or_instancemethod(classmethod):
     """Function decorator that binds `self` to a class if the function is called as class method,
     otherwise to an instance."""
 
-    def __get__(self, instance, type_):
+    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         descr_get = super().__get__ if instance is None else self.__func__.__get__
-        return descr_get(instance, type_)
+        return descr_get(instance, owner)
 
 
 class classproperty(object):
     """Property that can be called on a class."""
 
-    def __init__(self, f):
+    def __init__(self, f: tp.Callable) -> None:
         self.f = f
 
-    def __get__(self, obj, owner):
+    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         return self.f(owner)
 
 
-class custom_property():
+CPT = tp.TypeVar("CPT", bound="custom_property")
+
+
+class custom_property:
     """Custom extensible, read-only property.
 
     Can be called both as
@@ -44,30 +48,32 @@ class custom_property():
         for example, by disabling caching, will do the same for each instance of the class where
         the property has been defined."""
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls: tp.Type[CPT], *args, **kwargs) -> tp.Union[tp.Callable, CPT]:
         if len(args) == 0:
             return lambda func: cls(func, **kwargs)
         elif len(args) == 1:
             return super().__new__(cls)
-        else:
-            raise ValueError("Either function or keyword arguments must be passed")
+        raise ValueError("Either function or keyword arguments must be passed")
 
-    def __init__(self, func, **kwargs):
+    def __init__(self, func: tp.Callable, **kwargs) -> None:
         self.func = func
         self.name = func.__name__
         self.kwargs = kwargs
         self.__doc__ = getattr(func, '__doc__')
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
             return self
         return self.func(instance)
 
-    def __set__(self, obj, value):
+    def __set__(self, instance: tp.Any, value: tp.Any) -> None:
         raise AttributeError("can't set attribute")
 
+    def __call__(self, *args, **kwargs) -> tp.Any:
+        pass
 
-def is_caching_enabled(name, instance, func=None, **kwargs):
+
+def is_caching_enabled(name: str, instance: tp.Any, func: tp.Optional[tp.Callable] = None, **kwargs) -> bool:
     """Check whether caching is enabled for a cacheable property/function.
 
     Each condition has its own rank. A narrower condition has a lower (better) rank than a broader
@@ -183,24 +189,24 @@ class cached_property(custom_property):
         Assumes that the instance (provided as `self`) won't change. If calculation depends
         upon object attributes that can be changed, it won't notice the change."""
 
-    def __init__(self, func, **kwargs):
+    def __init__(self, func: tp.Callable, **kwargs) -> None:
         super().__init__(func, **kwargs)
         self.lock = RLock()
 
-    def clear_cache(self, instance):
+    def clear_cache(self, instance: tp.Any) -> None:
         """Clear the cache for this property belonging to `instance`."""
         if hasattr(instance, self.attrname):
             delattr(instance, self.attrname)
 
     @property
-    def attrname(self):
+    def attrname(self) -> str:
         """Get name of cached attribute."""
         return '__cached_' + self.name
 
-    def __set_name__(self, owner, name):
+    def __set_name__(self, owner: tp.Type, name: str) -> None:
         self.name = name
 
-    def __get__(self, instance, owner=None):
+    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
             return self
         if not is_caching_enabled(self.name, instance, **self.kwargs):
@@ -216,8 +222,11 @@ class cached_property(custom_property):
                     cache[self.attrname] = val
         return val
 
+    def __call__(self, *args, **kwargs) -> tp.Any:
+        pass
 
-def custom_method(*args, **kwargs):
+
+def custom_method(*args, **kwargs) -> tp.Callable:
     """Custom extensible method.
 
     Stores `**kwargs` as attributes of the wrapper function.
@@ -234,9 +243,9 @@ def custom_method(*args, **kwargs):
     ```
     """
 
-    def decorator(func):
+    def decorator(func: tp.Callable) -> tp.Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args, **kwargs) -> tp.Any:
             return func(*args, **kwargs)
 
         wrapper.func = func
@@ -248,11 +257,10 @@ def custom_method(*args, **kwargs):
         return decorator
     elif len(args) == 1:
         return decorator(args[0])
-    else:
-        raise ValueError("Either function or keyword arguments must be passed")
+    raise ValueError("Either function or keyword arguments must be passed")
 
 
-def cached_method(*args, maxsize=128, typed=False, **kwargs):
+def cached_method(*args, maxsize: int = 128, typed: bool = False, **kwargs) -> tp.Callable:
     """Extends `custom_method` with caching.
 
     Internally uses `functools.lru_cache`.
@@ -262,10 +270,10 @@ def cached_method(*args, maxsize=128, typed=False, **kwargs):
 
     See notes on `cached_property`."""
 
-    def decorator(func):
+    def decorator(func: tp.Callable) -> tp.Callable:
         @wraps(func)
-        def wrapper(instance, *args, **kwargs):
-            def partial_func(*args, **kwargs):
+        def wrapper(instance: tp.Any, *args, **kwargs) -> tp.Any:
+            def partial_func(*args, **kwargs) -> tp.Any:
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)
 
@@ -320,5 +328,4 @@ def cached_method(*args, maxsize=128, typed=False, **kwargs):
         return decorator
     elif len(args) == 1:
         return decorator(args[0])
-    else:
-        raise ValueError("Either function or keyword arguments must be passed")
+    raise ValueError("Either function or keyword arguments must be passed")

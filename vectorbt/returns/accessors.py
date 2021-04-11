@@ -44,7 +44,7 @@ from vectorbt.generic.accessors import (
     GenericSRAccessor,
     GenericDFAccessor
 )
-from vectorbt.utils.datetime import to_timedelta, DatetimeTypes
+from vectorbt.utils.datetime import to_timedelta, DatetimeIndexes
 from vectorbt.returns import nb, metrics
 
 
@@ -86,7 +86,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def daily(self, **kwargs):
         """Daily returns."""
-        checks.assert_type(self.wrapper.index, DatetimeTypes)
+        checks.assert_type(self.wrapper.index, DatetimeIndexes)
 
         if self.wrapper.freq == pd.Timedelta('1D'):
             return self._obj
@@ -94,7 +94,7 @@ class ReturnsAccessor(GenericAccessor):
 
     def annual(self, **kwargs):
         """Annual returns."""
-        checks.assert_type(self._obj.index, DatetimeTypes)
+        checks.assert_type(self._obj.index, DatetimeIndexes)
 
         if self.wrapper.freq == self.year_freq:
             return self._obj
