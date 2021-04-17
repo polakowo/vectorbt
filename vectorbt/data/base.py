@@ -215,7 +215,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from vectorbt.utils import checks
+from vectorbt.utils import checks, typing as tp
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.datetime import is_tz_aware, to_timezone
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
@@ -226,11 +226,15 @@ class symbol_dict(dict):
     pass
 
 
+DataT = tp.TypeVar("DataT", bound="Data")
+
+
 class Data(Wrapping):
     """Class that downloads, updates, and manages data coming from a data source."""
 
-    def __init__(self, wrapper, data, tz_localize=None, tz_convert=None, missing_index=None,
-                 missing_columns=None, download_kwargs=None, **kwargs):
+    def __init__(self, wrapper: ArrayWrapper, data: tp.DataBySymbol, tz_localize: tp.Optional[tp.TimezoneLike],
+                 tz_convert: tp.Optional[tp.TimezoneLike], missing_index: str, missing_columns: str,
+                 download_kwargs: dict, **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -253,52 +257,52 @@ class Data(Wrapping):
         self._missing_columns = missing_columns
         self._download_kwargs = download_kwargs
 
-    def indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: DataT, pd_indexing_func: tp.IndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
-        new_wrapper = pd_indexing_func(self.wrapper, **kwargs)
-        new_data = {k: pd_indexing_func(v, **kwargs) for k, v in self.data.items()}
+        new_wrapper = pd_indexing_func(self.wrapper)
+        new_data = {k: pd_indexing_func(v) for k, v in self.data.items()}
         return self.copy(
             wrapper=new_wrapper,
             data=new_data
         )
 
     @property
-    def data(self):
+    def data(self) -> tp.DataBySymbol:
         """Data dictionary keyed by symbol."""
         return self._data
 
     @property
-    def symbols(self):
+    def symbols(self) -> tp.List[tp.Symbol]:
         """List of symbols."""
         return list(self.data.keys())
 
     @property
-    def tz_localize(self):
+    def tz_localize(self) -> tp.Optional[tp.TimezoneLike]:
         """`tz_localize` initially passed to `Data.download_symbol`."""
         return self._tz_localize
 
     @property
-    def tz_convert(self):
+    def tz_convert(self) -> tp.Optional[tp.TimezoneLike]:
         """`tz_convert` initially passed to `Data.download_symbol`."""
         return self._tz_convert
 
     @property
-    def missing_index(self):
+    def missing_index(self) -> str:
         """`missing_index` initially passed to `Data.download_symbol`."""
         return self._missing_index
 
     @property
-    def missing_columns(self):
+    def missing_columns(self) -> str:
         """`missing_columns` initially passed to `Data.download_symbol`."""
         return self._missing_columns
 
     @property
-    def download_kwargs(self):
+    def download_kwargs(self) -> dict:
         """Keyword arguments initially passed to `Data.download_symbol`."""
         return self._download_kwargs
 
     @classmethod
-    def align_index(cls, data, missing='nan'):
+    def align_index(cls, data: tp.DataBySymbol, missing: str = 'nan') -> tp.DataBySymbol:
         """Align data to have the same index.
 
         The argument `missing` accepts the following values:
@@ -333,7 +337,7 @@ class Data(Wrapping):
         return new_data
 
     @classmethod
-    def align_columns(cls, data, missing='raise'):
+    def align_columns(cls, data: tp.DataBySymbol, missing: str = 'raise') -> tp.DataBySymbol:
         """Align data to have the same columns.
 
         See `Data.align_index` for `missing`."""
@@ -381,7 +385,7 @@ class Data(Wrapping):
         return new_data
 
     @classmethod
-    def select_symbol_kwargs(cls, symbol, kwargs):
+    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: dict) -> dict:
         """Select keyword arguments belonging to `symbol`."""
         _kwargs = dict()
         for k, v in kwargs.items():
@@ -393,16 +397,18 @@ class Data(Wrapping):
         return _kwargs
 
     @classmethod
-    def from_data(cls, data, tz_localize=None, tz_convert=None, missing_index=None,
-                  missing_columns=None, wrapper_kwargs=None, **kwargs):
+    def from_data(cls: tp.Type[DataT], data: tp.DataBySymbol, tz_localize: tp.Optional[tp.TimezoneLike] = None,
+                  tz_convert: tp.Optional[tp.TimezoneLike] = None, missing_index: tp.Optional[str] = None,
+                  missing_columns: tp.Optional[str] = None, wrapper_kwargs: tp.Optional[dict] = None,
+                  **kwargs) -> DataT:
         """Create a new `Data` instance from (aligned) data.
 
         Args:
             data (dict): Dictionary of array-like objects keyed by symbol.
-            tz_localize (any): If the index is tz-naive, convert to a timezone.
+            tz_localize (timezone_like): If the index is tz-naive, convert to a timezone.
 
                 See `vectorbt.utils.datetime.to_timezone`.
-            tz_convert (any): Convert the index from one timezone to another.
+            tz_convert (timezone_like): Convert the index from one timezone to another.
 
                 See `vectorbt.utils.datetime.to_timezone`.
 
@@ -467,17 +473,19 @@ class Data(Wrapping):
         )
 
     @classmethod
-    def download_symbol(cls, symbol, **kwargs):
+    def download_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         """Abstract method to download a symbol."""
         raise NotImplementedError
 
     @classmethod
-    def download(cls, symbols, tz_localize=None, tz_convert=None, missing_index=None,
-                 missing_columns=None, wrapper_kwargs=None, **kwargs):
+    def download(cls: tp.Type[DataT], symbols: tp.Symbols, tz_localize: tp.Optional[tp.TimezoneLike] = None,
+                 tz_convert: tp.Optional[tp.TimezoneLike] = None, missing_index: tp.Optional[str] = None,
+                 missing_columns: tp.Optional[str] = None, wrapper_kwargs: tp.Optional[dict] = None,
+                 **kwargs) -> DataT:
         """Download data using `Data.download_symbol`.
 
         Args:
-            symbols (any or list of any): One or multiple symbols.
+            symbols (hashable or list of hashable): One or multiple symbols.
 
                 !!! note
                     Tuple is considered as a single symbol.
@@ -512,11 +520,11 @@ class Data(Wrapping):
             download_kwargs=kwargs
         )
 
-    def update_symbol(self, symbol, **kwargs):
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         """Abstract method to update a symbol."""
         raise NotImplementedError
 
-    def update(self, **kwargs):
+    def update(self: DataT, **kwargs) -> DataT:
         """Update the data using `Data.update_symbol`.
 
         Args:
@@ -582,7 +590,7 @@ class Data(Wrapping):
         )
 
     @cached_method
-    def concat(self, level_name='symbol'):
+    def concat(self, level_name: str = 'symbol') -> tp.DataByColumn:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         first_data = self.data[self.symbols[0]]
         index = first_data.index
@@ -613,7 +621,7 @@ class Data(Wrapping):
 
         return new_data
 
-    def get(self, column=None, **kwargs):
+    def get(self, column: tp.Optional[tp.Column] = None, **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get column data.
 
         If one symbol, returns data for that symbol.

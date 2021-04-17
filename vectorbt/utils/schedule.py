@@ -56,10 +56,6 @@ class AsyncScheduler(Scheduler):
         return job
 
 
-AsyncJobT = tp.TypeVar('AsyncJobT', bound=AsyncJob)
-AsyncSchedulerT = tp.TypeVar('AsyncSchedulerT', bound=AsyncScheduler)
-
-
 class ScheduleManager:
     """Class that manages `schedule.Scheduler`."""
 
@@ -95,7 +91,7 @@ class ScheduleManager:
         self._async_task = None
 
     @property
-    def scheduler(self) -> AsyncSchedulerT:
+    def scheduler(self) -> AsyncScheduler:
         """Scheduler."""
         return self._scheduler
 
@@ -104,7 +100,8 @@ class ScheduleManager:
         """Current async task."""
         return self._async_task
 
-    def every(self, *args, to: int = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> AsyncJobT:
+    def every(self, *args, to: tp.Optional[int] = None,
+              tags: tp.Optional[tp.Iterable[tp.Hashable]] = None) -> AsyncJob:
         """Create a new job that runs every `interval` units of time.
 
         `*args` can include at most four different arguments: `interval`, `unit`, `start_day`, and `at`,

@@ -7,6 +7,7 @@ import time
 import warnings
 from functools import wraps
 
+from vectorbt.utils import typing as tp
 from vectorbt.utils.datetime import (
     get_utc_tz,
     get_local_tz,
@@ -16,17 +17,28 @@ from vectorbt.utils.datetime import (
 from vectorbt.utils.config import merge_dicts, get_func_kwargs
 from vectorbt.data.base import Data
 
+try:
+    from binance.client import Client as ClientT
+except ImportError:
+    ClientT = tp.Any
+try:
+    from ccxt.base.exchange import Exchange as ExchangeT
+except ImportError:
+    ExchangeT = tp.Any
+
 
 class SyntheticData(Data):
     """`Data` for synthetically generated data."""
 
     @classmethod
-    def generate_symbol(cls, symbol, index, **kwargs):
+    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
         """Abstract method to generate a symbol."""
         raise NotImplementedError
 
     @classmethod
-    def download_symbol(cls, symbol, start=0, end='now', freq=None, date_range_kwargs=None, **kwargs):
+    def download_symbol(cls, symbol: tp.Symbol, start: tp.DatetimeLike = 0, end: tp.DatetimeLike = 'now',
+                        freq: tp.Union[None, str, pd.DateOffset] = None, date_range_kwargs: tp.Optional[dict] = None,
+                        **kwargs) -> tp.SeriesFrame:
         """Download the symbol.
 
         Generates datetime index and passes it to `SyntheticData.generate_symbol` to fill
@@ -43,7 +55,7 @@ class SyntheticData(Data):
             raise ValueError("Date range is empty")
         return cls.generate_symbol(symbol, index, **kwargs)
 
-    def update_symbol(self, symbol, **kwargs):
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `SyntheticData.download_symbol`."""
@@ -53,7 +65,8 @@ class SyntheticData(Data):
         return self.download_symbol(symbol, **kwargs)
 
 
-def generate_gbm_paths(S0, mu, sigma, T, M, I, seed=None):
+def generate_gbm_paths(S0: float, mu: float, sigma: float, T: int, M: int, I: int,
+                       seed: tp.Optional[int] = None) -> tp.Array2d:
     """Generate using Geometric Brownian Motion (GBM).
 
     See https://stackoverflow.com/a/45036114/8141780."""
@@ -106,7 +119,9 @@ class GBMData(SyntheticData):
     ```"""
 
     @classmethod
-    def generate_symbol(cls, symbol, index, S0=100., mu=0., sigma=0.05, T=None, I=1, seed=None):
+    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, S0: float = 100., mu: float = 0.,
+                        sigma: float = 0.05, T: tp.Optional[int] = None, I: int = 1,
+                        seed: tp.Optional[int] = None) -> tp.SeriesFrame:
         """Generate the symbol using `generate_gbm_paths`.
 
         Args:
@@ -131,7 +146,7 @@ class GBMData(SyntheticData):
         columns = pd.RangeIndex(stop=out.shape[1], name='path')
         return pd.DataFrame(out, index=index, columns=columns)
 
-    def update_symbol(self, symbol, **kwargs):
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `GBMData.download_symbol`."""
@@ -216,11 +231,13 @@ class YFData(Data):
     """
 
     @classmethod
-    def download_symbol(cls, symbol, period='max', start=None, end=None, **kwargs):
+    def download_symbol(cls, symbol: tp.Symbol, period: str = 'max', start: tp.Optional[tp.DatetimeLike] = None,
+                        end: tp.Optional[tp.DatetimeLike] = None, **kwargs) -> tp.Frame:
         """Download the symbol.
 
         Args:
             symbol (str): Symbol.
+            period (str): Period.
             start (any): Start datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
@@ -239,7 +256,7 @@ class YFData(Data):
 
         return yf.Ticker(symbol).history(period=period, start=start, end=end, **kwargs)
 
-    def update_symbol(self, symbol, **kwargs):
+    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Frame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `YFData.download_symbol`."""
@@ -247,6 +264,9 @@ class YFData(Data):
         download_kwargs['start'] = self.data[symbol].index[-1]
         kwargs = merge_dicts(download_kwargs, kwargs)
         return self.download_symbol(symbol, **kwargs)
+
+
+BinanceDataT = tp.TypeVar("BinanceDataT", bound="BinanceData")
 
 
 class BinanceData(Data):
@@ -359,7 +379,8 @@ class BinanceData(Data):
     ```"""
 
     @classmethod
-    def download(cls, symbols, client=None, **kwargs):
+    def download(cls: tp.Type[BinanceDataT], symbols: tp.Symbols, client: tp.Optional["ClientT"] = None,
+                 **kwargs) -> BinanceDataT:
         """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
         from binance.client import Client
         from vectorbt import settings
@@ -374,8 +395,10 @@ class BinanceData(Data):
         return super(BinanceData, cls).download(symbols, client=client, **kwargs)
 
     @classmethod
-    def download_symbol(cls, symbol, client=None, interval=None, start=0, end='now UTC',
-                        delay=500, limit=500, show_progress=True):
+    def download_symbol(cls, symbol: str, client: tp.Optional["ClientT"] = None,
+                        interval: tp.Optional[str] = None, start: tp.DatetimeLike = 0,
+                        end: tp.DatetimeLike = 'now UTC', delay: tp.Optional[float] = 500,
+                        limit: int = 500, show_progress: bool = True) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -392,7 +415,7 @@ class BinanceData(Data):
             end (any): End datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            delay (int or float): Time to sleep after each request (in milliseconds).
+            delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
         """
@@ -415,11 +438,11 @@ class BinanceData(Data):
             next_start_ts = start_ts
         end_ts = datetime_to_ms(to_tzaware_datetime(end, tz=get_utc_tz()))
 
-        def _ts_to_str(ts):
+        def _ts_to_str(ts: tp.DatetimeLike) -> str:
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
         # Iteratively collect the data
-        data = []
+        data: tp.List[list] = []
         with tqdm(disable=not show_progress) as pbar:
             pbar.set_description(_ts_to_str(start_ts))
             while True:
@@ -480,7 +503,7 @@ class BinanceData(Data):
 
         return df
 
-    def update_symbol(self, symbol, **kwargs):
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `BinanceData.download_symbol`."""
@@ -541,8 +564,11 @@ class CCXTData(Data):
     ```"""
 
     @classmethod
-    def download_symbol(cls, symbol, exchange='binance', config=None, timeframe='1d', start=0,
-                        end='now UTC', delay=None, limit=500, retries=3, show_progress=True, params=None):
+    def download_symbol(cls, symbol: str, exchange: tp.Union[str, "ExchangeT"] = 'binance',
+                        config: tp.Optional[dict] = None, timeframe: str = '1d',
+                        start: tp.DatetimeLike = 0, end: tp.DatetimeLike = 'now UTC',
+                        delay: tp.Optional[float] = None, limit: tp.Optional[int] = 500, retries: int = 3,
+                        show_progress: bool = True, params: tp.Optional[dict] = None) -> tp.Frame:
         """Download the symbol.
 
         Args:
@@ -561,7 +587,7 @@ class CCXTData(Data):
             end (any): End datetime.
 
                 See `vectorbt.utils.datetime.to_tzaware_datetime`.
-            delay (int or float): Time to sleep after each request (in milliseconds).
+            delay (float): Time to sleep after each request (in milliseconds).
 
                 !!! note
                     Use only if `enableRateLimit` is not set.
@@ -639,7 +665,7 @@ class CCXTData(Data):
             return str(pd.Timestamp(to_tzaware_datetime(ts, tz=get_utc_tz())))
 
         # Iteratively collect the data
-        data = []
+        data: tp.List[list] = []
         with tqdm(disable=not show_progress) as pbar:
             pbar.set_description(_ts_to_str(start_ts))
             while True:
@@ -682,7 +708,7 @@ class CCXTData(Data):
 
         return df
 
-    def update_symbol(self, symbol, **kwargs):
+    def update_symbol(self, symbol: str, **kwargs) -> tp.Frame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `CCXTData.download_symbol`."""

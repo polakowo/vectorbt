@@ -96,7 +96,6 @@ from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
-WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 IMT = tp.Tuple[ArrayWrapperT, tp.MaybeArray1d, tp.MaybeArray1d, tp.Array1d]
 
 
@@ -148,8 +147,8 @@ class ArrayWrapper(Configured, PandasIndexer):
 
     @cached_method
     def indexing_func_meta(self: ArrayWrapperT, pd_indexing_func: tp.IndexingFunc, index: tp.Optional[tp.Index] = None,
-                            columns: tp.Optional[tp.Index] = None, column_only_select: tp.Optional[bool] = None,
-                            group_select: tp.Optional[bool] = None, group_by: tp.GroupByLike = None) -> IMT:
+                           columns: tp.Optional[tp.Index] = None, column_only_select: tp.Optional[bool] = None,
+                           group_select: tp.Optional[bool] = None, group_by: tp.GroupByLike = None) -> IMT:
         """Perform indexing on `ArrayWrapper` and also return indexing metadata.
 
         Takes into account column grouping.
@@ -560,6 +559,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         """Create a dummy Series/DataFrame."""
         _self = self.resolve(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
+
+
+WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 
 class Wrapping(Configured, PandasIndexer):

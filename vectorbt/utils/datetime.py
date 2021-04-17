@@ -60,7 +60,7 @@ def convert_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
-def is_tz_aware(dt: datetime) -> bool:
+def is_tz_aware(dt: tp.Union[tp.DatetimeLikeIndex, datetime]) -> bool:
     """Whether datetime is timezone-aware."""
     return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
 

@@ -117,6 +117,9 @@ FrequencyLike = Union[str, float, pd.Timedelta, timedelta, np.timedelta64, DateO
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]
 """Any object that can be coerced into a timezone."""
 
+DatetimeLikeIndex = Union[pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex]
+"""Any datetime-like index."""
+
 DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
 """Any object that can be coerced into a datetime."""
 
@@ -131,3 +134,22 @@ Shape = Tuple[int, ...]
 
 NameIndex = Union[None, Any, Index]
 """Name or index."""
+
+Symbol = Hashable
+"""Single data symbol."""
+
+Symbols = Sequence[Symbol]
+"""Multiple data symbols."""
+
+DataBySymbol = Dict[Symbol, SeriesFrame]
+"""Dict of Series or DataFrames by symbol."""
+
+Column = Hashable
+"""Single data column."""
+
+Columns = Sequence[Column]
+"""Multiple data columns."""
+
+DataByColumn = Dict[Column, SeriesFrame]
+"""Dict of Series or DataFrames by column."""
+

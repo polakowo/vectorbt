@@ -2,8 +2,10 @@
 
 import logging
 
+from vectorbt.utils import typing as tp
 from vectorbt.utils.schedule import ScheduleManager
 from vectorbt.utils.config import Configured
+from vectorbt.data.base import Data
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +90,7 @@ class DataUpdater(Configured):
     Freq: S, Length: 83, dtype: float64
     ```
     """
-    def __init__(self, data, schedule_manager=None, **kwargs):
+    def __init__(self, data: Data, schedule_manager: tp.Optional[ScheduleManager] = None, **kwargs) -> None:
         Configured.__init__(
             self,
             data=data,
@@ -101,20 +103,20 @@ class DataUpdater(Configured):
         self._schedule_manager = schedule_manager
 
     @property
-    def data(self):
+    def data(self) -> Data:
         """Data instance.
 
         See `vectorbt.data.base.Data`."""
         return self._data
 
     @property
-    def schedule_manager(self):
+    def schedule_manager(self) -> ScheduleManager:
         """Schedule manager instance.
 
         See `vectorbt.utils.schedule.ScheduleManager`."""
         return self._schedule_manager
 
-    def update(self, **kwargs):
+    def update(self, **kwargs) -> None:
         """Method that updates data.
 
         Override to do pre- and postprocessing.
@@ -125,7 +127,8 @@ class DataUpdater(Configured):
         new_index = self.data.wrapper.index
         logger.info(f"Updated data has {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
-    def update_every(self, *args, to=None, tags=None, in_background=False, start_kwargs=None, **kwargs):
+    def update_every(self, *args, to: int = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
+                     in_background: bool = False, start_kwargs: dict = None, **kwargs) -> None:
         """Schedule `DataUpdater.update`.
 
         For `*args`, `to` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
