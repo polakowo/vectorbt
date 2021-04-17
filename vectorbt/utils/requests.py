@@ -7,8 +7,7 @@ from urllib.parse import urlencode
 from vectorbt.utils import typing as tp
 
 
-def requests_retry_session(retries: int = 3,
-                           backoff_factor: float = 0.3,
+def requests_retry_session(retries: int = 3, backoff_factor: float = 0.3,
                            status_forcelist: tp.Tuple[int, ...] = (500, 502, 504),
                            session: tp.Optional[requests.Session] = None) -> requests.Session:
     """Retry `retries` times if unsuccessful."""

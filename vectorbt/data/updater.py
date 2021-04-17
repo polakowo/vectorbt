@@ -125,10 +125,10 @@ class DataUpdater(Configured):
         new_index = self.data.wrapper.index
         logger.info(f"Updated data has {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
-    def update_every(self, *args, to=None, until=None, tags=None, in_background=False, start_kwargs=None, **kwargs):
+    def update_every(self, *args, to=None, tags=None, in_background=False, start_kwargs=None, **kwargs):
         """Schedule `DataUpdater.update`.
 
-        For `*args`, `to`, `until` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
+        For `*args`, `to` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
 
         If `in_background` is set to True, starts in the background as an `asyncio` task.
         The task can be stopped with `vectorbt.utils.schedule.ScheduleManager.stop`.
@@ -136,7 +136,7 @@ class DataUpdater(Configured):
         `**kwargs` are passed to `DataUpdater.update`."""
         if start_kwargs is None:
             start_kwargs = {}
-        self.schedule_manager.every(*args, to=to, until=until, tags=tags).do(self.update, **kwargs)
+        self.schedule_manager.every(*args, to=to, tags=tags).do(self.update, **kwargs)
         if in_background:
             self.schedule_manager.start_in_background(**start_kwargs)
         else:

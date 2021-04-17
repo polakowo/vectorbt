@@ -8,7 +8,7 @@ one can manipulate complex classes with dozens of pandas objects using a single 
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import checks
+from vectorbt.utils import checks, typing as tp
 from vectorbt.base import index_fns, reshape_fns
 
 
@@ -16,33 +16,60 @@ class IndexingError(Exception):
     """Exception raised when an indexing error has occurred."""
 
 
-class _iLoc:
-    """Forwards `pd.Series.iloc`/`pd.DataFrame.iloc`
-    operation to each Series/DataFrame and returns a new class instance."""
+IndexingBaseT = tp.TypeVar("IndexingBaseT", bound="IndexingBase")
 
-    def __init__(self, obj, indexing_func, **kwargs):
-        self._obj = obj
+
+class IndexingBase:
+    """Class that supports indexing through `IndexingBase.indexing_func`."""
+
+    def indexing_func(self: IndexingBaseT, pd_indexing_func: tp.Func, **kwargs) -> IndexingBaseT:
+        """Apply `pd_indexing_func` on all pandas objects in question and return a new instance of the class.
+
+        Should be overridden."""
+        raise NotImplementedError
+
+
+class LocBase:
+    """Class that implements location-based indexing."""
+
+    def __init__(self, indexing_func: tp.Func, **kwargs) -> None:
         self._indexing_func = indexing_func
         self._indexing_kwargs = kwargs
 
-    def __getitem__(self, key):
-        return self._indexing_func(lambda x: x.iloc.__getitem__(key), **self._indexing_kwargs)
+    @property
+    def indexing_func(self) -> tp.Func:
+        """Indexing function."""
+        return self._indexing_func
+
+    @property
+    def indexing_kwargs(self) -> dict:
+        """Keyword arguments passed to `LocBase.indexing_func`."""
+        return self._indexing_kwargs
+
+    def __getitem__(self, key: tp.Any) -> tp.Any:
+        raise NotImplementedError
 
 
-class _Loc:
-    """Forwards `pd.Series.loc`/`pd.DataFrame.loc`
-    operation to each Series/DataFrame and returns a new class instance."""
+class iLoc(LocBase):
+    """Forwards `pd.Series.iloc`/`pd.DataFrame.iloc` operation to each
+    Series/DataFrame and returns a new class instance."""
 
-    def __init__(self, obj, indexing_func, **kwargs):
-        self._obj = obj
-        self._indexing_func = indexing_func
-        self._indexing_kwargs = kwargs
-
-    def __getitem__(self, key):
-        return self._indexing_func(lambda x: x.loc.__getitem__(key), **self._indexing_kwargs)
+    def __getitem__(self, key: tp.Any) -> tp.Any:
+        return self.indexing_func(lambda x: x.iloc.__getitem__(key), **self.indexing_kwargs)
 
 
-class PandasIndexer:
+class Loc(LocBase):
+    """Forwards `pd.Series.loc`/`pd.DataFrame.loc` operation to each
+    Series/DataFrame and returns a new class instance."""
+
+    def __getitem__(self, key: tp.Any) -> tp.Any:
+        return self.indexing_func(lambda x: x.loc.__getitem__(key), **self.indexing_kwargs)
+
+
+PandasIndexerT = tp.TypeVar("PandasIndexerT", bound="PandasIndexer")
+
+
+class PandasIndexer(IndexingBase):
     """Implements indexing using `iloc`, `loc`, `xs` and `__getitem__`.
 
     ## Example
@@ -57,7 +84,7 @@ class PandasIndexer:
     ...         self.df2 = df2
     ...         super().__init__()
     ...
-    ...     def _indexing_func(self, pd_indexing_func):
+    ...     def indexing_func(self, pd_indexing_func):
     ...         return self.__class__(
     ...             pd_indexing_func(self.df1),
     ...             pd_indexing_func(self.df2)
@@ -82,59 +109,70 @@ class PandasIndexer:
     ```
     """
 
-    def __init__(self,  **kwargs):
-        self._iloc = _iLoc(self, self._indexing_func, **kwargs)
-        self._loc = _Loc(self, self._indexing_func, **kwargs)
+    def __init__(self, **kwargs) -> None:
+        self._iloc = iLoc(self.indexing_func, **kwargs)
+        self._loc = Loc(self.indexing_func, **kwargs)
         self._indexing_kwargs = kwargs
 
     @property
-    def iloc(self):
-        return self._iloc
-
-    iloc.__doc__ = _iLoc.__doc__
+    def indexing_kwargs(self) -> dict:
+        """Indexing keyword arguments."""
+        return self._indexing_kwargs
 
     @property
-    def loc(self):
+    def iloc(self) -> iLoc:
+        """Purely integer-location based indexing for selection by position."""
+        return self._iloc
+
+    iloc.__doc__ = iLoc.__doc__
+
+    @property
+    def loc(self) -> Loc:
+        """Purely label-location based indexer for selection by label."""
         return self._loc
 
-    loc.__doc__ = _Loc.__doc__
+    loc.__doc__ = Loc.__doc__
 
-    def xs(self, *args, **kwargs):
+    def xs(self: PandasIndexerT, *args, **kwargs) -> PandasIndexerT:
         """Forwards `pd.Series.xs`/`pd.DataFrame.xs`
         operation to each Series/DataFrame and returns a new class instance."""
-        return self._indexing_func(lambda x: x.xs(*args, **kwargs), **self._indexing_kwargs)
+        return self.indexing_func(lambda x: x.xs(*args, **kwargs), **self.indexing_kwargs)
 
-    def __getitem__(self, key):
-        return self._indexing_func(lambda x: x.__getitem__(key), **self._indexing_kwargs)
-
-    def _indexing_func(self, pd_indexing_func, **kwargs):
-        """Apply `pd_indexing_func` on all pandas objects in question
-        and return a new instance of the class.
-
-        Replace by your custom function."""
-        raise NotImplementedError
+    def __getitem__(self: PandasIndexerT, key: tp.Any) -> PandasIndexerT:
+        return self.indexing_func(lambda x: x.__getitem__(key), **self.indexing_kwargs)
 
 
-class _ParamLoc:
+class ParamLoc(LocBase):
     """Access a group of columns by parameter using `pd.Series.loc`.
 
     Uses `mapper` to establish link between columns and parameter values."""
 
-    def __init__(self, obj, mapper, indexing_func, level_name=None, **kwargs):
+    def __init__(self, mapper: tp.Series, indexing_func: tp.Func,
+                 level_name: tp.Optional[tp.Level] = None, **kwargs) -> None:
         checks.assert_type(mapper, pd.Series)
 
-        self._obj = obj
         if mapper.dtype == 'O':
             # If params are objects, we must cast them to string first
             # The original mapper isn't touched
             mapper = mapper.astype(str)
         self._mapper = mapper
-        self._indexing_func = indexing_func
         self._level_name = level_name
-        self._indexing_kwargs = kwargs
 
-    def get_indices(self, key):
-        if self._mapper.dtype == 'O':
+        LocBase.__init__(self, indexing_func, **kwargs)
+
+    @property
+    def mapper(self) -> tp.Series:
+        """Mapper."""
+        return self._mapper
+
+    @property
+    def level_name(self) -> tp.Optional[tp.Level]:
+        """Level name."""
+        return self._level_name
+
+    def get_indices(self, key: tp.Any) -> tp.Array1d:
+        """Get array of indices affected by this key."""
+        if self.mapper.dtype == 'O':
             # We must also cast the key to string
             if isinstance(key, slice):
                 start = str(key.start) if key.start is not None else None
@@ -145,32 +183,32 @@ class _ParamLoc:
             else:
                 # Tuples, objects, etc.
                 key = str(key)
-        mapper = self._mapper
         # Use pandas to perform indexing
-        mapper = pd.Series(np.arange(len(mapper.index)), index=mapper.values)
+        mapper = pd.Series(np.arange(len(self.mapper.index)), index=self.mapper.values)
         indices = mapper.loc.__getitem__(key)
         if isinstance(indices, pd.Series):
             indices = indices.values
         return indices
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: tp.Any) -> tp.Any:
         indices = self.get_indices(key)
         is_multiple = isinstance(key, (slice, list, np.ndarray))
 
-        def pd_indexing_func(obj):
+        def pd_indexing_func(obj: tp.SeriesFrame) -> tp.MaybeSeriesFrame:
             new_obj = obj.iloc[:, indices]
             if not is_multiple:
                 # If we selected only one param, then remove its columns levels to keep it clean
-                if self._level_name is not None:
+                if self.level_name is not None:
                     if checks.is_frame(new_obj):
                         if isinstance(new_obj.columns, pd.MultiIndex):
-                            new_obj.columns = index_fns.drop_levels(new_obj.columns, self._level_name)
+                            new_obj.columns = index_fns.drop_levels(new_obj.columns, self.level_name)
             return new_obj
 
-        return self._indexing_func(pd_indexing_func, **self._indexing_kwargs)
+        return self.indexing_func(pd_indexing_func, **self.indexing_kwargs)
 
 
-def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
+def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
+                       pd_indexing_func: tp.Func) -> tp.Optional[tp.Series]:
     """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
     checks.assert_type(mapper, pd.Series)
     checks.assert_type(ref_obj, (pd.Series, pd.DataFrame))
@@ -182,6 +220,13 @@ def indexing_on_mapper(mapper, ref_obj, pd_indexing_func):
         return pd.Series(new_mapper.values, index=loced_range_mapper.columns, name=mapper.name)
     elif checks.is_series(loced_range_mapper):
         return pd.Series([new_mapper], index=[loced_range_mapper.name], name=mapper.name)
+    return None
+
+
+class ParamIndexerT(tp.Protocol):
+    def __init__(self, param_mappers: tp.Sequence[tp.Series],
+                 level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
+        ...
 
 
 class ParamIndexerFactory:
@@ -204,13 +249,13 @@ class ParamIndexerFactory:
     >>> from vectorbt.base.indexing import ParamIndexerFactory, indexing_on_mapper
 
     >>> MyParamIndexer = ParamIndexerFactory(['my_param'])
-    ... class C(MyParamIndexer):
+    >>> class C(MyParamIndexer):
     ...     def __init__(self, df, param_mapper):
     ...         self.df = df
     ...         self._my_param_mapper = param_mapper
     ...         super().__init__([param_mapper])
     ...
-    ...     def _indexing_func(self, pd_indexing_func):
+    ...     def indexing_func(self, pd_indexing_func):
     ...         return self.__class__(
     ...             pd_indexing_func(self.df),
     ...             indexing_on_mapper(self._my_param_mapper, self.df, pd_indexing_func)
@@ -237,35 +282,29 @@ class ParamIndexerFactory:
     ```
     """
 
-    def __new__(self, param_names, class_name='ParamIndexer', module_name=None):
+    def __new__(cls, param_names: tp.Sequence[str], class_name: str = 'ParamIndexer',
+                module_name: tp.Optional[str] = None) -> ParamIndexerT:
 
-        class ParamIndexer:
-            def __init__(self, param_mappers, level_names=None, **kwargs):
+        class ParamIndexer(IndexingBase):
+            def __init__(self, param_mappers: tp.Sequence[tp.Series],
+                         level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
                 checks.assert_len_equal(param_names, param_mappers)
 
                 for i, param_name in enumerate(param_names):
                     level_name = level_names[i] if level_names is not None else None
-                    _param_loc = _ParamLoc(self, param_mappers[i], self._indexing_func, level_name=level_name, **kwargs)
+                    _param_loc = ParamLoc(param_mappers[i], self.indexing_func, level_name=level_name, **kwargs)
                     setattr(self, f'_{param_name}_loc', _param_loc)
 
-            def _indexing_func(self, pd_indexing_func, **kwargs):
-                """Apply `pd_indexing_func` on all pandas objects in question
-                and return a new instance of the class.
-
-                Replace by your custom function."""
-                raise NotImplementedError
-
         for i, param_name in enumerate(param_names):
-            @property
-            def param_loc(self, param_name=param_name):
-                return getattr(self, f'_{param_name}_loc')
+            def param_loc(self, _param_name=param_name) -> ParamLoc:
+                return getattr(self, f'_{_param_name}_loc')
 
             param_loc.__doc__ = f"""Access a group of columns by parameter `{param_name}` using `pd.Series.loc`.
             
             Forwards this operation to each Series/DataFrame and returns a new class instance.
             """
 
-            setattr(ParamIndexer, f'{param_name}_loc', param_loc)
+            setattr(ParamIndexer, param_name + '_loc', property(param_loc))
 
         ParamIndexer.__name__ = class_name
         ParamIndexer.__qualname__ = class_name

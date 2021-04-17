@@ -28,16 +28,9 @@ def vstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     return c
 
 
-def save_animation(fname: str,
-                   index: tp.Sequence,
-                   plot_func: tp.Callable,
-                   *args,
-                   delta: tp.Optional[int] = None,
-                   step: int = 1,
-                   fps: int = 3,
-                   writer_kwargs: dict = None,
-                   show_progress: bool = True,
-                   **kwargs) -> None:
+def save_animation(fname: str, index: tp.Sequence, plot_func: tp.Func, *args,
+                   delta: tp.Optional[int] = None, step: int = 1, fps: int = 3,
+                   writer_kwargs: dict = None, show_progress: bool = True, **kwargs) -> None:
     """Save animation to a file.
 
     Args:

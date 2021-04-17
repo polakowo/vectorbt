@@ -60,11 +60,11 @@ class SignalFactory(IndicatorFactory):
             output_names = ['exits']
             if iteratively:
                 output_names = ['new_entries'] + output_names
-                attr_settings['new_entries'] = dict(dtype=np.bool)
+                attr_settings['new_entries'] = dict(dtype=np.bool_)
         else:
             output_names = ['entries', 'exits']
-        attr_settings['entries'] = dict(dtype=np.bool)
-        attr_settings['exits'] = dict(dtype=np.bool)
+        attr_settings['entries'] = dict(dtype=np.bool_)
+        attr_settings['exits'] = dict(dtype=np.bool_)
         IndicatorFactory.__init__(
             self, *args,
             input_names=input_names,

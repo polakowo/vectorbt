@@ -5,8 +5,6 @@ from numba import njit
 
 from vectorbt.utils import typing as tp
 
-MaybeArray = tp.TypeVar("MaybeArray", float, np.ndarray)
-
 
 def is_sorted(a: tp.Array1d) -> np.bool_:
     """Checks if array is sorted."""
@@ -72,9 +70,8 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
     return rand_floats
 
 
-def renormalize(a: MaybeArray,
-                from_range: tp.Tuple[float, float],
-                to_range: tp.Tuple[float, float]) -> MaybeArray:
+def renormalize(a: tp.MaybeNumberArray, from_range: tp.Tuple[float, float],
+                to_range: tp.Tuple[float, float]) -> tp.MaybeNumberArray:
     """Renormalize `a` from one range to another."""
     delta1 = from_range[1] - from_range[0]
     delta2 = to_range[1] - to_range[0]

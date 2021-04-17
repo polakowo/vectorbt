@@ -342,10 +342,10 @@ class MappedArray(Wrapping):
         self._value_map = value_map
         self._col_mapper = ColumnMapper(wrapper, col_arr)
 
-    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self, pd_indexing_func, **kwargs):
         """Perform indexing on `MappedArray` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_indices, new_col_arr = self.col_mapper._col_idxs_meta(col_idxs)
         new_mapped_arr = self.values[new_indices]
         new_id_arr = self.id_arr[new_indices]
@@ -355,10 +355,10 @@ class MappedArray(Wrapping):
             new_idx_arr = None
         return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
-            self._indexing_func_meta(pd_indexing_func, **kwargs)
+            self.indexing_func_meta(pd_indexing_func, **kwargs)
         return self.copy(
             wrapper=new_wrapper,
             mapped_arr=new_mapped_arr,

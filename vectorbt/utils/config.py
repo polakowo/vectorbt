@@ -4,12 +4,13 @@ from copy import copy
 from collections import namedtuple
 import dill
 import inspect
+from pathlib import Path
 
 from vectorbt.utils import checks, typing as tp
 from vectorbt.utils.attr import deep_getattr
 
 
-def get_func_kwargs(func: tp.Callable) -> dict:
+def get_func_kwargs(func: tp.Func) -> dict:
     """Get keyword arguments of the function."""
     signature = inspect.signature(func)
     return {
@@ -76,7 +77,7 @@ _RaiseKeyError = object()
 DumpTuple = namedtuple('DumpTuple', ('cls', 'dumps'))
 
 
-PT = tp.TypeVar("PT", bound="Pickleable")
+PickleableT = tp.TypeVar("PickleableT", bound="Pickleable")
 
 
 class Pickleable:
@@ -87,25 +88,25 @@ class Pickleable:
         raise NotImplementedError
 
     @classmethod
-    def loads(cls: tp.Type[PT], dumps: bytes, **kwargs) -> PT:
+    def loads(cls: tp.Type[PickleableT], dumps: bytes, **kwargs) -> PickleableT:
         """Unpickle from bytes."""
         raise NotImplementedError
 
-    def save(self, fname: str, **kwargs) -> None:
+    def save(self, fname: tp.Union[str, Path], **kwargs) -> None:
         """Save dumps to a file."""
         dumps = self.dumps(**kwargs)
         with open(fname, "wb") as f:
             f.write(dumps)
 
     @classmethod
-    def load(cls: tp.Type[PT], fname: str, **kwargs) -> PT:
+    def load(cls: tp.Type[PickleableT], fname: tp.Union[str, Path], **kwargs) -> PickleableT:
         """Load dumps from a file and create new instance."""
         with open(fname, "rb") as f:
             dumps = f.read()
         return cls.loads(dumps, **kwargs)
 
 
-CT = tp.TypeVar("CT", bound="Config")
+ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
 class Config(dict, Pickleable):
@@ -186,7 +187,7 @@ class Config(dict, Pickleable):
                     raise KeyError(f"Key '{k}' is not valid")
         super().update(other)
 
-    def copy(self: CT) -> CT:
+    def copy(self: ConfigT) -> ConfigT:
         """Copy config."""
         return self.__class__(
             self,
@@ -195,7 +196,7 @@ class Config(dict, Pickleable):
             init_config=copy_dict(self.init_config)
         )
 
-    def merge_with(self: CT, other: dict, **kwargs) -> CT:
+    def merge_with(self: ConfigT, other: dict, **kwargs) -> ConfigT:
         """Merge this and other dict into a new config."""
         return self.__class__(merge_dicts(self, other), **kwargs)
 
@@ -218,7 +219,7 @@ class Config(dict, Pickleable):
         return dill.dumps(config, **kwargs)
 
     @classmethod
-    def loads(cls: tp.Type[CT], dumps: bytes, **kwargs) -> CT:
+    def loads(cls: tp.Type[ConfigT], dumps: bytes, **kwargs) -> ConfigT:
         """Unpickle from bytes."""
         config = dill.loads(dumps, **kwargs)
         for k, v in config.items():
@@ -235,7 +236,7 @@ class AtomicConfig(Config, atomic_dict):
     pass
 
 
-CDT = tp.TypeVar("CDT", bound="Configured")
+ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
 class Configured(Pickleable):
@@ -256,7 +257,7 @@ class Configured(Pickleable):
         """Initialization config."""
         return self._config
 
-    def copy(self: CDT, **new_config) -> CDT:
+    def copy(self: ConfiguredT, **new_config) -> ConfiguredT:
         """Create a new instance based on the config.
 
         !!! warning
@@ -269,7 +270,7 @@ class Configured(Pickleable):
         return self.config.dumps(**kwargs)
 
     @classmethod
-    def loads(cls: tp.Type[CDT], dumps: bytes, **kwargs) -> CDT:
+    def loads(cls: tp.Type[ConfiguredT], dumps: bytes, **kwargs) -> ConfiguredT:
         """Unpickle from bytes."""
         return cls(**Config.loads(dumps, **kwargs))
 

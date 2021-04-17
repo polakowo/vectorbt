@@ -40,14 +40,14 @@ class LogHandler(Handler):
         return None
 
 
-def send_action(action: tp.Any) -> tp.Callable:
+def send_action(action: tp.Any) -> tp.Func:
     """Sends `action` while processing func command.
 
     Suitable only for bound callbacks taking arguments `self`, `update`, `context` and optionally other."""
 
-    def decorator(func: tp.Callable) -> tp.Callable:
+    def decorator(func: tp.Func) -> tp.Func:
         @wraps(func)
-        def command_func(self, update: Update, context: CallbackContext, *args, **kwargs) -> tp.Callable:
+        def command_func(self, update: Update, context: CallbackContext, *args, **kwargs) -> tp.Func:
             if update.effective_chat:
                 context.bot.send_chat_action(chat_id=update.effective_chat.id, action=action)
             return func(self, update, context, *args, **kwargs)
@@ -57,7 +57,7 @@ def send_action(action: tp.Any) -> tp.Callable:
     return decorator
 
 
-def self_decorator(self, func: tp.Callable) -> tp.Callable:
+def self_decorator(self, func: tp.Func) -> tp.Func:
     """Pass bot object to func command."""
 
     def command_func(update, context, *args, **kwargs):

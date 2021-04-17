@@ -1569,7 +1569,7 @@ class TestParams:
 
 class TestDatetime:
     def test_to_timedelta(self):
-        assert datetime.to_timedelta('d') == pd.to_timedelta('1d')
+        assert datetime.freq_to_timedelta('d') == pd.to_timedelta('1d')
 
     def test_get_utc_tz(self):
         assert datetime.get_utc_tz().utcoffset(_datetime.now()) == _timedelta(0)

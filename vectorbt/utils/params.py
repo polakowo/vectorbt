@@ -53,7 +53,7 @@ def create_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
     """
     checks.assert_type(op_tree, tuple)
     checks.assert_type(op_tree[0], Callable)
-    new_op_tree = (op_tree[0],)
+    new_op_tree: tp.Tuple = (op_tree[0],)
     for elem in op_tree[1:]:
         if isinstance(elem, tuple) and isinstance(elem[0], Callable):
             new_op_tree += (create_param_combs(elem, depth=depth + 1),)
@@ -75,7 +75,7 @@ def broadcast_params(param_list: tp.Sequence[tp.Sequence], to_n: tp.Optional[int
         params = param_list[i]
         if len(params) in [1, to_n]:
             if len(params) < to_n:
-                new_param_list.append([params for _ in range(to_n)])
+                new_param_list.append([p for _ in range(to_n) for p in params])
             else:
                 new_param_list.append(list(params))
         else:

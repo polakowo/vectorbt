@@ -253,7 +253,7 @@ class Data(Wrapping):
         self._missing_columns = missing_columns
         self._download_kwargs = download_kwargs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper, **kwargs)
         new_data = {k: pd_indexing_func(v, **kwargs) for k, v in self.data.items()}

@@ -1510,10 +1510,6 @@ def run_pipeline(
         input_list += [in_output_list[i] for i in in_output_idxs]
     if len(input_list) > 0:
         # Broadcast inputs
-        if input_index is None:
-            input_index = 'default'
-        if input_columns is None:
-            input_columns = 'default'
         # If input_shape is provided, will broadcast all inputs to this shape
         broadcast_kwargs = merge_dicts(dict(
             to_shape=input_shape,
@@ -2073,8 +2069,8 @@ class IndicatorFactory:
             Indicator.__module__ = self.module_name
 
         # Add indexing methods
-        def _indexing_func(obj, pd_indexing_func, **kwargs):
-            new_wrapper, idx_idxs, _, col_idxs = obj.wrapper._indexing_func_meta(pd_indexing_func, **kwargs)
+        def indexing_func(obj, pd_indexing_func, **kwargs):
+            new_wrapper, idx_idxs, _, col_idxs = obj.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
             idx_idxs_arr = reshape_fns.to_1d(idx_idxs, raw=True)
             col_idxs_arr = reshape_fns.to_1d(col_idxs, raw=True)
             if np.array_equal(idx_idxs_arr, np.arange(obj.wrapper.shape_2d[0])):
@@ -2112,7 +2108,7 @@ class IndicatorFactory:
                 mapper_list=mapper_list
             )
 
-        setattr(Indicator, '_indexing_func', _indexing_func)
+        setattr(Indicator, 'indexing_func', indexing_func)
 
         # Create read-only properties
         prop = property(lambda _self: _self._short_name)

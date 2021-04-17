@@ -9,14 +9,17 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
-from vectorbt.utils import checks
+from vectorbt.utils import checks, typing as tp
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.array import is_sorted
 from vectorbt.utils.config import Configured
 from vectorbt.base import index_fns
 
 
-def group_by_to_index(index, group_by):
+GroupByT = tp.Union[None, bool, tp.Index]
+
+
+def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
     """Convert mapper `group_by` to `pd.Index`.
 
     !!! note
@@ -25,8 +28,17 @@ def group_by_to_index(index, group_by):
         return group_by
     if group_by is True:
         group_by = pd.Index(np.full(len(index), 0))  # one group
-    if isinstance(group_by, (int, str, tuple, list)):
+    elif isinstance(group_by, (int, str)):
         group_by = index_fns.select_levels(index, group_by)
+    elif checks.is_sequence(group_by):
+        if len(group_by) != len(index) \
+                and isinstance(group_by[0], (int, str)) \
+                and isinstance(index, pd.MultiIndex) \
+                and len(group_by) <= len(index.names):
+            try:
+                group_by = index_fns.select_levels(index, group_by)
+            except (IndexError, KeyError):
+                pass
     if not isinstance(group_by, pd.Index):
         group_by = pd.Index(group_by)
     if len(group_by) != len(index):
@@ -34,27 +46,29 @@ def group_by_to_index(index, group_by):
     return group_by
 
 
-def get_groups_and_index(index, group_by):
+def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[tp.Array1d, tp.Index]:
     """Return array of group indices pointing to the original index, and grouped index.
     """
     if group_by is None or group_by is False:
         return np.arange(len(index)), index
 
     group_by = group_by_to_index(index, group_by)
-    groups, index = pd.factorize(group_by)
-    if not isinstance(index, pd.Index):
-        index = pd.Index(index)
+    codes, uniques = pd.factorize(group_by)
+    if not isinstance(uniques, pd.Index):
+        new_index = pd.Index(uniques)
+    else:
+        new_index = uniques
     if isinstance(group_by, pd.MultiIndex):
-        index.names = group_by.names
+        new_index.names = group_by.names
     elif isinstance(group_by, (pd.Index, pd.Series)):
-        index.name = group_by.name
-    if not is_sorted(groups):
+        new_index.name = group_by.name
+    if not is_sorted(codes):
         raise ValueError("Groups must be coherent and sorted")
-    return groups, index
+    return codes, new_index
 
 
 @njit(cache=True)
-def get_group_lens_nb(groups):
+def get_group_lens_nb(groups: tp.Array1d) -> tp.Array1d:
     """Return count per group."""
     result = np.empty(groups.shape[0], dtype=np.int_)
     j = 0
@@ -88,9 +102,8 @@ class ColumnGrouper(Configured):
     * boolean (False for no grouping, True for one group),
     * integer (level by position),
     * string (level by name),
-    * tuple or list (multiple levels),
-    * index or series (named index with groups),
-    * or NumPy array (raw groups).
+    * sequence of integers or strings that is shorter than `columns` (multiple levels),
+    * any other sequence that has the same length as `columns` (group per column).
 
     Set `allow_enable` to False to prohibit grouping if `ColumnGrouper.group_by` is None.
     Set `allow_disable` to False to prohibit disabling of grouping if `ColumnGrouper.group_by` is not None.
@@ -104,7 +117,8 @@ class ColumnGrouper(Configured):
     !!! note
         This class is meant to be immutable. To change any attribute, use `ColumnGrouper.copy`."""
 
-    def __init__(self, columns, group_by=None, allow_enable=True, allow_disable=True, allow_modify=True):
+    def __init__(self, columns: tp.Index, group_by: tp.GroupByLike = None, allow_enable: bool = True,
+                 allow_disable: bool = True, allow_modify: bool = True) -> None:
         Configured.__init__(
             self,
             columns=columns,
@@ -114,7 +128,7 @@ class ColumnGrouper(Configured):
             allow_modify=allow_modify
         )
 
-        checks.assert_not_none(columns)
+        checks.assert_type(columns, pd.Index)
         self._columns = columns
         if group_by is None or group_by is False:
             self._group_by = None
@@ -127,31 +141,31 @@ class ColumnGrouper(Configured):
         self._allow_modify = allow_modify
 
     @property
-    def columns(self):
+    def columns(self) -> tp.Index:
         """Original columns."""
         return self._columns
 
     @property
-    def group_by(self):
+    def group_by(self) -> GroupByT:
         """Mapper for grouping."""
         return self._group_by
 
     @property
-    def allow_enable(self):
+    def allow_enable(self) -> bool:
         """Whether to allow enabling grouping."""
         return self._allow_enable
 
     @property
-    def allow_disable(self):
+    def allow_disable(self) -> bool:
         """Whether to allow disabling grouping."""
         return self._allow_disable
 
     @property
-    def allow_modify(self):
+    def allow_modify(self) -> bool:
         """Whether to allow changing groups."""
         return self._allow_modify
 
-    def is_grouped(self, group_by=None):
+    def is_grouped(self, group_by: tp.GroupByLike = None) -> bool:
         """Check whether columns are grouped."""
         if group_by is False:
             return False
@@ -159,16 +173,16 @@ class ColumnGrouper(Configured):
             group_by = self.group_by
         return group_by is not None
 
-    def is_grouping_enabled(self, group_by=None):
+    def is_grouping_enabled(self, group_by: tp.GroupByLike = None) -> bool:
         """Check whether column grouping has been enabled."""
         return self.group_by is None and self.is_grouped(group_by=group_by)
 
-    def is_grouping_disabled(self, group_by=None):
+    def is_grouping_disabled(self, group_by: tp.GroupByLike = None) -> bool:
         """Check whether column grouping has been disabled."""
         return self.group_by is not None and not self.is_grouped(group_by=group_by)
 
     @cached_method
-    def is_grouping_modified(self, group_by=None):
+    def is_grouping_modified(self, group_by: tp.GroupByLike = None) -> bool:
         """Check whether column grouping has been modified.
 
         Doesn't care if grouping labels have been changed."""
@@ -185,7 +199,7 @@ class ColumnGrouper(Configured):
         return True
 
     @cached_method
-    def is_grouping_changed(self, group_by=None):
+    def is_grouping_changed(self, group_by: tp.GroupByLike = None) -> bool:
         """Check whether column grouping has changed in any way."""
         if group_by is None or (group_by is False and self.group_by is None):
             return False
@@ -194,7 +208,7 @@ class ColumnGrouper(Configured):
                 return False
         return True
 
-    def is_group_count_changed(self, group_by=None):
+    def is_group_count_changed(self, group_by: tp.GroupByLike = None) -> bool:
         """Check whether the number of groups has changed."""
         if group_by is None or (group_by is False and self.group_by is None):
             return False
@@ -202,7 +216,8 @@ class ColumnGrouper(Configured):
             return len(group_by) != len(self.group_by)
         return True
 
-    def check_group_by(self, group_by=None, allow_enable=None, allow_disable=None, allow_modify=None):
+    def check_group_by(self, group_by: tp.GroupByLike = None, allow_enable: tp.Optional[bool] = None,
+                       allow_disable: tp.Optional[bool] = None, allow_modify: tp.Optional[bool] = None) -> None:
         """Check passed `group_by` object against restrictions."""
         if allow_enable is None:
             allow_enable = self.allow_enable
@@ -221,7 +236,7 @@ class ColumnGrouper(Configured):
             if not allow_modify:
                 raise ValueError("Modifying groups is not allowed")
 
-    def resolve_group_by(self, group_by=None, **kwargs):
+    def resolve_group_by(self, group_by: tp.GroupByLike = None, **kwargs) -> GroupByT:
         """Resolve `group_by` from either object variable or keyword argument."""
         if group_by is None:
             group_by = self.group_by
@@ -231,21 +246,21 @@ class ColumnGrouper(Configured):
         return group_by_to_index(self.columns, group_by)
 
     @cached_method
-    def get_groups_and_columns(self, group_by=None, **kwargs):
+    def get_groups_and_columns(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.Tuple[tp.Array1d, tp.Index]:
         """See `get_groups_and_index`."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         return get_groups_and_index(self.columns, group_by)
 
-    def get_groups(self, **kwargs):
+    def get_groups(self, **kwargs) -> tp.Array1d:
         """Return groups array."""
         return self.get_groups_and_columns(**kwargs)[0]
 
-    def get_columns(self, **kwargs):
+    def get_columns(self, **kwargs) -> tp.Index:
         """Return grouped columns."""
         return self.get_groups_and_columns(**kwargs)[1]
 
     @cached_method
-    def get_group_lens(self, group_by=None, **kwargs):
+    def get_group_lens(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.Array1d:
         """See get_group_lens_nb."""
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
@@ -254,18 +269,18 @@ class ColumnGrouper(Configured):
         return get_group_lens_nb(groups)
 
     @cached_method
-    def get_group_count(self, **kwargs):
+    def get_group_count(self, **kwargs) -> int:
         """Get number of groups."""
         return len(self.get_group_lens(**kwargs))
 
     @cached_method
-    def get_group_start_idxs(self, **kwargs):
+    def get_group_start_idxs(self, **kwargs) -> tp.Array1d:
         """Get first index of each group as an array."""
         group_lens = self.get_group_lens(**kwargs)
         return np.cumsum(group_lens) - group_lens
 
     @cached_method
-    def get_group_end_idxs(self, **kwargs):
+    def get_group_end_idxs(self, **kwargs) -> tp.Array1d:
         """Get end index of each group as an array."""
         group_lens = self.get_group_lens(**kwargs)
         return np.cumsum(group_lens)

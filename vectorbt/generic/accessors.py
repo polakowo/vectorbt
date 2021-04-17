@@ -1313,7 +1313,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             neg_trace_kwargs = {}
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
-        obj, other = reshape_fns.broadcast(self._obj, other, columns_from=None)
+        obj, other = reshape_fns.broadcast(self._obj, other, columns_from='keep')
         checks.assert_type(other, pd.Series)
         if fig is None:
             fig = FigureWidget()
@@ -1428,7 +1428,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
 
-        obj, other = reshape_fns.broadcast(self._obj, other, columns_from=None)
+        obj, other = reshape_fns.broadcast(self._obj, other, columns_from='keep')
         checks.assert_type(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])

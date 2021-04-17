@@ -86,14 +86,18 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from vectorbt.utils import checks
+from vectorbt.utils import checks, typing as tp
 from vectorbt.utils.config import Configured, merge_dicts
-from vectorbt.utils.datetime import to_timedelta, DatetimeIndexes
+from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
+
+ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
+WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
+IMT = tp.Tuple[ArrayWrapperT, tp.MaybeArray1d, tp.MaybeArray1d, tp.Array1d]
 
 
 class ArrayWrapper(Configured, PandasIndexer):
@@ -109,8 +113,9 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Use methods that begin with `get_` to get group-aware results."""
 
-    def __init__(self, index, columns, ndim, freq=None, column_only_select=None,
-                 group_select=None, grouped_ndim=None, **kwargs):
+    def __init__(self, index: tp.IndexLike, columns: tp.IndexLike, ndim: int,
+                 freq: tp.Optional[tp.FrequencyLike] = None, column_only_select: tp.Optional[bool] = None,
+                 group_select: tp.Optional[bool] = None, grouped_ndim: tp.Optional[int] = None, **kwargs) -> None:
         config = dict(
             index=index,
             columns=columns,
@@ -142,8 +147,9 @@ class ArrayWrapper(Configured, PandasIndexer):
         Configured.__init__(self, **merge_dicts(config, self._grouper._config))
 
     @cached_method
-    def _indexing_func_meta(self, pd_indexing_func, index=None, columns=None,
-                            column_only_select=None, group_select=None, group_by=None):
+    def indexing_func_meta(self: ArrayWrapperT, pd_indexing_func: tp.IndexingFunc, index: tp.Optional[tp.Index] = None,
+                            columns: tp.Optional[tp.Index] = None, column_only_select: tp.Optional[bool] = None,
+                            group_select: tp.Optional[bool] = None, group_by: tp.GroupByLike = None) -> IMT:
         """Perform indexing on `ArrayWrapper` and also return indexing metadata.
 
         Takes into account column grouping.
@@ -188,9 +194,8 @@ class ArrayWrapper(Configured, PandasIndexer):
         if column_only_select:
             if i_wrapper.ndim == 1:
                 raise IndexingError("Columns only: Attempting to select a column on a Series")
-            col_mapper = i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns)
             try:
-                col_mapper = pd_indexing_func(col_mapper)
+                col_mapper = pd_indexing_func(i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns))
             except pd.core.indexing.IndexingError as e:
                 warnings.warn("Columns only: Make sure to treat this object "
                               "as a Series of columns rather than a DataFrame", stacklevel=2)
@@ -206,24 +211,22 @@ class ArrayWrapper(Configured, PandasIndexer):
             new_index = index
             idx_idxs = np.arange(len(index))
         else:
-            idx_mapper = i_wrapper.wrap(
+            idx_mapper = pd_indexing_func(i_wrapper.wrap(
                 np.broadcast_to(np.arange(n_rows)[:, None], (n_rows, n_cols)),
                 index=index,
                 columns=columns
-            )
-            idx_mapper = pd_indexing_func(idx_mapper)
+            ))
             if i_wrapper.ndim == 1:
                 if not checks.is_series(idx_mapper):
                     raise IndexingError("Selection of a scalar is not allowed")
                 idx_idxs = idx_mapper.values
                 col_idxs = 0
             else:
-                col_mapper = i_wrapper.wrap(
+                col_mapper = pd_indexing_func(i_wrapper.wrap(
                     np.broadcast_to(np.arange(n_cols), (n_rows, n_cols)),
                     index=index,
                     columns=columns
-                )
-                col_mapper = pd_indexing_func(col_mapper)
+                ))
                 if checks.is_frame(idx_mapper):
                     idx_idxs = idx_mapper.values[:, 0]
                     col_idxs = col_mapper.values[0]
@@ -310,12 +313,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             group_by=None
         ), idx_idxs, col_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: ArrayWrapperT, pd_indexing_func: tp.IndexingFunc, **kwargs) -> ArrayWrapperT:
         """Perform indexing on `ArrayWrapper`"""
-        return self._indexing_func_meta(pd_indexing_func, **kwargs)[0]
+        return self.indexing_func_meta(pd_indexing_func, **kwargs)[0]
 
     @classmethod
-    def from_obj(cls, obj, *args, **kwargs):
+    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.SeriesFrame, *args, **kwargs) -> ArrayWrapperT:
         """Derive metadata from an object."""
         index = index_fns.get_index(obj, 0)
         columns = index_fns.get_index(obj, 1)
@@ -323,7 +326,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         return cls(index, columns, ndim, *args, **kwargs)
 
     @classmethod
-    def from_shape(cls, shape, *args, **kwargs):
+    def from_shape(cls: tp.Type[ArrayWrapperT], shape: tp.Shape, *args, **kwargs) -> ArrayWrapperT:
         """Derive metadata from shape."""
         index = pd.RangeIndex(start=0, step=1, stop=shape[0])
         columns = pd.RangeIndex(start=0, step=1, stop=shape[1] if len(shape) > 1 else 1)
@@ -331,21 +334,21 @@ class ArrayWrapper(Configured, PandasIndexer):
         return cls(index, columns, ndim, *args, **kwargs)
 
     @property
-    def index(self):
+    def index(self) -> tp.Index:
         """Index."""
         return self._index
 
     @property
-    def columns(self):
+    def columns(self) -> tp.Index:
         """Columns."""
         return self._columns
 
-    def get_columns(self, group_by=None):
+    def get_columns(self, group_by: tp.GroupByLike = None) -> tp.Index:
         """Get group-aware `ArrayWrapper.columns`."""
         return self.resolve(group_by=group_by).columns
 
     @property
-    def name(self):
+    def name(self) -> tp.Any:
         """Name."""
         if self.ndim == 1:
             if self.columns[0] == 0:
@@ -353,43 +356,43 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.columns[0]
         return None
 
-    def get_name(self, group_by=None):
+    def get_name(self, group_by: tp.GroupByLike = None) -> tp.Any:
         """Get group-aware `ArrayWrapper.name`."""
         return self.resolve(group_by=group_by).name
 
     @property
-    def ndim(self):
+    def ndim(self) -> int:
         """Number of dimensions."""
         return self._ndim
 
-    def get_ndim(self, group_by=None):
+    def get_ndim(self, group_by: tp.GroupByLike = None) -> int:
         """Get group-aware `ArrayWrapper.ndim`."""
         return self.resolve(group_by=group_by).ndim
 
     @property
-    def shape(self):
+    def shape(self) -> tp.Shape:
         """Shape."""
         if self.ndim == 1:
             return len(self.index),
         return len(self.index), len(self.columns)
 
-    def get_shape(self, group_by=None):
+    def get_shape(self, group_by: tp.GroupByLike = None) -> tp.Shape:
         """Get group-aware `ArrayWrapper.shape`."""
         return self.resolve(group_by=group_by).shape
 
     @property
-    def shape_2d(self):
+    def shape_2d(self) -> tp.Shape:
         """Shape as if the object was two-dimensional."""
         if self.ndim == 1:
             return self.shape[0], 1
         return self.shape
 
-    def get_shape_2d(self, group_by=None):
+    def get_shape_2d(self, group_by: tp.GroupByLike = None) -> tp.Shape:
         """Get group-aware `ArrayWrapper.shape_2d`."""
         return self.resolve(group_by=group_by).shape_2d
 
     @property
-    def freq(self):
+    def freq(self) -> tp.Optional[pd.Timedelta]:
         """Index frequency."""
         from vectorbt import settings
 
@@ -397,43 +400,43 @@ class ArrayWrapper(Configured, PandasIndexer):
         if freq is None:
             freq = settings.array_wrapper['freq']
         if freq is not None:
-            return to_timedelta(freq)
+            return freq_to_timedelta(freq)
         if isinstance(self.index, DatetimeIndexes):
             if self.index.freq is not None:
                 try:
-                    return to_timedelta(self.index.freq)
+                    return freq_to_timedelta(self.index.freq)
                 except ValueError as e:
                     warnings.warn(repr(e), stacklevel=2)
             if self.index.inferred_freq is not None:
                 try:
-                    return to_timedelta(self.index.inferred_freq)
+                    return freq_to_timedelta(self.index.inferred_freq)
                 except ValueError as e:
                     warnings.warn(repr(e), stacklevel=2)
         return freq
 
-    def to_time_units(self, a):
+    def to_time_units(self, a: tp.MaybeSNumberArray) -> tp.Union[pd.Timedelta, tp.Array]:
         """Convert array to time units."""
         if self.freq is None:
             raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
-        return a * to_timedelta(self.freq)
+        return a * self.freq
 
     @property
-    def column_only_select(self):
+    def column_only_select(self) -> tp.Optional[bool]:
         """Whether to perform indexing on columns only."""
         return self._column_only_select
 
     @property
-    def group_select(self):
+    def group_select(self) -> tp.Optional[bool]:
         """Whether to perform indexing on groups."""
         return self._group_select
 
     @property
-    def grouper(self):
+    def grouper(self) -> ColumnGrouper:
         """Column grouper."""
         return self._grouper
 
     @property
-    def grouped_ndim(self):
+    def grouped_ndim(self) -> int:
         """Number of dimensions under column grouping."""
         if self._grouped_ndim is None:
             if self.grouper.is_grouped():
@@ -441,7 +444,7 @@ class ArrayWrapper(Configured, PandasIndexer):
             return self.ndim
         return self._grouped_ndim
 
-    def regroup(self, group_by, **kwargs):
+    def regroup(self: ArrayWrapperT, group_by: tp.GroupByLike, **kwargs) -> ArrayWrapperT:
         """Regroup this object.
 
         Only creates a new instance if grouping has changed, otherwise returns itself."""
@@ -455,7 +458,7 @@ class ArrayWrapper(Configured, PandasIndexer):
         return self  # important for keeping cache
 
     @cached_method
-    def resolve(self, group_by=None, **kwargs):
+    def resolve(self: ArrayWrapperT, group_by: tp.GroupByLike = None, **kwargs) -> ArrayWrapperT:
         """Resolve this object.
 
         Replaces columns and other metadata with groups."""
@@ -469,13 +472,14 @@ class ArrayWrapper(Configured, PandasIndexer):
             )
         return _self  # important for keeping cache
 
-    def wrap(self, a, index=None, columns=None, dtype=None, group_by=None):
+    def wrap(self, a: tp.ArrayLike, index: tp.Optional[tp.Index] = None, columns: tp.Optional[tp.Index] = None,
+             dtype: tp.Optional[tp.PandasDTypeLike] = None, group_by: tp.GroupByLike = None) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
         _self = self.resolve(group_by=group_by)
 
-        a = np.asarray(a)
-        a = reshape_fns.soft_to_ndim(a, self.ndim)
+        arr = np.asarray(a)
+        arr = reshape_fns.soft_to_ndim(arr, self.ndim)
         if index is None:
             index = _self.index
         if columns is None:
@@ -487,18 +491,20 @@ class ArrayWrapper(Configured, PandasIndexer):
         else:
             name = None
         if index is not None:
-            checks.assert_shape_equal(a, index, axis=(0, 0))
-        if a.ndim == 2 and columns is not None:
-            checks.assert_shape_equal(a, columns, axis=(1, 0))
-        if a.ndim == 1:
-            return pd.Series(a, index=index, name=name, dtype=dtype)
-        if a.ndim == 2:
-            if a.shape[1] == 1 and _self.ndim == 1:
-                return pd.Series(a[:, 0], index=index, name=name, dtype=dtype)
-            return pd.DataFrame(a, index=index, columns=columns, dtype=dtype)
-        raise ValueError(f"{a.ndim}-d input is not supported")
+            checks.assert_shape_equal(arr, index, axis=(0, 0))
+        if arr.ndim == 2 and columns is not None:
+            checks.assert_shape_equal(arr, columns, axis=(1, 0))
+        if arr.ndim == 1:
+            return pd.Series(arr, index=index, name=name, dtype=dtype)
+        if arr.ndim == 2:
+            if arr.shape[1] == 1 and _self.ndim == 1:
+                return pd.Series(arr[:, 0], index=index, name=name, dtype=dtype)
+            return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
+        raise ValueError(f"{arr.ndim}-d input is not supported")
 
-    def wrap_reduced(self, a, name_or_index=None, columns=None, dtype=None, group_by=None, time_units=False):
+    def wrap_reduced(self, a: tp.ArrayLike, name_or_index: tp.NameIndex = None, columns: tp.Optional[tp.Index] = None,
+                     dtype: tp.Optional[tp.PandasDTypeLike] = None, group_by: tp.GroupByLike = None,
+                     time_units: bool = False) -> tp.SeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
@@ -511,46 +517,46 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if columns is None:
             columns = _self.columns
-        a = np.asarray(a)
+        arr = np.asarray(a)
         if dtype is not None:
             try:
-                a = a.astype(dtype)
+                arr = arr.astype(dtype)
             except Exception as e:
                 warnings.warn(repr(e), stacklevel=2)
         if time_units:
-            a = _self.to_time_units(a)
+            arr = _self.to_time_units(arr)
             dtype = None
-        if a.ndim == 0:
+        if arr.ndim == 0:
             # Scalar per Series/DataFrame
             if time_units:
-                return pd.to_timedelta(a.item())
-            return a.item()
-        if a.ndim == 1:
+                return pd.to_timedelta(arr.item())
+            return arr.item()
+        if arr.ndim == 1:
             if _self.ndim == 1:
-                if a.shape[0] == 1:
+                if arr.shape[0] == 1:
                     # Scalar per Series/DataFrame with one column
                     if time_units:
-                        return pd.to_timedelta(a[0])
-                    return a[0]
+                        return pd.to_timedelta(arr[0])
+                    return arr[0]
                 # Array per Series
                 sr_name = columns[0]
-                if sr_name == 0:  # was a Series before
+                if sr_name == 0:  # was arr Series before
                     sr_name = None
-                return pd.Series(a, index=name_or_index, name=sr_name, dtype=dtype)
-            # Scalar per column in a DataFrame
-            return pd.Series(a, index=columns, name=name_or_index, dtype=dtype)
-        if a.ndim == 2:
-            if a.shape[1] == 1 and _self.ndim == 1:
+                return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
+            # Scalar per column in arr DataFrame
+            return pd.Series(arr, index=columns, name=name_or_index, dtype=dtype)
+        if arr.ndim == 2:
+            if arr.shape[1] == 1 and _self.ndim == 1:
                 # Array per Series
                 sr_name = columns[0]
-                if sr_name == 0:  # was a Series before
+                if sr_name == 0:  # was arr Series before
                     sr_name = None
-                return pd.Series(a[:, 0], index=name_or_index, name=sr_name, dtype=dtype)
-            # Array per column in a DataFrame
-            return pd.DataFrame(a, index=name_or_index, columns=columns, dtype=dtype)
-        raise ValueError(f"{a.ndim}-d input is not supported")
+                return pd.Series(arr[:, 0], index=name_or_index, name=sr_name, dtype=dtype)
+            # Array per column in arr DataFrame
+            return pd.DataFrame(arr, index=name_or_index, columns=columns, dtype=dtype)
+        raise ValueError(f"{arr.ndim}-d input is not supported")
 
-    def dummy(self, group_by=None, **kwargs):
+    def dummy(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.SeriesFrame:
         """Create a dummy Series/DataFrame."""
         _self = self.resolve(group_by=group_by)
         return _self.wrap(np.empty(_self.shape), **kwargs)
@@ -559,23 +565,23 @@ class ArrayWrapper(Configured, PandasIndexer):
 class Wrapping(Configured, PandasIndexer):
     """Class that uses `ArrayWrapper` globally."""
 
-    def __init__(self, wrapper, **kwargs):
+    def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
         checks.assert_type(wrapper, ArrayWrapper)
         self._wrapper = wrapper
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
         PandasIndexer.__init__(self)
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
-        """Perform indexing on `Wrapping`"""
-        return self.copy(wrapper=self.wrapper._indexing_func(pd_indexing_func, **kwargs))
+    def indexing_func(self: WrappingT, pd_indexing_func: tp.IndexingFunc, **kwargs) -> WrappingT:
+        """Perform indexing on `Wrapping`."""
+        return self.copy(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
 
     @property
-    def wrapper(self):
+    def wrapper(self) -> ArrayWrapper:
         """Array wrapper."""
         return self._wrapper
 
-    def regroup(self, group_by, **kwargs):
+    def regroup(self: WrappingT, group_by: tp.GroupByLike, **kwargs) -> WrappingT:
         """Regroup this object.
 
         Only creates a new instance if grouping has changed, otherwise returns itself.
@@ -586,7 +592,7 @@ class Wrapping(Configured, PandasIndexer):
             return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
 
-    def select_series(self, column=None, group_by=None, **kwargs):
+    def select_series(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
         """Select one column/group."""
         _self = self.regroup(group_by, **kwargs)
         if column is not None:

@@ -498,10 +498,10 @@ class Portfolio(Wrapping):
         self._incl_unrealized = incl_unrealized
         self._use_filled_close = use_filled_close
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Portfolio`."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
         new_order_records = self.orders._col_idxs_records(col_idxs)
         new_log_records = self.logs._col_idxs_records(col_idxs)
@@ -2277,12 +2277,12 @@ class Portfolio(Wrapping):
         ),
         share_flow=dict(
             title="Share Flow",
-            yaxis_title="Share flow",
+            yaxis_title="Shares",
             can_plot_groups=False
         ),
         cash_flow=dict(
             title="Cash Flow",
-            yaxis_title="Cash flow"
+            yaxis_title="Cash"
         ),
         shares=dict(
             title="Shares",
@@ -2303,11 +2303,11 @@ class Portfolio(Wrapping):
         ),
         drawdowns=dict(
             title="Drawdowns",
-            yaxis_title="Price"
+            yaxis_title="Value"
         ),
         underwater=dict(
             title="Underwater",
-            yaxis_title="Underwater"
+            yaxis_title="Drawdown"
         ),
         gross_exposure=dict(
             title="Gross Exposure",

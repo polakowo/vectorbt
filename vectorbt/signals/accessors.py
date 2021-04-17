@@ -24,7 +24,7 @@ The accessors extend `vectorbt.generic.accessors`.
 !!! note
     The underlying Series/DataFrame should already be a signal series.
 
-    Input arrays should be `np.bool`.
+    Input arrays should be `np.bool_`.
 
 Run for the examples below:
     
@@ -82,7 +82,7 @@ class SignalsAccessor(GenericAccessor):
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
-        checks.assert_dtype(obj, np.bool)
+        checks.assert_dtype(obj, np.bool_)
 
         GenericAccessor.__init__(self, obj, **kwargs)
 
@@ -719,7 +719,7 @@ class SignalsAccessor(GenericAccessor):
         else:
             # Two input arrays
             obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
-            checks.assert_dtype(other, np.bool)
+            checks.assert_dtype(other, np.bool_)
             result = nb.map_reduce_between_two_nb(
                 obj.vbt.to_2d_array(),
                 other.vbt.to_2d_array(),

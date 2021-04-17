@@ -85,10 +85,10 @@ class Drawdowns(Records):
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
             raise TypeError("Records array must match drawdown_dt")
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Drawdowns`."""
         new_wrapper, new_records_arr, _, col_idxs = \
-            Records._indexing_func_meta(self, pd_indexing_func, **kwargs)
+            Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
         new_ts = new_wrapper.wrap(self.ts.values[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,

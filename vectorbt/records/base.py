@@ -307,16 +307,16 @@ class Records(Wrapping):
                 self.values, self.col_mapper.col_map, to_1d(col_idxs))
         return new_records_arr
 
-    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Records` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_records_arr = self._col_idxs_records(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Records`."""
-        new_wrapper, new_records_arr, _, _ = self._indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
         return self.copy(
             wrapper=new_wrapper,
             records_arr=new_records_arr

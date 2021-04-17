@@ -54,10 +54,10 @@ class Orders(Records):
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise TypeError("Records array must match order_dt")
 
-    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Orders` and return metadata."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
-            Records._indexing_func_meta(self, pd_indexing_func, **kwargs)
+            Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
         new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,
@@ -65,9 +65,9 @@ class Orders(Records):
             close=new_close
         ), group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self, pd_indexing_func, **kwargs):
         """Perform indexing on `Orders`."""
-        return self._indexing_func_meta(pd_indexing_func, **kwargs)[0]
+        return self.indexing_func_meta(pd_indexing_func, **kwargs)[0]
 
     @property
     def close(self):

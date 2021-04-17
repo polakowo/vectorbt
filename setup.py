@@ -31,7 +31,9 @@ setup(
         'scikit-learn',
         'schedule',
         'requests',
-        'pytz'
+        'pytz',
+        'typing_extensions; python_version < "3.8"',
+        'mypy_extensions'
     ],
     extras_require={
         'full': [

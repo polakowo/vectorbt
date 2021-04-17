@@ -13,19 +13,13 @@ __pdoc__ = {}
 
 DatetimeIndexes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
 
-TimezoneLike = tp.Union[None, str, int, float, timedelta, tzinfo]
-"""Any object that can be coerced into a timezone."""
 
-DatetimeLike = tp.Union[str, int, float, pd.Timestamp, np.datetime64, datetime]
-"""Any object that can be coerced into a datetime."""
-
-
-def to_timedelta(arg: tp.Any, **kwargs) -> tp.Any:
+def freq_to_timedelta(arg: tp.FrequencyLike) -> pd.Timedelta:
     """`pd.to_timedelta` that uses unit abbreviation with number."""
     if isinstance(arg, str) and not arg[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
-        arg = '1' + arg
-    return pd.to_timedelta(arg, **kwargs)
+        return pd.Timedelta(1, unit=arg)
+    return pd.Timedelta(arg)
 
 
 def get_utc_tz() -> timezone:
@@ -71,13 +65,15 @@ def is_tz_aware(dt: datetime) -> bool:
     return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
 
 
-def to_timezone(tz: TimezoneLike, **kwargs) -> tzinfo:
+def to_timezone(tz: tp.TimezoneLike, keep_custom: bool = True, **kwargs) -> tzinfo:
     """Parse the timezone.
 
     Strings are parsed by `pytz` and `dateparser`, while integers and floats are treated as hour offsets.
 
     If the timezone object can't be checked for equality based on its properties,
     it's automatically converted to `datetime.timezone`.
+
+    If `keep_custom` is set to False, will convert to `datetime.timezone`.
 
     `**kwargs` are passed to `dateparser.parse`."""
     if tz is None:
@@ -94,34 +90,38 @@ def to_timezone(tz: TimezoneLike, **kwargs) -> tzinfo:
     if isinstance(tz, timedelta):
         tz = timezone(tz)
     if isinstance(tz, tzinfo):
-        if tz != copy.copy(tz):
+        if not keep_custom or tz != copy.copy(tz):
             return timezone(tz.utcoffset(datetime.now()))
         return tz
     raise TypeError("Couldn't parse the timezone")
 
 
-def to_tzaware_datetime(dt: DatetimeLike, tz: tp.Optional[TimezoneLike] = None, **kwargs) -> datetime:
+def to_tzaware_datetime(dt_like: tp.DatetimeLike, tz: tp.Optional[tp.TimezoneLike] = None, **kwargs) -> datetime:
     """Parse the datetime as a timezone-aware `datetime.datetime`.
 
     See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats and `**kwargs`.
 
     Timestamps are localized to UTC, while naive datetime is localized to the local time.
     To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
-    if isinstance(dt, float):
-        dt = datetime.fromtimestamp(dt, timezone.utc)
-    elif isinstance(dt, int):
-        if len(str(dt)) > 10:
-            dt = datetime.fromtimestamp(dt / 10 ** (len(str(dt)) - 10), timezone.utc)
+    dt = None
+    if isinstance(dt_like, float):
+        dt = datetime.fromtimestamp(dt_like, timezone.utc)
+    elif isinstance(dt_like, int):
+        if len(str(dt_like)) > 10:
+            dt = datetime.fromtimestamp(dt_like / 10 ** (len(str(dt_like)) - 10), timezone.utc)
         else:
-            dt = datetime.fromtimestamp(dt, timezone.utc)
-    elif isinstance(dt, str):
-        dt = dateparser.parse(dt, **kwargs)
-        if dt is None:
-            raise ValueError("Couldn't parse the datetime")
-    elif isinstance(dt, pd.Timestamp):
-        dt = dt.to_pydatetime()
-    elif isinstance(dt, np.datetime64):
-        dt = dt.astype(datetime)
+            dt = datetime.fromtimestamp(dt_like, timezone.utc)
+    elif isinstance(dt_like, str):
+        dt = dateparser.parse(dt_like, **kwargs)
+    elif isinstance(dt_like, pd.Timestamp):
+        dt = dt_like.to_pydatetime()
+    elif isinstance(dt_like, np.datetime64):
+        dt = datetime.combine(dt_like.astype(datetime), time())
+    else:
+        dt = dt_like
+
+    if dt is None:
+        raise ValueError("Couldn't parse the datetime")
 
     if not is_tz_aware(dt):
         dt = dt.replace(tzinfo=get_local_tz())

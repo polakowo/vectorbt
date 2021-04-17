@@ -14,26 +14,26 @@ from vectorbt.utils import typing as tp
 
 
 def is_series(arg: tp.Any) -> bool:
-    """Check whether `arg` is `pd.Series`."""
+    """Check whether the argument is `pd.Series`."""
     return isinstance(arg, pd.Series)
 
 
 def is_frame(arg: tp.Any) -> bool:
-    """Check whether `arg` is `pd.DataFrame`."""
+    """Check whether the argument is `pd.DataFrame`."""
     return isinstance(arg, pd.DataFrame)
 
 
 def is_pandas(arg: tp.Any) -> bool:
-    """Check whether `arg` is `pd.Series` or `pd.DataFrame`."""
+    """Check whether the argument is `pd.Series` or `pd.DataFrame`."""
     return is_series(arg) or is_frame(arg)
 
 
 def is_any_array(arg: tp.Any) -> bool:
-    """Check whether `arg` is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
+    """Check whether the argument is any of `np.ndarray`, `pd.Series` or `pd.DataFrame`."""
     return is_pandas(arg) or isinstance(arg, np.ndarray)
 
 
-def to_any_array(arg: tp.ArrayLike) -> tp.AnyArray:
+def _to_any_array(arg: tp.ArrayLike) -> tp.AnyArray:
     """Convert any array-like object to an array.
 
     Pandas objects are kept as-is."""
@@ -42,8 +42,18 @@ def to_any_array(arg: tp.ArrayLike) -> tp.AnyArray:
     return np.asarray(arg)
 
 
+def is_sequence(obj: tp.Any) -> bool:
+    """Check whether the argument is a sequence."""
+    try:
+        len(obj)
+        obj[0:0]
+        return True
+    except TypeError:
+        return False
+
+
 def is_numba_func(arg: tp.Any) -> bool:
-    """Check whether `arg` is a Numba-compiled function."""
+    """Check whether the argument is a Numba-compiled function."""
     if 'NUMBA_DISABLE_JIT' in os.environ:
         if os.environ['NUMBA_DISABLE_JIT'] == '1':
             if arg.__name__.endswith('_nb'):
@@ -52,7 +62,7 @@ def is_numba_func(arg: tp.Any) -> bool:
 
 
 def is_hashable(arg: tp.Any) -> bool:
-    """Check whether `arg` can be hashed."""
+    """Check whether the argument can be hashed."""
     try:
         hash(arg)
     except Exception:
@@ -94,7 +104,7 @@ def is_namedtuple(x: tp.Any) -> bool:
     return all(type(n) == str for n in f)
 
 
-def method_accepts_argument(method: tp.Callable, arg_name: str) -> bool:
+def method_accepts_argument(method: tp.Func, arg_name: str) -> bool:
     """Check whether `method` accepts a positional or keyword argument with name `arg_name`."""
     sig = signature(method)
     if arg_name.startswith('**'):
@@ -113,8 +123,7 @@ def method_accepts_argument(method: tp.Callable, arg_name: str) -> bool:
     ]
 
 
-def is_equal(arg1: tp.Any,
-             arg2: tp.Any,
+def is_equal(arg1: tp.Any, arg2: tp.Any,
              equality_func: tp.Callable[[tp.Any, tp.Any], bool] = lambda x, y: x == y) -> bool:
     """Check whether two objects are equal."""
     try:
@@ -195,25 +204,25 @@ def safe_assert(arg: tp.Any, msg: tp.Optional[str] = None) -> None:
 
 
 def assert_in(arg1: tp.Any, arg2: tp.Any) -> None:
-    """Raise exception if `arg1` is not in `arg2`."""
+    """Raise exception if the first argument is not in the second argument."""
     if arg1 not in arg2:
         raise AssertionError(f"{arg1} not found in {arg2}")
 
 
-def assert_numba_func(func: tp.Callable) -> None:
+def assert_numba_func(func: tp.Func) -> None:
     """Raise exception if `func` is not Numba-compiled."""
     if not is_numba_func(func):
         raise AssertionError(f"Function {func} must be Numba compiled")
 
 
 def assert_not_none(arg: tp.Any) -> None:
-    """Raise exception if `arg` is None."""
+    """Raise exception if the argument is None."""
     if arg is None:
         raise AssertionError(f"Cannot be None")
 
 
 def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
-    """Raise exception if `arg` is none of types `types`."""
+    """Raise exception if the argument is none of types `types`."""
     if not isinstance(arg, types):
         if isinstance(types, tuple):
             raise AssertionError(f"Type must be one of {types}, not {type(arg)}")
@@ -222,7 +231,7 @@ def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
 
 
 def assert_subclass(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
-    """Raise exception if `arg` is not a subclass of classes `classes`."""
+    """Raise exception if the argument is not a subclass of classes `classes`."""
     if not issubclass(arg, classes):
         if isinstance(classes, tuple):
             raise AssertionError(f"Class must be a subclass of one of {classes}, not {arg}")
@@ -231,14 +240,14 @@ def assert_subclass(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
 
 
 def assert_type_equal(arg1: tp.Any, arg2: tp.Any) -> None:
-    """Raise exception if `arg1` and `arg2` have different types."""
+    """Raise exception if the first argument and the second argument have different types."""
     if type(arg1) != type(arg2):
         raise AssertionError(f"Types {type(arg1)} and {type(arg2)} do not match")
 
 
 def assert_dtype(arg: tp.ArrayLike, dtype: tp.DTypeLike) -> None:
-    """Raise exception if `arg` is not of data type `dtype`."""
-    arg = to_any_array(arg)
+    """Raise exception if the argument is not of data type `dtype`."""
+    arg = _to_any_array(arg)
     if isinstance(arg, pd.DataFrame):
         for i, col_dtype in enumerate(arg.dtypes):
             if col_dtype != dtype:
@@ -249,8 +258,8 @@ def assert_dtype(arg: tp.ArrayLike, dtype: tp.DTypeLike) -> None:
 
 
 def assert_subdtype(arg: tp.ArrayLike, dtype: tp.DTypeLike) -> None:
-    """Raise exception if `arg` is not a sub data type of `dtype`."""
-    arg = to_any_array(arg)
+    """Raise exception if the argument is not a sub data type of `dtype`."""
+    arg = _to_any_array(arg)
     if isinstance(arg, pd.DataFrame):
         for i, col_dtype in enumerate(arg.dtypes):
             if not np.issubdtype(col_dtype, dtype):
@@ -261,9 +270,9 @@ def assert_subdtype(arg: tp.ArrayLike, dtype: tp.DTypeLike) -> None:
 
 
 def assert_dtype_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
-    """Raise exception if `arg1` and `arg2` have different data types."""
-    arg1 = to_any_array(arg1)
-    arg2 = to_any_array(arg2)
+    """Raise exception if the first argument and the second argument have different data types."""
+    arg1 = _to_any_array(arg1)
+    arg2 = _to_any_array(arg2)
     if isinstance(arg1, pd.DataFrame):
         dtypes1 = arg1.dtypes.to_numpy()
     else:
@@ -282,8 +291,8 @@ def assert_dtype_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
 
 
 def assert_ndim(arg: tp.ArrayLike, ndims: tp.MaybeTuple[int]) -> None:
-    """Raise exception if `arg` has a different number of dimensions than `ndims`."""
-    arg = to_any_array(arg)
+    """Raise exception if the argument has a different number of dimensions than `ndims`."""
+    arg = _to_any_array(arg)
     if isinstance(ndims, tuple):
         if arg.ndim not in ndims:
             raise AssertionError(f"Number of dimensions must be one of {ndims}, not {arg.ndim}")
@@ -293,19 +302,18 @@ def assert_ndim(arg: tp.ArrayLike, ndims: tp.MaybeTuple[int]) -> None:
 
 
 def assert_len_equal(arg1: tp.Sequence, arg2: tp.Sequence) -> None:
-    """Raise exception if `arg1` and `arg2` have different length.
+    """Raise exception if the first argument and the second argument have different length.
 
     Does not transform arguments to NumPy arrays."""
     if len(arg1) != len(arg2):
         raise AssertionError(f"Lengths of {arg1} and {arg2} do not match")
 
 
-def assert_shape_equal(arg1: tp.ArrayLike,
-                       arg2: tp.ArrayLike,
+def assert_shape_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike,
                        axis: tp.Optional[tp.Union[int, tp.Tuple[int, int]]] = None) -> None:
-    """Raise exception if `arg1` and `arg2` have different shapes along `axis`."""
-    arg1 = to_any_array(arg1)
-    arg2 = to_any_array(arg2)
+    """Raise exception if the first argument and the second argument have different shapes along `axis`."""
+    arg1 = _to_any_array(arg1)
+    arg2 = _to_any_array(arg2)
     if axis is None:
         if arg1.shape != arg2.shape:
             raise AssertionError(f"Shapes {arg1.shape} and {arg2.shape} do not match")
@@ -320,15 +328,15 @@ def assert_shape_equal(arg1: tp.ArrayLike,
 
 
 def assert_index_equal(arg1: pd.Index, arg2: pd.Index, **kwargs) -> None:
-    """Raise exception if `arg1` and `arg2` have different index/columns."""
+    """Raise exception if the first argument and the second argument have different index/columns."""
     if not is_index_equal(arg1, arg2, **kwargs):
         raise AssertionError(f"Indexes {arg1} and {arg2} do not match")
 
 
 def assert_meta_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
-    """Raise exception if `arg1` and `arg2` have different metadata."""
-    arg1 = to_any_array(arg1)
-    arg2 = to_any_array(arg2)
+    """Raise exception if the first argument and the second argument have different metadata."""
+    arg1 = _to_any_array(arg1)
+    arg2 = _to_any_array(arg2)
     assert_type_equal(arg1, arg2)
     assert_shape_equal(arg1, arg2)
     if is_pandas(arg1) and is_pandas(arg2):
@@ -338,9 +346,9 @@ def assert_meta_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
 
 
 def assert_array_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
-    """Raise exception if `arg1` and `arg2` have different metadata or values."""
-    arg1 = to_any_array(arg1)
-    arg2 = to_any_array(arg2)
+    """Raise exception if the first argument and the second argument have different metadata or values."""
+    arg1 = _to_any_array(arg1)
+    arg2 = _to_any_array(arg2)
     assert_meta_equal(arg1, arg2)
     if is_pandas(arg1) and is_pandas(arg2):
         if arg1.equals(arg2):
@@ -352,7 +360,7 @@ def assert_array_equal(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> None:
 
 
 def assert_level_not_exists(arg: pd.Index, level_name: str) -> None:
-    """Raise exception if index `arg` has level `level_name`."""
+    """Raise exception if index the argument has level `level_name`."""
     if isinstance(arg, pd.MultiIndex):
         names = arg.names
     else:
@@ -362,7 +370,7 @@ def assert_level_not_exists(arg: pd.Index, level_name: str) -> None:
 
 
 def assert_equal(arg1: tp.Any, arg2: tp.Any, deep: bool = False) -> None:
-    """Raise exception if `arg1` and `arg2` are different."""
+    """Raise exception if the first argument and the second argument are different."""
     if deep:
         if not is_deep_equal(arg1, arg2):
             raise AssertionError(f"{arg1} and {arg2} do not match (deep check)")
@@ -372,7 +380,7 @@ def assert_equal(arg1: tp.Any, arg2: tp.Any, deep: bool = False) -> None:
 
 
 def assert_dict_valid(arg: dict, lvl_keys: tp.Sequence[tp.Union[str, tp.Sequence[str]]]) -> None:
-    """Raise exception if dict `arg` has keys that are not in `lvl_keys`.
+    """Raise exception if dict the argument has keys that are not in `lvl_keys`.
 
     `lvl_keys` should be a list of lists, each corresponding to a level in the dict."""
     if len(lvl_keys) == 0:
