@@ -8,7 +8,8 @@ one can manipulate complex classes with dozens of pandas objects using a single 
 import numpy as np
 import pandas as pd
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.base import index_fns, reshape_fns
 
 
@@ -147,8 +148,7 @@ class ParamLoc(LocBase):
 
     Uses `mapper` to establish link between columns and parameter values."""
 
-    def __init__(self, mapper: tp.Series, indexing_func: tp.Func,
-                 level_name: tp.Optional[tp.Level] = None, **kwargs) -> None:
+    def __init__(self, mapper: tp.Series, indexing_func: tp.Func, level_name: tp.Level = None, **kwargs) -> None:
         checks.assert_type(mapper, pd.Series)
 
         if mapper.dtype == 'O':
@@ -166,7 +166,7 @@ class ParamLoc(LocBase):
         return self._mapper
 
     @property
-    def level_name(self) -> tp.Optional[tp.Level]:
+    def level_name(self) -> tp.Level:
         """Level name."""
         return self._level_name
 

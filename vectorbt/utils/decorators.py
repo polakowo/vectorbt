@@ -4,7 +4,8 @@ from functools import wraps, lru_cache
 from threading import RLock
 import inspect
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 
 
 class class_or_instancemethod(classmethod):

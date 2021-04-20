@@ -7,7 +7,7 @@ import time
 import warnings
 from functools import wraps
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 from vectorbt.utils.datetime import (
     get_utc_tz,
     get_local_tz,
@@ -31,13 +31,13 @@ class SyntheticData(Data):
     """`Data` for synthetically generated data."""
 
     @classmethod
-    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, **kwargs) -> tp.SeriesFrame:
+    def generate_symbol(cls, symbol: tp.Label, index: tp.Index, **kwargs) -> tp.SeriesFrame:
         """Abstract method to generate a symbol."""
         raise NotImplementedError
 
     @classmethod
-    def download_symbol(cls, symbol: tp.Symbol, start: tp.DatetimeLike = 0, end: tp.DatetimeLike = 'now',
-                        freq: tp.Union[None, str, pd.DateOffset] = None, date_range_kwargs: tp.Optional[dict] = None,
+    def download_symbol(cls, symbol: tp.Label, start: tp.DatetimeLike = 0, end: tp.DatetimeLike = 'now',
+                        freq: tp.Union[None, str, pd.DateOffset] = None, date_range_kwargs: tp.KwargsLike = None,
                         **kwargs) -> tp.SeriesFrame:
         """Download the symbol.
 
@@ -55,7 +55,7 @@ class SyntheticData(Data):
             raise ValueError("Date range is empty")
         return cls.generate_symbol(symbol, index, **kwargs)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `SyntheticData.download_symbol`."""
@@ -119,7 +119,7 @@ class GBMData(SyntheticData):
     ```"""
 
     @classmethod
-    def generate_symbol(cls, symbol: tp.Symbol, index: tp.Index, S0: float = 100., mu: float = 0.,
+    def generate_symbol(cls, symbol: tp.Label, index: tp.Index, S0: float = 100., mu: float = 0.,
                         sigma: float = 0.05, T: tp.Optional[int] = None, I: int = 1,
                         seed: tp.Optional[int] = None) -> tp.SeriesFrame:
         """Generate the symbol using `generate_gbm_paths`.
@@ -146,7 +146,7 @@ class GBMData(SyntheticData):
         columns = pd.RangeIndex(stop=out.shape[1], name='path')
         return pd.DataFrame(out, index=index, columns=columns)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `GBMData.download_symbol`."""
@@ -231,7 +231,7 @@ class YFData(Data):
     """
 
     @classmethod
-    def download_symbol(cls, symbol: tp.Symbol, period: str = 'max', start: tp.Optional[tp.DatetimeLike] = None,
+    def download_symbol(cls, symbol: tp.Label, period: str = 'max', start: tp.Optional[tp.DatetimeLike] = None,
                         end: tp.Optional[tp.DatetimeLike] = None, **kwargs) -> tp.Frame:
         """Download the symbol.
 
@@ -256,7 +256,7 @@ class YFData(Data):
 
         return yf.Ticker(symbol).history(period=period, start=start, end=end, **kwargs)
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.Frame:
+    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.Frame:
         """Update the symbol.
 
         `**kwargs` will override keyword arguments passed to `YFData.download_symbol`."""
@@ -379,7 +379,7 @@ class BinanceData(Data):
     ```"""
 
     @classmethod
-    def download(cls: tp.Type[BinanceDataT], symbols: tp.Symbols, client: tp.Optional["ClientT"] = None,
+    def download(cls: tp.Type[BinanceDataT], symbols: tp.Labels, client: tp.Optional["ClientT"] = None,
                  **kwargs) -> BinanceDataT:
         """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
         from binance.client import Client

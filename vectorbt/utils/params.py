@@ -4,7 +4,8 @@ from numba.typed import List
 import itertools
 from collections.abc import Callable
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 
 
 def to_typed_list(lst: list) -> List:

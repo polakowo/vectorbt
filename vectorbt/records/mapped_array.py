@@ -252,6 +252,7 @@ instance to the disk with `MappedArray.save` and load it with `MappedArray.load`
 import numpy as np
 import pandas as pd
 
+from vectorbt import typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import to_value_map
@@ -269,7 +270,20 @@ from vectorbt.records import nb
 from vectorbt.records.col_mapper import ColumnMapper
 
 
-def combine_mapped_with_other(self, other, np_func):
+MappedArrayT = tp.TypeVar("MappedArrayT", bound="MappedArray")
+IndexingMetaT = tp.Tuple[
+    ArrayWrapper,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Array1d,
+    tp.Optional[tp.Array1d],
+    tp.MaybeArray1d,
+    tp.Array1d
+]
+
+
+def combine_mapped_with_other(self: MappedArrayT, other: tp.Union["MappedArray", tp.ArrayLike],
+                              np_func: tp.Callable[[tp.ArrayLike, tp.ArrayLike], tp.Array1d]) -> MappedArrayT:
     """Combine `MappedArray` with other compatible object.
 
     If other object is also `MappedArray`, their `id_arr` and `col_arr` must match."""
@@ -312,7 +326,9 @@ class MappedArray(Wrapping):
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, mapped_arr, col_arr, id_arr=None, idx_arr=None, value_map=None, **kwargs):
+    def __init__(self, wrapper: ArrayWrapper, mapped_arr: tp.ArrayLike, col_arr: tp.ArrayLike,
+                 id_arr: tp.Optional[tp.ArrayLike] = None, idx_arr: tp.Optional[tp.ArrayLike] = None,
+                 value_map: tp.Optional[tp.ValueMapLike] = None, **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -328,6 +344,8 @@ class MappedArray(Wrapping):
         checks.assert_shape_equal(mapped_arr, col_arr, axis=0)
         if id_arr is None:
             id_arr = np.arange(len(mapped_arr))
+        else:
+            id_arr = np.asarray(id_arr)
         if idx_arr is not None:
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
@@ -342,7 +360,7 @@ class MappedArray(Wrapping):
         self._value_map = value_map
         self._col_mapper = ColumnMapper(wrapper, col_arr)
 
-    def indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `MappedArray` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
             self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
@@ -355,7 +373,7 @@ class MappedArray(Wrapping):
             new_idx_arr = None
         return new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, group_idxs, col_idxs
 
-    def indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: MappedArrayT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> MappedArrayT:
         """Perform indexing on `MappedArray`."""
         new_wrapper, new_mapped_arr, new_col_arr, new_id_arr, new_idx_arr, _, _ = \
             self.indexing_func_meta(pd_indexing_func, **kwargs)
@@ -368,50 +386,54 @@ class MappedArray(Wrapping):
         )
 
     @property
-    def mapped_arr(self):
+    def mapped_arr(self) -> tp.Array1d:
         """Mapped array."""
         return self._mapped_arr
 
-    values = mapped_arr
+    @property
+    def values(self) -> tp.Array1d:
+        """Mapped array."""
+        return self.mapped_arr
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.values)
 
     @property
-    def col_arr(self):
+    def col_arr(self) -> tp.Array1d:
         """Column array."""
         return self._col_arr
 
     @property
-    def col_mapper(self):
+    def col_mapper(self) -> ColumnMapper:
         """Column mapper.
 
         See `vectorbt.records.col_mapper.ColumnMapper`."""
         return self._col_mapper
 
     @property
-    def id_arr(self):
+    def id_arr(self) -> tp.Array1d:
         """Id array."""
         return self._id_arr
 
     @property
-    def idx_arr(self):
+    def idx_arr(self) -> tp.Optional[tp.Array1d]:
         """Index array."""
         return self._idx_arr
 
     @property
-    def value_map(self):
+    def value_map(self) -> tp.Optional[tp.ValueMap]:
         """Value map."""
         return self._value_map
 
     @cached_method
-    def is_sorted(self, incl_id=False):
+    def is_sorted(self, incl_id: bool = False) -> bool:
         """Check whether mapped array is sorted."""
         if incl_id:
             return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
         return nb.is_col_sorted_nb(self.col_arr)
 
-    def sort(self, incl_id=False, idx_arr=None, group_by=None, **kwargs):
+    def sort(self: MappedArrayT, incl_id: bool = False, idx_arr: tp.Optional[tp.Array1d] = None,
+             group_by: tp.GroupByLike = None, **kwargs) -> MappedArrayT:
         """Sort mapped array by column array (primary) and id array (secondary, optional)."""
         if idx_arr is None:
             idx_arr = self.idx_arr
@@ -429,7 +451,8 @@ class MappedArray(Wrapping):
             **kwargs
         ).regroup(group_by)
 
-    def filter_by_mask(self, mask, idx_arr=None, group_by=None, **kwargs):
+    def filter_by_mask(self: MappedArrayT, mask: tp.Array1d, idx_arr: tp.Optional[tp.Array1d] = None,
+                       group_by: tp.GroupByLike = None, **kwargs) -> MappedArrayT:
         """Return a new class instance, filtered by mask."""
         if idx_arr is None:
             idx_arr = self.idx_arr
@@ -441,7 +464,8 @@ class MappedArray(Wrapping):
             **kwargs
         ).regroup(group_by)
 
-    def map_to_mask(self, inout_map_func_nb, *args, group_by=None):
+    def map_to_mask(self, inout_map_func_nb: tp.MaskInOutMapFunc, *args,
+                    group_by: tp.GroupByLike = None) -> tp.Array1d:
         """Map mapped array to a mask.
 
         See `vectorbt.records.nb.mapped_to_mask_nb`."""
@@ -449,27 +473,27 @@ class MappedArray(Wrapping):
         return nb.mapped_to_mask_nb(self.values, col_map, inout_map_func_nb, *args)
 
     @cached_method
-    def top_n_mask(self, n, **kwargs):
+    def top_n_mask(self, n: int, **kwargs) -> tp.Array1d:
         """Return mask of top N elements in each column."""
         return self.map_to_mask(nb.top_n_inout_map_nb, n, **kwargs)
 
     @cached_method
-    def bottom_n_mask(self, n, **kwargs):
+    def bottom_n_mask(self, n: int, **kwargs) -> tp.Array1d:
         """Return mask of bottom N elements in each column."""
         return self.map_to_mask(nb.bottom_n_inout_map_nb, n, **kwargs)
 
     @cached_method
-    def top_n(self, n, **kwargs):
+    def top_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter top N elements from each column."""
         return self.filter_by_mask(self.top_n_mask(n), **kwargs)
 
     @cached_method
-    def bottom_n(self, n, **kwargs):
+    def bottom_n(self: MappedArrayT, n: int, **kwargs) -> MappedArrayT:
         """Filter bottom N elements from each column."""
         return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
-    def is_matrix_compatible(self, idx_arr=None, group_by=None):
+    def is_matrix_compatible(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
         """See `vectorbt.records.nb.mapped_matrix_compatible_nb`."""
         if idx_arr is None:
             if self.idx_arr is None:
@@ -479,7 +503,8 @@ class MappedArray(Wrapping):
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         return nb.mapped_matrix_compatible_nb(col_arr, idx_arr, target_shape)
 
-    def to_matrix(self, idx_arr=None, default_val=np.nan, group_by=None, wrap_kwargs=None):
+    def to_matrix(self, idx_arr: tp.Optional[tp.Array1d] = None, default_val: float = np.nan,
+                  group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Convert mapped array to the matrix form.
 
         See `vectorbt.records.nb.mapped_to_matrix_nb`.
@@ -501,8 +526,10 @@ class MappedArray(Wrapping):
         out = nb.mapped_to_matrix_nb(self.values, col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
-    def reduce(self, reduce_func_nb, *args, idx_arr=None, to_array=False, to_idx=False,
-               idx_labeled=True, default_val=np.nan, group_by=None, wrap_kwargs=None):
+    def reduce(self, reduce_func_nb: tp.ReduceFunc, *args, idx_arr: tp.Optional[tp.Array1d] = None,
+               to_array: bool = False, to_idx: bool = False, idx_labeled: bool = True,
+               default_val: float = np.nan, group_by: tp.GroupByLike = None,
+               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column.
 
         If `to_array` is False and `to_idx` is False, see `vectorbt.records.nb.reduce_mapped_nb`.
@@ -564,7 +591,7 @@ class MappedArray(Wrapping):
         if to_idx:
             nan_mask = np.isnan(out)
             if idx_labeled:
-                out = out.astype(np.object)
+                out = out.astype(object)
                 out[~nan_mask] = self.wrapper.index[out[~nan_mask].astype(np.int_)]
             else:
                 out[nan_mask] = -1
@@ -573,43 +600,43 @@ class MappedArray(Wrapping):
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def nst(self, n, **kwargs):
+    def nst(self, n: int, **kwargs) -> tp.MaybeSeries:
         """Return nst element of each column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nst')), kwargs)
         return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
-    def min(self, **kwargs):
+    def min(self, **kwargs) -> tp.MaybeSeries:
         """Return min by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='min')), kwargs)
         return self.reduce(generic_nb.min_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
-    def max(self, **kwargs):
+    def max(self, **kwargs) -> tp.MaybeSeries:
         """Return max by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='max')), kwargs)
         return self.reduce(generic_nb.max_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
-    def mean(self, **kwargs):
+    def mean(self, **kwargs) -> tp.MaybeSeries:
         """Return mean by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='mean')), kwargs)
         return self.reduce(generic_nb.mean_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
-    def median(self, **kwargs):
+    def median(self, **kwargs) -> tp.MaybeSeries:
         """Return median by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='median')), kwargs)
         return self.reduce(generic_nb.median_reduce_nb, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
-    def std(self, ddof=1, **kwargs):
+    def std(self, ddof: int = 1, **kwargs) -> tp.MaybeSeries:
         """Return std by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='std')), kwargs)
         return self.reduce(generic_nb.std_reduce_nb, ddof, to_array=False, to_idx=False, **kwargs)
 
     @cached_method
-    def sum(self, default_val=0., **kwargs):
+    def sum(self, default_val: float = 0., **kwargs) -> tp.MaybeSeries:
         """Return sum by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='sum')), kwargs)
         return self.reduce(
@@ -621,19 +648,19 @@ class MappedArray(Wrapping):
         )
 
     @cached_method
-    def idxmin(self, **kwargs):
+    def idxmin(self, **kwargs) -> tp.MaybeSeries:
         """Return index of min by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='idxmin')), kwargs)
         return self.reduce(generic_nb.argmin_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
     @cached_method
-    def idxmax(self, **kwargs):
+    def idxmax(self, **kwargs) -> tp.MaybeSeries:
         """Return index of max by column."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='idxmax')), kwargs)
         return self.reduce(generic_nb.argmax_reduce_nb, to_array=False, to_idx=True, **kwargs)
 
     @cached_method
-    def describe(self, percentiles=None, ddof=1, **kwargs):
+    def describe(self, percentiles: tp.Optional[tp.ArrayLike] = None, ddof: int = 1, **kwargs) -> tp.SeriesFrame:
         """Return statistics by column."""
         if percentiles is not None:
             percentiles = to_1d(percentiles, raw=True)
@@ -662,7 +689,7 @@ class MappedArray(Wrapping):
         return out
 
     @cached_method
-    def count(self, group_by=None, wrap_kwargs=None):
+    def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return count by column."""
         wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
         return self.wrapper.wrap_reduced(
@@ -670,7 +697,8 @@ class MappedArray(Wrapping):
             group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def value_counts(self, group_by=None, value_map=None, wrap_kwargs=None):
+    def value_counts(self, group_by: tp.GroupByLike = None, value_map: tp.Optional[tp.ValueMapLike] = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Return a pandas object containing counts of unique values."""
         mapped_codes, mapped_uniques = pd.factorize(self.values)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
@@ -689,7 +717,8 @@ class MappedArray(Wrapping):
             value_counts_df.index = value_counts_df.index.map(value_map)
         return value_counts_df
 
-    def stack(self, group_by=None, default_val=np.nan, wrap_kwargs=None):
+    def stack(self, group_by: tp.GroupByLike = None, default_val: float = np.nan,
+              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Stack into a matrix.
 
         Will lose index information and fill missing values with `default_val`."""
@@ -706,11 +735,11 @@ class MappedArray(Wrapping):
             out, index=np.arange(out.shape[0]),
             group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
-    def histplot(self, group_by=None, **kwargs):  # pragma: no cover
+    def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot histogram by column."""
         return self.stack(group_by=group_by).vbt.histplot(**kwargs)
 
-    def boxplot(self, group_by=None, **kwargs):  # pragma: no cover
+    def boxplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot box plot by column."""
         return self.stack(group_by=group_by).vbt.boxplot(**kwargs)
 

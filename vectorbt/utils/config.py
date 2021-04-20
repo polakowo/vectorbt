@@ -6,8 +6,23 @@ import dill
 import inspect
 from pathlib import Path
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.utils.attr import deep_getattr
+
+
+def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
+    """Select keyword arguments."""
+    if dct is None:
+        dct = {}
+    if isinstance(dct, dict):
+        return dict(dct)
+    if i is not None:
+        _dct = dct[i]
+        if _dct is None:
+            _dct = {}
+        return dict(_dct)
+    raise ValueError("Cannot resolve dict")
 
 
 def get_func_kwargs(func: tp.Func) -> dict:
@@ -25,7 +40,7 @@ class atomic_dict(dict):
     pass
 
 
-def merge_dicts(*dicts: tp.Optional[dict]) -> dict:
+def merge_dicts(*dicts: tp.DictLike) -> dict:
     """Merge dicts."""
     x, y = dicts[0], dicts[1]
     if x is None:
@@ -57,7 +72,7 @@ def merge_dicts(*dicts: tp.Optional[dict]) -> dict:
     return z
 
 
-def copy_dict(dct: tp.Optional[dict]) -> dict:
+def copy_dict(dct: tp.DictLike) -> dict:
     """Copy dict using shallow-deep copy hybrid.
     
     Traverses all nested dicts and copies each value using shallow copy."""
@@ -116,7 +131,7 @@ class Config(dict, Pickleable):
                  *args,
                  frozen: bool = False,
                  read_only: bool = False,
-                 init_config: tp.Optional[dict] = None,
+                 init_config: tp.DictLike = None,
                  **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self._frozen = frozen
@@ -136,7 +151,7 @@ class Config(dict, Pickleable):
         return self._read_only
 
     @property
-    def init_config(self) -> tp.Optional[dict]:
+    def init_config(self) -> tp.DictLike:
         """Initial config."""
         return self._init_config
 

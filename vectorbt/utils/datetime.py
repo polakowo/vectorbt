@@ -7,9 +7,7 @@ from datetime import datetime, timezone, timedelta, tzinfo, time
 import pytz
 import copy
 
-from vectorbt.utils import typing as tp
-
-__pdoc__ = {}
+from vectorbt import typing as tp
 
 DatetimeIndexes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
 

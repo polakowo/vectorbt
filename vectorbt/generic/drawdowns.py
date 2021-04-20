@@ -20,17 +20,22 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import FigureWidget
-from vectorbt.base.reshape_fns import to_1d
+from vectorbt.utils.figure import make_figure
+from vectorbt.base.reshape_fns import to_1d, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 from vectorbt.records.base import Records
+from vectorbt.records.mapped_array import MappedArray
+
+
+DrawdownsT = tp.TypeVar("DrawdownsT", bound="Drawdowns")
 
 
 class Drawdowns(Records):
@@ -71,7 +76,8 @@ class Drawdowns(Records):
     ![](/vectorbt/docs/img/drawdowns_drawdown_histplot.png)
     """
 
-    def __init__(self, wrapper, records_arr, ts, idx_field='end_idx', **kwargs):
+    def __init__(self, wrapper: ArrayWrapper, records_arr: tp.RecordArray, ts: tp.ArrayLike,
+                 idx_field: str = 'end_idx', **kwargs) -> None:
         Records.__init__(
             self,
             wrapper,
@@ -80,12 +86,12 @@ class Drawdowns(Records):
             ts=ts,
             **kwargs
         )
-        self._ts = ts
+        self._ts = broadcast_to(ts, wrapper.dummy(group_by=False))
 
         if not all(field in records_arr.dtype.names for field in drawdown_dt.names):
             raise TypeError("Records array must match drawdown_dt")
 
-    def indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: DrawdownsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DrawdownsT:
         """Perform indexing on `Drawdowns`."""
         new_wrapper, new_records_arr, _, col_idxs = \
             Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
@@ -97,21 +103,22 @@ class Drawdowns(Records):
         )
 
     @classmethod
-    def from_ts(cls, ts, idx_field='end_idx', **kwargs):
+    def from_ts(cls: tp.Type[DrawdownsT], ts: tp.ArrayLike, idx_field: str = 'end_idx', **kwargs) -> DrawdownsT:
         """Build `Drawdowns` from time series `ts`.
 
         `**kwargs` such as `freq` will be passed to `Drawdowns.__init__`."""
-        records_arr = nb.find_drawdowns_nb(ts.vbt.to_2d_array())
-        wrapper = ArrayWrapper.from_obj(ts, **kwargs)
-        return cls(wrapper, records_arr, ts, idx_field=idx_field)
+        pd_ts = to_pd_array(ts)
+        records_arr = nb.find_drawdowns_nb(pd_ts.vbt.to_2d_array())
+        wrapper = ArrayWrapper.from_obj(pd_ts, **kwargs)
+        return cls(wrapper, records_arr, pd_ts, idx_field=idx_field)
 
     @property
-    def ts(self):
+    def ts(self) -> tp.SeriesFrame:
         """Original time series that records are built from."""
         return self._ts
 
     @property  # no need for cached
-    def records_readable(self):
+    def records_readable(self) -> tp.Frame:
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
@@ -124,56 +131,57 @@ class Drawdowns(Records):
         return out
 
     @cached_property
-    def start_value(self):
+    def start_value(self) -> MappedArray:
         """Start value of each drawdown."""
         return self.map(nb.dd_start_value_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
-    def valley_value(self):
+    def valley_value(self) -> MappedArray:
         """Valley value of each drawdown."""
         return self.map(nb.dd_valley_value_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
-    def end_value(self):
+    def end_value(self) -> MappedArray:
         """End value of each drawdown."""
         return self.map(nb.dd_end_value_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
-    def drawdown(self):
+    def drawdown(self) -> MappedArray:
         """Drawdown value (in percentage)."""
         return self.map(nb.dd_drawdown_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_method
-    def avg_drawdown(self, default_val=0., **kwargs):
+    def avg_drawdown(self, default_val: float = 0., **kwargs) -> tp.MaybeSeries:
         """Average drawdown (ADD)."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='avg_drawdown')), kwargs)
         return self.drawdown.mean(default_val=default_val, **kwargs)
 
     @cached_method
-    def max_drawdown(self, default_val=0., **kwargs):
+    def max_drawdown(self, default_val: float = 0., **kwargs) -> tp.MaybeSeries:
         """Maximum drawdown (MDD)."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='max_drawdown')), kwargs)
         return self.drawdown.min(default_val=default_val, **kwargs)
 
     @cached_property
-    def duration(self):
+    def duration(self) -> MappedArray:
         """Duration of each drawdown (in raw format)."""
         return self.map(nb.dd_duration_map_nb)
 
     @cached_method
-    def avg_duration(self, **kwargs):
+    def avg_duration(self, **kwargs) -> tp.MaybeSeries:
         """Average drawdown duration (in time units)."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='avg_duration')), kwargs)
         return self.duration.mean(**kwargs)
 
     @cached_method
-    def max_duration(self, **kwargs):
+    def max_duration(self, **kwargs) -> tp.MaybeSeries:
         """Maximum drawdown duration (in time units)."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='max_duration')), kwargs)
         return self.duration.max(**kwargs)
 
     @cached_method
-    def coverage(self, group_by=None, wrap_kwargs=None):
+    def coverage(self, group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]
@@ -181,25 +189,26 @@ class Drawdowns(Records):
         return self.wrapper.wrap_reduced(total_duration / total_steps, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def ptv_duration(self):
+    def ptv_duration(self) -> MappedArray:
         """Peak-to-valley (PtV) duration of each drawdown."""
         return self.map(nb.dd_ptv_duration_map_nb)
 
     # ############# DrawdownStatus ############# #
 
     @cached_property
-    def status(self):
+    def status(self) -> MappedArray:
         """See `vectorbt.generic.enums.DrawdownStatus`."""
         return self.map_field('status')
 
     @cached_property
-    def active(self):
+    def active(self: DrawdownsT) -> DrawdownsT:
         """Active drawdowns."""
         filter_mask = self.values['status'] == DrawdownStatus.Active
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def active_rate(self, group_by=None, wrap_kwargs=None):
+    def active_rate(self, group_by: tp.GroupByLike = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of recovered drawdowns."""
         active_count = to_1d(self.active.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -207,13 +216,14 @@ class Drawdowns(Records):
         return self.wrapper.wrap_reduced(active_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def recovered(self):
+    def recovered(self: DrawdownsT) -> DrawdownsT:
         """Recovered drawdowns."""
         filter_mask = self.values['status'] == DrawdownStatus.Recovered
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def recovered_rate(self, group_by=None, wrap_kwargs=None):
+    def recovered_rate(self, group_by: tp.GroupByLike = None,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of recovered drawdowns."""
         recovered_count = to_1d(self.recovered.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -223,7 +233,8 @@ class Drawdowns(Records):
     # ############# DrawdownStatus.Active ############# #
 
     @cached_method
-    def current_drawdown(self, group_by=None, wrap_kwargs=None):
+    def current_drawdown(self, group_by: tp.GroupByLike = None,
+                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Current drawdown from peak.
 
         Does not support grouping."""
@@ -236,7 +247,7 @@ class Drawdowns(Records):
         return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def current_duration(self, group_by=None, **kwargs):
+    def current_duration(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
         """Current duration from peak.
 
         Does not support grouping."""
@@ -246,7 +257,7 @@ class Drawdowns(Records):
         return self.active.duration.nst(-1, group_by=group_by, **kwargs)
 
     @cached_method
-    def current_return(self, group_by=None, **kwargs):
+    def current_return(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
         """Current return from valley.
 
         Does not support grouping."""
@@ -259,17 +270,17 @@ class Drawdowns(Records):
     # ############# DrawdownStatus.Recovered ############# #
 
     @cached_property
-    def recovery_return(self):
+    def recovery_return(self) -> MappedArray:
         """Recovery return of each drawdown."""
         return self.recovered.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
 
     @cached_property
-    def vtr_duration(self):
+    def vtr_duration(self) -> MappedArray:
         """Valley-to-recovery (VtR) duration of each drawdown."""
         return self.recovered.map(nb.dd_vtr_duration_map_nb)
 
     @cached_property
-    def vtr_duration_ratio(self):
+    def vtr_duration_ratio(self) -> MappedArray:
         """Ratio of VtR duration to total duration of each drawdown.
 
         The time from valley to recovery divided by the time from peak to valley."""
@@ -278,22 +289,22 @@ class Drawdowns(Records):
     # ############# Plotting ############# #
 
     def plot(self,
-             column=None,
-             top_n=5,
-             plot_ts=True,
-             plot_zones=True,
-             ts_trace_kwargs=None,
-             peak_trace_kwargs=None,
-             valley_trace_kwargs=None,
-             recovery_trace_kwargs=None,
-             active_trace_kwargs=None,
-             ptv_shape_kwargs=None,
-             vtr_shape_kwargs=None,
-             active_shape_kwargs=None,
-             add_trace_kwargs=None,
-             xref='x', yref='y',
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             top_n: int = 5,
+             plot_ts: bool = True,
+             plot_zones: bool = True,
+             ts_trace_kwargs: tp.KwargsLike = None,
+             peak_trace_kwargs: tp.KwargsLike = None,
+             valley_trace_kwargs: tp.KwargsLike = None,
+             recovery_trace_kwargs: tp.KwargsLike = None,
+             active_trace_kwargs: tp.KwargsLike = None,
+             ptv_shape_kwargs: tp.KwargsLike = None,
+             vtr_shape_kwargs: tp.KwargsLike = None,
+             active_shape_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             xref: str = 'x', yref: str = 'y',
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot drawdowns over `Drawdowns.ts`.
 
         Args:
@@ -357,7 +368,7 @@ class Drawdowns(Records):
             add_trace_kwargs = {}
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
         y_domain = [0, 1]
         yaxis = 'yaxis' + yref[1:]

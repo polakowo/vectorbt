@@ -14,7 +14,7 @@ import plotly.graph_objects as go
 
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.widgets import FigureWidget, make_subplots
+from vectorbt.utils.figure import make_figure, make_subplots
 from vectorbt.utils.config import merge_dicts
 from vectorbt.generic.accessors import GenericDFAccessor
 
@@ -88,7 +88,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             if display_volume:
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0, row_heights=[0.7, 0.3])
             else:
-                fig = FigureWidget()
+                fig = make_figure()
             fig.update_layout(
                 showlegend=True,
                 xaxis=dict(
@@ -134,7 +134,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         if display_volume:
             volume = self._obj[column_names['volume']]
 
-            marker_colors = np.empty(volume.shape, dtype=np.object)
+            marker_colors = np.empty(volume.shape, dtype=object)
             marker_colors[(close.values - open.values) > 0] = color_schema['increasing']
             marker_colors[(close.values - open.values) == 0] = color_schema['gray']
             marker_colors[(close.values - open.values) < 0] = color_schema['decreasing']

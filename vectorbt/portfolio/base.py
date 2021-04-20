@@ -341,7 +341,7 @@ from vectorbt.utils.enum import prepare_enum_value
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.widgets import make_subplots
+from vectorbt.utils.figure import make_subplots
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb

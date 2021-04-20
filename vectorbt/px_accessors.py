@@ -6,7 +6,7 @@ import plotly.express as px
 
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.generic.plotting import clean_labels
@@ -44,10 +44,10 @@ def add_px_methods(cls):
                 obj.index = clean_labels(obj.index)
 
                 if px_func_name == 'imshow':
-                    return FigureWidget(px_func(
+                    return make_figure(px_func(
                         obj.vbt.to_2d_array(), *args, **layout_kwargs, **kwargs
                     ), layout=layout_kwargs)
-                return FigureWidget(px_func(
+                return make_figure(px_func(
                     obj, *args, **layout_kwargs, **kwargs
                 ), layout=layout_kwargs)
 

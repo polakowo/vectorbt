@@ -2,8 +2,8 @@
 
 import inspect
 
+from vectorbt import typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils import typing as tp
 
 
 def deep_getattr(obj: tp.Any, attr_chain: tp.Union[str, tuple, list]) -> tp.Any:

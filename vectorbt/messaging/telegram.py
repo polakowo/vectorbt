@@ -17,9 +17,9 @@ from telegram.ext import (
 from telegram.utils.helpers import effective_message_type
 from telegram.error import Unauthorized, ChatMigrated
 
+from vectorbt import typing as tp
 from vectorbt.utils.config import merge_dicts, get_func_kwargs, Configured
 from vectorbt.utils.requests import text_to_giphy_url
-from vectorbt.utils import typing as tp
 
 logger = logging.getLogger(__name__)
 
@@ -133,7 +133,7 @@ class TelegramBot(Configured):
     INFO:apscheduler.scheduler:Scheduler has been shut down
     ```"""
 
-    def __init__(self, giphy_kwargs: tp.Optional[dict] = None, **kwargs) -> None:
+    def __init__(self, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         from vectorbt import settings
 
         Configured.__init__(
@@ -279,7 +279,7 @@ class TelegramBot(Configured):
         log_msg = "\"%s\"" % text
         self.send_to_all('message', text, *args, log_msg=log_msg, **kwargs)
 
-    def send_giphy(self, chat_id: int, text: str, *args, giphy_kwargs: tp.Optional[dict] = None, **kwargs) -> None:
+    def send_giphy(self, chat_id: int, text: str, *args, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         """Send GIPHY from text to `chat_id`."""
         if giphy_kwargs is None:
             giphy_kwargs = self.giphy_kwargs
@@ -287,7 +287,7 @@ class TelegramBot(Configured):
         log_msg = "\"%s\" as GIPHY %s" % (text, gif_url)
         self.send('animation', chat_id, gif_url, *args, log_msg=log_msg, **kwargs)
 
-    def send_giphy_to_all(self, text: str, *args, giphy_kwargs: tp.Optional[dict] = None, **kwargs) -> None:
+    def send_giphy_to_all(self, text: str, *args, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
         """Send GIPHY from text to all in `TelegramBot.chat_ids`."""
         if giphy_kwargs is None:
             giphy_kwargs = self.giphy_kwargs

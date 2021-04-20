@@ -21,7 +21,7 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.records.base import Records
@@ -420,7 +420,7 @@ class Trades(Records):
         marker_size_range = tuple(marker_size_range)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
         x_domain = [0, 1]
         xaxis = 'xaxis' + xref[1:]
@@ -617,7 +617,7 @@ class Trades(Records):
             add_trace_kwargs = {}
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         # Plot close

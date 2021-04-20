@@ -105,7 +105,7 @@ class TestAccessors:
         pd.testing.assert_series_equal(df['a'].vbt.bshift(test_n), df['a'].shift(-test_n))
         np.testing.assert_array_equal(
             df['a'].vbt.bshift(test_n).values,
-            nb.bshift_1d_nb(df['a'].values, test_n)
+            nb.bshift_nb(df['a'].values, test_n)
         )
         pd.testing.assert_frame_equal(df.vbt.bshift(test_n), df.shift(-test_n))
 

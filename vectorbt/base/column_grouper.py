@@ -9,7 +9,8 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.array import is_sorted
 from vectorbt.utils.config import Configured

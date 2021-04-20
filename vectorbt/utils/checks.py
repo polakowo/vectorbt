@@ -6,8 +6,9 @@ import pandas as pd
 from numba.core.registry import CPUDispatcher
 from inspect import signature
 import dill
+from collections import Hashable
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 
 
 # ############# Checks ############# #
@@ -42,11 +43,20 @@ def _to_any_array(arg: tp.ArrayLike) -> tp.AnyArray:
     return np.asarray(arg)
 
 
-def is_sequence(obj: tp.Any) -> bool:
+def is_sequence(arg: tp.Any) -> bool:
     """Check whether the argument is a sequence."""
     try:
-        len(obj)
-        obj[0:0]
+        len(arg)
+        arg[0:0]
+        return True
+    except TypeError:
+        return False
+
+
+def is_iterable(arg: tp.Any) -> bool:
+    """Check whether the argument is iterable."""
+    try:
+        _ = iter(arg)
         return True
     except TypeError:
         return False
@@ -63,9 +73,12 @@ def is_numba_func(arg: tp.Any) -> bool:
 
 def is_hashable(arg: tp.Any) -> bool:
     """Check whether the argument can be hashed."""
+    if not isinstance(arg, Hashable):
+        return False
+    # Having __hash__() method does not mean that it's hashable
     try:
         hash(arg)
-    except Exception:
+    except TypeError:
         return False
     return True
 
@@ -301,7 +314,7 @@ def assert_ndim(arg: tp.ArrayLike, ndims: tp.MaybeTuple[int]) -> None:
             raise AssertionError(f"Number of dimensions must be {ndims}, not {arg.ndim}")
 
 
-def assert_len_equal(arg1: tp.Sequence, arg2: tp.Sequence) -> None:
+def assert_len_equal(arg1: tp.Sized, arg2: tp.Sized) -> None:
     """Raise exception if the first argument and the second argument have different length.
 
     Does not transform arguments to NumPy arrays."""

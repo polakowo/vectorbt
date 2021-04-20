@@ -1,6 +1,6 @@
 """Enum utilities."""
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 
 
 def get_caseins_enum_attr(enum: tp.NamedTuple, attr: str) -> tp.Any:

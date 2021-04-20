@@ -5,7 +5,7 @@ import imageio
 from tqdm import tqdm
 import plotly.graph_objects as go
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 
 
 def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
@@ -28,9 +28,16 @@ def vstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     return c
 
 
-def save_animation(fname: str, index: tp.Sequence, plot_func: tp.Func, *args,
-                   delta: tp.Optional[int] = None, step: int = 1, fps: int = 3,
-                   writer_kwargs: dict = None, show_progress: bool = True, **kwargs) -> None:
+def save_animation(fname: str,
+                   index: tp.ArrayLikeSequence,
+                   plot_func: tp.Func,
+                   *args,
+                   delta: tp.Optional[int] = None,
+                   step: int = 1,
+                   fps: int = 3,
+                   writer_kwargs: dict = None,
+                   show_progress: bool = True,
+                   **kwargs) -> None:
     """Save animation to a file.
 
     Args:

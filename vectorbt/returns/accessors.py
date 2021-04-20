@@ -36,7 +36,7 @@ from scipy.stats import skew, kurtosis
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import reshape_fns
 from vectorbt.generic.accessors import (
@@ -609,7 +609,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         from vectorbt.settings import color_schema
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
         x_domain = [0, 1]
         xaxis = 'xaxis' + xref[1:]

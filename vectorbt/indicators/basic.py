@@ -50,7 +50,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.generic import nb as generic_nb
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators import nb
@@ -114,7 +114,7 @@ class _MA(MA):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         if close_trace_kwargs is None:
@@ -195,7 +195,7 @@ class _MSTD(MSTD):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         if mstd_trace_kwargs is None:
@@ -288,7 +288,7 @@ class _BBANDS(BBANDS):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         if close_trace_kwargs is None:
@@ -398,7 +398,7 @@ class _RSI(RSI):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
         fig.update_layout(**default_layout)
@@ -500,7 +500,7 @@ class _STOCH(STOCH):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(range=[-5, 105])
         fig.update_layout(**default_layout)
@@ -612,7 +612,7 @@ class _MACD(MACD):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             fig.update_layout(bargap=0)
         fig.update_layout(**layout_kwargs)
 
@@ -640,7 +640,7 @@ class _MACD(MACD):
         # Plot hist
         hist = self_col.hist.values
         hist_diff = generic_nb.diff_1d_nb(hist)
-        marker_colors = np.full(hist.shape, 'silver', dtype=np.object)
+        marker_colors = np.full(hist.shape, 'silver', dtype=object)
         marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
         marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
         marker_colors[(hist < 0) & (hist_diff < 0)] = 'red'
@@ -724,7 +724,7 @@ class _ATR(ATR):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         if tr_trace_kwargs is None:
@@ -797,7 +797,7 @@ class _OBV(OBV):
         self_col = self.select_series(column=column)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         if obv_trace_kwargs is None:

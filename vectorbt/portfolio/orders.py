@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.records.base import Records
@@ -188,7 +188,7 @@ class Orders(Records):
             add_trace_kwargs = {}
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         # Plot close

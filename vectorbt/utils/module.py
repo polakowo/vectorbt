@@ -6,7 +6,7 @@ import importlib
 import pkgutil
 from types import ModuleType
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 
 
 def is_from_module(obj: tp.Any, module: ModuleType) -> bool:

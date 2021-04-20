@@ -86,7 +86,8 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.utils.config import Configured, merge_dicts
 from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
 from vectorbt.utils.array import get_ranges_arr
@@ -94,9 +95,10 @@ from vectorbt.utils.decorators import cached_method
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
+from vectorbt.base.reshape_fns import to_pd_array
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
-IMT = tp.Tuple[ArrayWrapperT, tp.MaybeArray1d, tp.MaybeArray1d, tp.Array1d]
+IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray1d, tp.MaybeArray1d, tp.Array1d]
 
 
 class ArrayWrapper(Configured, PandasIndexer):
@@ -146,9 +148,10 @@ class ArrayWrapper(Configured, PandasIndexer):
         Configured.__init__(self, **merge_dicts(config, self._grouper._config))
 
     @cached_method
-    def indexing_func_meta(self: ArrayWrapperT, pd_indexing_func: tp.IndexingFunc, index: tp.Optional[tp.Index] = None,
-                           columns: tp.Optional[tp.Index] = None, column_only_select: tp.Optional[bool] = None,
-                           group_select: tp.Optional[bool] = None, group_by: tp.GroupByLike = None) -> IMT:
+    def indexing_func_meta(self: ArrayWrapperT, pd_indexing_func: tp.PandasIndexingFunc,
+                           index: tp.Optional[tp.IndexLike] = None, columns: tp.Optional[tp.IndexLike] = None,
+                           column_only_select: tp.Optional[bool] = None, group_select: tp.Optional[bool] = None,
+                           group_by: tp.GroupByLike = None) -> IndexingMetaT:
         """Perform indexing on `ArrayWrapper` and also return indexing metadata.
 
         Takes into account column grouping.
@@ -176,11 +179,15 @@ class ArrayWrapper(Configured, PandasIndexer):
         group_select = group_select and _self.grouper.is_grouped()
         if index is None:
             index = _self.index
+        if not isinstance(index, pd.Index):
+            index = pd.Index(index)
         if columns is None:
             if group_select:
                 columns = _self.grouper.get_columns()
             else:
                 columns = _self.columns
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
         if group_select:
             # Groups as columns
             i_wrapper = ArrayWrapper(index, columns, _self.get_ndim())
@@ -312,16 +319,17 @@ class ArrayWrapper(Configured, PandasIndexer):
             group_by=None
         ), idx_idxs, col_idxs, col_idxs
 
-    def indexing_func(self: ArrayWrapperT, pd_indexing_func: tp.IndexingFunc, **kwargs) -> ArrayWrapperT:
+    def indexing_func(self: ArrayWrapperT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> ArrayWrapperT:
         """Perform indexing on `ArrayWrapper`"""
         return self.indexing_func_meta(pd_indexing_func, **kwargs)[0]
 
     @classmethod
-    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.SeriesFrame, *args, **kwargs) -> ArrayWrapperT:
+    def from_obj(cls: tp.Type[ArrayWrapperT], obj: tp.ArrayLike, *args, **kwargs) -> ArrayWrapperT:
         """Derive metadata from an object."""
-        index = index_fns.get_index(obj, 0)
-        columns = index_fns.get_index(obj, 1)
-        ndim = obj.ndim
+        pd_obj = to_pd_array(obj)
+        index = index_fns.get_index(pd_obj, 0)
+        columns = index_fns.get_index(pd_obj, 1)
+        ndim = pd_obj.ndim
         return cls(index, columns, ndim, *args, **kwargs)
 
     @classmethod
@@ -413,7 +421,7 @@ class ArrayWrapper(Configured, PandasIndexer):
                     warnings.warn(repr(e), stacklevel=2)
         return freq
 
-    def to_time_units(self, a: tp.MaybeSNumberArray) -> tp.Union[pd.Timedelta, tp.Array]:
+    def to_time_units(self, a: tp.MaybeArray[float]) -> tp.Union[pd.Timedelta, tp.Array]:
         """Convert array to time units."""
         if self.freq is None:
             raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
@@ -471,27 +479,31 @@ class ArrayWrapper(Configured, PandasIndexer):
             )
         return _self  # important for keeping cache
 
-    def wrap(self, a: tp.ArrayLike, index: tp.Optional[tp.Index] = None, columns: tp.Optional[tp.Index] = None,
+    def wrap(self, a: tp.ArrayLike, index: tp.Optional[tp.IndexLike] = None, columns: tp.Optional[tp.IndexLike] = None,
              dtype: tp.Optional[tp.PandasDTypeLike] = None, group_by: tp.GroupByLike = None) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
         _self = self.resolve(group_by=group_by)
 
-        arr = np.asarray(a)
-        arr = reshape_fns.soft_to_ndim(arr, self.ndim)
         if index is None:
             index = _self.index
+        if not isinstance(index, pd.Index):
+            index = pd.Index(index)
         if columns is None:
             columns = _self.columns
-        if columns is not None and len(columns) == 1:
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
+        if len(columns) == 1:
             name = columns[0]
             if name == 0:  # was a Series before
                 name = None
         else:
             name = None
-        if index is not None:
-            checks.assert_shape_equal(arr, index, axis=(0, 0))
-        if arr.ndim == 2 and columns is not None:
+
+        arr = np.asarray(a)
+        arr = reshape_fns.soft_to_ndim(arr, self.ndim)
+        checks.assert_shape_equal(arr, index, axis=(0, 0))
+        if arr.ndim == 2:
             checks.assert_shape_equal(arr, columns, axis=(1, 0))
         if arr.ndim == 1:
             return pd.Series(arr, index=index, name=name, dtype=dtype)
@@ -501,9 +513,9 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
         raise ValueError(f"{arr.ndim}-d input is not supported")
 
-    def wrap_reduced(self, a: tp.ArrayLike, name_or_index: tp.NameIndex = None, columns: tp.Optional[tp.Index] = None,
-                     dtype: tp.Optional[tp.PandasDTypeLike] = None, group_by: tp.GroupByLike = None,
-                     time_units: bool = False) -> tp.SeriesFrame:
+    def wrap_reduced(self, a: tp.ArrayLike, name_or_index: tp.NameIndex = None,
+                     columns: tp.Optional[tp.IndexLike] = None, dtype: tp.Optional[tp.PandasDTypeLike] = None,
+                     group_by: tp.GroupByLike = None, time_units: bool = False) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
@@ -516,6 +528,9 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if columns is None:
             columns = _self.columns
+        if not isinstance(columns, pd.Index):
+            columns = pd.Index(columns)
+
         arr = np.asarray(a)
         if dtype is not None:
             try:
@@ -574,7 +589,7 @@ class Wrapping(Configured, PandasIndexer):
         Configured.__init__(self, wrapper=wrapper, **kwargs)
         PandasIndexer.__init__(self)
 
-    def indexing_func(self: WrappingT, pd_indexing_func: tp.IndexingFunc, **kwargs) -> WrappingT:
+    def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
         return self.copy(wrapper=self.wrapper.indexing_func(pd_indexing_func, **kwargs))
 

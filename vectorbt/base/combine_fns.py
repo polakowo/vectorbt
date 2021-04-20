@@ -10,7 +10,7 @@ from numba import njit
 from numba.typed import List
 from tqdm import tqdm
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 from vectorbt.base import reshape_fns
 
 
@@ -24,7 +24,7 @@ def apply_and_concat_none(n: int, apply_func: tp.Func, *args, show_progress: boo
 
 
 @njit
-def apply_and_concat_none_nb(n: int, apply_func_nb: tp.NumbaFunc, *args) -> None:
+def apply_and_concat_none_nb(n: int, apply_func_nb: tp.Func, *args) -> None:
     """A Numba-compiled version of `apply_and_concat_none`.
 
     !!! note
@@ -61,7 +61,7 @@ def to_2d_one_nb(a: tp.Array) -> tp.Array2d:
 
 
 @njit
-def apply_and_concat_one_nb(n: int, apply_func_nb: tp.NumbaFunc, *args) -> tp.Array2d:
+def apply_and_concat_one_nb(n: int, apply_func_nb: tp.Func, *args) -> tp.Array2d:
     """A Numba-compiled version of `apply_and_concat_one`.
 
     !!! note
@@ -105,7 +105,7 @@ def to_2d_multiple_nb(a: tp.Iterable[tp.Array]) -> List:
 
 
 @njit
-def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.NumbaFunc, *args) -> List:
+def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.Func, *args) -> List:
     """A Numba-compiled version of `apply_and_concat_multiple`.
 
     !!! note
@@ -128,21 +128,20 @@ def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.NumbaFunc, *args) -> 
     return outputs
 
 
-def select_and_combine(i: int, obj: tp.Any, others: tp.Sequence[tp.Any],
+def select_and_combine(i: int, obj: tp.Any, others: tp.Sequence,
                        combine_func: tp.Func, *args, **kwargs) -> tp.AnyArray:
     """Combine `obj` and an element from `others` at `i` using `combine_func`."""
     return combine_func(obj, others[i], *args, **kwargs)
 
 
-def combine_and_concat(obj: tp.Any, others: tp.Sequence[tp.Any],
+def combine_and_concat(obj: tp.Any, others: tp.Sequence,
                        combine_func: tp.Func, *args, **kwargs) -> tp.Array2d:
     """Use `apply_and_concat_one` to combine `obj` with each element from `others` using `combine_func`."""
     return apply_and_concat_one(len(others), select_and_combine, obj, others, combine_func, *args, **kwargs)
 
 
 @njit
-def select_and_combine_nb(i: int, obj: tp.Any, others: tp.Sequence[tp.Any],
-                          combine_func_nb: tp.NumbaFunc, *args) -> tp.Array:
+def select_and_combine_nb(i: int, obj: tp.Any, others: tp.Sequence, combine_func_nb: tp.Func, *args) -> tp.Array:
     """A Numba-compiled version of `select_and_combine`.
 
     !!! note
@@ -155,13 +154,12 @@ def select_and_combine_nb(i: int, obj: tp.Any, others: tp.Sequence[tp.Any],
 
 
 @njit
-def combine_and_concat_nb(obj: tp.Any, others: tp.Sequence[tp.Any],
-                          combine_func_nb: tp.NumbaFunc, *args) -> tp.Array2d:
+def combine_and_concat_nb(obj: tp.Any, others: tp.Sequence, combine_func_nb: tp.Func, *args) -> tp.Array2d:
     """A Numba-compiled version of `combine_and_concat`."""
     return apply_and_concat_one_nb(len(others), select_and_combine_nb, obj, others, combine_func_nb, *args)
 
 
-def combine_multiple(objs: tp.Sequence[tp.Any], combine_func: tp.Func, *args, **kwargs) -> tp.AnyArray:
+def combine_multiple(objs: tp.Sequence, combine_func: tp.Func, *args, **kwargs) -> tp.AnyArray:
     """Combine `objs` pairwise into a single object."""
     result = objs[0]
     for i in range(1, len(objs)):
@@ -170,7 +168,7 @@ def combine_multiple(objs: tp.Sequence[tp.Any], combine_func: tp.Func, *args, **
 
 
 @njit
-def combine_multiple_nb(objs: tp.Sequence[tp.Any], combine_func_nb: tp.NumbaFunc, *args) -> tp.Array:
+def combine_multiple_nb(objs: tp.Sequence, combine_func_nb: tp.Func, *args) -> tp.Array:
     """A Numba-compiled version of `combine_multiple`.
 
     !!! note
@@ -186,7 +184,7 @@ def combine_multiple_nb(objs: tp.Sequence[tp.Any], combine_func_nb: tp.NumbaFunc
 
 
 def ray_apply(n: int, apply_func: tp.Func, *args, ray_force_init: bool = False,
-              ray_func_kwargs: tp.Optional[dict] = None, ray_init_kwargs: tp.Optional[dict] = None,
+              ray_func_kwargs: tp.KwargsLike = None, ray_init_kwargs: tp.KwargsLike = None,
               ray_shutdown: bool = False, **kwargs) -> tp.List[tp.AnyArray]:
     """Run `apply_func` in distributed manner.
 
@@ -236,7 +234,6 @@ def apply_and_concat_multiple_ray(*args, **kwargs) -> tp.List[tp.Array2d]:
     return list(map(np.column_stack, list(zip(*results))))
 
 
-def combine_and_concat_ray(obj: tp.Any, others: tp.Sequence[tp.Any],
-                           combine_func: tp.Func, *args, **kwargs) -> tp.Array2d:
+def combine_and_concat_ray(obj: tp.Any, others: tp.Sequence, combine_func: tp.Func, *args, **kwargs) -> tp.Array2d:
     """Distributed version of `combine_and_concat`."""
     return apply_and_concat_one_ray(len(others), select_and_combine, obj, others, combine_func, *args, **kwargs)

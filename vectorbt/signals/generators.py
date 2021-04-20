@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objects as go
 
 from vectorbt.utils.config import Config
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
@@ -425,7 +425,7 @@ def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
             raise TypeError("Select a column first. Use indexing.")
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             fig.update_layout(
                 showlegend=True,
                 xaxis_rangeslider_visible=False,

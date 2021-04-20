@@ -215,7 +215,8 @@ import numpy as np
 import pandas as pd
 import warnings
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.datetime import is_tz_aware, to_timezone
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
@@ -232,9 +233,15 @@ DataT = tp.TypeVar("DataT", bound="Data")
 class Data(Wrapping):
     """Class that downloads, updates, and manages data coming from a data source."""
 
-    def __init__(self, wrapper: ArrayWrapper, data: tp.DataBySymbol, tz_localize: tp.Optional[tp.TimezoneLike],
-                 tz_convert: tp.Optional[tp.TimezoneLike], missing_index: str, missing_columns: str,
-                 download_kwargs: dict, **kwargs) -> None:
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 data: tp.Data,
+                 tz_localize: tp.Optional[tp.TimezoneLike],
+                 tz_convert: tp.Optional[tp.TimezoneLike],
+                 missing_index: str,
+                 missing_columns: str,
+                 download_kwargs: dict,
+                 **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -257,7 +264,7 @@ class Data(Wrapping):
         self._missing_columns = missing_columns
         self._download_kwargs = download_kwargs
 
-    def indexing_func(self: DataT, pd_indexing_func: tp.IndexingFunc, **kwargs) -> DataT:
+    def indexing_func(self: DataT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> DataT:
         """Perform indexing on `Data`."""
         new_wrapper = pd_indexing_func(self.wrapper)
         new_data = {k: pd_indexing_func(v) for k, v in self.data.items()}
@@ -267,12 +274,12 @@ class Data(Wrapping):
         )
 
     @property
-    def data(self) -> tp.DataBySymbol:
+    def data(self) -> tp.Data:
         """Data dictionary keyed by symbol."""
         return self._data
 
     @property
-    def symbols(self) -> tp.List[tp.Symbol]:
+    def symbols(self) -> tp.List[tp.Label]:
         """List of symbols."""
         return list(self.data.keys())
 
@@ -302,7 +309,7 @@ class Data(Wrapping):
         return self._download_kwargs
 
     @classmethod
-    def align_index(cls, data: tp.DataBySymbol, missing: str = 'nan') -> tp.DataBySymbol:
+    def align_index(cls, data: tp.Data, missing: str = 'nan') -> tp.Data:
         """Align data to have the same index.
 
         The argument `missing` accepts the following values:
@@ -337,7 +344,7 @@ class Data(Wrapping):
         return new_data
 
     @classmethod
-    def align_columns(cls, data: tp.DataBySymbol, missing: str = 'raise') -> tp.DataBySymbol:
+    def align_columns(cls, data: tp.Data, missing: str = 'raise') -> tp.Data:
         """Align data to have the same columns.
 
         See `Data.align_index` for `missing`."""
@@ -385,7 +392,7 @@ class Data(Wrapping):
         return new_data
 
     @classmethod
-    def select_symbol_kwargs(cls, symbol: tp.Symbol, kwargs: dict) -> dict:
+    def select_symbol_kwargs(cls, symbol: tp.Label, kwargs: dict) -> dict:
         """Select keyword arguments belonging to `symbol`."""
         _kwargs = dict()
         for k, v in kwargs.items():
@@ -397,9 +404,13 @@ class Data(Wrapping):
         return _kwargs
 
     @classmethod
-    def from_data(cls: tp.Type[DataT], data: tp.DataBySymbol, tz_localize: tp.Optional[tp.TimezoneLike] = None,
-                  tz_convert: tp.Optional[tp.TimezoneLike] = None, missing_index: tp.Optional[str] = None,
-                  missing_columns: tp.Optional[str] = None, wrapper_kwargs: tp.Optional[dict] = None,
+    def from_data(cls: tp.Type[DataT],
+                  data: tp.Data,
+                  tz_localize: tp.Optional[tp.TimezoneLike] = None,
+                  tz_convert: tp.Optional[tp.TimezoneLike] = None,
+                  missing_index: tp.Optional[str] = None,
+                  missing_columns: tp.Optional[str] = None,
+                  wrapper_kwargs: tp.KwargsLike = None,
                   **kwargs) -> DataT:
         """Create a new `Data` instance from (aligned) data.
 
@@ -473,22 +484,26 @@ class Data(Wrapping):
         )
 
     @classmethod
-    def download_symbol(cls, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def download_symbol(cls, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
         """Abstract method to download a symbol."""
         raise NotImplementedError
 
     @classmethod
-    def download(cls: tp.Type[DataT], symbols: tp.Symbols, tz_localize: tp.Optional[tp.TimezoneLike] = None,
-                 tz_convert: tp.Optional[tp.TimezoneLike] = None, missing_index: tp.Optional[str] = None,
-                 missing_columns: tp.Optional[str] = None, wrapper_kwargs: tp.Optional[dict] = None,
+    def download(cls: tp.Type[DataT],
+                 symbols: tp.Union[tp.Label, tp.Labels],
+                 tz_localize: tp.Optional[tp.TimezoneLike] = None,
+                 tz_convert: tp.Optional[tp.TimezoneLike] = None,
+                 missing_index: tp.Optional[str] = None,
+                 missing_columns: tp.Optional[str] = None,
+                 wrapper_kwargs: tp.KwargsLike = None,
                  **kwargs) -> DataT:
         """Download data using `Data.download_symbol`.
 
         Args:
-            symbols (hashable or list of hashable): One or multiple symbols.
+            symbols (hashable or sequence of hashable): One or multiple symbols.
 
                 !!! note
-                    Tuple is considered as a single symbol.
+                    Tuple is considered as a single symbol (since hashable).
             tz_localize (any): See `Data.from_data`.
             tz_convert (any): See `Data.from_data`.
             missing_index (str): See `Data.from_data`.
@@ -498,8 +513,10 @@ class Data(Wrapping):
 
                 If two symbols require different keyword arguments, pass `symbol_dict` for each argument.
         """
-        if not isinstance(symbols, list):
+        if checks.is_hashable(symbols):
             symbols = [symbols]
+        elif not checks.is_sequence(symbols):
+            raise TypeError("Symbols must be either hashable or sequence of hashable")
 
         data = dict()
         for s in symbols:
@@ -520,7 +537,7 @@ class Data(Wrapping):
             download_kwargs=kwargs
         )
 
-    def update_symbol(self, symbol: tp.Symbol, **kwargs) -> tp.SeriesFrame:
+    def update_symbol(self, symbol: tp.Label, **kwargs) -> tp.SeriesFrame:
         """Abstract method to update a symbol."""
         raise NotImplementedError
 
@@ -590,7 +607,7 @@ class Data(Wrapping):
         )
 
     @cached_method
-    def concat(self, level_name: str = 'symbol') -> tp.DataByColumn:
+    def concat(self, level_name: str = 'symbol') -> tp.Data:
         """Return a dict of Series/DataFrames with symbols as columns, keyed by column name."""
         first_data = self.data[self.symbols[0]]
         index = first_data.index
@@ -621,7 +638,7 @@ class Data(Wrapping):
 
         return new_data
 
-    def get(self, column: tp.Optional[tp.Column] = None, **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
+    def get(self, column: tp.Optional[tp.Label] = None, **kwargs) -> tp.MaybeTuple[tp.SeriesFrame]:
         """Get column data.
 
         If one symbol, returns data for that symbol.

@@ -6,10 +6,10 @@ and cleansing MultiIndex levels. "Index" in pandas context is referred to both i
 import numpy as np
 import pandas as pd
 from numba import njit
-from collections.abc import Sequence
 from datetime import datetime, timedelta
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 
 
 def to_any_index(index_like: tp.IndexLike) -> tp.Index:
@@ -37,7 +37,7 @@ def get_index(arg: tp.SeriesFrame, axis: int) -> tp.Index:
             return arg.columns
 
 
-def index_from_values(values: tp.Sequence, name: tp.Optional[str] = None) -> tp.Index:
+def index_from_values(values: tp.ArrayLikeSequence, name: tp.Optional[str] = None) -> tp.Index:
     """Create a new `pd.Index` with `name` by parsing an iterable `values`.
 
     Each in `values` will correspond to an element in the new index."""
@@ -214,7 +214,7 @@ def drop_duplicate_levels(index: tp.Index, keep: tp.Optional[str] = None) -> tp.
     if keep == 'first':
         r = range(0, index.nlevels)
     else:
-        r = range(index.nlevels-1, -1, -1)  # loop backwards
+        r = range(index.nlevels - 1, -1, -1)  # loop backwards
     for i in r:
         level = (index.levels[i].name, tuple(index.get_level_values(i).to_numpy().tolist()))
         if level not in levels:
@@ -315,8 +315,12 @@ def align_indexes(indexes: tp.Sequence[tp.Index]) -> tp.List[tp.Index]:
     return indices
 
 
-def pick_levels(index: tp.Index, required_levels: tp.Optional[tp.LevelSequence] = None,
-                optional_levels: tp.Optional[tp.LevelSequence] = None) -> tp.Tuple[tp.List[int], tp.List[int]]:
+OptionalLevelSequence = tp.Optional[tp.Sequence[tp.Union[None, tp.Level]]]
+
+
+def pick_levels(index: tp.Index,
+                required_levels: OptionalLevelSequence = None,
+                optional_levels: OptionalLevelSequence = None) -> tp.Tuple[tp.List[int], tp.List[int]]:
     """Pick optional and required levels and return their indices.
 
     Raises an exception if index has less or more levels than expected."""

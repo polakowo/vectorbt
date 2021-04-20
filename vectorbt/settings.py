@@ -181,6 +181,22 @@ def reset_theme():
 
 reset_theme()
 
+# Plotting
+plotting = Config(
+    dict(
+        use_widgets=True
+    ),
+    frozen=True
+)
+"""_"""
+
+__pdoc__['plotting'] = f"""Parameters for plotting.
+
+```plaintext
+{json.dumps(plotting, indent=2, default=str)}
+```
+"""
+
 # OHLCV
 ohlcv = Config(
     dict(

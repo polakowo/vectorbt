@@ -7,7 +7,9 @@ import pandas as pd
 from numba import njit
 from collections.abc import Sequence
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
+from vectorbt.utils.config import resolve_dict
 from vectorbt.base import index_fns, array_wrapper
 
 
@@ -18,6 +20,18 @@ def to_any_array(arg: tp.ArrayLike, raw: bool = False) -> tp.AnyArray:
     if not raw and checks.is_any_array(arg):
         return arg
     return np.asarray(arg)
+
+
+def to_pd_array(arg: tp.ArrayLike) -> tp.SeriesFrame:
+    """Convert any array-like object to a pandas object."""
+    if checks.is_pandas(arg):
+        return arg
+    arg = np.asarray(arg)
+    if arg.ndim == 1:
+        return pd.Series(arg)
+    if arg.ndim == 2:
+        return pd.DataFrame(arg)
+    raise ValueError("Wrong number of dimensions: cannot convert to Series or DataFrame")
 
 
 def soft_to_ndim(arg: tp.ArrayLike, ndim: int, raw: bool = False) -> tp.AnyArray:
@@ -120,8 +134,12 @@ IndexFromLike = tp.Union[None, str, int, tp.Any]
 """Any object that can be coerced into a `index_from` argument."""
 
 
-def broadcast_index(args: tp.Sequence[tp.AnyArray], to_shape: tp.Shape, index_from: IndexFromLike = None,
-                    axis: int = 0, ignore_sr_names: tp.Optional[bool] = None, **kwargs) -> tp.Optional[tp.Index]:
+def broadcast_index(args: tp.Sequence[tp.AnyArray],
+                    to_shape: tp.Shape,
+                    index_from: IndexFromLike = None,
+                    axis: int = 0,
+                    ignore_sr_names: tp.Optional[bool] = None,
+                    **kwargs) -> tp.Optional[tp.Index]:
     """Produce a broadcast index/columns.
 
     Args:
@@ -241,7 +259,9 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray], to_shape: tp.Shape, index_fr
     return new_index
 
 
-def wrap_broadcasted(old_arg: tp.AnyArray, new_arg: tp.Array, is_pd: bool = False,
+def wrap_broadcasted(old_arg: tp.AnyArray,
+                     new_arg: tp.Array,
+                     is_pd: bool = False,
                      new_index: tp.Optional[tp.Index] = None,
                      new_columns: tp.Optional[tp.Index] = None) -> tp.AnyArray:
     """If the newly brodcasted array was originally a pandas object, make it pandas object again 
@@ -286,23 +306,21 @@ def broadcast_shape(*args) -> tp.Shape:
 
 
 BCRT = tp.Union[
-    tp.AnyArray,
-    tp.Tuple[tp.AnyArray, ...],
-    tp.Tuple[tp.AnyArray, tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]],
-    tp.Tuple[tp.Tuple[tp.AnyArray, ...], tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]]
+    tp.MaybeTuple[tp.AnyArray],
+    tp.Tuple[tp.MaybeTuple[tp.AnyArray], tp.Shape, tp.Optional[tp.Index], tp.Optional[tp.Index]]
 ]
 
 
 def broadcast(*args: tp.ArrayLike,
-              to_shape: tp.Optional[tp.Tuple[int, ...]] = None,
-              to_pd: tp.Optional[tp.Union[bool, tp.Sequence[bool]]] = None,
+              to_shape: tp.Optional[tp.Shape] = None,
+              to_pd: tp.Optional[tp.MaybeSequence[bool]] = None,
               to_frame: tp.Optional[bool] = None,
               align_index: tp.Optional[bool] = None,
               align_columns: tp.Optional[bool] = None,
               index_from: tp.Optional[IndexFromLike] = None,
               columns_from: tp.Optional[IndexFromLike] = None,
-              require_kwargs: tp.Optional[tp.Union[dict, tp.Sequence[dict]]] = None,
-              keep_raw: tp.Union[bool, tp.Sequence[bool]] = False,
+              require_kwargs: tp.KwargsLikeSequence = None,
+              keep_raw: tp.Optional[tp.MaybeSequence[bool]] = False,
               return_meta: bool = False,
               **kwargs) -> BCRT:
     """Bring any array-like object in `args` to the same shape by using NumPy broadcasting.
@@ -461,8 +479,7 @@ def broadcast(*args: tp.ArrayLike,
 
     is_pd = False
     is_2d = False
-    if require_kwargs is None:
-        require_kwargs = {}
+    require_kwargs = resolve_dict(require_kwargs)
     if align_index is None:
         align_index = settings.broadcasting['align_index']
     if align_columns is None:
@@ -548,10 +565,7 @@ def broadcast(*args: tp.ArrayLike,
 
     # Force to match requirements
     for i in range(len(new_args)):
-        if isinstance(require_kwargs, Sequence) and not isinstance(require_kwargs, dict):
-            _require_kwargs = require_kwargs[i]
-        else:
-            _require_kwargs = require_kwargs
+        _require_kwargs = resolve_dict(require_kwargs, i=i)
         new_args[i] = np.require(new_args[i], **_require_kwargs)
 
     if is_pd:
@@ -591,9 +605,12 @@ def broadcast(*args: tp.ArrayLike,
     return new_args[0]
 
 
-def broadcast_to(arg1: tp.ArrayLike, arg2: tp.ArrayLike,
-                 to_pd: tp.Optional[bool] = None, index_from: tp.Optional[IndexFromLike] = None,
-                 columns_from: tp.Optional[IndexFromLike] = None, **kwargs) -> BCRT:
+def broadcast_to(arg1: tp.ArrayLike,
+                 arg2: tp.ArrayLike,
+                 to_pd: tp.Optional[bool] = None,
+                 index_from: tp.Optional[IndexFromLike] = None,
+                 columns_from: tp.Optional[IndexFromLike] = None,
+                 **kwargs) -> BCRT:
     """Broadcast `arg1` to `arg2`.
 
     Pass None to `index_from`/`columns_from` to use index/columns of the second argument.
@@ -669,15 +686,14 @@ def broadcast_to_array_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike) -> tp.Array:
     return np.tile(arg1, (1, *arg2.shape))
 
 
-def broadcast_to_axis_of(arg1: tp.AnyArray, arg2: tp.AnyArray, axis: int,
-                         require_kwargs: tp.Optional[dict] = None) -> tp.Array:
+def broadcast_to_axis_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: int,
+                         require_kwargs: tp.KwargsLike = None) -> tp.Array:
     """Broadcast `arg1` to an axis of `arg2`.
 
     If `arg2` has less dimensions than requested, will broadcast `arg1` to a single number.
 
     For other keyword arguments, see `broadcast`."""
-    if require_kwargs is None:
-        require_kwargs = {}
+    require_kwargs = resolve_dict(require_kwargs)
     arg2 = to_any_array(arg2)
     if arg2.ndim < axis + 1:
         return np.broadcast_to(arg1, (1,))[0]  # to a single number

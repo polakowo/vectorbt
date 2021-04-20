@@ -60,9 +60,9 @@ under the hood, which is mostly much faster than with pandas.
 
 import numpy as np
 import pandas as pd
-from collections.abc import Iterable
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base import combine_fns, index_fns, reshape_fns
@@ -241,7 +241,7 @@ class BaseAccessor:
         return reshape_fns.to_2d(self._obj, raw=True)
 
     def tile(self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1,
-             wrap_kwargs: tp.Optional[dict] = None) -> tp.SeriesFrame:
+             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.base.reshape_fns.tile`.
 
         Set `axis` to 1 for columns and 0 for index.
@@ -259,7 +259,7 @@ class BaseAccessor:
         return tiled
 
     def repeat(self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1,
-               wrap_kwargs: tp.Optional[dict] = None) -> tp.SeriesFrame:
+               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.base.reshape_fns.repeat`.
 
         Set `axis` to 1 for columns and 0 for index.
@@ -276,7 +276,7 @@ class BaseAccessor:
                     repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
         return repeated
 
-    def align_to(self, other: tp.ArrayLike, wrap_kwargs: tp.Optional[dict] = None) -> tp.SeriesFrame:
+    def align_to(self, other: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Align to `other` on their axes.
 
         ## Example
@@ -346,7 +346,7 @@ class BaseAccessor:
     # ############# Combining ############# #
 
     def apply(self, *args, apply_func: tp.Optional[tp.Func] = None, keep_pd: bool = False,
-              to_2d: bool = False, wrap_kwargs: tp.Optional[dict] = None, **kwargs) -> tp.SeriesFrame:
+              to_2d: bool = False, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Apply a function `apply_func`.
 
         Args:
@@ -390,7 +390,7 @@ class BaseAccessor:
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @class_or_instancemethod
-    def concat(self_or_cls, *others: tp.ArrayLike, broadcast_kwargs: tp.Optional[dict] = None,
+    def concat(self_or_cls, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
                keys: tp.Optional[tp.IndexLike] = None):
         """Concatenate with `others` along columns.
 
@@ -431,7 +431,7 @@ class BaseAccessor:
     def apply_and_concat(self, ntimes: int, *args, apply_func: tp.Optional[tp.Func] = None,
                          keep_pd: bool = False, to_2d: bool = False, numba_loop: bool = False,
                          use_ray: bool = False, keys: tp.Optional[tp.IndexLike] = None,
-                         wrap_kwargs: tp.Optional[dict] = None, **kwargs):
+                         wrap_kwargs: tp.KwargsLike = None, **kwargs):
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
         See `vectorbt.base.combine_fns.apply_and_concat_one`.
 
@@ -518,8 +518,8 @@ class BaseAccessor:
     def combine(self, other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, "BaseAccessor"]], *args,
                 allow_multiple: bool = True, combine_func: tp.Optional[tp.Func] = None,
                 keep_pd: bool = False, to_2d: bool = False, concat: bool = False, numba_loop: bool = False,
-                use_ray: bool = False, broadcast: bool = True, broadcast_kwargs: tp.Optional[dict] = None,
-                keys: tp.Optional[tp.IndexLike] = None, wrap_kwargs: tp.Optional[dict] = None, **kwargs):
+                use_ray: bool = False, broadcast: bool = True, broadcast_kwargs: tp.KwargsLike = None,
+                keys: tp.Optional[tp.IndexLike] = None, wrap_kwargs: tp.KwargsLike = None, **kwargs):
         """Combine with `other` using `combine_func`.
 
         Args:

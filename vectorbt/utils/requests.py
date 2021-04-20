@@ -4,7 +4,8 @@ import requests
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 from urllib.parse import urlencode
-from vectorbt.utils import typing as tp
+
+from vectorbt import typing as tp
 
 
 def requests_retry_session(retries: int = 3, backoff_factor: float = 0.3,

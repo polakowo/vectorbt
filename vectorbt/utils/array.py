@@ -3,7 +3,7 @@
 import numpy as np
 from numba import njit
 
-from vectorbt.utils import typing as tp
+from vectorbt import typing as tp
 
 
 def is_sorted(a: tp.Array1d) -> np.bool_:
@@ -70,8 +70,8 @@ def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
     return rand_floats
 
 
-def renormalize(a: tp.MaybeNumberArray, from_range: tp.Tuple[float, float],
-                to_range: tp.Tuple[float, float]) -> tp.MaybeNumberArray:
+def renormalize(a: tp.MaybeArray[float], from_range: tp.Tuple[float, float],
+                to_range: tp.Tuple[float, float]) -> tp.MaybeArray[float]:
     """Renormalize `a` from one range to another."""
     delta1 = from_range[1] - from_range[0]
     delta2 = to_range[1] - to_range[0]

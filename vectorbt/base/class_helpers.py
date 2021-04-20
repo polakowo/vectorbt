@@ -6,7 +6,8 @@ to quickly add a range of Numba-compiled functions to the class."""
 import numpy as np
 import inspect
 
-from vectorbt.utils import checks, typing as tp
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 
 
@@ -19,10 +20,11 @@ def get_kwargs(func: tp.Func) -> tp.Dict[str, tp.Any]:
     }
 
 
-NBFuncInfo = tp.Union[tp.Tuple[tp.Func, bool, tp.NameIndex], tp.Tuple[tp.Func, bool]]
+WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
+NBFuncInfoT = tp.Union[tp.Tuple[tp.Func, bool, tp.NameIndex], tp.Tuple[tp.Func, bool]]
 
 
-def add_nb_methods(nb_funcs: tp.Sequence[NBFuncInfo], module_name: tp.Optional[str] = None) -> tp.Func:
+def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[str] = None) -> WrapperFuncT:
     """Class decorator to wrap Numba functions methods of an accessor class.
 
     `nb_funcs` should contain tuples of Numba functions, whether they are reducing, and optionally `index_or_name`.
@@ -46,7 +48,7 @@ def add_nb_methods(nb_funcs: tp.Sequence[NBFuncInfo], module_name: tp.Optional[s
                           _nb_func: tp.Func = nb_func,
                           _is_reducing: bool = is_reducing,
                           _name_or_index: tp.NameIndex = name_or_index,
-                          wrap_kwargs: tp.Optional[dict] = None,
+                          wrap_kwargs: tp.KwargsLike = None,
                           **kwargs) -> tp.SeriesFrame:
                 default_kwargs = get_kwargs(nb_func)
                 wrap_kwargs = merge_dicts({}, wrap_kwargs)
@@ -78,11 +80,11 @@ def add_nb_methods(nb_funcs: tp.Sequence[NBFuncInfo], module_name: tp.Optional[s
     return wrapper
 
 
-BTFT = tp.Callable[[tp.Any, tp.Any, tp.Func], tp.SeriesFrame]
+NPFuncInfoT = tp.Tuple[str, tp.Func]
+BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Func], tp.SeriesFrame]
 
 
-def add_binary_magic_methods(np_funcs: tp.Sequence[tp.Tuple[str, tp.Func]],
-                             translate_func: BTFT) -> tp.Func:
+def add_binary_magic_methods(np_funcs: tp.Iterable[NPFuncInfoT], translate_func: BinaryTranslateFuncT) -> WrapperFuncT:
     """Class decorator to add binary magic methods using NumPy to the class."""
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
@@ -96,11 +98,10 @@ def add_binary_magic_methods(np_funcs: tp.Sequence[tp.Tuple[str, tp.Func]],
     return wrapper
 
 
-UTFT = tp.Callable[[tp.Any, tp.Func], tp.SeriesFrame]
+UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Func], tp.SeriesFrame]
 
 
-def add_unary_magic_methods(np_funcs: tp.Sequence[tp.Tuple[str, tp.Func]],
-                            translate_func: UTFT) -> tp.Func:
+def add_unary_magic_methods(np_funcs: tp.Iterable[NPFuncInfoT], translate_func: UnaryTranslateFuncT) -> WrapperFuncT:
     """Class decorator to add unary magic methods using NumPy to the class."""
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
