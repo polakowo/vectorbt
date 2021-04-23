@@ -40,7 +40,7 @@ class LogHandler(Handler):
         return None
 
 
-def send_action(action: tp.Any) -> tp.Func:
+def send_action(action: str) -> tp.Func:
     """Sends `action` while processing func command.
 
     Suitable only for bound callbacks taking arguments `self`, `update`, `context` and optionally other."""

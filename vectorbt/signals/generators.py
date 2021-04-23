@@ -475,7 +475,7 @@ def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
         `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_entry_markers` for `{0}.{1}`.
         exit_trace_kwargs (dict): Keyword arguments passed to \
         `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
-        fig (plotly.graph_objects.Figure): Figure to add traces to.
+        fig (Figure or FigureWidget): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.""".format(base_cls.__name__, entries_attr)
 
     if entries_attr == 'entries':

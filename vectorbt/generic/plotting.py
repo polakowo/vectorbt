@@ -37,7 +37,7 @@ def clean_labels(labels: tp.ArrayLikeSequence) -> tp.ArrayLikeSequence:
 
 
 class TraceUpdater:
-    def __init__(self, fig: tp.BaseFigure, traces: tp.Tuple[BaseTraceType]) -> None:
+    def __init__(self, fig: tp.BaseFigure, traces: tp.Tuple[BaseTraceType, ...]) -> None:
         """Base trace updating class."""
         self._fig = fig
         self._traces = traces
@@ -48,7 +48,7 @@ class TraceUpdater:
         return self._fig
 
     @property
-    def traces(self) -> tp.Tuple[BaseTraceType]:
+    def traces(self) -> tp.Tuple[BaseTraceType, ...]:
         """Traces to update."""
         return self._traces
 
@@ -109,8 +109,10 @@ class Gauge(Configured, TraceUpdater):
 
         from vectorbt.settings import layout
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
 
         if fig is None:
             fig = make_figure()
@@ -203,8 +205,10 @@ class Bar(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if data is None:
             if trace_names is None:
                 raise ValueError("At least trace_names must be passed")
@@ -306,8 +310,10 @@ class Scatter(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if data is None:
             if trace_names is None:
                 raise ValueError("At least trace_names must be passed")
@@ -411,8 +417,10 @@ class Histogram(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if data is None:
             if trace_names is None:
                 raise ValueError("At least trace_names must be passed")
@@ -515,8 +523,10 @@ class Box(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if data is None:
             if trace_names is None:
                 raise ValueError("At least trace_names must be passed")
@@ -627,8 +637,10 @@ class Heatmap(Configured, TraceUpdater):
 
         from vectorbt.settings import layout
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if data is None:
             if x_labels is None or y_labels is None:
                 raise ValueError("At least x_labels and y_labels must be passed")
@@ -765,8 +777,10 @@ class Volume(Configured, TraceUpdater):
 
         from vectorbt.settings import layout
 
-        trace_kwargs = resolve_dict(trace_kwargs)
-        add_trace_kwargs = resolve_dict(add_trace_kwargs)
+        if trace_kwargs is None:
+            trace_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
         if data is None:
             if x_labels is None or y_labels is None or z_labels is None:
                 raise ValueError("At least x_labels, y_labels and z_labels must be passed")

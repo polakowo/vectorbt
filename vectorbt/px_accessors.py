@@ -4,6 +4,7 @@ import pandas as pd
 from inspect import getmembers, isfunction
 import plotly.express as px
 
+from vectorbt import typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.figure import make_figure
@@ -12,12 +13,13 @@ from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.generic.plotting import clean_labels
 
 
-def add_px_methods(cls):
+def add_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     """Class decorator to add Plotly Express methods that accept a DataFrame as first argument."""
 
     for px_func_name, px_func in getmembers(px, isfunction):
         if checks.method_accepts_argument(px_func, 'data_frame') or px_func_name == 'imshow':
-            def plot_func(self, *args, px_func_name=px_func_name, px_func=px_func, **kwargs):
+            def plot_func(self, *args, _px_func_name: str = px_func_name,
+                          _px_func: tp.Func = px_func, **kwargs) -> tp.BaseFigure:
                 from vectorbt.settings import layout
 
                 layout_kwargs = dict(
@@ -43,11 +45,11 @@ def add_px_methods(cls):
                     obj.columns = clean_labels(obj.columns)
                 obj.index = clean_labels(obj.index)
 
-                if px_func_name == 'imshow':
-                    return make_figure(px_func(
+                if _px_func_name == 'imshow':
+                    return make_figure(_px_func(
                         obj.vbt.to_2d_array(), *args, **layout_kwargs, **kwargs
                     ), layout=layout_kwargs)
-                return make_figure(px_func(
+                return make_figure(_px_func(
                     obj, *args, **layout_kwargs, **kwargs
                 ), layout=layout_kwargs)
 
@@ -75,7 +77,7 @@ class PXAccessor(BaseAccessor):
     ![](/vectorbt/docs/img/px_bar.png)
     """
 
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
@@ -88,7 +90,7 @@ class PXSRAccessor(PXAccessor, BaseSRAccessor):
 
     Accessible through `pd.Series.vbt.px`."""
 
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj: tp.Series, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
@@ -102,7 +104,7 @@ class PXDFAccessor(PXAccessor, BaseDFAccessor):
 
     Accessible through `pd.DataFrame.vbt.px`."""
 
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj: tp.Frame, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 

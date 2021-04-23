@@ -31,6 +31,7 @@ import json
 import sys
 import pkgutil
 
+from vectorbt import typing as tp
 from vectorbt.utils.config import Config
 
 this_module = sys.modules[__name__]
@@ -53,7 +54,7 @@ __all__ = [
 ]
 
 
-def save(fname, names=__all__, **kwargs):
+def save(fname: str, names: tp.Iterable[str] = __all__, **kwargs) -> None:
     """Save settings to a file."""
     settings = dict()
     for k in names:
@@ -61,7 +62,7 @@ def save(fname, names=__all__, **kwargs):
     Config(settings).save(fname, **kwargs)
 
 
-def load(fname, names=__all__, **kwargs):
+def load(fname: str, names: tp.Iterable[str] = __all__, **kwargs) -> None:
     """Load settings from a file."""
     settings = Config.load(fname, **kwargs)
     for k in names:
@@ -140,7 +141,7 @@ __pdoc__['layout'] = f"""Plotly layout.
 """
 
 
-def set_theme(theme):
+def set_theme(theme: str) -> None:
     if theme == 'light' or theme == 'dark':
         color_schema.update(
             blue="#1f77b4",
@@ -175,7 +176,7 @@ def set_theme(theme):
         raise ValueError(f"Theme '{theme}' not supported")
 
 
-def reset_theme():
+def reset_theme() -> None:
     set_theme('light')
 
 

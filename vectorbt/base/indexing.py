@@ -223,13 +223,8 @@ def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
     return None
 
 
-class ParamIndexerT(tp.Protocol):
-    def __init__(self, param_mappers: tp.Sequence[tp.Series],
-                 level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
-        ...
-
-
-class ParamIndexerFactory:
+def build_param_indexer(param_names: tp.Sequence[str], class_name: str = 'ParamIndexer',
+                        module_name: tp.Optional[str] = None) -> tp.Type[IndexingBase]:
     """A factory to create a class with parameter indexing.
 
     Parameter indexer enables accessing a group of rows and columns by a parameter array (similar to `loc`).
@@ -241,14 +236,16 @@ class ParamIndexerFactory:
 
     Args:
         param_names (list of str): Names of the parameters.
+        class_name (str): Name of the generated class.
+        module_name (str): Name of the module to which the class should be bound.
 
     ## Example
 
     ```python-repl
     >>> import pandas as pd
-    >>> from vectorbt.base.indexing import ParamIndexerFactory, indexing_on_mapper
+    >>> from vectorbt.base.indexing import build_param_indexer, indexing_on_mapper
 
-    >>> MyParamIndexer = ParamIndexerFactory(['my_param'])
+    >>> MyParamIndexer = build_param_indexer(['my_param'])
     >>> class C(MyParamIndexer):
     ...     def __init__(self, df, param_mapper):
     ...         self.df = df
@@ -281,34 +278,30 @@ class ParamIndexerFactory:
     1  2  2  4  4
     ```
     """
+    class ParamIndexer(IndexingBase):
+        def __init__(self, param_mappers: tp.Sequence[tp.Series],
+                     level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
+            checks.assert_len_equal(param_names, param_mappers)
 
-    def __new__(cls, param_names: tp.Sequence[str], class_name: str = 'ParamIndexer',
-                module_name: tp.Optional[str] = None) -> ParamIndexerT:
+            for i, param_name in enumerate(param_names):
+                level_name = level_names[i] if level_names is not None else None
+                _param_loc = ParamLoc(param_mappers[i], self.indexing_func, level_name=level_name, **kwargs)
+                setattr(self, f'_{param_name}_loc', _param_loc)
 
-        class ParamIndexer(IndexingBase):
-            def __init__(self, param_mappers: tp.Sequence[tp.Series],
-                         level_names: tp.Optional[tp.LevelSequence] = None, **kwargs) -> None:
-                checks.assert_len_equal(param_names, param_mappers)
+    for i, param_name in enumerate(param_names):
+        def param_loc(self, _param_name=param_name) -> ParamLoc:
+            return getattr(self, f'_{_param_name}_loc')
 
-                for i, param_name in enumerate(param_names):
-                    level_name = level_names[i] if level_names is not None else None
-                    _param_loc = ParamLoc(param_mappers[i], self.indexing_func, level_name=level_name, **kwargs)
-                    setattr(self, f'_{param_name}_loc', _param_loc)
+        param_loc.__doc__ = f"""Access a group of columns by parameter `{param_name}` using `pd.Series.loc`.
+        
+        Forwards this operation to each Series/DataFrame and returns a new class instance.
+        """
 
-        for i, param_name in enumerate(param_names):
-            def param_loc(self, _param_name=param_name) -> ParamLoc:
-                return getattr(self, f'_{_param_name}_loc')
+        setattr(ParamIndexer, param_name + '_loc', property(param_loc))
 
-            param_loc.__doc__ = f"""Access a group of columns by parameter `{param_name}` using `pd.Series.loc`.
-            
-            Forwards this operation to each Series/DataFrame and returns a new class instance.
-            """
+    ParamIndexer.__name__ = class_name
+    ParamIndexer.__qualname__ = class_name
+    if module_name is not None:
+        ParamIndexer.__module__ = module_name
 
-            setattr(ParamIndexer, param_name + '_loc', property(param_loc))
-
-        ParamIndexer.__name__ = class_name
-        ParamIndexer.__qualname__ = class_name
-        if module_name is not None:
-            ParamIndexer.__module__ = module_name
-
-        return ParamIndexer
+    return ParamIndexer

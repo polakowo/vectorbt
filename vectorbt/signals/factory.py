@@ -124,7 +124,7 @@ class SignalFactory(IndicatorFactory):
             `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_entry_markers` for `{0}.{1}`.
             exit_trace_kwargs (dict): Keyword arguments passed to \
             `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_markers`.
         """.format(
             self.class_name, 'new_entries' if exit_only and iteratively else 'entries'

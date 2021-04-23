@@ -20,11 +20,12 @@ class class_or_instancemethod(classmethod):
 class classproperty(object):
     """Property that can be called on a class."""
 
-    def __init__(self, f: tp.Func) -> None:
-        self.f = f
+    def __init__(self, func: tp.Func) -> None:
+        self.func = func
+        self.__doc__ = getattr(func, '__doc__')
 
     def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
-        return self.f(owner)
+        return self.func(owner)
 
 
 custom_propertyT = tp.TypeVar("custom_propertyT", bound="custom_property")

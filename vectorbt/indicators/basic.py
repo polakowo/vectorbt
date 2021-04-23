@@ -49,6 +49,7 @@ Date
 import numpy as np
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.figure import make_figure
 from vectorbt.generic import nb as generic_nb
@@ -83,13 +84,13 @@ class _MA(MA):
     See [Moving Average (MA)](https://www.investopedia.com/terms/m/movingaverage.asp)."""
 
     def plot(self,
-             column=None,
-             plot_close=True,
-             close_trace_kwargs=None,
-             ma_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             plot_close: bool = True,
+             close_trace_kwargs: tp.KwargsLike = None,
+             ma_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MA.ma` against `MA.close`.
 
         Args:
@@ -98,7 +99,7 @@ class _MA(MA):
             close_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.close`.
             ma_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MA.ma`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -170,18 +171,18 @@ class _MSTD(MSTD):
     in order to predict how volatile the price may be in the future."""
 
     def plot(self,
-             column=None,
-             mstd_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             mstd_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MSTD.mstd`.
 
         Args:
             column (str): Name of the column to plot.
             mstd_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MSTD.mstd`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -252,15 +253,15 @@ class _BBANDS(BBANDS):
     See [Bollinger Band®](https://www.investopedia.com/terms/b/bollingerbands.asp)."""
 
     def plot(self,
-             column=None,
-             plot_close=True,
-             close_trace_kwargs=None,
-             middle_trace_kwargs=None,
-             upper_trace_kwargs=None,
-             lower_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             plot_close: bool = True,
+             close_trace_kwargs: tp.KwargsLike = None,
+             middle_trace_kwargs: tp.KwargsLike = None,
+             upper_trace_kwargs: tp.KwargsLike = None,
+             lower_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `BBANDS.middle`, `BBANDS.upper` and `BBANDS.lower` against
         `BBANDS.close`.
 
@@ -272,7 +273,7 @@ class _BBANDS(BBANDS):
             upper_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.upper`.
             lower_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `BBANDS.lower`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -368,13 +369,14 @@ class _RSI(RSI):
     See [Relative Strength Index (RSI)](https://www.investopedia.com/terms/r/rsi.asp)."""
 
     def plot(self,
-             column=None,
-             levels=(30, 70),
-             rsi_trace_kwargs=None,
-             add_trace_kwargs=None,
-             xref='x', yref='y',
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             levels: tp.Tuple[float, float] = (30, 70),
+             rsi_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             xref: str = 'x', 
+             yref: str = 'y',
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `RSI.rsi`.
 
         Args:
@@ -384,7 +386,7 @@ class _RSI(RSI):
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -466,15 +468,16 @@ class _STOCH(STOCH):
     See [Stochastic Oscillator](https://www.investopedia.com/terms/s/stochasticoscillator.asp)."""
 
     def plot(self,
-             column=None,
-             levels=(30, 70),
-             percent_k_trace_kwargs=None,
-             percent_d_trace_kwargs=None,
-             shape_kwargs=None,
-             add_trace_kwargs=None,
-             xref='x', yref='y',
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             levels: tp.Tuple[float, float] = (30, 70),
+             percent_k_trace_kwargs: tp.KwargsLike = None,
+             percent_d_trace_kwargs: tp.KwargsLike = None,
+             shape_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             xref: str = 'x',
+             yref: str = 'y',
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `STOCH.percent_k` and `STOCH.percent_d`.
 
         Args:
@@ -482,11 +485,11 @@ class _STOCH(STOCH):
             levels (tuple): Two extremes: bottom and top.
             percent_k_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_k`.
             percent_d_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `STOCH.percent_d`.
-            shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zone between levels.
+            shape_kwargs (dict): Keyword arguments passed to `Figure or FigureWidget.add_shape` for zone between levels.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             xref (str): X coordinate axis.
             yref (str): Y coordinate axis.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -584,13 +587,13 @@ class _MACD(MACD):
     See [Moving Average Convergence Divergence – MACD](https://www.investopedia.com/terms/m/macd.asp)."""
 
     def plot(self,
-             column=None,
-             macd_trace_kwargs=None,
-             signal_trace_kwargs=None,
-             hist_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             macd_trace_kwargs: tp.KwargsLike = None,
+             signal_trace_kwargs: tp.KwargsLike = None,
+             hist_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `MACD.macd`, `MACD.signal` and `MACD.hist`.
 
         Args:
@@ -599,7 +602,7 @@ class _MACD(MACD):
             signal_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `MACD.signal`.
             hist_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar` for `MACD.hist`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -697,12 +700,12 @@ class _ATR(ATR):
     """
 
     def plot(self,
-             column=None,
-             tr_trace_kwargs=None,
-             atr_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             tr_trace_kwargs: tp.KwargsLike = None,
+             atr_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `ATR.tr` and `ATR.atr`.
 
         Args:
@@ -710,7 +713,7 @@ class _ATR(ATR):
             tr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.tr`.
             atr_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `ATR.atr`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -772,18 +775,18 @@ class _OBV(OBV):
     See [On-Balance Volume (OBV)](https://www.investopedia.com/terms/o/onbalancevolume.asp)."""
 
     def plot(self,
-             column=None,
-             obv_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             obv_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot `OBV.obv`.
 
         Args:
             column (str): Name of the column to plot.
             obv_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for `OBV.obv`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example

@@ -7,7 +7,6 @@ a single DataFrame is important. All functions are available in both Python and 
 
 import numpy as np
 from numba import njit
-from numba.typed import List
 from tqdm import tqdm
 
 from vectorbt import typing as tp
@@ -92,20 +91,20 @@ def apply_and_concat_multiple(n: int, apply_func: tp.Func, *args,
 
 
 @njit
-def to_2d_multiple_nb(a: tp.Iterable[tp.Array]) -> List:
+def to_2d_multiple_nb(a: tp.Iterable[tp.Array]) -> tp.List[tp.Array2d]:
     """Expand the dimensions of each array in `a` along axis 1.
 
     !!! note
         * `a` must be strictly homogeneous
     """
-    lst = List()
+    lst = list()
     for _a in a:
         lst.append(to_2d_one_nb(_a))
     return lst
 
 
 @njit
-def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.Func, *args) -> List:
+def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.Func, *args) -> tp.List[tp.Array2d]:
     """A Numba-compiled version of `apply_and_concat_multiple`.
 
     !!! note
@@ -114,7 +113,7 @@ def apply_and_concat_multiple_nb(n: int, apply_func_nb: tp.Func, *args) -> List:
         * `*args` must be Numba-compatible
         * No support for `**kwargs`
     """
-    outputs = List()
+    outputs = list()
     outputs_0 = to_2d_multiple_nb(apply_func_nb(0, *args))
     for j in range(len(outputs_0)):
         outputs.append(np.empty((outputs_0[j].shape[0], n * outputs_0[j].shape[1]), dtype=outputs_0[j].dtype))

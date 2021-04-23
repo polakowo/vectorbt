@@ -231,7 +231,7 @@ def assert_numba_func(func: tp.Func) -> None:
 def assert_not_none(arg: tp.Any) -> None:
     """Raise exception if the argument is None."""
     if arg is None:
-        raise AssertionError(f"Cannot be None")
+        raise AssertionError(f"Argument cannot be None")
 
 
 def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
@@ -392,10 +392,12 @@ def assert_equal(arg1: tp.Any, arg2: tp.Any, deep: bool = False) -> None:
             raise AssertionError(f"{arg1} and {arg2} do not match")
 
 
-def assert_dict_valid(arg: dict, lvl_keys: tp.Sequence[tp.Union[str, tp.Sequence[str]]]) -> None:
+def assert_dict_valid(arg: tp.DictLike, lvl_keys: tp.Sequence[tp.MaybeSequence[str]]) -> None:
     """Raise exception if dict the argument has keys that are not in `lvl_keys`.
 
     `lvl_keys` should be a list of lists, each corresponding to a level in the dict."""
+    if arg is None:
+        arg = {}
     if len(lvl_keys) == 0:
         return
     if isinstance(lvl_keys[0], str):
@@ -407,3 +409,26 @@ def assert_dict_valid(arg: dict, lvl_keys: tp.Sequence[tp.Union[str, tp.Sequence
     for k, v in arg.items():
         if isinstance(v, dict):
             assert_dict_valid(v, lvl_keys[1:])
+
+
+def assert_dict_sequence_valid(arg: tp.DictLikeSequence, lvl_keys: tp.Sequence[tp.MaybeSequence[str]]) -> None:
+    """Raise exception if a dict or any dict in a sequence of dicts has keys that are not in `lvl_keys`."""
+    if arg is None:
+        arg = {}
+    if isinstance(arg, dict):
+        assert_dict_valid(arg, lvl_keys)
+    else:
+        for _arg in arg:
+            assert_dict_valid(_arg, lvl_keys)
+
+
+def assert_sequence(arg: tp.Any) -> None:
+    """Raise exception if the argument is not a sequence."""
+    if not is_sequence(arg):
+        raise ValueError(f"{arg} must be a sequence")
+
+
+def assert_iterable(arg: tp.Any) -> None:
+    """Raise exception if the argument is not an iterable."""
+    if not is_iterable(arg):
+        raise ValueError(f"{arg} must be an iterable")

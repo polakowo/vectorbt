@@ -2205,7 +2205,7 @@ called_dict = {}
 
 
 PandasIndexer = indexing.PandasIndexer
-ParamIndexer = indexing.ParamIndexerFactory(['param1', 'param2', 'tuple'])
+ParamIndexer = indexing.build_param_indexer(['param1', 'param2', 'tuple'])
 
 
 class H(PandasIndexer, ParamIndexer):

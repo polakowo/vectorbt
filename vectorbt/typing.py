@@ -38,6 +38,7 @@ MaybeSequence = Union[T, Sequence[T]]
 
 # Arrays
 Shape = Tuple[int, ...]
+RelaxedShape = Union[int, Shape]
 Array = np.ndarray
 Array1d = np.ndarray
 Array2d = np.ndarray

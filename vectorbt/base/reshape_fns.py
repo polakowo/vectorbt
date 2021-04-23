@@ -312,7 +312,7 @@ BCRT = tp.Union[
 
 
 def broadcast(*args: tp.ArrayLike,
-              to_shape: tp.Optional[tp.Shape] = None,
+              to_shape: tp.Optional[tp.RelaxedShape] = None,
               to_pd: tp.Optional[tp.MaybeSequence[bool]] = None,
               to_frame: tp.Optional[bool] = None,
               align_index: tp.Optional[bool] = None,
@@ -479,7 +479,8 @@ def broadcast(*args: tp.ArrayLike,
 
     is_pd = False
     is_2d = False
-    require_kwargs = resolve_dict(require_kwargs)
+    if require_kwargs is None:
+        require_kwargs = {}
     if align_index is None:
         align_index = settings.broadcasting['align_index']
     if align_columns is None:
@@ -693,7 +694,8 @@ def broadcast_to_axis_of(arg1: tp.ArrayLike, arg2: tp.ArrayLike, axis: int,
     If `arg2` has less dimensions than requested, will broadcast `arg1` to a single number.
 
     For other keyword arguments, see `broadcast`."""
-    require_kwargs = resolve_dict(require_kwargs)
+    if require_kwargs is None:
+        require_kwargs = {}
     arg2 = to_any_array(arg2)
     if arg2.ndim < axis + 1:
         return np.broadcast_to(arg1, (1,))[0]  # to a single number

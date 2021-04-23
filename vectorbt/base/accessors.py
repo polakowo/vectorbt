@@ -391,7 +391,7 @@ class BaseAccessor:
 
     @class_or_instancemethod
     def concat(self_or_cls, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
-               keys: tp.Optional[tp.IndexLike] = None):
+               keys: tp.Optional[tp.IndexLike] = None) -> tp.Frame:
         """Concatenate with `others` along columns.
 
         Args:
@@ -431,7 +431,7 @@ class BaseAccessor:
     def apply_and_concat(self, ntimes: int, *args, apply_func: tp.Optional[tp.Func] = None,
                          keep_pd: bool = False, to_2d: bool = False, numba_loop: bool = False,
                          use_ray: bool = False, keys: tp.Optional[tp.IndexLike] = None,
-                         wrap_kwargs: tp.KwargsLike = None, **kwargs):
+                         wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Frame:
         """Apply `apply_func` `ntimes` times and concatenate the results along columns.
         See `vectorbt.base.combine_fns.apply_and_concat_one`.
 
@@ -519,7 +519,7 @@ class BaseAccessor:
                 allow_multiple: bool = True, combine_func: tp.Optional[tp.Func] = None,
                 keep_pd: bool = False, to_2d: bool = False, concat: bool = False, numba_loop: bool = False,
                 use_ray: bool = False, broadcast: bool = True, broadcast_kwargs: tp.KwargsLike = None,
-                keys: tp.Optional[tp.IndexLike] = None, wrap_kwargs: tp.KwargsLike = None, **kwargs):
+                keys: tp.Optional[tp.IndexLike] = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Combine with `other` using `combine_func`.
 
         Args:
@@ -532,7 +532,7 @@ class BaseAccessor:
             keep_pd (bool): Whether to keep inputs as pandas objects, otherwise convert to NumPy arrays.
             to_2d (bool): Whether to reshape inputs to 2-dim arrays, otherwise keep as-is.
             concat (bool): Whether to concatenate the results along the column axis.
-                therwise, pairwise combine into a Series/DataFrame of the same shape.
+                Otherwise, pairwise combine into a Series/DataFrame of the same shape.
 
                 If True, see `vectorbt.base.combine_fns.combine_and_concat`.
                 If False, see `vectorbt.base.combine_fns.combine_multiple`.
