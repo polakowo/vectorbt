@@ -438,7 +438,7 @@ class GenericAccessor(BaseAccessor):
 
     def apply_and_reduce(self, apply_func_nb: nb.apply_and_reduce_nbAT, reduce_func_nb: nb.apply_and_reduce_nbRT,
                          apply_args: tp.Optional[tuple] = None, reduce_args: tp.Optional[tuple] = None,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.generic.nb.apply_and_reduce_nb`.
 
         ## Example
@@ -657,7 +657,7 @@ class GenericAccessor(BaseAccessor):
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
 
-    def min(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+    def min(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return min of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='min'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -671,7 +671,7 @@ class GenericAccessor(BaseAccessor):
             _nanmin = nanmin
         return self.wrapper.wrap_reduced(_nanmin(arr, axis=0), **wrap_kwargs)
 
-    def max(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+    def max(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return max of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='max'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -685,7 +685,7 @@ class GenericAccessor(BaseAccessor):
             _nanmax = nanmax
         return self.wrapper.wrap_reduced(_nanmax(arr, axis=0), **wrap_kwargs)
 
-    def mean(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+    def mean(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return mean of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='mean'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -700,7 +700,7 @@ class GenericAccessor(BaseAccessor):
             _nanmean = nanmean
         return self.wrapper.wrap_reduced(_nanmean(arr, axis=0), **wrap_kwargs)
 
-    def median(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+    def median(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return median of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='median'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -715,7 +715,7 @@ class GenericAccessor(BaseAccessor):
         return self.wrapper.wrap_reduced(_nanmedian(arr, axis=0), **wrap_kwargs)
 
     def std(self, ddof: int = 1, group_by: tp.GroupByLike = None,
-            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return standard deviation of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='std'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -729,7 +729,7 @@ class GenericAccessor(BaseAccessor):
             _nanstd = nanstd
         return self.wrapper.wrap_reduced(_nanstd(arr, ddof=ddof, axis=0), **wrap_kwargs)
 
-    def sum(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[float]:
+    def sum(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return sum of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='sum'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -743,7 +743,7 @@ class GenericAccessor(BaseAccessor):
             _nansum = nansum
         return self.wrapper.wrap_reduced(_nansum(arr, axis=0), **wrap_kwargs)
 
-    def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[int]:
+    def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return count of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='count', dtype=np.int_), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -752,7 +752,7 @@ class GenericAccessor(BaseAccessor):
         return self.wrapper.wrap_reduced(np.sum(~np.isnan(self.to_2d_array()), axis=0), **wrap_kwargs)
 
     def idxmin(self, group_by: tp.GroupByLike = None, order: str = 'C',
-               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[tp.Label]:
+               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return labeled index of min of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='idxmin'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -772,7 +772,7 @@ class GenericAccessor(BaseAccessor):
         return self.wrapper.wrap_reduced(out, **wrap_kwargs)
 
     def idxmax(self, group_by: tp.GroupByLike = None, order: str = 'C',
-               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries[tp.Label]:
+               wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return labeled index of max of non-NaN elements."""
         wrap_kwargs = merge_dicts(dict(name_or_index='idxmax'), wrap_kwargs)
         if self.wrapper.grouper.is_grouped(group_by=group_by):

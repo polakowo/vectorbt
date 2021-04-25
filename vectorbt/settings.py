@@ -201,6 +201,7 @@ __pdoc__['plotting'] = f"""Parameters for plotting.
 # OHLCV
 ohlcv = Config(
     dict(
+        plot_type='OHLC',
         column_names=dict(
             open='Open',
             high='High',

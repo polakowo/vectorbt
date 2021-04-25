@@ -255,7 +255,7 @@ from vectorbt.records.col_mapper import ColumnMapper
 
 
 RecordsT = tp.TypeVar("RecordsT", bound="Records")
-IndexingMetaT = tp.Tuple[ArrayWrapper, tp.RecordArray, tp.MaybeArray1d, tp.Array1d]
+IndexingMetaT = tp.Tuple[ArrayWrapper, tp.RecordArray, tp.MaybeArray, tp.Array1d]
 
 
 class Records(Wrapping):

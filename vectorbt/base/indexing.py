@@ -23,7 +23,7 @@ IndexingBaseT = tp.TypeVar("IndexingBaseT", bound="IndexingBase")
 class IndexingBase:
     """Class that supports indexing through `IndexingBase.indexing_func`."""
 
-    def indexing_func(self: IndexingBaseT, pd_indexing_func: tp.Func, **kwargs) -> IndexingBaseT:
+    def indexing_func(self: IndexingBaseT, pd_indexing_func: tp.Callable, **kwargs) -> IndexingBaseT:
         """Apply `pd_indexing_func` on all pandas objects in question and return a new instance of the class.
 
         Should be overridden."""
@@ -33,12 +33,12 @@ class IndexingBase:
 class LocBase:
     """Class that implements location-based indexing."""
 
-    def __init__(self, indexing_func: tp.Func, **kwargs) -> None:
+    def __init__(self, indexing_func: tp.Callable, **kwargs) -> None:
         self._indexing_func = indexing_func
         self._indexing_kwargs = kwargs
 
     @property
-    def indexing_func(self) -> tp.Func:
+    def indexing_func(self) -> tp.Callable:
         """Indexing function."""
         return self._indexing_func
 
@@ -148,7 +148,7 @@ class ParamLoc(LocBase):
 
     Uses `mapper` to establish link between columns and parameter values."""
 
-    def __init__(self, mapper: tp.Series, indexing_func: tp.Func, level_name: tp.Level = None, **kwargs) -> None:
+    def __init__(self, mapper: tp.Series, indexing_func: tp.Callable, level_name: tp.Level = None, **kwargs) -> None:
         checks.assert_type(mapper, pd.Series)
 
         if mapper.dtype == 'O':
@@ -208,7 +208,7 @@ class ParamLoc(LocBase):
 
 
 def indexing_on_mapper(mapper: tp.Series, ref_obj: tp.SeriesFrame,
-                       pd_indexing_func: tp.Func) -> tp.Optional[tp.Series]:
+                       pd_indexing_func: tp.Callable) -> tp.Optional[tp.Series]:
     """Broadcast `mapper` Series to `ref_obj` and perform pandas indexing using `pd_indexing_func`."""
     checks.assert_type(mapper, pd.Series)
     checks.assert_type(ref_obj, (pd.Series, pd.DataFrame))

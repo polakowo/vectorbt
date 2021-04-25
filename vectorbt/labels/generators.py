@@ -2,6 +2,7 @@
 
 You can access all the indicators either by `vbt.*` or `vbt.labels.*`."""
 
+from vectorbt import typing as tp
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators.configs import flex_elem_param_config
 from vectorbt.labels import nb
@@ -74,7 +75,7 @@ FMAX.__doc__ = """Look-ahead indicator based on `vectorbt.labels.nb.future_max_a
 # ############# Label generators ############# #
 
 
-def _plot(self, **kwargs):  # pragma: no cover
+def _plot(self, **kwargs) -> tp.BaseFigure:  # pragma: no cover
     """Plot `close` and overlay it with the heatmap of `labels`."""
     if self.wrapper.ndim > 1:
         raise TypeError("Select a column first. Use indexing.")

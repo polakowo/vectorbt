@@ -20,7 +20,7 @@ class class_or_instancemethod(classmethod):
 class classproperty(object):
     """Property that can be called on a class."""
 
-    def __init__(self, func: tp.Func) -> None:
+    def __init__(self, func: tp.Callable) -> None:
         self.func = func
         self.__doc__ = getattr(func, '__doc__')
 
@@ -50,14 +50,14 @@ class custom_property:
         for example, by disabling caching, will do the same for each instance of the class where
         the property has been defined."""
 
-    def __new__(cls: tp.Type[custom_propertyT], *args, **kwargs) -> tp.Union[tp.Func, custom_propertyT]:
+    def __new__(cls: tp.Type[custom_propertyT], *args, **kwargs) -> tp.Union[tp.Callable, custom_propertyT]:
         if len(args) == 0:
             return lambda func: cls(func, **kwargs)
         elif len(args) == 1:
             return super().__new__(cls)
         raise ValueError("Either function or keyword arguments must be passed")
 
-    def __init__(self, func: tp.Func, **kwargs) -> None:
+    def __init__(self, func: tp.Callable, **kwargs) -> None:
         self.func = func
         self.name = func.__name__
         self.kwargs = kwargs
@@ -75,7 +75,7 @@ class custom_property:
         pass
 
 
-def is_caching_enabled(name: str, instance: tp.Any, func: tp.Optional[tp.Func] = None, **kwargs) -> bool:
+def is_caching_enabled(name: str, instance: tp.Any, func: tp.Optional[tp.Callable] = None, **kwargs) -> bool:
     """Check whether caching is enabled for a cacheable property/function.
 
     Each condition has its own rank. A narrower condition has a lower (better) rank than a broader
@@ -191,7 +191,7 @@ class cached_property(custom_property):
         Assumes that the instance (provided as `self`) won't change. If calculation depends
         upon object attributes that can be changed, it won't notice the change."""
 
-    def __init__(self, func: tp.Func, **kwargs) -> None:
+    def __init__(self, func: tp.Callable, **kwargs) -> None:
         super().__init__(func, **kwargs)
         self.lock = RLock()
 
@@ -229,14 +229,14 @@ class cached_property(custom_property):
 
 
 class custom_methodT(tp.Protocol):
-    func: tp.Func
+    func: tp.Callable
     kwargs: tp.Dict
 
     def __call__(self, *args, **kwargs) -> tp.Any:
         ...
 
 
-def custom_method(*args, **kwargs) -> tp.Union[tp.Func, custom_methodT]:
+def custom_method(*args, **kwargs) -> tp.Union[tp.Callable, custom_methodT]:
     """Custom extensible method.
 
     Stores `**kwargs` as attributes of the wrapper function.
@@ -253,7 +253,7 @@ def custom_method(*args, **kwargs) -> tp.Union[tp.Func, custom_methodT]:
     ```
     """
 
-    def decorator(func: tp.Func) -> custom_methodT:
+    def decorator(func: tp.Callable) -> custom_methodT:
         @wraps(func)
         def wrapper(*args, **kwargs) -> tp.Any:
             return func(*args, **kwargs)
@@ -282,7 +282,7 @@ class cached_methodT(custom_methodT):
         ...
 
 
-def cached_method(*args, maxsize: int = 128, typed: bool = False, **kwargs) -> tp.Union[tp.Func, cached_methodT]:
+def cached_method(*args, maxsize: int = 128, typed: bool = False, **kwargs) -> tp.Union[tp.Callable, cached_methodT]:
     """Extends `custom_method` with caching.
 
     Internally uses `functools.lru_cache`.
@@ -292,7 +292,7 @@ def cached_method(*args, maxsize: int = 128, typed: bool = False, **kwargs) -> t
 
     See notes on `cached_property`."""
 
-    def decorator(func: tp.Func) -> cached_methodT:
+    def decorator(func: tp.Callable) -> cached_methodT:
         @wraps(func)
         def wrapper(instance: tp.Any, *args, **kwargs) -> tp.Any:
             def partial_func(*args, **kwargs) -> tp.Any:

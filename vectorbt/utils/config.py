@@ -25,7 +25,7 @@ def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
     raise ValueError("Cannot resolve dict")
 
 
-def get_func_kwargs(func: tp.Func) -> dict:
+def get_func_kwargs(func: tp.Callable) -> dict:
     """Get keyword arguments of the function."""
     signature = inspect.signature(func)
     return {

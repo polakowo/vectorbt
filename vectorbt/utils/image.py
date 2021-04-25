@@ -30,7 +30,7 @@ def vstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
 
 def save_animation(fname: str,
                    index: tp.ArrayLikeSequence,
-                   plot_func: tp.Func,
+                   plot_func: tp.Callable,
                    *args,
                    delta: tp.Optional[int] = None,
                    step: int = 1,

@@ -58,6 +58,7 @@ Run for the examples below:
 import numpy as np
 import pandas as pd
 
+from vectorbt import typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
@@ -67,7 +68,10 @@ from vectorbt.base import reshape_fns
 from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic.accessors import GenericAccessor, GenericSRAccessor, GenericDFAccessor
+from vectorbt.generic import plotting
 from vectorbt.signals import nb
+
+MaybeSeriesFrameTupleT = tp.Union[tp.SeriesFrame, tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]]
 
 
 @add_nb_methods([
@@ -78,7 +82,7 @@ class SignalsAccessor(GenericAccessor):
 
     Accessible through `pd.Series.vbt.signals` and `pd.DataFrame.vbt.signals`."""
 
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
@@ -87,7 +91,7 @@ class SignalsAccessor(GenericAccessor):
         GenericAccessor.__init__(self, obj, **kwargs)
 
     @classmethod
-    def empty(cls, *args, fill_value=False, **kwargs):
+    def empty(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.base.accessors.BaseAccessor.empty` with `fill_value=False`.
 
         ## Example
@@ -113,7 +117,7 @@ class SignalsAccessor(GenericAccessor):
         return GenericAccessor.empty(*args, fill_value=fill_value, dtype=bool, **kwargs)
 
     @classmethod
-    def empty_like(cls, *args, fill_value=False, **kwargs):
+    def empty_like(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.base.accessors.BaseAccessor.empty_like` with `fill_value=False`.
 
         ## Example
@@ -141,7 +145,7 @@ class SignalsAccessor(GenericAccessor):
     # ############# Generation ############# #
 
     @classmethod
-    def generate(cls, shape, choice_func_nb, *args, **kwargs):
+    def generate(cls, shape: tp.RelaxedShape, choice_func_nb: tp.SignalChoiceFunc, *args, **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -180,8 +184,10 @@ class SignalsAccessor(GenericAccessor):
         return pd.DataFrame(result, **kwargs)
 
     @classmethod
-    def generate_both(cls, shape, entry_choice_func_nb, exit_choice_func_nb,
-                      entry_args=None, exit_args=None, entry_wait=1, exit_wait=1, **kwargs):
+    def generate_both(cls, shape: tp.RelaxedShape, entry_choice_func_nb: tp.SignalChoiceFunc,
+                      exit_choice_func_nb: tp.SignalChoiceFunc, entry_args: tp.Optional[tp.Args] = None,
+                      exit_args: tp.Optional[tp.Args] = None, entry_wait: int = 1, exit_wait: int = 1,
+                      **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """See `vectorbt.signals.nb.generate_enex_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -249,7 +255,8 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
-    def generate_exits(self, exit_choice_func_nb, *args, wait=1, wrap_kwargs=None):
+    def generate_exits(self, exit_choice_func_nb: tp.SignalChoiceFunc, *args, wait: int = 1,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_ex_nb`.
 
         ## Example
@@ -278,7 +285,8 @@ class SignalsAccessor(GenericAccessor):
     # ############# Filtering ############# #
 
     @class_or_instancemethod
-    def clean(self_or_cls, *args, entry_first=True, broadcast_kwargs=None, wrap_kwargs=None):
+    def clean(self_or_cls, *args, entry_first: bool = True, broadcast_kwargs: tp.KwargsLike = None,
+              wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
         """Clean signals.
 
         If one array passed, see `SignalsAccessor.first`.
@@ -310,7 +318,9 @@ class SignalsAccessor(GenericAccessor):
     # ############# Random ############# #
 
     @classmethod
-    def generate_random(cls, shape, n=None, prob=None, seed=None, **kwargs):
+    def generate_random(cls, shape: tp.RelaxedShape, n: tp.Optional[tp.ArrayLike] = None,
+                        prob: tp.Optional[tp.ArrayLike] = None, seed: tp.Optional[int] = None,
+                        **kwargs) -> tp.SeriesFrame:
         """Generate signals randomly.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_nb`.
@@ -374,8 +384,10 @@ class SignalsAccessor(GenericAccessor):
     # ############# Exits ############# #
 
     @classmethod
-    def generate_random_both(cls, shape, n=None, entry_prob=None, exit_prob=None, seed=None,
-                             entry_wait=1, exit_wait=1, **kwargs):
+    def generate_random_both(cls, shape: tp.RelaxedShape, n: tp.Optional[tp.ArrayLike] = None,
+                             entry_prob: tp.Optional[tp.ArrayLike] = None, exit_prob: tp.Optional[tp.ArrayLike] = None,
+                             seed: tp.Optional[int] = None, entry_wait: int = 1, exit_wait: int = 1,
+                             **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """Generate entry and exit signals randomly and iteratively.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_enex_nb`.
@@ -451,7 +463,8 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(entries[:, 0], **kwargs), pd.Series(exits[:, 0], **kwargs)
         return pd.DataFrame(entries, **kwargs), pd.DataFrame(exits, **kwargs)
 
-    def generate_random_exits(self, prob=None, seed=None, wait=1, wrap_kwargs=None):
+    def generate_random_exits(self, prob: tp.Optional[tp.ArrayLike] = None, seed: tp.Optional[int] = None,
+                              wait: int = 1, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Generate exit signals randomly.
 
         If `prob` is None, see `vectorbt.signals.nb.generate_rand_ex_nb`.
@@ -488,8 +501,16 @@ class SignalsAccessor(GenericAccessor):
         exits = nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed)
         return self.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
 
-    def generate_stop_exits(self, ts, stop, trailing=False, entry_wait=1, exit_wait=1,
-                            first=True, iteratively=False, broadcast_kwargs=None, wrap_kwargs=None):
+    def generate_stop_exits(self,
+                            ts: tp.ArrayLike,
+                            stop: tp.ArrayLike,
+                            trailing: tp.ArrayLike = False,
+                            entry_wait: int = 1,
+                            exit_wait: int = 1,
+                            first: bool = True,
+                            iteratively: bool = False,
+                            broadcast_kwargs: tp.KwargsLike = None,
+                            wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
         """Generate exits based on when `ts` hits the stop.
 
         For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
@@ -529,9 +550,10 @@ class SignalsAccessor(GenericAccessor):
             broadcast_kwargs = {}
         entries = self._obj
 
-        keep_raw = (False, True, True)
+        keep_raw = (False, True, True, True)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, ts, stop = reshape_fns.broadcast(entries, ts, stop, **broadcast_kwargs, keep_raw=keep_raw)
+        entries, ts, stop, trailing = reshape_fns.broadcast(
+            entries, ts, stop, trailing, **broadcast_kwargs, keep_raw=keep_raw)
 
         # Perform generation
         if iteratively:
@@ -544,9 +566,22 @@ class SignalsAccessor(GenericAccessor):
                 entries.vbt.to_2d_array(), ts, stop, trailing, exit_wait, first, entries.ndim == 2)
             return entries.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
 
-    def generate_ohlc_stop_exits(self, open, high=None, low=None, close=None, is_open_safe=True,
-                                out_dict=None, sl_stop=0., ts_stop=0., tp_stop=0., entry_wait=1,
-                                exit_wait=1, first=True, iteratively=False, broadcast_kwargs=None, wrap_kwargs=None):
+    def generate_ohlc_stop_exits(self,
+                                 open: tp.ArrayLike,
+                                 high: tp.Optional[tp.ArrayLike] = None,
+                                 low: tp.Optional[tp.ArrayLike] = None,
+                                 close: tp.Optional[tp.ArrayLike] = None,
+                                 is_open_safe: bool = True,
+                                 out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
+                                 sl_stop: tp.Optional[tp.ArrayLike] = 0.,
+                                 ts_stop: tp.Optional[tp.ArrayLike] = 0.,
+                                 tp_stop: tp.Optional[tp.ArrayLike] = 0.,
+                                 entry_wait: int = 1,
+                                 exit_wait: int = 1,
+                                 first: bool = True,
+                                 iteratively: bool = False,
+                                 broadcast_kwargs: tp.KwargsLike = None,
+                                 wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
         """Generate exits based on when the price hits (trailing) stop loss or take profit.
 
         If any of `high`, `low` or `close` is None, it will be set to `open`.
@@ -670,8 +705,14 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Map and reduce ############# #
 
-    def map_reduce_between(self, other=None, map_func_nb=None, map_args=None,
-                           reduce_func_nb=None, reduce_args=None, broadcast_kwargs=None, wrap_kwargs=None):
+    def map_reduce_between(self,
+                           other: tp.Optional[tp.ArrayLike] = None,
+                           map_func_nb: tp.Optional[tp.SignalMapFunc] = None,
+                           map_args: tp.Optional[tp.Args] = None,
+                           reduce_func_nb: tp.Optional[tp.SignalReduceFunc] = None,
+                           reduce_args: tp.Optional[tp.Args] = None,
+                           broadcast_kwargs: tp.KwargsLike = None,
+                           wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.signals.nb.map_reduce_between_nb`.
 
         If `other` specified, see `vectorbt.signals.nb.map_reduce_between_two_nb`.
@@ -728,8 +769,12 @@ class SignalsAccessor(GenericAccessor):
             )
             return obj.vbt.wrapper.wrap_reduced(result, **wrap_kwargs)
 
-    def map_reduce_partitions(self, map_func_nb=None, map_args=None,
-                              reduce_func_nb=None, reduce_args=None, wrap_kwargs=None):
+    def map_reduce_partitions(self,
+                              map_func_nb: tp.Optional[tp.SignalMapFunc] = None,
+                              map_args: tp.Optional[tp.Args] = None,
+                              reduce_func_nb: tp.Optional[tp.SignalReduceFunc] = None,
+                              reduce_args: tp.Optional[tp.Args] = None,
+                              wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.signals.nb.map_reduce_partitions_nb`.
 
         ## Example
@@ -765,12 +810,12 @@ class SignalsAccessor(GenericAccessor):
         wrap_kwargs = merge_dicts(dict(name_or_index='map_reduce_partitions'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, **wrap_kwargs)
 
-    def num_signals(self, **kwargs):
+    def num_signals(self, **kwargs) -> tp.MaybeSeries:
         """Sum up True values."""
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='num_signals')), kwargs)
         return self.sum(**kwargs)
 
-    def avg_distance(self, to=None, **kwargs):
+    def avg_distance(self, to=None, **kwargs) -> tp.MaybeSeries:
         """Calculate the average distance between True values in `self` and optionally `to`.
 
         See `SignalsAccessor.map_reduce_between`."""
@@ -781,7 +826,9 @@ class SignalsAccessor(GenericAccessor):
 
     # ############# Ranking ############# #
 
-    def rank(self, reset_by=None, after_false=False, allow_gaps=False, broadcast_kwargs=None, wrap_kwargs=None):
+    def rank(self, reset_by: tp.Optional[tp.ArrayLike] = None, after_false: bool = False,
+             allow_gaps: bool = False, broadcast_kwargs: tp.KwargsLike = None,
+             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.rank_nb`.
 
         ## Example
@@ -835,7 +882,8 @@ class SignalsAccessor(GenericAccessor):
             allow_gaps=allow_gaps)
         return obj.vbt.wrapper.wrap(ranked, **merge_dicts({}, wrap_kwargs))
 
-    def rank_partitions(self, reset_by=None, after_false=False, broadcast_kwargs=None, wrap_kwargs=None):
+    def rank_partitions(self, reset_by: tp.Optional[tp.ArrayLike] = None, after_false: bool = False,
+                        broadcast_kwargs: tp.KwargsLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.rank_partitions_nb`.
 
         ## Example
@@ -880,21 +928,21 @@ class SignalsAccessor(GenericAccessor):
             after_false=after_false)
         return obj.vbt.wrapper.wrap(ranked, **merge_dicts({}, wrap_kwargs))
 
-    def first(self, wrap_kwargs=None, **kwargs):
+    def first(self, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.signals.nb.rank_nb` == 1."""
         return self.wrapper.wrap(self.rank(**kwargs).values == 1, **merge_dicts({}, wrap_kwargs))
 
-    def nst(self, n, wrap_kwargs=None, **kwargs):
+    def nst(self, n, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.signals.nb.rank_nb` == n."""
         return self.wrapper.wrap(self.rank(**kwargs).values == n, **merge_dicts({}, wrap_kwargs))
 
-    def from_nst(self, n, wrap_kwargs=None, **kwargs):
+    def from_nst(self, n, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.signals.nb.rank_nb` >= n."""
         return self.wrapper.wrap(self.rank(**kwargs).values >= n, **merge_dicts({}, wrap_kwargs))
 
     # ############# Logical operations ############# #
 
-    def AND(self, other, **kwargs):
+    def AND(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
         """Combine with `other` using logical AND.
 
         See `vectorbt.base.accessors.BaseAccessor.combine`.
@@ -902,7 +950,7 @@ class SignalsAccessor(GenericAccessor):
         """
         return self.combine(other, combine_func=np.logical_and, **kwargs)
 
-    def OR(self, other, **kwargs):
+    def OR(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
         """Combine with `other` using logical OR.
 
         See `vectorbt.base.accessors.BaseAccessor.combine`.
@@ -924,13 +972,13 @@ class SignalsAccessor(GenericAccessor):
         """
         return self.combine(other, combine_func=np.logical_or, **kwargs)
 
-    def XOR(self, other, **kwargs):
+    def XOR(self, other: tp.ArrayLike, **kwargs) -> tp.SeriesFrame:
         """Combine with `other` using logical XOR.
 
         See `vectorbt.base.accessors.BaseAccessor.combine`."""
         return self.combine(other, combine_func=np.logical_xor, **kwargs)
 
-    def plot(self, yref='y', **kwargs):  # pragma: no cover
+    def plot(self, yref: str = 'y', **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot signals.
 
         Args:
@@ -960,14 +1008,15 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
 
     Accessible through `pd.Series.vbt.signals`."""
 
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj: tp.Series, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
         GenericSRAccessor.__init__(self, obj, **kwargs)
         SignalsAccessor.__init__(self, obj, **kwargs)
 
-    def plot_as_markers(self, y=None, **kwargs):  # pragma: no cover
+    def plot_as_markers(self, y: tp.Optional[tp.ArrayLike] = None,
+                        **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot Series as markers.
 
         Args:
@@ -989,6 +1038,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
 
         if y is None:
             y = pd.Series.vbt.empty_like(self._obj, 1)
+        else:
+            y = reshape_fns.to_pd_array(y)
 
         return y[self._obj].vbt.scatterplot(**merge_dicts(dict(
             trace_kwargs=dict(
@@ -1004,7 +1055,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             )
         ), kwargs))
 
-    def plot_as_entry_markers(self, y=None, **kwargs):  # pragma: no cover
+    def plot_as_entry_markers(self, y: tp.Optional[tp.ArrayLike] = None,
+                              **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot signals as entry markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
@@ -1025,7 +1077,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             )
         ), kwargs))
 
-    def plot_as_exit_markers(self, y=None, **kwargs):  # pragma: no cover
+    def plot_as_exit_markers(self, y: tp.Optional[tp.ArrayLike] = None,
+                             **kwargs) -> tp.Union[tp.BaseFigure, plotting.Scatter]:  # pragma: no cover
         """Plot signals as exit markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
@@ -1053,7 +1106,7 @@ class SignalsDFAccessor(SignalsAccessor, GenericDFAccessor):
 
     Accessible through `pd.DataFrame.vbt.signals`."""
 
-    def __init__(self, obj, **kwargs):
+    def __init__(self, obj: tp.Frame, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 

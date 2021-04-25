@@ -117,7 +117,7 @@ def is_namedtuple(x: tp.Any) -> bool:
     return all(type(n) == str for n in f)
 
 
-def method_accepts_argument(method: tp.Func, arg_name: str) -> bool:
+def method_accepts_argument(method: tp.Callable, arg_name: str) -> bool:
     """Check whether `method` accepts a positional or keyword argument with name `arg_name`."""
     sig = signature(method)
     if arg_name.startswith('**'):
@@ -216,13 +216,13 @@ def safe_assert(arg: tp.Any, msg: tp.Optional[str] = None) -> None:
         raise AssertionError(msg)
 
 
-def assert_in(arg1: tp.Any, arg2: tp.Any) -> None:
+def assert_in(arg1: tp.Any, arg2: tp.Sequence) -> None:
     """Raise exception if the first argument is not in the second argument."""
     if arg1 not in arg2:
         raise AssertionError(f"{arg1} not found in {arg2}")
 
 
-def assert_numba_func(func: tp.Func) -> None:
+def assert_numba_func(func: tp.Callable) -> None:
     """Raise exception if `func` is not Numba-compiled."""
     if not is_numba_func(func):
         raise AssertionError(f"Function {func} must be Numba compiled")

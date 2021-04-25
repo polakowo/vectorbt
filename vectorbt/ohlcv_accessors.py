@@ -11,7 +11,6 @@ The accessors inherit `vectorbt.generic.accessors`.
 
 import numpy as np
 import plotly.graph_objects as go
-from plotly.basedatatypes import BaseTraceType
 
 from vectorbt import typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor
@@ -35,7 +34,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         GenericDFAccessor.__init__(self, obj, **kwargs)
 
     def plot(self,
-             plot_type: tp.Union[str, BaseTraceType] = 'OHLC',
+             plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
              display_volume: bool = True,
              ohlc_kwargs: tp.KwargsLike = None,
              volume_kwargs: tp.KwargsLike = None,
@@ -46,7 +45,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         """Plot OHLCV data.
 
         Args:
-            plot_type: Either 'OHLC' or 'Candlestick'.
+            plot_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
             display_volume (bool): If True, displays volume as bar chart.
             ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
             volume_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
@@ -112,6 +113,8 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                     bargap=0
                 )
         fig.update_layout(**layout_kwargs)
+        if plot_type is None:
+            plot_type = ohlcv['plot_type']
         if isinstance(plot_type, str):
             if plot_type.lower() == 'ohlc':
                 plot_type = 'OHLC'

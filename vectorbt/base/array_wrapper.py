@@ -98,7 +98,7 @@ from vectorbt.base.column_grouper import ColumnGrouper
 from vectorbt.base.reshape_fns import to_pd_array
 
 ArrayWrapperT = tp.TypeVar("ArrayWrapperT", bound="ArrayWrapper")
-IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray1d, tp.MaybeArray1d, tp.Array1d]
+IndexingMetaT = tp.Tuple[ArrayWrapperT, tp.MaybeArray, tp.MaybeArray, tp.Array1d]
 
 
 class ArrayWrapper(Configured, PandasIndexer):

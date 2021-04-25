@@ -19,7 +19,7 @@ def add_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
     for px_func_name, px_func in getmembers(px, isfunction):
         if checks.method_accepts_argument(px_func, 'data_frame') or px_func_name == 'imshow':
             def plot_func(self, *args, _px_func_name: str = px_func_name,
-                          _px_func: tp.Func = px_func, **kwargs) -> tp.BaseFigure:
+                          _px_func: tp.Callable = px_func, **kwargs) -> tp.BaseFigure:
                 from vectorbt.settings import layout
 
                 layout_kwargs = dict(

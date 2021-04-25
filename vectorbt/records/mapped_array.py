@@ -277,7 +277,7 @@ IndexingMetaT = tp.Tuple[
     tp.Array1d,
     tp.Array1d,
     tp.Optional[tp.Array1d],
-    tp.MaybeArray1d,
+    tp.MaybeArray,
     tp.Array1d
 ]
 

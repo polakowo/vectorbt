@@ -1,10 +1,12 @@
-"""Enum utilities."""
+"""Enum utilities.
+
+In vectorbt, enums are represented by instances of named tuples to be easily used in Numba."""
 
 from vectorbt import typing as tp
 
 
 def get_caseins_enum_attr(enum: tp.NamedTuple, attr: str) -> tp.Any:
-    """Case-insensitive `getattr` for enumerated types."""
+    """Case-insensitive `getattr` for enums."""
     lower_attr_keys = list(map(lambda x: x.lower(), enum._fields))
     attr_idx = lower_attr_keys.index(attr.lower())
     orig_attr = enum._fields[attr_idx]
@@ -12,7 +14,7 @@ def get_caseins_enum_attr(enum: tp.NamedTuple, attr: str) -> tp.Any:
 
 
 def prepare_enum_value(enum: tp.NamedTuple, value: tp.Any) -> tp.Any:
-    """Make sure that `value` is a proper enumerated value.
+    """Prepare value of an enum.
 
     `enum` is expected to be an instance of `collections.namedtuple`.
     `value` can a string of any case or a tuple/list of such, otherwise returns unmodified value."""
@@ -39,7 +41,7 @@ def prepare_enum_value(enum: tp.NamedTuple, value: tp.Any) -> tp.Any:
 
 
 def to_value_map(enum: tp.NamedTuple) -> dict:
-    """Create value map from enumerated type."""
+    """Create value map from enum."""
     value_map = dict(zip(tuple(enum), enum._fields))
     if -1 not in value_map:
         value_map[-1] = None

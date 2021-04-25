@@ -5,22 +5,21 @@ import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame as Frame, Index
 from typing import *
-from numpy.typing import ArrayLike as _ArrayLike, DTypeLike
+from numpy.typing import DTypeLike
 from pandas._typing import Dtype as PandasDTypeLike
 from pandas.core.arrays.base import ExtensionArray
 from datetime import datetime, timedelta, tzinfo
 from mypy_extensions import VarArg, KwArg
 from pandas.tseries.offsets import DateOffset
 from plotly.graph_objects import Figure, FigureWidget
-from plotly.basedatatypes import BaseFigure
+from plotly.basedatatypes import BaseFigure, BaseTraceType
 
-if sys.version_info < (3, 8, 0):
+if sys.version_info < (3, 8):
     from typing_extensions import *
 
 # Generic types
 T = TypeVar("T")
 F = TypeVar("F", bound=Callable[..., Any])
-Func = Callable[..., Any]
 
 # Scalars
 Scalar = Union[str, float, int, complex, bool, object, np.generic]
@@ -36,10 +35,15 @@ TupleList = Union[List[T], Tuple[T, ...]]
 MaybeTupleList = Union[T, List[T], Tuple[T, ...]]
 MaybeSequence = Union[T, Sequence[T]]
 
+
 # Arrays
+class _SupportsArray(Protocol):
+    def __array__(self) -> np.ndarray: ...
+
+
 Shape = Tuple[int, ...]
 RelaxedShape = Union[int, Shape]
-Array = np.ndarray
+Array = np.ndarray  # ready to be used for n-dim data
 Array1d = np.ndarray
 Array2d = np.ndarray
 Array3d = np.ndarray
@@ -47,17 +51,16 @@ Record = np.void
 RecordArray = np.ndarray
 RecArray = np.recarray
 MaybeArray = Union[T, Array]
-MaybeArray1d = Union[T, Array1d]
 SeriesFrame = Union[Series, Frame]
 MaybeSeries = Union[T, Series]
-MaybeSeriesFrame = Union[T, SeriesFrame]
-AnyArray = Union[Array, SeriesFrame]
-MaybeAnyArray = Union[T, AnyArray]
+MaybeSeriesFrame = Union[T, Series, Frame]
+AnyArray = Union[Array, Series, Frame]
 AnyArray1d = Union[Array1d, Series]
 AnyArray2d = Union[Array2d, Frame]
-ArrayLike = Union[_ArrayLike, ExtensionArray, Index, SeriesFrame]
-IndexLike = Union[_ArrayLike, ExtensionArray, Index, Series]
-ArrayLikeSequence = Union[Sequence[T], Array1d, Index, Series]
+_ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], _SupportsArray]
+ArrayLike = Union[_ArrayLike, Array, ExtensionArray, Index, Series, Frame]  # must be converted
+IndexLike = Union[_ArrayLike, Array1d, ExtensionArray, Index, Series]
+ArrayLikeSequence = Union[Sequence[T], Array1d, ExtensionArray, Index, Series]  # sequence for 1-dim data
 
 # Labels
 Label = Hashable
@@ -90,7 +93,7 @@ K = TypeVar("K")
 V = TypeVar("V")
 DictLike = Union[None, Dict[K, V]]
 DictLikeSequence = Union[None, Dict[K, V], Sequence[Union[None, Dict[K, V]]]]
-Args = Tuple[V]
+Args = Tuple[V, ...]
 Kwargs = Dict[str, V]
 KwargsLike = DictLike[str, V]
 KwargsLikeSequence = DictLikeSequence[str, V]
@@ -115,6 +118,11 @@ GroupReduceFunc = Callable[[int, Array2d, VarArg()], R]
 GroupReduceFlatFunc = Callable[[int, Array1d, VarArg()], R]
 GroupSqueezeFunc = Callable[[int, int, Array1d, VarArg()], R]
 
+# Signals
+SignalChoiceFunc = Callable[[int, int, int, VarArg()], Array1d]
+SignalMapFunc = Callable[[int, int, int, VarArg()], float]
+SignalReduceFunc = Callable[[int, Array1d, VarArg()], float]
+
 # Records
 ColRange = Array2d
 ColMap = Tuple[Array1d, Array1d]
@@ -122,3 +130,6 @@ RecordMapFunc = Callable[[np.void, VarArg()], R]
 MaskInOutMapFunc = Callable[[Array1d, Array1d, int, Array1d, VarArg()], None]
 ValueMap = Mapping
 ValueMapLike = Union[NamedTuple, ValueMap]
+
+# Indicators
+Param = Any

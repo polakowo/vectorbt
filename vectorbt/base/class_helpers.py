@@ -11,7 +11,7 @@ from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 
 
-def get_kwargs(func: tp.Func) -> tp.Dict[str, tp.Any]:
+def get_kwargs(func: tp.Callable) -> tp.Dict[str, tp.Any]:
     """Get names and default values of keyword arguments from the signature of `func`."""
     return {
         k: v.default
@@ -21,7 +21,7 @@ def get_kwargs(func: tp.Func) -> tp.Dict[str, tp.Any]:
 
 
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
-NBFuncInfoT = tp.Union[tp.Tuple[tp.Func, bool, tp.NameIndex], tp.Tuple[tp.Func, bool]]
+NBFuncInfoT = tp.Union[tp.Tuple[tp.Callable, bool, tp.NameIndex], tp.Tuple[tp.Callable, bool]]
 
 
 def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[str] = None) -> WrapperFuncT:
@@ -45,7 +45,7 @@ def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[
 
             def nb_method(self,
                           *args,
-                          _nb_func: tp.Func = nb_func,
+                          _nb_func: tp.Callable = nb_func,
                           _is_reducing: bool = is_reducing,
                           _name_or_index: tp.NameIndex = name_or_index,
                           wrap_kwargs: tp.KwargsLike = None,
@@ -80,8 +80,8 @@ def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[
     return wrapper
 
 
-NPFuncInfoT = tp.Tuple[str, tp.Func]
-BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Func], tp.SeriesFrame]
+NPFuncInfoT = tp.Tuple[str, tp.Callable]
+BinaryTranslateFuncT = tp.Callable[[tp.Any, tp.Any, tp.Callable], tp.SeriesFrame]
 
 
 def add_binary_magic_methods(np_funcs: tp.Iterable[NPFuncInfoT], translate_func: BinaryTranslateFuncT) -> WrapperFuncT:
@@ -98,7 +98,7 @@ def add_binary_magic_methods(np_funcs: tp.Iterable[NPFuncInfoT], translate_func:
     return wrapper
 
 
-UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Func], tp.SeriesFrame]
+UnaryTranslateFuncT = tp.Callable[[tp.Any, tp.Callable], tp.SeriesFrame]
 
 
 def add_unary_magic_methods(np_funcs: tp.Iterable[NPFuncInfoT], translate_func: UnaryTranslateFuncT) -> WrapperFuncT:

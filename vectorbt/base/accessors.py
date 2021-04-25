@@ -107,6 +107,14 @@ class BaseAccessor:
 
         return self.__class__(self._obj, *args, **kwargs)
 
+    @class_or_instancemethod
+    def is_series(self_or_cls) -> bool:
+        raise NotImplementedError
+
+    @class_or_instancemethod
+    def is_frame(self_or_cls) -> bool:
+        raise NotImplementedError
+
     @property
     def wrapper(self) -> ArrayWrapper:
         """Array wrapper."""
@@ -130,7 +138,7 @@ class BaseAccessor:
 
     # ############# Index and columns ############# #
 
-    def apply_on_index(self, apply_func: tp.Func, *args, axis: int = 1,
+    def apply_on_index(self, apply_func: tp.Callable, *args, axis: int = 1,
                        inplace: bool = False, **kwargs) -> tp.Optional[tp.SeriesFrame]:
         """Apply function `apply_func` on index of the pandas object.
 
@@ -276,7 +284,7 @@ class BaseAccessor:
                     repeated.values, **merge_dicts(dict(index=new_index), wrap_kwargs))
         return repeated
 
-    def align_to(self, other: tp.ArrayLike, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def align_to(self, other: tp.SeriesFrame, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Align to `other` on their axes.
 
         ## Example
@@ -345,7 +353,7 @@ class BaseAccessor:
 
     # ############# Combining ############# #
 
-    def apply(self, *args, apply_func: tp.Optional[tp.Func] = None, keep_pd: bool = False,
+    def apply(self, *args, apply_func: tp.Optional[tp.Callable] = None, keep_pd: bool = False,
               to_2d: bool = False, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Apply a function `apply_func`.
 
@@ -428,7 +436,7 @@ class BaseAccessor:
             out.columns = pd.RangeIndex(start=0, stop=len(out.columns), step=1)
         return out
 
-    def apply_and_concat(self, ntimes: int, *args, apply_func: tp.Optional[tp.Func] = None,
+    def apply_and_concat(self, ntimes: int, *args, apply_func: tp.Optional[tp.Callable] = None,
                          keep_pd: bool = False, to_2d: bool = False, numba_loop: bool = False,
                          use_ray: bool = False, keys: tp.Optional[tp.IndexLike] = None,
                          wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.Frame:
@@ -516,7 +524,7 @@ class BaseAccessor:
         return self.wrapper.wrap(result, group_by=False, **merge_dicts(dict(columns=new_columns), wrap_kwargs))
 
     def combine(self, other: tp.MaybeTupleList[tp.Union[tp.ArrayLike, "BaseAccessor"]], *args,
-                allow_multiple: bool = True, combine_func: tp.Optional[tp.Func] = None,
+                allow_multiple: bool = True, combine_func: tp.Optional[tp.Callable] = None,
                 keep_pd: bool = False, to_2d: bool = False, concat: bool = False, numba_loop: bool = False,
                 use_ray: bool = False, broadcast: bool = True, broadcast_kwargs: tp.KwargsLike = None,
                 keys: tp.Optional[tp.IndexLike] = None, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:

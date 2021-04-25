@@ -13,13 +13,15 @@ classes. These only accept NumPy arrays and other Numba-compatible types.
 import numpy as np
 from numba import njit
 
+from vectorbt import typing as tp
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
 from vectorbt.labels.enums import TrendMode
 
 
 @njit(cache=True)
-def future_mean_apply_nb(close, window, ewm, wait=1, adjust=False):
+def future_mean_apply_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1,
+                         adjust: bool = False) -> tp.Array2d:
     """Get the mean of the next period."""
     if ewm:
         out = generic_nb.ewm_mean_nb(close[::-1], window, minp=window, adjust=adjust)[::-1]
@@ -31,7 +33,8 @@ def future_mean_apply_nb(close, window, ewm, wait=1, adjust=False):
 
 
 @njit(cache=True)
-def future_std_apply_nb(close, window, ewm, wait=1, adjust=False, ddof=0):
+def future_std_apply_nb(close: tp.Array2d, window: int, ewm: bool, wait: int = 1,
+                        adjust: bool = False, ddof: int = 0) -> tp.Array2d:
     """Get the standard deviation of the next period."""
     if ewm:
         out = generic_nb.ewm_std_nb(close[::-1], window, minp=window, adjust=adjust, ddof=ddof)[::-1]
@@ -43,7 +46,7 @@ def future_std_apply_nb(close, window, ewm, wait=1, adjust=False, ddof=0):
 
 
 @njit(cache=True)
-def future_min_apply_nb(close, window, wait=1):
+def future_min_apply_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
     """Get the minimum of the next period."""
     out = generic_nb.rolling_min_nb(close[::-1], window, minp=window)[::-1]
     if wait > 0:
@@ -52,7 +55,7 @@ def future_min_apply_nb(close, window, wait=1):
 
 
 @njit(cache=True)
-def future_max_apply_nb(close, window, wait=1):
+def future_max_apply_nb(close: tp.Array2d, window: int, wait: int = 1) -> tp.Array2d:
     """Get the maximum of the next period."""
     out = generic_nb.rolling_max_nb(close[::-1], window, minp=window)[::-1]
     if wait > 0:
@@ -61,19 +64,20 @@ def future_max_apply_nb(close, window, wait=1):
 
 
 @njit(cache=True)
-def fixed_labels_apply_nb(close, n):
+def fixed_labels_apply_nb(close: tp.Array2d, n: int) -> tp.Array2d:
     """Get percentage change from the current value to a future value."""
     return (generic_nb.bshift_nb(close, n) - close) / close
 
 
 @njit(cache=True)
-def mean_labels_apply_nb(close, window, ewm, wait=1, adjust=False):
+def mean_labels_apply_nb(close: tp.Array2d, window: int, ewm: bool,
+                         wait: int = 1, adjust: bool = False) -> tp.Array2d:
     """Get the percentage change from the current value to the average of the next period."""
     return (future_mean_apply_nb(close, window, ewm, wait, adjust) - close) / close
 
 
 @njit(cache=True)
-def get_symmetric_pos_th_nb(neg_th):
+def get_symmetric_pos_th_nb(neg_th: tp.MaybeArray[float]) -> tp.MaybeArray[float]:
     """Compute the positive return that is symmetric to a negative one.
 
     For example, 50% down requires 100% to go up to the initial level."""
@@ -81,13 +85,14 @@ def get_symmetric_pos_th_nb(neg_th):
 
 
 @njit(cache=True)
-def get_symmetric_neg_th_nb(pos_th):
+def get_symmetric_neg_th_nb(pos_th: tp.MaybeArray[float]) -> tp.MaybeArray[float]:
     """Compute the negative return that is symmetric to a positive one."""
     return pos_th / (1 + pos_th)
 
 
 @njit(cache=True)
-def local_extrema_apply_nb(close, pos_th, neg_th, flex_2d=True):
+def local_extrema_apply_nb(close: tp.Array2d, pos_th: tp.MaybeArray[float],
+                           neg_th: tp.MaybeArray[float], flex_2d: bool = True) -> tp.Array2d:
     """Get array of local extrema denoted by 1 (peak) or -1 (trough), otherwise 0.
 
     Two adjacent peak and trough points should exceed the given threshold parameters.
@@ -146,7 +151,7 @@ def local_extrema_apply_nb(close, pos_th, neg_th, flex_2d=True):
 
 
 @njit(cache=True)
-def bn_trend_labels_nb(close, local_extrema):
+def bn_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
     """Return 0 for H-L and 1 for L-H."""
     out = np.full_like(close, np.nan, dtype=np.float_)
 
@@ -168,7 +173,7 @@ def bn_trend_labels_nb(close, local_extrema):
 
 
 @njit(cache=True)
-def bn_cont_trend_labels_nb(close, local_extrema):
+def bn_cont_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d) -> tp.Array2d:
     """Normalize each range between two extrema between 0 (will go up) and 1 (will go down)."""
     out = np.full_like(close, np.nan, dtype=np.float_)
 
@@ -189,7 +194,8 @@ def bn_cont_trend_labels_nb(close, local_extrema):
 
 
 @njit(cache=True)
-def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=True):
+def bn_cont_sat_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, pos_th: tp.MaybeArray[float],
+                                neg_th: tp.MaybeArray[float], flex_2d: bool = True) -> tp.Array2d:
     """Similar to `bn_cont_trend_labels_nb` but sets each close value to 0 or 1
     if the percentage change to the next extremum exceeds the threshold set for this range.
     """
@@ -235,7 +241,7 @@ def bn_cont_sat_trend_labels_nb(close, local_extrema, pos_th, neg_th, flex_2d=Tr
 
 
 @njit(cache=True)
-def pct_trend_labels_nb(close, local_extrema, normalize):
+def pct_trend_labels_nb(close: tp.Array2d, local_extrema: tp.Array2d, normalize: bool) -> tp.Array2d:
     """Compute the percentage change of the current value to the next extremum."""
     out = np.full_like(close, np.nan, dtype=np.float_)
 
@@ -258,7 +264,8 @@ def pct_trend_labels_nb(close, local_extrema, normalize):
 
 
 @njit(cache=True)
-def trend_labels_apply_nb(close, pos_th, neg_th, mode, flex_2d=True):
+def trend_labels_apply_nb(close: tp.Array2d, pos_th: tp.MaybeArray[float],
+                          neg_th: tp.MaybeArray[float], mode: int, flex_2d: bool = True) -> tp.Array2d:
     """Apply a trend labeling function based on `TrendMode`."""
     local_extrema = local_extrema_apply_nb(close, pos_th, neg_th, flex_2d)
     if mode == TrendMode.Binary:
@@ -275,11 +282,14 @@ def trend_labels_apply_nb(close, pos_th, neg_th, mode, flex_2d=True):
 
 
 @njit(cache=True)
-def breakout_labels_nb(close, window, pos_th, neg_th, wait=1, flex_2d=True):
+def breakout_labels_nb(close: tp.Array2d, window: int, pos_th: tp.MaybeArray[float], neg_th: tp.MaybeArray[float],
+                       wait: int = 1, flex_2d: bool = True) -> tp.Array2d:
     """For each value, return 1 if any value in the next period is greater than the
     positive threshold (in %), -1 if less than the negative threshold, and 0 otherwise.
 
     First hit wins."""
+    pos_th = np.asarray(pos_th)
+    neg_th = np.asarray(neg_th)
     out = np.full_like(close, 0, dtype=np.float_)
 
     for col in range(close.shape[1]):
