@@ -5,6 +5,8 @@ simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio
 
 import pandas as pd
 
+from vectorbt import typing as tp
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records.base import Records
 from vectorbt.portfolio.enums import (
     log_dt,
@@ -23,7 +25,11 @@ class Logs(Records):
         Some features require the log records to be sorted prior to the processing.
         Use the `vectorbt.records.base.Records.sort` method."""
 
-    def __init__(self, wrapper, records_arr, idx_field='idx', **kwargs):
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 records_arr: tp.RecordArray,
+                 idx_field: str = 'idx',
+                 **kwargs) -> None:
         Records.__init__(
             self,
             wrapper,
@@ -36,7 +42,7 @@ class Logs(Records):
             raise TypeError("Records array must match debug_info_dt")
 
     @property  # no need for cached
-    def records_readable(self):
+    def records_readable(self) -> tp.Frame:
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame(columns=pd.MultiIndex.from_tuples([

@@ -424,11 +424,11 @@ class SignalFactory(IndicatorFactory):
         def _check_settings(func_settings: tp.Kwargs) -> None:
             for k in func_settings:
                 if k not in (
-                    'pass_inputs',
-                    'pass_in_outputs',
-                    'pass_params',
-                    'pass_kwargs',
-                    'pass_cache'
+                        'pass_inputs',
+                        'pass_in_outputs',
+                        'pass_params',
+                        'pass_kwargs',
+                        'pass_cache'
                 ):
                     raise ValueError(f"Can't find key {k} in function settings")
 

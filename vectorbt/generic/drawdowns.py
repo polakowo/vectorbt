@@ -76,8 +76,12 @@ class Drawdowns(Records):
     ![](/vectorbt/docs/img/drawdowns_drawdown_histplot.png)
     """
 
-    def __init__(self, wrapper: ArrayWrapper, records_arr: tp.RecordArray, ts: tp.ArrayLike,
-                 idx_field: str = 'end_idx', **kwargs) -> None:
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 records_arr: tp.RecordArray,
+                 ts: tp.ArrayLike,
+                 idx_field: str = 'end_idx',
+                 **kwargs) -> None:
         Records.__init__(
             self,
             wrapper,

@@ -114,9 +114,15 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         Use methods that begin with `get_` to get group-aware results."""
 
-    def __init__(self, index: tp.IndexLike, columns: tp.IndexLike, ndim: int,
-                 freq: tp.Optional[tp.FrequencyLike] = None, column_only_select: tp.Optional[bool] = None,
-                 group_select: tp.Optional[bool] = None, grouped_ndim: tp.Optional[int] = None, **kwargs) -> None:
+    def __init__(self,
+                 index: tp.IndexLike,
+                 columns: tp.IndexLike,
+                 ndim: int,
+                 freq: tp.Optional[tp.FrequencyLike] = None,
+                 column_only_select: tp.Optional[bool] = None,
+                 group_select: tp.Optional[bool] = None,
+                 grouped_ndim: tp.Optional[int] = None,
+                 **kwargs) -> None:
         config = dict(
             index=index,
             columns=columns,
@@ -148,9 +154,12 @@ class ArrayWrapper(Configured, PandasIndexer):
         Configured.__init__(self, **merge_dicts(config, self._grouper._config))
 
     @cached_method
-    def indexing_func_meta(self: ArrayWrapperT, pd_indexing_func: tp.PandasIndexingFunc,
-                           index: tp.Optional[tp.IndexLike] = None, columns: tp.Optional[tp.IndexLike] = None,
-                           column_only_select: tp.Optional[bool] = None, group_select: tp.Optional[bool] = None,
+    def indexing_func_meta(self: ArrayWrapperT,
+                           pd_indexing_func: tp.PandasIndexingFunc,
+                           index: tp.Optional[tp.IndexLike] = None,
+                           columns: tp.Optional[tp.IndexLike] = None,
+                           column_only_select: tp.Optional[bool] = None,
+                           group_select: tp.Optional[bool] = None,
                            group_by: tp.GroupByLike = None) -> IndexingMetaT:
         """Perform indexing on `ArrayWrapper` and also return indexing metadata.
 
@@ -479,8 +488,12 @@ class ArrayWrapper(Configured, PandasIndexer):
             )
         return _self  # important for keeping cache
 
-    def wrap(self, a: tp.ArrayLike, index: tp.Optional[tp.IndexLike] = None, columns: tp.Optional[tp.IndexLike] = None,
-             dtype: tp.Optional[tp.PandasDTypeLike] = None, group_by: tp.GroupByLike = None) -> tp.SeriesFrame:
+    def wrap(self,
+             a: tp.ArrayLike,
+             index: tp.Optional[tp.IndexLike] = None,
+             columns: tp.Optional[tp.IndexLike] = None,
+             dtype: tp.Optional[tp.PandasDTypeLike] = None,
+             group_by: tp.GroupByLike = None) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
         _self = self.resolve(group_by=group_by)
@@ -513,9 +526,13 @@ class ArrayWrapper(Configured, PandasIndexer):
             return pd.DataFrame(arr, index=index, columns=columns, dtype=dtype)
         raise ValueError(f"{arr.ndim}-d input is not supported")
 
-    def wrap_reduced(self, a: tp.ArrayLike, name_or_index: tp.NameIndex = None,
-                     columns: tp.Optional[tp.IndexLike] = None, dtype: tp.Optional[tp.PandasDTypeLike] = None,
-                     group_by: tp.GroupByLike = None, time_units: bool = False) -> tp.MaybeSeriesFrame:
+    def wrap_reduced(self,
+                     a: tp.ArrayLike,
+                     name_or_index: tp.NameIndex = None,
+                     columns: tp.Optional[tp.IndexLike] = None,
+                     dtype: tp.Optional[tp.PandasDTypeLike] = None,
+                     group_by: tp.GroupByLike = None,
+                     time_units: bool = False) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,

@@ -13,6 +13,8 @@ from mypy_extensions import VarArg, KwArg
 from pandas.tseries.offsets import DateOffset
 from plotly.graph_objects import Figure, FigureWidget
 from plotly.basedatatypes import BaseFigure, BaseTraceType
+from numba.core.registry import CPUDispatcher
+from numba.typed import List as TypedList
 
 if sys.version_info < (3, 8):
     from typing_extensions import *
@@ -133,3 +135,4 @@ ValueMapLike = Union[NamedTuple, ValueMap]
 
 # Indicators
 Param = Any
+Params = Union[List[Param], Tuple[Param, ...], TypedList, Array1d]

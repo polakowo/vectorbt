@@ -3,8 +3,9 @@
 Defines enums and other schemas for `vectorbt.portfolio`."""
 
 import numpy as np
-from collections import namedtuple
 import json
+
+from vectorbt import typing as tp
 
 __all__ = [
     'SimulationContext',
@@ -37,26 +38,31 @@ __all__ = [
 
 __pdoc__ = {}
 
+
 # We use namedtuple for enums and classes to be able to use them in Numba
 
 # ############# Portfolio ############# #
 
-SimulationContext = namedtuple('SimulationContext', [
-    'target_shape',
-    'close',
-    'group_lens',
-    'init_cash',
-    'cash_sharing',
-    'call_seq',
-    'active_mask',
-    'order_records',
-    'log_records',
-    'last_cash',
-    'last_shares',
-    'last_val_price'
-])
+class SimulationContext(tp.NamedTuple):
+    target_shape: tp.Shape
+    close: tp.Array2d
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Array2d
+    active_mask: tp.Array2d
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_shares: tp.Array1d
+    last_val_price: tp.Array1d
+    last_lidx: tp.Array1d
+    last_ridx: tp.Array1d
 
-__pdoc__['SimulationContext'] = "A named tuple representing context of the simulation."
+
+__pdoc__['SimulationContext'] = """A named tuple representing context of the simulation.
+
+Contains general information available to all other contexts."""
 __pdoc__['SimulationContext.target_shape'] = """Target shape.
 
 A tuple with exactly two elements: the number of rows and columns.
@@ -71,8 +77,8 @@ Even if columns are not grouped, `group_lens` contains ones - one column per gro
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column, or per group if cash sharing is enabled.
 
-If `cash_sharing` is True, has shape `(target_shape[0], group_lens.shape[0])`. 
-Otherwise, has shape `target_shape`.
+If `cash_sharing` is True, has shape `(group_lens.shape[0],)`. 
+Otherwise, has shape `(target_shape[1],)`.
 """
 __pdoc__['SimulationContext.cash_sharing'] = """Whether cash sharing is enabled."""
 __pdoc__['SimulationContext.call_seq'] = """Default sequence of calls per segment.
@@ -106,18 +112,26 @@ Used to calculate `value_now`. Can be changed in-place before group valuation.
 
 Has shape `(target_shape[1],)`.
 """
+__pdoc__['SimulationContext.last_ridx'] = """Index of the last order record.
 
-GroupContext = namedtuple('GroupContext', [
-    *SimulationContext._fields,
-    'group',
-    'group_len',
-    'from_col',
-    'to_col'
-])
+Has shape `(target_shape[1],)`.
+"""
+__pdoc__['SimulationContext.last_lidx'] = """Index of the last log record.
+
+Has shape `(target_shape[1],)`.
+"""
+
+
+class GroupContext(tp.NamedTuple):
+    sim_ctx: SimulationContext
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+
 
 __pdoc__['GroupContext'] = "A named tuple representing context of the group."
-for field in SimulationContext._fields:
-    __pdoc__[f'GroupContext.{field}'] = f"See `SimulationContext.{field}`."
+__pdoc__['GroupContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
 __pdoc__['GroupContext.group'] = """Index of the group.
 
 Has range `[0, group_lens.shape[0])`.
@@ -137,52 +151,55 @@ Has range `[1, target_shape[1] + 1)`.
 If columns are not grouped, equals `from_col + 1`.
 """
 
-RowContext = namedtuple('RowContext', [
-    *SimulationContext._fields,
-    'i'
-])
+
+class RowContext(tp.NamedTuple):
+    sim_ctx: SimulationContext
+    i: int
+
+
 __pdoc__['RowContext'] = "A named tuple representing context of the row."
-for field in SimulationContext._fields:
-    __pdoc__[f'RowContext.{field}'] = f"See `SimulationContext.{field}`."
+__pdoc__['RowContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
 __pdoc__['RowContext.i'] = """Current row (time axis).
 
 Has range `[0, target_shape[0])`.
 """
 
-SegmentContext = namedtuple('SegmentContext', [
-    *SimulationContext._fields,
-    'i',
-    'group',
-    'group_len',
-    'from_col',
-    'to_col',
-    'call_seq_now'
-])
+
+class SegmentContext(tp.NamedTuple):
+    sim_ctx: SimulationContext
+    group_ctx: GroupContext
+    row_ctx: RowContext
+    call_seq_now: tp.Array1d
+
+
 __pdoc__['SegmentContext'] = "A named tuple representing context of the segment."
-for field in SimulationContext._fields:
-    __pdoc__[f'SegmentContext.{field}'] = f"See `SimulationContext.{field}`."
-__pdoc__['SegmentContext.i'] = "See `RowContext.i`."
-__pdoc__['SegmentContext.group'] = "See `GroupContext.group`."
-__pdoc__['SegmentContext.group_len'] = "See `GroupContext.group_len`."
-__pdoc__['SegmentContext.from_col'] = "See `GroupContext.from_col`."
-__pdoc__['SegmentContext.to_col'] = "See `GroupContext.to_col`."
+__pdoc__['SegmentContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
+__pdoc__['SegmentContext.group_ctx'] = "Group context of type `GroupContext`."
+__pdoc__['SegmentContext.row_ctx'] = "Row context of type `RowContext`."
 __pdoc__['SegmentContext.call_seq_now'] = """Current sequence of calls.
 
 Has shape `(group_len,)`. 
 """
 
-OrderContext = namedtuple('OrderContext', [
-    *SegmentContext._fields,
-    'col',
-    'call_idx',
-    'cash_now',
-    'shares_now',
-    'val_price_now',
-    'value_now'
-])
+
+class OrderContext(tp.NamedTuple):
+    sim_ctx: SimulationContext
+    group_ctx: GroupContext
+    row_ctx: RowContext
+    seg_ctx: SegmentContext
+    col: int
+    call_idx: int
+    cash_now: float
+    shares_now: float
+    val_price_now: float
+    value_now: float
+
+
 __pdoc__['OrderContext'] = "A named tuple representing context of the order."
-for field in SegmentContext._fields:
-    __pdoc__[f'OrderContext.{field}'] = f"See `SegmentContext.{field}`."
+__pdoc__['OrderContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
+__pdoc__['OrderContext.group_ctx'] = "Group context of type `GroupContext`."
+__pdoc__['OrderContext.row_ctx'] = "Row context of type `RowContext`."
+__pdoc__['OrderContext.seg_ctx'] = "Segment context of type `SegmentContext`."
 __pdoc__['OrderContext.col'] = """Current column (feature axis).
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`.
@@ -210,10 +227,13 @@ Scalar value. Per group if cash sharing is enabled, otherwise per column.
 Current value is calculated using `last_val_price`.
 """
 
-InitCashMode = namedtuple('InitCashMode', [
-    'Auto',
-    'AutoAlign'
-])(*range(2))
+
+class InitCashModeT(tp.NamedTuple):
+    Auto: int
+    AutoAlign: int
+
+
+InitCashMode = InitCashModeT(*range(2))
 """_"""
 
 __pdoc__['InitCashMode'] = f"""Initial cash mode.
@@ -227,12 +247,15 @@ Attributes:
     AutoAlign: Optimal initial cash aligned across all columns.
 """
 
-CallSeqType = namedtuple('CallSeqType', [
-    'Default',
-    'Reversed',
-    'Random',
-    'Auto'
-])(*range(4))
+
+class CallSeqTypeT(tp.NamedTuple):
+    Default: int
+    Reversed: int
+    Random: int
+    Auto: int
+
+
+CallSeqType = CallSeqTypeT(*range(4))
 """_"""
 
 __pdoc__['CallSeqType'] = f"""Call sequence type.
@@ -248,13 +271,16 @@ Attributes:
     Auto: Place calls dynamically based on order value.
 """
 
-SizeType = namedtuple('SizeType', [
-    'Shares',
-    'TargetShares',
-    'TargetValue',
-    'TargetPercent',
-    'Percent'
-])(*range(5))
+
+class SizeTypeT(tp.NamedTuple):
+    Shares: int
+    TargetShares: int
+    TargetValue: int
+    TargetPercent: int
+    Percent: int
+
+
+SizeType = SizeTypeT(*range(5))
 """_"""
 
 __pdoc__['SizeType'] = f"""Size type.
@@ -271,12 +297,15 @@ Attributes:
     Percent: Percentage of available cash (if buy) or shares (if sell).
 """
 
-ConflictMode = namedtuple('ConflictMode', [
-    'Ignore',
-    'Entry',
-    'Exit',
-    'Opposite'
-])(*range(4))
+
+class ConflictModeT(tp.NamedTuple):
+    Ignore: int
+    Entry: int
+    Exit: int
+    Opposite: int
+
+
+ConflictMode = ConflictModeT(*range(4))
 """_"""
 
 __pdoc__['ConflictMode'] = f"""Conflict mode.
@@ -294,21 +323,22 @@ Attributes:
     Opposite: Use opposite signal. Takes effect only when in position.
 """
 
-Order = namedtuple('Order', [
-    'size',
-    'size_type',
-    'direction',
-    'price',
-    'fees',
-    'fixed_fees',
-    'slippage',
-    'min_size',
-    'max_size',
-    'reject_prob',
-    'allow_partial',
-    'raise_reject',
-    'log'
-])
+
+class Order(tp.NamedTuple):
+    size: float
+    size_type: int
+    direction: int
+    price: float
+    fees: float
+    fixed_fees: float
+    slippage: float
+    min_size: float
+    max_size: float
+    reject_prob: float
+    allow_partial: bool
+    raise_reject: bool
+    log: bool
+
 
 __pdoc__['Order'] = "A named tuple representing an order."
 __pdoc__['Order.size'] = "Size in shares. Final size will depend upon your funds."
@@ -330,11 +360,14 @@ NoOrder = Order(np.nan, -1, -1, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 
 
 __pdoc__['NoOrder'] = "Order that will not be processed."
 
-OrderStatus = namedtuple('OrderStatus', [
-    'Filled',
-    'Ignored',
-    'Rejected'
-])(*range(3))
+
+class OrderStatusT(tp.NamedTuple):
+    Filled: int
+    Ignored: int
+    Rejected: int
+
+
+OrderStatus = OrderStatusT(*range(3))
 """_"""
 
 __pdoc__['OrderStatus'] = f"""Order status.
@@ -349,10 +382,13 @@ Attributes:
     Rejected: Order rejected.
 """
 
-OrderSide = namedtuple('OrderSide', [
-    'Buy',
-    'Sell'
-])(*range(2))
+
+class OrderSideT(tp.NamedTuple):
+    Buy: int
+    Sell: int
+
+
+OrderSide = OrderSideT(*range(2))
 """_"""
 
 __pdoc__['OrderSide'] = f"""Order side.
@@ -362,22 +398,25 @@ __pdoc__['OrderSide'] = f"""Order side.
 ```
 """
 
-StatusInfo = namedtuple('StatusInfo', [
-    'SizeNaN',
-    'PriceNaN',
-    'ValPriceNaN',
-    'ValueNaN',
-    'ValueZeroNeg',
-    'SizeZero',
-    'NoCashShort',
-    'NoCashLong',
-    'NoOpenPosition',
-    'MaxSizeExceeded',
-    'RandomEvent',
-    'CantCoverFees',
-    'MinSizeNotReached',
-    'PartialFill'
-])(*range(14))
+
+class StatusInfoT(tp.NamedTuple):
+    SizeNaN: int
+    PriceNaN: int
+    ValPriceNaN: int
+    ValueNaN: int
+    ValueZeroNeg: int
+    SizeZero: int
+    NoCashShort: int
+    NoCashLong: int
+    NoOpenPosition: int
+    MaxSizeExceeded: int
+    RandomEvent: int
+    CantCoverFees: int
+    MinSizeNotReached: int
+    PartialFill: int
+
+
+StatusInfo = StatusInfoT(*range(14))
 """_"""
 
 __pdoc__['StatusInfo'] = f"""Order status information.
@@ -412,22 +451,23 @@ __pdoc__['status_info_desc'] = f"""Order status description.
 ```
 """
 
-OrderResult = namedtuple('OrderResult', [
-    'size',
-    'price',
-    'fees',
-    'side',
-    'status',
-    'status_info'
-])
+
+class OrderResult(tp.NamedTuple):
+    size: float
+    price: float
+    fees: float
+    side: int
+    status: int
+    status_info: int
+
 
 __pdoc__['OrderResult'] = "A named tuple representing an order result."
 __pdoc__['OrderResult.size'] = "Filled size in shares."
 __pdoc__['OrderResult.price'] = "Filled price per share, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
-__pdoc__['OrderResult.side'] = "See `vectorbt.portfolio.enums.OrderSide`."
+__pdoc__['OrderResult.side'] = "See `OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
-__pdoc__['OrderResult.status_info'] = "See `vectorbt.portfolio.enums.StatusInfo`."
+__pdoc__['OrderResult.status_info'] = "See `StatusInfo`."
 
 
 class RejectedOrderError(Exception):
@@ -435,11 +475,13 @@ class RejectedOrderError(Exception):
     pass
 
 
-Direction = namedtuple('Direction', [
-    'LongOnly',
-    'ShortOnly',
-    'All'
-])(*range(3))
+class DirectionT(tp.NamedTuple):
+    LongOnly: int
+    ShortOnly: int
+    All: int
+
+
+Direction = DirectionT(*range(3))
 """_"""
 
 __pdoc__['Direction'] = f"""Position direction.
@@ -477,10 +519,13 @@ __pdoc__['order_dt'] = f"""`np.dtype` of order records.
 ```
 """
 
-TradeDirection = namedtuple('TradeDirection', [
-    'Long',
-    'Short'
-])(*range(2))
+
+class TradeDirectionT(tp.NamedTuple):
+    Long: int
+    Short: int
+
+
+TradeDirection = TradeDirectionT(*range(2))
 """_"""
 
 __pdoc__['TradeDirection'] = f"""Event direction.
@@ -490,10 +535,13 @@ __pdoc__['TradeDirection'] = f"""Event direction.
 ```
 """
 
-TradeStatus = namedtuple('TradeStatus', [
-    'Open',
-    'Closed'
-])(*range(2))
+
+class TradeStatusT(tp.NamedTuple):
+    Open: int
+    Closed: int
+
+
+TradeStatus = TradeStatusT(*range(2))
 """_"""
 
 __pdoc__['TradeStatus'] = f"""Event status.
@@ -594,10 +642,13 @@ __pdoc__['log_dt'] = f"""`np.dtype` of log records.
 ```
 """
 
-TradeType = namedtuple('TradeType', [
-    'Trade',
-    'Position'
-])(*range(2))
+
+class TradeTypeT(tp.NamedTuple):
+    Trade: int
+    Position: int
+
+
+TradeType = TradeTypeT(*range(2))
 """_"""
 
 __pdoc__['TradeType'] = f"""Trade type.
@@ -607,11 +658,14 @@ __pdoc__['TradeType'] = f"""Trade type.
 ```
 """
 
-BenchmarkSize = namedtuple('BenchmarkSize', [
-    'InfLong',
-    'InfShort',
-    'Auto'
-])(*range(3))
+
+class BenchmarkSizeT(tp.NamedTuple):
+    InfLong: int
+    InfShort: int
+    Auto: int
+
+
+BenchmarkSize = BenchmarkSizeT(*range(3))
 """_"""
 
 __pdoc__['BenchmarkSize'] = f"""Benchmark size.

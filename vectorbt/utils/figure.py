@@ -7,13 +7,21 @@ from vectorbt import typing as tp
 from vectorbt.utils.config import merge_dicts
 
 
-class FigurePNG:
-    def show_png(self) -> None:
+class FigureMixin:
+    def show(self, *args, **kwargs) -> None:
         """Display the figure in PNG format."""
         raise NotImplementedError
 
+    def show_png(self) -> None:
+        """Display the figure in PNG format."""
+        self.show(renderer="png")
 
-class Figure(FigurePNG, _Figure):
+    def show_svg(self) -> None:
+        """Display the figure in SVG format."""
+        self.show(renderer="svg")
+
+
+class Figure(_Figure, FigureMixin):
     """Figure."""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -24,12 +32,16 @@ class Figure(FigurePNG, _Figure):
         super().__init__(*args, **kwargs)
         self.update_layout(**merge_dicts(settings.layout, layout))
 
-    def show_png(self) -> None:
-        """Display the figure in PNG format."""
-        self.show(renderer="png", width=self.layout.width, height=self.layout.height)
+    def show(self, *args, **kwargs) -> None:
+        """Show the figure."""
+        from vectorbt.settings import plotting
+
+        fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+        show_kwargs = merge_dicts(fig_kwargs, plotting['show'], kwargs)
+        _Figure.show(self, *args, **show_kwargs)
 
 
-class FigureWidget(FigurePNG, _FigureWidget):
+class FigureWidget(_FigureWidget, FigureMixin):
     """Figure widget."""
 
     def __init__(self, *args, **kwargs) -> None:
@@ -40,9 +52,13 @@ class FigureWidget(FigurePNG, _FigureWidget):
         super().__init__(*args, **kwargs)
         self.update_layout(**merge_dicts(settings.layout, layout))
 
-    def show_png(self) -> None:
-        """Display the figure in PNG format."""
-        self.show(renderer="png", width=self.layout.width, height=self.layout.height)
+    def show(self, *args, **kwargs) -> None:
+        """Show the figure."""
+        from vectorbt.settings import plotting
+
+        fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
+        show_kwargs = merge_dicts(fig_kwargs, plotting['show'], kwargs)
+        _Figure.show(self, *args, **show_kwargs)
 
 
 def make_figure(*args, **kwargs) -> tp.BaseFigure:

@@ -278,7 +278,11 @@ class Records(Wrapping):
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper: ArrayWrapper, records_arr: tp.RecordArray, idx_field: str = 'auto', **kwargs) -> None:
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 records_arr: tp.RecordArray,
+                 idx_field: str = 'auto',
+                 **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,

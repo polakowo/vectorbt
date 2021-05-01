@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
@@ -24,12 +25,17 @@ from vectorbt.utils.enum import to_value_map
 from vectorbt.utils.figure import make_figure
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records.base import Records
+from vectorbt.records.mapped_array import MappedArray
 from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, position_dt, TradeType
 from vectorbt.portfolio import nb
+from vectorbt.portfolio.orders import Orders
 
 
 # ############# Trades ############# #
+
+TradesT = tp.TypeVar("TradesT", bound="Trades")
 
 
 class Trades(Records):
@@ -130,8 +136,13 @@ class Trades(Records):
     ```
     """
 
-    def __init__(self, wrapper, records_arr, close, idx_field='exit_idx',
-                 trade_type=TradeType.Trade, **kwargs):
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 records_arr: tp.RecordArray,
+                 close: tp.ArrayLike,
+                 idx_field: str = 'exit_idx',
+                 trade_type: int = TradeType.Trade,
+                 **kwargs) -> None:
         Records.__init__(
             self,
             wrapper,
@@ -151,7 +162,8 @@ class Trades(Records):
             if not all(field in records_arr.dtype.names for field in position_dt.names):
                 raise TypeError("Records array must match position_dt")
 
-    def indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self: TradesT, pd_indexing_func: tp.PandasIndexingFunc,
+                           **kwargs) -> tp.Tuple[TradesT, tp.MaybeArray, tp.Array1d]:
         """Perform indexing on `Trades` and also return metadata."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
             Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
@@ -162,22 +174,22 @@ class Trades(Records):
             close=new_close
         ), group_idxs, col_idxs
 
-    def indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: TradesT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> TradesT:
         """Perform indexing on `Trades`."""
         return self.indexing_func_meta(pd_indexing_func, **kwargs)[0]
 
     @property
-    def close(self):
+    def close(self) -> tp.SeriesFrame:
         """Reference price such as close."""
         return self._close
 
     @property
-    def trade_type(self):
+    def trade_type(self) -> int:
         """Trade type."""
         return self._trade_type
 
     @classmethod
-    def from_orders(cls, orders, **kwargs):
+    def from_orders(cls: tp.Type[TradesT], orders: Orders, **kwargs) -> TradesT:
         """Build `Trades` from `vectorbt.portfolio.orders.Orders`."""
         trade_records_arr = nb.orders_to_trades_nb(
             orders.close.vbt.to_2d_array(),
@@ -187,7 +199,7 @@ class Trades(Records):
         return cls(orders.wrapper, trade_records_arr, orders.close, **kwargs)
 
     @property  # no need for cached
-    def records_readable(self):
+    def records_readable(self) -> tp.Frame:
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
@@ -210,30 +222,30 @@ class Trades(Records):
         return out
 
     @cached_property
-    def duration(self):
+    def duration(self) -> MappedArray:
         """Duration of each trade (in raw format)."""
         return self.map(nb.trade_duration_map_nb)
 
     @cached_property
-    def pnl(self):
+    def pnl(self) -> MappedArray:
         """PnL of each trade."""
         return self.map_field('pnl')
 
     @cached_property
-    def returns(self):
+    def returns(self) -> MappedArray:
         """Return of each trade."""
         return self.map_field('return')
 
     # ############# PnL ############# #
 
     @cached_property
-    def winning(self):
+    def winning(self: TradesT) -> TradesT:
         """Winning trades."""
         filter_mask = self.values['pnl'] > 0.
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def win_rate(self, group_by=None, wrap_kwargs=None):
+    def win_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of winning trades."""
         win_count = to_1d(self.winning.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -241,13 +253,13 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(win_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def losing(self):
+    def losing(self: TradesT) -> TradesT:
         """Losing trades."""
         filter_mask = self.values['pnl'] < 0.
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def loss_rate(self, group_by=None, wrap_kwargs=None):
+    def loss_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of losing trades."""
         loss_count = to_1d(self.losing.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -255,7 +267,7 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(loss_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def profit_factor(self, group_by=None, wrap_kwargs=None):
+    def profit_factor(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Profit factor."""
         total_win = to_1d(self.winning.pnl.sum(group_by=group_by), raw=True)
         total_loss = to_1d(self.losing.pnl.sum(group_by=group_by), raw=True)
@@ -270,7 +282,7 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(profit_factor, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def expectancy(self, group_by=None, wrap_kwargs=None):
+    def expectancy(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Average profitability."""
         win_rate = to_1d(self.win_rate(group_by=group_by), raw=True)
         avg_win = to_1d(self.winning.pnl.mean(group_by=group_by), raw=True)
@@ -286,7 +298,7 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(expectancy, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def sqn(self, group_by=None, wrap_kwargs=None):
+    def sqn(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """System Quality Number (SQN)."""
         count = to_1d(self.count(group_by=group_by), raw=True)
         pnl_mean = to_1d(self.pnl.mean(group_by=group_by), raw=True)
@@ -298,18 +310,18 @@ class Trades(Records):
     # ############# TradeDirection ############# #
 
     @cached_property
-    def direction(self):
+    def direction(self) -> MappedArray:
         """See `vectorbt.portfolio.enums.TradeDirection`."""
         return self.map_field('direction')
 
     @cached_property
-    def long(self):
+    def long(self: TradesT) -> TradesT:
         """Long trades."""
         filter_mask = self.values['direction'] == TradeDirection.Long
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def long_rate(self, group_by=None, wrap_kwargs=None):
+    def long_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of long trades."""
         long_count = to_1d(self.long.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -317,13 +329,13 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(long_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def short(self):
+    def short(self: TradesT) -> TradesT:
         """Short trades."""
         filter_mask = self.values['direction'] == TradeDirection.Short
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def short_rate(self, group_by=None, wrap_kwargs=None):
+    def short_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of short trades."""
         short_count = to_1d(self.short.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -333,18 +345,18 @@ class Trades(Records):
     # ############# TradeStatus ############# #
 
     @cached_property
-    def status(self):
+    def status(self) -> MappedArray:
         """See `vectorbt.portfolio.enums.TradeStatus`."""
         return self.map_field('status')
 
     @cached_property
-    def open(self):
+    def open(self: TradesT) -> TradesT:
         """Open trades."""
         filter_mask = self.values['status'] == TradeStatus.Open
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def open_rate(self, group_by=None, wrap_kwargs=None):
+    def open_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of open trades."""
         open_count = to_1d(self.open.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -352,13 +364,13 @@ class Trades(Records):
         return self.wrapper.wrap_reduced(open_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def closed(self):
+    def closed(self: TradesT) -> TradesT:
         """Closed trades."""
         filter_mask = self.values['status'] == TradeStatus.Closed
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def closed_rate(self, group_by=None, wrap_kwargs=None):
+    def closed_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of closed trades."""
         closed_count = to_1d(self.closed.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -368,17 +380,18 @@ class Trades(Records):
     # ############# Plotting ############# #
 
     def plot_pnl(self,
-                 column=None,
-                 marker_size_range=(7, 14),
-                 opacity_range=(0.75, 0.9),
-                 closed_profit_trace_kwargs=None,
-                 closed_loss_trace_kwargs=None,
-                 open_trace_kwargs=None,
-                 hline_shape_kwargs=None,
-                 add_trace_kwargs=None,
-                 xref='x', yref='y',
-                 fig=None,
-                 **layout_kwargs):  # pragma: no cover
+                 column: tp.Optional[tp.Label] = None,
+                 marker_size_range: tp.Tuple[float, float] = (7, 14),
+                 opacity_range: tp.Tuple[float, float] = (0.75, 0.9),
+                 closed_profit_trace_kwargs: tp.KwargsLike = None,
+                 closed_loss_trace_kwargs: tp.KwargsLike = None,
+                 open_trace_kwargs: tp.KwargsLike = None,
+                 hline_shape_kwargs: tp.KwargsLike = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 xref: str = 'x',
+                 yref: str = 'y',
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot trade PnL.
 
         Args:
@@ -545,21 +558,22 @@ class Trades(Records):
         return fig
 
     def plot(self,
-             column=None,
-             plot_close=True,
-             plot_zones=True,
-             close_trace_kwargs=None,
-             entry_trace_kwargs=None,
-             exit_trace_kwargs=None,
-             exit_profit_trace_kwargs=None,
-             exit_loss_trace_kwargs=None,
-             active_trace_kwargs=None,
-             profit_shape_kwargs=None,
-             loss_shape_kwargs=None,
-             add_trace_kwargs=None,
-             xref='x', yref='y',
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             plot_close: bool = True,
+             plot_zones: bool = True,
+             close_trace_kwargs: tp.KwargsLike = None,
+             entry_trace_kwargs: tp.KwargsLike = None,
+             exit_trace_kwargs: tp.KwargsLike = None,
+             exit_profit_trace_kwargs: tp.KwargsLike = None,
+             exit_loss_trace_kwargs: tp.KwargsLike = None,
+             active_trace_kwargs: tp.KwargsLike = None,
+             profit_shape_kwargs: tp.KwargsLike = None,
+             loss_shape_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             xref: str = 'x',
+             yref: str = 'y',
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot orders.
 
         Args:
@@ -809,6 +823,9 @@ class Trades(Records):
 # ############# Positions ############# #
 
 
+PositionsT = tp.TypeVar("PositionsT", bound="Positions")
+
+
 class Positions(Trades):
     """Extends `Trades` for working with position records.
 
@@ -866,23 +883,23 @@ class Positions(Trades):
     ```
     """
 
-    def __init__(self, *args, trade_type=TradeType.Position, **kwargs):
+    def __init__(self, *args, trade_type: int = TradeType.Position, **kwargs) -> None:
         if trade_type != TradeType.Position:
             raise ValueError("Trade type must be TradeType.Position")
         Trades.__init__(self, *args, trade_type=trade_type, **kwargs)
 
     @classmethod
-    def from_orders(cls, orders, **kwargs):
+    def from_orders(cls: tp.Type[PositionsT], orders: Orders, **kwargs) -> PositionsT:
         raise NotImplementedError
 
     @classmethod
-    def from_trades(cls, trades, **kwargs):
+    def from_trades(cls: tp.Type[PositionsT], trades: Trades, **kwargs) -> PositionsT:
         """Build `Positions` from `Trades`."""
         position_records_arr = nb.trades_to_positions_nb(trades.values, trades.col_mapper.col_map)
         return cls(trades.wrapper, position_records_arr, trades.close, **kwargs)
 
     @cached_method
-    def coverage(self, group_by=None, wrap_kwargs=None):
+    def coverage(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Coverage, that is, total duration divided by the whole period."""
         total_duration = to_1d(self.duration.sum(group_by=group_by), raw=True)
         total_steps = self.wrapper.grouper.get_group_lens(group_by=group_by) * self.wrapper.shape[0]

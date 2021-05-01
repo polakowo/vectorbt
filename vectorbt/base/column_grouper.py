@@ -11,8 +11,8 @@ from numba import njit
 
 from vectorbt import typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.array import is_sorted
+from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.config import Configured
 from vectorbt.base import index_fns
 
@@ -63,8 +63,6 @@ def get_groups_and_index(index: tp.Index, group_by: tp.GroupByLike) -> tp.Tuple[
         new_index.names = group_by.names
     elif isinstance(group_by, (pd.Index, pd.Series)):
         new_index.name = group_by.name
-    if not is_sorted(codes):
-        raise ValueError("Groups must be coherent and sorted")
     return codes, new_index
 
 
@@ -78,7 +76,7 @@ def get_group_lens_nb(groups: tp.Array1d) -> tp.Array1d:
     for i in range(groups.shape[0]):
         cur_group = groups[i]
         if cur_group < last_group:
-            raise ValueError("Groups must be coherent and sorted")
+            raise ValueError("Groups must be coherent and sorted (such as [0, 0, 1, 2, 2, ...])")
         if cur_group != last_group:
             if last_group != -1:
                 # Process previous group
@@ -113,7 +111,7 @@ class ColumnGrouper(Configured):
     All properties are read-only to enable caching.
 
     !!! note
-        Columns must build groups that are coherent and sorted.
+        Columns should build groups that are coherent and sorted for using `get_group_lens_nb`.
 
     !!! note
         This class is meant to be immutable. To change any attribute, use `ColumnGrouper.copy`."""
@@ -261,8 +259,18 @@ class ColumnGrouper(Configured):
         return self.get_groups_and_columns(**kwargs)[1]
 
     @cached_method
+    def is_sorted(self, group_by: tp.GroupByLike = None, **kwargs) -> bool:
+        """Return whether groups are coherent and sorted."""
+        group_by = self.resolve_group_by(group_by=group_by, **kwargs)
+        groups = self.get_groups(group_by=group_by)
+        return is_sorted(groups)
+
+    @cached_method
     def get_group_lens(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.Array1d:
         """See get_group_lens_nb."""
+        if not self.is_sorted(group_by=group_by):
+            raise ValueError("group_by must lead to groups that are coherent and sorted "
+                             "(such as [0, 0, 1, 2, 2, ...])")
         group_by = self.resolve_group_by(group_by=group_by, **kwargs)
         if group_by is None or group_by is False:  # no grouping
             return np.full(len(self.columns), 1)

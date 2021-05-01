@@ -135,8 +135,6 @@ class TestColumnGrouper:
             (0, 1),
             (0, 0)
         ], names=['first', 'second']))
-        with pytest.raises(Exception) as e_info:
-            column_grouper.get_groups_and_index(grouped_columns[[0, -1, 0]], group_by=[0, 1])
 
     def test_get_group_lens_nb(self):
         np.testing.assert_array_equal(
@@ -159,6 +157,10 @@ class TestColumnGrouper:
             column_grouper.get_group_lens_nb(np.array([])),
             np.array([])
         )
+        with pytest.raises(Exception) as e_info:
+            column_grouper.get_group_lens_nb(np.array([1, 1, 0, 0]))
+        with pytest.raises(Exception) as e_info:
+            column_grouper.get_group_lens_nb(np.array([0, 1, 0, 1]))
 
     def test_is_grouped(self):
         assert column_grouper.ColumnGrouper(grouped_columns, group_by=0).is_grouped()

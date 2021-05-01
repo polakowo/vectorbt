@@ -398,9 +398,9 @@ ohlcstex_func_config = Config(
         ts_stop=flex_elem_param_config,
         tp_stop=flex_elem_param_config
     ),
-    sl_stop=0.,
-    ts_stop=0.,
-    tp_stop=0.,
+    sl_stop=np.nan,
+    ts_stop=np.nan,
+    tp_stop=np.nan,
     hit_price=np.nan,
     stop_type=-1
 )

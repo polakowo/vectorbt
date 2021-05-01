@@ -185,7 +185,8 @@ reset_theme()
 # Plotting
 plotting = Config(
     dict(
-        use_widgets=True
+        use_widgets=True,
+        show=Config()
     ),
     frozen=True
 )

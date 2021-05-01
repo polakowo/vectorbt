@@ -1121,7 +1121,7 @@ except ImportError:
     IndicatorMixinT = tp.Any
 
 
-def params_to_list(params: tp.Param, is_tuple: bool, is_array_like: bool) -> list:
+def params_to_list(params: tp.Params, is_tuple: bool, is_array_like: bool) -> list:
     """Cast parameters to a list."""
     check_against = [list, List]
     if not is_tuple:
@@ -1135,7 +1135,7 @@ def params_to_list(params: tp.Param, is_tuple: bool, is_array_like: bool) -> lis
     return new_params
 
 
-def prepare_params(param_list: tp.Sequence[tp.Param],
+def prepare_params(param_list: tp.Sequence[tp.Params],
                    param_settings: tp.KwargsLikeSequence = None,
                    input_shape: tp.Optional[tp.Shape] = None,
                    to_2d: bool = False) -> tp.List[tp.List]:
@@ -1954,6 +1954,8 @@ def combine_objs(obj: tp.SeriesFrame, other: tp.MaybeTupleList[tp.Union[tp.Array
 
 
 IndicatorBaseT = tp.TypeVar("IndicatorBaseT", bound="IndicatorBase")
+RunOutputT = tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOutputT]
+RunCombsOutputT = tp.Tuple[IndicatorBaseT, ...]
 
 
 class IndicatorBase(Wrapping):
@@ -2095,6 +2097,26 @@ class IndicatorBase(Wrapping):
             param_list=param_list,
             mapper_list=mapper_list
         )
+
+    @classmethod
+    def _run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
+        """Private run method."""
+        raise NotImplementedError
+
+    @classmethod
+    def run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
+        """Public run method."""
+        return cls._run(*args, **kwargs)
+
+    @classmethod
+    def _run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
+        """Private run combinations method."""
+        raise NotImplementedError
+
+    @classmethod
+    def run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
+        """Public run combinations method."""
+        return cls._run_combs(*args, **kwargs)
 
 
 class IndicatorFactory:
@@ -2630,22 +2652,17 @@ class IndicatorFactory:
             **default_kwargs
         )
 
-        def _run(cls: tp.Type[IndicatorBaseT],
-                 *args,
-                 _param_settings: tp.KwargsLike = param_settings,
-                 _in_output_settings: tp.KwargsLike = in_output_settings,
-                 _pipeline_kwargs: tp.KwargsLike = pipeline_kwargs,
-                 **kwargs) -> tp.Union[IndicatorBaseT, tp.Tuple[tp.Any, ...], RawOutputT, CacheOutputT]:
+        def _run(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunOutputT:
             _short_name = kwargs.pop('short_name', def_run_kwargs['short_name'])
             _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
             _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
             _param_settings = _merge_settings(
-                _param_settings,
+                param_settings,
                 kwargs.pop('param_settings', {}),
                 [param_names]
             )
             _in_output_settings = _merge_settings(
-                _in_output_settings,
+                in_output_settings,
                 kwargs.pop('in_output_settings', {}),
                 [in_output_names]
             )
@@ -2681,7 +2698,7 @@ class IndicatorFactory:
                 hide_levels=hide_levels,
                 param_settings=[_param_settings.get(n, {}) for n in param_names],
                 in_output_settings=[_in_output_settings.get(n, {}) for n in in_output_names],
-                **merge_dicts(_pipeline_kwargs, kwargs)
+                **merge_dicts(pipeline_kwargs, kwargs)
             )
 
             # Return the raw result if any of the flags are set
@@ -2798,10 +2815,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 **default_kwargs
             )
 
-            def _run_combs(cls: tp.Type[IndicatorBaseT],
-                           *args,
-                           _param_settings: tp.KwargsLike = param_settings,
-                           **kwargs) -> tp.Tuple[IndicatorBaseT, ...]:
+            def _run_combs(cls: tp.Type[IndicatorBaseT], *args, **kwargs) -> RunCombsOutputT:
                 _r = kwargs.pop('r', def_run_combs_kwargs['r'])
                 _param_product = kwargs.pop('param_product', def_run_combs_kwargs['param_product'])
                 _comb_func = kwargs.pop('comb_func', def_run_combs_kwargs['comb_func'])
@@ -2810,7 +2824,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
                 _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
                 _param_settings = _merge_settings(
-                    _param_settings,
+                    param_settings,
                     kwargs.get('param_settings', {}),  # get, not pop
                     [param_names]
                 )
