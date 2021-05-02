@@ -1,6 +1,5 @@
 """General types used in vectorbt."""
 
-import sys
 import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame as Frame, Index
@@ -11,10 +10,12 @@ from pandas.tseries.offsets import DateOffset
 from plotly.graph_objects import Figure, FigureWidget
 from plotly.basedatatypes import BaseFigure, BaseTraceType
 from numba.core.registry import CPUDispatcher
-from numba.typed import List as TypedList
+from numba.typed import List as NumbaList
 
-if sys.version_info < (3, 8):
-    from typing_extensions import *
+try:
+    from typing import Protocol
+except ImportError:
+    from typing_extensions import Protocol
 
 # Generic types
 T = TypeVar("T")
@@ -140,4 +141,4 @@ ValueMapLike = Union[NamedTuple, ValueMap]
 
 # Indicators
 Param = Any
-Params = Union[List[Param], Tuple[Param, ...], TypedList, Array1d]
+Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
