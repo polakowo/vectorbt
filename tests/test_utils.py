@@ -1603,11 +1603,12 @@ class TestDatetime:
         assert datetime.is_tz_aware(pd.Timestamp('2020-01-01', tz=datetime.get_utc_tz()))
 
     def test_to_timezone(self):
-        assert datetime.to_timezone('UTC') == pytz.UTC
-        assert datetime.to_timezone('Europe/Berlin') == pytz.timezone('Europe/Berlin')
+        assert datetime.to_timezone('UTC') == _timezone.utc
+        assert datetime.to_timezone('Europe/Berlin') == _timezone(_timedelta(hours=2))
+        assert datetime.to_timezone('Europe/Berlin', to_py_timezone=False) == pytz.timezone('Europe/Berlin')
         assert datetime.to_timezone('+0500') == _timezone(_timedelta(hours=5))
         assert datetime.to_timezone(_timezone(_timedelta(hours=1))) == _timezone(_timedelta(hours=1))
-        assert datetime.to_timezone(pytz.timezone('Europe/Berlin')) == pytz.timezone('Europe/Berlin')
+        assert datetime.to_timezone(pytz.timezone('Europe/Berlin')) == _timezone(_timedelta(hours=2))
         assert datetime.to_timezone(1) == _timezone(_timedelta(hours=1))
         assert datetime.to_timezone(0.5) == _timezone(_timedelta(hours=0.5))
         with pytest.raises(Exception):

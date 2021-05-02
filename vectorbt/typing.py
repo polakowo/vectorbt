@@ -39,7 +39,7 @@ MaybeSequence = Union[T, Sequence[T]]
 
 
 # Arrays
-class _SupportsArray(Protocol):
+class SupportsArray(Protocol):
     def __array__(self) -> np.ndarray: ...
 
 
@@ -59,7 +59,7 @@ MaybeSeriesFrame = Union[T, Series, Frame]
 AnyArray = Union[Array, Series, Frame]
 AnyArray1d = Union[Array1d, Series]
 AnyArray2d = Union[Array2d, Frame]
-_ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], _SupportsArray]
+_ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArray]
 ArrayLike = Union[_ArrayLike, Array, ExtensionArray, Index, Series, Frame]  # must be converted
 IndexLike = Union[_ArrayLike, Array1d, ExtensionArray, Index, Series]
 ArrayLikeSequence = Union[Sequence[T], Array1d, ExtensionArray, Index, Series]  # sequence for 1-dim data
@@ -79,6 +79,11 @@ PandasFrequencyLike = Union[str, pd.Timedelta, timedelta, np.timedelta64, DateOf
 TimezoneLike = Union[None, str, float, timedelta, tzinfo]
 DatetimeLikeIndex = Union[pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex]
 DatetimeLike = Union[str, float, pd.Timestamp, np.datetime64, datetime]
+
+
+class SupportsTZInfo(Protocol):
+    tzinfo: tzinfo
+
 
 # Indexing
 PandasIndexingFunc = Callable[[SeriesFrame], MaybeSeriesFrame]

@@ -58,15 +58,12 @@ def convert_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
-def is_tz_aware(dt: tp.Union[tp.DatetimeLikeIndex, datetime]) -> bool:
+def is_tz_aware(dt: tp.SupportsTZInfo) -> bool:
     """Whether datetime is timezone-aware."""
-    tzinfo = dt.tzinfo
-    if tzinfo is None:
+    tz = dt.tzinfo
+    if tz is None:
         return False
-    tzinfo = to_timezone(tzinfo, to_py_timezone=True)
-    if isinstance(dt, DatetimeIndexes):
-        return tzinfo.utcoffset(dt[0]) is not None
-    return tzinfo.utcoffset(dt) is not None
+    return tz.utcoffset(datetime.now()) is not None
 
 
 def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, **kwargs) -> tzinfo:
