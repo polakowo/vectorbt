@@ -101,7 +101,7 @@ fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='rand_n', yaxis_titl
 fig.show()
 ```
 
-![rand_scatter.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.png)
+![rand_scatter.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/rand_scatter.svg)
 
 For fans of hyperparameter optimization, here is a snippet for testing 10000 window combinations of a 
 dual SMA crossover strategy on BTC, USD and LTC:
@@ -133,31 +133,31 @@ portfolio[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
-Start                            2015-08-07 00:00:00
-End                              2021-03-12 00:00:00
-Duration                          2041 days 00:00:00
+Start                      2015-08-07 00:00:00+00:00
+End                        2021-05-02 00:00:00+00:00
+Duration                          2092 days 00:00:00
 Init. Cash                                       100
-Total Profit                                  679765
-Total Return [%]                              679765
-Benchmark Return [%]                         63250.5
-Position Coverage [%]                         55.463
+Total Profit                                  846151
+Total Return [%]                              846151
+Benchmark Return [%]                          106176
+Position Coverage [%]                        56.1185
 Max. Drawdown [%]                             70.735
-Avg. Drawdown [%]                            12.0311
+Avg. Drawdown [%]                            12.2078
 Max. Drawdown Duration             760 days 00:00:00
-Avg. Drawdown Duration    28 days 20:03:34.925373134
-Num. Trades                                       49
-Win Rate [%]                                  55.102
+Avg. Drawdown Duration    29 days 14:19:42.089552239
+Num. Trades                                       50
+Win Rate [%]                                      54
 Best Trade [%]                                1075.8
 Worst Trade [%]                             -29.5934
-Avg. Trade [%]                               49.0573
+Avg. Trade [%]                               47.8175
 Max. Trade Duration                 80 days 00:00:00
-Avg. Trade Duration       23 days 01:28:09.795918367
-Expectancy                                   14440.6
-SQN                                          1.70339
-Gross Exposure                               0.55463
-Sharpe Ratio                                 2.16534
-Sortino Ratio                                3.81088
-Calmar Ratio                                 5.43694
+Avg. Trade Duration                 22 days 20:38:24
+Expectancy                                   12322.9
+SQN                                          1.43759
+Gross Exposure                              0.561185
+Sharpe Ratio                                 2.17109
+Sortino Ratio                                3.81812
+Calmar Ratio                                 5.43505
 Name: (10, 20, ETH-USD), dtype: object
 ```
 
@@ -165,7 +165,7 @@ Name: (10, 20, ETH-USD), dtype: object
 portfolio[(10, 20, 'ETH-USD')].plot().show()
 ```
 
-![dmac_portfolio.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.png)
+![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.svg)
 
 It's not all about backtesting - vectorbt can be used to facilitate financial data analysis and visualization.
 Let's generate a GIF that animates the %B and bandwidth of Bollinger Bands for different symbols:
@@ -308,7 +308,7 @@ split_idx    0    1    2    3  4
 >>> pd.Series([2, 1, 3, 2]).vbt.drawdowns.plot().show()
 ```
 
-![drawdowns.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.png)
+![drawdowns.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/drawdowns.svg)
 
 - Functions for working with signals
     - Entry, exit, and random signal generators
@@ -370,7 +370,7 @@ rand_n      0      1      2
 >>> portfolio.trades.plot().show()
 ```
 
-![trades.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.png)
+![trades.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.svg)
 
 - Indicator factory for building complex technical indicators with ease
     - Includes technical indicators with full Numba support
@@ -423,7 +423,7 @@ sma_timeperiod    2    3
 >>> vbt.LEXLB.run(price, 0.2, 0.2).plot().show()
 ``` 
 
-![local_extrema.png](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.png)
+![local_extrema.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/local_extrema.svg)
 
 - Classes for downloading and (periodically) updating data
     - Includes APIs such as [ccxt](https://github.com/ccxt/ccxt), [yfinance](https://github.com/ranaroussi/yfinance) and [python-binance](https://github.com/sammchardy/python-binance)

@@ -3,112 +3,140 @@
 import numpy as np
 import pandas as pd
 import dateparser
-from datetime import datetime, timezone, timedelta, tzinfo
+from datetime import datetime, timezone, timedelta, tzinfo, time
 import pytz
 import copy
 
-DatetimeTypes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
+from vectorbt import typing as tp
+
+DatetimeIndexes = (pd.DatetimeIndex, pd.TimedeltaIndex, pd.PeriodIndex)
 
 
-def to_timedelta(arg, **kwargs):
+def freq_to_timedelta(arg: tp.FrequencyLike) -> pd.Timedelta:
     """`pd.to_timedelta` that uses unit abbreviation with number."""
     if isinstance(arg, str) and not arg[0].isdigit():
         # Otherwise "ValueError: unit abbreviation w/o a number"
-        arg = '1' + arg
-    return pd.to_timedelta(arg, **kwargs)
+        return pd.Timedelta(1, unit=arg)
+    return pd.Timedelta(arg)
 
 
-def get_utc_tz():
+def get_utc_tz() -> timezone:
     """Get UTC timezone."""
     return timezone.utc
 
 
-def get_local_tz():
+def get_local_tz() -> timezone:
     """Get local timezone."""
     return timezone(datetime.now(timezone.utc).astimezone().utcoffset())
 
 
-def convert_tzaware_time(t, tz_out):
+def convert_tzaware_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as non-naive time.
 
     `datetime.time` should have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).timetz()
 
 
-def tzaware_to_naive_time(t, tz_out):
+def tzaware_to_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as naive time.
 
     `datetime.time` should have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
-def naive_to_tzaware_time(t, tz_out):
+def naive_to_tzaware_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as non-naive time.
 
     `datetime.time` should not have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time().replace(tzinfo=tz_out)
 
 
-def convert_naive_time(t, tz_out):
+def convert_naive_time(t: time, tz_out: tp.Optional[tzinfo]) -> time:
     """Return as naive time.
 
     `datetime.time` should not have `tzinfo` set."""
     return datetime.combine(datetime.today(), t).astimezone(tz_out).time()
 
 
-def is_tz_aware(dt):
+def is_tz_aware(dt: tp.SupportsTZInfo) -> bool:
     """Whether datetime is timezone-aware."""
-    return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
+    tz = dt.tzinfo
+    if tz is None:
+        return False
+    return tz.utcoffset(datetime.now()) is not None
 
 
-def to_timezone(tz):
+def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, **kwargs) -> tzinfo:
     """Parse the timezone.
 
     Strings are parsed by `pytz` and `dateparser`, while integers and floats are treated as hour offsets.
 
     If the timezone object can't be checked for equality based on its properties,
-    it's automatically converted to `datetime.timezone`."""
+    it's automatically converted to `datetime.timezone`.
+
+    If `to_py_timezone` is set to True, will convert to `datetime.timezone`.
+
+    `**kwargs` are passed to `dateparser.parse`."""
+    from vectorbt.settings import datetime as dt_settings
+
+    if tz is None:
+        return get_local_tz()
+    if to_py_timezone is None:
+        to_py_timezone = dt_settings['to_py_timezone']
     if isinstance(tz, str):
         try:
             tz = pytz.timezone(tz)
         except pytz.UnknownTimeZoneError:
-            dt = dateparser.parse('now %s' % tz)
+            dt = dateparser.parse('now %s' % tz, **kwargs)
             if dt is not None:
                 tz = dt.tzinfo
     if isinstance(tz, (int, float)):
         tz = timezone(timedelta(hours=tz))
+    if isinstance(tz, timedelta):
+        tz = timezone(tz)
     if isinstance(tz, tzinfo):
-        if tz != copy.copy(tz):
+        if to_py_timezone or tz != copy.copy(tz):
             return timezone(tz.utcoffset(datetime.now()))
         return tz
     raise TypeError("Couldn't parse the timezone")
 
 
-def to_tzaware_datetime(dt, tz=None):
+def to_tzaware_datetime(dt_like: tp.DatetimeLike,
+                        naive_tz: tp.Optional[tp.TimezoneLike] = None,
+                        tz: tp.Optional[tp.TimezoneLike] = None,
+                        **kwargs) -> datetime:
     """Parse the datetime as a timezone-aware `datetime.datetime`.
 
-    See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats.
+    See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats and `**kwargs`.
 
-    Timestamps are localized to UTC, while naive datetime is localized to the local time.
+    Raw timestamps are localized to UTC, while naive datetime is localized to `naive_tz`.
+    Set `naive_tz` to None to use the default value defined in `vectorbt.settings.datetime`.
     To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
-    if isinstance(dt, float):
-        dt = datetime.fromtimestamp(dt, timezone.utc)
-    elif isinstance(dt, int):
-        if len(str(dt)) > 10:
-            dt = datetime.fromtimestamp(dt / 10 ** (len(str(dt)) - 10), timezone.utc)
+    from vectorbt.settings import datetime as dt_settings
+
+    if naive_tz is None:
+        naive_tz = dt_settings['naive_tz']
+    if isinstance(dt_like, float):
+        dt = datetime.fromtimestamp(dt_like, timezone.utc)
+    elif isinstance(dt_like, int):
+        if len(str(dt_like)) > 10:
+            dt = datetime.fromtimestamp(dt_like / 10 ** (len(str(dt_like)) - 10), timezone.utc)
         else:
-            dt = datetime.fromtimestamp(dt, timezone.utc)
-    elif isinstance(dt, str):
-        dt = dateparser.parse(dt)
-        if dt is None:
-            raise ValueError("Couldn't parse the datetime")
-    elif isinstance(dt, pd.Timestamp):
-        dt = dt.to_pydatetime()
-    elif isinstance(dt, np.datetime64):
-        dt = dt.astype(datetime)
+            dt = datetime.fromtimestamp(dt_like, timezone.utc)
+    elif isinstance(dt_like, str):
+        dt = dateparser.parse(dt_like, **kwargs)
+    elif isinstance(dt_like, pd.Timestamp):
+        dt = dt_like.to_pydatetime()
+    elif isinstance(dt_like, np.datetime64):
+        dt = datetime.combine(dt_like.astype(datetime), time())
+    else:
+        dt = dt_like
+
+    if dt is None:
+        raise ValueError("Couldn't parse the datetime")
 
     if not is_tz_aware(dt):
-        dt = dt.replace(tzinfo=get_local_tz())
+        dt = dt.replace(tzinfo=to_timezone(naive_tz))
     else:
         dt = dt.replace(tzinfo=to_timezone(dt.tzinfo))
     if tz is not None:
@@ -116,13 +144,13 @@ def to_tzaware_datetime(dt, tz=None):
     return dt
 
 
-def datetime_to_ms(dt):
+def datetime_to_ms(dt: datetime) -> int:
     """Convert a datetime to milliseconds."""
     epoch = datetime.fromtimestamp(0, dt.tzinfo)
     return int((dt - epoch).total_seconds() * 1000.0)
 
 
-def interval_to_ms(interval):
+def interval_to_ms(interval: str) -> tp.Optional[int]:
     """Convert an interval string to milliseconds."""
     seconds_per_unit = {
         "m": 60,

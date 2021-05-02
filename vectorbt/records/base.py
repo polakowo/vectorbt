@@ -243,6 +243,7 @@ instance to the disk with `Records.save` and load it with `Records.load`.
 import numpy as np
 import pandas as pd
 
+from vectorbt import typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.config import merge_dicts
@@ -251,6 +252,10 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.records import nb
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.col_mapper import ColumnMapper
+
+
+RecordsT = tp.TypeVar("RecordsT", bound="Records")
+IndexingMetaT = tp.Tuple[ArrayWrapper, tp.RecordArray, tp.MaybeArray, tp.Array1d]
 
 
 class Records(Wrapping):
@@ -273,7 +278,11 @@ class Records(Wrapping):
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper, records_arr, idx_field='auto', **kwargs):
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 records_arr: tp.RecordArray,
+                 idx_field: str = 'auto',
+                 **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -295,7 +304,7 @@ class Records(Wrapping):
         self._idx_field = idx_field
         self._col_mapper = ColumnMapper(wrapper, records_arr['col'])
 
-    def _col_idxs_records(self, col_idxs):
+    def _col_idxs_records(self, col_idxs: tp.Array1d) -> tp.RecordArray:
         """Get records corresponding to column indices.
 
         Returns new records array."""
@@ -307,60 +316,63 @@ class Records(Wrapping):
                 self.values, self.col_mapper.col_map, to_1d(col_idxs))
         return new_records_arr
 
-    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
         """Perform indexing on `Records` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_records_arr = self._col_idxs_records(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:
         """Perform indexing on `Records`."""
-        new_wrapper, new_records_arr, _, _ = self._indexing_func_meta(pd_indexing_func, **kwargs)
+        new_wrapper, new_records_arr, _, _ = self.indexing_func_meta(pd_indexing_func, **kwargs)
         return self.copy(
             wrapper=new_wrapper,
             records_arr=new_records_arr
         )
 
     @property
-    def records_arr(self):
+    def records_arr(self) -> tp.RecordArray:
         """Records array."""
         return self._records_arr
 
-    values = records_arr
+    @property
+    def values(self) -> tp.RecordArray:
+        """Records array."""
+        return self.records_arr
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.values)
 
     @property
-    def idx_field(self):
+    def idx_field(self) -> str:
         """Index field."""
         return self._idx_field
 
     @property
-    def records(self):
+    def records(self) -> tp.Frame:
         """Records."""
         return pd.DataFrame.from_records(self.values)
 
     @property
-    def recarray(self):
+    def recarray(self) -> tp.RecArray:
         return self.values.view(np.recarray)
 
     @property
-    def col_mapper(self):
+    def col_mapper(self) -> ColumnMapper:
         """Column mapper.
 
         See `vectorbt.records.col_mapper.ColumnMapper`."""
         return self._col_mapper
 
     @cached_method
-    def is_sorted(self, incl_id=False):
+    def is_sorted(self, incl_id: bool = False) -> bool:
         """Check whether records are sorted."""
         if incl_id:
             return nb.is_col_idx_sorted_nb(self.values['col'], self.values['id'])
         return nb.is_col_sorted_nb(self.values['col'])
 
-    def sort(self, incl_id=False, group_by=None, **kwargs):
+    def sort(self: RecordsT, incl_id: bool = False, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Sort records by columns (primary) and ids (secondary, optional).
 
         !!! note
@@ -373,11 +385,12 @@ class Records(Wrapping):
             ind = np.argsort(self.values['col'])
         return self.copy(records_arr=self.values[ind], **kwargs).regroup(group_by)
 
-    def filter_by_mask(self, mask, group_by=None, **kwargs):
+    def filter_by_mask(self: RecordsT, mask: tp.Array1d, group_by: tp.GroupByLike = None, **kwargs) -> RecordsT:
         """Return a new class instance, filtered by mask."""
         return self.copy(records_arr=self.values[mask], **kwargs).regroup(group_by)
 
-    def map(self, map_func_nb, *args, idx_field=None, value_map=None, group_by=None, **kwargs):
+    def map(self, map_func_nb: tp.RecordMapFunc, *args, idx_field: tp.Optional[str] = None,
+            value_map: tp.Optional[tp.ValueMapLike] = None, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Map each record to a scalar value. Returns mapped array.
 
         See `vectorbt.records.nb.map_records_nb`."""
@@ -399,7 +412,9 @@ class Records(Wrapping):
             **kwargs
         ).regroup(group_by)
 
-    def map_field(self, field, idx_field=None, value_map=None, group_by=None, **kwargs):
+    def map_field(self, field: str, idx_field: tp.Optional[str] = None,
+                  value_map: tp.Optional[tp.ValueMapLike] = None,
+                  group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Convert field to mapped array."""
         if idx_field is None:
             idx_field = self.idx_field
@@ -417,7 +432,9 @@ class Records(Wrapping):
             **kwargs
         ).regroup(group_by)
 
-    def map_array(self, a, idx_field=None, value_map=None, group_by=None, **kwargs):
+    def map_array(self, a: tp.ArrayLike, idx_field: tp.Optional[str] = None,
+                  value_map: tp.Optional[tp.ValueMapLike] = None,
+                  group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Convert array to mapped array.
 
          The length of the array should match that of the records."""
@@ -441,7 +458,7 @@ class Records(Wrapping):
         ).regroup(group_by)
 
     @cached_method
-    def count(self, group_by=None, wrap_kwargs=None):
+    def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Return count by column."""
         wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
         return self.wrapper.wrap_reduced(

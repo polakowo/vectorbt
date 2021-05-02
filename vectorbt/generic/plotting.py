@@ -13,17 +13,19 @@ The module can be accessed directly via `vbt.plotting`.
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.basedatatypes import BaseTraceType
 import math
 
+from vectorbt import typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.utils.array import renormalize
 from vectorbt.utils.colors import rgb_from_cmap
-from vectorbt.utils.config import Configured
+from vectorbt.utils.config import Configured, resolve_dict
 from vectorbt.base import reshape_fns
 
 
-def clean_labels(labels):
+def clean_labels(labels: tp.ArrayLikeSequence) -> tp.ArrayLikeSequence:
     """Clean labels.
 
     Plotly doesn't support multi-indexes."""
@@ -35,41 +37,48 @@ def clean_labels(labels):
 
 
 class TraceUpdater:
-    def __init__(self, fig, traces):
+    def __init__(self, fig: tp.BaseFigure, traces: tp.Tuple[BaseTraceType, ...]) -> None:
         """Base trace updating class."""
         self._fig = fig
         self._traces = traces
 
     @property
-    def fig(self):
+    def fig(self) -> tp.BaseFigure:
         """Figure."""
         return self._fig
 
     @property
-    def traces(self):
+    def traces(self) -> tp.Tuple[BaseTraceType, ...]:
         """Traces to update."""
         return self._traces
 
-    def update(self, *agrs, **kwargs):
+    def update(self, *args, **kwargs) -> None:
         """Update the trace data."""
         raise NotImplementedError
 
 
 class Gauge(Configured, TraceUpdater):
-    def __init__(self, value=None, label=None, value_range=None, cmap_name='Spectral',
-                 trace_kwargs=None, add_trace_kwargs=None, fig=None, **layout_kwargs):
+    def __init__(self,
+                 value: tp.Optional[float] = None,
+                 label: tp.Optional[str] = None,
+                 value_range: tp.Optional[tp.Tuple[float, float]] = None,
+                 cmap_name: str = 'Spectral',
+                 trace_kwargs: tp.KwargsLike = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a gauge plot.
 
         Args:
-            value (int or float): The value to be displayed.
+            value (float): The value to be displayed.
             label (str): The label to be displayed.
-            value_range (list or tuple of 2 values): The value range of the gauge.
+            value_range (tuple of float): The value range of the gauge.
             cmap_name (str): A matplotlib-compatible colormap name.
 
                 See the [list of available colormaps](https://matplotlib.org/tutorials/colors/colormaps.html).
             trace_kwargs (dict): Keyword arguments passed to the `plotly.graph_objects.Indicator`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -84,7 +93,7 @@ class Gauge(Configured, TraceUpdater):
         ... )
         >>> gauge.fig
         ```
-        ![](/vectorbt/docs/img/Gauge.png)
+        ![](/vectorbt/docs/img/Gauge.svg)
         """
         Configured.__init__(
             self,
@@ -106,7 +115,7 @@ class Gauge(Configured, TraceUpdater):
             add_trace_kwargs = {}
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             if 'width' in layout:
                 # Calculate nice width and height
                 fig.update_layout(
@@ -124,14 +133,14 @@ class Gauge(Configured, TraceUpdater):
         indicator.update(**trace_kwargs)
         fig.add_trace(indicator, **add_trace_kwargs)
 
-        TraceUpdater.__init__(self, fig, [fig.data[-1]])
+        TraceUpdater.__init__(self, fig, (fig.data[-1],))
         self.value_range = value_range
         self.cmap_name = cmap_name
 
         if value is not None:
             self.update(value)
 
-    def update(self, value):
+    def update(self, value: float) -> None:
         """Update the trace data."""
         if self.value_range is None:
             self.value_range = value, value
@@ -148,8 +157,14 @@ class Gauge(Configured, TraceUpdater):
 
 
 class Bar(Configured, TraceUpdater):
-    def __init__(self, data=None, trace_names=None, x_labels=None, trace_kwargs=None,
-                 add_trace_kwargs=None, fig=None, **layout_kwargs):
+    def __init__(self,
+                 data: tp.Optional[tp.ArrayLike] = None,
+                 trace_names: tp.TraceNames = None,
+                 x_labels: tp.Optional[tp.Labels] = None,
+                 trace_kwargs: tp.KwargsLikeSequence = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a bar plot.
 
         Args:
@@ -158,9 +173,11 @@ class Bar(Configured, TraceUpdater):
                 Must be of shape (`x_labels`, `trace_names`).
             trace_names (str or list of str): Trace names, corresponding to columns in pandas.
             x_labels (array_like): X-axis labels, corresponding to index in pandas.
-            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
+
+                Can be specified per trace as a sequence of dicts.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -175,7 +192,7 @@ class Bar(Configured, TraceUpdater):
         ... )
         >>> bar.fig
         ```
-        ![](/vectorbt/docs/img/Bar.png)
+        ![](/vectorbt/docs/img/Bar.svg)
         """
         Configured.__init__(
             self,
@@ -196,7 +213,7 @@ class Bar(Configured, TraceUpdater):
             if trace_names is None:
                 raise ValueError("At least trace_names must be passed")
         if trace_names is None:
-            data = reshape_fns.to_2d(np.array(data))
+            data = reshape_fns.to_2d(np.asarray(data))
             trace_names = [None] * data.shape[1]
         if isinstance(trace_names, str):
             trace_names = [trace_names]
@@ -204,11 +221,11 @@ class Bar(Configured, TraceUpdater):
             x_labels = clean_labels(x_labels)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
-            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            _trace_kwargs = resolve_dict(trace_kwargs, i=i)
             trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
@@ -225,7 +242,7 @@ class Bar(Configured, TraceUpdater):
         if data is not None:
             self.update(data)
 
-    def update(self, data):
+    def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data.
 
         ## Example
@@ -234,9 +251,9 @@ class Bar(Configured, TraceUpdater):
         >>> bar.update([[2, 1], [4, 3]])
         >>> bar.fig
         ```
-        ![](/vectorbt/docs/img/update_bar_data.png)
+        ![](/vectorbt/docs/img/Bar_updated.svg)
         """
-        data = reshape_fns.to_2d(np.array(data))
+        data = reshape_fns.to_2d(np.asarray(data))
         with self.fig.batch_update():
             for i, bar in enumerate(self.traces):
                 bar.y = data[:, i]
@@ -245,8 +262,14 @@ class Bar(Configured, TraceUpdater):
 
 
 class Scatter(Configured, TraceUpdater):
-    def __init__(self, data=None, trace_names=None, x_labels=None, trace_kwargs=None,
-                 add_trace_kwargs=None, fig=None, **layout_kwargs):
+    def __init__(self,
+                 data: tp.Optional[tp.ArrayLike] = None,
+                 trace_names: tp.TraceNames = None,
+                 x_labels: tp.Optional[tp.Labels] = None,
+                 trace_kwargs: tp.KwargsLikeSequence = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a scatter plot.
 
         Args:
@@ -255,9 +278,11 @@ class Scatter(Configured, TraceUpdater):
                 Must be of shape (`x_labels`, `trace_names`).
             trace_names (str or list of str): Trace names, corresponding to columns in pandas.
             x_labels (array_like): X-axis labels, corresponding to index in pandas.
-            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to `plotly.graph_objects.Scatter`.
+
+                Can be specified per trace as a sequence of dicts.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -272,7 +297,7 @@ class Scatter(Configured, TraceUpdater):
         ... )
         >>> scatter.fig
         ```
-        ![](/vectorbt/docs/img/Scatter.png)
+        ![](/vectorbt/docs/img/Scatter.svg)
         """
         Configured.__init__(
             self,
@@ -301,11 +326,11 @@ class Scatter(Configured, TraceUpdater):
             x_labels = clean_labels(x_labels)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
-            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            _trace_kwargs = resolve_dict(trace_kwargs, i=i)
             trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
@@ -322,9 +347,9 @@ class Scatter(Configured, TraceUpdater):
         if data is not None:
             self.update(data)
 
-    def update(self, data):
+    def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.array(data))
+        data = reshape_fns.to_2d(np.asarray(data))
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -332,9 +357,17 @@ class Scatter(Configured, TraceUpdater):
 
 
 class Histogram(Configured, TraceUpdater):
-    def __init__(self, data=None, trace_names=None, horizontal=False, remove_nan=True,
-                 from_quantile=None, to_quantile=None, trace_kwargs=None, add_trace_kwargs=None,
-                 fig=None, **layout_kwargs):
+    def __init__(self,
+                 data: tp.Optional[tp.ArrayLike] = None,
+                 trace_names: tp.TraceNames = None,
+                 horizontal: bool = False,
+                 remove_nan: bool = True,
+                 from_quantile: tp.Optional[float] = None,
+                 to_quantile: tp.Optional[float] = None,
+                 trace_kwargs: tp.KwargsLikeSequence = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a histogram plot.
 
         Args:
@@ -350,9 +383,11 @@ class Histogram(Configured, TraceUpdater):
             to_quantile (float): Filter out data points after this quantile.
 
                 Should be in range `[0, 1]`.
-            trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Histogram`.
+            trace_kwargs (dict or list of dict): Keyword arguments passed to `plotly.graph_objects.Histogram`.
+
+                Can be specified per trace as a sequence of dicts.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -366,7 +401,7 @@ class Histogram(Configured, TraceUpdater):
         ... )
         >>> hist.fig
         ```
-        ![](/vectorbt/docs/img/Histogram.png)
+        ![](/vectorbt/docs/img/Histogram.svg)
         """
         Configured.__init__(
             self,
@@ -396,12 +431,12 @@ class Histogram(Configured, TraceUpdater):
             trace_names = [trace_names]
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             fig.update_layout(barmode='overlay')
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
-            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            _trace_kwargs = resolve_dict(trace_kwargs, i=i)
             trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
@@ -422,9 +457,9 @@ class Histogram(Configured, TraceUpdater):
         if data is not None:
             self.update(data)
 
-    def update(self, data):
+    def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.array(data))
+        data = reshape_fns.to_2d(np.asarray(data))
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -446,9 +481,17 @@ class Histogram(Configured, TraceUpdater):
 
 
 class Box(Configured, TraceUpdater):
-    def __init__(self, data=None, trace_names=None, horizontal=False, remove_nan=True,
-                 from_quantile=None, to_quantile=None, trace_kwargs=None, add_trace_kwargs=None,
-                 fig=None, **layout_kwargs):
+    def __init__(self,
+                 data: tp.Optional[tp.ArrayLike] = None,
+                 trace_names: tp.TraceNames = None,
+                 horizontal: bool = False,
+                 remove_nan: bool = True,
+                 from_quantile: tp.Optional[float] = None,
+                 to_quantile: tp.Optional[float] = None,
+                 trace_kwargs: tp.KwargsLikeSequence = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a box plot.
 
         For keyword arguments, see `Histogram`.
@@ -464,7 +507,7 @@ class Box(Configured, TraceUpdater):
         ... )
         >>> box.fig
         ```
-        ![](/vectorbt/docs/img/Box.png)
+        ![](/vectorbt/docs/img/Box.svg)
         """
         Configured.__init__(
             self,
@@ -494,11 +537,11 @@ class Box(Configured, TraceUpdater):
             trace_names = [trace_names]
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         for i, trace_name in enumerate(trace_names):
-            _trace_kwargs = trace_kwargs[i] if isinstance(trace_kwargs, (list, tuple)) else trace_kwargs
+            _trace_kwargs = resolve_dict(trace_kwargs, i=i)
             trace_name = _trace_kwargs.pop('name', trace_name)
             if trace_name is not None:
                 trace_name = str(trace_name)
@@ -518,9 +561,9 @@ class Box(Configured, TraceUpdater):
         if data is not None:
             self.update(data)
 
-    def update(self, data):
+    def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.array(data))
+        data = reshape_fns.to_2d(np.asarray(data))
 
         with self.fig.batch_update():
             for i, trace in enumerate(self.traces):
@@ -542,8 +585,16 @@ class Box(Configured, TraceUpdater):
 
 
 class Heatmap(Configured, TraceUpdater):
-    def __init__(self, data=None, x_labels=None, y_labels=None, is_x_category=False, is_y_category=False,
-                 trace_kwargs=None, add_trace_kwargs=None, fig=None, **layout_kwargs):
+    def __init__(self,
+                 data: tp.Optional[tp.ArrayLike] = None,
+                 x_labels: tp.Optional[tp.Labels] = None,
+                 y_labels: tp.Optional[tp.Labels] = None,
+                 is_x_category: bool = False,
+                 is_y_category: bool = False,
+                 trace_kwargs: tp.KwargsLike = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a heatmap plot.
 
         Args:
@@ -556,7 +607,7 @@ class Heatmap(Configured, TraceUpdater):
             is_y_category (bool): Whether Y-axis is a categorical axis.
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Heatmap`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -571,7 +622,7 @@ class Heatmap(Configured, TraceUpdater):
         ... )
         >>> heatmap.fig
         ```
-        ![](/vectorbt/docs/img/Heatmap.png)
+        ![](/vectorbt/docs/img/Heatmap.svg)
         """
         Configured.__init__(
             self,
@@ -594,14 +645,14 @@ class Heatmap(Configured, TraceUpdater):
             if x_labels is None or y_labels is None:
                 raise ValueError("At least x_labels and y_labels must be passed")
         else:
-            data = reshape_fns.to_2d(np.array(data))
+            data = reshape_fns.to_2d(np.asarray(data))
         if x_labels is not None:
             x_labels = clean_labels(x_labels)
         if y_labels is not None:
             y_labels = clean_labels(y_labels)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             if 'width' in layout:
                 # Calculate nice width and height
                 max_width = layout['width']
@@ -613,14 +664,14 @@ class Heatmap(Configured, TraceUpdater):
                     y_len = len(y_labels)
                 width = math.ceil(renormalize(
                     x_len / (x_len + y_len),
-                    [0, 1],
-                    [0.3 * max_width, max_width]
+                    (0, 1),
+                    (0.3 * max_width, max_width)
                 ))
                 width = min(width + 150, max_width)  # account for colorbar
                 height = math.ceil(renormalize(
                     y_len / (x_len + y_len),
-                    [0, 1],
-                    [0.3 * max_width, max_width]
+                    (0, 1),
+                    (0.3 * max_width, max_width)
                 ))
                 height = min(height, max_width * 0.7)  # limit height
                 fig.update_layout(
@@ -651,22 +702,30 @@ class Heatmap(Configured, TraceUpdater):
         fig.update_layout(**axis_kwargs)
         fig.update_layout(**layout_kwargs)
 
-        TraceUpdater.__init__(self, fig, [fig.data[-1]])
+        TraceUpdater.__init__(self, fig, (fig.data[-1],))
 
         if data is not None:
             self.update(data)
 
-    def update(self, data):
+    def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
-        data = reshape_fns.to_2d(np.array(data))
+        data = reshape_fns.to_2d(np.asarray(data))
 
         with self.fig.batch_update():
             self.traces[0].z = data
 
 
 class Volume(Configured, TraceUpdater):
-    def __init__(self, data=None, x_labels=None, y_labels=None, z_labels=False, trace_kwargs=None,
-                 add_trace_kwargs=None, scene_name='scene', fig=None, **layout_kwargs):
+    def __init__(self,
+                 data: tp.Optional[tp.ArrayLike] = None,
+                 x_labels: tp.Optional[tp.Labels] = None,
+                 y_labels: tp.Optional[tp.Labels] = None,
+                 z_labels: tp.Optional[tp.Labels] = None,
+                 trace_kwargs: tp.KwargsLike = None,
+                 add_trace_kwargs: tp.KwargsLike = None,
+                 scene_name: str = 'scene',
+                 fig: tp.Optional[tp.BaseFigure] = None,
+                 **layout_kwargs) -> None:
         """Create a volume plot.
 
         Args:
@@ -679,7 +738,7 @@ class Volume(Configured, TraceUpdater):
             trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Volume`.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
             scene_name (str): Reference to the 3D scene.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         !!! note
@@ -701,7 +760,7 @@ class Volume(Configured, TraceUpdater):
         >>> volume.fig
         ```
 
-        ![](/vectorbt/docs/img/Volume.png)
+        ![](/vectorbt/docs/img/Volume.svg)
         """
         Configured.__init__(
             self,
@@ -749,7 +808,7 @@ class Volume(Configured, TraceUpdater):
         z_labels = np.asarray(z_labels)
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             if 'width' in layout:
                 # Calculate nice width and height
                 fig.update_layout(
@@ -809,12 +868,12 @@ class Volume(Configured, TraceUpdater):
         volume.update(**trace_kwargs)
         fig.add_trace(volume, **add_trace_kwargs)
 
-        TraceUpdater.__init__(self, fig, [fig.data[-1]])
+        TraceUpdater.__init__(self, fig, (fig.data[-1],))
 
         if data is not None:
             self.update(data)
 
-    def update(self, data):
+    def update(self, data: tp.ArrayLike) -> None:
         """Update the trace data."""
         data = np.asarray(data).flatten()
 

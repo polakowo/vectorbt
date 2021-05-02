@@ -2,11 +2,13 @@
 
 from numba.typed import List
 import itertools
+from collections.abc import Callable
 
+from vectorbt import typing as tp
 from vectorbt.utils import checks
 
 
-def to_typed_list(lst):
+def to_typed_list(lst: list) -> List:
     """Cast Python list to typed list.
 
     Direct construction is flawed in Numba 0.52.0.
@@ -17,8 +19,8 @@ def to_typed_list(lst):
     return nb_lst
 
 
-def flatten_param_tuples(param_tuples):
-    """Flattens a nested list of tuples using unzipping."""
+def flatten_param_tuples(param_tuples: tp.Sequence) -> tp.List[tp.List]:
+    """Flattens a nested list of iterables using unzipping."""
     param_list = []
     unzipped_tuples = zip(*param_tuples)
     for i, unzipped in enumerate(unzipped_tuples):
@@ -30,12 +32,13 @@ def flatten_param_tuples(param_tuples):
     return param_list
 
 
-def create_param_combs(op_tree, depth=0):
+def create_param_combs(op_tree: tp.Tuple, depth: int = 0) -> tp.List[tp.List]:
     """Create arbitrary parameter combinations from the operation tree `op_tree`.
 
-    `op_tree` must be a tuple of tuples, each being an instruction to generate parameters.
-    The first element of each tuple should a function that takes remaining elements as arguments.
-    If one of the elements is a tuple, it will be unfolded in the same way.
+    `op_tree` is a tuple with nested instructions to generate parameters.
+    The first element of the tuple should be a callable that takes remaining elements as arguments.
+    If one of the elements is a tuple itself and its first argument is a callable, it will be
+    unfolded in the same way as above.
 
     ## Example
 
@@ -50,9 +53,10 @@ def create_param_combs(op_tree, depth=0):
     ```
     """
     checks.assert_type(op_tree, tuple)
-    new_op_tree = (op_tree[0],)
+    checks.assert_type(op_tree[0], Callable)
+    new_op_tree: tp.Tuple = (op_tree[0],)
     for elem in op_tree[1:]:
-        if isinstance(elem, tuple):
+        if isinstance(elem, tuple) and isinstance(elem[0], Callable):
             new_op_tree += (create_param_combs(elem, depth=depth + 1),)
         else:
             new_op_tree += (elem,)
@@ -63,7 +67,7 @@ def create_param_combs(op_tree, depth=0):
     return out
 
 
-def broadcast_params(param_list, to_n=None):
+def broadcast_params(param_list: tp.Sequence[tp.Sequence], to_n: tp.Optional[int] = None) -> tp.List[tp.List]:
     """Broadcast parameters in `param_list`."""
     if to_n is None:
         to_n = max(list(map(len, param_list)))
@@ -72,7 +76,7 @@ def broadcast_params(param_list, to_n=None):
         params = param_list[i]
         if len(params) in [1, to_n]:
             if len(params) < to_n:
-                new_param_list.append(list(params * to_n))
+                new_param_list.append([p for _ in range(to_n) for p in params])
             else:
                 new_param_list.append(list(params))
         else:
@@ -80,7 +84,7 @@ def broadcast_params(param_list, to_n=None):
     return new_param_list
 
 
-def create_param_product(param_list):
+def create_param_product(param_list: tp.Sequence[tp.Sequence]) -> tp.List[tp.List]:
     """Make Cartesian product out of all params in `param_list`."""
     return list(map(list, zip(*list(itertools.product(*param_list)))))
 
@@ -88,8 +92,8 @@ def create_param_product(param_list):
 class DefaultParam:
     """Class for wrapping default values."""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.value.__repr__()
 
-    def __init__(self, value):
+    def __init__(self, value: tp.Any) -> None:
         self.value = value

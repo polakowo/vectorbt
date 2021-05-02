@@ -3,14 +3,16 @@
 import numpy as np
 from numba import njit
 
+from vectorbt import typing as tp
 
-def is_sorted(a):
+
+def is_sorted(a: tp.Array1d) -> np.bool_:
     """Checks if array is sorted."""
     return np.all(a[:-1] <= a[1:])
 
 
 @njit(cache=True)
-def is_sorted_nb(a):
+def is_sorted_nb(a: tp.Array1d) -> bool:
     """Numba-compiled version of `is_sorted`."""
     for i in range(a.size - 1):
         if a[i + 1] < a[i]:
@@ -19,7 +21,7 @@ def is_sorted_nb(a):
 
 
 @njit(cache=True)
-def insert_argsort_nb(A, I):
+def insert_argsort_nb(A: tp.Array1d, I: tp.Array1d) -> None:
     """Perform argsort using insertion sort.
 
     In-memory and without recursion -> very fast for smaller arrays."""
@@ -35,27 +37,27 @@ def insert_argsort_nb(A, I):
         I[i + 1] = I_j
 
 
-def get_ranges_arr(starts, ends):
+def get_ranges_arr(starts: tp.ArrayLike, ends: tp.ArrayLike) -> tp.Array1d:
     """Build array from start and end indices.
 
     Based on https://stackoverflow.com/a/37626057"""
-    starts = np.asarray(starts)
-    if starts.ndim == 0:
-        starts = np.array([starts])
-    ends = np.asarray(ends)
-    if ends.ndim == 0:
-        ends = np.array([ends])
-    starts, end = np.broadcast_arrays(starts, ends)
-    counts = ends - starts
+    starts_arr = np.asarray(starts)
+    if starts_arr.ndim == 0:
+        starts_arr = np.array([starts_arr])
+    ends_arr = np.asarray(ends)
+    if ends_arr.ndim == 0:
+        ends_arr = np.array([ends_arr])
+    starts_arr, end = np.broadcast_arrays(starts_arr, ends_arr)
+    counts = ends_arr - starts_arr
     counts_csum = counts.cumsum()
     id_arr = np.ones(counts_csum[-1], dtype=int)
-    id_arr[0] = starts[0]
-    id_arr[counts_csum[:-1]] = starts[1:] - ends[:-1] + 1
+    id_arr[0] = starts_arr[0]
+    id_arr[counts_csum[:-1]] = starts_arr[1:] - ends_arr[:-1] + 1
     return id_arr.cumsum()
 
 
 @njit(cache=True)
-def uniform_summing_to_one_nb(n):
+def uniform_summing_to_one_nb(n: int) -> tp.Array1d:
     """Generate random floats summing to one.
 
     See # https://stackoverflow.com/a/2640067/8141780"""
@@ -68,7 +70,8 @@ def uniform_summing_to_one_nb(n):
     return rand_floats
 
 
-def renormalize(a, from_range, to_range):
+def renormalize(a: tp.MaybeArray[float], from_range: tp.Tuple[float, float],
+                to_range: tp.Tuple[float, float]) -> tp.MaybeArray[float]:
     """Renormalize `a` from one range to another."""
     delta1 = from_range[1] - from_range[0]
     delta2 = to_range[1] - to_range[0]
@@ -79,7 +82,7 @@ renormalize_nb = njit(cache=True)(renormalize)
 """Numba-compiled version of `renormalize`."""
 
 
-def min_rel_rescale(a, to_range):
+def min_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
     """Rescale elements in `a` relatively to minimum."""
     a_min = np.min(a)
     a_max = np.max(a)
@@ -97,7 +100,7 @@ def min_rel_rescale(a, to_range):
     return renormalize(a, from_range, to_range)
 
 
-def max_rel_rescale(a, to_range):
+def max_rel_rescale(a: tp.Array, to_range: tp.Tuple[float, float]) -> tp.Array:
     """Rescale elements in `a` relatively to maximum."""
     a_min = np.min(a)
     a_max = np.max(a)
@@ -116,7 +119,7 @@ def max_rel_rescale(a, to_range):
 
 
 @njit(cache=True)
-def rescale_float_to_int_nb(floats, int_range, total):
+def rescale_float_to_int_nb(floats: tp.Array, int_range: tp.Tuple[float, float], total: float) -> tp.Array:
     """Rescale a float array into an int array."""
     ints = np.floor(renormalize_nb(floats, [0., 1.], int_range))
     leftover = int(total - ints.sum())

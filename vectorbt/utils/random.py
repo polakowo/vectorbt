@@ -6,12 +6,12 @@ from numba import njit
 
 
 @njit(cache=True)
-def set_seed_nb(seed):
+def set_seed_nb(seed: int) -> None:
     """Set seed in numba."""
     np.random.seed(seed)
 
 
-def set_seed(seed):
+def set_seed(seed: int) -> None:
     """Set seed."""
     random.seed(seed)
     np.random.seed(seed)

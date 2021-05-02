@@ -41,27 +41,33 @@ in 2020 against every single pattern found in TA-Lib, and translates them into s
 
 >>> # Fetch price history
 >>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
->>> start = datetime(2020, 1, 1)
->>> end = datetime(2020, 9, 1)
+>>> start = '2020-01-01 UTC'  # crypto is UTC
+>>> end = '2020-09-01 UTC'
 >>> # OHLCV by column
 >>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
+>>> ohlcv['Open']
 
->>> ohlcv['Open'].head()
-symbol          BTC-USD     ETH-USD   XRP-USD    BNB-USD     BCH-USD  \\
+symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \
 Date
-2020-01-01  7194.892090  129.630661  0.192912  13.730962  204.671295
-2020-01-02  7202.551270  130.820038  0.192708  13.698126  204.354538
-2020-01-03  6984.428711  127.411263  0.187948  13.035329  196.007690
-2020-01-04  7345.375488  134.168518  0.193521  13.667442  222.536560
-2020-01-05  7410.451660  135.072098  0.194367  13.888340  225.779831
+2020-01-01 00:00:00+00:00   7194.892090  129.630661  0.192912  13.730962
+2020-01-02 00:00:00+00:00   7202.551270  130.820038  0.192708  13.698126
+2020-01-03 00:00:00+00:00   6984.428711  127.411263  0.187948  13.035329
+...                                 ...         ...       ...        ...
+2020-08-30 00:00:00+00:00  11508.713867  399.616699  0.274568  23.009060
+2020-08-31 00:00:00+00:00  11713.306641  428.509003  0.283065  23.647858
+2020-09-01 00:00:00+00:00  11679.316406  434.874451  0.281612  23.185047
 
-symbol        LTC-USD
+symbol                        BCH-USD    LTC-USD
 Date
-2020-01-01  41.326534
-2020-01-02  42.018085
-2020-01-03  39.863129
-2020-01-04  42.383526
-2020-01-05  43.291382
+2020-01-01 00:00:00+00:00  204.671295  41.326534
+2020-01-02 00:00:00+00:00  204.354538  42.018085
+2020-01-03 00:00:00+00:00  196.007690  39.863129
+...                               ...        ...
+2020-08-30 00:00:00+00:00  268.842865  57.207737
+2020-08-31 00:00:00+00:00  279.280426  62.844059
+2020-09-01 00:00:00+00:00  274.480865  61.105076
+
+[244 rows x 6 columns]
 
 >>> # Run every single pattern recognition indicator and combine results
 >>> result = pd.DataFrame.vbt.empty_like(ohlcv['Open'], fill_value=0.)
@@ -85,7 +91,7 @@ Date
 >>> portfolio.value().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/portfolio_value.png)
+![](/vectorbt/docs/img/portfolio_value.svg)
 
 ## Broadcasting
 
@@ -335,14 +341,15 @@ from inspect import signature
 from collections import OrderedDict
 import warnings
 
+from vectorbt import typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.enum import convert_str_enum_value
+from vectorbt.utils.enum import prepare_enum_value
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.widgets import make_subplots
-from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
+from vectorbt.utils.figure import make_subplots
+from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.drawdowns import Drawdowns
@@ -360,15 +367,19 @@ from vectorbt.portfolio.enums import (
 )
 
 
-def _mean_agg_func(df):
+def _mean_agg_func(df: tp.Frame) -> tp.Series:
     """Compute mean for `Portfolio.stats`."""
     return df.mean(axis=0)
 
 
-def add_returns_methods(func_names):
+WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
+PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
+
+
+def add_returns_methods(func_names: tp.Iterable[tp.Union[str, tp.Tuple[str, str]]]) -> WrapperFuncT:
     """Class decorator to add `vectorbt.returns.accessors.ReturnsAccessor` methods to `Portfolio`."""
 
-    def wrapper(cls):
+    def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         for func_name in func_names:
             if isinstance(func_name, tuple):
                 ret_func_name = func_name[0]
@@ -378,13 +389,13 @@ def add_returns_methods(func_names):
             def returns_method(
                     self,
                     *args,
-                    group_by=None,
-                    year_freq=None,
-                    _ret_func_name=ret_func_name,
-                    active_returns=False,
-                    in_sim_order=False,
-                    reuse_returns=None,
-                    **kwargs):
+                    group_by: tp.GroupByLike = None,
+                    year_freq: tp.Optional[tp.FrequencyLike] = None,
+                    _ret_func_name: str = ret_func_name,
+                    active_returns: bool = False,
+                    in_sim_order: bool = False,
+                    reuse_returns: tp.Optional[tp.SeriesFrame] = None,
+                    **kwargs) -> tp.Any:
                 if reuse_returns is not None:
                     returns = reuse_returns
                 else:
@@ -466,8 +477,16 @@ class Portfolio(Wrapping):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
-    def __init__(self, wrapper, close, order_records, log_records, init_cash,
-                 cash_sharing, call_seq, incl_unrealized=None, use_filled_close=None):
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 close: tp.ArrayLike,
+                 order_records: tp.RecordArray,
+                 log_records: tp.RecordArray,
+                 init_cash: tp.ArrayLike,
+                 cash_sharing: bool,
+                 call_seq: tp.Array2d,
+                 incl_unrealized: tp.Optional[bool] = None,
+                 use_filled_close: tp.Optional[bool] = None) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -498,10 +517,10 @@ class Portfolio(Wrapping):
         self._incl_unrealized = incl_unrealized
         self._use_filled_close = use_filled_close
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
         new_wrapper, _, group_idxs, col_idxs = \
-            self.wrapper._indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
+            self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
         new_order_records = self.orders._col_idxs_records(col_idxs)
         new_log_records = self.logs._col_idxs_records(col_idxs)
@@ -523,15 +542,23 @@ class Portfolio(Wrapping):
     # ############# Class methods ############# #
 
     @classmethod
-    def from_holding(cls, close, **kwargs):
+    def from_holding(cls: tp.Type[PortfolioT], close: tp.ArrayLike, **kwargs) -> PortfolioT:
         """Simulate portfolio from holding.
 
         Based on `Portfolio.from_signals`."""
         return cls.from_signals(close, True, False, accumulate=False, **kwargs)
 
     @classmethod
-    def from_random_signals(cls, close, n=None, prob=None, entry_prob=None, exit_prob=None,
-                            param_product=False, seed=None, run_kwargs=None, **kwargs):
+    def from_random_signals(cls: tp.Type[PortfolioT],
+                            close: tp.ArrayLike,
+                            n: tp.Optional[tp.ArrayLike] = None,
+                            prob: tp.Optional[tp.ArrayLike] = None,
+                            entry_prob: tp.Optional[tp.ArrayLike] = None,
+                            exit_prob: tp.Optional[tp.ArrayLike] = None,
+                            param_product: bool = False,
+                            seed: tp.Optional[int] = None,
+                            run_kwargs: tp.KwargsLike = None,
+                            **kwargs) -> PortfolioT:
         """Simulate portfolio from random entry and exit signals.
 
         Generates signals based either on the number of signals `n` or the probability
@@ -543,6 +570,7 @@ class Portfolio(Wrapping):
         Based on `Portfolio.from_signals`."""
         from vectorbt import settings
 
+        close = to_pd_array(close)
         if entry_prob is None:
             entry_prob = prob
         if exit_prob is None:
@@ -584,12 +612,38 @@ class Portfolio(Wrapping):
         return cls.from_signals(close, entries, exits, seed=seed, **kwargs)
 
     @classmethod
-    def from_signals(cls, close, entries, exits, size=None, size_type=None, direction=None, price=None,
-                     fees=None, fixed_fees=None, slippage=None, min_size=None, max_size=None,
-                     reject_prob=None, allow_partial=None, raise_reject=None, accumulate=None, log=None,
-                     conflict_mode=None, close_first=None, val_price=None, init_cash=None, cash_sharing=None,
-                     call_seq=None, max_orders=None, max_logs=None, seed=None, group_by=None,
-                     broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
+    def from_signals(cls: tp.Type[PortfolioT],
+                     close: tp.ArrayLike,
+                     entries: tp.ArrayLike,
+                     exits: tp.ArrayLike,
+                     size: tp.Optional[tp.ArrayLike] = None,
+                     size_type: tp.Optional[tp.ArrayLike] = None,
+                     direction: tp.Optional[tp.ArrayLike] = None,
+                     price: tp.Optional[tp.ArrayLike] = None,
+                     fees: tp.Optional[tp.ArrayLike] = None,
+                     fixed_fees: tp.Optional[tp.ArrayLike] = None,
+                     slippage: tp.Optional[tp.ArrayLike] = None,
+                     min_size: tp.Optional[tp.ArrayLike] = None,
+                     max_size: tp.Optional[tp.ArrayLike] = None,
+                     reject_prob: tp.Optional[tp.ArrayLike] = None,
+                     allow_partial: tp.Optional[tp.ArrayLike] = None,
+                     raise_reject: tp.Optional[tp.ArrayLike] = None,
+                     accumulate: tp.Optional[tp.ArrayLike] = None,
+                     log: tp.Optional[tp.ArrayLike] = None,
+                     conflict_mode: tp.Optional[tp.ArrayLike] = None,
+                     close_first: tp.Optional[tp.ArrayLike] = None,
+                     val_price: tp.Optional[tp.ArrayLike] = None,
+                     init_cash: tp.Optional[tp.ArrayLike] = None,
+                     cash_sharing: tp.Optional[bool] = None,
+                     call_seq: tp.Optional[tp.ArrayLike] = None,
+                     max_orders: tp.Optional[int] = None,
+                     max_logs: tp.Optional[int] = None,
+                     seed: tp.Optional[int] = None,
+                     group_by: tp.GroupByLike = None,
+                     broadcast_kwargs: tp.KwargsLike = None,
+                     wrapper_kwargs: tp.KwargsLike = None,
+                     freq: tp.Optional[tp.FrequencyLike] = None,
+                     **kwargs) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
         Starting with initial cash `init_cash`, for each signal in `entries`, enters a long/short position
@@ -719,8 +773,7 @@ class Portfolio(Wrapping):
 
         ## Example
 
-        Some of the ways of how signals are interpreted:
-
+        Entry opens long, exit closes long:
         ```python-repl
         >>> import pandas as pd
         >>> import vectorbt as vbt
@@ -729,7 +782,6 @@ class Portfolio(Wrapping):
         >>> entries = pd.Series([True, True, True, False, False])
         >>> exits = pd.Series([False, False, True, True, True])
 
-        >>> # Entry opens long, exit closes long
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='longonly')
         >>> portfolio.share_flow()
@@ -739,8 +791,10 @@ class Portfolio(Wrapping):
         3   -1.0
         4    0.0
         dtype: float64
+        ```
 
-        >>> # Entry opens short, exit closes short
+        Entry opens short, exit closes short:
+        ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='shortonly')
         >>> portfolio.share_flow()
@@ -750,9 +804,10 @@ class Portfolio(Wrapping):
         3    1.0
         4    0.0
         dtype: float64
+        ```
 
-        >>> # Entry opens long and closes short, exit closes long and opens short
-        >>> # Reversal within one tick
+        Reversal within one tick. Entry opens long and closes short, exit closes long and opens short:
+        ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all')
         >>> portfolio.share_flow()
@@ -762,9 +817,10 @@ class Portfolio(Wrapping):
         3   -2.0
         4    0.0
         dtype: float64
+        ```
 
-        >>> # Reversal within two ticks
-        >>> # First signal closes position, second signal opens the opposite one
+        Reversal within two ticks. First signal closes position, second signal opens the opposite one:
+        ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=True)
@@ -775,8 +831,10 @@ class Portfolio(Wrapping):
         3   -1.0
         4   -1.0
         dtype: float64
+        ```
 
-        >>> # If entry and exit, chooses exit
+        If entry and exit, chooses exit:
+        ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=True, conflict_mode='exit')
@@ -787,9 +845,10 @@ class Portfolio(Wrapping):
         3   -1.0
         4    0.0
         dtype: float64
+        ```
 
-        >>> # Entry means long order, exit means short order
-        >>> # Acts similar to `from_orders`
+        Entry means long order, exit means short order (acts similar to `from_orders`):
+        ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     accumulate=True)
@@ -800,8 +859,10 @@ class Portfolio(Wrapping):
         3   -1.0
         4   -1.0
         dtype: float64
+        ```
 
-        >>> # Testing multiple parameters (via broadcasting)
+        Testing multiple parameters (via broadcasting):
+        ```python-repl
         >>> from vectorbt.portfolio.enums import Direction
 
         >>> portfolio = vbt.Portfolio.from_signals(
@@ -815,6 +876,101 @@ class Portfolio(Wrapping):
         3 -100.0   50.0 -200.0
         4    0.0    0.0    0.0
         ```
+
+        Specifying information in a more granular way thanks to broadcasting.
+        Reverse the first long position by first closing it, and all other immediately:
+        ```python-repl
+        >>> entries = pd.Series([True, False, False, True, False])
+        >>> exits = pd.Series([False, True, True, False, True])
+        >>> close_first = pd.Series([False, True, False, False, False])
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits, size=1., direction='all',
+        ...     close_first=close_first)
+        >>> portfolio.share_flow()
+        0    1.0
+        1   -1.0
+        2   -1.0
+        3    2.0
+        4   -2.0
+        dtype: float64
+        ```
+
+        Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
+        ```python-repl
+        >>> close = pd.Series([10, 11, 12, 13, 14, 15])
+        >>> entries = pd.Series([True, True, True, False, False, False])
+        >>> exits = pd.Series([False, False, False, True, True, True])
+
+        >>> # 1. Remove adjacent entries and exits
+        >>> # since stop condition refers only to the first signal
+        >>> entries, exits = entries.vbt.signals.clean(exits)
+        >>> entries
+        0     True
+        1    False
+        2    False
+        3    False
+        4    False
+        5    False
+        dtype: bool
+        >>> exits
+        0    False
+        1    False
+        2    False
+        3     True
+        4    False
+        5    False
+        dtype: bool
+
+        >>> # 2. Find stop exits
+        >>> stop_exits = entries.vbt.signals.generate_stop_exits(close, 0.1)
+        >>> stop_exits
+        0    False
+        1     True
+        2    False
+        3    False
+        4    False
+        5    False
+        dtype: bool
+
+        >>> # 3. Combine exits
+        >>> exits = exits | stop_exits
+        >>> exits
+        0    False
+        1     True
+        2    False
+        3     True
+        4    False
+        5    False
+        dtype: bool
+
+        >>> # 4. Pick the first exit after each entry
+        >>> exits = exits.vbt.signals.first(reset_by=entries, allow_gaps=True)
+        >>> exits
+        0    False
+        1     True
+        2    False
+        3    False
+        4    False
+        5    False
+        dtype: bool
+
+        >>> # 5. Simulate portfolio
+        >>> portfolio = vbt.Portfolio.from_signals(close, entries, exits)
+        >>> portfolio.share_flow()
+        0    10.0
+        1   -10.0
+        2     0.0
+        3     0.0
+        4     0.0
+        5     0.0
+        dtype: float64
+        ```
+
+        !!! note
+            By cleaning signals, you lose information. Moreover, this automatically assumes
+            that each entry/signal signal succeeds (= order gets filled). Use this with caution,
+            and consider rewriting your strategy for `Portfolio.from_order_func`, which is a
+            preferred way of defining complex logic in vectorbt.
         """
         # Get defaults
         from vectorbt import settings
@@ -823,10 +979,10 @@ class Portfolio(Wrapping):
             size = settings.portfolio['size']
         if size_type is None:
             size_type = settings.portfolio['signal_size_type']
-        size_type = convert_str_enum_value(SizeType, size_type)
+        size_type = prepare_enum_value(SizeType, size_type)
         if direction is None:
             direction = settings.portfolio['signal_direction']
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
@@ -851,14 +1007,14 @@ class Portfolio(Wrapping):
             accumulate = settings.portfolio['accumulate']
         if conflict_mode is None:
             conflict_mode = settings.portfolio['conflict_mode']
-        conflict_mode = convert_str_enum_value(ConflictMode, conflict_mode)
+        conflict_mode = prepare_enum_value(ConflictMode, conflict_mode)
         if close_first is None:
             close_first = settings.portfolio['close_first']
         if val_price is None:
             val_price = price
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
-        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -868,7 +1024,7 @@ class Portfolio(Wrapping):
             cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = settings.portfolio['call_seq']
-        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        call_seq = prepare_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -959,11 +1115,33 @@ class Portfolio(Wrapping):
         )
 
     @classmethod
-    def from_orders(cls, close, size, size_type=None, direction=None, price=None, fees=None,
-                    fixed_fees=None, slippage=None, min_size=None, max_size=None, reject_prob=None,
-                    allow_partial=None, raise_reject=None, log=None, val_price=None, init_cash=None,
-                    cash_sharing=None, call_seq=None, max_orders=None, max_logs=None, seed=None,
-                    group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
+    def from_orders(cls: tp.Type[PortfolioT],
+                    close: tp.ArrayLike,
+                    size: tp.ArrayLike,
+                    size_type: tp.Optional[tp.ArrayLike] = None,
+                    direction: tp.Optional[tp.ArrayLike] = None,
+                    price: tp.Optional[tp.ArrayLike] = None,
+                    fees: tp.Optional[tp.ArrayLike] = None,
+                    fixed_fees: tp.Optional[tp.ArrayLike] = None,
+                    slippage: tp.Optional[tp.ArrayLike] = None,
+                    min_size: tp.Optional[tp.ArrayLike] = None,
+                    max_size: tp.Optional[tp.ArrayLike] = None,
+                    reject_prob: tp.Optional[tp.ArrayLike] = None,
+                    allow_partial: tp.Optional[tp.ArrayLike] = None,
+                    raise_reject: tp.Optional[tp.ArrayLike] = None,
+                    log: tp.Optional[tp.ArrayLike] = None,
+                    val_price: tp.Optional[tp.ArrayLike] = None,
+                    init_cash: tp.Optional[tp.ArrayLike] = None,
+                    cash_sharing: tp.Optional[bool] = None,
+                    call_seq: tp.Optional[tp.ArrayLike] = None,
+                    max_orders: tp.Optional[int] = None,
+                    max_logs: tp.Optional[int] = None,
+                    seed: tp.Optional[int] = None,
+                    group_by: tp.GroupByLike = None,
+                    broadcast_kwargs: tp.KwargsLike = None,
+                    wrapper_kwargs: tp.KwargsLike = None,
+                    freq: tp.Optional[tp.FrequencyLike] = None,
+                    **kwargs) -> PortfolioT:
         """Simulate portfolio from orders.
 
         Starting with initial cash `init_cash`, orders the number of shares specified in `size`
@@ -1182,7 +1360,7 @@ class Portfolio(Wrapping):
         >>> portfolio.holding_value(group_by=False).vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/simulate_nb.png)
+        ![](/vectorbt/docs/img/simulate_nb.svg)
         """
         # Get defaults
         from vectorbt import settings
@@ -1191,10 +1369,10 @@ class Portfolio(Wrapping):
             size = settings.portfolio['size']
         if size_type is None:
             size_type = settings.portfolio['size_type']
-        size_type = convert_str_enum_value(SizeType, size_type)
+        size_type = prepare_enum_value(SizeType, size_type)
         if direction is None:
             direction = settings.portfolio['order_direction']
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
@@ -1219,7 +1397,7 @@ class Portfolio(Wrapping):
             val_price = price
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
-        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1229,7 +1407,7 @@ class Portfolio(Wrapping):
             cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = settings.portfolio['call_seq']
-        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        call_seq = prepare_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1315,12 +1493,35 @@ class Portfolio(Wrapping):
         )
 
     @classmethod
-    def from_order_func(cls, close, order_func_nb, *order_args, target_shape=None, keys=None,
-                        init_cash=None, cash_sharing=None, call_seq=None, active_mask=None,
-                        prep_func_nb=None, prep_args=None, group_prep_func_nb=None, group_prep_args=None,
-                        row_prep_func_nb=None, row_prep_args=None, segment_prep_func_nb=None,
-                        segment_prep_args=None, row_wise=None, max_orders=None, max_logs=None,
-                        seed=None, group_by=None, broadcast_kwargs=None, wrapper_kwargs=None, freq=None, **kwargs):
+    def from_order_func(cls: tp.Type[PortfolioT],
+                        close: tp.ArrayLike,
+                        order_func_nb: nb.OrderFuncT,
+                        *order_args,
+                        target_shape: tp.Optional[tp.RelaxedShape] = None,
+                        keys: tp.Optional[tp.IndexLike] = None,
+                        init_cash: tp.Optional[tp.ArrayLike] = None,
+                        cash_sharing: tp.Optional[bool] = None,
+                        call_seq: tp.Optional[tp.ArrayLike] = None,
+                        active_mask: tp.Optional[tp.ArrayLike] = None,
+                        prep_func_nb: tp.Optional[nb.PrepFuncT] = None,
+                        prep_args: tp.Optional[tp.Args] = None,
+                        group_prep_func_nb: tp.Optional[nb.GroupPrepFuncT] = None,
+                        group_prep_args: tp.Optional[tp.Args] = None,
+                        row_prep_func_nb: tp.Optional[nb.RowPrepFuncT] = None,
+                        row_prep_args: tp.Optional[tp.Args] = None,
+                        segment_prep_func_nb: tp.Optional[nb.SegmentPrepFuncT] = None,
+                        segment_prep_args: tp.Optional[tp.Args] = None,
+                        after_order_func_nb: tp.Optional[nb.AfterOrderFuncT] = None,
+                        after_order_args: tp.Optional[tp.Args] = None,
+                        row_wise: tp.Optional[bool] = None,
+                        max_orders: tp.Optional[int] = None,
+                        max_logs: tp.Optional[int] = None,
+                        seed: tp.Optional[int] = None,
+                        group_by: tp.GroupByLike = None,
+                        broadcast_kwargs: tp.KwargsLike = None,
+                        wrapper_kwargs: tp.KwargsLike = None,
+                        freq: tp.Optional[tp.FrequencyLike] = None,
+                        **kwargs) -> PortfolioT:
         """Build portfolio from a custom order function.
 
         For details, see `vectorbt.portfolio.nb.simulate_nb`.
@@ -1385,6 +1586,10 @@ class Portfolio(Wrapping):
             segment_prep_args (tuple): Packed arguments passed to `segment_prep_func_nb`.
 
                 Defaults to `()`.
+            after_order_func_nb (callable): Callback that is called after the order has been processed.
+            after_order_args (tuple): Packed arguments passed to `after_order_func_nb`.
+
+                Defaults to `()`.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
 
                 See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
@@ -1428,8 +1633,8 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.nb import create_order_nb
 
         >>> @njit
-        ... def order_func_nb(oc, size):
-        ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
+        ... def order_func_nb(c, size):
+        ...     return create_order_nb(size=size, price=c.close[c.i, c.col])
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
@@ -1456,16 +1661,16 @@ class Portfolio(Wrapping):
         >>> import numpy as np
 
         >>> @njit
-        ... def group_prep_func_nb(gc):
+        ... def group_prep_func_nb(c):
         ...     last_pos_state = np.array([-1])
         ...     return (last_pos_state,)
 
         >>> @njit
-        ... def order_func_nb(oc, last_pos_state):
-        ...     if oc.shares_now > 0:
-        ...         size = -oc.shares_now  # close long
-        ...     elif oc.shares_now < 0:
-        ...         size = -oc.shares_now  # close short
+        ... def order_func_nb(c, last_pos_state):
+        ...     if c.shares_now > 0:
+        ...         size = -c.shares_now  # close long
+        ...     elif c.shares_now < 0:
+        ...         size = -c.shares_now  # close short
         ...     else:
         ...         if last_pos_state[0] == 1:
         ...             size = -np.inf  # open short
@@ -1474,7 +1679,7 @@ class Portfolio(Wrapping):
         ...             size = np.inf  # open long
         ...             last_pos_state[0] = 1
         ...
-        ...     return create_order_nb(size=size, price=oc.close[oc.i, oc.col])
+        ...     return create_order_nb(size=size, price=c.close[c.i, c.col])
 
         >>> portfolio = vbt.Portfolio.from_order_func(
         ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
@@ -1501,32 +1706,35 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.enums import SizeType, Direction
 
         >>> @njit
-        ... def group_prep_func_nb(gc):
+        ... def group_prep_func_nb(c):
         ...     '''Define empty arrays for each group.'''
-        ...     order_value_out = np.empty(gc.group_len, dtype=np.float_)
+        ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
         ...     return (order_value_out,)
 
         >>> @njit
-        ... def segment_prep_func_nb(sc, order_value_out):
+        ... def segment_prep_func_nb(c, order_value_out):
         ...     '''Perform rebalancing at each segment.'''
-        ...     for k in range(sc.group_len):
-        ...         col = sc.from_col + k
-        ...         sc.last_val_price[col] = sc.close[sc.i, col]
-        ...     size = 1 / sc.group_len
+        ...     for col in range(c.from_col, c.to_col):
+        ...         # Here we use order price for group valuation
+        ...         c.last_val_price[col] = c.close[c.i, col]
+        ...     # Reorder call sequence such that selling orders come first and buying last
+        ...     size = 1 / c.group_len
         ...     size_type = SizeType.TargetPercent
         ...     direction = Direction.LongOnly  # long positions only
-        ...     sort_call_seq_nb(sc, size, size_type, direction, order_value_out)
-        ...     return size, size_type, direction
+        ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out)
+        ...     return (size, size_type, direction)
 
         >>> @njit
-        ... def order_func_nb(oc, size, size_type, direction, fees, fixed_fees, slippage):
+        ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
         ...     '''Place an order.'''
         ...     return create_order_nb(
         ...         size=size,
         ...         size_type=size_type,
         ...         direction=direction,
-        ...         price=oc.close[oc.i, oc.col],
-        ...         fees=fees, fixed_fees=fixed_fees, slippage=slippage
+        ...         price=c.close[c.i, c.col],
+        ...         fees=fees,
+        ...         fixed_fees=fixed_fees,
+        ...         slippage=slippage
         ...     )
 
         >>> np.random.seed(42)
@@ -1547,20 +1755,115 @@ class Portfolio(Wrapping):
         >>> portfolio.holding_value(group_by=False).vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/simulate_nb.png)
+        ![](/vectorbt/docs/img/simulate_nb.svg)
+
+        Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
+        (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
+        ```python-repl
+        >>> from vectorbt.base.reshape_fns import flex_select_auto_nb, to_2d
+        >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
+
+        >>> @njit
+        ... def group_prep_func_nb(c):
+        ...     # We need to define stop price per column, thus we do it in group_prep_func_nb
+        ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
+        ...     return (stop_price,)
+
+        >>> @njit
+        ... def order_func_nb(c, stop_price, entries, exits, size, flex_2d):
+        ...     # Select info related to this order
+        ...     # flex_select_auto_nb allows us to pass size as single number, 1-dim or 2-dim array
+        ...     # If flex_2d is True, 1-dim array will be per column, otherwise per row
+        ...     size_now = flex_select_auto_nb(c.i, c.col, np.asarray(size), flex_2d)
+        ...     # close is always 2-dim array
+        ...     price_now = c.close[c.i, c.col]
+        ...     stop_price_now = stop_price[c.col]
+        ...
+        ...     # Our logic
+        ...     if entries[c.i, c.col]:
+        ...         if c.shares_now == 0:
+        ...             return create_order_nb(
+        ...                 size=size_now,
+        ...                 price=price_now,
+        ...                 direction=Direction.LongOnly)
+        ...     elif exits[c.i, c.col] or price_now >= stop_price_now:
+        ...         if c.shares_now > 0:
+        ...             return create_order_nb(
+        ...                 size=-size_now,
+        ...                 price=price_now,
+        ...                 direction=Direction.LongOnly)
+        ...     return NoOrder
+
+        >>> @njit
+        ... def after_order_func_nb(c, order_result, stop_price, stop, flex_2d):
+        ...     # Same broadcasting as for size
+        ...     stop_now = flex_select_auto_nb(c.i, c.col, np.asarray(stop), flex_2d)
+        ...
+        ...     if order_result.status == OrderStatus.Filled:
+        ...         if order_result.side == OrderSide.Buy:
+        ...             # Position entered: Set stop condition
+        ...             stop_price[c.col] = (1 + stop_now) * order_result.price
+        ...         else:
+        ...             # Position exited: Remove stop condition
+        ...             stop_price[c.col] = np.nan
+
+        >>> def simulate(close, entries, exits, threshold):
+        ...     return vbt.Portfolio.from_order_func(
+        ...         close,
+        ...         order_func_nb,
+        ...         to_2d(entries, raw=True),  # 2-dim array
+        ...         to_2d(exits, raw=True),  # 2-dim array
+        ...         np.inf, # will broadcast
+        ...         True,
+        ...         group_prep_func_nb=group_prep_func_nb,
+        ...         after_order_func_nb=after_order_func_nb,
+        ...         after_order_args=(
+        ...             threshold,  # will broadcast
+        ...             True
+        ...         )
+        ...     )
+
+        >>> close = pd.Series([10, 11, 12, 13, 14])
+        >>> entries = pd.Series([True, True, False, False, False])
+        >>> exits = pd.Series([False, False, False, True, True])
+        >>> simulate(close, entries, exits, 0.1).share_flow()
+        0    10.0
+        1     0.0
+        2   -10.0
+        3     0.0
+        4     0.0
+        dtype: float64
+        >>> simulate(close, entries, exits, 0.2).share_flow()
+        0    10.0
+        1     0.0
+        2   -10.0
+        3     0.0
+        4     0.0
+        dtype: float64
+        >>> simulate(close, entries, exits, np.nan).share_flow()
+        0    10.0
+        1     0.0
+        2     0.0
+        3   -10.0
+        4     0.0
+        dtype: float64
+        ```
+
+        The reason why stop of 10% does not result in an order at the second time step is because
+        it comes at the same time as entry, so it must wait until no entry is present.
+        This can be changed by replacing the statement "elif" with "if", which would execute
+        an exit regardless if an entry is present (similar to using `ConflictMode.Opposite` in
+        `Portfolio.from_signals`).
         """
         # Get defaults
         from vectorbt import settings
 
-        if not checks.is_pandas(close):
-            if not checks.is_any_array(close):
-                close = np.asarray(close)
-            close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
+        close = to_pd_array(close)
         if target_shape is None:
             target_shape = close.shape
         if init_cash is None:
             init_cash = settings.portfolio['init_cash']
-        init_cash = convert_str_enum_value(InitCashMode, init_cash)
+        init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1570,7 +1873,7 @@ class Portfolio(Wrapping):
             cash_sharing = settings.portfolio['cash_sharing']
         if call_seq is None:
             call_seq = settings.portfolio['call_seq']
-        call_seq = convert_str_enum_value(CallSeqType, call_seq)
+        call_seq = prepare_enum_value(CallSeqType, call_seq)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually. "
@@ -1595,6 +1898,8 @@ class Portfolio(Wrapping):
             raise ValueError("group_select cannot be disabled if cash_sharing=True")
 
         # Broadcast inputs
+        if isinstance(target_shape, int):
+            target_shape = (target_shape,)
         target_shape_2d = (target_shape[0], target_shape[1] if len(target_shape) > 1 else 1)
         if close.shape != target_shape:
             if len(close.vbt.wrapper.columns) <= target_shape_2d[1]:
@@ -1631,21 +1936,25 @@ class Portfolio(Wrapping):
 
         # Prepare arguments
         if prep_func_nb is None:
-            prep_func_nb = nb.empty_prep_nb
+            prep_func_nb = nb.empty_prep_func_nb
         if prep_args is None:
             prep_args = ()
         if group_prep_func_nb is None:
-            group_prep_func_nb = nb.empty_prep_nb
+            group_prep_func_nb = nb.empty_prep_func_nb
         if group_prep_args is None:
             group_prep_args = ()
         if row_prep_func_nb is None:
-            row_prep_func_nb = nb.empty_prep_nb
+            row_prep_func_nb = nb.empty_prep_func_nb
         if row_prep_args is None:
             row_prep_args = ()
         if segment_prep_func_nb is None:
-            segment_prep_func_nb = nb.empty_prep_nb
+            segment_prep_func_nb = nb.empty_prep_func_nb
         if segment_prep_args is None:
             segment_prep_args = ()
+        if after_order_func_nb is None:
+            after_order_func_nb = nb.empty_after_order_func_nb
+        if after_order_args is None:
+            after_order_args = ()
 
         # Perform calculation
         if row_wise:
@@ -1665,6 +1974,8 @@ class Portfolio(Wrapping):
                 segment_prep_args,
                 order_func_nb,
                 order_args,
+                after_order_func_nb,
+                after_order_args,
                 max_orders,
                 max_logs
             )
@@ -1685,6 +1996,8 @@ class Portfolio(Wrapping):
                 segment_prep_args,
                 order_func_nb,
                 order_args,
+                after_order_func_nb,
+                after_order_args,
                 max_orders,
                 max_logs
             )
@@ -1704,7 +2017,7 @@ class Portfolio(Wrapping):
     # ############# Properties ############# #
 
     @property
-    def wrapper(self):
+    def wrapper(self) -> ArrayWrapper:
         """Array wrapper."""
         if self.cash_sharing:
             # Allow only disabling grouping when needed (but not globally, see regroup)
@@ -1714,7 +2027,7 @@ class Portfolio(Wrapping):
             )
         return self._wrapper
 
-    def regroup(self, group_by, **kwargs):
+    def regroup(self: PortfolioT, group_by: tp.GroupByLike, **kwargs) -> PortfolioT:
         """Regroup this object.
 
         See `vectorbt.base.array_wrapper.Wrapping.regroup`."""
@@ -1724,34 +2037,34 @@ class Portfolio(Wrapping):
         return Wrapping.regroup(self, group_by, **kwargs)
 
     @property
-    def cash_sharing(self):
+    def cash_sharing(self) -> bool:
         """Whether to share cash within the same group."""
         return self._cash_sharing
 
     @property
-    def call_seq(self, wrap_kwargs=None):
+    def call_seq(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Sequence of calls per row and group."""
         return self.wrapper.wrap(self._call_seq, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @property
-    def incl_unrealized(self):
+    def incl_unrealized(self) -> bool:
         """Whether to include unrealized trade P&L in statistics."""
         return self._incl_unrealized
 
     @property
-    def use_filled_close(self):
+    def use_filled_close(self) -> bool:
         """Whether to forward-backward fill NaN values in `Portfolio.close`."""
         return self._use_filled_close
 
     # ############# Reference price ############# #
 
     @property
-    def close(self):
+    def close(self) -> tp.SeriesFrame:
         """Price per share series."""
         return self._close
 
     @cached_method
-    def fill_close(self, ffill=True, bfill=True, wrap_kwargs=None):
+    def fill_close(self, ffill: bool = True, bfill: bool = True, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Fill NaN values of `Portfolio.close`.
         Use `ffill` and `bfill` to fill forwards and backwards respectively."""
         close = to_2d(self.close, raw=True)
@@ -1764,66 +2077,66 @@ class Portfolio(Wrapping):
     # ############# Records ############# #
 
     @property
-    def order_records(self):
+    def order_records(self) -> tp.RecordArray:
         """A structured NumPy array of order records."""
         return self._order_records
 
     @cached_property
-    def orders(self):
+    def orders(self) -> Orders:
         """`Portfolio.get_orders` with default arguments."""
         return Orders(self.wrapper, self.order_records, self.close)
 
-    def get_orders(self, group_by=None):
+    def get_orders(self, group_by: tp.GroupByLike = None) -> Orders:
         """Get order records.
 
         See `vectorbt.portfolio.orders.Orders`."""
         return self.orders.regroup(group_by=group_by)
 
     @property
-    def log_records(self):
+    def log_records(self) -> tp.RecordArray:
         """A structured NumPy array of log records."""
         return self._log_records
 
     @cached_property
-    def logs(self):
+    def logs(self) -> Logs:
         """`Portfolio.get_logs` with default arguments."""
         return Logs(self.wrapper, self.log_records)
 
-    def get_logs(self, group_by=None):
+    def get_logs(self, group_by: tp.GroupByLike = None) -> Logs:
         """Get log records.
 
         See `vectorbt.portfolio.logs.Logs`."""
         return self.logs.regroup(group_by=group_by)
 
     @cached_property
-    def trades(self):
+    def trades(self) -> Trades:
         """`Portfolio.get_trades` with default arguments."""
         return Trades.from_orders(self.orders)
 
-    def get_trades(self, group_by=None):
+    def get_trades(self, group_by: tp.GroupByLike = None) -> Trades:
         """Get trade records.
 
         See `vectorbt.portfolio.trades.Trades`."""
         return self.trades.regroup(group_by=group_by)
 
     @cached_property
-    def positions(self):
+    def positions(self) -> Positions:
         """`Portfolio.get_positions` with default arguments."""
         return Positions.from_trades(self.trades)
 
-    def get_positions(self, group_by=None):
+    def get_positions(self, group_by: tp.GroupByLike = None) -> Positions:
         """Get position records.
 
         See `vectorbt.portfolio.trades.Positions`."""
         return self.positions.regroup(group_by=group_by)
 
     @cached_property
-    def drawdowns(self):
+    def drawdowns(self) -> Drawdowns:
         """`Portfolio.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
     @cached_method
-    def get_drawdowns(self, **kwargs):
+    def get_drawdowns(self, **kwargs) -> Drawdowns:
         """Get drawdown records from `Portfolio.value`.
 
         See `vectorbt.generic.drawdowns.Drawdowns`.
@@ -1834,9 +2147,9 @@ class Portfolio(Wrapping):
     # ############# Shares ############# #
 
     @cached_method
-    def share_flow(self, direction='all', wrap_kwargs=None):
+    def share_flow(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get share flow series per column."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         share_flow = nb.share_flow_nb(
             self.wrapper.shape_2d,
             self.orders.values,
@@ -1846,9 +2159,9 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(share_flow, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def shares(self, direction='all', wrap_kwargs=None):
+    def shares(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get share series per column."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         share_flow = to_2d(self.share_flow(direction='all'), raw=True)
         shares = nb.shares_nb(share_flow)
         if direction == Direction.LongOnly:
@@ -1858,9 +2171,10 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(shares, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def pos_mask(self, direction='all', group_by=None, wrap_kwargs=None):
+    def pos_mask(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position mask per column/group."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         shares = to_2d(self.shares(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             pos_mask = to_2d(self.pos_mask(direction=direction, group_by=False), raw=True)
@@ -1871,9 +2185,10 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(pos_mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def pos_coverage(self, direction='all', group_by=None, wrap_kwargs=None):
+    def pos_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         shares = to_2d(self.shares(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             pos_mask = to_2d(self.pos_mask(direction=direction, group_by=False), raw=True)
@@ -1887,7 +2202,8 @@ class Portfolio(Wrapping):
     # ############# Cash ############# #
 
     @cached_method
-    def cash_flow(self, group_by=None, short_cash=True, wrap_kwargs=None):
+    def cash_flow(self, group_by: tp.GroupByLike = None, short_cash: bool = True,
+                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
         When `short_cash` is set to False, cash never goes above the initial level,
@@ -1906,12 +2222,12 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(cash_flow, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_property
-    def init_cash(self):
+    def init_cash(self) -> tp.MaybeSeries:
         """`Portfolio.get_init_cash` with default arguments."""
         return self.get_init_cash()
 
     @cached_method
-    def get_init_cash(self, group_by=None, wrap_kwargs=None):
+    def get_init_cash(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Initial amount of cash per column/group with default arguments.
 
         !!! note
@@ -1936,7 +2252,8 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def cash(self, group_by=None, in_sim_order=False, short_cash=True, wrap_kwargs=None):
+    def cash(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, short_cash: bool = True,
+             wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get cash balance series per column/group."""
         if in_sim_order and not self.cash_sharing:
             raise ValueError("Cash sharing must be enabled for in_sim_order=True")
@@ -1952,22 +2269,23 @@ class Portfolio(Wrapping):
                 init_cash
             )
         else:
-            group_lens = self.wrapper.grouper.get_group_lens()
             if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
+                group_lens = self.wrapper.grouper.get_group_lens()
                 init_cash = to_1d(self.init_cash, raw=True)
                 call_seq = to_2d(self.call_seq, raw=True)
                 cash = nb.cash_in_sim_order_nb(cash_flow, group_lens, init_cash, call_seq)
             else:
                 init_cash = to_1d(self.get_init_cash(group_by=False), raw=True)
-                cash = nb.cash_nb(cash_flow, group_lens, init_cash)
+                cash = nb.cash_nb(cash_flow, init_cash)
         return self.wrapper.wrap(cash, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     # ############# Performance ############# #
 
     @cached_method
-    def holding_value(self, direction='all', group_by=None, wrap_kwargs=None):
+    def holding_value(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get holding value series per column/group."""
-        direction = convert_str_enum_value(Direction, direction)
+        direction = prepare_enum_value(Direction, direction)
         close = to_2d(self.close, raw=True).copy()
         shares = to_2d(self.shares(direction=direction), raw=True)
         close[shares == 0] = 0.  # for price being NaN
@@ -1980,7 +2298,8 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(holding_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def gross_exposure(self, direction='all', group_by=None, wrap_kwargs=None):
+    def gross_exposure(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get gross exposure."""
         holding_value = to_2d(self.holding_value(group_by=group_by, direction=direction), raw=True)
         cash = to_2d(self.cash(group_by=group_by, short_cash=False), raw=True)
@@ -1988,7 +2307,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def net_exposure(self, group_by=None, wrap_kwargs=None):
+    def net_exposure(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get net exposure."""
         long_exposure = to_2d(self.gross_exposure(direction='longonly', group_by=group_by), raw=True)
         short_exposure = to_2d(self.gross_exposure(direction='shortonly', group_by=group_by), raw=True)
@@ -1996,7 +2315,8 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(net_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def value(self, group_by=None, in_sim_order=False, wrap_kwargs=None):
+    def value(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False,
+              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get portfolio value series per column/group.
 
         By default, will generate portfolio value for each asset based on cash flows and thus
@@ -2019,7 +2339,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def total_profit(self, group_by=None, wrap_kwargs=None):
+    def total_profit(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group.
 
         Calculated directly from order records (fast).
@@ -2047,7 +2367,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(total_profit, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def final_value(self, group_by=None, wrap_kwargs=None):
+    def final_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
         total_profit = to_1d(self.total_profit(group_by=group_by), raw=True)
@@ -2056,7 +2376,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(final_value, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def total_return(self, group_by=None, wrap_kwargs=None):
+    def total_return(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group."""
         init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
         total_profit = to_1d(self.total_profit(group_by=group_by), raw=True)
@@ -2065,7 +2385,8 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(total_return, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def returns(self, group_by=None, in_sim_order=False, wrap_kwargs=None):
+    def returns(self, group_by: tp.GroupByLike = None, in_sim_order=False,
+                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get return series per column/group based on portfolio value."""
         value = to_2d(self.value(group_by=group_by, in_sim_order=in_sim_order), raw=True)
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
@@ -2079,7 +2400,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def active_returns(self, group_by=None, wrap_kwargs=None):
+    def active_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get active return series per column/group.
 
         This type of returns is based solely on cash flows and holding value rather than portfolio value.
@@ -2092,7 +2413,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(active_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def market_value(self, group_by=None, wrap_kwargs=None):
+    def market_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get market (benchmark) value series per column/group.
 
         If grouped, evenly distributes initial cash among assets in the group.
@@ -2115,7 +2436,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(market_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def market_returns(self, group_by=None, wrap_kwargs=None):
+    def market_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get return series per column/group based on market (benchmark) value."""
         market_value = to_2d(self.market_value(group_by=group_by), raw=True)
         init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
@@ -2123,7 +2444,8 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(market_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def total_market_return(self, group_by=None, wrap_kwargs=None):
+    def total_market_return(self, group_by: tp.GroupByLike = None,
+                            wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total market (benchmark) return."""
         market_value = to_2d(self.market_value(group_by=group_by), raw=True)
         total_market_return = nb.total_market_return_nb(market_value)
@@ -2131,8 +2453,15 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(total_market_return, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def stats(self, column=None, group_by=None, incl_unrealized=None, active_returns=False,
-              in_sim_order=False, agg_func=_mean_agg_func, wrap_kwargs=None, **kwargs):
+    def stats(self,
+              column: tp.Optional[tp.Label] = None,
+              group_by: tp.GroupByLike = None,
+              incl_unrealized: tp.Optional[bool] = None,
+              active_returns: bool = False,
+              in_sim_order: bool = False,
+              agg_func: tp.Optional[tp.Callable] = _mean_agg_func,
+              wrap_kwargs: tp.KwargsLike = None,
+              **kwargs) -> tp.SeriesFrame:
         """Compute various statistics on this portfolio.
 
         `kwargs` will be passed to each `vectorbt.returns.accessors.ReturnsAccessor` method.
@@ -2207,8 +2536,14 @@ class Portfolio(Wrapping):
             return agg_stats_sr
         return stats_df
 
-    def returns_stats(self, column=None, group_by=None, active_returns=False, in_sim_order=False,
-                      agg_func=_mean_agg_func, year_freq=None, **kwargs):
+    def returns_stats(self,
+                      column: tp.Optional[tp.Label] = None,
+                      group_by: tp.GroupByLike = None,
+                      active_returns: bool = False,
+                      in_sim_order: bool = False,
+                      agg_func: tp.Optional[tp.Callable] = _mean_agg_func,
+                      year_freq: tp.Optional[tp.FrequencyLike] = None,
+                      **kwargs) -> tp.SeriesFrame:
         """Compute various statistics on returns of this portfolio.
 
         For keyword arguments and notes, see `Portfolio.stats`.
@@ -2245,7 +2580,7 @@ class Portfolio(Wrapping):
 
     # ############# Plotting ############# #
 
-    subplot_settings = OrderedDict(
+    subplot_settings: tp.ClassVar[tp.Dict[str, tp.Kwargs]] = OrderedDict(
         orders=dict(
             title="Orders",
             yaxis_title="Price",
@@ -2271,18 +2606,28 @@ class Portfolio(Wrapping):
             yaxis_title="P&L",
             can_plot_groups=False
         ),
+        trade_returns=dict(
+            title="Trade Returns",
+            yaxis_title="Return",
+            can_plot_groups=False
+        ),
+        position_returns=dict(
+            title="Position Returns",
+            yaxis_title="Return",
+            can_plot_groups=False
+        ),
         cum_returns=dict(
             title="Cumulative Returns",
             yaxis_title="Cumulative returns"
         ),
         share_flow=dict(
             title="Share Flow",
-            yaxis_title="Share flow",
+            yaxis_title="Shares",
             can_plot_groups=False
         ),
         cash_flow=dict(
             title="Cash Flow",
-            yaxis_title="Cash flow"
+            yaxis_title="Cash"
         ),
         shares=dict(
             title="Shares",
@@ -2303,11 +2648,11 @@ class Portfolio(Wrapping):
         ),
         drawdowns=dict(
             title="Drawdowns",
-            yaxis_title="Price"
+            yaxis_title="Value"
         ),
         underwater=dict(
             title="Underwater",
-            yaxis_title="Underwater"
+            yaxis_title="Drawdown"
         ),
         gross_exposure=dict(
             title="Gross Exposure",
@@ -2321,15 +2666,15 @@ class Portfolio(Wrapping):
     """Settings of subplots supported by `Portfolio.plot`."""
 
     def plot(self, *,
-             column=None,
-             subplots=None,
-             group_by=None,
-             show_titles=True,
-             hide_id_labels=True,
-             group_id_labels=True,
-             hline_shape_kwargs=None,
-             make_subplots_kwargs=None,
-             **kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             subplots: tp.Optional[tp.Sequence[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
+             group_by: tp.GroupByLike = None,
+             show_titles: bool = True,
+             hide_id_labels: bool = True,
+             group_id_labels: bool = True,
+             hline_shape_kwargs: tp.KwargsLike = None,
+             make_subplots_kwargs: tp.KwargsLike = None,
+             **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot various parts of this portfolio.
 
         Args:
@@ -2378,8 +2723,8 @@ class Portfolio(Wrapping):
         >>> from datetime import datetime
         >>> import vectorbt as vbt
 
-        >>> start = datetime(2020, 1, 1)
-        >>> end = datetime(2020, 9, 1)
+        >>> start = '2020-01-01 UTC'  # crypto is in UTC
+        >>> end = '2020-09-01 UTC'
         >>> close = vbt.YFData.download("BTC-USD", start=start, end=end).get('Close')
 
         >>> np.random.seed(42)
@@ -2393,7 +2738,7 @@ class Portfolio(Wrapping):
         >>> portfolio.plot()
         ```
 
-        ![](/vectorbt/docs/img/portfolio_plot.png)
+        ![](/vectorbt/docs/img/portfolio_plot.svg)
 
         You can choose any of the subplots in `Portfolio.subplot_settings`, in any order:
 
@@ -2412,7 +2757,7 @@ class Portfolio(Wrapping):
         ... )
         ```
 
-        ![](/vectorbt/docs/img/portfolio_plot_drawdowns.png)
+        ![](/vectorbt/docs/img/portfolio_plot_drawdowns.svg)
 
         You can also create a custom subplot by creating a placeholder that can be written later:
 
@@ -2424,7 +2769,6 @@ class Portfolio(Wrapping):
         ...         can_plot_groups=False
         ...     ))  # placeholder
         ... ])
-
         >>> size.rename('Order Size').vbt.plot(add_trace_kwargs=dict(row=2, col=1), fig=fig)
         ```
 
@@ -2444,18 +2788,23 @@ class Portfolio(Wrapping):
         ... ])
         ```
 
-        ![](/vectorbt/docs/img/portfolio_plot_custom.png)
+        ![](/vectorbt/docs/img/portfolio_plot_custom.svg)
         """
-        from vectorbt.settings import color_schema, layout
+        from vectorbt.settings import color_schema, layout, portfolio
 
         # Select one column/group
         self_col = self.select_series(column=column, group_by=group_by)
 
         if subplots is None:
+            subplots = portfolio['subplots']
             if self_col.wrapper.grouper.is_grouped():
-                subplots = ['cum_returns']
-            else:
-                subplots = ['orders', 'trade_pnl', 'cum_returns']
+                def _filter(x: str) -> bool:
+                    _settings = self.subplot_settings[x]
+                    if 'can_plot_groups' in _settings and not _settings['can_plot_groups']:
+                        return False
+                    return True
+
+                subplots = filter(_filter, subplots)
         elif subplots == 'all':
             if self_col.wrapper.grouper.is_grouped():
                 supported_subplots = filter(lambda x: x[1].get('can_plot_groups', True), self.subplot_settings.items())
@@ -2539,7 +2888,7 @@ class Portfolio(Wrapping):
         )
         fig.update_layout(default_layout)
 
-        def _add_hline(value, x_domain, yref):
+        def _add_hline(value: tp.Any, x_domain: tp.Tuple[tp.Any, tp.Any], yref: str) -> None:
             fig.add_shape(**merge_dicts(dict(
                 xref="paper",
                 yref=yref,
@@ -2549,13 +2898,13 @@ class Portfolio(Wrapping):
                 y1=value
             ), hline_shape_kwargs))
 
-        def _get_arg_names(method):
+        def _get_arg_names(method: tp.Callable) -> tp.List[str]:
             return [
                 p.name for p in signature(method).parameters.values()
                 if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
             ]
 
-        def _extract_method_kwargs(method, kwargs):
+        def _extract_method_kwargs(method: tp.Callable, kwargs: tp.Kwargs) -> tp.Kwargs:
             arg_names = _get_arg_names(method)
             method_kwargs = {}
             for name in arg_names:
@@ -2599,7 +2948,7 @@ class Portfolio(Wrapping):
                         custom_kwargs['y_domain'] = y_domain
                     custom_kwargs = merge_dicts(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
                     plot_func(self_col, **custom_kwargs, fig=fig)
-                    
+
             else:
                 settings = self.subplot_settings[name]
                 can_plot_groups = settings.get('can_plot_groups', True)
@@ -2612,21 +2961,21 @@ class Portfolio(Wrapping):
                     self_col.get_orders(**method_kwargs).plot(
                         **orders_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
-    
+
                 elif name == 'trades':
                     trades_kwargs = kwargs.pop('trades_kwargs', {})
                     method_kwargs = _extract_method_kwargs(self_col.get_trades, trades_kwargs)
                     self_col.get_trades(**method_kwargs).plot(
                         **trades_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'positions':
                     positions_kwargs = kwargs.pop('positions_kwargs', {})
                     method_kwargs = _extract_method_kwargs(self_col.get_positions, positions_kwargs)
                     self_col.get_positions(**method_kwargs).plot(
                         **positions_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'trade_pnl':
                     trade_pnl_kwargs = merge_dicts(dict(
                         hline_shape_kwargs=hline_shape_kwargs
@@ -2635,14 +2984,30 @@ class Portfolio(Wrapping):
                     self_col.get_trades(**method_kwargs).plot_pnl(
                         **trade_pnl_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'position_pnl':
                     position_pnl_kwargs = kwargs.pop('position_pnl_kwargs', {})
                     method_kwargs = _extract_method_kwargs(self_col.get_positions, position_pnl_kwargs)
                     self_col.get_positions(**method_kwargs).plot_pnl(
                         **position_pnl_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
+                elif name == 'trade_returns':
+                    trade_returns_kwargs = merge_dicts(dict(
+                        hline_shape_kwargs=hline_shape_kwargs
+                    ), kwargs.pop('trade_returns_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.get_trades, trade_returns_kwargs)
+                    self_col.get_trades(**method_kwargs).plot_returns(
+                        **trade_returns_kwargs,
+                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
+
+                elif name == 'position_returns':
+                    position_returns_kwargs = kwargs.pop('position_returns_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.get_positions, position_returns_kwargs)
+                    self_col.get_positions(**method_kwargs).plot_returns(
+                        **position_returns_kwargs,
+                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
+
                 elif name == 'cum_returns':
                     cum_returns_kwargs = merge_dicts(dict(
                         benchmark_rets=self_col.market_returns(),
@@ -2663,7 +3028,7 @@ class Portfolio(Wrapping):
                     returns.vbt.returns.plot_cum_returns(
                         **cum_returns_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'drawdowns':
                     drawdowns_kwargs = merge_dicts(dict(
                         ts_trace_kwargs=dict(
@@ -2675,7 +3040,7 @@ class Portfolio(Wrapping):
                     self_col.get_drawdowns(**method_kwargs).plot(
                         **drawdowns_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'underwater':
                     underwater_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2691,7 +3056,7 @@ class Portfolio(Wrapping):
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
                     fig.layout[yaxis]['tickformat'] = '%'
-    
+
                 elif name == 'share_flow':
                     share_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2704,7 +3069,7 @@ class Portfolio(Wrapping):
                         **share_flow_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'cash_flow':
                     cash_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2717,7 +3082,7 @@ class Portfolio(Wrapping):
                         **cash_flow_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'shares':
                     shares_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2737,7 +3102,7 @@ class Portfolio(Wrapping):
                         0, **shares_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'cash':
                     cash_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2757,7 +3122,7 @@ class Portfolio(Wrapping):
                         0, **cash_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(self_col.init_cash, x_domain, yref)
-    
+
                 elif name == 'holding_value':
                     holding_value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2777,7 +3142,7 @@ class Portfolio(Wrapping):
                         0, **holding_value_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'value':
                     value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2791,7 +3156,7 @@ class Portfolio(Wrapping):
                         self_col.init_cash, **value_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(self_col.init_cash, x_domain, yref)
-    
+
                 elif name == 'gross_exposure':
                     gross_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -2811,7 +3176,7 @@ class Portfolio(Wrapping):
                         1, **gross_exposure_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(1, x_domain, yref)
-    
+
                 elif name == 'net_exposure':
                     net_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(

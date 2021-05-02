@@ -3,8 +3,9 @@
 Defines enums and other schemas for `vectorbt.generic`."""
 
 import numpy as np
-from collections import namedtuple
 import json
+
+from vectorbt import typing as tp
 
 __all__ = [
     'DrawdownStatus',
@@ -13,14 +14,15 @@ __all__ = [
 
 __pdoc__ = {}
 
-# We use namedtuple for enums and classes to be able to use them in Numba
 
 # ############# Records ############# #
 
-DrawdownStatus = namedtuple('DrawdownStatus', [
-    'Active',
-    'Recovered'
-])(*range(2))
+class DrawdownStatusT(tp.NamedTuple):
+    Active: int
+    Recovered: int
+
+
+DrawdownStatus = DrawdownStatusT(*range(2))
 """_"""
 
 __pdoc__['DrawdownStatus'] = f"""Drawdown status.

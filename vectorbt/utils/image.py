@@ -5,8 +5,10 @@ import imageio
 from tqdm import tqdm
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 
-def hstack_image_arrays(a, b):
+
+def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     """Stack NumPy images horizontally."""
     h1, w1, d = a.shape
     h2, w2, _ = b.shape
@@ -16,7 +18,7 @@ def hstack_image_arrays(a, b):
     return c
 
 
-def vstack_image_arrays(a, b):
+def vstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:
     """Stack NumPy images vertically."""
     h1, w1, d = a.shape
     h2, w2, _ = b.shape
@@ -26,8 +28,16 @@ def vstack_image_arrays(a, b):
     return c
 
 
-def save_animation(fname, index, plot_func, *args, delta=None, step=1,
-                   fps=3, writer_kwargs=None, show_progress=True, **kwargs):
+def save_animation(fname: str,
+                   index: tp.ArrayLikeSequence,
+                   plot_func: tp.Callable,
+                   *args,
+                   delta: tp.Optional[int] = None,
+                   step: int = 1,
+                   fps: int = 3,
+                   writer_kwargs: dict = None,
+                   show_progress: bool = True,
+                   **kwargs) -> None:
     """Save animation to a file.
 
     Args:

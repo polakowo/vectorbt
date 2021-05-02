@@ -8,28 +8,18 @@ jobs:
         - "3.8"
         - "3.9"
       install:
-        - curl -O https://netcologne.dl.sourceforge.net/project/ta-lib/ta-lib/0.4.0/ta-lib-0.4.0-src.tar.gz
-        - tar -xzf ta-lib-0.4.0-src.tar.gz
-        - cd ta-lib/
-        - "./configure --prefix=/usr"
-        - make
-        - sudo make install
-        - cd ..
-        - pip install .[cov] empyrical
-        - pip install ray || true
-        - pip install ta || true
-        - pip install pandas_ta || true
-        - pip install TA-Lib || true
+        - ./scripts/install-talib.sh
+        - pip install .[full,cov]
       script:
         - export NUMBA_BOUNDSCHECK=1
         - pytest tests/
         - export NUMBA_DISABLE_JIT=1
         - pytest --cov=vectorbt tests/
       after_success:
-        - codecov
+        - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then codecov; fi
     - stage: deploy-pypi
       language: python
-      python: "3.7"
+      python: "3.6"
       script: skip
       deploy:
         - provider: pypi
@@ -41,9 +31,10 @@ jobs:
             branch: master
     - stage: deploy-pages
       language: python
-      python: "3.7"
+      python: "3.6"
       install:
-        - pip install .[docs]
+        - ./scripts/install-talib.sh
+        - pip install .[full,docs]
       script:
         - pdoc --html --force --output-dir docs vectorbt --template-dir docs/templates
         - rm -rf !(docs)
@@ -64,4 +55,6 @@ stages:
     if: commit_message !~ /(\[ci skip-deploy-pypi\]|\[travis skip-deploy-pypi\])/
   - name: deploy-pages
     if: commit_message !~ /(\[ci skip-deploy-pages\]|\[travis skip-deploy-pages\])/
-
+branches:
+  only:
+  - master

@@ -2,8 +2,10 @@
 
 import logging
 
+from vectorbt import typing as tp
 from vectorbt.utils.schedule import ScheduleManager
 from vectorbt.utils.config import Configured
+from vectorbt.data.base import Data
 
 logger = logging.getLogger(__name__)
 
@@ -43,27 +45,27 @@ class DataUpdater(Configured):
     Data updated with 1 data points
     Data updated with 1 data points
     Data updated with 1 data points
+
     >>> my_updater.data.get()
-    2021-03-19 21:14:00.359754+01:00     97.934842
-    2021-03-19 21:14:01.359754+01:00     89.750977
-    2021-03-19 21:14:02.359754+01:00     89.361692
-    2021-03-19 21:14:03.359754+01:00     91.725854
-    2021-03-19 21:14:04.359754+01:00     97.759234
-                                           ...
-    2021-03-19 21:15:06.359754+01:00    140.974050
-    2021-03-19 21:15:07.359754+01:00    143.796632
-    2021-03-19 21:15:08.359754+01:00    143.065523
-    2021-03-19 21:15:09.359754+01:00    131.059728
-    2021-03-19 21:15:10.359754+01:00    126.803748
+    2021-05-02 16:53:51.755347+00:00    96.830482
+    2021-05-02 16:53:52.755347+00:00    94.481883
+    2021-05-02 16:53:53.755347+00:00    94.327835
+    2021-05-02 16:53:54.755347+00:00    90.178038
+    2021-05-02 16:53:55.755347+00:00    88.260168
+                                          ...
+    2021-05-02 16:54:57.755347+00:00    99.342590
+    2021-05-02 16:54:58.755347+00:00    94.872893
+    2021-05-02 16:54:59.755347+00:00    93.212823
+    2021-05-02 16:55:00.755347+00:00    95.199882
+    2021-05-02 16:55:01.755347+00:00    93.070532
     Freq: S, Length: 71, dtype: float64
     ```
 
     Update in the background:
 
     ```python-repl
-    >>> my_updater = MyDataUpdater(data)
+    >>> my_updater = MyDataUpdater(my_updater.data)
     >>> my_updater.update_every(in_background=True, count_limit=10)
-    Data updated with 13 data points
     Data updated with 1 data points
     Data updated with 1 data points
     Data updated with 1 data points
@@ -73,22 +75,24 @@ class DataUpdater(Configured):
     Data updated with 1 data points
     Data updated with 1 data points
     Data updated with 1 data points
+    Data updated with 1 data points
+
     >>> my_updater.data.get()
-    2021-03-19 21:14:00.359754+01:00     97.934842
-    2021-03-19 21:14:01.359754+01:00     89.750977
-    2021-03-19 21:14:02.359754+01:00     89.361692
-    2021-03-19 21:14:03.359754+01:00     91.725854
-    2021-03-19 21:14:04.359754+01:00     97.759234
-                                           ...
-    2021-03-19 21:15:18.359754+01:00    161.816107
-    2021-03-19 21:15:19.359754+01:00    165.721875
-    2021-03-19 21:15:20.359754+01:00    174.419841
-    2021-03-19 21:15:21.359754+01:00    189.774741
-    2021-03-19 21:15:22.359754+01:00    187.604753
-    Freq: S, Length: 83, dtype: float64
+    2021-05-02 16:53:51.755347+00:00    96.830482
+    2021-05-02 16:53:52.755347+00:00    94.481883
+    2021-05-02 16:53:53.755347+00:00    94.327835
+    2021-05-02 16:53:54.755347+00:00    90.178038
+    2021-05-02 16:53:55.755347+00:00    88.260168
+                                          ...
+    2021-05-02 16:55:07.755347+00:00    94.502885
+    2021-05-02 16:55:08.755347+00:00    94.823707
+    2021-05-02 16:55:09.755347+00:00    92.570025
+    2021-05-02 16:55:10.755347+00:00    84.239018
+    2021-05-02 16:55:11.755347+00:00    81.294486
+    Freq: S, Length: 81, dtype: float64
     ```
     """
-    def __init__(self, data, schedule_manager=None, **kwargs):
+    def __init__(self, data: Data, schedule_manager: tp.Optional[ScheduleManager] = None, **kwargs) -> None:
         Configured.__init__(
             self,
             data=data,
@@ -101,20 +105,20 @@ class DataUpdater(Configured):
         self._schedule_manager = schedule_manager
 
     @property
-    def data(self):
+    def data(self) -> Data:
         """Data instance.
 
         See `vectorbt.data.base.Data`."""
         return self._data
 
     @property
-    def schedule_manager(self):
+    def schedule_manager(self) -> ScheduleManager:
         """Schedule manager instance.
 
         See `vectorbt.utils.schedule.ScheduleManager`."""
         return self._schedule_manager
 
-    def update(self, **kwargs):
+    def update(self, **kwargs) -> None:
         """Method that updates data.
 
         Override to do pre- and postprocessing.
@@ -125,10 +129,11 @@ class DataUpdater(Configured):
         new_index = self.data.wrapper.index
         logger.info(f"Updated data has {len(new_index)} rows from {new_index[0]} to {new_index[-1]}")
 
-    def update_every(self, *args, to=None, until=None, tags=None, in_background=False, start_kwargs=None, **kwargs):
+    def update_every(self, *args, to: int = None, tags: tp.Optional[tp.Iterable[tp.Hashable]] = None,
+                     in_background: bool = False, start_kwargs: dict = None, **kwargs) -> None:
         """Schedule `DataUpdater.update`.
 
-        For `*args`, `to`, `until` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
+        For `*args`, `to` and `tags`, see `vectorbt.utils.schedule.ScheduleManager.every`.
 
         If `in_background` is set to True, starts in the background as an `asyncio` task.
         The task can be stopped with `vectorbt.utils.schedule.ScheduleManager.stop`.
@@ -136,7 +141,7 @@ class DataUpdater(Configured):
         `**kwargs` are passed to `DataUpdater.update`."""
         if start_kwargs is None:
             start_kwargs = {}
-        self.schedule_manager.every(*args, to=to, until=until, tags=tags).do(self.update, **kwargs)
+        self.schedule_manager.every(*args, to=to, tags=tags).do(self.update, **kwargs)
         if in_background:
             self.schedule_manager.start_in_background(**start_kwargs)
         else:

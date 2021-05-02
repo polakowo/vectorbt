@@ -6,30 +6,34 @@ import numpy as np
 import pandas as pd
 import math
 
+from vectorbt import typing as tp
+from vectorbt.utils import checks
 from vectorbt.base.index_fns import find_first_occurrence
+from vectorbt.base.reshape_fns import to_any_array
+
+RangesT = tp.Generator[tp.Sequence[tp.ArrayLikeSequence], None, None]
 
 
-class BaseSplitter:
-    """Abstract splitter class."""
-
-    def split(self, X, **kwargs):
-        raise NotImplementedError
-
-
-def split_ranges_into_sets(start_idxs, end_idxs, set_lens=(), left_to_right=True):
+def split_ranges_into_sets(start_idxs: tp.ArrayLike, end_idxs: tp.ArrayLike,
+                           set_lens: tp.MaybeSequence[tp.Sequence[float]] = (),
+                           left_to_right: tp.MaybeSequence[bool] = True) -> RangesT:
     """Generate ranges between each in `start_idxs` and `end_idxs` and
     optionally split into one or more sets.
 
     Args:
-        start_idxs (array_like): Absolute start indices.
-        end_idxs (array_like): Absolute end indices.
-        set_lens (tuple or list of tuple): Lengths of sets in each range.
+        start_idxs (array_like): Start indices.
+        end_idxs (array_like): End indices.
+        set_lens (list of float): Lengths of sets in each range.
 
             The number of returned sets is the length of `set_lens` plus one,
             which stores the remaining elements.
+
+            Can be passed per range.
         left_to_right (bool or list of bool): Whether to resolve `set_lens` from left to right.
 
             Makes the last set variable, otherwise makes the first set variable.
+
+            Can be passed per range.
 
     ## Example
 
@@ -39,6 +43,9 @@ def split_ranges_into_sets(start_idxs, end_idxs, set_lens=(), left_to_right=True
     * `set_lens=(50, 30)` and `left_to_right=False`: 30 in test set, 50 in validation set,
         the rest in training set
     """
+    start_idxs = np.asarray(start_idxs)
+    end_idxs = np.asarray(end_idxs)
+    checks.assert_len_equal(start_idxs, end_idxs)
 
     for i in range(len(start_idxs)):
         start_idx = start_idxs[i]
@@ -49,11 +56,11 @@ def split_ranges_into_sets(start_idxs, end_idxs, set_lens=(), left_to_right=True
         if len(set_lens) == 0:
             yield (np.arange(start_idx, end_idx + 1),)
         else:
-            if isinstance(set_lens[0], (tuple, list)):
+            if checks.is_sequence(set_lens[0]):
                 _set_lens = set_lens[i]
             else:
                 _set_lens = set_lens
-            if isinstance(left_to_right, (tuple, list)):
+            if checks.is_sequence(left_to_right):
                 _left_to_right = left_to_right[i]
             else:
                 _left_to_right = left_to_right
@@ -82,10 +89,24 @@ def split_ranges_into_sets(start_idxs, end_idxs, set_lens=(), left_to_right=True
             yield tuple(set_ranges)
 
 
+class SplitterT(tp.Protocol):
+    def split(self, X: tp.ArrayLike, **kwargs) -> RangesT:
+        ...
+
+
+class BaseSplitter:
+    """Abstract splitter class."""
+
+    def split(self, X: tp.ArrayLike, **kwargs) -> RangesT:
+        raise NotImplementedError
+
+
 class RangeSplitter(BaseSplitter):
     """Range splitter."""
 
-    def split(self, X, n=None, range_len=None, min_len=1, start_idxs=None, end_idxs=None, **kwargs):
+    def split(self, X: tp.ArrayLike, n: tp.Optional[int] = None, range_len: tp.Optional[float] = None,
+              min_len: int = 1, start_idxs: tp.Optional[tp.ArrayLike] = None,
+              end_idxs: tp.Optional[tp.ArrayLike] = None, **kwargs) -> RangesT:
         """Either split into `n` ranges each `range_len` long, or split into ranges between
         `start_idxs` and `end_idxs`, and concatenate along the column axis.
 
@@ -98,7 +119,10 @@ class RangeSplitter(BaseSplitter):
         pandas indexes with labels. The last index should be inclusive. The distance
         between each start and end index can be different, and smaller ranges are filled with NaNs.
 
+        `range_len` can be a floating number between 0 and 1 to indicate a fraction of the total range.
+
         `**kwargs` are passed to `split_ranges_into_sets`."""
+        X = to_any_array(X)
         if isinstance(X, (pd.Series, pd.DataFrame)):
             index = X.index
         else:
@@ -149,10 +173,12 @@ class RangeSplitter(BaseSplitter):
 class RollingSplitter(BaseSplitter):
     """Rolling walk-forward splitter."""
 
-    def split(self, X, n=None, window_len=None, min_len=1, **kwargs):
+    def split(self, X: tp.ArrayLike, n: tp.Optional[int] = None, window_len: tp.Optional[float] = None,
+              min_len: int = 1, **kwargs) -> RangesT:
         """Split by rolling a window.
 
         `**kwargs` are passed to `split_ranges_into_sets`."""
+        X = to_any_array(X)
         if isinstance(X, (pd.Series, pd.DataFrame)):
             index = X.index
         else:
@@ -190,10 +216,11 @@ class RollingSplitter(BaseSplitter):
 class ExpandingSplitter(BaseSplitter):
     """Expanding walk-forward splitter."""
 
-    def split(self, X, n=None, min_len=1, **kwargs):
+    def split(self, X: tp.ArrayLike, n: tp.Optional[int] = None, min_len: int = 1, **kwargs) -> RangesT:
         """Similar to `RollingSplitter.split`, but expanding.
 
         `**kwargs` are passed to `split_ranges_into_sets`."""
+        X = to_any_array(X)
         if isinstance(X, (pd.Series, pd.DataFrame)):
             index = X.index
         else:

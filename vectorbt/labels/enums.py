@@ -2,8 +2,9 @@
 
 Defines enums and other schemas for `vectorbt.labels`."""
 
-from collections import namedtuple
 import json
+
+from vectorbt import typing as tp
 
 __all__ = [
     'TrendMode'
@@ -11,13 +12,16 @@ __all__ = [
 
 __pdoc__ = {}
 
-TrendMode = namedtuple('TrendMode', [
-    'Binary',
-    'BinaryCont',
-    'BinaryContSat',
-    'PctChange',
-    'PctChangeNorm',
-])(*range(5))
+
+class TrendModeT(tp.NamedTuple):
+    Binary: int
+    BinaryCont: int
+    BinaryContSat: int
+    PctChange: int
+    PctChangeNorm: int
+
+
+TrendMode = TrendModeT(*range(5))
 """_"""
 
 __pdoc__['TrendMode'] = f"""Trend mode.

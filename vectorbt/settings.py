@@ -31,7 +31,9 @@ import json
 import sys
 import pkgutil
 
+from vectorbt import typing as tp
 from vectorbt.utils.config import Config
+from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 
 this_module = sys.modules[__name__]
 
@@ -53,7 +55,7 @@ __all__ = [
 ]
 
 
-def save(fname, names=__all__, **kwargs):
+def save(fname: str, names: tp.Iterable[str] = __all__, **kwargs) -> None:
     """Save settings to a file."""
     settings = dict()
     for k in names:
@@ -61,7 +63,7 @@ def save(fname, names=__all__, **kwargs):
     Config(settings).save(fname, **kwargs)
 
 
-def load(fname, names=__all__, **kwargs):
+def load(fname: str, names: tp.Iterable[str] = __all__, **kwargs) -> None:
     """Load settings from a file."""
     settings = Config.load(fname, **kwargs)
     for k in names:
@@ -140,7 +142,7 @@ __pdoc__['layout'] = f"""Plotly layout.
 """
 
 
-def set_theme(theme):
+def set_theme(theme: str) -> None:
     if theme == 'light' or theme == 'dark':
         color_schema.update(
             blue="#1f77b4",
@@ -175,15 +177,33 @@ def set_theme(theme):
         raise ValueError(f"Theme '{theme}' not supported")
 
 
-def reset_theme():
+def reset_theme() -> None:
     set_theme('light')
 
 
 reset_theme()
 
+# Plotting
+plotting = Config(
+    dict(
+        use_widgets=True,
+        show=Config()
+    ),
+    frozen=True
+)
+"""_"""
+
+__pdoc__['plotting'] = f"""Parameters for plotting.
+
+```plaintext
+{json.dumps(plotting, indent=2, default=str)}
+```
+"""
+
 # OHLCV
 ohlcv = Config(
     dict(
+        plot_type='OHLC',
         column_names=dict(
             open='Open',
             high='High',
@@ -312,7 +332,8 @@ portfolio = Config(
         seed=None,
         freq=None,
         incl_unrealized=False,
-        use_filled_close=True
+        use_filled_close=True,
+        subplots=['orders', 'trade_returns', 'cum_returns']
     ),
     frozen=True
 )
@@ -325,11 +346,28 @@ __pdoc__['portfolio'] = f"""Parameters for portfolio.
 ```
 """
 
+# Datetime
+datetime = Config(
+    dict(
+        naive_tz=get_local_tz(),
+        to_py_timezone=True
+    ),
+    frozen=True
+)
+"""_"""
+
+__pdoc__['datetime'] = f"""Parameters for datetime.
+
+```plaintext
+{json.dumps(datetime, indent=2, default=str)}
+```
+"""
+
 # Data
 data = Config(
     dict(
-        tz_localize=None,
-        tz_convert=None,
+        tz_localize=get_utc_tz(),
+        tz_convert=get_utc_tz(),
         missing_index='nan',
         missing_columns='raise',
         binance=Config(

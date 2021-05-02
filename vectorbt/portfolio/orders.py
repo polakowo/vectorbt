@@ -9,14 +9,20 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
+from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records.base import Records
+from vectorbt.records.mapped_array import MappedArray
 from vectorbt.portfolio.enums import order_dt, OrderSide
+
+
+OrdersT = tp.TypeVar("OrdersT", bound="Orders")
 
 
 class Orders(Records):
@@ -40,7 +46,12 @@ class Orders(Records):
     ```
     """
 
-    def __init__(self, wrapper, records_arr, close, idx_field='idx', **kwargs):
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 records_arr: tp.RecordArray,
+                 close: tp.ArrayLike,
+                 idx_field: str = 'idx',
+                 **kwargs) -> None:
         Records.__init__(
             self,
             wrapper,
@@ -54,10 +65,11 @@ class Orders(Records):
         if not all(field in records_arr.dtype.names for field in order_dt.names):
             raise TypeError("Records array must match order_dt")
 
-    def _indexing_func_meta(self, pd_indexing_func, **kwargs):
+    def indexing_func_meta(self: OrdersT, pd_indexing_func: tp.PandasIndexingFunc,
+                           **kwargs) -> tp.Tuple[OrdersT, tp.MaybeArray, tp.Array1d]:
         """Perform indexing on `Orders` and return metadata."""
         new_wrapper, new_records_arr, group_idxs, col_idxs = \
-            Records._indexing_func_meta(self, pd_indexing_func, **kwargs)
+            Records.indexing_func_meta(self, pd_indexing_func, **kwargs)
         new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
         return self.copy(
             wrapper=new_wrapper,
@@ -65,17 +77,17 @@ class Orders(Records):
             close=new_close
         ), group_idxs, col_idxs
 
-    def _indexing_func(self, pd_indexing_func, **kwargs):
+    def indexing_func(self: OrdersT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> OrdersT:
         """Perform indexing on `Orders`."""
-        return self._indexing_func_meta(pd_indexing_func, **kwargs)[0]
+        return self.indexing_func_meta(pd_indexing_func, **kwargs)[0]
 
     @property
-    def close(self):
+    def close(self) -> tp.SeriesFrame:
         """Reference price such as close."""
         return self._close
 
     @property  # no need for cached
-    def records_readable(self):
+    def records_readable(self) -> tp.Frame:
         """Records in readable format."""
         records_df = self.records
         out = pd.DataFrame()
@@ -89,37 +101,37 @@ class Orders(Records):
         return out
 
     @cached_property
-    def size(self):
+    def size(self) -> MappedArray:
         """Size of each order."""
         return self.map_field('size')
 
     @cached_property
-    def price(self):
+    def price(self) -> MappedArray:
         """Price of each order."""
         return self.map_field('price')
 
     @cached_property
-    def fees(self):
+    def fees(self) -> MappedArray:
         """Fees paid for each order."""
         return self.map_field('fees')
 
     # ############# OrderSide ############# #
 
     @cached_property
-    def side(self):
+    def side(self) -> MappedArray:
         """Side of each order.
 
         See `vectorbt.portfolio.enums.OrderSide`."""
         return self.map_field('side')
 
     @cached_property
-    def buy(self):
+    def buy(self: OrdersT) -> OrdersT:
         """Buy operations."""
         filter_mask = self.values['side'] == OrderSide.Buy
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def buy_rate(self, group_by=None, wrap_kwargs=None):
+    def buy_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of buy operations."""
         buy_count = to_1d(self.buy.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -127,13 +139,13 @@ class Orders(Records):
         return self.wrapper.wrap_reduced(buy_count / total_count, group_by=group_by, **wrap_kwargs)
 
     @cached_property
-    def sell(self):
+    def sell(self: OrdersT) -> OrdersT:
         """Sell operations."""
         filter_mask = self.values['side'] == OrderSide.Sell
         return self.filter_by_mask(filter_mask)
 
     @cached_method
-    def sell_rate(self, group_by=None, wrap_kwargs=None):
+    def sell_rate(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Rate of sell operations."""
         sell_count = to_1d(self.sell.count(group_by=group_by), raw=True)
         total_count = to_1d(self.count(group_by=group_by), raw=True)
@@ -143,14 +155,14 @@ class Orders(Records):
     # ############# Plotting ############# #
 
     def plot(self,
-             column=None,
-             plot_close=True,
-             close_trace_kwargs=None,
-             buy_trace_kwargs=None,
-             sell_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             column: tp.Optional[tp.Label] = None,
+             plot_close: bool = True,
+             close_trace_kwargs: tp.KwargsLike = None,
+             buy_trace_kwargs: tp.KwargsLike = None,
+             sell_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot orders.
 
         Args:
@@ -160,7 +172,7 @@ class Orders(Records):
             buy_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Buy" markers.
             sell_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Sell" markers.
             add_trace_kwargs (dict): Keyword arguments passed to `add_trace`.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -169,7 +181,7 @@ class Orders(Records):
         >>> orders.plot()
         ```
 
-        ![](/vectorbt/docs/img/orders_plot.png)"""
+        ![](/vectorbt/docs/img/orders_plot.svg)"""
         from vectorbt.settings import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
@@ -188,7 +200,7 @@ class Orders(Records):
             add_trace_kwargs = {}
 
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         # Plot close

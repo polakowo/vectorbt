@@ -360,7 +360,7 @@ class TestMappedArray:
         assert mapped_array['a'].reduce(argmin_reduce_nb, to_idx=True) == 'x'
         pd.testing.assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, to_idx=True),
-            pd.Series(np.array(['x', 'x', 'z', np.nan], dtype=np.object), index=wrapper.columns).rename('reduce')
+            pd.Series(np.array(['x', 'x', 'z', np.nan], dtype=object), index=wrapper.columns).rename('reduce')
         )
         pd.testing.assert_series_equal(
             mapped_array.reduce(argmin_reduce_nb, to_idx=True, idx_labeled=False),
@@ -451,7 +451,7 @@ class TestMappedArray:
                 wrap_kwargs=dict(name_or_index=['min', 'max'])
             ),
             pd.Series(
-                np.array(['x', 'z'], dtype=np.object),
+                np.array(['x', 'z'], dtype=object),
                 index=pd.Index(['min', 'max'], dtype='object'),
                 name='a'
             )
@@ -467,7 +467,7 @@ class TestMappedArray:
                 np.array([
                     ['x', 'x', 'z', np.nan],
                     ['z', 'y', 'x', np.nan]
-                ], dtype=np.object),
+                ], dtype=object),
                 index=pd.Index(['min', 'max'], dtype='object'),
                 columns=wrapper.columns
             )
@@ -611,7 +611,7 @@ class TestMappedArray:
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmin(),
             pd.Series(
-                np.array(['x', 'z'], dtype=np.object),
+                np.array(['x', 'z'], dtype=object),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('idxmin')
         )
@@ -625,7 +625,7 @@ class TestMappedArray:
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmax(),
             pd.Series(
-                np.array(['y', 'x'], dtype=np.object),
+                np.array(['y', 'x'], dtype=object),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('idxmax')
         )

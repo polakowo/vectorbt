@@ -3,8 +3,9 @@
 import numpy as np
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 from vectorbt.utils.config import Config
-from vectorbt.utils.widgets import FigureWidget
+from vectorbt.utils.figure import make_figure
 from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config
 from vectorbt.signals.enums import StopType
 from vectorbt.signals.factory import SignalFactory
@@ -397,9 +398,9 @@ ohlcstex_func_config = Config(
         ts_stop=flex_elem_param_config,
         tp_stop=flex_elem_param_config
     ),
-    sl_stop=0.,
-    ts_stop=0.,
-    tp_stop=0.,
+    sl_stop=np.nan,
+    ts_stop=np.nan,
+    tp_stop=np.nan,
     hit_price=np.nan,
     stop_type=-1
 )
@@ -412,20 +413,31 @@ OHLCSTEX = SignalFactory(
 )
 
 
-def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
+def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pragma: no cover
+
+    base_cls_plot = base_cls.plot
+
     def plot(self,
-             plot_type=go.Ohlc,
-             ohlc_kwargs=None,
-             entry_trace_kwargs=None,
-             exit_trace_kwargs=None,
-             add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):  # pragma: no cover
+             plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
+             ohlc_kwargs: tp.KwargsLike = None,
+             entry_trace_kwargs: tp.KwargsLike = None,
+             exit_trace_kwargs: tp.KwargsLike = None,
+             add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             _base_cls_plot: tp.Callable = base_cls_plot,
+             **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+        from vectorbt.settings import ohlcv, color_schema
+
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
 
+        if ohlc_kwargs is None:
+            ohlc_kwargs = {}
+        if add_trace_kwargs is None:
+            add_trace_kwargs = {}
+
         if fig is None:
-            fig = FigureWidget()
+            fig = make_figure()
             fig.update_layout(
                 showlegend=True,
                 xaxis_rangeslider_visible=False,
@@ -433,28 +445,35 @@ def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
                 yaxis_showgrid=True
             )
         fig.update_layout(**layout_kwargs)
-        if ohlc_kwargs is None:
-            ohlc_kwargs = {}
-        if add_trace_kwargs is None:
-            add_trace_kwargs = {}
 
-        # Plot OHLC
-        ohlc = plot_type(
+        if plot_type is None:
+            plot_type = ohlcv['plot_type']
+        if isinstance(plot_type, str):
+            if plot_type.lower() == 'ohlc':
+                plot_type = 'OHLC'
+                plot_obj = go.Ohlc
+            elif plot_type.lower() == 'candlestick':
+                plot_type = 'Candlestick'
+                plot_obj = go.Candlestick
+            else:
+                raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
+        else:
+            plot_obj = plot_type
+        ohlc = plot_obj(
             x=self.wrapper.index,
             open=self.open,
             high=self.high,
             low=self.low,
             close=self.close,
-            name='OHLC',
-            increasing_line_color='#1b9e76',
-            decreasing_line_color='#d95f02',
-            opacity=0.7
+            name=plot_type,
+            increasing_line_color=color_schema['increasing'],
+            decreasing_line_color=color_schema['decreasing']
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)
 
         # Plot entry and exit markers
-        base_cls.plot(
+        _base_cls_plot(
             self,
             entry_y=self.open,
             exit_y=self.hit_price,
@@ -469,13 +488,13 @@ def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
     plot.__doc__ = """Plot OHLC, `{0}.{1}` and `{0}.exits`.
     
     Args:
-        plot_type: Either `plotly.graph_objects.Ohlc` or `plotly.graph_objects.Candlestick`.
+        plot_type: Either 'OHLC', 'Candlestick' or Plotly trace.
         ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
         entry_trace_kwargs (dict): Keyword arguments passed to \
         `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_entry_markers` for `{0}.{1}`.
         exit_trace_kwargs (dict): Keyword arguments passed to \
         `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_exit_markers` for `{0}.exits`.
-        fig (plotly.graph_objects.Figure): Figure to add traces to.
+        fig (Figure or FigureWidget): Figure to add traces to.
         **layout_kwargs: Keyword arguments for layout.""".format(base_cls.__name__, entries_attr)
 
     if entries_attr == 'entries':
@@ -486,7 +505,7 @@ def _generate_ohlcstex_plot(base_cls, entries_attr):  # pragma: no cover
     >>> ohlcstex.iloc[:, 0].plot()
     ```
     
-    ![](/vectorbt/docs/img/ohlcstex.png)
+    ![](/vectorbt/docs/img/ohlcstex.svg)
     """
     return plot
 
@@ -560,7 +579,7 @@ class _OHLCSTEX(OHLCSTEX):
     ```
     """
 
-    plot = _generate_ohlcstex_plot(OHLCSTEX, 'entries')
+    plot = _bind_ohlcstex_plot(OHLCSTEX, 'entries')
 
 
 setattr(OHLCSTEX, '__doc__', _OHLCSTEX.__doc__)
@@ -587,7 +606,7 @@ class _IOHLCSTEX(IOHLCSTEX):
 
     See `OHLCSTEX` for notes on parameters."""
 
-    plot = _generate_ohlcstex_plot(IOHLCSTEX, 'new_entries')
+    plot = _bind_ohlcstex_plot(IOHLCSTEX, 'new_entries')
 
 
 setattr(IOHLCSTEX, '__doc__', _IOHLCSTEX.__doc__)

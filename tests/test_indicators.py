@@ -1794,32 +1794,32 @@ class TestFactory:
         assert obj._tuple_mapper == [(0, 3), (1, 3), (2, 3)]
 
     def test_properties(self):
-        F = vbt.IndicatorFactory(
+        I = vbt.IndicatorFactory(
             input_names=['ts1', 'ts2'],
             param_names=['p1', 'p2'],
             output_names=['o1', 'o2'],
             in_output_names=['in_o1', 'in_o2'],
             output_flags={'o1': 'Hello'}
-        )
-        obj = F.from_apply_func(lambda ts1, ts2, p1, p2, in_o1, in_o2: (ts1, ts2)).run(ts, ts, [0, 1], 2)
+        ).from_apply_func(lambda ts1, ts2, p1, p2, in_o1, in_o2: (ts1, ts2))
+        obj = I.run(ts, ts, [0, 1], 2)
 
         # Class properties
-        assert F.input_names == ['ts1', 'ts2']
-        assert F.param_names == ['p1', 'p2']
-        assert F.output_names == ['o1', 'o2']
-        assert F.in_output_names == ['in_o1', 'in_o2']
-        assert F.output_flags == {'o1': 'Hello'}
+        assert I.input_names == ('ts1', 'ts2')
+        assert I.param_names == ('p1', 'p2')
+        assert I.output_names == ('o1', 'o2')
+        assert I.in_output_names == ('in_o1', 'in_o2')
+        assert I.output_flags == {'o1': 'Hello'}
 
         # Instance properties
-        assert obj.input_names == ['ts1', 'ts2']
-        assert obj.param_names == ['p1', 'p2']
-        assert obj.output_names == ['o1', 'o2']
-        assert obj.in_output_names == ['in_o1', 'in_o2']
+        assert obj.input_names == ('ts1', 'ts2')
+        assert obj.param_names == ('p1', 'p2')
+        assert obj.output_names == ('o1', 'o2')
+        assert obj.in_output_names == ('in_o1', 'in_o2')
         assert obj.output_flags == {'o1': 'Hello'}
         assert obj.short_name == 'custom'
-        assert obj.level_names == ['custom_p1', 'custom_p2']
-        np.testing.assert_array_equal(obj.p1_array, np.array([0, 1]))
-        np.testing.assert_array_equal(obj.p2_array, np.array([2, 2]))
+        assert obj.level_names == ('custom_p1', 'custom_p2')
+        assert obj.p1_list == [0, 1]
+        assert obj.p2_list == [2, 2]
 
     @pytest.mark.parametrize(
         "test_attr",
@@ -2008,7 +2008,7 @@ class TestFactory:
     def test_dir(self):
         TestEnum = namedtuple('TestEnum', ['Hello', 'World'])(0, 1)
         F = vbt.IndicatorFactory(
-            input_names=['ts'], output_names=['o1', 'o2'], in_output_names=['in_out'],
+            input_names=['ts'], output_names=['o1', 'o2'], in_output_names=['in_out'], param_names=['p1', 'p2'],
             attr_settings={
                 'ts': {'dtype': None},
                 'o1': {'dtype': np.float_},
@@ -2016,8 +2016,10 @@ class TestFactory:
                 'in_out': {'dtype': TestEnum}
             }
         )
-        test_attr_list = dir(F.from_apply_func(lambda ts, in_out: (ts + in_out, ts + in_out)).run(ts))
+        ind = F.from_apply_func(lambda ts, in_out, p1, p2: (ts + in_out, ts + in_out)).run(ts, 100, 200)
+        test_attr_list = dir(ind)
         assert test_attr_list == [
+            '__annotations__',
             '__class__',
             '__delattr__',
             '__dict__',
@@ -2048,16 +2050,29 @@ class TestFactory:
             '_config',
             '_iloc',
             '_in_out',
-            '_indexing_func',
+            '_in_output_names',
             '_indexing_kwargs',
             '_input_mapper',
+            '_input_names',
             '_level_names',
             '_loc',
             '_o1',
             '_o2',
+            '_output_flags',
+            '_output_names',
+            '_p1_list',
+            '_p1_loc',
+            '_p1_mapper',
+            '_p2_list',
+            '_p2_loc',
+            '_p2_mapper',
+            '_param_names',
             '_run',
+            '_run_combs',
             '_short_name',
             '_ts',
+            '_tuple_loc',
+            '_tuple_mapper',
             '_wrapper',
             'apply_func',
             'config',
@@ -2069,6 +2084,8 @@ class TestFactory:
             'in_out',
             'in_out_readable',
             'in_output_names',
+            'indexing_func',
+            'indexing_kwargs',
             'input_names',
             'level_names',
             'load',
@@ -2084,9 +2101,14 @@ class TestFactory:
             'o2_xor',
             'output_flags',
             'output_names',
+            'p1_list',
+            'p1_loc',
+            'p2_list',
+            'p2_loc',
             'param_names',
             'regroup',
             'run',
+            'run_combs',
             'save',
             'select_series',
             'short_name',
@@ -2094,6 +2116,7 @@ class TestFactory:
             'ts_above',
             'ts_below',
             'ts_equal',
+            'tuple_loc',
             'update_config',
             'wrapper',
             'xs'

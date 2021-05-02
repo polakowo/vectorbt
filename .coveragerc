@@ -11,9 +11,10 @@ ignore_errors = True
 omit =
     */px_accessors.py
     */utils/colors.py
-    */utils/widgets.py
+    */utils/figure.py
     */utils/image.py
     */utils/module.py
-    */utils/messaging.py
+    */utils/requests.py
     */generic/plotting.py
     */data/custom.py
+    */messaging/telegram.py

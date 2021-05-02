@@ -12,9 +12,10 @@ The accessors inherit `vectorbt.generic.accessors`.
 import numpy as np
 import plotly.graph_objects as go
 
+from vectorbt import typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.widgets import FigureWidget, make_subplots
+from vectorbt.utils.figure import make_figure, make_subplots
 from vectorbt.utils.config import merge_dicts
 from vectorbt.generic.accessors import GenericDFAccessor
 
@@ -25,7 +26,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
     Accessible through `pd.DataFrame.vbt.ohlcv`."""
 
-    def __init__(self, obj, column_names=None, **kwargs):
+    def __init__(self, obj: tp.Frame, column_names: tp.Optional[tp.Dict[str, str]] = None, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
         self._column_names = column_names
@@ -33,24 +34,26 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         GenericDFAccessor.__init__(self, obj, **kwargs)
 
     def plot(self,
-             plot_type='OHLC',
-             display_volume=True,
-             ohlc_kwargs=None,
-             volume_kwargs=None,
-             ohlc_add_trace_kwargs=None,
-             volume_add_trace_kwargs=None,
-             fig=None,
-             **layout_kwargs):
+             plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
+             display_volume: bool = True,
+             ohlc_kwargs: tp.KwargsLike = None,
+             volume_kwargs: tp.KwargsLike = None,
+             ohlc_add_trace_kwargs: tp.KwargsLike = None,
+             volume_add_trace_kwargs: tp.KwargsLike = None,
+             fig: tp.Optional[tp.BaseFigure] = None,
+             **layout_kwargs) -> tp.BaseFigure:
         """Plot OHLCV data.
 
         Args:
-            plot_type: Either 'OHLC' or 'Candlestick'.
+            plot_type: Either 'OHLC', 'Candlestick' or Plotly trace.
+
+                Pass None to use the default.
             display_volume (bool): If True, displays volume as bar chart.
             ohlc_kwargs (dict): Keyword arguments passed to `plot_type`.
             volume_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Bar`.
             ohlc_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for OHLC.
             volume_add_trace_kwargs (dict): Keyword arguments passed to `add_trace` for volume.
-            fig (plotly.graph_objects.Figure): Figure to add traces to.
+            fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
 
         ## Example
@@ -61,7 +64,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         >>> vbt.YFData.download("BTC-USD").get().vbt.ohlcv.plot()
         ```
 
-        ![](/vectorbt/docs/img/ohlcv.png)
+        ![](/vectorbt/docs/img/ohlcv.svg)
         """
         from vectorbt.settings import ohlcv, color_schema
 
@@ -88,7 +91,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             if display_volume:
                 fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0, row_heights=[0.7, 0.3])
             else:
-                fig = FigureWidget()
+                fig = make_figure()
             fig.update_layout(
                 showlegend=True,
                 xaxis=dict(
@@ -110,14 +113,19 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                     bargap=0
                 )
         fig.update_layout(**layout_kwargs)
-        if plot_type.lower() == 'ohlc':
-            plot_type = 'OHLC'
-            plot_obj = go.Ohlc
-        elif plot_type.lower() == 'candlestick':
-            plot_type = 'Candlestick'
-            plot_obj = go.Candlestick
+        if plot_type is None:
+            plot_type = ohlcv['plot_type']
+        if isinstance(plot_type, str):
+            if plot_type.lower() == 'ohlc':
+                plot_type = 'OHLC'
+                plot_obj = go.Ohlc
+            elif plot_type.lower() == 'candlestick':
+                plot_type = 'Candlestick'
+                plot_obj = go.Candlestick
+            else:
+                raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
         else:
-            raise ValueError("Plot type can be either 'OHLC' or 'Candlestick'")
+            plot_obj = plot_type
         ohlc = plot_obj(
             x=self.wrapper.index,
             open=open,
@@ -134,7 +142,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         if display_volume:
             volume = self._obj[column_names['volume']]
 
-            marker_colors = np.empty(volume.shape, dtype=np.object)
+            marker_colors = np.empty(volume.shape, dtype=object)
             marker_colors[(close.values - open.values) > 0] = color_schema['increasing']
             marker_colors[(close.values - open.values) == 0] = color_schema['gray']
             marker_colors[(close.values - open.values) < 0] = color_schema['decreasing']
