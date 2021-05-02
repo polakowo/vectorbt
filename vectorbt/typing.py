@@ -5,9 +5,6 @@ import numpy as np
 import pandas as pd
 from pandas import Series, DataFrame as Frame, Index
 from typing import *
-from numpy.typing import DTypeLike
-from pandas._typing import Dtype as PandasDTypeLike
-from pandas.core.arrays.base import ExtensionArray
 from datetime import datetime, timedelta, tzinfo
 from mypy_extensions import VarArg, KwArg
 from pandas.tseries.offsets import DateOffset
@@ -43,6 +40,8 @@ class SupportsArray(Protocol):
     def __array__(self) -> np.ndarray: ...
 
 
+DTypeLike = Any
+PandasDTypeLike = Any
 Shape = Tuple[int, ...]
 RelaxedShape = Union[int, Shape]
 Array = np.ndarray  # ready to be used for n-dim data
@@ -60,9 +59,9 @@ AnyArray = Union[Array, Series, Frame]
 AnyArray1d = Union[Array1d, Series]
 AnyArray2d = Union[Array2d, Frame]
 _ArrayLike = Union[Scalar, Sequence[Scalar], Sequence[Sequence[Any]], SupportsArray]
-ArrayLike = Union[_ArrayLike, Array, ExtensionArray, Index, Series, Frame]  # must be converted
-IndexLike = Union[_ArrayLike, Array1d, ExtensionArray, Index, Series]
-ArrayLikeSequence = Union[Sequence[T], Array1d, ExtensionArray, Index, Series]  # sequence for 1-dim data
+ArrayLike = Union[_ArrayLike, Array, Index, Series, Frame]  # must be converted
+IndexLike = Union[_ArrayLike, Array1d, Index, Series]
+ArrayLikeSequence = Union[Sequence[T], Array1d, Index, Series]  # sequence for 1-dim data
 
 # Labels
 Label = Hashable
