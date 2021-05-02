@@ -41,27 +41,33 @@ in 2020 against every single pattern found in TA-Lib, and translates them into s
 
 >>> # Fetch price history
 >>> symbols = ['BTC-USD', 'ETH-USD', 'XRP-USD', 'BNB-USD', 'BCH-USD', 'LTC-USD']
->>> start = datetime(2020, 1, 1)
->>> end = datetime(2020, 9, 1)
+>>> start = '2020-01-01 UTC'  # crypto is UTC
+>>> end = '2020-09-01 UTC'
 >>> # OHLCV by column
 >>> ohlcv = vbt.YFData.download(symbols, start=start, end=end).concat()
+>>> ohlcv['Open']
 
->>> ohlcv['Open'].head()
-symbol          BTC-USD     ETH-USD   XRP-USD    BNB-USD     BCH-USD  \\
+symbol                          BTC-USD     ETH-USD   XRP-USD    BNB-USD  \
 Date
-2020-01-01  7194.892090  129.630661  0.192912  13.730962  204.671295
-2020-01-02  7202.551270  130.820038  0.192708  13.698126  204.354538
-2020-01-03  6984.428711  127.411263  0.187948  13.035329  196.007690
-2020-01-04  7345.375488  134.168518  0.193521  13.667442  222.536560
-2020-01-05  7410.451660  135.072098  0.194367  13.888340  225.779831
+2020-01-01 00:00:00+00:00   7194.892090  129.630661  0.192912  13.730962
+2020-01-02 00:00:00+00:00   7202.551270  130.820038  0.192708  13.698126
+2020-01-03 00:00:00+00:00   6984.428711  127.411263  0.187948  13.035329
+...                                 ...         ...       ...        ...
+2020-08-30 00:00:00+00:00  11508.713867  399.616699  0.274568  23.009060
+2020-08-31 00:00:00+00:00  11713.306641  428.509003  0.283065  23.647858
+2020-09-01 00:00:00+00:00  11679.316406  434.874451  0.281612  23.185047
 
-symbol        LTC-USD
+symbol                        BCH-USD    LTC-USD
 Date
-2020-01-01  41.326534
-2020-01-02  42.018085
-2020-01-03  39.863129
-2020-01-04  42.383526
-2020-01-05  43.291382
+2020-01-01 00:00:00+00:00  204.671295  41.326534
+2020-01-02 00:00:00+00:00  204.354538  42.018085
+2020-01-03 00:00:00+00:00  196.007690  39.863129
+...                               ...        ...
+2020-08-30 00:00:00+00:00  268.842865  57.207737
+2020-08-31 00:00:00+00:00  279.280426  62.844059
+2020-09-01 00:00:00+00:00  274.480865  61.105076
+
+[244 rows x 6 columns]
 
 >>> # Run every single pattern recognition indicator and combine results
 >>> result = pd.DataFrame.vbt.empty_like(ohlcv['Open'], fill_value=0.)
@@ -85,7 +91,7 @@ Date
 >>> portfolio.value().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/portfolio_value.png)
+![](/vectorbt/docs/img/portfolio_value.svg)
 
 ## Broadcasting
 
@@ -1354,7 +1360,7 @@ class Portfolio(Wrapping):
         >>> portfolio.holding_value(group_by=False).vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/simulate_nb.png)
+        ![](/vectorbt/docs/img/simulate_nb.svg)
         """
         # Get defaults
         from vectorbt import settings
@@ -1627,12 +1633,8 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.nb import create_order_nb
 
         >>> @njit
-        ... def order_func_nb(order_ctx, size):
-        ...     close = order_ctx.sim_ctx.close
-        ...     i = order_ctx.row_ctx.i
-        ...     col = order_ctx.col
-        ...
-        ...     return create_order_nb(size=size, price=close[i, col])
+        ... def order_func_nb(c, size):
+        ...     return create_order_nb(size=size, price=c.close[c.i, c.col])
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
@@ -1659,21 +1661,16 @@ class Portfolio(Wrapping):
         >>> import numpy as np
 
         >>> @njit
-        ... def group_prep_func_nb(group_ctx):
+        ... def group_prep_func_nb(c):
         ...     last_pos_state = np.array([-1])
         ...     return (last_pos_state,)
 
         >>> @njit
-        ... def order_func_nb(order_ctx, last_pos_state):
-        ...     shares_now = order_ctx.shares_now
-        ...     close = order_ctx.sim_ctx.close
-        ...     i = order_ctx.row_ctx.i
-        ...     col = order_ctx.col
-        ...
-        ...     if shares_now > 0:
-        ...         size = -shares_now  # close long
-        ...     elif shares_now < 0:
-        ...         size = -shares_now  # close short
+        ... def order_func_nb(c, last_pos_state):
+        ...     if c.shares_now > 0:
+        ...         size = -c.shares_now  # close long
+        ...     elif c.shares_now < 0:
+        ...         size = -c.shares_now  # close short
         ...     else:
         ...         if last_pos_state[0] == 1:
         ...             size = -np.inf  # open short
@@ -1682,7 +1679,7 @@ class Portfolio(Wrapping):
         ...             size = np.inf  # open long
         ...             last_pos_state[0] = 1
         ...
-        ...     return create_order_nb(size=size, price=close[i, col])
+        ...     return create_order_nb(size=size, price=c.close[c.i, c.col])
 
         >>> portfolio = vbt.Portfolio.from_order_func(
         ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
@@ -1709,45 +1706,32 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.enums import SizeType, Direction
 
         >>> @njit
-        ... def group_prep_func_nb(group_ctx):
+        ... def group_prep_func_nb(c):
         ...     '''Define empty arrays for each group.'''
-        ...     group_len = group_ctx.group_len
-        ...
-        ...     order_value_out = np.empty(group_len, dtype=np.float_)
+        ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
         ...     return (order_value_out,)
 
         >>> @njit
-        ... def segment_prep_func_nb(seg_ctx, order_value_out):
+        ... def segment_prep_func_nb(c, order_value_out):
         ...     '''Perform rebalancing at each segment.'''
-        ...     i = seg_ctx.row_ctx.i
-        ...     group_len = seg_ctx.group_ctx.group_len
-        ...     from_col = seg_ctx.group_ctx.from_col
-        ...     to_col = seg_ctx.group_ctx.to_col
-        ...     close = seg_ctx.sim_ctx.close
-        ...     last_val_price = seg_ctx.sim_ctx.last_val_price
-        ...
-        ...     for col in range(from_col, to_col):
+        ...     for col in range(c.from_col, c.to_col):
         ...         # Here we use order price for group valuation
-        ...         last_val_price[col] = close[i, col]
+        ...         c.last_val_price[col] = c.close[c.i, col]
         ...     # Reorder call sequence such that selling orders come first and buying last
-        ...     size = 1 / group_len
+        ...     size = 1 / c.group_len
         ...     size_type = SizeType.TargetPercent
         ...     direction = Direction.LongOnly  # long positions only
-        ...     sort_call_seq_nb(seg_ctx, size, size_type, direction, order_value_out)
+        ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out)
         ...     return (size, size_type, direction)
 
         >>> @njit
-        ... def order_func_nb(order_ctx, size, size_type, direction, fees, fixed_fees, slippage):
+        ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
         ...     '''Place an order.'''
-        ...     i = order_ctx.row_ctx.i
-        ...     col = order_ctx.col
-        ...     close = order_ctx.sim_ctx.close
-        ...
         ...     return create_order_nb(
         ...         size=size,
         ...         size_type=size_type,
         ...         direction=direction,
-        ...         price=close[i, col],
+        ...         price=c.close[c.i, c.col],
         ...         fees=fees,
         ...         fixed_fees=fixed_fees,
         ...         slippage=slippage
@@ -1771,7 +1755,7 @@ class Portfolio(Wrapping):
         >>> portfolio.holding_value(group_by=False).vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/simulate_nb.png)
+        ![](/vectorbt/docs/img/simulate_nb.svg)
 
         Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
         (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
@@ -1780,38 +1764,30 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
 
         >>> @njit
-        ... def group_prep_func_nb(group_ctx):
-        ...     target_shape = group_ctx.sim_ctx.target_shape
-        ...
+        ... def group_prep_func_nb(c):
         ...     # We need to define stop price per column, thus we do it in group_prep_func_nb
-        ...     stop_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
         ...     return (stop_price,)
 
         >>> @njit
-        ... def order_func_nb(order_ctx, stop_price, entries, exits, size, flex_2d):
-        ...     # Select relevant context info
-        ...     shares_now = order_ctx.shares_now
-        ...     close = order_ctx.sim_ctx.close
-        ...     i = order_ctx.row_ctx.i
-        ...     col = order_ctx.col
-        ...
+        ... def order_func_nb(c, stop_price, entries, exits, size, flex_2d):
         ...     # Select info related to this order
         ...     # flex_select_auto_nb allows us to pass size as single number, 1-dim or 2-dim array
         ...     # If flex_2d is True, 1-dim array will be per column, otherwise per row
-        ...     size_now = flex_select_auto_nb(i, col, np.asarray(size), flex_2d)
+        ...     size_now = flex_select_auto_nb(c.i, c.col, np.asarray(size), flex_2d)
         ...     # close is always 2-dim array
-        ...     price_now = close[i, col]
-        ...     stop_price_now = stop_price[col]
+        ...     price_now = c.close[c.i, c.col]
+        ...     stop_price_now = stop_price[c.col]
         ...
         ...     # Our logic
-        ...     if entries[i, col]:
-        ...         if shares_now == 0:
+        ...     if entries[c.i, c.col]:
+        ...         if c.shares_now == 0:
         ...             return create_order_nb(
         ...                 size=size_now,
         ...                 price=price_now,
         ...                 direction=Direction.LongOnly)
-        ...     elif exits[i, col] or price_now >= stop_price_now:
-        ...         if shares_now > 0:
+        ...     elif exits[c.i, c.col] or price_now >= stop_price_now:
+        ...         if c.shares_now > 0:
         ...             return create_order_nb(
         ...                 size=-size_now,
         ...                 price=price_now,
@@ -1819,20 +1795,17 @@ class Portfolio(Wrapping):
         ...     return NoOrder
 
         >>> @njit
-        ... def after_order_func_nb(after_order_ctx, order_result, stop_price, stop, flex_2d):
-        ...     i = after_order_ctx.row_ctx.i
-        ...     col = after_order_ctx.col
-        ...
+        ... def after_order_func_nb(c, order_result, stop_price, stop, flex_2d):
         ...     # Same broadcasting as for size
-        ...     stop_now = flex_select_auto_nb(i, col, np.asarray(stop), flex_2d)
+        ...     stop_now = flex_select_auto_nb(c.i, c.col, np.asarray(stop), flex_2d)
         ...
         ...     if order_result.status == OrderStatus.Filled:
         ...         if order_result.side == OrderSide.Buy:
         ...             # Position entered: Set stop condition
-        ...             stop_price[col] = (1 + stop_now) * order_result.price
+        ...             stop_price[c.col] = (1 + stop_now) * order_result.price
         ...         else:
         ...             # Position exited: Remove stop condition
-        ...             stop_price[col] = np.nan
+        ...             stop_price[c.col] = np.nan
 
         >>> def simulate(close, entries, exits, threshold):
         ...     return vbt.Portfolio.from_order_func(
@@ -2198,7 +2171,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(shares, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def pos_mask(self, direction: str = 'all', group_by: tp.GroupByLike = None, 
+    def pos_mask(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position mask per column/group."""
         direction = prepare_enum_value(Direction, direction)
@@ -2212,7 +2185,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(pos_mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def pos_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None, 
+    def pos_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
         direction = prepare_enum_value(Direction, direction)
@@ -2229,7 +2202,7 @@ class Portfolio(Wrapping):
     # ############# Cash ############# #
 
     @cached_method
-    def cash_flow(self, group_by: tp.GroupByLike = None, short_cash: bool = True, 
+    def cash_flow(self, group_by: tp.GroupByLike = None, short_cash: bool = True,
                   wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
@@ -2279,7 +2252,7 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def cash(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, short_cash: bool = True, 
+    def cash(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, short_cash: bool = True,
              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get cash balance series per column/group."""
         if in_sim_order and not self.cash_sharing:
@@ -2296,14 +2269,14 @@ class Portfolio(Wrapping):
                 init_cash
             )
         else:
-            group_lens = self.wrapper.grouper.get_group_lens()
             if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
+                group_lens = self.wrapper.grouper.get_group_lens()
                 init_cash = to_1d(self.init_cash, raw=True)
                 call_seq = to_2d(self.call_seq, raw=True)
                 cash = nb.cash_in_sim_order_nb(cash_flow, group_lens, init_cash, call_seq)
             else:
                 init_cash = to_1d(self.get_init_cash(group_by=False), raw=True)
-                cash = nb.cash_nb(cash_flow, group_lens, init_cash)
+                cash = nb.cash_nb(cash_flow, init_cash)
         return self.wrapper.wrap(cash, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     # ############# Performance ############# #
@@ -2633,6 +2606,16 @@ class Portfolio(Wrapping):
             yaxis_title="P&L",
             can_plot_groups=False
         ),
+        trade_returns=dict(
+            title="Trade Returns",
+            yaxis_title="Return",
+            can_plot_groups=False
+        ),
+        position_returns=dict(
+            title="Position Returns",
+            yaxis_title="Return",
+            can_plot_groups=False
+        ),
         cum_returns=dict(
             title="Cumulative Returns",
             yaxis_title="Cumulative returns"
@@ -2740,8 +2723,8 @@ class Portfolio(Wrapping):
         >>> from datetime import datetime
         >>> import vectorbt as vbt
 
-        >>> start = datetime(2020, 1, 1)
-        >>> end = datetime(2020, 9, 1)
+        >>> start = '2020-01-01 UTC'  # crypto is in UTC
+        >>> end = '2020-09-01 UTC'
         >>> close = vbt.YFData.download("BTC-USD", start=start, end=end).get('Close')
 
         >>> np.random.seed(42)
@@ -2755,7 +2738,7 @@ class Portfolio(Wrapping):
         >>> portfolio.plot()
         ```
 
-        ![](/vectorbt/docs/img/portfolio_plot.png)
+        ![](/vectorbt/docs/img/portfolio_plot.svg)
 
         You can choose any of the subplots in `Portfolio.subplot_settings`, in any order:
 
@@ -2774,7 +2757,7 @@ class Portfolio(Wrapping):
         ... )
         ```
 
-        ![](/vectorbt/docs/img/portfolio_plot_drawdowns.png)
+        ![](/vectorbt/docs/img/portfolio_plot_drawdowns.svg)
 
         You can also create a custom subplot by creating a placeholder that can be written later:
 
@@ -2786,7 +2769,6 @@ class Portfolio(Wrapping):
         ...         can_plot_groups=False
         ...     ))  # placeholder
         ... ])
-
         >>> size.rename('Order Size').vbt.plot(add_trace_kwargs=dict(row=2, col=1), fig=fig)
         ```
 
@@ -2806,18 +2788,23 @@ class Portfolio(Wrapping):
         ... ])
         ```
 
-        ![](/vectorbt/docs/img/portfolio_plot_custom.png)
+        ![](/vectorbt/docs/img/portfolio_plot_custom.svg)
         """
-        from vectorbt.settings import color_schema, layout
+        from vectorbt.settings import color_schema, layout, portfolio
 
         # Select one column/group
         self_col = self.select_series(column=column, group_by=group_by)
 
         if subplots is None:
+            subplots = portfolio['subplots']
             if self_col.wrapper.grouper.is_grouped():
-                subplots = ['cum_returns']
-            else:
-                subplots = ['orders', 'trade_pnl', 'cum_returns']
+                def _filter(x: str) -> bool:
+                    _settings = self.subplot_settings[x]
+                    if 'can_plot_groups' in _settings and not _settings['can_plot_groups']:
+                        return False
+                    return True
+
+                subplots = filter(_filter, subplots)
         elif subplots == 'all':
             if self_col.wrapper.grouper.is_grouped():
                 supported_subplots = filter(lambda x: x[1].get('can_plot_groups', True), self.subplot_settings.items())
@@ -2961,7 +2948,7 @@ class Portfolio(Wrapping):
                         custom_kwargs['y_domain'] = y_domain
                     custom_kwargs = merge_dicts(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
                     plot_func(self_col, **custom_kwargs, fig=fig)
-                    
+
             else:
                 settings = self.subplot_settings[name]
                 can_plot_groups = settings.get('can_plot_groups', True)
@@ -2974,21 +2961,21 @@ class Portfolio(Wrapping):
                     self_col.get_orders(**method_kwargs).plot(
                         **orders_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
-    
+
                 elif name == 'trades':
                     trades_kwargs = kwargs.pop('trades_kwargs', {})
                     method_kwargs = _extract_method_kwargs(self_col.get_trades, trades_kwargs)
                     self_col.get_trades(**method_kwargs).plot(
                         **trades_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'positions':
                     positions_kwargs = kwargs.pop('positions_kwargs', {})
                     method_kwargs = _extract_method_kwargs(self_col.get_positions, positions_kwargs)
                     self_col.get_positions(**method_kwargs).plot(
                         **positions_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'trade_pnl':
                     trade_pnl_kwargs = merge_dicts(dict(
                         hline_shape_kwargs=hline_shape_kwargs
@@ -2997,14 +2984,30 @@ class Portfolio(Wrapping):
                     self_col.get_trades(**method_kwargs).plot_pnl(
                         **trade_pnl_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'position_pnl':
                     position_pnl_kwargs = kwargs.pop('position_pnl_kwargs', {})
                     method_kwargs = _extract_method_kwargs(self_col.get_positions, position_pnl_kwargs)
                     self_col.get_positions(**method_kwargs).plot_pnl(
                         **position_pnl_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
+                elif name == 'trade_returns':
+                    trade_returns_kwargs = merge_dicts(dict(
+                        hline_shape_kwargs=hline_shape_kwargs
+                    ), kwargs.pop('trade_returns_kwargs', {}))
+                    method_kwargs = _extract_method_kwargs(self_col.get_trades, trade_returns_kwargs)
+                    self_col.get_trades(**method_kwargs).plot_returns(
+                        **trade_returns_kwargs,
+                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
+
+                elif name == 'position_returns':
+                    position_returns_kwargs = kwargs.pop('position_returns_kwargs', {})
+                    method_kwargs = _extract_method_kwargs(self_col.get_positions, position_returns_kwargs)
+                    self_col.get_positions(**method_kwargs).plot_returns(
+                        **position_returns_kwargs,
+                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
+
                 elif name == 'cum_returns':
                     cum_returns_kwargs = merge_dicts(dict(
                         benchmark_rets=self_col.market_returns(),
@@ -3025,7 +3028,7 @@ class Portfolio(Wrapping):
                     returns.vbt.returns.plot_cum_returns(
                         **cum_returns_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'drawdowns':
                     drawdowns_kwargs = merge_dicts(dict(
                         ts_trace_kwargs=dict(
@@ -3037,7 +3040,7 @@ class Portfolio(Wrapping):
                     self_col.get_drawdowns(**method_kwargs).plot(
                         **drawdowns_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-    
+
                 elif name == 'underwater':
                     underwater_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3053,7 +3056,7 @@ class Portfolio(Wrapping):
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
                     fig.layout[yaxis]['tickformat'] = '%'
-    
+
                 elif name == 'share_flow':
                     share_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3066,7 +3069,7 @@ class Portfolio(Wrapping):
                         **share_flow_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'cash_flow':
                     cash_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3079,7 +3082,7 @@ class Portfolio(Wrapping):
                         **cash_flow_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'shares':
                     shares_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3099,7 +3102,7 @@ class Portfolio(Wrapping):
                         0, **shares_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'cash':
                     cash_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3119,7 +3122,7 @@ class Portfolio(Wrapping):
                         0, **cash_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(self_col.init_cash, x_domain, yref)
-    
+
                 elif name == 'holding_value':
                     holding_value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3139,7 +3142,7 @@ class Portfolio(Wrapping):
                         0, **holding_value_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(0, x_domain, yref)
-    
+
                 elif name == 'value':
                     value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3153,7 +3156,7 @@ class Portfolio(Wrapping):
                         self_col.init_cash, **value_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(self_col.init_cash, x_domain, yref)
-    
+
                 elif name == 'gross_exposure':
                     gross_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
@@ -3173,7 +3176,7 @@ class Portfolio(Wrapping):
                         1, **gross_exposure_kwargs,
                         add_trace_kwargs=dict(row=row, col=col), fig=fig)
                     _add_hline(1, x_domain, yref)
-    
+
                 elif name == 'net_exposure':
                     net_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(

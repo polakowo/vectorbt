@@ -235,20 +235,20 @@ Let's start with fetching the daily price of Bitcoin:
 >>> import vectorbt as vbt
 
 >>> # Prepare data
->>> start = datetime(2019, 1, 1)
->>> end = datetime(2020, 1, 1)
+>>> start = '2019-01-01 UTC'  # crypto is in UTC
+>>> end = '2020-01-01 UTC'
 >>> btc_price = vbt.YFData.download('BTC-USD', start=start, end=end).get('Close')
 
 >>> btc_price
 Date
-2019-01-01    3843.520020
-2019-01-02    3943.409424
-2019-01-03    3836.741211
-...                   ...
-2019-12-30    7292.995117
-2019-12-31    7193.599121
-2020-01-01    7200.174316
-Name: Close, Length: 366, dtype: float64
+2019-01-01 00:00:00+00:00    3843.520020
+2019-01-02 00:00:00+00:00    3943.409424
+2019-01-03 00:00:00+00:00    3836.741211
+...                                  ...
+2019-12-30 00:00:00+00:00    7292.995117
+2019-12-31 00:00:00+00:00    7193.599121
+2020-01-01 00:00:00+00:00    7200.174316
+Freq: D, Name: Close, Length: 366, dtype: float64
 ```
 
 We are going to test a simple Dual Moving Average Crossover (DMAC) strategy. For this, we are going to
@@ -264,26 +264,26 @@ average, and sell when opposite.
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
 Date
-2019-01-01    False
-2019-01-02    False
-2019-01-03    False
-...             ...
-2019-12-30    False
-2019-12-31    False
-2020-01-01    False
-Length: 366, dtype: bool
+2019-01-01 00:00:00+00:00    False
+2019-01-02 00:00:00+00:00    False
+2019-01-03 00:00:00+00:00    False
+...                            ...
+2019-12-30 00:00:00+00:00    False
+2019-12-31 00:00:00+00:00    False
+2020-01-01 00:00:00+00:00    False
+Freq: D, Length: 366, dtype: bool
 
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
 Date
-2019-01-01    False
-2019-01-02    False
-2019-01-03    False
-...             ...
-2019-12-30    False
-2019-12-31    False
-2020-01-01    False
-Length: 366, dtype: bool
+2019-01-01 00:00:00+00:00    False
+2019-01-02 00:00:00+00:00    False
+2019-01-03 00:00:00+00:00    False
+...                            ...
+2019-12-30 00:00:00+00:00    False
+2019-12-31 00:00:00+00:00    False
+2020-01-01 00:00:00+00:00    False
+Freq: D, Length: 366, dtype: bool
 
 >>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
 >>> portfolio.total_return()
@@ -303,31 +303,31 @@ average over the entire price series and stores it as a distinct column.
 
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
-fast_window     10     20
-slow_window     30     30
+fast_window                   10     20
+slow_window                   30     30
 Date
-2019-01-01   False  False
-2019-01-02   False  False
-2019-01-03   False  False
-...            ...    ...
-2019-12-30   False  False
-2019-12-31   False  False
-2020-01-01   False  False
+2019-01-01 00:00:00+00:00  False  False
+2019-01-02 00:00:00+00:00  False  False
+2019-01-03 00:00:00+00:00  False  False
+...                          ...    ...
+2019-12-30 00:00:00+00:00  False  False
+2019-12-31 00:00:00+00:00  False  False
+2020-01-01 00:00:00+00:00  False  False
 
 [366 rows x 2 columns]
 
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
-fast_window     10     20
-slow_window     30     30
+fast_window                   10     20
+slow_window                   30     30
 Date
-2019-01-01   False  False
-2019-01-02   False  False
-2019-01-03   False  False
-...            ...    ...
-2019-12-30   False  False
-2019-12-31   False  False
-2020-01-01   False  False
+2019-01-01 00:00:00+00:00  False  False
+2019-01-02 00:00:00+00:00  False  False
+2019-01-03 00:00:00+00:00  False  False
+...                          ...    ...
+2019-12-30 00:00:00+00:00  False  False
+2019-12-31 00:00:00+00:00  False  False
+2020-01-01 00:00:00+00:00  False  False
 
 [366 rows x 2 columns]
 
@@ -356,15 +356,15 @@ combine price series for Bitcoin and Ethereum into one DataFrame and run the sam
 ...     keys=pd.Index(['BTC', 'ETH'], name='symbol'))
 >>> comb_price.vbt.drop_levels(-1, inplace=True)
 >>> comb_price
-symbol              BTC         ETH
+symbol                             BTC         ETH
 Date
-2019-01-01  3843.520020  140.819412
-2019-01-02  3943.409424  155.047684
-2019-01-03  3836.741211  149.135010
-...                 ...         ...
-2019-12-30  7292.995117  132.633484
-2019-12-31  7193.599121  129.610855
-2020-01-01  7200.174316  130.802002
+2019-01-01 00:00:00+00:00  3843.520020  140.819412
+2019-01-02 00:00:00+00:00  3943.409424  155.047684
+2019-01-03 00:00:00+00:00  3836.741211  149.135010
+...                                ...         ...
+2019-12-30 00:00:00+00:00  7292.995117  132.633484
+2019-12-31 00:00:00+00:00  7193.599121  129.610855
+2020-01-01 00:00:00+00:00  7200.174316  130.802002
 
 [366 rows x 2 columns]
 
@@ -373,33 +373,33 @@ Date
 
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> entries
-fast_window            10            20
-slow_window            30            30
-symbol         BTC    ETH    BTC    ETH
+fast_window                          10            20
+slow_window                          30            30
+symbol                       BTC    ETH    BTC    ETH
 Date
-2019-01-01   False  False  False  False
-2019-01-02   False  False  False  False
-2019-01-03   False  False  False  False
-...            ...    ...    ...    ...
-2019-12-30   False  False  False  False
-2019-12-31   False  False  False  False
-2020-01-01   False  False  False  False
+2019-01-01 00:00:00+00:00  False  False  False  False
+2019-01-02 00:00:00+00:00  False  False  False  False
+2019-01-03 00:00:00+00:00  False  False  False  False
+...                          ...    ...    ...    ...
+2019-12-30 00:00:00+00:00  False  False  False  False
+2019-12-31 00:00:00+00:00  False  False  False  False
+2020-01-01 00:00:00+00:00  False  False  False  False
 
 [366 rows x 4 columns]
 
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 >>> exits
-fast_window            10            20
-slow_window            30            30
-symbol         BTC    ETH    BTC    ETH
+fast_window                          10            20
+slow_window                          30            30
+symbol                       BTC    ETH    BTC    ETH
 Date
-2019-01-01   False  False  False  False
-2019-01-02   False  False  False  False
-2019-01-03   False  False  False  False
-...            ...    ...    ...    ...
-2019-12-30   False  False  False  False
-2019-12-31   False  False  False  False
-2020-01-01   False  False  False  False
+2019-01-01 00:00:00+00:00  False  False  False  False
+2019-01-02 00:00:00+00:00  False  False  False  False
+2019-01-03 00:00:00+00:00  False  False  False  False
+...                          ...    ...    ...    ...
+2019-12-30 00:00:00+00:00  False  False  False  False
+2019-12-31 00:00:00+00:00  False  False  False  False
+2020-01-01 00:00:00+00:00  False  False  False  False
 
 [366 rows x 4 columns]
 
@@ -416,7 +416,7 @@ Name: total_return, dtype: float64
 >>> mean_return.vbt.barplot(xaxis_title='Symbol', yaxis_title='Mean total return')
 ```
 
-![](/vectorbt/docs/img/index_by_symbol.png)
+![](/vectorbt/docs/img/index_by_symbol.svg)
 
 Not only strategies and instruments can act as separate features, but also time. If we want to find out
 when our strategy performs best, it's reasonable to test it over multiple time periods. vectorbt allows
@@ -475,7 +475,7 @@ by any feature, such as window pair, symbol, and time period.
 ...     legend_title_text='Symbol')
 ```
 
-![](/vectorbt/docs/img/index_by_any.png)
+![](/vectorbt/docs/img/index_by_any.svg)
 
 There is much more to backtesting than simply stacking columns: vectorbt offers functions for
 most parts of a backtesting pipeline, from building indicators and generating signals, to

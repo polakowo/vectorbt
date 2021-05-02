@@ -64,7 +64,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         >>> vbt.YFData.download("BTC-USD").get().vbt.ohlcv.plot()
         ```
 
-        ![](/vectorbt/docs/img/ohlcv.png)
+        ![](/vectorbt/docs/img/ohlcv.svg)
         """
         from vectorbt.settings import ohlcv, color_schema
 

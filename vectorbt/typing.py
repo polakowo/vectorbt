@@ -104,7 +104,8 @@ KwargsLikeSequence = DictLikeSequence[str, V]
 Data = Dict[Label, SeriesFrame]
 
 # Plotting
-TraceNames = MaybeSequence[Union[str, None]]
+TraceName = Union[str, None]
+TraceNames = MaybeSequence[TraceName]
 
 # Generic
 I = TypeVar("I")

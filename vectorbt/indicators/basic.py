@@ -25,26 +25,36 @@ Run for the examples below:
 >>> import vectorbt as vbt
 >>> from datetime import datetime
 
->>> start = datetime(2019, 3, 1)
->>> end = datetime(2019, 9, 1)
+>>> start = '2019-03-01 UTC'  # crypto is in UTC
+>>> end = '2019-09-01 UTC'
 >>> cols = ['Open', 'High', 'Low', 'Close', 'Volume']
 >>> ohlcv = vbt.YFData.download("BTC-USD", start=start, end=end).get(cols)
 >>> ohlcv
-                    Open          High          Low        Close       Volume
+                                   Open          High          Low  \
 Date
-2019-03-01   3853.757080   3907.795410  3851.692383  3859.583740   7661247975
-2019-03-02   3855.318115   3874.607422  3832.127930  3864.415039   7578786076
-2019-03-03   3862.266113   3875.483643  3836.905762  3847.175781   7253558152
-...                  ...           ...          ...          ...          ...
-2019-08-30   9514.844727   9656.124023  9428.302734  9598.173828  13595263986
-2019-08-31   9597.539062   9673.220703  9531.799805  9630.664062  11454806419
-2019-09-01   9630.592773   9796.755859  9582.944336  9757.970703  11445355859
+2019-03-01 00:00:00+00:00   3853.757080   3907.795410  3851.692383
+2019-03-02 00:00:00+00:00   3855.318115   3874.607422  3832.127930
+2019-03-03 00:00:00+00:00   3862.266113   3875.483643  3836.905762
+...                                 ...           ...          ...
+2019-08-30 00:00:00+00:00   9514.844727   9656.124023  9428.302734
+2019-08-31 00:00:00+00:00   9597.539062   9673.220703  9531.799805
+2019-09-01 00:00:00+00:00   9630.592773   9796.755859  9582.944336
+
+                                 Close       Volume
+Date
+2019-03-01 00:00:00+00:00  3859.583740   7661247975
+2019-03-02 00:00:00+00:00  3864.415039   7578786076
+2019-03-03 00:00:00+00:00  3847.175781   7253558152
+...                                ...          ...
+2019-08-30 00:00:00+00:00  9598.173828  13595263986
+2019-08-31 00:00:00+00:00  9630.664062  11454806419
+2019-09-01 00:00:00+00:00  9757.970703  11445355859
 
 [185 rows x 5 columns]
 
 >>> ohlcv.vbt.ohlcv.plot()
 ```
-![](/vectorbt/docs/img/basic_price.png)"""
+![](/vectorbt/docs/img/basic_price.svg)"""
 
 import numpy as np
 import plotly.graph_objects as go
@@ -52,6 +62,7 @@ import plotly.graph_objects as go
 from vectorbt import typing as tp
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.figure import make_figure
+from vectorbt.utils.colors import adjust_opacity
 from vectorbt.generic import nb as generic_nb
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators import nb
@@ -108,7 +119,7 @@ class _MA(MA):
         >>> vbt.MA.run(ohlcv['Close'], 10).plot()
         ```
 
-        ![](/vectorbt/docs/img/MA.png)
+        ![](/vectorbt/docs/img/MA.svg)
         """
         from vectorbt.settings import color_schema
 
@@ -191,7 +202,7 @@ class _MSTD(MSTD):
         >>> vbt.MSTD.run(ohlcv['Close'], 10).plot()
         ```
 
-        ![](/vectorbt/docs/img/MSTD.png)
+        ![](/vectorbt/docs/img/MSTD.svg)
         """
         self_col = self.select_series(column=column)
 
@@ -282,7 +293,7 @@ class _BBANDS(BBANDS):
         >>> vbt.BBANDS.run(ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/BBANDS.png)
+        ![](/vectorbt/docs/img/BBANDS.svg)
         """
         from vectorbt.settings import color_schema
 
@@ -302,11 +313,11 @@ class _BBANDS(BBANDS):
             lower_trace_kwargs = {}
         lower_trace_kwargs = merge_dicts(dict(
             name='Lower Band',
-            line_color=color_schema['gray'],
+            line_color=adjust_opacity(color_schema['gray'], 0.75),
         ), lower_trace_kwargs)
         upper_trace_kwargs = merge_dicts(dict(
             name='Upper Band',
-            line_color=color_schema['gray'],
+            line_color=adjust_opacity(color_schema['gray'], 0.75),
             fill='tonexty',
             fillcolor='rgba(128, 128, 128, 0.2)'
         ), upper_trace_kwargs)  # default kwargs
@@ -395,7 +406,7 @@ class _RSI(RSI):
         >>> vbt.RSI.run(ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/RSI.png)
+        ![](/vectorbt/docs/img/RSI.svg)
         """
         self_col = self.select_series(column=column)
 
@@ -498,7 +509,7 @@ class _STOCH(STOCH):
         >>> vbt.STOCH.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/STOCH.png)
+        ![](/vectorbt/docs/img/STOCH.svg)
         """
         self_col = self.select_series(column=column)
 
@@ -611,7 +622,7 @@ class _MACD(MACD):
         >>> vbt.MACD.run(ohlcv['Close']).plot()
         ```
 
-        ![](/vectorbt/docs/img/MACD.png)"""
+        ![](/vectorbt/docs/img/MACD.svg)"""
         self_col = self.select_series(column=column)
 
         if fig is None:
@@ -643,11 +654,11 @@ class _MACD(MACD):
         # Plot hist
         hist = self_col.hist.values
         hist_diff = generic_nb.diff_1d_nb(hist)
-        marker_colors = np.full(hist.shape, 'silver', dtype=object)
-        marker_colors[(hist > 0) & (hist_diff > 0)] = 'green'
-        marker_colors[(hist > 0) & (hist_diff <= 0)] = 'lightgreen'
-        marker_colors[(hist < 0) & (hist_diff < 0)] = 'red'
-        marker_colors[(hist < 0) & (hist_diff >= 0)] = 'lightcoral'
+        marker_colors = np.full(hist.shape, adjust_opacity('silver', 0.75), dtype=object)
+        marker_colors[(hist > 0) & (hist_diff > 0)] = adjust_opacity('green', 0.75)
+        marker_colors[(hist > 0) & (hist_diff <= 0)] = adjust_opacity('lightgreen', 0.75)
+        marker_colors[(hist < 0) & (hist_diff < 0)] = adjust_opacity('red', 0.75)
+        marker_colors[(hist < 0) & (hist_diff >= 0)] = adjust_opacity('lightcoral', 0.75)
 
         hist_bar = go.Bar(
             x=self_col.hist.index,
@@ -722,7 +733,7 @@ class _ATR(ATR):
         >>> vbt.ATR.run(ohlcv['High'], ohlcv['Low'], ohlcv['Close'], 10).plot()
         ```
 
-        ![](/vectorbt/docs/img/ATR.png)
+        ![](/vectorbt/docs/img/ATR.svg)
         """
         self_col = self.select_series(column=column)
 
@@ -795,7 +806,7 @@ class _OBV(OBV):
         >>> vbt.OBV.run(ohlcv['Close'], ohlcv['Volume']).plot()
         ```
 
-        ![](/vectorbt/docs/img/OBV.png)
+        ![](/vectorbt/docs/img/OBV.svg)
         """
         self_col = self.select_series(column=column)
 

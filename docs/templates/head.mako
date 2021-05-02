@@ -12,8 +12,8 @@
         color: #e82;
     }
     .homelink img {
-        max-width: 128px;
-        max-height: 128px;
+        max-width: 100px;
+        max-height: 100px;
         margin: auto;
         margin-bottom: .3em;
     }

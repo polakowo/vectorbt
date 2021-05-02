@@ -991,7 +991,7 @@ class SignalsAccessor(GenericAccessor):
         >>> sig[['a', 'c']].vbt.signals.plot()
         ```
 
-        ![](/vectorbt/docs/img/signals_df_plot.png)
+        ![](/vectorbt/docs/img/signals_df_plot.svg)
         """
         default_layout = dict()
         default_layout['yaxis' + yref[1:]] = dict(
@@ -1032,7 +1032,7 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         >>> (~sig['b']).vbt.signals.plot_as_exit_markers(y=ts, fig=fig)
         ```
 
-        ![](/vectorbt/docs/img/signals_plot_as_markers.png)
+        ![](/vectorbt/docs/img/signals_plot_as_markers.svg)
         """
         from vectorbt.settings import contrast_color_schema
 

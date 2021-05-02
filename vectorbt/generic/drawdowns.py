@@ -51,8 +51,8 @@ class Drawdowns(Records):
     >>> import pandas as pd
     >>> from datetime import datetime
 
-    >>> start = datetime(2019, 1, 1)
-    >>> end = datetime(2020, 1, 1)
+    >>> start = '2019-01-01 UTC'  # crypto is in UTC
+    >>> end = '2020-01-01 UTC'
     >>> price = vbt.YFData.download('BTC-USD', start=start, end=end).get('Close')
     >>> drawdowns = vbt.Drawdowns.from_ts(price, freq='1 days')
 
@@ -73,7 +73,7 @@ class Drawdowns(Records):
     >>> drawdowns.drawdown.histplot(trace_kwargs=dict(nbinsx=50))
     ```
 
-    ![](/vectorbt/docs/img/drawdowns_drawdown_histplot.png)
+    ![](/vectorbt/docs/img/drawdowns_drawdown_histplot.svg)
     """
 
     def __init__(self,
@@ -340,7 +340,7 @@ class Drawdowns(Records):
         >>> vbt.Drawdowns.from_ts(ts, freq='1 days').plot()
         ```
 
-        ![](/vectorbt/docs/img/drawdowns_plot.png)
+        ![](/vectorbt/docs/img/drawdowns_plot.svg)
         """
         from vectorbt.settings import color_schema, contrast_color_schema
 

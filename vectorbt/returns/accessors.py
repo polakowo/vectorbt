@@ -612,7 +612,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         >>> rets.vbt.returns.plot_cum_returns(benchmark_rets=benchmark_rets)
         ```
 
-        ![](/vectorbt/docs/img/plot_cum_returns.png)
+        ![](/vectorbt/docs/img/plot_cum_returns.svg)
         """
         from vectorbt.settings import color_schema
 

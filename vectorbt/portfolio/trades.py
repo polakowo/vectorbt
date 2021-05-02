@@ -32,7 +32,6 @@ from vectorbt.portfolio.enums import TradeDirection, TradeStatus, trade_dt, posi
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 
-
 # ############# Trades ############# #
 
 TradesT = tp.TypeVar("TradesT", bound="Trades")
@@ -379,23 +378,25 @@ class Trades(Records):
 
     # ############# Plotting ############# #
 
-    def plot_pnl(self,
-                 column: tp.Optional[tp.Label] = None,
-                 marker_size_range: tp.Tuple[float, float] = (7, 14),
-                 opacity_range: tp.Tuple[float, float] = (0.75, 0.9),
-                 closed_profit_trace_kwargs: tp.KwargsLike = None,
-                 closed_loss_trace_kwargs: tp.KwargsLike = None,
-                 open_trace_kwargs: tp.KwargsLike = None,
-                 hline_shape_kwargs: tp.KwargsLike = None,
-                 add_trace_kwargs: tp.KwargsLike = None,
-                 xref: str = 'x',
-                 yref: str = 'y',
-                 fig: tp.Optional[tp.BaseFigure] = None,
-                 **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
+    def plot_pnl_returns(self,
+                         column: tp.Optional[tp.Label] = None,
+                         as_pct: bool = True,
+                         marker_size_range: tp.Tuple[float, float] = (7, 14),
+                         opacity_range: tp.Tuple[float, float] = (0.75, 0.9),
+                         closed_profit_trace_kwargs: tp.KwargsLike = None,
+                         closed_loss_trace_kwargs: tp.KwargsLike = None,
+                         open_trace_kwargs: tp.KwargsLike = None,
+                         hline_shape_kwargs: tp.KwargsLike = None,
+                         add_trace_kwargs: tp.KwargsLike = None,
+                         xref: str = 'x',
+                         yref: str = 'y',
+                         fig: tp.Optional[tp.BaseFigure] = None,
+                         **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot trade PnL.
 
         Args:
             column (str): Name of the column to plot.
+            as_pct (bool): Whether to set y-axis to `Trades.returns`, otherwise to `Trades.pnl`.
             marker_size_range (tuple): Range of marker size.
             opacity_range (tuple): Range of marker opacity.
             closed_profit_trace_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Scatter` for "Closed - Profit" markers.
@@ -407,14 +408,6 @@ class Trades(Records):
             yref (str): Y coordinate axis.
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
-
-        ## Example
-
-        ```python-repl
-        >>> trades.plot_pnl()
-        ```
-
-        ![](/vectorbt/docs/img/trades_plot_pnl.png)
         """
         from vectorbt.settings import contrast_color_schema
 
@@ -431,12 +424,17 @@ class Trades(Records):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
         marker_size_range = tuple(marker_size_range)
+        xaxis = 'xaxis' + xref[1:]
+        yaxis = 'yaxis' + yref[1:]
 
         if fig is None:
             fig = make_figure()
+        if as_pct:
+            _layout_kwargs = dict()
+            _layout_kwargs[yaxis] = dict(tickformat='.2%')
+            fig.update_layout(**_layout_kwargs)
         fig.update_layout(**layout_kwargs)
         x_domain = [0, 1]
-        xaxis = 'xaxis' + xref[1:]
         if xaxis in fig.layout:
             if 'domain' in fig.layout[xaxis]:
                 if fig.layout[xaxis]['domain'] is not None:
@@ -446,6 +444,8 @@ class Trades(Records):
             # Extract information
             _id = self.values['id']
             _id_str = 'Trade Id' if self.trade_type == TradeType.Trade else 'Position Id'
+            _pnl_str = '%{customdata[1]:.6f}' if as_pct else '%{y}'
+            _return_str = '%{y}' if as_pct else '%{customdata[1]:.2%}'
             exit_idx = self.values['exit_idx']
             pnl = self.values['pnl']
             returns = self.values['return']
@@ -463,83 +463,58 @@ class Trades(Records):
             closed_loss_mask = (~open_mask) & loss_mask
             open_mask &= ~neutral_mask
 
-            if np.any(closed_profit_mask):
-                # Plot Profit markers
-                profit_scatter = go.Scatter(
-                    x=self_col.wrapper.index[exit_idx[closed_profit_mask]],
-                    y=pnl[closed_profit_mask],
-                    mode='markers',
-                    marker=dict(
-                        symbol='circle',
-                        color=contrast_color_schema['green'],
-                        size=marker_size[closed_profit_mask],
-                        opacity=opacity[closed_profit_mask],
-                        line=dict(
-                            width=1,
-                            color=adjust_lightness(contrast_color_schema['green'])
+            def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
+                if np.any(mask):
+                    scatter = go.Scatter(
+                        x=self_col.wrapper.index[exit_idx[mask]],
+                        y=returns[mask] if as_pct else pnl[mask],
+                        mode='markers',
+                        marker=dict(
+                            symbol='circle',
+                            color=color,
+                            size=marker_size[mask],
+                            opacity=opacity[mask],
+                            line=dict(
+                                width=1,
+                                color=adjust_lightness(color)
+                            ),
                         ),
-                    ),
-                    name='Closed - Profit',
-                    customdata=np.stack((_id[closed_profit_mask], returns[closed_profit_mask]), axis=1),
-                    hovertemplate=_id_str + ": %{customdata[0]}"
-                                            "<br>Date: %{x}"
-                                            "<br>PnL: %{y}"
-                                            "<br>Return: %{customdata[1]:.2%}"
-                )
-                profit_scatter.update(**closed_profit_trace_kwargs)
-                fig.add_trace(profit_scatter, **add_trace_kwargs)
+                        name=name,
+                        customdata=np.stack((
+                            _id[mask],
+                            pnl[mask] if as_pct else returns[mask]
+                        ), axis=1),
+                        hovertemplate=_id_str + ": %{customdata[0]}"
+                                                "<br>Date: %{x}"
+                                                f"<br>PnL: {_pnl_str}"
+                                                f"<br>Return: {_return_str}"
+                    )
+                    scatter.update(**kwargs)
+                    fig.add_trace(scatter, **add_trace_kwargs)
 
-            if np.any(closed_loss_mask):
-                # Plot Loss markers
-                loss_scatter = go.Scatter(
-                    x=self_col.wrapper.index[exit_idx[closed_loss_mask]],
-                    y=pnl[closed_loss_mask],
-                    mode='markers',
-                    marker=dict(
-                        symbol='circle',
-                        color=contrast_color_schema['red'],
-                        size=marker_size[closed_loss_mask],
-                        opacity=opacity[closed_loss_mask],
-                        line=dict(
-                            width=1,
-                            color=adjust_lightness(contrast_color_schema['red'])
-                        )
-                    ),
-                    name='Closed - Loss',
-                    customdata=np.stack((_id[closed_loss_mask], returns[closed_loss_mask]), axis=1),
-                    hovertemplate=_id_str + ": %{customdata[0]}"
-                                            "<br>Date: %{x}"
-                                            "<br>PnL: %{y}"
-                                            "<br>Return: %{customdata[1]:.2%}"
-                )
-                loss_scatter.update(**closed_loss_trace_kwargs)
-                fig.add_trace(loss_scatter, **add_trace_kwargs)
+            # Plot Closed - Profit scatter
+            _plot_scatter(
+                closed_profit_mask,
+                'Closed - Profit',
+                contrast_color_schema['green'],
+                closed_profit_trace_kwargs
+            )
 
-            if np.any(open_mask):
-                # Plot Active markers
-                active_scatter = go.Scatter(
-                    x=self_col.wrapper.index[exit_idx[open_mask]],
-                    y=pnl[open_mask],
-                    mode='markers',
-                    marker=dict(
-                        symbol='circle',
-                        color=contrast_color_schema['orange'],
-                        size=marker_size[open_mask],
-                        opacity=opacity[open_mask],
-                        line=dict(
-                            width=1,
-                            color=adjust_lightness(contrast_color_schema['orange'])
-                        )
-                    ),
-                    name='Open',
-                    customdata=np.stack((_id[open_mask], returns[open_mask]), axis=1),
-                    hovertemplate=_id_str + ": %{customdata[0]}"
-                                            "<br>Date: %{x}"
-                                            "<br>PnL: %{y}"
-                                            "<br>Return: %{customdata[1]:.2%}"
-                )
-                active_scatter.update(**open_trace_kwargs)
-                fig.add_trace(active_scatter, **add_trace_kwargs)
+            # Plot Closed - Profit scatter
+            _plot_scatter(
+                closed_loss_mask,
+                'Closed - Loss',
+                contrast_color_schema['red'],
+                closed_loss_trace_kwargs
+            )
+
+            # Plot Open scatter
+            _plot_scatter(
+                open_mask,
+                'Open',
+                contrast_color_schema['orange'],
+                open_trace_kwargs
+            )
 
         # Plot zeroline
         fig.add_shape(**merge_dicts(dict(
@@ -556,6 +531,22 @@ class Trades(Records):
             )
         ), hline_shape_kwargs))
         return fig
+
+    def plot_pnl(self, **kwargs):
+        """`Trades.plot_pnl_returns` with `as_pct` set to False.
+
+        ## Example
+
+        ```python-repl
+        >>> trades.plot_pnl()
+        ```
+
+        ![](/vectorbt/docs/img/trades_plot_pnl.svg)"""
+        return self.plot_pnl_returns(as_pct=False, **kwargs)
+
+    def plot_returns(self, **kwargs):
+        """`Trades.plot_pnl_returns` with `as_pct` set to True."""
+        return self.plot_pnl_returns(as_pct=True, **kwargs)
 
     def plot(self,
              column: tp.Optional[tp.Label] = None,
@@ -602,7 +593,7 @@ class Trades(Records):
         >>> trades.plot()
         ```
 
-        ![](/vectorbt/docs/img/trades_plot.png)"""
+        ![](/vectorbt/docs/img/trades_plot.svg)"""
         from vectorbt.settings import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)
@@ -656,7 +647,7 @@ class Trades(Records):
             direction = np.vectorize(lambda x: str(direction_value_map[x]))(direction)
             status = self_col.values['status']
 
-            def get_duration_str(from_idx, to_idx):
+            def _get_duration_str(from_idx: int, to_idx: int) -> tp.Array1d:
                 if isinstance(self_col.wrapper.index, DatetimeIndexes):
                     duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
                 elif self_col.wrapper.freq is not None:
@@ -665,7 +656,7 @@ class Trades(Records):
                     duration = to_idx - from_idx
                 return np.vectorize(str)(duration)
 
-            duration = get_duration_str(entry_idx, exit_idx)
+            duration = _get_duration_str(entry_idx, exit_idx)
 
             if len(entry_idx) > 0:
                 # Plot Entry markers
@@ -705,7 +696,7 @@ class Trades(Records):
                 fig.add_trace(entry_scatter, **add_trace_kwargs)
 
             # Plot end markers
-            def _plot_end_markers(mask, name, color, kwargs):
+            def _plot_end_markers(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
                     customdata = np.stack((
                         _id[mask],

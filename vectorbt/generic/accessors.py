@@ -969,7 +969,7 @@ class GenericAccessor(BaseAccessor):
         >>> sr.vbt.split(splitter, plot=True, trace_names=['train', 'test'])
         ```
 
-        ![](/vectorbt/docs/img/split_plot.png)
+        ![](/vectorbt/docs/img/split_plot.svg)
         """
         total_range_sr = pd.Series(np.arange(len(self.wrapper.index)), index=self.wrapper.index)
         set_ranges = list(splitter.split(total_range_sr, **kwargs))
@@ -1111,13 +1111,13 @@ class GenericAccessor(BaseAccessor):
          DatetimeIndex(['2020-01-02', ..., '2020-01-05'], dtype='datetime64[ns]', name='split_1')]
 
          >>> sr.vbt.range_split(
-         ...     start_idxs=pd.Index(['2020-01-01', '2020-01-02', '2020-01-01']),
-         ...     end_idxs=pd.Index(['2020-01-08', '2020-01-04', '2020-01-07']),
-         ...     plot=True
+         ...    start_idxs=pd.Index(['2020-01-01', '2020-01-02', '2020-01-01']),
+         ...    end_idxs=pd.Index(['2020-01-08', '2020-01-04', '2020-01-07']),
+         ...    plot=True
          ... )
         ```
 
-        ![](/vectorbt/docs/img/range_split_plot.png)
+        ![](/vectorbt/docs/img/range_split_plot.svg)
         """
         return self.split(RangeSplitter(), **kwargs)
 
@@ -1146,7 +1146,7 @@ class GenericAccessor(BaseAccessor):
         ...     plot=True, trace_names=['train', 'valid', 'test'])
         ```
 
-        ![](/vectorbt/docs/img/rolling_split_plot.png)
+        ![](/vectorbt/docs/img/rolling_split_plot.svg)
         """
         return self.split(RollingSplitter(), **kwargs)
 
@@ -1180,7 +1180,7 @@ class GenericAccessor(BaseAccessor):
         ...     plot=True, trace_names=['train', 'valid', 'test'])
         ```
 
-        ![](/vectorbt/docs/img/rolling_split_plot.png)
+        ![](/vectorbt/docs/img/expanding_split_plot.svg)
         """
         return self.split(ExpandingSplitter(), **kwargs)
 
@@ -1199,7 +1199,7 @@ class GenericAccessor(BaseAccessor):
         >>> df.vbt.plot()
         ```
 
-        ![](/vectorbt/docs/img/df_plot.png)
+        ![](/vectorbt/docs/img/df_plot.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
@@ -1225,7 +1225,7 @@ class GenericAccessor(BaseAccessor):
         >>> df.vbt.lineplot()
         ```
 
-        ![](/vectorbt/docs/img/df_lineplot.png)
+        ![](/vectorbt/docs/img/df_lineplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='lines')), kwargs))
 
@@ -1238,7 +1238,7 @@ class GenericAccessor(BaseAccessor):
         >>> df.vbt.scatterplot()
         ```
 
-        ![](/vectorbt/docs/img/df_scatterplot.png)
+        ![](/vectorbt/docs/img/df_scatterplot.svg)
         """
         return self.plot(**merge_dicts(dict(trace_kwargs=dict(mode='markers')), kwargs))
 
@@ -1255,7 +1255,7 @@ class GenericAccessor(BaseAccessor):
         >>> df.vbt.barplot()
         ```
 
-        ![](/vectorbt/docs/img/df_barplot.png)
+        ![](/vectorbt/docs/img/df_barplot.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.index
@@ -1285,7 +1285,7 @@ class GenericAccessor(BaseAccessor):
         >>> df.vbt.histplot()
         ```
 
-        ![](/vectorbt/docs/img/df_histplot.png)
+        ![](/vectorbt/docs/img/df_histplot.svg)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.histplot(trace_names=trace_names, **kwargs)
@@ -1315,7 +1315,7 @@ class GenericAccessor(BaseAccessor):
         >>> df.vbt.boxplot()
         ```
 
-        ![](/vectorbt/docs/img/df_boxplot.png)
+        ![](/vectorbt/docs/img/df_boxplot.svg)
         """
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             return self.flatten_grouped(group_by=group_by).vbt.boxplot(trace_names=trace_names, **kwargs)
@@ -1376,7 +1376,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> df['a'].vbt.plot_against(df['b'])
         ```
 
-        ![](/vectorbt/docs/img/sr_plot_against.png)
+        ![](/vectorbt/docs/img/sr_plot_against.svg)
         """
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1497,7 +1497,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> df['a'].vbt.overlay_with_heatmap(df['b'])
         ```
 
-        ![](/vectorbt/docs/img/sr_overlay_with_heatmap.png)
+        ![](/vectorbt/docs/img/sr_overlay_with_heatmap.svg)
         """
         from vectorbt.settings import layout, color_schema
 
@@ -1565,7 +1565,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> sr.vbt.heatmap()
         ```
 
-        ![](/vectorbt/docs/img/sr_heatmap.png)
+        ![](/vectorbt/docs/img/sr_heatmap.svg)
 
         Using one level as a slider:
 
@@ -1727,7 +1727,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> sr.vbt.volume().show()
         ```
 
-        ![](/vectorbt/docs/img/sr_volume.png)
+        ![](/vectorbt/docs/img/sr_volume.svg)
         """
         (x_level, y_level, z_level), (slider_level,) = index_fns.pick_levels(
             self.wrapper.index,
@@ -1862,7 +1862,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         >>> pd.Series(np.random.standard_normal(100)).vbt.qqplot()
         ```
 
-        ![](/vectorbt/docs/img/sr_qqplot.png)
+        ![](/vectorbt/docs/img/sr_qqplot.svg)
         """
         qq = stats.probplot(self._obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
@@ -1916,7 +1916,7 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         >>> df.vbt.heatmap()
         ```
 
-        ![](/vectorbt/docs/img/df_heatmap.png)
+        ![](/vectorbt/docs/img/df_heatmap.svg)
         """
         if x_labels is None:
             x_labels = self.wrapper.columns

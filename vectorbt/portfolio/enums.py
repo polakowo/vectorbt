@@ -123,7 +123,20 @@ Has shape `(target_shape[1],)`.
 
 
 class GroupContext(tp.NamedTuple):
-    sim_ctx: SimulationContext
+    target_shape: tp.Shape
+    close: tp.Array2d
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Array2d
+    active_mask: tp.Array2d
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_shares: tp.Array1d
+    last_val_price: tp.Array1d
+    last_lidx: tp.Array1d
+    last_ridx: tp.Array1d
     group: int
     group_len: int
     from_col: int
@@ -131,7 +144,9 @@ class GroupContext(tp.NamedTuple):
 
 
 __pdoc__['GroupContext'] = "A named tuple representing context of the group."
-__pdoc__['GroupContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
+for field in GroupContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__['GroupContext.' + field] = f"See `SimulationContext.{field}`."
 __pdoc__['GroupContext.group'] = """Index of the group.
 
 Has range `[0, group_lens.shape[0])`.
@@ -153,12 +168,27 @@ If columns are not grouped, equals `from_col + 1`.
 
 
 class RowContext(tp.NamedTuple):
-    sim_ctx: SimulationContext
+    target_shape: tp.Shape
+    close: tp.Array2d
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Array2d
+    active_mask: tp.Array2d
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_shares: tp.Array1d
+    last_val_price: tp.Array1d
+    last_lidx: tp.Array1d
+    last_ridx: tp.Array1d
     i: int
 
 
 __pdoc__['RowContext'] = "A named tuple representing context of the row."
-__pdoc__['RowContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
+for field in RowContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__['RowContext.' + field] = f"See `SimulationContext.{field}`."
 __pdoc__['RowContext.i'] = """Current row (time axis).
 
 Has range `[0, target_shape[0])`.
@@ -166,16 +196,36 @@ Has range `[0, target_shape[0])`.
 
 
 class SegmentContext(tp.NamedTuple):
-    sim_ctx: SimulationContext
-    group_ctx: GroupContext
-    row_ctx: RowContext
+    target_shape: tp.Shape
+    close: tp.Array2d
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Array2d
+    active_mask: tp.Array2d
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_shares: tp.Array1d
+    last_val_price: tp.Array1d
+    last_lidx: tp.Array1d
+    last_ridx: tp.Array1d
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
     call_seq_now: tp.Array1d
 
 
 __pdoc__['SegmentContext'] = "A named tuple representing context of the segment."
-__pdoc__['SegmentContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
-__pdoc__['SegmentContext.group_ctx'] = "Group context of type `GroupContext`."
-__pdoc__['SegmentContext.row_ctx'] = "Row context of type `RowContext`."
+for field in SegmentContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__['SegmentContext.' + field] = f"See `SimulationContext.{field}`."
+    elif field in GroupContext._fields:
+        __pdoc__['SegmentContext.' + field] = f"See `GroupContext.{field}`."
+    elif field in RowContext._fields:
+        __pdoc__['SegmentContext.' + field] = f"See `RowContext.{field}`."
 __pdoc__['SegmentContext.call_seq_now'] = """Current sequence of calls.
 
 Has shape `(group_len,)`. 
@@ -183,10 +233,26 @@ Has shape `(group_len,)`.
 
 
 class OrderContext(tp.NamedTuple):
-    sim_ctx: SimulationContext
-    group_ctx: GroupContext
-    row_ctx: RowContext
-    seg_ctx: SegmentContext
+    target_shape: tp.Shape
+    close: tp.Array2d
+    group_lens: tp.Array1d
+    init_cash: tp.Array1d
+    cash_sharing: bool
+    call_seq: tp.Array2d
+    active_mask: tp.Array2d
+    order_records: tp.RecordArray
+    log_records: tp.RecordArray
+    last_cash: tp.Array1d
+    last_shares: tp.Array1d
+    last_val_price: tp.Array1d
+    last_lidx: tp.Array1d
+    last_ridx: tp.Array1d
+    group: int
+    group_len: int
+    from_col: int
+    to_col: int
+    i: int
+    call_seq_now: tp.Array1d
     col: int
     call_idx: int
     cash_now: float
@@ -196,10 +262,15 @@ class OrderContext(tp.NamedTuple):
 
 
 __pdoc__['OrderContext'] = "A named tuple representing context of the order."
-__pdoc__['OrderContext.sim_ctx'] = "Simulation context of type `SimulationContext`."
-__pdoc__['OrderContext.group_ctx'] = "Group context of type `GroupContext`."
-__pdoc__['OrderContext.row_ctx'] = "Row context of type `RowContext`."
-__pdoc__['OrderContext.seg_ctx'] = "Segment context of type `SegmentContext`."
+for field in SegmentContext._fields:
+    if field in SimulationContext._fields:
+        __pdoc__['OrderContext.' + field] = f"See `SimulationContext.{field}`."
+    elif field in GroupContext._fields:
+        __pdoc__['OrderContext.' + field] = f"See `GroupContext.{field}`."
+    elif field in RowContext._fields:
+        __pdoc__['OrderContext.' + field] = f"See `RowContext.{field}`."
+    elif field in SegmentContext._fields:
+        __pdoc__['OrderContext.' + field] = f"See `SegmentContext.{field}`."
 __pdoc__['OrderContext.col'] = """Current column (feature axis).
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`.

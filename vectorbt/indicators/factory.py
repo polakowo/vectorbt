@@ -978,7 +978,7 @@ Another way of defining own properties and methods is subclassing:
 >>> MyIndExtended.run(price, [2, 3])[(2, 'a')].plot()
 ```
 
-![](/vectorbt/docs/img/MyInd_plot.png)
+![](/vectorbt/docs/img/MyInd_plot.svg)
 
 ## Helper properties and methods
 
@@ -1552,7 +1552,8 @@ def run_pipeline(
         broadcast_kwargs = merge_dicts(dict(
             to_shape=input_shape,
             index_from=input_index,
-            columns_from=input_columns
+            columns_from=input_columns,
+            require_kwargs=dict(requirements='W')
         ), broadcast_kwargs)
         bc_input_list, input_shape, input_index, input_columns = reshape_fns.broadcast(
             *input_list,

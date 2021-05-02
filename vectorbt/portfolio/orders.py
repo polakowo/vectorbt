@@ -181,7 +181,7 @@ class Orders(Records):
         >>> orders.plot()
         ```
 
-        ![](/vectorbt/docs/img/orders_plot.png)"""
+        ![](/vectorbt/docs/img/orders_plot.svg)"""
         from vectorbt.settings import color_schema, contrast_color_schema
 
         self_col = self.select_series(column=column, group_by=False)

@@ -2072,21 +2072,13 @@ class TestFromOrders:
 # ############# from_order_func ############# #
 
 @njit
-def order_func_nb(order_ctx, size):
-    i = order_ctx.row_ctx.i
-    col = order_ctx.col
-    close = order_ctx.sim_ctx.close
-
-    return nb.create_order_nb(size=size if i % 2 == 0 else -size, price=close[i, col])
+def order_func_nb(c, size):
+    return nb.create_order_nb(size=size if c.i % 2 == 0 else -size, price=c.close[c.i, c.col])
 
 
 @njit
-def log_order_func_nb(order_ctx, size):
-    i = order_ctx.row_ctx.i
-    col = order_ctx.col
-    close = order_ctx.sim_ctx.close
-
-    return nb.create_order_nb(size=size if i % 2 == 0 else -size, price=close[i, col], log=True)
+def log_order_func_nb(c, size):
+    return nb.create_order_nb(size=size if c.i % 2 == 0 else -size, price=c.close[c.i, c.col], log=True)
 
 
 class TestFromOrderFunc:
@@ -2436,34 +2428,22 @@ class TestFromOrderFunc:
         }, index=price.index)
 
         @njit
-        def segment_prep_func_nb(seg_ctx, target_hold_value):
-            i = seg_ctx.row_ctx.i
-            close = seg_ctx.sim_ctx.close
-            from_col = seg_ctx.group_ctx.from_col
-            to_col = seg_ctx.group_ctx.to_col
-            group_len = seg_ctx.group_ctx.group_len
-            last_val_price = seg_ctx.sim_ctx.last_val_price
-
-            order_size = np.copy(target_hold_value[i, from_col:to_col])
-            order_size_type = np.full(group_len, SizeType.TargetValue)
-            direction = np.full(group_len, Direction.All)
-            order_value_out = np.empty(group_len, dtype=np.float_)
-            last_val_price[from_col:to_col] = close[i, from_col:to_col]
-            nb.sort_call_seq_nb(seg_ctx, order_size, order_size_type, direction, order_value_out)
+        def segment_prep_func_nb(c, target_hold_value):
+            order_size = np.copy(target_hold_value[c.i, c.from_col:c.to_col])
+            order_size_type = np.full(c.group_len, SizeType.TargetValue)
+            direction = np.full(c.group_len, Direction.All)
+            order_value_out = np.empty(c.group_len, dtype=np.float_)
+            c.last_val_price[c.from_col:c.to_col] = c.close[c.i, c.from_col:c.to_col]
+            nb.sort_call_seq_nb(c, order_size, order_size_type, direction, order_value_out)
             return order_size, order_size_type, direction
 
         @njit
-        def pct_order_func_nb(order_ctx, order_size, order_size_type, direction):
-            i = order_ctx.row_ctx.i
-            close = order_ctx.sim_ctx.close
-            call_idx = order_ctx.call_idx
-            call_seq_now = order_ctx.seg_ctx.call_seq_now
-
-            col_i = call_seq_now[call_idx]
+        def pct_order_func_nb(c, order_size, order_size_type, direction):
+            col_i = c.call_seq_now[c.call_idx]
             return nb.create_order_nb(
                 size=order_size[col_i],
                 size_type=order_size_type[col_i],
-                price=close[i, col_i],
+                price=c.close[c.i, col_i],
                 direction=direction[col_i]
             )
 
@@ -2492,22 +2472,13 @@ class TestFromOrderFunc:
     )
     def test_target_value(self, test_row_wise):
         @njit
-        def target_val_segment_prep_func_nb(seg_ctx, val_price):
-            last_val_price = seg_ctx.sim_ctx.last_val_price
-            from_col = seg_ctx.group_ctx.from_col
-            to_col = seg_ctx.group_ctx.to_col
-            i = seg_ctx.row_ctx.i
-
-            last_val_price[from_col:to_col] = val_price[i]
+        def target_val_segment_prep_func_nb(c, val_price):
+            c.last_val_price[c.from_col:c.to_col] = val_price[c.i]
             return ()
 
         @njit
-        def target_val_order_func_nb(order_ctx):
-            i = order_ctx.row_ctx.i
-            col = order_ctx.col
-            close = order_ctx.sim_ctx.close
-
-            return nb.create_order_nb(size=50., size_type=SizeType.TargetValue, price=close[i, col])
+        def target_val_order_func_nb(c):
+            return nb.create_order_nb(size=50., size_type=SizeType.TargetValue, price=c.close[c.i, c.col])
 
         portfolio = vbt.Portfolio.from_order_func(
             price.iloc[1:], target_val_order_func_nb, row_wise=test_row_wise)
@@ -2554,22 +2525,13 @@ class TestFromOrderFunc:
     )
     def test_target_percent(self, test_row_wise):
         @njit
-        def target_pct_segment_prep_func_nb(seg_ctx, val_price):
-            last_val_price = seg_ctx.sim_ctx.last_val_price
-            from_col = seg_ctx.group_ctx.from_col
-            to_col = seg_ctx.group_ctx.to_col
-            i = seg_ctx.row_ctx.i
-
-            last_val_price[from_col:to_col] = val_price[i]
+        def target_pct_segment_prep_func_nb(c, val_price):
+            c.last_val_price[c.from_col:c.to_col] = val_price[c.i]
             return ()
 
         @njit
-        def target_pct_order_func_nb(order_ctx):
-            i = order_ctx.row_ctx.i
-            col = order_ctx.col
-            close = order_ctx.sim_ctx.close
-
-            return nb.create_order_nb(size=0.5, size_type=SizeType.TargetPercent, price=close[i, col])
+        def target_pct_order_func_nb(c):
+            return nb.create_order_nb(size=0.5, size_type=SizeType.TargetPercent, price=c.close[c.i, c.col])
 
         portfolio = vbt.Portfolio.from_order_func(
             price.iloc[1:], target_pct_order_func_nb, row_wise=test_row_wise)
@@ -2665,25 +2627,25 @@ class TestFromOrderFunc:
 
     def test_func_calls(self):
         @njit
-        def prep_func_nb(sim_ctx, call_i, sim_lst):
+        def prep_func_nb(c, call_i, sim_lst):
             call_i[0] += 1
             sim_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def group_prep_func_nb(group_ctx, call_i, group_lst):
+        def group_prep_func_nb(c, call_i, group_lst):
             call_i[0] += 1
             group_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def segment_prep_func_nb(seg_ctx, call_i, segment_lst):
+        def segment_prep_func_nb(c, call_i, segment_lst):
             call_i[0] += 1
             segment_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def order_func_nb(order_ctx, call_i, order_lst):
+        def order_func_nb(c, call_i, order_lst):
             call_i[0] += 1
             order_lst.append(call_i[0])
             return NoOrder
@@ -2734,25 +2696,25 @@ class TestFromOrderFunc:
 
     def test_func_calls_row_wise(self):
         @njit
-        def prep_func_nb(sim_ctx, call_i, sim_lst):
+        def prep_func_nb(c, call_i, sim_lst):
             call_i[0] += 1
             sim_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def row_prep_func_nb(row_ctx, call_i, row_lst):
+        def row_prep_func_nb(c, call_i, row_lst):
             call_i[0] += 1
             row_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def segment_prep_func_nb(seg_ctx, call_i, segment_lst):
+        def segment_prep_func_nb(c, call_i, segment_lst):
             call_i[0] += 1
             segment_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def order_func_nb(order_ctx, call_i, order_lst):
+        def order_func_nb(c, call_i, order_lst):
             call_i[0] += 1
             order_lst.append(call_i[0])
             return NoOrder

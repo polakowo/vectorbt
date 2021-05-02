@@ -45,8 +45,7 @@ def deep_getattr(obj: tp.Any, attr_chain: tp.Union[str, tuple, list]) -> tp.Any:
     return result
 
 
-def traverse_attr_kwargs(cls,
-                         key: tp.Optional[str] = None,
+def traverse_attr_kwargs(cls, key: tp.Optional[str] = None,
                          value: tp.Optional[tp.Any] = None) -> tp.Dict[str, tp.Dict[str, tp.Any]]:
     """Traverse the class `cls` and its attributes for properties/methods with attribute `kwargs`,
     and optionally a specific `key` and `value`.

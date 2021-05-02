@@ -23,13 +23,17 @@ def split_ranges_into_sets(start_idxs: tp.ArrayLike, end_idxs: tp.ArrayLike,
     Args:
         start_idxs (array_like): Start indices.
         end_idxs (array_like): End indices.
-        set_lens (float or list of float): Lengths of sets in each range.
+        set_lens (list of float): Lengths of sets in each range.
 
             The number of returned sets is the length of `set_lens` plus one,
             which stores the remaining elements.
+
+            Can be passed per range.
         left_to_right (bool or list of bool): Whether to resolve `set_lens` from left to right.
 
             Makes the last set variable, otherwise makes the first set variable.
+
+            Can be passed per range.
 
     ## Example
 
@@ -52,7 +56,7 @@ def split_ranges_into_sets(start_idxs: tp.ArrayLike, end_idxs: tp.ArrayLike,
         if len(set_lens) == 0:
             yield (np.arange(start_idx, end_idx + 1),)
         else:
-            if checks.is_sequence(set_lens[i]):
+            if checks.is_sequence(set_lens[0]):
                 _set_lens = set_lens[i]
             else:
                 _set_lens = set_lens

@@ -713,14 +713,14 @@ def get_group_value_ctx_nb(seg_ctx: SegmentContext) -> float:
 
     !!! note
         Cash sharing must be enabled."""
-    if not seg_ctx.sim_ctx.cash_sharing:
+    if not seg_ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
     return get_group_value_nb(
-        seg_ctx.group_ctx.from_col,
-        seg_ctx.group_ctx.to_col,
-        seg_ctx.sim_ctx.last_cash[seg_ctx.group_ctx.group],
-        seg_ctx.sim_ctx.last_shares,
-        seg_ctx.sim_ctx.last_val_price
+        seg_ctx.from_col,
+        seg_ctx.to_col,
+        seg_ctx.last_cash[seg_ctx.group],
+        seg_ctx.last_shares,
+        seg_ctx.last_val_price
     )
 
 
@@ -772,28 +772,28 @@ def sort_call_seq_nb(seg_ctx: SegmentContext,
 
     !!! note
         Cash sharing must be enabled and `call_seq_now` should follow `CallSeqType.Default`."""
-    if not seg_ctx.sim_ctx.cash_sharing:
+    if not seg_ctx.cash_sharing:
         raise ValueError("Cash sharing must be enabled")
     size_arr = np.asarray(size)
     size_type_arr = np.asarray(size_type)
     direction_arr = np.asarray(direction)
 
     group_value_now = get_group_value_ctx_nb(seg_ctx)
-    group_len = seg_ctx.group_ctx.to_col - seg_ctx.group_ctx.from_col
+    group_len = seg_ctx.to_col - seg_ctx.from_col
     for k in range(group_len):
         if seg_ctx.call_seq_now[k] != k:
             raise ValueError("call_seq_now should follow CallSeqType.Default")
-        col = seg_ctx.group_ctx.from_col + k
-        if seg_ctx.sim_ctx.cash_sharing:
-            cash_now = seg_ctx.sim_ctx.last_cash[seg_ctx.group_ctx.group]
+        col = seg_ctx.from_col + k
+        if seg_ctx.cash_sharing:
+            cash_now = seg_ctx.last_cash[seg_ctx.group]
         else:
-            cash_now = seg_ctx.sim_ctx.last_cash[col]
+            cash_now = seg_ctx.last_cash[col]
         order_value_out[k] = approx_order_value_nb(
             flex_select_auto_nb(k, 0, size_arr, False),
             flex_select_auto_nb(k, 0, size_type_arr, False),
             cash_now,
-            seg_ctx.sim_ctx.last_shares[col],
-            seg_ctx.sim_ctx.last_val_price[col],
+            seg_ctx.last_shares[col],
+            seg_ctx.last_val_price[col],
             group_value_now,
             flex_select_auto_nb(k, 0, direction_arr, False)
         )
@@ -804,14 +804,13 @@ def sort_call_seq_nb(seg_ctx: SegmentContext,
 @njit(cache=True)
 def try_order_nb(order_ctx: OrderContext, order: Order) -> tp.Tuple[float, float, OrderResult]:
     """Process an order without side effects."""
-    sim_ctx = order_ctx.sim_ctx
     return process_order_nb(
         order_ctx.cash_now,
         order_ctx.shares_now,
         order_ctx.val_price_now,
         order_ctx.value_now,
         order,
-        sim_ctx.log_records[-1]
+        order_ctx.log_records[-1]
     )
 
 
@@ -1017,63 +1016,48 @@ def simulate_nb(target_shape: tp.Shape,
     ... )
 
     >>> @njit
-    ... def prep_func_nb(sim_ctx):  # do nothing
+    ... def prep_func_nb(c):  # do nothing
     ...     print('preparing simulation')
     ...     return ()
 
     >>> @njit
-    ... def group_prep_func_nb(group_ctx):
+    ... def group_prep_func_nb(c):
     ...     '''Define empty arrays for each group.'''
     ...     # Try to create new arrays as rarely as possible
-    ...     group_len = group_ctx.group_len
-    ...     group = group_ctx.group
-    ...
-    ...     print('\\tpreparing group', group)
-    ...     order_value_out = np.empty(group_len, dtype=np.float_)
+    ...     print('\\tpreparing group', c.group)
+    ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
     ...     return (order_value_out,)
 
     >>> @njit
-    ... def segment_prep_func_nb(seg_ctx, order_value_out):
+    ... def segment_prep_func_nb(c, order_value_out):
     ...     '''Perform rebalancing at each segment.'''
-    ...     i = seg_ctx.row_ctx.i
-    ...     group_len = seg_ctx.group_ctx.group_len
-    ...     from_col = seg_ctx.group_ctx.from_col
-    ...     to_col = seg_ctx.group_ctx.to_col
-    ...     close = seg_ctx.sim_ctx.close
-    ...     last_val_price = seg_ctx.sim_ctx.last_val_price
-    ...
-    ...     print('\\t\\tpreparing segment', i, '(row)')
-    ...     for col in range(from_col, to_col):
+    ...     print('\\t\\tpreparing segment', c.i, '(row)')
+    ...     for col in range(c.from_col, c.to_col):
     ...         # Here we use order price for group valuation
-    ...         last_val_price[col] = close[i, col]
+    ...         c.last_val_price[col] = close[c.i, col]
     ...     # Reorder call sequence such that selling orders come first and buying last
-    ...     size = 1 / group_len
+    ...     size = 1 / c.group_len
     ...     size_type = SizeType.TargetPercent
     ...     direction = Direction.LongOnly  # long positions only
-    ...     sort_call_seq_nb(seg_ctx, size, size_type, direction, order_value_out)
+    ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out)
     ...     return (size, size_type, direction)
 
     >>> @njit
-    ... def order_func_nb(order_ctx, size, size_type, direction, fees, fixed_fees, slippage):
+    ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
     ...     '''Place an order.'''
-    ...     call_idx = order_ctx.call_idx
-    ...     i = order_ctx.row_ctx.i
-    ...     col = order_ctx.col
-    ...     close = order_ctx.sim_ctx.close
-    ...
-    ...     print('\\t\\t\\trunning order', call_idx, 'at column', col)
+    ...     print('\\t\\t\\trunning order', c.call_idx, 'at column', c.col)
     ...     return create_order_nb(
     ...         size=size,
     ...         size_type=size_type,
     ...         direction=direction,
-    ...         price=close[i, col],
+    ...         price=close[c.i, c.col],
     ...         fees=fees,
     ...         fixed_fees=fixed_fees,
     ...         slippage=slippage
     ...     )
 
     >>> @njit
-    ... def after_order_func_nb(order_ctx, order_result, size, size_type, direction):
+    ... def after_order_func_nb(c, order_result, size, size_type, direction):
     ...     '''Check order status.'''
     ...     print('\\t\\t\\t\\torder status:', order_result.status)
 
@@ -1155,7 +1139,7 @@ def simulate_nb(target_shape: tp.Shape,
     >>> Scatter(data=holding_value).fig
     ```
 
-    ![](/vectorbt/docs/img/simulate_nb.png)
+    ![](/vectorbt/docs/img/simulate_nb.svg)
 
     Note that the last order in a group with cash sharing is always disadvantaged
     as it has a bit less funds than the previous orders due to costs, which are not
@@ -1204,7 +1188,20 @@ def simulate_nb(target_shape: tp.Shape,
 
             # Run a function to preprocess this entire group
             group_ctx = GroupContext(
-                sim_ctx=sim_ctx,
+                target_shape=target_shape,
+                close=close,
+                group_lens=group_lens,
+                init_cash=init_cash,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                active_mask=active_mask,
+                order_records=order_records,
+                log_records=log_records,
+                last_cash=last_cash,
+                last_shares=last_shares,
+                last_val_price=last_val_price,
+                last_ridx=last_ridx,
+                last_lidx=last_lidx,
                 group=group,
                 group_len=group_len,
                 from_col=from_col,
@@ -1222,14 +1219,26 @@ def simulate_nb(target_shape: tp.Shape,
 
                     # Run a function to preprocess this group within this row
                     call_seq_now = call_seq[i, from_col:to_col]
-                    row_ctx = RowContext(
-                        sim_ctx=sim_ctx,
-                        i=i
-                    )
                     seg_ctx = SegmentContext(
-                        sim_ctx=sim_ctx,
-                        group_ctx=group_ctx,
-                        row_ctx=row_ctx,
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=call_seq,
+                        active_mask=active_mask,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_shares=last_shares,
+                        last_val_price=last_val_price,
+                        last_ridx=last_ridx,
+                        last_lidx=last_lidx,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
                         call_seq_now=call_seq_now
                     )
                     segment_prep_out = segment_prep_func_nb(seg_ctx, *group_prep_out, *segment_prep_args)
@@ -1256,10 +1265,26 @@ def simulate_nb(target_shape: tp.Shape,
 
                         # Generate the next order
                         order_ctx = OrderContext(
-                            sim_ctx=sim_ctx,
-                            group_ctx=group_ctx,
-                            row_ctx=row_ctx,
-                            seg_ctx=seg_ctx,
+                            target_shape=target_shape,
+                            close=close,
+                            group_lens=group_lens,
+                            init_cash=init_cash,
+                            cash_sharing=cash_sharing,
+                            call_seq=call_seq,
+                            active_mask=active_mask,
+                            order_records=order_records,
+                            log_records=log_records,
+                            last_cash=last_cash,
+                            last_shares=last_shares,
+                            last_val_price=last_val_price,
+                            last_ridx=last_ridx,
+                            last_lidx=last_lidx,
+                            group=group,
+                            group_len=group_len,
+                            from_col=from_col,
+                            to_col=to_col,
+                            i=i,
+                            call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
                             cash_now=cash_now,
@@ -1306,10 +1331,26 @@ def simulate_nb(target_shape: tp.Shape,
 
                         # After order callback
                         after_order_ctx = OrderContext(
-                            sim_ctx=sim_ctx,
-                            group_ctx=group_ctx,
-                            row_ctx=row_ctx,
-                            seg_ctx=seg_ctx,
+                            target_shape=target_shape,
+                            close=close,
+                            group_lens=group_lens,
+                            init_cash=init_cash,
+                            cash_sharing=cash_sharing,
+                            call_seq=call_seq,
+                            active_mask=active_mask,
+                            order_records=order_records,
+                            log_records=log_records,
+                            last_cash=last_cash,
+                            last_shares=last_shares,
+                            last_val_price=last_val_price,
+                            last_ridx=last_ridx,
+                            last_lidx=last_lidx,
+                            group=group,
+                            group_len=group_len,
+                            from_col=from_col,
+                            to_col=to_col,
+                            i=i,
+                            call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
                             cash_now=cash_now,
@@ -1452,7 +1493,20 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
             # Run a function to preprocess this entire row
             row_ctx = RowContext(
-                sim_ctx=sim_ctx,
+                target_shape=target_shape,
+                close=close,
+                group_lens=group_lens,
+                init_cash=init_cash,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                active_mask=active_mask,
+                order_records=order_records,
+                log_records=log_records,
+                last_cash=last_cash,
+                last_shares=last_shares,
+                last_val_price=last_val_price,
+                last_ridx=last_ridx,
+                last_lidx=last_lidx,
                 i=i
             )
             row_prep_out = row_prep_func_nb(row_ctx, *prep_out, *row_prep_args)
@@ -1466,17 +1520,26 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                     # Run a function to preprocess this row within this group
                     call_seq_now = call_seq[i, from_col:to_col]
-                    group_ctx = GroupContext(
-                        sim_ctx=sim_ctx,
+                    seg_ctx = SegmentContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=call_seq,
+                        active_mask=active_mask,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_shares=last_shares,
+                        last_val_price=last_val_price,
+                        last_ridx=last_ridx,
+                        last_lidx=last_lidx,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
-                        to_col=to_col
-                    )
-                    seg_ctx = SegmentContext(
-                        sim_ctx=sim_ctx,
-                        group_ctx=group_ctx,
-                        row_ctx=row_ctx,
+                        to_col=to_col,
+                        i=i,
                         call_seq_now=call_seq_now
                     )
                     segment_prep_out = segment_prep_func_nb(seg_ctx, *row_prep_out, *segment_prep_args)
@@ -1503,10 +1566,26 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                         # Generate the next order
                         order_ctx = OrderContext(
-                            sim_ctx=sim_ctx,
-                            group_ctx=group_ctx,
-                            row_ctx=row_ctx,
-                            seg_ctx=seg_ctx,
+                            target_shape=target_shape,
+                            close=close,
+                            group_lens=group_lens,
+                            init_cash=init_cash,
+                            cash_sharing=cash_sharing,
+                            call_seq=call_seq,
+                            active_mask=active_mask,
+                            order_records=order_records,
+                            log_records=log_records,
+                            last_cash=last_cash,
+                            last_shares=last_shares,
+                            last_val_price=last_val_price,
+                            last_ridx=last_ridx,
+                            last_lidx=last_lidx,
+                            group=group,
+                            group_len=group_len,
+                            from_col=from_col,
+                            to_col=to_col,
+                            i=i,
+                            call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
                             cash_now=cash_now,
@@ -1553,10 +1632,26 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                         # After order callback
                         after_order_ctx = OrderContext(
-                            sim_ctx=sim_ctx,
-                            group_ctx=group_ctx,
-                            row_ctx=row_ctx,
-                            seg_ctx=seg_ctx,
+                            target_shape=target_shape,
+                            close=close,
+                            group_lens=group_lens,
+                            init_cash=init_cash,
+                            cash_sharing=cash_sharing,
+                            call_seq=call_seq,
+                            active_mask=active_mask,
+                            order_records=order_records,
+                            log_records=log_records,
+                            last_cash=last_cash,
+                            last_shares=last_shares,
+                            last_val_price=last_val_price,
+                            last_ridx=last_ridx,
+                            last_lidx=last_lidx,
+                            group=group,
+                            group_len=group_len,
+                            from_col=from_col,
+                            to_col=to_col,
+                            i=i,
+                            call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
                             cash_now=cash_now,
@@ -1794,7 +1889,7 @@ def signal_to_size_nb(shares_now: float,
                         size_type = SizeType.Shares
                     else:
                         if size_type == SizeType.Percent:
-                            raise ValueError("SizeType.Percent does not support position reversal")
+                            raise ValueError("SizeType.Percent does not support Direction.All")
                         order_size = abs_shares_now + abs_size
                 elif shares_now == 0:
                     # Open long position
@@ -1821,7 +1916,7 @@ def signal_to_size_nb(shares_now: float,
                         size_type = SizeType.Shares
                     else:
                         if size_type == SizeType.Percent:
-                            raise ValueError("SizeType.Percent does not support position reversal")
+                            raise ValueError("SizeType.Percent does not support Direction.All")
                         order_size = -abs_shares_now - abs_size
                 elif shares_now == 0:
                     # Open short position
@@ -2142,13 +2237,10 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     ... )
 
     >>> @njit
-    ... def order_func_nb(order_ctx, order_size, order_price):
-    ...     i = order_ctx.row_ctx.i
-    ...     col = order_ctx.col
-    ...
+    ... def order_func_nb(c, order_size, order_price):
     ...     return create_order_nb(
-    ...         size=order_size[i, col],
-    ...         price=order_price[i, col],
+    ...         size=order_size[c.i, c.col],
+    ...         price=order_price[c.i, c.col],
     ...         fees=0.01,
     ...         slippage=0.01
     ...     )
@@ -2717,19 +2809,13 @@ def init_cash_nb(init_cash: tp.Array1d, group_lens: tp.Array1d, cash_sharing: bo
 
 
 @njit(cache=True)
-def cash_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d, init_cash: tp.Array1d) -> tp.Array2d:
+def cash_nb(cash_flow: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
     """Get cash series per column."""
-    check_group_lens(group_lens, cash_flow.shape[1])
-
     out = np.empty_like(cash_flow)
-    from_col = 0
-    for group in range(len(group_lens)):
-        to_col = from_col + group_lens[group]
+    for col in range(cash_flow.shape[1]):
         for i in range(cash_flow.shape[0]):
-            for col in range(from_col, to_col):
-                cash_now = init_cash[col] if i == 0 else out[i - 1, col]
-                out[i, col] = add_nb(cash_now, cash_flow[i, col])
-        from_col = to_col
+            cash_now = init_cash[col] if i == 0 else out[i - 1, col]
+            out[i, col] = add_nb(cash_now, cash_flow[i, col])
     return out
 
 

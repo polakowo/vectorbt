@@ -33,6 +33,7 @@ import pkgutil
 
 from vectorbt import typing as tp
 from vectorbt.utils.config import Config
+from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 
 this_module = sys.modules[__name__]
 
@@ -331,7 +332,8 @@ portfolio = Config(
         seed=None,
         freq=None,
         incl_unrealized=False,
-        use_filled_close=True
+        use_filled_close=True,
+        subplots=['orders', 'trade_returns', 'cum_returns']
     ),
     frozen=True
 )
@@ -344,11 +346,28 @@ __pdoc__['portfolio'] = f"""Parameters for portfolio.
 ```
 """
 
+# Datetime
+datetime = Config(
+    dict(
+        naive_tz=get_local_tz(),
+        to_py_timezone=True
+    ),
+    frozen=True
+)
+"""_"""
+
+__pdoc__['datetime'] = f"""Parameters for datetime.
+
+```plaintext
+{json.dumps(datetime, indent=2, default=str)}
+```
+"""
+
 # Data
 data = Config(
     dict(
-        tz_localize=None,
-        tz_convert=None,
+        tz_localize=get_utc_tz(),
+        tz_convert=get_utc_tz(),
         missing_index='nan',
         missing_columns='raise',
         binance=Config(

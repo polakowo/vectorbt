@@ -505,7 +505,7 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
     >>> ohlcstex.iloc[:, 0].plot()
     ```
     
-    ![](/vectorbt/docs/img/ohlcstex.png)
+    ![](/vectorbt/docs/img/ohlcstex.svg)
     """
     return plot
 
