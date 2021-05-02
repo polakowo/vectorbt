@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import pytest
 
 import vectorbt as vbt
@@ -87,8 +87,8 @@ class TestData:
                 '2020-01-04 00:00:00',
                 '2020-01-05 00:00:00'
             ],
-            dtype='datetime64[ns, UTC]',
-            freq='D'
+            freq='D',
+            tz=timezone.utc
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,)).data[0],
@@ -195,7 +195,7 @@ class TestData:
                 index=index
             )
         )
-        tzaware_index = pd.DatetimeIndex(
+        index2 = pd.DatetimeIndex(
             [
                 '2020-01-01 02:00:00',
                 '2020-01-02 02:00:00',
@@ -203,8 +203,8 @@ class TestData:
                 '2020-01-04 02:00:00',
                 '2020-01-05 02:00:00'
             ],
-            dtype='datetime64[ns, UTC+02:00]',
-            freq='D'
+            freq='D',
+            tz=timezone(timedelta(hours=2))
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,), tz_localize='UTC', tz_convert='Europe/Berlin').data[0],
@@ -216,7 +216,7 @@ class TestData:
                     0.5986584841970366,
                     0.15601864044243652
                 ],
-                index=tzaware_index
+                index=index2
             )
         )
         index_mask = vbt.symbol_dict({
@@ -401,8 +401,8 @@ class TestData:
                 '2020-01-04 00:00:00',
                 '2020-01-05 00:00:00'
             ],
-            dtype='datetime64[ns, UTC]',
-            freq='D'
+            freq='D',
+            tz=timezone.utc
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,)).update().data[0],
@@ -417,7 +417,7 @@ class TestData:
                 index=index
             )
         )
-        index2 = pd.DatetimeIndex(
+        updated_index = pd.DatetimeIndex(
             [
                 '2020-01-01 00:00:00',
                 '2020-01-02 00:00:00',
@@ -426,8 +426,8 @@ class TestData:
                 '2020-01-05 00:00:00',
                 '2020-01-06 00:00:00'
             ],
-            dtype='datetime64[ns, UTC]',
-            freq='D'
+            freq='D',
+            tz=timezone.utc
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,)).update(n=2).data[0],
@@ -440,10 +440,10 @@ class TestData:
                     0.11505456638977896,
                     0.6090665392794814
                 ],
-                index=index2
+                index=updated_index
             )
         )
-        tzaware_index = pd.DatetimeIndex(
+        index2 = pd.DatetimeIndex(
             [
                 '2020-01-01 02:00:00',
                 '2020-01-02 02:00:00',
@@ -451,8 +451,8 @@ class TestData:
                 '2020-01-04 02:00:00',
                 '2020-01-05 02:00:00'
             ],
-            dtype='datetime64[ns, UTC+02:00]',
-            freq='D'
+            freq='D',
+            tz=timezone(timedelta(hours=2))
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,), tz_localize='UTC', tz_convert='Europe/Berlin')
@@ -465,7 +465,7 @@ class TestData:
                     0.5986584841970366,
                     0.11505456638977896
                 ],
-                index=tzaware_index
+                index=index2
             )
         )
         index_mask = vbt.symbol_dict({
@@ -520,7 +520,7 @@ class TestData:
                     0.11505456638977896,
                     np.nan
                 ],
-                index=index2
+                index=updated_index
             )
         )
         pd.testing.assert_series_equal(
@@ -535,7 +535,7 @@ class TestData:
                     np.nan,
                     1.6090665392794814
                 ],
-                index=index2
+                index=updated_index
             )
         )
         pd.testing.assert_series_equal(
@@ -633,7 +633,7 @@ class TestData:
                     [np.nan, 0.6090665392794814, 0.13339096418598828],
                     [np.nan, np.nan, np.nan]
                 ],
-                index=index2
+                index=updated_index
             )
         )
         pd.testing.assert_frame_equal(
@@ -649,7 +649,7 @@ class TestData:
                     [np.nan, np.nan, np.nan],
                     [1.2405896199653488, 1.3271390558111398, np.nan]
                 ],
-                index=index2
+                index=updated_index
             )
         )
         pd.testing.assert_frame_equal(
@@ -718,8 +718,8 @@ class TestData:
                 '2020-01-04 00:00:00',
                 '2020-01-05 00:00:00'
             ],
-            dtype='datetime64[ns, UTC]',
-            freq='D'
+            freq='D',
+            tz=timezone.utc
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,), columns='feat0').concat()['feat0'],
@@ -843,8 +843,8 @@ class TestData:
                 '2020-01-04 00:00:00',
                 '2020-01-05 00:00:00'
             ],
-            dtype='datetime64[ns, UTC]',
-            freq='D'
+            freq='D',
+            tz=timezone.utc
         )
         pd.testing.assert_series_equal(
             MyData.download(0, shape=(5,), columns='feat0').get(),
