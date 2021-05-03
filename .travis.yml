@@ -1,23 +1,29 @@
-language: python
-python:
-  - "3.6"
-  - "3.7"
-  - "3.8"
-  - "3.9"
+test: &test
+  stage: test
+  language: python
+  install:
+    - ./scripts/install-talib.sh
+    - pip install .[full,cov]
+  script:
+    - export NUMBA_BOUNDSCHECK=1
+    - pytest tests/
+    - export NUMBA_DISABLE_JIT=1
+    - pytest --cov=vectorbt tests/
+  after_success:
+    - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then codecov; fi
+
 jobs:
   include:
-    - stage: test
-      install:
-        - ./scripts/install-talib.sh
-        - pip install .[full,cov]
-      script:
-        - export NUMBA_BOUNDSCHECK=1
-        - pytest tests/
-        - export NUMBA_DISABLE_JIT=1
-        - pytest --cov=vectorbt tests/
-      after_success:
-        - if [[ $TRAVIS_PYTHON_VERSION == 3.6 ]]; then codecov; fi
+    - <<: *test
+      python: 3.6
+    - <<: *test
+      python: 3.7
+    - <<: *test
+      python: 3.8
+    - <<: *test
+      python: 3.9
     - stage: deploy-pypi
+      language: python
       python: "3.6"
       script: skip
       deploy:
@@ -29,6 +35,7 @@ jobs:
           on:
             branch: master
     - stage: deploy-pages
+      language: python
       python: "3.6"
       install:
         - ./scripts/install-talib.sh
