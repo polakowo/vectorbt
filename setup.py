@@ -40,7 +40,7 @@ setup(
             'yfinance',
             'python-binance',
             'ccxt',
-            'ray',
+            'ray; python_version < "3.9"',
             'empyrical',
             'ta',
             'pandas_ta',
