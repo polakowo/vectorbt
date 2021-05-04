@@ -3,9 +3,13 @@ from setuptools import setup, find_packages
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
+version = {}
+with open("vectorbt/_version.py") as fp:
+    exec(fp.read(), version)
+
 setup(
     name='vectorbt',
-    version='0.18.0',
+    version=version['__version__'],
     description='Python library for backtesting and analyzing trading strategies at scale',
     author='Oleg Polakow',
     author_email='olegpolakow@gmail.com',
@@ -33,7 +37,8 @@ setup(
         'requests',
         'pytz',
         'typing_extensions; python_version < "3.8"',
-        'mypy_extensions'
+        'mypy_extensions',
+        'kaleido'
     ],
     extras_require={
         'full': [
@@ -48,6 +53,7 @@ setup(
             'python-telegram-bot>=13.4'  # LGPLv3
         ],
         'cov': [
+            'pytest',
             'pytest-cov',
             'codecov'
         ],

@@ -511,6 +511,10 @@ This software is for educational purposes only. Do not risk money which you are 
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
 """
 
+# Import version
+from vectorbt._version import __version__ as _version
+__version__ = _version
+
 # Most important modules
 from vectorbt.generic import nb, plotting
 
