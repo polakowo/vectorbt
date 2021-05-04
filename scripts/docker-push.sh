@@ -1,12 +1,5 @@
 #!/bin/bash
 
-TARGET_IMAGE_LATEST="${SOURCE_IMAGE}:latest"
-TARGET_IMAGE_TAGGED="${SOURCE_IMAGE}:${IMAGE_TAG}"
-
-# push new version
-docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE_TAGGED}"
-docker push "${TARGET_IMAGE_TAGGED}"
-
-# update latest version
-docker tag "${SOURCE_IMAGE}" "${TARGET_IMAGE_LATEST}"
-docker push "${TARGET_IMAGE_LATEST}"
+docker tag "${1}" "${1}:${2}"
+docker tag "${1}" "${1}:latest"
+docker push "${1}" --all-tags

@@ -53,6 +53,15 @@ jobs:
           keep_history: true
           on:
             branch: master
+    - stage: deploy-docker
+      language: ruby
+      script:
+        - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        - docker build -t polakowo/vectorbt . --build-arg FULL=
+        - ./scripts/docker-push.sh "polakowo/vectorbt" "$(cat vectorbt/_version.py | cut -d '"' -f 2)"
+        - docker build -t polakowo/vectorbt-full . --build-arg FULL=yes --build-arg TEST=yes
+        - ./scripts/docker-push.sh "polakowo/vectorbt-full" "$(cat vectorbt/_version.py | cut -d '"' -f 2)"
+
 stages:
   - name: test
     if: (type = pull_request) OR (commit_message =~ /(\[ci test\]|\[ci deploy\])/)
@@ -60,6 +69,8 @@ stages:
     if: (type != pull_request) AND (commit_message =~ /(\[ci deploy-pypi\]|\[ci deploy\])/)
   - name: deploy-pages
     if: (type != pull_request) AND (commit_message =~ /(\[ci deploy-pages\]|\[ci deploy\])/)
+  - name: deploy-docker
+    if: (type != pull_request) AND (commit_message =~ /(\[ci deploy-docker\]|\[ci deploy\])/)
 branches:
   only:
   - master
