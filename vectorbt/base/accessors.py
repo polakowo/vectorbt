@@ -61,7 +61,7 @@ under the hood, which is mostly much faster than with pandas.
 import numpy as np
 import pandas as pd
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.config import merge_dicts

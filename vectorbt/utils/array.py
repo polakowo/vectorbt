@@ -3,7 +3,7 @@
 import numpy as np
 from numba import njit
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 
 def is_sorted(a: tp.Array1d) -> np.bool_:

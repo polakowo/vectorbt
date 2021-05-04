@@ -13,7 +13,7 @@ classes. These only accept NumPy arrays and other Numba-compatible types.
 import numpy as np
 from numba import njit
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
 from vectorbt.labels.enums import TrendMode

@@ -7,7 +7,7 @@ import time
 import warnings
 from functools import wraps
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.datetime import (
     get_utc_tz,
     get_local_tz,

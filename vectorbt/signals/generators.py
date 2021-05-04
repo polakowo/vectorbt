@@ -3,7 +3,7 @@
 import numpy as np
 import plotly.graph_objects as go
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.config import Config
 from vectorbt.utils.figure import make_figure
 from vectorbt.indicators.configs import flex_col_param_config, flex_elem_param_config

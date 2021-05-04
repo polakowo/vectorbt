@@ -5,7 +5,7 @@ Defines enums and other schemas for `vectorbt.generic`."""
 import numpy as np
 import json
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 __all__ = [
     'DrawdownStatus',

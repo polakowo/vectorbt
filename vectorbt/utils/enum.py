@@ -2,7 +2,7 @@
 
 In vectorbt, enums are represented by instances of named tuples to be easily used in Numba."""
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 
 def get_caseins_enum_attr(enum: tp.NamedTuple, attr: str) -> tp.Any:

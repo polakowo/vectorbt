@@ -1,6 +1,6 @@
 """Class for mapping column arrays."""
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.array_wrapper import ArrayWrapper

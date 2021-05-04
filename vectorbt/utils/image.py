@@ -5,7 +5,7 @@ import imageio
 from tqdm import tqdm
 import plotly.graph_objects as go
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 
 def hstack_image_arrays(a: tp.Array3d, b: tp.Array3d) -> tp.Array3d:

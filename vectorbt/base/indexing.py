@@ -8,7 +8,7 @@ one can manipulate complex classes with dozens of pandas objects using a single 
 import numpy as np
 import pandas as pd
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.base import index_fns, reshape_fns
 

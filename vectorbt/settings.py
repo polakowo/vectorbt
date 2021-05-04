@@ -31,7 +31,7 @@ import json
 import sys
 import pkgutil
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 

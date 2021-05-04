@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 from plotly.basedatatypes import BaseTraceType
 import math
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.figure import make_figure
 from vectorbt.utils.array import renormalize

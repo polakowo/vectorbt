@@ -8,7 +8,7 @@ from inspect import signature
 import dill
 from collections import Hashable
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 
 # ############# Checks ############# #

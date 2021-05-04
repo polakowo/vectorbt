@@ -3,7 +3,7 @@
 import numpy as np
 from numba import njit
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 rel_tol = 1e-9  # 1,000,000,000 == 1,000,000,001
 abs_tol = 1e-12  # 0.000000000001 == 0.000000000002

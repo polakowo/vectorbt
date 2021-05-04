@@ -252,7 +252,7 @@ instance to the disk with `MappedArray.save` and load it with `MappedArray.load`
 import numpy as np
 import pandas as pd
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import to_value_map

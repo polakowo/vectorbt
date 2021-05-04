@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.enum import to_value_map

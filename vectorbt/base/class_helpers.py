@@ -6,7 +6,7 @@ to quickly add a range of Numba-compiled functions to the class."""
 import numpy as np
 import inspect
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 

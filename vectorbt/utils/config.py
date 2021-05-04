@@ -6,7 +6,7 @@ import dill
 import inspect
 from pathlib import Path
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.attr import deep_getattr
 

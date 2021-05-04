@@ -2,7 +2,7 @@
 
 You can access all the indicators either by `vbt.*` or `vbt.labels.*`."""
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.indicators.factory import IndicatorFactory
 from vectorbt.indicators.configs import flex_elem_param_config
 from vectorbt.labels import nb

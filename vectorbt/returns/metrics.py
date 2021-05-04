@@ -3,7 +3,7 @@
 import numpy as np
 from scipy.stats import norm
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 
 def approx_exp_max_sharpe(mean_sharpe: float, var_sharpe: float, nb_trials: int) -> float:

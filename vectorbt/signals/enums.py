@@ -4,7 +4,7 @@ Defines enums and other schemas for `vectorbt.signals`."""
 
 import json
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 __all__ = [
     'StopType'

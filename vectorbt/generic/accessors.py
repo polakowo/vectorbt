@@ -88,7 +88,7 @@ from sklearn.preprocessing import (
     PowerTransformer
 )
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, resolve_dict
 from vectorbt.utils.figure import make_figure, make_subplots

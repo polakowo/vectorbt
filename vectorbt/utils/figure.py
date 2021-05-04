@@ -3,7 +3,7 @@
 from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidget
 from plotly.subplots import make_subplots as _make_subplots
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.config import merge_dicts
 
 

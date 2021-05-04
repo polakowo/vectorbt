@@ -58,7 +58,7 @@ Run for the examples below:
 import numpy as np
 import pandas as pd
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod

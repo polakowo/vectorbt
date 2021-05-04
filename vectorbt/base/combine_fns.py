@@ -9,7 +9,7 @@ import numpy as np
 from numba import njit
 from tqdm import tqdm
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.base import reshape_fns
 
 

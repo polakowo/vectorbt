@@ -31,7 +31,7 @@ So, for example, the method `pd.Series.vbt.to_2d_array` is also available as
 import pandas as pd
 from pandas.core.accessor import _register_accessor, DirNamesMixin
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.generic.accessors import GenericSRAccessor, GenericDFAccessor
 
 

@@ -59,7 +59,7 @@ Date
 import numpy as np
 import plotly.graph_objects as go
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.figure import make_figure
 from vectorbt.utils.colors import adjust_opacity

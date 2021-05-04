@@ -30,7 +30,7 @@ from numba import njit
 from numba.typed import Dict
 import numpy as np
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.generic.enums import DrawdownStatus, drawdown_dt
 
 

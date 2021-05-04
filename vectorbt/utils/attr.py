@@ -2,7 +2,7 @@
 
 import inspect
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 
 

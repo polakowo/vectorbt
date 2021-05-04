@@ -12,7 +12,7 @@ The accessors inherit `vectorbt.generic.accessors`.
 import numpy as np
 import plotly.graph_objects as go
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.figure import make_figure, make_subplots

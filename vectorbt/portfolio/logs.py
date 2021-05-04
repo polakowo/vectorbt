@@ -5,7 +5,7 @@ simulating a portfolio and can be accessed as `vectorbt.portfolio.base.Portfolio
 
 import pandas as pd
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.records.base import Records
 from vectorbt.portfolio.enums import (

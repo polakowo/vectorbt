@@ -17,7 +17,7 @@ from telegram.ext import (
 from telegram.utils.helpers import effective_message_type
 from telegram.error import Unauthorized, ChatMigrated
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.config import merge_dicts, get_func_kwargs, Configured
 from vectorbt.utils.requests import text_to_giphy_url
 

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 
 
 def rgb_from_cmap(cmap_name: str, value: float, value_range: tp.Tuple[float, float]) -> str:

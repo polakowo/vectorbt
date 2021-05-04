@@ -1098,7 +1098,7 @@ from datetime import datetime, timedelta
 from types import ModuleType
 from collections import Counter
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import classproperty, cached_property
 from vectorbt.utils.config import merge_dicts, resolve_dict
@@ -2369,10 +2369,10 @@ class IndicatorFactory:
                 if allow_multiple and isinstance(other, (tuple, list)):
                     other = list(other)
                     for i in range(len(other)):
-                        if isinstance(other[i], self.__class__):
+                        if isinstance(other[i], IndicatorBase):
                             other[i] = getattr(other[i], attr_name)
                 else:
-                    if isinstance(other, self.__class__):
+                    if isinstance(other, IndicatorBase):
                         other = getattr(other, attr_name)
                 if level_name is None:
                     if _prepend_name:

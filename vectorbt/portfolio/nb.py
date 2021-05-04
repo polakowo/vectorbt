@@ -47,7 +47,7 @@ other Numba-compatible types.
 import numpy as np
 from numba import njit
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.math import (
     is_close_nb,
     is_close_or_less_nb,

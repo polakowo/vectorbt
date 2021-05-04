@@ -25,7 +25,7 @@ array([0, 1, 2, 3, 0])
 from numba import njit
 import numpy as np
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.signals.enums import StopType

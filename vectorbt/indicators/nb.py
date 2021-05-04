@@ -13,7 +13,7 @@ classes. These only accept NumPy arrays and other Numba-compatible types.
 import numpy as np
 from numba import njit
 
-from vectorbt import typing as tp
+from vectorbt import _typing as tp
 from vectorbt.generic import nb as generic_nb
 
 
