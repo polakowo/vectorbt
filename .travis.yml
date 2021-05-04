@@ -55,11 +55,11 @@ jobs:
             branch: master
 stages:
   - name: test
-    if: commit_message !~ /(\[ci skip-test\]|\[travis skip-test\])/
+    if: (type = pull_request) OR (commit_message =~ /(\[ci test\]|\[ci deploy\])/)
   - name: deploy-pypi
-    if: commit_message !~ /(\[ci skip-deploy-pypi\]|\[travis skip-deploy-pypi\])/
+    if: (type != pull_request) AND (commit_message =~ /(\[ci deploy-pypi\]|\[ci deploy\])/)
   - name: deploy-pages
-    if: commit_message !~ /(\[ci skip-deploy-pages\]|\[travis skip-deploy-pages\])/
+    if: (type != pull_request) AND (commit_message =~ /(\[ci deploy-pages\]|\[ci deploy\])/)
 branches:
   only:
   - master

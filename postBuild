@@ -1,3 +1,0 @@
-./scripts/install-talib.sh
-./scripts/install-lab-plotly.sh
-pip install .[full]
