@@ -34,4 +34,6 @@ RUN if [[ -n "${TEST}" ]] ; then \
     export NUMBA_DISABLE_JIT=1 && \
     python -m pytest tests ; fi
 
-WORKDIR $HOME
+WORKDIR "$HOME/work"
+
+ENV JUPYTER_ENABLE_LAB "yes"
