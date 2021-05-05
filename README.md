@@ -57,8 +57,8 @@ You can pull the most recent Docker image if you [have Docker installed](https:/
 docker run --rm -p 8888:8888 -v "$PWD":/home/jovyan/work polakowo/vectorbt
 ```
 
-This command pulls the latest polakowo/vectorbt image from Docker Hub. It then starts a container running 
-a Jupyter Notebook server and exposes the server on host port 8888. Visiting http://127.0.0.1:8888/?token=<token> 
+This command pulls the latest `polakowo/vectorbt` image from Docker Hub. It then starts a container running 
+a Jupyter Notebook server and exposes the server on host port 8888. Visiting `http://127.0.0.1:8888/?token=<token>` 
 in a browser loads JupyterLab, where token is the secret token printed in the console. Docker destroys 
 the container after notebook server exit, but any files written to the working directory in the container 
 remain intact in the working directory on the host. See [Jupyter Docker Stacks - Quick Start](https://github.com/jupyter/docker-stacks#quick-start).
