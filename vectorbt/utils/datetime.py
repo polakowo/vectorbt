@@ -77,12 +77,13 @@ def to_timezone(tz: tp.TimezoneLike, to_py_timezone: tp.Optional[bool] = None, *
     If `to_py_timezone` is set to True, will convert to `datetime.timezone`.
 
     `**kwargs` are passed to `dateparser.parse`."""
-    from vectorbt.settings import datetime as dt_settings
+    from vectorbt._settings import settings
+    datetime_cfg = settings['datetime']
 
     if tz is None:
         return get_local_tz()
     if to_py_timezone is None:
-        to_py_timezone = dt_settings['to_py_timezone']
+        to_py_timezone = datetime_cfg['to_py_timezone']
     if isinstance(tz, str):
         try:
             tz = pytz.timezone(tz)
@@ -110,12 +111,14 @@ def to_tzaware_datetime(dt_like: tp.DatetimeLike,
     See [dateparser docs](http://dateparser.readthedocs.io/en/latest/) for valid string formats and `**kwargs`.
 
     Raw timestamps are localized to UTC, while naive datetime is localized to `naive_tz`.
-    Set `naive_tz` to None to use the default value defined in `vectorbt.settings.datetime`.
+    Set `naive_tz` to None to use the default value defined under `datetime` settings
+    in `vectorbt._settings.settings`.
     To explicitly convert the datetime to a timezone, use `tz` (uses `to_timezone`)."""
-    from vectorbt.settings import datetime as dt_settings
+    from vectorbt._settings import settings
+    datetime_cfg = settings['datetime']
 
     if naive_tz is None:
-        naive_tz = dt_settings['naive_tz']
+        naive_tz = datetime_cfg['naive_tz']
     if isinstance(dt_like, float):
         dt = datetime.fromtimestamp(dt_like, timezone.utc)
     elif isinstance(dt_like, int):

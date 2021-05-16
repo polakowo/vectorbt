@@ -107,7 +107,8 @@ class Gauge(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        from vectorbt.settings import layout
+        from vectorbt._settings import settings
+        layout_cfg = settings['plotting']['layout']
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -116,11 +117,11 @@ class Gauge(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            if 'width' in layout:
+            if 'width' in layout_cfg:
                 # Calculate nice width and height
                 fig.update_layout(
-                    width=layout['width'] * 0.7,
-                    height=layout['width'] * 0.5,
+                    width=layout_cfg['width'] * 0.7,
+                    height=layout_cfg['width'] * 0.5,
                     margin=dict(t=80)
                 )
         fig.update_layout(**layout_kwargs)
@@ -635,7 +636,8 @@ class Heatmap(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        from vectorbt.settings import layout
+        from vectorbt._settings import settings
+        layout_cfg = settings['plotting']['layout']
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -653,9 +655,9 @@ class Heatmap(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            if 'width' in layout:
+            if 'width' in layout_cfg:
                 # Calculate nice width and height
-                max_width = layout['width']
+                max_width = layout_cfg['width']
                 if data is not None:
                     x_len = data.shape[1]
                     y_len = data.shape[0]
@@ -775,7 +777,8 @@ class Volume(Configured, TraceUpdater):
             **layout_kwargs
         )
 
-        from vectorbt.settings import layout
+        from vectorbt._settings import settings
+        layout_cfg = settings['plotting']['layout']
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -809,11 +812,11 @@ class Volume(Configured, TraceUpdater):
 
         if fig is None:
             fig = make_figure()
-            if 'width' in layout:
+            if 'width' in layout_cfg:
                 # Calculate nice width and height
                 fig.update_layout(
-                    width=layout['width'],
-                    height=0.7 * layout['width']
+                    width=layout_cfg['width'],
+                    height=0.7 * layout_cfg['width']
                 )
 
         # Non-numeric data types are not supported by go.Volume, so use ticktext

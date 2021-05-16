@@ -61,7 +61,7 @@ symbol           RAND1       RAND2
 ```
 
 In case two symbols have different index or columns, they are automatically aligned based on
-the settings `missing_index` and `missing_columns` (see `vectorbt.settings.data`):
+`missing_index` and `missing_columns` (see `data` in `vectorbt._settings.settings`):
 
 ```python-repl
 >>> start_dt = vbt.symbol_dict({'RAND2': '2021-01-03'})
@@ -422,27 +422,24 @@ class Data(Wrapping):
             tz_convert (timezone_like): Convert the index from one timezone to another.
 
                 See `vectorbt.utils.datetime.to_timezone`.
-
-                Defaults to `tz_convert` in `vectorbt.settings.data`.
             missing_index (str): See `Data.align_index`.
-
-                Defaults to `missing_index` in `vectorbt.settings.data`.
             missing_columns (str): See `Data.align_columns`.
-
-                Defaults to `missing_columns` in `vectorbt.settings.data`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
-            **kwargs: Keyword arguments passed to the `__init__` method."""
-        from vectorbt import settings
+            **kwargs: Keyword arguments passed to the `__init__` method.
+
+        For defaults, see `data` in `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        data_cfg = settings['data']
 
         # Get global defaults
         if tz_localize is None:
-            tz_localize = settings.data['tz_localize']
+            tz_localize = data_cfg['tz_localize']
         if tz_convert is None:
-            tz_convert = settings.data['tz_convert']
+            tz_convert = data_cfg['tz_convert']
         if missing_index is None:
-            missing_index = settings.data['missing_index']
+            missing_index = data_cfg['missing_index']
         if missing_columns is None:
-            missing_columns = settings.data['missing_columns']
+            missing_columns = data_cfg['missing_columns']
         if wrapper_kwargs is None:
             wrapper_kwargs = {}
 

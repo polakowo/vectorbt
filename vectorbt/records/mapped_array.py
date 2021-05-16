@@ -237,7 +237,7 @@ array([10., 11., 12., 13., 14., 15.])
 
 `MappedArray` supports caching. If a method or a property requires heavy computation, it's wrapped
 with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
-respectively. Caching can be disabled globally via `vectorbt.settings`.
+respectively. Caching can be disabled globally via `caching` in `vectorbt._settings.settings`.
 
 !!! note
     Because of caching, class is meant to be immutable and all properties are read-only.

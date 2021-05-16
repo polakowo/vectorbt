@@ -74,11 +74,12 @@ class ReturnsAccessor(GenericAccessor):
     @property
     def year_freq(self) -> pd.Timedelta:
         """Year frequency."""
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        returns_cfg = settings['returns']
 
         year_freq = self._year_freq
         if year_freq is None:
-            year_freq = settings.returns['year_freq']
+            year_freq = returns_cfg['year_freq']
         return freq_to_timedelta(year_freq)
 
     @property
@@ -614,7 +615,8 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
 
         ![](/vectorbt/docs/img/plot_cum_returns.svg)
         """
-        from vectorbt.settings import color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         if fig is None:
             fig = make_figure()
@@ -634,7 +636,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
                 benchmark_kwargs = {}
             benchmark_kwargs = merge_dicts(dict(
                 trace_kwargs=dict(
-                    line_color=color_schema['gray'],
+                    line_color=plotting_cfg['color_schema']['gray'],
                     name='Benchmark'
                 )
             ), benchmark_kwargs)
@@ -648,7 +650,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             main_kwargs = {}
         main_kwargs = merge_dicts(dict(
             trace_kwargs=dict(
-                line_color=color_schema['purple'],
+                line_color=plotting_cfg['color_schema']['purple'],
             ),
             other_trace_kwargs='hidden'
         ), main_kwargs)

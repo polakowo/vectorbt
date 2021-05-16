@@ -26,8 +26,8 @@ TrendMode = TrendModeT(*range(5))
 
 __pdoc__['TrendMode'] = f"""Trend mode.
 
-```plaintext
-{json.dumps(dict(zip(TrendMode._fields, TrendMode)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(TrendMode._fields, TrendMode)), indent=4, default=str)}
 ```
 
 Attributes:

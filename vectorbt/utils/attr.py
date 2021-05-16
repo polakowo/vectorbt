@@ -43,38 +43,3 @@ def deep_getattr(obj: tp.Any, attr_chain: tp.Union[str, tuple, list]) -> tp.Any:
     for attr in attr_chain:
         result = deep_getattr(result, attr)
     return result
-
-
-def traverse_attr_kwargs(cls, key: tp.Optional[str] = None,
-                         value: tp.Optional[tp.Any] = None) -> tp.Dict[str, tp.Dict[str, tp.Any]]:
-    """Traverse the class `cls` and its attributes for properties/methods with attribute `kwargs`,
-    and optionally a specific `key` and `value`.
-
-    Class attributes acting as children should have a key `child_cls`.
-
-    Returns a nested dict of attributes."""
-    checks.assert_type(cls, type)
-
-    if value is not None and not isinstance(value, tuple):
-        value = (value,)
-    attrs = {}
-    for attr in dir(cls):
-        prop = getattr(cls, attr)
-        if hasattr(prop, 'kwargs'):
-            kwargs = getattr(prop, 'kwargs')
-            if key is None:
-                attrs[attr] = kwargs.copy()
-            else:
-                if key in kwargs:
-                    if value is None:
-                        attrs[attr] = kwargs
-                    else:
-                        _value = kwargs[key]
-                        if _value in value:
-                            attrs[attr] = kwargs
-            if 'child_cls' in kwargs:
-                child_cls = kwargs['child_cls']
-                checks.assert_type(child_cls, type)
-                attrs[attr] = kwargs.copy()
-                attrs[attr]['child_attrs'] = traverse_attr_kwargs(child_cls, key, value)
-    return attrs

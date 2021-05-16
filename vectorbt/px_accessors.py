@@ -20,12 +20,13 @@ def add_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
         if checks.method_accepts_argument(px_func, 'data_frame') or px_func_name == 'imshow':
             def plot_func(self, *args, _px_func_name: str = px_func_name,
                           _px_func: tp.Callable = px_func, **kwargs) -> tp.BaseFigure:
-                from vectorbt.settings import layout
+                from vectorbt._settings import settings
+                layout_cfg = settings['plotting']['layout']
 
                 layout_kwargs = dict(
-                    template=kwargs.pop('template', layout['template']),
-                    width=kwargs.pop('width', layout['width']),
-                    height=kwargs.pop('height', layout['height'])
+                    template=kwargs.pop('template', layout_cfg['template']),
+                    width=kwargs.pop('width', layout_cfg['width']),
+                    height=kwargs.pop('height', layout_cfg['height'])
                 )
                 # Fix category_orders
                 if 'color' in kwargs:

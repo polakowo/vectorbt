@@ -342,7 +342,8 @@ class Drawdowns(Records):
 
         ![](/vectorbt/docs/img/drawdowns_plot.svg)
         """
-        from vectorbt.settings import color_schema, contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         self_col = self.select_series(column=column, group_by=False)
         if top_n is not None:
@@ -352,7 +353,7 @@ class Drawdowns(Records):
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
         ts_trace_kwargs = merge_dicts(dict(
-            line_color=color_schema['blue']
+            line_color=plotting_cfg['color_schema']['blue']
         ), ts_trace_kwargs)
         if peak_trace_kwargs is None:
             peak_trace_kwargs = {}
@@ -415,11 +416,11 @@ class Drawdowns(Records):
                     mode='markers',
                     marker=dict(
                         symbol='diamond',
-                        color=contrast_color_schema['blue'],
+                        color=plotting_cfg['contrast_color_schema']['blue'],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(contrast_color_schema['blue'])
+                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['blue'])
                         )
                     ),
                     name='Peak',
@@ -443,11 +444,11 @@ class Drawdowns(Records):
                     mode='markers',
                     marker=dict(
                         symbol='diamond',
-                        color=contrast_color_schema['red'],
+                        color=plotting_cfg['contrast_color_schema']['red'],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(contrast_color_schema['red'])
+                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['red'])
                         )
                     ),
                     name='Valley',
@@ -488,11 +489,11 @@ class Drawdowns(Records):
                     mode='markers',
                     marker=dict(
                         symbol='diamond',
-                        color=contrast_color_schema['green'],
+                        color=plotting_cfg['contrast_color_schema']['green'],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(contrast_color_schema['green'])
+                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['green'])
                         )
                     ),
                     name='Recovery/Peak',
@@ -535,11 +536,11 @@ class Drawdowns(Records):
                     mode='markers',
                     marker=dict(
                         symbol='diamond',
-                        color=contrast_color_schema['orange'],
+                        color=plotting_cfg['contrast_color_schema']['orange'],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(contrast_color_schema['orange'])
+                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['orange'])
                         )
                     ),
                     name='Active',

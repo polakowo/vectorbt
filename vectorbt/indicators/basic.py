@@ -121,7 +121,8 @@ class _MA(MA):
 
         ![](/vectorbt/docs/img/MA.svg)
         """
-        from vectorbt.settings import color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         self_col = self.select_series(column=column)
 
@@ -135,7 +136,7 @@ class _MA(MA):
             ma_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(dict(
             name='Close',
-            line_color=color_schema['blue']
+            line_color=plotting_cfg['color_schema']['blue']
         ), close_trace_kwargs)
         ma_trace_kwargs = merge_dicts(dict(
             name='MA'
@@ -295,7 +296,8 @@ class _BBANDS(BBANDS):
 
         ![](/vectorbt/docs/img/BBANDS.svg)
         """
-        from vectorbt.settings import color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         self_col = self.select_series(column=column)
 
@@ -313,11 +315,11 @@ class _BBANDS(BBANDS):
             lower_trace_kwargs = {}
         lower_trace_kwargs = merge_dicts(dict(
             name='Lower Band',
-            line_color=adjust_opacity(color_schema['gray'], 0.75),
+            line_color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75),
         ), lower_trace_kwargs)
         upper_trace_kwargs = merge_dicts(dict(
             name='Upper Band',
-            line_color=adjust_opacity(color_schema['gray'], 0.75),
+            line_color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75),
             fill='tonexty',
             fillcolor='rgba(128, 128, 128, 0.2)'
         ), upper_trace_kwargs)  # default kwargs
@@ -326,7 +328,7 @@ class _BBANDS(BBANDS):
         ), middle_trace_kwargs)
         close_trace_kwargs = merge_dicts(dict(
             name='Close',
-            line=dict(color=color_schema['blue'])
+            line=dict(color=plotting_cfg['color_schema']['blue'])
         ), close_trace_kwargs)
 
         fig = self_col.lower.vbt.plot(

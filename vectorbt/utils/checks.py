@@ -4,9 +4,9 @@ import os
 import numpy as np
 import pandas as pd
 from numba.core.registry import CPUDispatcher
-from inspect import signature
+from inspect import signature, getmro
 import dill
-from collections import Hashable
+from collections.abc import Hashable
 
 from vectorbt import _typing as tp
 
@@ -209,6 +209,30 @@ def is_deep_equal(arg1: tp.Any, arg2: tp.Any, check_exact: bool = False, **kwarg
     return True
 
 
+def is_subclass_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) -> bool:
+    """Check whether the argument is a subclass of `types`.
+
+    `types` can be one or multiple types or strings."""
+    if isinstance(types, type):
+        return issubclass(arg, types)
+    if isinstance(types, str):
+        for base_t in getmro(arg):
+            if str(base_t) == types or base_t.__name__ == types:
+                return True
+    if isinstance(types, tuple):
+        for t in types:
+            if is_subclass_of(arg, t):
+                return True
+    return False
+
+
+def is_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) -> bool:
+    """Check whether the argument is an instance of `types`.
+
+    `types` can be one or multiple types or strings."""
+    return is_subclass_of(type(arg), types)
+
+
 # ############# Asserts ############# #
 
 def safe_assert(arg: tp.Any, msg: tp.Optional[str] = None) -> None:
@@ -236,7 +260,7 @@ def assert_not_none(arg: tp.Any) -> None:
 
 def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
     """Raise exception if the argument is none of types `types`."""
-    if not isinstance(arg, types):
+    if not is_instance_of(arg, types):
         if isinstance(types, tuple):
             raise AssertionError(f"Type must be one of {types}, not {type(arg)}")
         else:
@@ -245,7 +269,7 @@ def assert_type(arg: tp.Any, types: tp.MaybeTuple[tp.Type]) -> None:
 
 def assert_subclass(arg: tp.Type, classes: tp.MaybeTuple[tp.Type]) -> None:
     """Raise exception if the argument is not a subclass of classes `classes`."""
-    if not issubclass(arg, classes):
+    if not is_subclass_of(arg, classes):
         if isinstance(classes, tuple):
             raise AssertionError(f"Class must be a subclass of one of {classes}, not {arg}")
         else:

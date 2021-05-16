@@ -511,12 +511,15 @@ This software is for educational purposes only. Do not risk money which you are 
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
 """
 
+__pdoc__ = {}
+
 # Import version
 from vectorbt._version import __version__ as _version
 __version__ = _version
 
 # Most important modules
 from vectorbt.generic import nb, plotting
+from vectorbt._settings import settings
 
 # Most important classes
 from vectorbt.utils import *
@@ -540,3 +543,5 @@ from numba.core.errors import NumbaExperimentalFeatureWarning
 warnings.filterwarnings("ignore", category=NumbaExperimentalFeatureWarning)
 
 import_submodules(__name__)
+
+__pdoc__['_settings'] = True

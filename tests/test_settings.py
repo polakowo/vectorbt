@@ -5,10 +5,8 @@ from vectorbt import settings
 
 class TestSettings:
     def test_save_and_load(self, tmp_path):
-        initial_settings = dict()
-        for k in settings.__all__:
-            initial_settings[k] = getattr(settings, k)
+        settings.set_theme('seaborn')
         settings.save(tmp_path / "settings")
-        settings.load(tmp_path / "settings")
-        for k in settings.__all__:
-            assert initial_settings[k] == getattr(settings, k)
+        new_settings = settings.load(tmp_path / "settings")
+        assert settings == new_settings
+        assert settings.__dict__ == new_settings.__dict__

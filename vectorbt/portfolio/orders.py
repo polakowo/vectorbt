@@ -182,14 +182,15 @@ class Orders(Records):
         ```
 
         ![](/vectorbt/docs/img/orders_plot.svg)"""
-        from vectorbt.settings import color_schema, contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         self_col = self.select_series(column=column, group_by=False)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(dict(
-            line_color=color_schema['blue'],
+            line_color=plotting_cfg['color_schema']['blue'],
             name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
         ), close_trace_kwargs)
         if buy_trace_kwargs is None:
@@ -225,11 +226,11 @@ class Orders(Records):
                 mode='markers',
                 marker=dict(
                     symbol='triangle-up',
-                    color=contrast_color_schema['green'],
+                    color=plotting_cfg['contrast_color_schema']['green'],
                     size=8,
                     line=dict(
                         width=1,
-                        color=adjust_lightness(contrast_color_schema['green'])
+                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['green'])
                     )
                 ),
                 name='Buy',
@@ -252,11 +253,11 @@ class Orders(Records):
                 mode='markers',
                 marker=dict(
                     symbol='triangle-down',
-                    color=contrast_color_schema['red'],
+                    color=plotting_cfg['contrast_color_schema']['red'],
                     size=8,
                     line=dict(
                         width=1,
-                        color=adjust_lightness(contrast_color_schema['red'])
+                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['red'])
                     )
                 ),
                 name='Sell',

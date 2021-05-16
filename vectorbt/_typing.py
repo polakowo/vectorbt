@@ -11,6 +11,7 @@ from plotly.graph_objects import Figure, FigureWidget
 from plotly.basedatatypes import BaseFigure, BaseTraceType
 from numba.core.registry import CPUDispatcher
 from numba.typed import List as NumbaList
+from pathlib import Path
 
 try:
     from typing import Protocol
@@ -67,8 +68,6 @@ ArrayLikeSequence = Union[Sequence[T], Array1d, Index, Series]  # sequence for 1
 # Labels
 Label = Hashable
 Labels = ArrayLikeSequence[Label]
-
-# Index levels
 Level = Union[str, int]
 LevelSequence = Sequence[Level]
 MaybeLevelSequence = Union[Level, LevelSequence]
@@ -96,14 +95,13 @@ PandasGroupByLike = Union[Label, Labels, Callable, Mapping[Label, Any]]
 NameIndex = Union[None, Any, Index]
 
 # Config
-K = TypeVar("K")
-V = TypeVar("V")
-DictLike = Union[None, Dict[K, V]]
-DictLikeSequence = Union[None, Dict[K, V], Sequence[Union[None, Dict[K, V]]]]
-Args = Tuple[V, ...]
-Kwargs = Dict[str, V]
-KwargsLike = DictLike[str, V]
-KwargsLikeSequence = DictLikeSequence[str, V]
+DictLike = Union[None, dict]
+DictLikeSequence = MaybeSequence[DictLike]
+Args = Tuple[Any, ...]
+Kwargs = Dict[str, Any]
+KwargsLike = Union[None, Kwargs]
+KwargsLikeSequence = MaybeSequence[KwargsLike]
+FileName = Union[str, Path]
 
 # Data
 Data = Dict[Label, SeriesFrame]

@@ -61,10 +61,11 @@ def repeat_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] 
     """Repeat each element in `index` `n` times.
 
     Set `ignore_default` to None to use the default."""
-    from vectorbt import settings
+    from vectorbt._settings import settings
+    broadcasting_cfg = settings['broadcasting']
 
     if ignore_default is None:
-        ignore_default = settings.broadcasting['ignore_default']
+        ignore_default = broadcasting_cfg['ignore_default']
 
     index = to_any_index(index)
     if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
@@ -76,10 +77,11 @@ def tile_index(index: tp.IndexLike, n: int, ignore_default: tp.Optional[bool] = 
     """Tile the whole `index` `n` times.
 
     Set `ignore_default` to None to use the default."""
-    from vectorbt import settings
+    from vectorbt._settings import settings
+    broadcasting_cfg = settings['broadcasting']
 
     if ignore_default is None:
-        ignore_default = settings.broadcasting['ignore_default']
+        ignore_default = broadcasting_cfg['ignore_default']
 
     index = to_any_index(index)
     if checks.is_default_index(index) and ignore_default:  # ignore simple ranges without name
@@ -94,14 +96,15 @@ def stack_indexes(indexes: tp.Sequence[tp.IndexLike], drop_duplicates: tp.Option
     """Stack each index in `indexes` on top of each other, from top to bottom.
 
     Set `drop_duplicates`, `keep`, or `drop_redundant` to None to use the default."""
-    from vectorbt import settings
+    from vectorbt._settings import settings
+    broadcasting_cfg = settings['broadcasting']
 
     if drop_duplicates is None:
-        drop_duplicates = settings.broadcasting['drop_duplicates']
+        drop_duplicates = broadcasting_cfg['drop_duplicates']
     if keep is None:
-        keep = settings.broadcasting['keep']
+        keep = broadcasting_cfg['keep']
     if drop_redundant is None:
-        drop_redundant = settings.broadcasting['drop_redundant']
+        drop_redundant = broadcasting_cfg['drop_redundant']
 
     levels = []
     for i in range(len(indexes)):
@@ -201,10 +204,11 @@ def drop_duplicate_levels(index: tp.Index, keep: tp.Optional[str] = None) -> tp.
     Set `keep` to 'last' to keep last levels, otherwise 'first'.
 
     Set `keep` to None to use the default."""
-    from vectorbt import settings
+    from vectorbt._settings import settings
+    broadcasting_cfg = settings['broadcasting']
 
     if keep is None:
-        keep = settings.broadcasting['keep']
+        keep = broadcasting_cfg['keep']
     if not isinstance(index, pd.MultiIndex):
         return index
     checks.assert_in(keep.lower(), ['first', 'last'])

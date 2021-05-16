@@ -409,7 +409,8 @@ class Trades(Records):
             fig (Figure or FigureWidget): Figure to add traces to.
             **layout_kwargs: Keyword arguments for layout.
         """
-        from vectorbt.settings import contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         self_col = self.select_series(column=column, group_by=False)
 
@@ -496,7 +497,7 @@ class Trades(Records):
             _plot_scatter(
                 closed_profit_mask,
                 'Closed - Profit',
-                contrast_color_schema['green'],
+                plotting_cfg['contrast_color_schema']['green'],
                 closed_profit_trace_kwargs
             )
 
@@ -504,7 +505,7 @@ class Trades(Records):
             _plot_scatter(
                 closed_loss_mask,
                 'Closed - Loss',
-                contrast_color_schema['red'],
+                plotting_cfg['contrast_color_schema']['red'],
                 closed_loss_trace_kwargs
             )
 
@@ -512,7 +513,7 @@ class Trades(Records):
             _plot_scatter(
                 open_mask,
                 'Open',
-                contrast_color_schema['orange'],
+                plotting_cfg['contrast_color_schema']['orange'],
                 open_trace_kwargs
             )
 
@@ -594,14 +595,15 @@ class Trades(Records):
         ```
 
         ![](/vectorbt/docs/img/trades_plot.svg)"""
-        from vectorbt.settings import color_schema, contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         self_col = self.select_series(column=column, group_by=False)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(dict(
-            line_color=color_schema['blue'],
+            line_color=plotting_cfg['color_schema']['blue'],
             name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
         ), close_trace_kwargs)
         if entry_trace_kwargs is None:
@@ -674,11 +676,11 @@ class Trades(Records):
                     mode='markers',
                     marker=dict(
                         symbol='square',
-                        color=contrast_color_schema['blue'],
+                        color=plotting_cfg['contrast_color_schema']['blue'],
                         size=7,
                         line=dict(
                             width=1,
-                            color=adjust_lightness(contrast_color_schema['blue'])
+                            color=adjust_lightness(plotting_cfg['contrast_color_schema']['blue'])
                         )
                     ),
                     name='Entry',
@@ -743,7 +745,7 @@ class Trades(Records):
             _plot_end_markers(
                 (status == TradeStatus.Closed) & (pnl == 0.),
                 'Exit',
-                contrast_color_schema['gray'],
+                plotting_cfg['contrast_color_schema']['gray'],
                 exit_trace_kwargs
             )
 
@@ -751,7 +753,7 @@ class Trades(Records):
             _plot_end_markers(
                 (status == TradeStatus.Closed) & (pnl > 0.),
                 'Exit - Profit',
-                contrast_color_schema['green'],
+                plotting_cfg['contrast_color_schema']['green'],
                 exit_profit_trace_kwargs
             )
 
@@ -759,7 +761,7 @@ class Trades(Records):
             _plot_end_markers(
                 (status == TradeStatus.Closed) & (pnl < 0.),
                 'Exit - Loss',
-                contrast_color_schema['red'],
+                plotting_cfg['contrast_color_schema']['red'],
                 exit_loss_trace_kwargs
             )
 
@@ -767,7 +769,7 @@ class Trades(Records):
             _plot_end_markers(
                 status == TradeStatus.Open,
                 'Active',
-                contrast_color_schema['orange'],
+                plotting_cfg['contrast_color_schema']['orange'],
                 active_trace_kwargs
             )
 

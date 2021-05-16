@@ -253,7 +253,7 @@ variables it's specified per order and can broadcast automatically.
 
 `Portfolio` heavily relies upon caching. If a method or a property requires heavy computation,
 it's wrapped with `vectorbt.utils.decorators.cached_method` and `vectorbt.utils.decorators.cached_property`
-respectively. Caching can be disabled globally via `vectorbt.settings`.
+respectively. Caching can be disabled globally via `caching` in `vectorbt._settings.settings`.
 
 !!! note
     Because of caching, class is meant to be immutable and all properties are read-only.
@@ -270,26 +270,28 @@ be cached. For example, you can blacklist the entire `Portfolio` class except a 
 methods such as `Portfolio.cash_flow` and `Portfolio.share_flow`:
 
 ```python-repl
->>> vbt.settings.caching['blacklist'].append('Portfolio')
+>>> vbt.settings.caching['blacklist'].append(
+...     vbt.CacheCondition(base_cls='Portfolio')
+... )
 >>> vbt.settings.caching['whitelist'].extend([
-...     'Portfolio.cash_flow',
-...     'Portfolio.share_flow'
+...     vbt.CacheCondition(base_cls='Portfolio', func='cash_flow'),
+...     vbt.CacheCondition(base_cls='Portfolio', func='share_flow')
 ... ])
 ```
 
 Define rules for one instance of `Portfolio`:
 
 ```python-repl
->>> vbt.settings.caching['blacklist'].append(portfolio)
+>>> vbt.settings.caching['blacklist'].append(
+...     vbt.CacheCondition(instance=portfolio)
+... )
 >>> vbt.settings.caching['whitelist'].extend([
-...     portfolio.cash_flow,
-...     portfolio.share_flow
+...     vbt.CacheCondition(instance=portfolio, func='cash_flow'),
+...     vbt.CacheCondition(instance=portfolio, func='share_flow')
 ... ])
 ```
 
-!!! note
-    Note that the above approach doesn't work for cached properties.
-    Use tuples of the instance and the property name instead, such as `(portfolio, 'orders')`.
+See `vectorbt.utils.decorators.should_cache` for caching rules.
 
 To reset caching:
 
@@ -332,7 +334,7 @@ Name: sharpe_ratio, dtype: float64
 !!! note
     Save files won't include neither cached results nor global defaults. For example,
     passing `incl_unrealized` as None will also use None when the portfolio is loaded from disk.
-    Make sure to either pass all arguments explicitly or to save and load the `vectorbt.settings` config.
+    Make sure to either pass all arguments explicitly or to save and load the `vectorbt._settings.settings` config.
 """
 
 import numpy as np
@@ -500,12 +502,13 @@ class Portfolio(Wrapping):
             use_filled_close=use_filled_close
         )
         # Get defaults
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        portfolio_cfg = settings['portfolio']
 
         if incl_unrealized is None:
-            incl_unrealized = settings.portfolio['incl_unrealized']
+            incl_unrealized = portfolio_cfg['incl_unrealized']
         if use_filled_close is None:
-            use_filled_close = settings.portfolio['use_filled_close']
+            use_filled_close = portfolio_cfg['use_filled_close']
 
         # Store passed arguments
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
@@ -568,7 +571,8 @@ class Portfolio(Wrapping):
         If `prob` is set, see `vectorbt.signals.generators.RPROB`.
 
         Based on `Portfolio.from_signals`."""
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        portfolio_cfg = settings['portfolio']
 
         close = to_pd_array(close)
         if entry_prob is None:
@@ -576,7 +580,7 @@ class Portfolio(Wrapping):
         if exit_prob is None:
             exit_prob = prob
         if seed is None:
-            seed = settings.portfolio['seed']
+            seed = portfolio_cfg['seed']
         if run_kwargs is None:
             run_kwargs = {}
 
@@ -762,7 +766,7 @@ class Portfolio(Wrapping):
         All broadcastable arguments will broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
-        For defaults, see `vectorbt.settings.portfolio`.
+        For defaults, see `portfolio` in `vectorbt._settings.settings`.
 
         !!! hint
             If you generated signals using close price, don't forget to shift your signals by one tick
@@ -973,47 +977,48 @@ class Portfolio(Wrapping):
             preferred way of defining complex logic in vectorbt.
         """
         # Get defaults
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        portfolio_cfg = settings['portfolio']
 
         if size is None:
-            size = settings.portfolio['size']
+            size = portfolio_cfg['size']
         if size_type is None:
-            size_type = settings.portfolio['signal_size_type']
+            size_type = portfolio_cfg['signal_size_type']
         size_type = prepare_enum_value(SizeType, size_type)
         if direction is None:
-            direction = settings.portfolio['signal_direction']
+            direction = portfolio_cfg['signal_direction']
         direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
-            fees = settings.portfolio['fees']
+            fees = portfolio_cfg['fees']
         if fixed_fees is None:
-            fixed_fees = settings.portfolio['fixed_fees']
+            fixed_fees = portfolio_cfg['fixed_fees']
         if slippage is None:
-            slippage = settings.portfolio['slippage']
+            slippage = portfolio_cfg['slippage']
         if min_size is None:
-            min_size = settings.portfolio['min_size']
+            min_size = portfolio_cfg['min_size']
         if max_size is None:
-            max_size = settings.portfolio['max_size']
+            max_size = portfolio_cfg['max_size']
         if reject_prob is None:
-            reject_prob = settings.portfolio['reject_prob']
+            reject_prob = portfolio_cfg['reject_prob']
         if allow_partial is None:
-            allow_partial = settings.portfolio['allow_partial']
+            allow_partial = portfolio_cfg['allow_partial']
         if raise_reject is None:
-            raise_reject = settings.portfolio['raise_reject']
+            raise_reject = portfolio_cfg['raise_reject']
         if log is None:
-            log = settings.portfolio['log']
+            log = portfolio_cfg['log']
         if accumulate is None:
-            accumulate = settings.portfolio['accumulate']
+            accumulate = portfolio_cfg['accumulate']
         if conflict_mode is None:
-            conflict_mode = settings.portfolio['conflict_mode']
+            conflict_mode = portfolio_cfg['conflict_mode']
         conflict_mode = prepare_enum_value(ConflictMode, conflict_mode)
         if close_first is None:
-            close_first = settings.portfolio['close_first']
+            close_first = portfolio_cfg['close_first']
         if val_price is None:
             val_price = price
         if init_cash is None:
-            init_cash = settings.portfolio['init_cash']
+            init_cash = portfolio_cfg['init_cash']
         init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
@@ -1021,9 +1026,9 @@ class Portfolio(Wrapping):
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = settings.portfolio['cash_sharing']
+            cash_sharing = portfolio_cfg['cash_sharing']
         if call_seq is None:
-            call_seq = settings.portfolio['call_seq']
+            call_seq = portfolio_cfg['call_seq']
         call_seq = prepare_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
@@ -1031,11 +1036,11 @@ class Portfolio(Wrapping):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if seed is None:
-            seed = settings.portfolio['seed']
+            seed = portfolio_cfg['seed']
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = settings.portfolio['freq']
+            freq = portfolio_cfg['freq']
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if wrapper_kwargs is None:
@@ -1274,7 +1279,7 @@ class Portfolio(Wrapping):
         All broadcastable arguments will broadcast using `vectorbt.base.reshape_fns.broadcast`
         but keep original shape to utilize flexible indexing and to save memory.
 
-        For defaults, see `vectorbt.settings.portfolio`.
+        For defaults, see `portfolio` in `vectorbt._settings.settings`.
 
         !!! note
             When `call_seq` is not `CallSeqType.Auto`, at each timestamp, processing of the assets in
@@ -1363,40 +1368,41 @@ class Portfolio(Wrapping):
         ![](/vectorbt/docs/img/simulate_nb.svg)
         """
         # Get defaults
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        portfolio_cfg = settings['portfolio']
 
         if size is None:
-            size = settings.portfolio['size']
+            size = portfolio_cfg['size']
         if size_type is None:
-            size_type = settings.portfolio['size_type']
+            size_type = portfolio_cfg['size_type']
         size_type = prepare_enum_value(SizeType, size_type)
         if direction is None:
-            direction = settings.portfolio['order_direction']
+            direction = portfolio_cfg['order_direction']
         direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = close
         if fees is None:
-            fees = settings.portfolio['fees']
+            fees = portfolio_cfg['fees']
         if fixed_fees is None:
-            fixed_fees = settings.portfolio['fixed_fees']
+            fixed_fees = portfolio_cfg['fixed_fees']
         if slippage is None:
-            slippage = settings.portfolio['slippage']
+            slippage = portfolio_cfg['slippage']
         if min_size is None:
-            min_size = settings.portfolio['min_size']
+            min_size = portfolio_cfg['min_size']
         if max_size is None:
-            max_size = settings.portfolio['max_size']
+            max_size = portfolio_cfg['max_size']
         if reject_prob is None:
-            reject_prob = settings.portfolio['reject_prob']
+            reject_prob = portfolio_cfg['reject_prob']
         if allow_partial is None:
-            allow_partial = settings.portfolio['allow_partial']
+            allow_partial = portfolio_cfg['allow_partial']
         if raise_reject is None:
-            raise_reject = settings.portfolio['raise_reject']
+            raise_reject = portfolio_cfg['raise_reject']
         if log is None:
-            log = settings.portfolio['log']
+            log = portfolio_cfg['log']
         if val_price is None:
             val_price = price
         if init_cash is None:
-            init_cash = settings.portfolio['init_cash']
+            init_cash = portfolio_cfg['init_cash']
         init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
@@ -1404,9 +1410,9 @@ class Portfolio(Wrapping):
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = settings.portfolio['cash_sharing']
+            cash_sharing = portfolio_cfg['cash_sharing']
         if call_seq is None:
-            call_seq = settings.portfolio['call_seq']
+            call_seq = portfolio_cfg['call_seq']
         call_seq = prepare_enum_value(CallSeqType, call_seq)
         auto_call_seq = False
         if isinstance(call_seq, int):
@@ -1414,11 +1420,11 @@ class Portfolio(Wrapping):
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
         if seed is None:
-            seed = settings.portfolio['seed']
+            seed = portfolio_cfg['seed']
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = settings.portfolio['freq']
+            freq = portfolio_cfg['freq']
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if wrapper_kwargs is None:
@@ -1514,6 +1520,7 @@ class Portfolio(Wrapping):
                         after_order_func_nb: tp.Optional[nb.AfterOrderFuncT] = None,
                         after_order_args: tp.Optional[tp.Args] = None,
                         row_wise: tp.Optional[bool] = None,
+                        use_numba: tp.Optional[bool] = None,
                         max_orders: tp.Optional[int] = None,
                         max_logs: tp.Optional[int] = None,
                         seed: tp.Optional[int] = None,
@@ -1593,6 +1600,13 @@ class Portfolio(Wrapping):
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
 
                 See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
+            use_numba (bool): Whether to run the main simulation function using Numba.
+
+                !!! note
+                    Disabling it does not disable Numba for other functions.
+                    If neccessary, you should ensure that every other function does not uses Numba as well.
+                    You can do this by using the `py_func` attribute of that function.
+                    Or, you could disable Numba globally by doing `os.environ['NUMBA_DISABLE_JIT'] = '1'`.
             max_orders (int): Size of the order records array.
                 Defaults to the number of elements in the broadcasted shape.
 
@@ -1608,7 +1622,7 @@ class Portfolio(Wrapping):
             freq (any): Index frequency in case `close.index` is not datetime-like.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
-        For defaults, see `vectorbt.settings.portfolio`.
+        For defaults, see `portfolio` in `vectorbt._settings.settings`.
 
         !!! note
             All passed functions should be Numba-compiled.
@@ -1856,13 +1870,14 @@ class Portfolio(Wrapping):
         `Portfolio.from_signals`).
         """
         # Get defaults
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        portfolio_cfg = settings['portfolio']
 
         close = to_pd_array(close)
         if target_shape is None:
             target_shape = close.shape
         if init_cash is None:
-            init_cash = settings.portfolio['init_cash']
+            init_cash = portfolio_cfg['init_cash']
         init_cash = prepare_enum_value(InitCashMode, init_cash)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
@@ -1870,9 +1885,9 @@ class Portfolio(Wrapping):
         else:
             init_cash_mode = None
         if cash_sharing is None:
-            cash_sharing = settings.portfolio['cash_sharing']
+            cash_sharing = portfolio_cfg['cash_sharing']
         if call_seq is None:
-            call_seq = settings.portfolio['call_seq']
+            call_seq = portfolio_cfg['call_seq']
         call_seq = prepare_enum_value(CallSeqType, call_seq)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1881,13 +1896,15 @@ class Portfolio(Wrapping):
         if active_mask is None:
             active_mask = True
         if row_wise is None:
-            row_wise = settings.portfolio['row_wise']
+            row_wise = portfolio_cfg['row_wise']
+        if use_numba is None:
+            use_numba = portfolio_cfg['use_numba']
         if seed is None:
-            seed = settings.portfolio['seed']
+            seed = portfolio_cfg['seed']
         if seed is not None:
             set_seed(seed)
         if freq is None:
-            freq = settings.portfolio['freq']
+            freq = portfolio_cfg['freq']
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         require_kwargs = dict(require_kwargs=dict(requirements='W'))
@@ -1958,7 +1975,11 @@ class Portfolio(Wrapping):
 
         # Perform calculation
         if row_wise:
-            order_records, log_records = nb.simulate_row_wise_nb(
+            if use_numba:
+                simulate_func = nb.simulate_row_wise_nb
+            else:
+                simulate_func = nb.simulate_row_wise_nb.py_func
+            order_records, log_records = simulate_func(
                 target_shape_2d,
                 to_2d(close, raw=True),
                 group_lens,
@@ -1980,7 +2001,11 @@ class Portfolio(Wrapping):
                 max_logs
             )
         else:
-            order_records, log_records = nb.simulate_nb(
+            if use_numba:
+                simulate_func = nb.simulate_nb
+            else:
+                simulate_func = nb.simulate_nb.py_func
+            order_records, log_records = simulate_func(
                 target_shape_2d,
                 to_2d(close, raw=True),
                 group_lens,
@@ -2790,13 +2815,15 @@ class Portfolio(Wrapping):
 
         ![](/vectorbt/docs/img/portfolio_plot_custom.svg)
         """
-        from vectorbt.settings import color_schema, layout, portfolio
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+        portfolio_cfg = settings['portfolio']
 
         # Select one column/group
         self_col = self.select_series(column=column, group_by=group_by)
 
         if subplots is None:
-            subplots = portfolio['subplots']
+            subplots = portfolio_cfg['subplots']
             if self_col.wrapper.grouper.is_grouped():
                 def _filter(x: str) -> bool:
                     _settings = self.subplot_settings[x]
@@ -2833,8 +2860,10 @@ class Portfolio(Wrapping):
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))
         cols = make_subplots_kwargs.pop('cols', 1)
-        width = kwargs.get('width', layout['width'] + 50)
-        height = kwargs.get('height', (layout['height'] - 50) * rows if rows > 1 else layout['height'])
+        default_width = plotting_cfg['layout']['width']
+        default_height = plotting_cfg['layout']['height']
+        width = kwargs.get('width', default_width + 50)
+        height = kwargs.get('height', (default_height - 50) * rows if rows > 1 else default_height)
         specs = make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
         for row, row_spec in enumerate(specs):
@@ -3013,7 +3042,7 @@ class Portfolio(Wrapping):
                         benchmark_rets=self_col.market_returns(),
                         main_kwargs=dict(
                             trace_kwargs=dict(
-                                line_color=color_schema['purple'],
+                                line_color=plotting_cfg['color_schema']['purple'],
                                 name='Value'
                             )
                         ),
@@ -3032,7 +3061,7 @@ class Portfolio(Wrapping):
                 elif name == 'drawdowns':
                     drawdowns_kwargs = merge_dicts(dict(
                         ts_trace_kwargs=dict(
-                            line_color=color_schema['purple'],
+                            line_color=plotting_cfg['color_schema']['purple'],
                             name='Value'
                         )
                     ), kwargs.pop('drawdowns_kwargs', {}))
@@ -3044,8 +3073,8 @@ class Portfolio(Wrapping):
                 elif name == 'underwater':
                     underwater_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['red'],
-                            fillcolor=adjust_opacity(color_schema['red'], 0.3),
+                            line_color=plotting_cfg['color_schema']['red'],
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3),
                             fill='tozeroy',
                             name='Drawdown'
                         )
@@ -3060,7 +3089,7 @@ class Portfolio(Wrapping):
                 elif name == 'share_flow':
                     share_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['brown'],
+                            line_color=plotting_cfg['color_schema']['brown'],
                             name='Shares'
                         )
                     ), kwargs.pop('share_flow_kwargs', {}))
@@ -3073,7 +3102,7 @@ class Portfolio(Wrapping):
                 elif name == 'cash_flow':
                     cash_flow_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['green'],
+                            line_color=plotting_cfg['color_schema']['green'],
                             name='Cash'
                         )
                     ), kwargs.pop('cash_flow_kwargs', {}))
@@ -3086,14 +3115,14 @@ class Portfolio(Wrapping):
                 elif name == 'shares':
                     shares_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['brown'],
+                            line_color=plotting_cfg['color_schema']['brown'],
                             name='Shares'
                         ),
                         pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['brown'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['brown'], 0.3)
                         ),
                         neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
                         ),
                         other_trace_kwargs='hidden'
                     ), kwargs.pop('shares_kwargs', {}))
@@ -3106,14 +3135,14 @@ class Portfolio(Wrapping):
                 elif name == 'cash':
                     cash_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['green'],
+                            line_color=plotting_cfg['color_schema']['green'],
                             name='Cash'
                         ),
                         pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['green'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['green'], 0.3)
                         ),
                         neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['red'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3)
                         ),
                         other_trace_kwargs='hidden'
                     ), kwargs.pop('cash_kwargs', {}))
@@ -3126,14 +3155,14 @@ class Portfolio(Wrapping):
                 elif name == 'holding_value':
                     holding_value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['cyan'],
+                            line_color=plotting_cfg['color_schema']['cyan'],
                             name='Holding Value'
                         ),
                         pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['cyan'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['cyan'], 0.3)
                         ),
                         neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
                         ),
                         other_trace_kwargs='hidden'
                     ), kwargs.pop('holding_value_kwargs', {}))
@@ -3146,7 +3175,7 @@ class Portfolio(Wrapping):
                 elif name == 'value':
                     value_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['purple'],
+                            line_color=plotting_cfg['color_schema']['purple'],
                             name='Value'
                         ),
                         other_trace_kwargs='hidden'
@@ -3160,14 +3189,14 @@ class Portfolio(Wrapping):
                 elif name == 'gross_exposure':
                     gross_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['pink'],
+                            line_color=plotting_cfg['color_schema']['pink'],
                             name='Exposure'
                         ),
                         pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
                         ),
                         neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['pink'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
                         ),
                         other_trace_kwargs='hidden'
                     ), kwargs.pop('gross_exposure_kwargs', {}))
@@ -3180,14 +3209,14 @@ class Portfolio(Wrapping):
                 elif name == 'net_exposure':
                     net_exposure_kwargs = merge_dicts(dict(
                         trace_kwargs=dict(
-                            line_color=color_schema['pink'],
+                            line_color=plotting_cfg['color_schema']['pink'],
                             name='Exposure'
                         ),
                         pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['pink'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
                         ),
                         neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(color_schema['orange'], 0.3)
+                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
                         ),
                         other_trace_kwargs='hidden'
                     ), kwargs.pop('net_exposure_kwargs', {}))

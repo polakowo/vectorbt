@@ -398,13 +398,14 @@ class BinanceData(Data):
                  **kwargs) -> BinanceDataT:
         """Override `vectorbt.data.base.Data.download` to instantiate a Binance client."""
         from binance.client import Client
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        binance_cfg = settings['data']['binance']
 
         client_kwargs = dict()
         for k in get_func_kwargs(Client):
             if k in kwargs:
                 client_kwargs[k] = kwargs.pop(k)
-        client_kwargs = merge_dicts(settings.data['binance'], client_kwargs)
+        client_kwargs = merge_dicts(binance_cfg, client_kwargs)
         if client is None:
             client = Client(**client_kwargs)
         return super(BinanceData, cls).download(symbols, client=client, **kwargs)
@@ -424,8 +425,6 @@ class BinanceData(Data):
         Args:
             symbol (str): Symbol.
             client (binance.client.Client): Binance client of type `binance.client.Client`.
-
-                Overrides `binance` settings defined in `vectorbt.settings.data`.
             interval (str): Kline interval.
 
                 See `binance.enums`.
@@ -438,6 +437,8 @@ class BinanceData(Data):
             delay (float): Time to sleep after each request (in milliseconds).
             limit (int): The maximum number of returned items.
             show_progress (bool): Whether to show the progress bar.
+
+        For defaults, see `data.binance` in `vectorbt._settings.settings`.
         """
         if client is None:
             raise ValueError("client must be provided")
@@ -603,8 +604,6 @@ class CCXTData(Data):
                 `ccxt.base.exchange.Exchange`.
             config (dict): Config passed to the exchange upon instantiation.
 
-                Overrides settings under `ccxt` in `vectorbt.settings.data`.
-
                 Will raise an exception if exchange has been already instantiated.
             timeframe (str): Timeframe supported by the exchange.
             start (any): Start datetime.
@@ -621,9 +620,12 @@ class CCXTData(Data):
             retries (int): The number of retries on failure to fetch data.
             show_progress (bool): Whether to show the progress bar.
             params (dict): Exchange-specific key-value parameters.
+
+        For defaults, see `data.ccxt` in `vectorbt._settings.settings`.
         """
         import ccxt
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        ccxt_cfg = settings['data']['ccxt']
 
         if config is None:
             config = {}
@@ -634,13 +636,13 @@ class CCXTData(Data):
                 raise ValueError(f"Exchange {exchange} not found")
             # Resolve config
             default_config = {}
-            for k, v in settings.data['ccxt'].items():
+            for k, v in ccxt_cfg.items():
                 # Get general (not per exchange) settings
                 if k in ccxt.exchanges:
                     continue
                 default_config[k] = v
-            if exchange in settings.data['ccxt']:
-                default_config = merge_dicts(default_config, settings.data['ccxt'][exchange])
+            if exchange in ccxt_cfg:
+                default_config = merge_dicts(default_config, ccxt_cfg[exchange])
             config = merge_dicts(default_config, config)
             exchange = getattr(ccxt, exchange)(config)
         else:

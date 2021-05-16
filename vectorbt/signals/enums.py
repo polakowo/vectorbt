@@ -24,7 +24,7 @@ StopType = StopTypeT(*range(3))
 
 __pdoc__['StopType'] = f"""Stop type.
 
-```plaintext
-{json.dumps(dict(zip(StopType._fields, StopType)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(StopType._fields, StopType)), indent=4, default=str)}
 ```
 """

@@ -7,6 +7,7 @@ from collections import namedtuple
 from itertools import product, combinations
 import asyncio
 import pytz
+from copy import copy, deepcopy
 
 from vectorbt import settings
 from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr, datetime, schedule
@@ -20,59 +21,133 @@ seed = 42
 # ############# config.py ############# #
 
 class TestConfig:
-    def test_config(self):
-        conf = config.Config({'a': 0, 'b': {'c': 1}}, frozen=False)
-        conf['b']['d'] = 2
+    def test_copy_dict(self):
+        def _init_dict():
+            return dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[4, 5, 6]))
 
-        conf = config.Config({'a': 0, 'b': {'c': 1}}, frozen=True)
-        conf['a'] = 2
+        dct = _init_dict()
+        _dct = config.copy_dict(dct, 'shallow', nested=False)
+        _dct['const'] = 2
+        _dct['dct']['const'] = 3
+        _dct['lst'][0] = 0
+        _dct['dct']['lst'][0] = 0
+        assert dct == dict(const=0, lst=[0, 2, 3], dct=dict(const=3, lst=[0, 5, 6]))
 
+        dct = _init_dict()
+        _dct = config.copy_dict(dct, 'shallow', nested=True)
+        _dct['const'] = 2
+        _dct['dct']['const'] = 3
+        _dct['lst'][0] = 0
+        _dct['dct']['lst'][0] = 0
+        assert dct == dict(const=0, lst=[0, 2, 3], dct=dict(const=1, lst=[0, 5, 6]))
+
+        dct = _init_dict()
+        _dct = config.copy_dict(dct, 'hybrid', nested=False)
+        _dct['const'] = 2
+        _dct['dct']['const'] = 3
+        _dct['lst'][0] = 0
+        _dct['dct']['lst'][0] = 0
+        assert dct == dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[0, 5, 6]))
+
+        dct = _init_dict()
+        _dct = config.copy_dict(dct, 'hybrid', nested=True)
+        _dct['const'] = 2
+        _dct['dct']['const'] = 3
+        _dct['lst'][0] = 0
+        _dct['dct']['lst'][0] = 0
+        assert dct == dict(const=0, lst=[1, 2, 3], dct=dict(const=1, lst=[4, 5, 6]))
+
+        def init_config_(**kwargs):
+            return config.Config(dict(lst=[1, 2, 3], dct=config.Config(dict(lst=[4, 5, 6]), **kwargs)), **kwargs)
+
+        cfg = init_config_(readonly=True)
+        _cfg = config.copy_dict(cfg, 'shallow', nested=False)
+        assert isinstance(_cfg, config.Config)
+        assert _cfg.readonly_
+        assert isinstance(_cfg['dct'], config.Config)
+        assert _cfg['dct'].readonly_
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        assert cfg['lst'] == [0, 2, 3]
+        assert cfg['dct']['lst'] == [0, 5, 6]
+
+        cfg = init_config_(readonly=True)
+        _cfg = config.copy_dict(cfg, 'shallow', nested=True)
+        assert isinstance(_cfg, config.Config)
+        assert _cfg.readonly_
+        assert isinstance(_cfg['dct'], config.Config)
+        assert _cfg['dct'].readonly_
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        assert cfg['lst'] == [0, 2, 3]
+        assert cfg['dct']['lst'] == [0, 5, 6]
+
+        cfg = init_config_(readonly=True)
+        _cfg = config.copy_dict(cfg, 'hybrid', nested=False)
+        assert isinstance(_cfg, config.Config)
+        assert _cfg.readonly_
+        assert isinstance(_cfg['dct'], config.Config)
+        assert _cfg['dct'].readonly_
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        assert cfg['lst'] == [1, 2, 3]
+        assert cfg['dct']['lst'] == [0, 5, 6]
+
+        cfg = init_config_(readonly=True)
+        _cfg = config.copy_dict(cfg, 'hybrid', nested=True)
+        assert isinstance(_cfg, config.Config)
+        assert _cfg.readonly_
+        assert isinstance(_cfg['dct'], config.Config)
+        assert _cfg['dct'].readonly_
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        assert cfg['lst'] == [1, 2, 3]
+        assert cfg['dct']['lst'] == [4, 5, 6]
+
+        cfg = init_config_(readonly=True)
+        _cfg = config.copy_dict(cfg, 'deep')
+        assert isinstance(_cfg, config.Config)
+        assert _cfg.readonly_
+        assert isinstance(_cfg['dct'], config.Config)
+        assert _cfg['dct'].readonly_
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        assert cfg['lst'] == [1, 2, 3]
+        assert cfg['dct']['lst'] == [4, 5, 6]
+
+    def test_update_dict(self):
+        def init_config_(**kwargs):
+            return config.Config(dict(a=0, b=config.Config(dict(c=1), **kwargs)), **kwargs)
+
+        cfg = init_config_()
+        config.update_dict(cfg, dict(a=1), nested=False)
+        assert cfg == config.Config(dict(a=1, b=config.Config(dict(c=1))))
+
+        cfg = init_config_()
+        config.update_dict(cfg, dict(b=dict(c=2)), nested=False)
+        assert cfg == config.Config(dict(a=0, b=dict(c=2)))
+
+        cfg = init_config_()
+        config.update_dict(cfg, dict(b=dict(c=2)), nested=True)
+        assert cfg == config.Config(dict(a=0, b=config.Config(dict(c=2))))
+
+        cfg = init_config_(readonly=True)
         with pytest.raises(Exception):
-            conf['d'] = 2
+            config.update_dict(cfg, dict(b=dict(c=2)), nested=True)
 
-        with pytest.raises(Exception):
-            conf.update(d=2)
+        cfg = init_config_(readonly=True)
+        config.update_dict(cfg, dict(b=dict(c=2)), nested=True, force=True)
+        assert cfg == config.Config(dict(a=0, b=config.Config(dict(c=2))))
+        assert cfg.readonly_
+        assert cfg['b'].readonly_
 
-        conf.update(d=2, force_update=True)
-        assert conf['d'] == 2
-
-        conf = config.Config({'a': 0, 'b': {'c': 1}}, read_only=True)
-
-        with pytest.raises(Exception):
-            conf['a'] = 2
-
-        with pytest.raises(Exception):
-            del conf['a']
-
-        with pytest.raises(Exception):
-            conf.pop('a')
-
-        with pytest.raises(Exception):
-            conf.popitem()
-
-        with pytest.raises(Exception):
-            conf.clear()
-
-        with pytest.raises(Exception):
-            conf.update(a=2)
-
-        assert isinstance(conf.merge_with(dict(b=dict(d=2))), config.Config)
-        assert conf.merge_with(dict(b=dict(d=2)), read_only=True).read_only
-        assert conf.merge_with(dict(b=dict(d=2)))['b']['d'] == 2
-
-        conf = config.Config({'a': 0, 'b': {'c': [1, 2]}})
-        conf['a'] = 1
-        conf['b']['c'].append(3)
-        conf['b']['d'] = 2
-        assert conf == {'a': 1, 'b': {'c': [1, 2, 3], 'd': 2}}
-        conf.reset()
-        assert conf == {'a': 0, 'b': {'c': [1, 2]}}
-
-    def test_get_func_kwargs(self):
-        def f(a, *args, b=2, **kwargs):
-            pass
-
-        assert config.get_func_kwargs(f) == {'b': 2}
+        cfg = init_config_(readonly=True)
+        config.update_dict(
+            cfg, config.Config(dict(b=config.Config(dict(c=2), readonly=False)), readonly=False),
+            nested=True, force=True)
+        assert cfg == config.Config(dict(a=0, b=config.Config(dict(c=2))))
+        assert cfg.readonly_
+        assert cfg['b'].readonly_
 
     def test_merge_dicts(self):
         assert config.merge_dicts({'a': 1}, {'b': 2}) == {'a': 1, 'b': 2}
@@ -80,7 +155,720 @@ class TestConfig:
         assert config.merge_dicts({'a': {'b': 2}}, {'a': {'c': 3}}) == {'a': {'b': 2, 'c': 3}}
         assert config.merge_dicts({'a': {'b': 2}}, {'a': {'b': 3}}) == {'a': {'b': 3}}
 
-    def test_configured(self):
+        def init_configs(**kwargs):
+            lists = [[1, 2, 3], [4, 5, 6], [7, 8, 9], [10, 11, 12]]
+            return lists, \
+                   config.Config(dict(lst=lists[0], dct=dict(a=1, lst=lists[1])), **kwargs), \
+                   dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]), **kwargs))
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=True,
+            copy_mode='shallow',
+            nested=False
+        )
+        assert _cfg == dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3])))
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [0, 8, 9]
+        assert _cfg['dct']['lst'] == [0, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=True,
+            copy_mode='shallow',
+            nested=True
+        )
+        assert _cfg == dict(lst=lists[2], dct=dict(a=1, b=2, lst=lists[3]))
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [0, 8, 9]
+        assert _cfg['dct']['lst'] == [0, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        cfg2['dct'] = config.atomic_dict(cfg2['dct'])
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=True,
+            copy_mode='shallow',
+            nested=True
+        )
+        assert _cfg == dict(lst=lists[2], dct=dict(b=2, lst=lists[3]))
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [0, 8, 9]
+        assert _cfg['dct']['lst'] == [0, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, config.atomic_dict(cfg2),
+            to_dict=True,
+            copy_mode='shallow',
+            nested=True
+        )
+        assert _cfg == config.atomic_dict(lst=lists[2], dct=dict(b=2, lst=lists[3]))
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [0, 8, 9]
+        assert _cfg['dct']['lst'] == [0, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=False,
+            copy_mode='shallow',
+            nested=False
+        )
+        assert _cfg == config.Config(dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]))))
+        assert _cfg.readonly_
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [0, 8, 9]
+        assert _cfg['dct']['lst'] == [0, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=False,
+            copy_mode='hybrid',
+            nested=False
+        )
+        assert _cfg == config.Config(dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]))))
+        assert _cfg.readonly_
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [7, 8, 9]
+        assert _cfg['dct']['lst'] == [0, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=False,
+            copy_mode='hybrid',
+            nested=True
+        )
+        assert _cfg == config.Config(dict(lst=lists[2], dct=dict(a=1, b=2, lst=lists[3])))
+        assert _cfg.readonly_
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [7, 8, 9]
+        assert _cfg['dct']['lst'] == [10, 11, 12]
+
+        lists, cfg1, cfg2 = init_configs(readonly=True)
+        _cfg = config.merge_dicts(
+            cfg1, cfg2,
+            to_dict=False,
+            copy_mode='deep',
+            nested=False
+        )
+        assert _cfg == config.Config(dict(lst=lists[2], dct=config.Config(dict(b=2, lst=lists[3]))))
+        assert _cfg.readonly_
+        lists[2][0] = 0
+        lists[3][0] = 0
+        assert _cfg['lst'] == [7, 8, 9]
+        assert _cfg['dct']['lst'] == [10, 11, 12]
+
+    def test_config_copy(self):
+        def init_config(**kwargs):
+            dct = dict(
+                const=0,
+                lst=[1, 2, 3],
+                dct=config.Config(dict(
+                    const=1,
+                    lst=[4, 5, 6]
+                ))
+            )
+            return dct, config.Config(dct, **kwargs)
+
+        dct, cfg = init_config(copy_kwargs=dict(copy_mode='shallow'))
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        dct['lst'][0] = 0
+        dct['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6])))
+
+        dct, cfg = init_config(copy_kwargs=dict(copy_mode='shallow'), nested=True)
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        dct['lst'][0] = 0
+        dct['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6])))
+
+        dct, cfg = init_config(copy_kwargs=dict(copy_mode='hybrid'), nested=True)
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        dct['lst'][0] = 0
+        dct['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+        dct, cfg = init_config(
+            copy_kwargs=dict(copy_mode='shallow'),
+            reset_dct_copy_kwargs=dict(copy_mode='hybrid'),
+            nested=True
+        )
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        dct['lst'][0] = 0
+        dct['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+        dct, cfg = init_config(copy_kwargs=dict(copy_mode='deep'), nested=True)
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        dct['lst'][0] = 0
+        dct['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+        init_d, _ = init_config()
+        init_d = config.copy_dict(init_d, 'deep')
+        dct, cfg = init_config(copy_kwargs=dict(copy_mode='hybrid'), reset_dct=init_d, nested=True)
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        init_d['lst'][0] = 0
+        init_d['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+        init_d, _ = init_config()
+        init_d = config.copy_dict(init_d, 'deep')
+        dct, cfg = init_config(
+            copy_kwargs=dict(copy_mode='hybrid'),
+            reset_dct=init_d,
+            reset_dct_copy_kwargs=dict(copy_mode='shallow'),
+            nested=True
+        )
+        assert isinstance(cfg['dct'], config.Config)
+        assert isinstance(cfg.reset_dct_['dct'], config.Config)
+        dct['const'] = 2
+        dct['dct']['const'] = 3
+        dct['lst'][0] = 0
+        dct['dct']['lst'][0] = 0
+        init_d['const'] = 2
+        init_d['dct']['const'] = 3
+        init_d['lst'][0] = 0
+        init_d['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6])))
+
+        _, cfg = init_config(nested=True)
+        _cfg = copy(cfg)
+        _cfg['const'] = 2
+        _cfg['dct']['const'] = 3
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        _cfg.reset_dct_['const'] = 2
+        _cfg.reset_dct_['dct']['const'] = 3
+        _cfg.reset_dct_['lst'][0] = 0
+        _cfg.reset_dct_['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=2, lst=[0, 2, 3], dct=config.Config(dict(const=3, lst=[0, 5, 6])))
+
+        _, cfg = init_config(nested=True)
+        _cfg = deepcopy(cfg)
+        _cfg['const'] = 2
+        _cfg['dct']['const'] = 3
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        _cfg.reset_dct_['const'] = 2
+        _cfg.reset_dct_['dct']['const'] = 3
+        _cfg.reset_dct_['lst'][0] = 0
+        _cfg.reset_dct_['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+        _, cfg = init_config(copy_kwargs=dict(copy_mode='hybrid'), nested=True)
+        _cfg = cfg.copy()
+        _cfg['const'] = 2
+        _cfg['dct']['const'] = 3
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        _cfg.reset_dct_['const'] = 2
+        _cfg.reset_dct_['dct']['const'] = 3
+        _cfg.reset_dct_['lst'][0] = 0
+        _cfg.reset_dct_['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+        _, cfg = init_config(copy_kwargs=dict(copy_mode='hybrid'), nested=True)
+        _cfg = cfg.copy(reset_dct_copy_kwargs=dict(copy_mode='shallow'))
+        _cfg['const'] = 2
+        _cfg['dct']['const'] = 3
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        _cfg.reset_dct_['const'] = 2
+        _cfg.reset_dct_['dct']['const'] = 3
+        _cfg.reset_dct_['lst'][0] = 0
+        _cfg.reset_dct_['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[0, 2, 3], dct=config.Config(dict(const=1, lst=[0, 5, 6])))
+
+        _, cfg = init_config(nested=True)
+        _cfg = cfg.copy(copy_mode='deep')
+        _cfg['const'] = 2
+        _cfg['dct']['const'] = 3
+        _cfg['lst'][0] = 0
+        _cfg['dct']['lst'][0] = 0
+        _cfg.reset_dct_['const'] = 2
+        _cfg.reset_dct_['dct']['const'] = 3
+        _cfg.reset_dct_['lst'][0] = 0
+        _cfg.reset_dct_['dct']['lst'][0] = 0
+        assert cfg == config.Config(dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6]))))
+        assert cfg.reset_dct_ == dict(const=0, lst=[1, 2, 3], dct=config.Config(dict(const=1, lst=[4, 5, 6])))
+
+    def test_config_convert_dicts(self):
+        cfg = config.Config(dict(dct=dict(dct=config.Config(dict()))), nested=True, convert_dicts=True)
+        assert cfg.nested_
+        assert cfg.convert_dicts_
+        assert isinstance(cfg['dct'], config.Config)
+        assert cfg['dct'].nested_
+        assert cfg['dct'].convert_dicts_
+        assert isinstance(cfg['dct']['dct'], config.Config)
+        assert not cfg['dct']['dct'].nested_
+        assert not cfg['dct']['dct'].convert_dicts_
+
+    def test_config_from_config(self):
+        cfg = config.Config(config.Config(
+            dct=dict(a=0),
+            copy_kwargs=dict(
+                copy_mode='deep',
+                nested=True
+            ),
+            reset_dct=dict(b=0),
+            reset_dct_copy_kwargs=dict(
+                copy_mode='deep',
+                nested=True
+            ),
+            frozen_keys=True,
+            readonly=True,
+            nested=True,
+            convert_dicts=True,
+            as_attrs=True
+        ))
+        assert dict(cfg) == dict(a=0)
+        assert cfg.copy_kwargs_ == dict(
+            copy_mode='deep',
+            nested=True
+        )
+        assert cfg.reset_dct_ == dict(b=0)
+        assert cfg.reset_dct_copy_kwargs_ == dict(
+            copy_mode='deep',
+            nested=True
+        )
+        assert cfg.frozen_keys_
+        assert cfg.readonly_
+        assert cfg.nested_
+        assert cfg.convert_dicts_
+        assert cfg.as_attrs_
+
+        c2 = config.Config(
+            dct=cfg,
+            copy_kwargs=dict(
+                copy_mode='hybrid'
+            ),
+            reset_dct=dict(b=0),
+            reset_dct_copy_kwargs=dict(
+                nested=False
+            ),
+            frozen_keys=False,
+            readonly=False,
+            nested=False,
+            convert_dicts=False,
+            as_attrs=False
+        )
+        assert dict(c2) == dict(a=0)
+        assert c2.copy_kwargs_ == dict(
+            copy_mode='hybrid',
+            nested=True
+        )
+        assert c2.reset_dct_ == dict(b=0)
+        assert c2.reset_dct_copy_kwargs_ == dict(
+            copy_mode='hybrid',
+            nested=False
+        )
+        assert not c2.frozen_keys_
+        assert not c2.readonly_
+        assert not c2.nested_
+        assert not c2.convert_dicts_
+        assert not c2.as_attrs_
+
+    def test_config_defaults(self):
+        cfg = config.Config(dict(a=0))
+        assert dict(cfg) == dict(a=0)
+        assert cfg.copy_kwargs_ == dict(
+            copy_mode='hybrid',
+            nested=False
+        )
+        assert cfg.reset_dct_ == dict(a=0)
+        assert cfg.reset_dct_copy_kwargs_ == dict(
+            copy_mode='hybrid',
+            nested=False
+        )
+        assert not cfg.frozen_keys_
+        assert not cfg.readonly_
+        assert not cfg.nested_
+        assert not cfg.convert_dicts_
+        assert not cfg.as_attrs_
+
+        settings.config.reset()
+        settings.config['copy_kwargs'] = dict(copy_mode='deep')
+        settings.config['reset_dct_copy_kwargs'] = dict(copy_mode='deep')
+        settings.config['frozen_keys'] = True
+        settings.config['readonly'] = True
+        settings.config['nested'] = True
+        settings.config['convert_dicts'] = True
+        settings.config['as_attrs'] = True
+
+        cfg = config.Config(dict(a=0))
+        assert dict(cfg) == dict(a=0)
+        assert cfg.copy_kwargs_ == dict(
+            copy_mode='deep',
+            nested=True
+        )
+        assert cfg.reset_dct_ == dict(a=0)
+        assert cfg.reset_dct_copy_kwargs_ == dict(
+            copy_mode='deep',
+            nested=True
+        )
+        assert cfg.frozen_keys_
+        assert cfg.readonly_
+        assert cfg.nested_
+        assert cfg.convert_dicts_
+        assert cfg.as_attrs_
+
+        settings.config.reset()
+
+    def test_config_as_attrs(self):
+        cfg = config.Config(dict(a=0, b=0, dct=dict(d=0)), as_attrs=True)
+        assert cfg.a == 0
+        assert cfg.b == 0
+        with pytest.raises(Exception):
+            assert cfg.dct.d == 0
+
+        cfg.e = 0
+        assert cfg['e'] == 0
+        cfg['f'] = 0
+        assert cfg.f == 0
+        with pytest.raises(Exception):
+            assert cfg.g == 0
+        del cfg['f']
+        with pytest.raises(Exception):
+            assert cfg.f == 0
+        del cfg.e
+        with pytest.raises(Exception):
+            assert cfg['e'] == 0
+        cfg.clear()
+        assert dict(cfg) == dict()
+        assert not hasattr(cfg, 'a')
+        assert not hasattr(cfg, 'b')
+        cfg.a = 0
+        cfg.b = 0
+        cfg.pop('a')
+        assert not hasattr(cfg, 'a')
+        cfg.popitem()
+        assert not hasattr(cfg, 'b')
+
+        cfg = config.Config(dict(a=0, b=0, dct=dict(d=0)), as_attrs=True, nested=True, convert_dicts=True)
+        assert cfg.a == 0
+        assert cfg.b == 0
+        assert cfg.dct.d == 0
+
+        with pytest.raises(Exception):
+            _ = config.Config(dict(readonly_=True), as_attrs=True)
+        with pytest.raises(Exception):
+            _ = config.Config(dict(values=True), as_attrs=True)
+        with pytest.raises(Exception):
+            _ = config.Config(dict(update=True), as_attrs=True)
+
+    def test_config_frozen_keys(self):
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg.pop('a')
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg.popitem()
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg.clear()
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg.update(dict(a=1))
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg.update(dict(b=0))
+        assert dict(cfg) == dict(a=0, b=0)
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        del cfg['a']
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg['a'] = 1
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), frozen_keys=False)
+        cfg['b'] = 0
+        assert dict(cfg) == dict(a=0, b=0)
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        with pytest.raises(Exception):
+            cfg.pop('a')
+        cfg.pop('a', force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        with pytest.raises(Exception):
+            cfg.popitem()
+        cfg.popitem(force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        with pytest.raises(Exception):
+            cfg.clear()
+        cfg.clear(force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        cfg.update(dict(a=1))
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        with pytest.raises(Exception):
+            cfg.update(dict(b=0))
+        cfg.update(dict(b=0), force=True)
+        assert dict(cfg) == dict(a=0, b=0)
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        with pytest.raises(Exception):
+            del cfg['a']
+        cfg.__delitem__('a', force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        cfg['a'] = 1
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), frozen_keys=True)
+        with pytest.raises(Exception):
+            cfg['b'] = 0
+        cfg.__setitem__('b', 0, force=True)
+        assert dict(cfg) == dict(a=0, b=0)
+
+    def test_config_readonly(self):
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg.pop('a')
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg.popitem()
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg.clear()
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg.update(dict(a=1))
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg.update(dict(b=0))
+        assert dict(cfg) == dict(a=0, b=0)
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        del cfg['a']
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg['a'] = 1
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), readonly=False)
+        cfg['b'] = 0
+        assert dict(cfg) == dict(a=0, b=0)
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg.pop('a')
+        cfg.pop('a', force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg.popitem()
+        cfg.popitem(force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg.clear()
+        cfg.clear(force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg.update(dict(a=1))
+        cfg.update(dict(a=1), force=True)
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg.update(dict(b=0))
+        cfg.update(dict(b=0), force=True)
+        assert dict(cfg) == dict(a=0, b=0)
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            del cfg['a']
+        cfg.__delitem__('a', force=True)
+        assert dict(cfg) == dict()
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg['a'] = 1
+        cfg.__setitem__('a', 1, force=True)
+        assert dict(cfg) == dict(a=1)
+
+        cfg = config.Config(dict(a=0), readonly=True)
+        with pytest.raises(Exception):
+            cfg['b'] = 0
+        cfg.__setitem__('b', 0, force=True)
+        assert dict(cfg) == dict(a=0, b=0)
+
+    def test_config_merge_with(self):
+        cfg1 = config.Config(dict(a=0, dct=dict(b=1, dct=config.Config(dict(c=2), readonly=False))), readonly=False)
+        cfg2 = config.Config(dict(d=3, dct=config.Config(dict(e=4, dct=dict(f=5)), readonly=True)), readonly=True)
+        _cfg = cfg1.merge_with(cfg2)
+        assert _cfg == dict(a=0, d=3, dct=cfg2['dct'])
+        assert not isinstance(_cfg, config.Config)
+        assert isinstance(_cfg['dct'], config.Config)
+        assert not isinstance(_cfg['dct']['dct'], config.Config)
+
+        _cfg = cfg1.merge_with(cfg2, to_dict=False, nested=False)
+        assert _cfg == config.Config(dict(a=0, d=3, dct=cfg2['dct']))
+        assert not _cfg.readonly_
+        assert isinstance(_cfg['dct'], config.Config)
+        assert _cfg['dct'].readonly_
+        assert not isinstance(_cfg['dct']['dct'], config.Config)
+
+        _cfg = cfg1.merge_with(cfg2, to_dict=False, nested=True)
+        assert _cfg == config.Config(dict(a=0, d=3, dct=dict(b=1, e=4, dct=config.Config(dict(c=2, f=5)))))
+        assert not _cfg.readonly_
+        assert not isinstance(_cfg['dct'], config.Config)
+        assert isinstance(_cfg['dct']['dct'], config.Config)
+        assert not _cfg['dct']['dct'].readonly_
+
+    def test_config_reset(self):
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs=dict(copy_mode='shallow'))
+        cfg['a'] = 1
+        cfg['dct']['b'] = 1
+        cfg.reset()
+        assert cfg == config.Config(dict(a=0, dct=dict(b=1)))
+
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs=dict(copy_mode='hybrid'))
+        cfg['a'] = 1
+        cfg['dct']['b'] = 1
+        cfg.reset()
+        assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
+
+        cfg = config.Config(dict(a=0, dct=dict(b=0)), copy_kwargs=dict(copy_mode='deep'))
+        cfg['a'] = 1
+        cfg['dct']['b'] = 1
+        cfg.reset()
+        assert cfg == config.Config(dict(a=0, dct=dict(b=0)))
+
+    def test_config_save_and_load(self, tmp_path):
+        cfg = config.Config(
+            dct=dict(a=0, dct=dict(b=[1, 2, 3], dct=config.Config(readonly=False))),
+            copy_kwargs=dict(
+                copy_mode='deep',
+                nested=True
+            ),
+            reset_dct=dict(b=0),
+            reset_dct_copy_kwargs=dict(
+                copy_mode='deep',
+                nested=True
+            ),
+            frozen_keys=True,
+            readonly=True,
+            nested=True,
+            convert_dicts=True,
+            as_attrs=True
+        )
+        cfg.save(tmp_path / "config")
+        new_cfg = config.Config.load(tmp_path / "config")
+        assert new_cfg == deepcopy(cfg)
+        assert new_cfg.__dict__ == deepcopy(cfg).__dict__
+
+    def test_config_load_update(self, tmp_path):
+        cfg1 = config.Config(
+            dct=dict(a=0, dct=dict(b=[1, 2, 3], dct=config.Config(readonly=False))),
+            copy_kwargs=dict(
+                copy_mode='deep',
+                nested=True
+            ),
+            reset_dct=dict(b=0),
+            reset_dct_copy_kwargs=dict(
+                copy_mode='deep',
+                nested=True
+            ),
+            frozen_keys=True,
+            readonly=True,
+            nested=True,
+            convert_dicts=True,
+            as_attrs=True
+        )
+        cfg2 = config.Config(
+            dct=dict(a=1, dct=dict(b=[4, 5, 6], dct=config.Config(readonly=True))),
+            copy_kwargs=dict(
+                copy_mode='shallow',
+                nested=False
+            ),
+            reset_dct=dict(b=1),
+            reset_dct_copy_kwargs=dict(
+                copy_mode='shallow',
+                nested=False
+            ),
+            frozen_keys=False,
+            readonly=False,
+            nested=False,
+            convert_dicts=False,
+            as_attrs=False
+        )
+        cfg1.save(tmp_path / "config")
+        cfg2.load_update(tmp_path / "config")
+        assert cfg2 == deepcopy(cfg1)
+        assert cfg2.__dict__ == cfg1.__dict__
+
+    def test_get_func_kwargs(self):
+        def f(a, *args, b=2, **kwargs):
+            pass
+
+        assert config.get_func_kwargs(f) == {'b': 2}
+
+    def test_configured(self, tmp_path):
         class H(config.Configured):
             def __init__(self, a, b=2, **kwargs):
                 super().__init__(a=a, b=b, **kwargs)
@@ -98,6 +886,11 @@ class TestConfig:
         assert H(np.array([1, 2, 3])) != H(np.array([1, 2, 4]))
         assert H(None) == H(None)
         assert H(None) != H(10.)
+
+        H(1).save(tmp_path / "configured")
+        new_cfgd = H.load(tmp_path / "configured")
+        assert new_cfgd == H(1)
+        assert new_cfgd.__dict__ == H(1).__dict__
 
 
 # ############# decorators.py ############# #
@@ -119,751 +912,504 @@ class TestDecorators:
             @decorators.custom_property(some='key')
             def cache_me(self): return np.random.uniform()
 
-        assert 'some' in G.cache_me.kwargs
-        assert G.cache_me.kwargs['some'] == 'key'
+        assert 'some' in G.cache_me.flags
+        assert G.cache_me.flags['some'] == 'key'
 
     def test_custom_method(self):
         class G:
             @decorators.custom_method(some='key')
             def cache_me(self): return np.random.uniform()
 
-        assert 'some' in G.cache_me.kwargs
-        assert G.cache_me.kwargs['some'] == 'key'
+        assert 'some' in G.cache_me.flags
+        assert G.cache_me.flags['some'] == 'key'
 
-    def test_cached_property(self):
+    @pytest.mark.parametrize(
+        "test_property,test_blacklist",
+        [
+            (True, True),
+            (True, False),
+            (False, True),
+            (False, False)
+        ]
+    )
+    def test_caching(self, test_property, test_blacklist):
         np.random.seed(seed)
+        
+        if test_property:
+            call = lambda x: x
+        else:
+            call = lambda x: x()
+        
+        if test_property:
 
-        class G:
-            @decorators.cached_property
-            def cache_me(self): return np.random.uniform()
+            class G:
+                @decorators.cached_property
+                def cache_me(self): return np.random.uniform()
+    
+            g = G()
+            cached_number = g.cache_me
+            assert g.cache_me == cached_number
+    
+            class G:
+                @decorators.cached_property(a=0, b=0)
+                def cache_me(self): return np.random.uniform()
+    
+            assert G.cache_me.flags == dict(a=0, b=0)
+    
+            g = G()
+            g2 = G()
+    
+            class G3(G):
+                @decorators.cached_property(b=0, c=0)
+                def cache_me(self): return np.random.uniform()
+    
+            g3 = G3()
+            
+        else:
+            
+            class G:
+                @decorators.cached_method
+                def cache_me(self): return np.random.uniform()
 
-        g = G()
-        cached_number = g.cache_me
-        assert g.cache_me == cached_number
+            g = G()
+            cached_number = g.cache_me()
+            assert g.cache_me() == cached_number
 
-        class G:
-            @decorators.cached_property(hello="world", hello2="world2")
-            def cache_me(self): return np.random.uniform()
+            class G:
+                @decorators.cached_method(a=0, b=0)
+                def cache_me(self): return np.random.uniform()
 
-        assert 'hello' in G.cache_me.kwargs
-        assert G.cache_me.kwargs['hello'] == 'world'
+            assert G.cache_me.flags == dict(a=0, b=0)
+            g = G()
+            assert g.cache_me.flags == dict(a=0, b=0)
+            g2 = G()
 
-        g = G()
-        g2 = G()
+            class G3(G):
+                @decorators.cached_method(b=0, c=0)
+                def cache_me(self): return np.random.uniform()
 
-        class G3(G):
-            pass
+            g3 = G3()
 
-        g3 = G3()
-
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert call(g.cache_me) == cached_number
+        assert call(g2.cache_me) == cached_number2
+        assert call(g3.cache_me) == cached_number3
 
         # clear_cache method
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
         G.cache_me.clear_cache(g)
-        assert g.cache_me != cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
+        assert call(g.cache_me) != cached_number
+        assert call(g2.cache_me) == cached_number2
+        assert call(g3.cache_me) == cached_number3
 
-        # test blacklist
-
-        # instance + name
+        # ranks
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append((g, 'cache_me'))
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
+        settings.caching['enabled'] = True
+        settings.caching['blacklist'].append(decorators.CacheCondition(instance=g))
+        settings.caching['blacklist'].append(decorators.CacheCondition(cls=G))
+        settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert call(g.cache_me) != cached_number
+        assert call(g2.cache_me) == cached_number2
+        assert call(g3.cache_me) == cached_number3
         settings.caching.reset()
 
-        # name
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('cache_me')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
+        settings.caching['enabled'] = True
+        settings.caching['blacklist'].append(decorators.CacheCondition(cls=G))
+        settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert call(g.cache_me) == cached_number
+        assert call(g2.cache_me) == cached_number2
+        assert call(g3.cache_me) == cached_number3
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = True
+        settings.caching['blacklist'].append(decorators.CacheCondition(cls=G, rank=0))
+        settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert call(g.cache_me) != cached_number
+        assert call(g2.cache_me) != cached_number2
+        assert call(g3.cache_me) == cached_number3
+        settings.caching.reset()
+
+        # test list
+
+        if test_blacklist:
+            lst = 'blacklist'
+        else:
+            lst = 'whitelist'
+        
+        def compare(a, b):
+            if test_blacklist:
+                return a != b
+            return a == b
+        
+        def not_compare(a, b):
+            if test_blacklist:
+                return a == b
+            return a != b
+
+        # condition health
+        G.cache_me.clear_cache(g)
+        settings.caching[lst].append(decorators.CacheCondition(func=True))
+        with pytest.raises(Exception):
+            _ = call(g.cache_me)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        settings.caching[lst].append(decorators.CacheCondition(cls=True))
+        with pytest.raises(Exception):
+            _ = call(g.cache_me)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        settings.caching[lst].append(decorators.CacheCondition(base_cls=True))
+        with pytest.raises(Exception):
+            _ = call(g.cache_me)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        settings.caching[lst].append(decorators.CacheCondition(flags=True))
+        with pytest.raises(Exception):
+            _ = call(g.cache_me)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        settings.caching[lst].append(decorators.CacheCondition(rank='test'))
+        with pytest.raises(Exception):
+            _ = call(g.cache_me)
+        settings.caching.reset()
+
+        # instance + func
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(instance=g, func=G.cache_me))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        if not test_property:
+            G.cache_me.clear_cache(g)
+            G.cache_me.clear_cache(g2)
+            G3.cache_me.clear_cache(g3)
+            settings.caching['enabled'] = test_blacklist
+            settings.caching[lst].append(decorators.CacheCondition(instance=g, func=g.cache_me))
+            cached_number = call(g.cache_me)
+            cached_number2 = call(g2.cache_me)
+            cached_number3 = call(g3.cache_me)
+            assert compare(call(g.cache_me), cached_number)
+            assert not_compare(call(g2.cache_me), cached_number2)
+            assert not_compare(call(g3.cache_me), cached_number3)
+            settings.caching.reset()
+
+        # instance + func_name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(instance=g, func='cache_me'))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # instance + flags
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(instance=g, flags=dict(a=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(instance=g, flags=dict(c=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert not_compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
 
         # instance
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append(g)
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(instance=g))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
 
-        # class + name
+        # class + func_name
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append((G, 'cache_me'))
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me == cached_number3
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(cls=G, func='cache_me'))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # class + flags
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(cls=G, flags=dict(a=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
 
         # class
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append(G)
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        # class name + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('G.cache_me')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        # class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('G')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        # improper class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('g')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        # kwargs
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append({'hello': 'world'})
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(cls=G))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2'})
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(cls="G"))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # base class + func_name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(base_cls=G, func='cache_me'))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # base class + flags
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(base_cls=G, flags=dict(a=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(base_cls=G, flags=dict(c=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert not_compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # base class
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(base_cls=G))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(base_cls="G"))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(base_cls=G3))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert not_compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # func_name and flags
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(func='cache_me', flags=dict(a=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(func='cache_me', flags=dict(c=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert not_compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # func_name
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(func='cache_me'))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        # flags
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(flags=dict(a=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(flags=dict(c=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert not_compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
+        settings.caching.reset()
+
+        G.cache_me.clear_cache(g)
+        G.cache_me.clear_cache(g2)
+        G3.cache_me.clear_cache(g3)
+        settings.caching['enabled'] = test_blacklist
+        settings.caching[lst].append(decorators.CacheCondition(flags=dict(d=0)))
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert not_compare(call(g.cache_me), cached_number)
+        assert not_compare(call(g2.cache_me), cached_number2)
+        assert not_compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
 
         # disabled globally
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
+        settings.caching['enabled'] = not test_blacklist
+        cached_number = call(g.cache_me)
+        cached_number2 = call(g2.cache_me)
+        cached_number3 = call(g3.cache_me)
+        assert compare(call(g.cache_me), cached_number)
+        assert compare(call(g2.cache_me), cached_number2)
+        assert compare(call(g3.cache_me), cached_number3)
         settings.caching.reset()
-
-        # test whitelist
-
-        # instance + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append((g, 'cache_me'))
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('cache_me')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        # instance
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append(g)
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # class + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append((G, 'cache_me'))
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # class
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append(G)
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # class name + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('G.cache_me')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('G')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # improper class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('g')
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-        # kwargs
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append({'hello': 'world'})
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2'})
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me == cached_number
-        assert g2.cache_me == cached_number2
-        assert g3.cache_me == cached_number3
-        settings.caching.reset()
-
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
-        cached_number = g.cache_me
-        cached_number2 = g2.cache_me
-        cached_number3 = g3.cache_me
-        assert g.cache_me != cached_number
-        assert g2.cache_me != cached_number2
-        assert g3.cache_me != cached_number3
-        settings.caching.reset()
-
-    def test_cached_method(self):
-        np.random.seed(seed)
-
-        class G:
-            @decorators.cached_method
-            def cache_me(self, b=None): return np.random.uniform()
-
-        g = G()
-        cached_number = g.cache_me
-        assert g.cache_me == cached_number
-
-        class G:
-            @decorators.cached_method(hello="world", hello2="world2")
-            def cache_me(self, b=None): return np.random.uniform()
-
-        assert 'hello' in G.cache_me.kwargs
-        assert G.cache_me.kwargs['hello'] == 'world'
-
-        g = G()
-        g2 = G()
-
-        class G3(G):
-            pass
-
-        g3 = G3()
-
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-
-        # clear_cache method
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        G.cache_me.clear_cache(g)
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-
-        # test blacklist
-
-        # function
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append(g.cache_me)
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # instance + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append((g, 'cache_me'))
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('cache_me')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # instance
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append(g)
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # class + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append((G, 'cache_me'))
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # class
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append(G)
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # class name + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('G.cache_me')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('G')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # improper class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append('g')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # kwargs
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append({'hello': 'world'})
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2'})
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['blacklist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # disabled globally
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # test whitelist
-
-        # function
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append(g.cache_me)
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # instance + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append((g, 'cache_me'))
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('cache_me')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        # instance
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append(g)
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # class + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append((G, 'cache_me'))
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # class
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append(G)
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # class name + name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('G.cache_me')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('G')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # improper class name
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append('g')
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # kwargs
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append({'hello': 'world'})
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2'})
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() == cached_number
-        assert g2.cache_me() == cached_number2
-        assert g3.cache_me() == cached_number3
-        settings.caching.reset()
-
-        G.cache_me.clear_cache(g)
-        G.cache_me.clear_cache(g2)
-        G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = False
-        settings.caching['whitelist'].append({'hello': 'world', 'hello2': 'world2', 'hello3': 'world3'})
-        cached_number = g.cache_me()
-        cached_number2 = g2.cache_me()
-        cached_number3 = g3.cache_me()
-        assert g.cache_me() != cached_number
-        assert g2.cache_me() != cached_number2
-        assert g3.cache_me() != cached_number3
-        settings.caching.reset()
-
-        # disabled by non-hashable args
-        G.cache_me.clear_cache(g)
-        cached_number = g.cache_me(b=np.zeros(1))
-        assert g.cache_me(b=np.zeros(1)) != cached_number
 
 
 # ############# attr.py ############# #
@@ -908,30 +1454,6 @@ class TestAttrs:
         assert attr.deep_getattr(C(), ['b', ('b', (1,))]) == 1
         assert attr.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
         assert attr.deep_getattr(C(), 'b.b_prop') == 1
-
-    def test_traverse_attr_kwargs(self):
-        class A:
-            @decorators.custom_property(some_key=0)
-            def a(self): pass
-
-        class B:
-            @decorators.cached_property(some_key=0, child_cls=A)
-            def a(self): pass
-
-            @decorators.custom_method(some_key=1)
-            def b(self): pass
-
-        class C:
-            @decorators.cached_method(some_key=0, child_cls=B)
-            def b(self): pass
-
-            @decorators.custom_property(some_key=1)
-            def c(self): pass
-
-        assert hash(str(attr.traverse_attr_kwargs(C))) == 2963162802907041721
-        assert hash(str(attr.traverse_attr_kwargs(C, key='some_key'))) == 2963162802907041721
-        assert hash(str(attr.traverse_attr_kwargs(C, key='some_key', value=1))) == 8774823009175420311
-        assert hash(str(attr.traverse_attr_kwargs(C, key='some_key', value=(0, 1)))) == 2963162802907041721
 
 
 # ############# checks.py ############# #
@@ -1135,6 +1657,68 @@ class TestChecks:
         assert not checks.is_deep_equal(0, 1)
         assert checks.is_deep_equal(lambda x: x, lambda x: x)
         assert not checks.is_deep_equal(lambda x: x, lambda x: 2 * x)
+
+    def test_is_instance_of(self):
+        class _A:
+            pass
+
+        class A:
+            pass
+
+        class B:
+            pass
+
+        class C(B):
+            pass
+
+        class D(A, C):
+            pass
+
+        d = D()
+
+        assert not checks.is_instance_of(d, _A)
+        assert checks.is_instance_of(d, A)
+        assert checks.is_instance_of(d, B)
+        assert checks.is_instance_of(d, C)
+        assert checks.is_instance_of(d, D)
+        assert checks.is_instance_of(d, object)
+
+        assert not checks.is_instance_of(d, '_A')
+        assert checks.is_instance_of(d, 'A')
+        assert checks.is_instance_of(d, 'B')
+        assert checks.is_instance_of(d, 'C')
+        assert checks.is_instance_of(d, 'D')
+        assert checks.is_instance_of(d, 'object')
+
+    def test_is_subclass_of(self):
+        class _A:
+            pass
+
+        class A:
+            pass
+
+        class B:
+            pass
+
+        class C(B):
+            pass
+
+        class D(A, C):
+            pass
+
+        assert not checks.is_subclass_of(D, _A)
+        assert checks.is_subclass_of(D, A)
+        assert checks.is_subclass_of(D, B)
+        assert checks.is_subclass_of(D, C)
+        assert checks.is_subclass_of(D, D)
+        assert checks.is_subclass_of(D, object)
+
+        assert not checks.is_subclass_of(D, '_A')
+        assert checks.is_subclass_of(D, 'A')
+        assert checks.is_subclass_of(D, 'B')
+        assert checks.is_subclass_of(D, 'C')
+        assert checks.is_subclass_of(D, 'D')
+        assert checks.is_subclass_of(D, 'object')
 
     def test_assert_in(self):
         checks.assert_in(0, (0, 1))

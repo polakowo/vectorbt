@@ -26,18 +26,20 @@ class Figure(_Figure, FigureMixin):
 
     def __init__(self, *args, **kwargs) -> None:
         """Extends `plotly.graph_objects.Figure`."""
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
-        self.update_layout(**merge_dicts(settings.layout, layout))
+        self.update_layout(**merge_dicts(plotting_cfg['layout'], layout))
 
     def show(self, *args, **kwargs) -> None:
         """Show the figure."""
-        from vectorbt.settings import plotting
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
-        show_kwargs = merge_dicts(fig_kwargs, plotting['show'], kwargs)
+        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg['show_kwargs'], kwargs)
         _Figure.show(self, *args, **show_kwargs)
 
 
@@ -46,28 +48,32 @@ class FigureWidget(_FigureWidget, FigureMixin):
 
     def __init__(self, *args, **kwargs) -> None:
         """Extends `plotly.graph_objects.FigureWidget`."""
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         layout = kwargs.pop('layout', {})
         super().__init__(*args, **kwargs)
-        self.update_layout(**merge_dicts(settings.layout, layout))
+        self.update_layout(**merge_dicts(plotting_cfg['layout'], layout))
 
     def show(self, *args, **kwargs) -> None:
         """Show the figure."""
-        from vectorbt.settings import plotting
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         fig_kwargs = dict(width=self.layout.width, height=self.layout.height)
-        show_kwargs = merge_dicts(fig_kwargs, plotting['show'], kwargs)
+        show_kwargs = merge_dicts(fig_kwargs, plotting_cfg['show_kwargs'], kwargs)
         _Figure.show(self, *args, **show_kwargs)
 
 
 def make_figure(*args, **kwargs) -> tp.BaseFigure:
     """Make new figure.
 
-    Returns either `Figure` or `FigureWidget`, depending on `use_widgets` in `vectorbt.settings.plotting`."""
-    from vectorbt import settings
+    Returns either `Figure` or `FigureWidget`, depending on `use_widgets`
+    defined under `plotting` in `vectorbt._settings.settings`."""
+    from vectorbt._settings import settings
+    plotting_cfg = settings['plotting']
 
-    if settings.plotting['use_widgets']:
+    if plotting_cfg['use_widgets']:
         return FigureWidget(*args, **kwargs)
     return Figure(*args, **kwargs)
 

@@ -1034,7 +1034,8 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
 
         ![](/vectorbt/docs/img/signals_plot_as_markers.svg)
         """
-        from vectorbt.settings import contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         if y is None:
             y = pd.Series.vbt.empty_like(self._obj, 1)
@@ -1045,11 +1046,11 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
             trace_kwargs=dict(
                 marker=dict(
                     symbol='circle',
-                    color=contrast_color_schema['blue'],
+                    color=plotting_cfg['contrast_color_schema']['blue'],
                     size=7,
                     line=dict(
                         width=1,
-                        color=adjust_lightness(contrast_color_schema['blue'])
+                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['blue'])
                     )
                 )
             )
@@ -1060,17 +1061,18 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         """Plot signals as entry markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
-        from vectorbt.settings import contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         return self.plot_as_markers(y=y, **merge_dicts(dict(
             trace_kwargs=dict(
                 marker=dict(
                     symbol='triangle-up',
-                    color=contrast_color_schema['green'],
+                    color=plotting_cfg['contrast_color_schema']['green'],
                     size=8,
                     line=dict(
                         width=1,
-                        color=adjust_lightness(contrast_color_schema['green'])
+                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['green'])
                     )
                 ),
                 name='Entry'
@@ -1082,17 +1084,18 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         """Plot signals as exit markers.
 
         See `SignalsSRAccessor.plot_as_markers`."""
-        from vectorbt.settings import contrast_color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         return self.plot_as_markers(y=y, **merge_dicts(dict(
             trace_kwargs=dict(
                 marker=dict(
                     symbol='triangle-down',
-                    color=contrast_color_schema['red'],
+                    color=plotting_cfg['contrast_color_schema']['red'],
                     size=8,
                     line=dict(
                         width=1,
-                        color=adjust_lightness(contrast_color_schema['red'])
+                        color=adjust_lightness(plotting_cfg['contrast_color_schema']['red'])
                     )
                 ),
                 name='Exit'

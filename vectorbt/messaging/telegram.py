@@ -71,8 +71,8 @@ class TelegramBot(Configured):
 
     See [Extensions – Your first Bot](https://github.com/python-telegram-bot/python-telegram-bot/wiki/Extensions-%E2%80%93-Your-first-Bot).
 
-    `**kwargs` are passed to `telegram.ext.updater.Updater` and override settings
-    under `telegram` in `vectorbt.settings.messaging`.
+    `**kwargs` are passed to `telegram.ext.updater.Updater` and override
+    settings under `messaging.telegram` in `vectorbt._settings.settings`.
 
     ## Example
 
@@ -134,7 +134,9 @@ class TelegramBot(Configured):
     ```"""
 
     def __init__(self, giphy_kwargs: tp.KwargsLike = None, **kwargs) -> None:
-        from vectorbt import settings
+        from vectorbt._settings import settings
+        telegram_cfg = settings['messaging']['telegram']
+        giphy_cfg = settings['messaging']['giphy']
 
         Configured.__init__(
             self,
@@ -143,13 +145,13 @@ class TelegramBot(Configured):
         )
 
         # Resolve kwargs
-        giphy_kwargs = merge_dicts(settings.messaging['giphy'], giphy_kwargs)
+        giphy_kwargs = merge_dicts(giphy_cfg, giphy_kwargs)
         self.giphy_kwargs = giphy_kwargs
         default_kwargs = dict()
         passed_kwargs = dict()
         for k in get_func_kwargs(Updater):
-            if k in settings.messaging['telegram']:
-                default_kwargs[k] = settings.messaging['telegram'][k]
+            if k in telegram_cfg:
+                default_kwargs[k] = telegram_cfg[k]
             if k in kwargs:
                 passed_kwargs[k] = kwargs.pop(k)
         updater_kwargs = merge_dicts(default_kwargs, passed_kwargs)
@@ -216,15 +218,16 @@ class TelegramBot(Configured):
         """Start the bot.
 
         `**kwargs` are passed to `telegram.ext.updater.Updater.start_polling`
-        and override settings under `telegram` in `vectorbt.settings.messaging`."""
-        from vectorbt import settings
+        and override settings under `messaging.telegram` in `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        telegram_cfg = settings['messaging']['telegram']
 
         # Resolve kwargs
         default_kwargs = dict()
         passed_kwargs = dict()
         for k in get_func_kwargs(self.updater.start_polling):
-            if k in settings.messaging['telegram']:
-                default_kwargs[k] = settings.messaging['telegram'][k]
+            if k in telegram_cfg:
+                default_kwargs[k] = telegram_cfg[k]
             if k in kwargs:
                 passed_kwargs[k] = kwargs.pop(k)
         polling_kwargs = merge_dicts(default_kwargs, passed_kwargs)

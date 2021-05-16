@@ -219,26 +219,30 @@ class _RPROB(RPROB):
 setattr(RPROB, '__doc__', _RPROB.__doc__)
 
 rprobex_config = Config(
-    class_name='RPROBEX',
-    module_name=__name__,
-    short_name='rprobex',
-    param_names=['prob'],
-    exit_only=True,
-    iteratively=False
+    dict(
+        class_name='RPROBEX',
+        module_name=__name__,
+        short_name='rprobex',
+        param_names=['prob'],
+        exit_only=True,
+        iteratively=False
+    )
 )
 """Factory config for `RPROBEX`."""
 
 rprobex_func_config = Config(
-    exit_choice_func=rand_by_prob_choice_nb,
-    exit_settings=dict(
-        pass_params=['prob'],
-        pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
-    ),
-    pass_flex_2d=True,
-    param_settings=dict(
-        prob=flex_elem_param_config
-    ),
-    seed=None
+    dict(
+        exit_choice_func=rand_by_prob_choice_nb,
+        exit_settings=dict(
+            pass_params=['prob'],
+            pass_kwargs=['first', 'temp_idx_arr', 'flex_2d']
+        ),
+        pass_flex_2d=True,
+        param_settings=dict(
+            prob=flex_elem_param_config
+        ),
+        seed=None
+    )
 )
 """Exit function config for `RPROBEX`."""
 
@@ -288,29 +292,33 @@ setattr(IRPROBEX, '__doc__', _IRPROBEX.__doc__)
 # ############# Stop signals ############# #
 
 stex_config = Config(
-    class_name='STEX',
-    module_name=__name__,
-    short_name='stex',
-    input_names=['ts'],
-    param_names=['stop', 'trailing'],
-    exit_only=True,
-    iteratively=False
+    dict(
+        class_name='STEX',
+        module_name=__name__,
+        short_name='stex',
+        input_names=['ts'],
+        param_names=['stop', 'trailing'],
+        exit_only=True,
+        iteratively=False
+    )
 )
 """Factory config for `STEX`."""
 
 stex_func_config = Config(
-    exit_choice_func=stop_choice_nb,
-    exit_settings=dict(
-        pass_inputs=['ts'],
-        pass_params=['stop', 'trailing'],
-        pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
-    ),
-    pass_flex_2d=True,
-    param_settings=dict(
-        stop=flex_elem_param_config,
-        trailing=flex_elem_param_config
-    ),
-    trailing=False
+    dict(
+        exit_choice_func=stop_choice_nb,
+        exit_settings=dict(
+            pass_inputs=['ts'],
+            pass_params=['stop', 'trailing'],
+            pass_kwargs=['wait', 'first', 'temp_idx_arr', 'flex_2d']
+        ),
+        pass_flex_2d=True,
+        param_settings=dict(
+            stop=flex_elem_param_config,
+            trailing=flex_elem_param_config
+        ),
+        trailing=False
+    )
 )
 """Exit function config for `STEX`."""
 
@@ -362,47 +370,51 @@ setattr(ISTEX, '__doc__', _ISTEX.__doc__)
 # ############# OHLC stop signals ############# #
 
 ohlcstex_config = Config(
-    class_name='OHLCSTEX',
-    module_name=__name__,
-    short_name='ohlcstex',
-    input_names=['open', 'high', 'low', 'close'],
-    in_output_names=['hit_price', 'stop_type'],
-    param_names=['sl_stop', 'ts_stop', 'tp_stop'],
-    attr_settings=dict(
-        stop_type=dict(dtype=StopType)  # creates rand_type_readable
-    ),
-    exit_only=True,
-    iteratively=False
+    dict(
+        class_name='OHLCSTEX',
+        module_name=__name__,
+        short_name='ohlcstex',
+        input_names=['open', 'high', 'low', 'close'],
+        in_output_names=['hit_price', 'stop_type'],
+        param_names=['sl_stop', 'ts_stop', 'tp_stop'],
+        attr_settings=dict(
+            stop_type=dict(dtype=StopType)  # creates rand_type_readable
+        ),
+        exit_only=True,
+        iteratively=False
+    )
 )
 """Factory config for `OHLCSTEX`."""
 
 ohlcstex_func_config = Config(
-    exit_choice_func=ohlc_stop_choice_nb,
-    exit_settings=dict(
-        pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
-        pass_in_outputs=['hit_price', 'stop_type'],
-        pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
-        pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
-    ),
-    pass_flex_2d=True,
-    in_output_settings=dict(
-        hit_price=dict(
-            dtype=np.float_
+    dict(
+        exit_choice_func=ohlc_stop_choice_nb,
+        exit_settings=dict(
+            pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
+            pass_in_outputs=['hit_price', 'stop_type'],
+            pass_params=['sl_stop', 'ts_stop', 'tp_stop'],
+            pass_kwargs=[('is_open_safe', True), 'wait', 'first', 'temp_idx_arr', 'flex_2d'],
         ),
-        stop_type=dict(
-            dtype=np.int_
-        )
-    ),
-    param_settings=dict(
-        sl_stop=flex_elem_param_config,
-        ts_stop=flex_elem_param_config,
-        tp_stop=flex_elem_param_config
-    ),
-    sl_stop=np.nan,
-    ts_stop=np.nan,
-    tp_stop=np.nan,
-    hit_price=np.nan,
-    stop_type=-1
+        pass_flex_2d=True,
+        in_output_settings=dict(
+            hit_price=dict(
+                dtype=np.float_
+            ),
+            stop_type=dict(
+                dtype=np.int_
+            )
+        ),
+        param_settings=dict(
+            sl_stop=flex_elem_param_config,
+            ts_stop=flex_elem_param_config,
+            tp_stop=flex_elem_param_config
+        ),
+        sl_stop=np.nan,
+        ts_stop=np.nan,
+        tp_stop=np.nan,
+        hit_price=np.nan,
+        stop_type=-1
+    )
 )
 """Exit function config for `OHLCSTEX`."""
 
@@ -426,7 +438,9 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
              fig: tp.Optional[tp.BaseFigure] = None,
              _base_cls_plot: tp.Callable = base_cls_plot,
              **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
-        from vectorbt.settings import ohlcv, color_schema
+        from vectorbt._settings import settings
+        ohlcv_cfg = settings['ohlcv']
+        plotting_cfg = settings['plotting']
 
         if self.wrapper.ndim > 1:
             raise TypeError("Select a column first. Use indexing.")
@@ -447,7 +461,7 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
         fig.update_layout(**layout_kwargs)
 
         if plot_type is None:
-            plot_type = ohlcv['plot_type']
+            plot_type = ohlcv_cfg['plot_type']
         if isinstance(plot_type, str):
             if plot_type.lower() == 'ohlc':
                 plot_type = 'OHLC'
@@ -466,8 +480,8 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
             low=self.low,
             close=self.close,
             name=plot_type,
-            increasing_line_color=color_schema['increasing'],
-            decreasing_line_color=color_schema['decreasing']
+            increasing_line_color=plotting_cfg['color_schema']['increasing'],
+            decreasing_line_color=plotting_cfg['color_schema']['decreasing']
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)

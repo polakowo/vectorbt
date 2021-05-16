@@ -265,6 +265,7 @@ dt:target .name {
 }
 
 .desc h3 {
+    font-weight: 400;
     font-size: 1em;
 }
 
@@ -719,9 +720,9 @@ pre .btnIcon:hover {
 	img {
 		page-break-inside: avoid;
 	}
-	img {
-		max-width: 100% !important;
-	}
+    img {
+        max-width: 100% !important;
+    }
 	@page {
 		margin: 0.5cm;
 	}

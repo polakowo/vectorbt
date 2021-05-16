@@ -1499,7 +1499,8 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         ![](/vectorbt/docs/img/sr_overlay_with_heatmap.svg)
         """
-        from vectorbt.settings import layout, color_schema
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
 
         if trace_kwargs is None:
             trace_kwargs = {}
@@ -1512,13 +1513,13 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         checks.assert_type(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
-            if 'width' in layout:
-                fig.update_layout(width=layout['width'] + 100)
+            if 'width' in plotting_cfg['layout']:
+                fig.update_layout(width=plotting_cfg['layout']['width'] + 100)
         fig.update_layout(**layout_kwargs)
 
         other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         self.plot(
-            trace_kwargs=merge_dicts(dict(line_color=color_schema['blue']), trace_kwargs),
+            trace_kwargs=merge_dicts(dict(line_color=plotting_cfg['color_schema']['blue']), trace_kwargs),
             add_trace_kwargs=merge_dicts(dict(secondary_y=True), add_trace_kwargs),
             fig=fig
         )

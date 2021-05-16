@@ -66,7 +66,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
         ![](/vectorbt/docs/img/ohlcv.svg)
         """
-        from vectorbt.settings import ohlcv, color_schema
+        from vectorbt._settings import settings
+        ohlcv_cfg = settings['ohlcv']
+        plotting_cfg = settings['plotting']
 
         if ohlc_kwargs is None:
             ohlc_kwargs = {}
@@ -80,7 +82,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ohlc_add_trace_kwargs = merge_dicts(dict(row=1, col=1), ohlc_add_trace_kwargs)
             volume_add_trace_kwargs = merge_dicts(dict(row=2, col=1), volume_add_trace_kwargs)
 
-        column_names = ohlcv['column_names'] if self._column_names is None else self._column_names
+        column_names = ohlcv_cfg['column_names'] if self._column_names is None else self._column_names
         open = self._obj[column_names['open']]
         high = self._obj[column_names['high']]
         low = self._obj[column_names['low']]
@@ -114,7 +116,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
                 )
         fig.update_layout(**layout_kwargs)
         if plot_type is None:
-            plot_type = ohlcv['plot_type']
+            plot_type = ohlcv_cfg['plot_type']
         if isinstance(plot_type, str):
             if plot_type.lower() == 'ohlc':
                 plot_type = 'OHLC'
@@ -133,8 +135,8 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             low=low,
             close=close,
             name=plot_type,
-            increasing_line_color=color_schema['increasing'],
-            decreasing_line_color=color_schema['decreasing']
+            increasing_line_color=plotting_cfg['color_schema']['increasing'],
+            decreasing_line_color=plotting_cfg['color_schema']['decreasing']
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **ohlc_add_trace_kwargs)
@@ -143,9 +145,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             volume = self._obj[column_names['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=object)
-            marker_colors[(close.values - open.values) > 0] = color_schema['increasing']
-            marker_colors[(close.values - open.values) == 0] = color_schema['gray']
-            marker_colors[(close.values - open.values) < 0] = color_schema['decreasing']
+            marker_colors[(close.values - open.values) > 0] = plotting_cfg['color_schema']['increasing']
+            marker_colors[(close.values - open.values) == 0] = plotting_cfg['color_schema']['gray']
+            marker_colors[(close.values - open.values) < 0] = plotting_cfg['color_schema']['decreasing']
             volume_bar = go.Bar(
                 x=self.wrapper.index,
                 y=volume,

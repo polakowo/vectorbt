@@ -309,8 +309,8 @@ InitCashMode = InitCashModeT(*range(2))
 
 __pdoc__['InitCashMode'] = f"""Initial cash mode.
 
-```plaintext
-{json.dumps(dict(zip(InitCashMode._fields, InitCashMode)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(InitCashMode._fields, InitCashMode)), indent=4, default=str)}
 ```
 
 Attributes:
@@ -331,8 +331,8 @@ CallSeqType = CallSeqTypeT(*range(4))
 
 __pdoc__['CallSeqType'] = f"""Call sequence type.
 
-```plaintext
-{json.dumps(dict(zip(CallSeqType._fields, CallSeqType)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(CallSeqType._fields, CallSeqType)), indent=4, default=str)}
 ```
 
 Attributes:
@@ -356,8 +356,8 @@ SizeType = SizeTypeT(*range(5))
 
 __pdoc__['SizeType'] = f"""Size type.
 
-```plaintext
-{json.dumps(dict(zip(SizeType._fields, SizeType)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(SizeType._fields, SizeType)), indent=4, default=str)}
 ```
 
 Attributes:
@@ -381,8 +381,8 @@ ConflictMode = ConflictModeT(*range(4))
 
 __pdoc__['ConflictMode'] = f"""Conflict mode.
 
-```plaintext
-{json.dumps(dict(zip(ConflictMode._fields, ConflictMode)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(ConflictMode._fields, ConflictMode)), indent=4, default=str)}
 ```
 
 What should happen if both entry and exit signals occur simultaneously?
@@ -443,8 +443,8 @@ OrderStatus = OrderStatusT(*range(3))
 
 __pdoc__['OrderStatus'] = f"""Order status.
 
-```plaintext
-{json.dumps(dict(zip(OrderStatus._fields, OrderStatus)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(OrderStatus._fields, OrderStatus)), indent=4, default=str)}
 ```
 
 Attributes:
@@ -464,8 +464,8 @@ OrderSide = OrderSideT(*range(2))
 
 __pdoc__['OrderSide'] = f"""Order side.
 
-```plaintext
-{json.dumps(dict(zip(OrderSide._fields, OrderSide)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(OrderSide._fields, OrderSide)), indent=4, default=str)}
 ```
 """
 
@@ -492,8 +492,8 @@ StatusInfo = StatusInfoT(*range(14))
 
 __pdoc__['StatusInfo'] = f"""Order status information.
 
-```plaintext
-{json.dumps(dict(zip(StatusInfo._fields, StatusInfo)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(StatusInfo._fields, StatusInfo)), indent=4, default=str)}
 ```
 """
 
@@ -517,8 +517,8 @@ status_info_desc = [
 
 __pdoc__['status_info_desc'] = f"""Order status description.
 
-```plaintext
-{json.dumps(status_info_desc, indent=2, default=str)}
+```json
+{json.dumps(status_info_desc, indent=4, default=str)}
 ```
 """
 
@@ -557,8 +557,8 @@ Direction = DirectionT(*range(3))
 
 __pdoc__['Direction'] = f"""Position direction.
 
-```plaintext
-{json.dumps(dict(zip(Direction._fields, Direction)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(Direction._fields, Direction)), indent=4, default=str)}
 ```
 
 Attributes:
@@ -582,11 +582,11 @@ order_dt = np.dtype([
 
 __pdoc__['order_dt'] = f"""`np.dtype` of order records.
 
-```plaintext
+```json
 {json.dumps(dict(zip(
     dict(order_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(order_dt.fields).values()))
-)), indent=2, default=str)}
+)), indent=4, default=str)}
 ```
 """
 
@@ -601,8 +601,8 @@ TradeDirection = TradeDirectionT(*range(2))
 
 __pdoc__['TradeDirection'] = f"""Event direction.
 
-```plaintext
-{json.dumps(dict(zip(TradeDirection._fields, TradeDirection)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(TradeDirection._fields, TradeDirection)), indent=4, default=str)}
 ```
 """
 
@@ -617,8 +617,8 @@ TradeStatus = TradeStatusT(*range(2))
 
 __pdoc__['TradeStatus'] = f"""Event status.
 
-```plaintext
-{json.dumps(dict(zip(TradeStatus._fields, TradeStatus)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(TradeStatus._fields, TradeStatus)), indent=4, default=str)}
 ```
 """
 
@@ -644,11 +644,11 @@ trade_dt = np.dtype(_trade_fields, align=True)
 
 __pdoc__['trade_dt'] = f"""`np.dtype` of trade records.
 
-```plaintext
+```json
 {json.dumps(dict(zip(
     dict(trade_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(trade_dt.fields).values()))
-)), indent=2, default=str)}
+)), indent=4, default=str)}
 ```
 """
 
@@ -659,11 +659,11 @@ position_dt = np.dtype(_position_fields, align=True)
 
 __pdoc__['position_dt'] = f"""`np.dtype` of position records.
 
-```plaintext
+```json
 {json.dumps(dict(zip(
     dict(position_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(position_dt.fields).values()))
-)), indent=2, default=str)}
+)), indent=4, default=str)}
 ```
 """
 
@@ -705,11 +705,11 @@ log_dt = np.dtype(_log_fields, align=True)
 
 __pdoc__['log_dt'] = f"""`np.dtype` of log records.
 
-```plaintext
+```json
 {json.dumps(dict(zip(
     dict(log_dt.fields).keys(),
     list(map(lambda x: str(x[0]), dict(log_dt.fields).values()))
-)), indent=2, default=str)}
+)), indent=4, default=str)}
 ```
 """
 
@@ -724,8 +724,8 @@ TradeType = TradeTypeT(*range(2))
 
 __pdoc__['TradeType'] = f"""Trade type.
 
-```plaintext
-{json.dumps(dict(zip(TradeType._fields, TradeType)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(TradeType._fields, TradeType)), indent=4, default=str)}
 ```
 """
 
@@ -741,8 +741,8 @@ BenchmarkSize = BenchmarkSizeT(*range(3))
 
 __pdoc__['BenchmarkSize'] = f"""Benchmark size.
 
-```plaintext
-{json.dumps(dict(zip(BenchmarkSize._fields, BenchmarkSize)), indent=2, default=str)}
+```json
+{json.dumps(dict(zip(BenchmarkSize._fields, BenchmarkSize)), indent=4, default=str)}
 ```
 
 Attributes:

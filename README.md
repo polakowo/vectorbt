@@ -200,10 +200,10 @@ bbands = vbt.BBANDS.run(price)
 def plot(index, bbands):
     bbands = bbands.loc[index]
     fig = vbt.make_subplots(
-            rows=5, cols=1, shared_xaxes=True, 
-            row_heights=[*[0.5 / 3] * len(symbols), 0.25, 0.25], vertical_spacing=0.05,
-            subplot_titles=(*symbols, '%B', 'Bandwidth'))
-    fig.update_layout(template=vbt.settings.dark_template, showlegend=False, width=750, height=650)
+        rows=5, cols=1, shared_xaxes=True, 
+        row_heights=[*[0.5 / 3] * len(symbols), 0.25, 0.25], vertical_spacing=0.05,
+        subplot_titles=(*symbols, '%B', 'Bandwidth'))
+    fig.update_layout(template='vbt_dark', showlegend=False, width=750, height=650)
     for i, symbol in enumerate(symbols):
         bbands.close[symbol].vbt.lineplot(add_trace_kwargs=dict(row=i + 1, col=1), fig=fig)
     bbands.percent_b.vbt.ts_heatmap(

@@ -1224,7 +1224,7 @@ def build_columns(param_list: tp.Sequence[tp.Sequence[tp.Param]],
             if _per_column:
                 param_index = None
                 for param in params:
-                    bc_param = np.broadcast_to(param, len(input_columns))
+                    bc_param = np.broadcast_to(param, (len(input_columns),))
                     _param_index = index_fns.index_from_values(bc_param, name=level_name)
                     if param_index is None:
                         param_index = _param_index
@@ -3323,8 +3323,8 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         return TALibIndicator
 
     @classmethod
-    def _parse_pandas_ta_config(cls, func: tp.Callable, test_input_names: tp.Optional[tp.Sequence[str]] = None,
-                                test_index_len: int = 50) -> tp.Kwargs:
+    def parse_pandas_ta_config(cls, func: tp.Callable, test_input_names: tp.Optional[tp.Sequence[str]] = None,
+                               test_index_len: int = 50) -> tp.Kwargs:
         """Get the config of a pandas-ta indicator."""
         if test_input_names is None:
             test_input_names = {'open_', 'open', 'high', 'low', 'close', 'adj_close', 'volume', 'dividends', 'split'}
@@ -3421,7 +3421,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         indicators = set()
         for func_name in [_k for k, v in pandas_ta.Category.items() for _k in v]:
             try:
-                cls._parse_pandas_ta_config(getattr(pandas_ta, func_name))
+                cls.parse_pandas_ta_config(getattr(pandas_ta, func_name))
                 indicators.add(func_name.upper())
             except Exception as e:
                 if not silence_warnings:
@@ -3437,7 +3437,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         Args:
             func_name (str): Function name.
-            parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory._parse_pandas_ta_config`.
+            parse_kwargs (dict): Keyword arguments passed to `IndicatorFactory.parse_pandas_ta_config`.
             init_kwargs (dict): Keyword arguments passed to `IndicatorFactory`.
             **kwargs: Keyword arguments passed to `IndicatorFactory.from_custom_func`.
 
@@ -3518,7 +3518,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
 
         if parse_kwargs is None:
             parse_kwargs = {}
-        config = cls._parse_pandas_ta_config(pandas_ta_func, **parse_kwargs)
+        config = cls.parse_pandas_ta_config(pandas_ta_func, **parse_kwargs)
 
         def apply_func(input_list: tp.List[tp.SeriesFrame],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],
@@ -3604,7 +3604,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         raise ValueError(f"Indicator \"{cls_name}\" not found")
 
     @classmethod
-    def _parse_ta_config(cls, ind_cls: IndicatorMixinT) -> tp.Kwargs:
+    def parse_ta_config(cls, ind_cls: IndicatorMixinT) -> tp.Kwargs:
         """Get the config of a ta indicator."""
         input_names = []
         param_names = []
@@ -3705,7 +3705,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
         import ta
 
         ind_cls = cls.find_ta_indicator(cls_name)
-        config = cls._parse_ta_config(ind_cls)
+        config = cls.parse_ta_config(ind_cls)
 
         def apply_func(input_list: tp.List[tp.SeriesFrame],
                        in_output_tuple: tp.Tuple[tp.SeriesFrame, ...],

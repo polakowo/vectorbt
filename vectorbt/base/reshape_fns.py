@@ -162,7 +162,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
             Conflicting Series names are those that are different but not None.
         **kwargs: Keyword arguments passed to `vectorbt.base.index_fns.stack_indexes`.
 
-    For defaults, see `vectorbt.settings.broadcasting`.
+    For defaults, see `broadcasting` in `vectorbt._settings.settings`.
 
     !!! note
         Series names are treated as columns with a single element but without a name.
@@ -170,10 +170,11 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
         with one column prior to broadcasting. If the name of a Series is not that important,
         better to drop it altogether by setting it to None.
     """
-    from vectorbt import settings
+    from vectorbt._settings import settings
+    broadcasting_cfg = settings['broadcasting']
 
     if ignore_sr_names is None:
-        ignore_sr_names = settings.broadcasting['ignore_sr_names']
+        ignore_sr_names = broadcasting_cfg['ignore_sr_names']
     index_str = 'columns' if axis == 1 else 'index'
     to_shape_2d = (to_shape[0], 1) if len(to_shape) == 1 else to_shape
     # maxlen stores the length of the longest index
@@ -360,7 +361,7 @@ def broadcast(*args: tp.ArrayLike,
         return_meta (bool): Whether to also return new shape, index and columns.
         **kwargs: Keyword arguments passed to `broadcast_index`.
 
-    For defaults, see `vectorbt.settings.broadcasting`.
+    For defaults, see `broadcasting` in `vectorbt._settings.settings`.
 
     ## Example
 
@@ -475,20 +476,21 @@ def broadcast(*args: tp.ArrayLike,
     c  7  8  9
     ```
     """
-    from vectorbt import settings
+    from vectorbt._settings import settings
+    broadcasting_cfg = settings['broadcasting']
 
     is_pd = False
     is_2d = False
     if require_kwargs is None:
         require_kwargs = {}
     if align_index is None:
-        align_index = settings.broadcasting['align_index']
+        align_index = broadcasting_cfg['align_index']
     if align_columns is None:
-        align_columns = settings.broadcasting['align_columns']
+        align_columns = broadcasting_cfg['align_columns']
     if index_from is None:
-        index_from = settings.broadcasting['index_from']
+        index_from = broadcasting_cfg['index_from']
     if columns_from is None:
-        columns_from = settings.broadcasting['columns_from']
+        columns_from = broadcasting_cfg['columns_from']
 
     # Convert to np.ndarray object if not numpy or pandas
     # Also check whether we broadcast to pandas and whether work on 2-dim data
