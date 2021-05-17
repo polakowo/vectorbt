@@ -791,7 +791,7 @@ over each column in the `apply_func`.
 `IndicatorFactory` re-uses calculation artifacts whenever possible. Since it was originally designed
 for hyperparameter optimization and there are times when parameter values gets repeated,
 prevention of processing the same parameter over and over again is inevitable for good performance.
-For instance, when the `run_combs` method is being used and `speedup` is set to True, it first calculates
+For instance, when the `run_combs` method is being used and `run_unique` is set to True, it first calculates
 the raw outputs of all unique parameter combinations and then uses them to build outputs for
 the whole parameter grid.
 
@@ -829,23 +829,23 @@ ma_ewm                    True
 ```
 
 Here is how the performance compares when repeatedly running the same parameter combination
-with and without speedup:
+with and without `run_unique`:
 
 ```python-repl
 >>> a = np.random.uniform(size=(1000,))
 
->>> %timeit vbt.MA.run(a, np.full(1000, 2), speedup=False)
+>>> %timeit vbt.MA.run(a, np.full(1000, 2), run_unique=False)
 73.4 ms ± 4.76 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
 
->>> %timeit vbt.MA.run(a, np.full(1000, 2), speedup=True)
+>>> %timeit vbt.MA.run(a, np.full(1000, 2), run_unique=True)
 8.99 ms ± 114 µs per loop (mean ± std. dev. of 7 runs, 100 loops each)
 ```
 
 !!! note
-    `speedup` is disabled by default.
+    `run_unique` is disabled by default.
 
-Enable `speedup` if input arrays have few columns and there are tons of repeated parameter combinations.
-Disable `speedup` if input arrays are very wide, if two identical parameter combinations can lead to
+Enable `run_unique` if input arrays have few columns and there are tons of repeated parameter combinations.
+Disable `run_unique` if input arrays are very wide, if two identical parameter combinations can lead to
 different results, or when requesting raw output, cache, or additional outputs outside of `output_names`.
 
 Another performance enhancement can be introduced by caching, which has to be implemented by the user.
@@ -854,7 +854,7 @@ prior to the main calculation.
 
 Consider the following scenario: we want to compute the relative distance between two expensive
 rolling windows. We have already decided on the value for the first window, and want to test
-thousands of values for the second window. Without caching, and even with `speedup` enabled,
+thousands of values for the second window. Without caching, and even with `run_unique` enabled,
 the first rolling window will be re-calculated over and over again and waste our resources:
 
 ```python-repl
@@ -1296,7 +1296,7 @@ def run_pipeline(
         param_list: tp.Optional[tp.Sequence[tp.Param]] = None,
         param_product: bool = False,
         param_settings: tp.KwargsLikeSequence = None,
-        speedup: bool = False,
+        run_unique: bool = False,
         silence_warnings: bool = False,
         per_column: bool = False,
         pass_col: bool = False,
@@ -1363,7 +1363,7 @@ def run_pipeline(
             * `broadcast_kwargs`: Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             * `per_column`: Whether each parameter value can be split per column such that it can
                 be better reflected in a multi-index. Does not affect broadcasting.
-        speedup (bool): Whether to run only on unique parameter combinations.
+        run_unique (bool): Whether to run only on unique parameter combinations.
 
             Disable if two identical parameter combinations can lead to different results
             (e.g., due to randomness) or if inputs are large and `custom_func` is fast.
@@ -1371,7 +1371,7 @@ def run_pipeline(
             !!! note
                 Cache, raw output, and output objects outside of `num_ret_outputs` will be returned
                 for unique parameter combinations only.
-        silence_warnings (bool): Whether to hide warnings such as coming from `speedup`.
+        silence_warnings (bool): Whether to hide warnings such as coming from `run_unique`.
         per_column (bool): Whether to split the DataFrame into Series, one per column, and run `custom_func`
             on each Series.
 
@@ -1617,16 +1617,16 @@ def run_pipeline(
         else:
             param_list = broadcast_params(param_list)
     n_param_values = len(param_list[0]) if len(param_list) > 0 else 1
-    use_speedup = False
+    use_run_unique = False
     param_list_unique = param_list
-    if not per_column and speedup:
+    if not per_column and run_unique:
         try:
             # Try to get all unique parameter combinations
             param_tuples = list(zip(*param_list))
             unique_param_tuples = list(OrderedDict.fromkeys(param_tuples).keys())
             if len(unique_param_tuples) < len(param_tuples):
                 param_list_unique = list(map(list, zip(*unique_param_tuples)))
-                use_speedup = True
+                use_run_unique = True
         except:
             pass
     if checks.is_numba_func(custom_func):
@@ -1811,9 +1811,9 @@ def run_pipeline(
 
         # Return cache
         if kwargs.get('return_cache', False):
-            if use_speedup and not silence_warnings:
+            if use_run_unique and not silence_warnings:
                 warnings.warn("Cache is produced by unique parameter "
-                              "combinations when speedup=True", stacklevel=2)
+                              "combinations when run_unique=True", stacklevel=2)
             return output
 
         def _split_output(output):
@@ -1829,9 +1829,9 @@ def run_pipeline(
                 # Other outputs should be returned without post-processing (for example cache_dict)
                 if len(_output_list) > num_ret_outputs:
                     _other_list = _output_list[num_ret_outputs:]
-                    if use_speedup and not silence_warnings:
+                    if use_run_unique and not silence_warnings:
                         warnings.warn("Additional output objects are produced by unique parameter "
-                                      "combinations when speedup=True", stacklevel=2)
+                                      "combinations when run_unique=True", stacklevel=2)
                 else:
                     _other_list = []
                 # Process only the num_ret_outputs outputs
@@ -1858,7 +1858,7 @@ def run_pipeline(
         output_list = in_output_list + output_list
 
         # Prepare raw
-        param_map = list(zip(*param_list_unique))  # account for use_speedup
+        param_map = list(zip(*param_list_unique))  # account for use_run_unique
         output_shape = output_list[0].shape
         for output in output_list:
             if output.shape != output_shape:
@@ -1875,11 +1875,11 @@ def run_pipeline(
                     raise ValueError("All outputs must have the number of columns = #input columns x #parameters")
         raw = output_list, param_map, n_input_cols, other_list
         if return_raw:
-            if use_speedup and not silence_warnings:
+            if use_run_unique and not silence_warnings:
                 warnings.warn("Raw output is produced by unique parameter "
-                              "combinations when speedup=True", stacklevel=2)
+                              "combinations when run_unique=True", stacklevel=2)
             return raw
-        if use_speedup:
+        if use_run_unique:
             output_list, param_map, n_input_cols, other_list = _use_raw(raw)
 
     # Update shape and other meta if no inputs
@@ -2809,7 +2809,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 r=2,
                 param_product=False,
                 comb_func=itertools.combinations,
-                speedup=True,
+                run_unique=True,
                 short_names=None,
                 hide_params=hide_params,
                 hide_default=hide_default,
@@ -2820,7 +2820,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                 _r = kwargs.pop('r', def_run_combs_kwargs['r'])
                 _param_product = kwargs.pop('param_product', def_run_combs_kwargs['param_product'])
                 _comb_func = kwargs.pop('comb_func', def_run_combs_kwargs['comb_func'])
-                _speedup = kwargs.pop('speedup', def_run_combs_kwargs['speedup'])
+                _run_unique = kwargs.pop('run_unique', def_run_combs_kwargs['run_unique'])
                 _short_names = kwargs.pop('short_names', def_run_combs_kwargs['short_names'])
                 _hide_params = kwargs.pop('hide_params', def_run_kwargs['hide_params'])
                 _hide_default = kwargs.pop('hide_default', def_run_kwargs['hide_default'])
@@ -2862,14 +2862,14 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                     param_list = [param_list]
 
                 # Speed up by pre-calculating raw outputs
-                if _speedup:
+                if _run_unique:
                     raw_results = cls._run(
                         *input_list,
                         *param_list,
                         *in_output_list,
                         *args,
                         return_raw=True,
-                        speedup=False,
+                        run_unique=False,
                         **kwargs
                     )
                     kwargs['use_raw'] = raw_results  # use them next time
@@ -2889,7 +2889,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
                         short_name=_short_names[i],
                         hide_params=_hide_params,
                         hide_default=_hide_default,
-                        speedup=False,
+                        run_unique=False,
                         **kwargs
                     ))
                 return tuple(instances)
@@ -2914,7 +2914,7 @@ Other keyword arguments are passed to `vectorbt.indicators.factory.run_pipeline`
 Also accepts all combinatoric iterators from itertools such as `itertools.combinations`.
 Pass `r` to specify how many indicators to run. 
 Pass `short_names` to specify the short name for each indicator. 
-Set `speedup` to True to first compute raw outputs for all parameters, 
+Set `run_unique` to True to first compute raw outputs for all parameters, 
 and then use them to build each indicator (faster).
 
 Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)

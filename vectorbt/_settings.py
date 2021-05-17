@@ -42,7 +42,8 @@ import pkgutil
 import plotly.io as pio
 import plotly.graph_objects as go
 
-from vectorbt.utils.config import Config, collapse_for_pdoc
+from vectorbt.utils.docs import to_doc
+from vectorbt.utils.config import Config
 from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -292,14 +293,6 @@ settings.reset_theme()
 settings.make_checkpoint()
 settings.register_templates()
 
-_collapse_keys = {
-    'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
-    'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
-    'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
-}
-
-_settings_for_pdoc = collapse_for_pdoc(settings, _collapse_keys, 'settings')
-
 __pdoc__['settings'] = f"""Global settings config.
 
 ## settings.config
@@ -307,7 +300,7 @@ __pdoc__['settings'] = f"""Global settings config.
 Configuration settings applied across `vectorbt.utils.config`.
 
 ```json
-{json.dumps(_settings_for_pdoc['config'], indent=4, default=str)}
+{to_doc(settings['config'])}
 ```
 
 ## settings.caching
@@ -317,7 +310,7 @@ Settings applied across `vectorbt.utils.decorators`.
 See `vectorbt.utils.decorators.should_cache`.
 
 ```json
-{json.dumps(_settings_for_pdoc['caching'], indent=4, default=str)}
+{to_doc(settings['caching'])}
 ```
 
 ## settings.broadcasting
@@ -325,7 +318,7 @@ See `vectorbt.utils.decorators.should_cache`.
 Settings applied across `vectorbt.base.reshape_fns`.
 
 ```json
-{json.dumps(_settings_for_pdoc['broadcasting'], indent=4, default=str)}
+{to_doc(settings['broadcasting'])}
 ```
 
 ## settings.array_wrapper
@@ -333,7 +326,7 @@ Settings applied across `vectorbt.base.reshape_fns`.
 Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
 
 ```json
-{json.dumps(_settings_for_pdoc['array_wrapper'], indent=4, default=str)}
+{to_doc(settings['array_wrapper'])}
 ```
 
 ## settings.datetime
@@ -341,7 +334,7 @@ Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
 Datetime settings applied across `vectorbt.utils.datetime`.
 
 ```json
-{json.dumps(_settings_for_pdoc['datetime'], indent=4, default=str)}
+{to_doc(settings['datetime'])}
 ```
 
 ## settings.data
@@ -349,7 +342,7 @@ Datetime settings applied across `vectorbt.utils.datetime`.
 Data settings applied across `vectorbt.data`.
 
 ```json
-{json.dumps(_settings_for_pdoc['data'], indent=4, default=str)}
+{to_doc(settings['data'])}
 ```
 
 ### settings.data.binance
@@ -366,7 +359,11 @@ Keys can be defined per exchange. If a key is defined at the root, it applies to
 Settings applied to plotting Plotly figures.
 
 ```json
-{json.dumps(_settings_for_pdoc['plotting'], indent=4, default=str)}
+{to_doc(settings['plotting'], replace={
+    'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
+    'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
+    'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
+}, path='settings.plotting')}
 ```
 
 ## settings.ohlcv
@@ -374,7 +371,7 @@ Settings applied to plotting Plotly figures.
 OHLCV settings applied across `vectorbt.ohlcv_accessors`.
 
 ```json
-{json.dumps(_settings_for_pdoc['ohlcv'], indent=4, default=str)}
+{to_doc(settings['ohlcv'])}
 ```
 
 ## settings.returns
@@ -382,7 +379,7 @@ OHLCV settings applied across `vectorbt.ohlcv_accessors`.
 Returns settings applied across `vectorbt.returns`.
 
 ```json
-{json.dumps(_settings_for_pdoc['returns'], indent=4, default=str)}
+{to_doc(settings['returns'])}
 ```
 
 ## settings.portfolio
@@ -390,7 +387,7 @@ Returns settings applied across `vectorbt.returns`.
 Settings applied to `vectorbt.portfolio.base.Portfolio`.
 
 ```json
-{json.dumps(_settings_for_pdoc['portfolio'], indent=4, default=str)}
+{to_doc(settings['portfolio'])}
 ```
 
 ## settings.messaging
@@ -398,7 +395,7 @@ Settings applied to `vectorbt.portfolio.base.Portfolio`.
 Messaging settings applied across `vectorbt.messaging`.
 
 ```json
-{json.dumps(_settings_for_pdoc['messaging'], indent=4, default=str)}
+{to_doc(settings['messaging'])}
 ```
 
 ### settings.messaging.telegram

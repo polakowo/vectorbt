@@ -10,24 +10,6 @@ from vectorbt.utils import checks
 from vectorbt.utils.attr import deep_getattr
 
 
-def collapse_for_pdoc(dct: dict, keys: dict, path: str = None) -> dict:
-    """Collapse some (long) values for clearer documentation."""
-    new_dct = dict()
-    for k, v in dct.items():
-        if path is None:
-            new_path = k
-        else:
-            new_path = path + '.' + k
-        if new_path in keys:
-            new_dct[k] = keys[new_path]
-        else:
-            if isinstance(v, dict):
-                new_dct[k] = collapse_for_pdoc(v, keys, new_path)
-            else:
-                new_dct[k] = v
-    return new_dct
-
-
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
     """Select keyword arguments."""
     if dct is None:

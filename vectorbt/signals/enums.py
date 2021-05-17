@@ -2,9 +2,8 @@
 
 Defines enums and other schemas for `vectorbt.signals`."""
 
-import json
-
 from vectorbt import _typing as tp
+from vectorbt.utils.docs import to_doc
 
 __all__ = [
     'StopType'
@@ -25,6 +24,6 @@ StopType = StopTypeT(*range(3))
 __pdoc__['StopType'] = f"""Stop type.
 
 ```json
-{json.dumps(dict(zip(StopType._fields, StopType)), indent=4, default=str)}
+{to_doc(StopType)}
 ```
 """

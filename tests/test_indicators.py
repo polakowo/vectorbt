@@ -1516,17 +1516,17 @@ class TestFactory:
         for i, other in enumerate(others):
             np.testing.assert_array_equal(other[0], ts.iloc[:, [i]] + 2)
 
-    def test_speedup(self):
+    def test_run_unique(self):
         F = vbt.IndicatorFactory(input_names=['ts'], param_names=['p1', 'p2'], output_names=['out'])
 
         def apply_func(ts, p1, p2):
             return ts * (p1 + p2)
 
         pd.testing.assert_series_equal(
-            F.from_apply_func(apply_func).run(ts['a'], 2, 3, speedup=True).out,
-            F.from_apply_func(apply_func).run(ts['a'], 2, 3, speedup=False).out
+            F.from_apply_func(apply_func).run(ts['a'], 2, 3, run_unique=True).out,
+            F.from_apply_func(apply_func).run(ts['a'], 2, 3, run_unique=False).out
         )
-        raw = F.from_apply_func(apply_func).run(ts['a'], [2, 2, 2], [3, 3, 3], speedup=True, return_raw=True)
+        raw = F.from_apply_func(apply_func).run(ts['a'], [2, 2, 2], [3, 3, 3], run_unique=True, return_raw=True)
         np.testing.assert_array_equal(
             raw[0][0],
             np.array([[5.], [10.], [15.], [20.], [25.]])
@@ -1535,20 +1535,20 @@ class TestFactory:
         assert raw[2] == 1
         assert raw[3] == []
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts['a'], [2, 2, 2], [3, 3, 3], speedup=True).out,
-            F.from_apply_func(apply_func).run(ts['a'], [2, 2, 2], [3, 3, 3], speedup=False).out
+            F.from_apply_func(apply_func).run(ts['a'], [2, 2, 2], [3, 3, 3], run_unique=True).out,
+            F.from_apply_func(apply_func).run(ts['a'], [2, 2, 2], [3, 3, 3], run_unique=False).out
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts, 2, 3, speedup=True).out,
-            F.from_apply_func(apply_func).run(ts, 2, 3, speedup=False).out
+            F.from_apply_func(apply_func).run(ts, 2, 3, run_unique=True).out,
+            F.from_apply_func(apply_func).run(ts, 2, 3, run_unique=False).out
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts, [2, 2, 2], [3, 3, 3], speedup=True).out,
-            F.from_apply_func(apply_func).run(ts, [2, 2, 2], [3, 3, 3], speedup=False).out
+            F.from_apply_func(apply_func).run(ts, [2, 2, 2], [3, 3, 3], run_unique=True).out,
+            F.from_apply_func(apply_func).run(ts, [2, 2, 2], [3, 3, 3], run_unique=False).out
         )
         pd.testing.assert_frame_equal(
-            F.from_apply_func(apply_func).run(ts, [2, 3, 4], [4, 3, 2], speedup=True).out,
-            F.from_apply_func(apply_func).run(ts, [2, 3, 4], [4, 3, 2], speedup=False).out
+            F.from_apply_func(apply_func).run(ts, [2, 3, 4], [4, 3, 2], run_unique=True).out,
+            F.from_apply_func(apply_func).run(ts, [2, 3, 4], [4, 3, 2], run_unique=False).out
         )
 
     def test_run_combs(self):
@@ -1560,9 +1560,9 @@ class TestFactory:
         ind2 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
             .run(ts, [3, 4, 4], [11, 12, 12], short_name='custom_2')
         ind1_1, ind2_1 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, speedup=False)
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, run_unique=False)
         ind1_2, ind2_2 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, speedup=True)
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, run_unique=True)
         pd.testing.assert_frame_equal(
             ind1.out,
             ind1_1.out
@@ -1585,9 +1585,9 @@ class TestFactory:
         ind4 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
             .run(ts, [2, 3, 4, 2, 3, 4, 2, 3, 4], [10, 11, 12, 10, 11, 12, 10, 11, 12], short_name='custom_2')
         ind3_1, ind4_1 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speedup=False)
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, run_unique=False)
         ind3_2, ind4_2 = F.from_apply_func(lambda ts, p1, p2: ts * p1 * p2) \
-            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, speedup=True)
+            .run_combs(ts, [2, 3, 4], [10, 11, 12], r=2, comb_func=product, run_unique=True)
         pd.testing.assert_frame_equal(
             ind3.out,
             ind3_1.out

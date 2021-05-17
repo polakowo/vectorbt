@@ -3,9 +3,9 @@
 Defines enums and other schemas for `vectorbt.generic`."""
 
 import numpy as np
-import json
 
 from vectorbt import _typing as tp
+from vectorbt.utils.docs import to_doc
 
 __all__ = [
     'DrawdownStatus',
@@ -28,7 +28,7 @@ DrawdownStatus = DrawdownStatusT(*range(2))
 __pdoc__['DrawdownStatus'] = f"""Drawdown status.
 
 ```json
-{json.dumps(dict(zip(DrawdownStatus._fields, DrawdownStatus)), indent=4, default=str)}
+{to_doc(DrawdownStatus)}
 ```
 """
 
@@ -45,9 +45,6 @@ drawdown_dt = np.dtype([
 __pdoc__['drawdown_dt'] = f"""`np.dtype` of drawdown records.
 
 ```json
-{json.dumps(dict(zip(
-    dict(drawdown_dt.fields).keys(),
-    list(map(lambda x: str(x[0]), dict(drawdown_dt.fields).values()))
-)), indent=4, default=str)}
+{to_doc(drawdown_dt)}
 ```
 """

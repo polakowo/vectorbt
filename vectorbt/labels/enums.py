@@ -2,9 +2,8 @@
 
 Defines enums and other schemas for `vectorbt.labels`."""
 
-import json
-
 from vectorbt import _typing as tp
+from vectorbt.utils.docs import to_doc
 
 __all__ = [
     'TrendMode'
@@ -27,7 +26,7 @@ TrendMode = TrendModeT(*range(5))
 __pdoc__['TrendMode'] = f"""Trend mode.
 
 ```json
-{json.dumps(dict(zip(TrendMode._fields, TrendMode)), indent=4, default=str)}
+{to_doc(TrendMode)}
 ```
 
 Attributes:
