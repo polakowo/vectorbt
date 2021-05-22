@@ -632,14 +632,15 @@ class Portfolio(Wrapping):
                      reject_prob: tp.Optional[tp.ArrayLike] = None,
                      allow_partial: tp.Optional[tp.ArrayLike] = None,
                      raise_reject: tp.Optional[tp.ArrayLike] = None,
-                     accumulate: tp.Optional[tp.ArrayLike] = None,
                      log: tp.Optional[tp.ArrayLike] = None,
+                     accumulate: tp.Optional[tp.ArrayLike] = None,
                      conflict_mode: tp.Optional[tp.ArrayLike] = None,
                      close_first: tp.Optional[tp.ArrayLike] = None,
                      val_price: tp.Optional[tp.ArrayLike] = None,
                      init_cash: tp.Optional[tp.ArrayLike] = None,
                      cash_sharing: tp.Optional[bool] = None,
                      call_seq: tp.Optional[tp.ArrayLike] = None,
+                     update_value: tp.Optional[tp.ArrayLike] = None,
                      max_orders: tp.Optional[int] = None,
                      max_logs: tp.Optional[int] = None,
                      seed: tp.Optional[int] = None,
@@ -735,27 +736,24 @@ class Portfolio(Wrapping):
                 the opposite position. This allows to define parameters such as `fixed_fees` for long
                 and short positions separately.
             val_price (array_like of float): Asset valuation price.
-                Defaults to `price` if set, otherwise to previous `close`.
 
                 See `val_price` in `Portfolio.from_orders`.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                See `init_cash` in `Portfolio.from_order_func`.
+                See `init_cash` in `Portfolio.from_orders`.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 See `cash_sharing` in `Portfolio.from_orders`.
             call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
 
                 See `call_seq` in `Portfolio.from_orders`.
+            update_value (bool): Whether to update group value after each filled order.
             max_orders (int): Size of the order records array.
-                Defaults to the number of elements in the broadcasted shape.
 
-                Set to a lower number if you run out of memory.
+                See `max_orders` in `Portfolio.from_orders`.
             max_logs (int): Size of the log records array.
-                Defaults to the number of elements in the broadcasted shape if any of the `log` is True,
-                otherwise to 1.
 
-                Set to a lower number if you run out of memory.
+                See `max_logs` in `Portfolio.from_orders`.
             seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
@@ -973,7 +971,7 @@ class Portfolio(Wrapping):
         !!! note
             By cleaning signals, you lose information. Moreover, this automatically assumes
             that each entry/signal signal succeeds (= order gets filled). Use this with caution,
-            and consider rewriting your strategy for `Portfolio.from_order_func`, which is a
+            and consider rewriting your strategy with `Portfolio.from_order_func`, which is a
             preferred way of defining complex logic in vectorbt.
         """
         # Get defaults
@@ -1035,6 +1033,8 @@ class Portfolio(Wrapping):
             if call_seq == CallSeqType.Auto:
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
+        if update_value is None:
+            update_value = portfolio_cfg['update_value']
         if seed is None:
             seed = portfolio_cfg['seed']
         if seed is not None:
@@ -1055,9 +1055,9 @@ class Portfolio(Wrapping):
             entries,
             exits,
             size,
+            price,
             size_type,
             direction,
-            price,
             fees,
             fixed_fees,
             slippage,
@@ -1066,8 +1066,8 @@ class Portfolio(Wrapping):
             reject_prob,
             allow_partial,
             raise_reject,
-            accumulate,
             log,
+            accumulate,
             conflict_mode,
             close_first,
             val_price
@@ -1100,8 +1100,9 @@ class Portfolio(Wrapping):
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            auto_call_seq,
             *broadcasted_args[1:],
+            auto_call_seq,
+            update_value,
             max_orders,
             max_logs,
             close.ndim == 2
@@ -1139,6 +1140,7 @@ class Portfolio(Wrapping):
                     init_cash: tp.Optional[tp.ArrayLike] = None,
                     cash_sharing: tp.Optional[bool] = None,
                     call_seq: tp.Optional[tp.ArrayLike] = None,
+                    update_value: tp.Optional[tp.ArrayLike] = None,
                     max_orders: tp.Optional[int] = None,
                     max_logs: tp.Optional[int] = None,
                     seed: tp.Optional[int] = None,
@@ -1223,7 +1225,14 @@ class Portfolio(Wrapping):
                     otherwise you're cheating yourself.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                See `init_cash` in `Portfolio.from_order_func`.
+                By default, will broadcast to the number of columns.
+                If cash sharing is enabled, will broadcast to the number of groups.
+                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
+
+                !!! note
+                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
+                    to set the same initial cash for all columns/groups. Changing grouping
+                    will change the initial cash, so be aware when indexing.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
@@ -1260,6 +1269,7 @@ class Portfolio(Wrapping):
                         leave them without required funds.
 
                     For more control, use `Portfolio.from_order_func`.
+            update_value (bool): Whether to update group value after each filled order.
             max_orders (int): Size of the order records array.
                 Defaults to the number of elements in the broadcasted shape.
 
@@ -1419,6 +1429,8 @@ class Portfolio(Wrapping):
             if call_seq == CallSeqType.Auto:
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
+        if update_value is None:
+            update_value = portfolio_cfg['update_value']
         if seed is None:
             seed = portfolio_cfg['seed']
         if seed is not None:
@@ -1437,9 +1449,9 @@ class Portfolio(Wrapping):
         broadcastable_args = (
             close,
             size,
+            price,
             size_type,
             direction,
-            price,
             fees,
             fixed_fees,
             slippage,
@@ -1479,8 +1491,9 @@ class Portfolio(Wrapping):
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            auto_call_seq,
             *broadcasted_args[1:],
+            auto_call_seq,
+            update_value,
             max_orders,
             max_logs,
             close.ndim == 2
@@ -1519,6 +1532,7 @@ class Portfolio(Wrapping):
                         segment_prep_args: tp.Optional[tp.Args] = None,
                         after_order_func_nb: tp.Optional[nb.AfterOrderFuncT] = None,
                         after_order_args: tp.Optional[tp.Args] = None,
+                        update_value: tp.Optional[tp.ArrayLike] = None,
                         row_wise: tp.Optional[bool] = None,
                         use_numba: tp.Optional[bool] = None,
                         max_orders: tp.Optional[int] = None,
@@ -1549,14 +1563,7 @@ class Portfolio(Wrapping):
                 Should be set only if `target_shape` is bigger than `close.shape`.
             init_cash (InitCashMode, float or array_like of float): Initial capital.
 
-                By default, will broadcast to the number of columns.
-                If cash sharing is enabled, will broadcast to the number of groups.
-                See `vectorbt.portfolio.enums.InitCashMode` to find optimal initial cash.
-
-                !!! note
-                    Mode `InitCashMode.AutoAlign` is applied after the portfolio is initialized
-                    to set the same initial cash for all columns/groups. Changing grouping
-                    will change the initial cash, so be aware when indexing.
+                See `init_cash` in `Portfolio.from_orders`.
             cash_sharing (bool): Whether to share cash within the same group.
 
                 !!! warning
@@ -1597,6 +1604,7 @@ class Portfolio(Wrapping):
             after_order_args (tuple): Packed arguments passed to `after_order_func_nb`.
 
                 Defaults to `()`.
+            update_value (bool): Whether to update group value after each filled order.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
 
                 See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
@@ -1648,7 +1656,7 @@ class Portfolio(Wrapping):
 
         >>> @njit
         ... def order_func_nb(c, size):
-        ...     return create_order_nb(size=size, price=c.close[c.i, c.col])
+        ...     return create_order_nb(size, c.close[c.i, c.col])
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
@@ -1693,24 +1701,24 @@ class Portfolio(Wrapping):
         ...             size = np.inf  # open long
         ...             last_pos_state[0] = 1
         ...
-        ...     return create_order_nb(size=size, price=c.close[c.i, c.col])
+        ...     return create_order_nb(size, c.close[c.i, c.col])
 
         >>> portfolio = vbt.Portfolio.from_order_func(
         ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
 
         >>> portfolio.shares()
-        0    100.0
-        1      0.0
-        2   -100.0
-        3      0.0
-        4     20.0
+        0    100.000000
+        1      0.000000
+        2    -66.666667
+        3      0.000000
+        4     26.666667
         dtype: float64
         >>> portfolio.cash()
-        0      0.0
-        1    200.0
-        2    500.0
-        3    100.0
-        4      0.0
+        0      0.000000
+        1    200.000000
+        2    400.000000
+        3    133.333333
+        4      0.000000
         dtype: float64
         ```
 
@@ -1742,10 +1750,10 @@ class Portfolio(Wrapping):
         ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
         ...     '''Place an order.'''
         ...     return create_order_nb(
-        ...         size=size,
+        ...         size,
+        ...         c.close[c.i, c.col],
         ...         size_type=size_type,
         ...         direction=direction,
-        ...         price=c.close[c.i, c.col],
         ...         fees=fees,
         ...         fixed_fees=fixed_fees,
         ...         slippage=slippage
@@ -1797,14 +1805,14 @@ class Portfolio(Wrapping):
         ...     if entries[c.i, c.col]:
         ...         if c.shares_now == 0:
         ...             return create_order_nb(
-        ...                 size=size_now,
-        ...                 price=price_now,
+        ...                 size_now,
+        ...                 price_now,
         ...                 direction=Direction.LongOnly)
         ...     elif exits[c.i, c.col] or price_now >= stop_price_now:
         ...         if c.shares_now > 0:
         ...             return create_order_nb(
-        ...                 size=-size_now,
-        ...                 price=price_now,
+        ...                 -size_now,
+        ...                 price_now,
         ...                 direction=Direction.LongOnly)
         ...     return NoOrder
 
@@ -1895,6 +1903,8 @@ class Portfolio(Wrapping):
                                  "Use sort_call_seq_nb in segment_prep_func_nb.")
         if active_mask is None:
             active_mask = True
+        if update_value is None:
+            update_value = portfolio_cfg['update_value']
         if row_wise is None:
             row_wise = portfolio_cfg['row_wise']
         if use_numba is None:
@@ -1997,6 +2007,7 @@ class Portfolio(Wrapping):
                 order_args,
                 after_order_func_nb,
                 after_order_args,
+                update_value,
                 max_orders,
                 max_logs
             )
@@ -2023,6 +2034,7 @@ class Portfolio(Wrapping):
                 order_args,
                 after_order_func_nb,
                 after_order_args,
+                update_value,
                 max_orders,
                 max_logs
             )

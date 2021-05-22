@@ -3559,7 +3559,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             return np.column_stack(outputs)
 
         defaults = config.pop('defaults')
-        TALibIndicator = cls(
+        PTAIndicator = cls(
             **merge_dicts(
                 config,
                 init_kwargs
@@ -3572,7 +3572,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             **defaults,
             **kwargs
         )
-        return TALibIndicator
+        return PTAIndicator
 
     @classmethod
     def get_ta_indicators(cls) -> tp.Set[str]:
@@ -3740,7 +3740,7 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             return np.column_stack(outputs)
 
         defaults = config.pop('defaults')
-        TALibIndicator = cls(
+        TAIndicator = cls(
             **merge_dicts(
                 config,
                 init_kwargs
@@ -3753,4 +3753,4 @@ Other keyword arguments are passed to `{0}.run`.""".format(_0, _1)
             **defaults,
             **kwargs
         )
-        return TALibIndicator
+        return TAIndicator

@@ -414,7 +414,7 @@ class BinanceData(Data):
     def download_symbol(cls,
                         symbol: str,
                         client: tp.Optional["ClientT"] = None,
-                        interval: tp.Optional[str] = None,
+                        interval: str = '1d',
                         start: tp.DatetimeLike = 0,
                         end: tp.DatetimeLike = 'now UTC',
                         delay: tp.Optional[float] = 500,
