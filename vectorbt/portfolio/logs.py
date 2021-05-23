@@ -69,6 +69,8 @@ class Logs(Records):
             ('Order', 'Log?'),
             ('Result', 'New Cash'),
             ('Result', 'New Shares'),
+            ('Result', 'New Val. Price'),
+            ('Result', 'New Value'),
             ('Result', 'Size'),
             ('Result', 'Price'),
             ('Result', 'Fees'),
@@ -104,11 +106,13 @@ class Logs(Records):
         out.iloc[:, 20] = records_df['log']
         out.iloc[:, 21] = records_df['new_cash']
         out.iloc[:, 22] = records_df['new_shares']
-        out.iloc[:, 23] = records_df['res_size']
-        out.iloc[:, 24] = records_df['res_price']
-        out.iloc[:, 25] = records_df['res_fees']
-        out.iloc[:, 26] = map_enum(records_df['res_side'], OrderSide)
-        out.iloc[:, 27] = map_enum(records_df['res_status'], OrderStatus)
-        out.iloc[:, 28] = map_enum(records_df['res_status_info'], StatusInfo)
-        out.iloc[:, 29] = records_df['order_id']
+        out.iloc[:, 23] = records_df['new_val_price']
+        out.iloc[:, 24] = records_df['new_value']
+        out.iloc[:, 25] = records_df['res_size']
+        out.iloc[:, 26] = records_df['res_price']
+        out.iloc[:, 27] = records_df['res_fees']
+        out.iloc[:, 28] = map_enum(records_df['res_side'], OrderSide)
+        out.iloc[:, 29] = map_enum(records_df['res_status'], OrderStatus)
+        out.iloc[:, 30] = map_enum(records_df['res_status_info'], StatusInfo)
+        out.iloc[:, 31] = records_df['order_id']
         return out

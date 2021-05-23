@@ -942,6 +942,8 @@ _log_fields = [
     ('log', np.bool_),
     ('new_cash', np.float_),
     ('new_shares', np.float_),
+    ('new_val_price', np.float_),
+    ('new_value', np.float_),
     ('res_size', np.float_),
     ('res_price', np.float_),
     ('res_fees', np.float_),
