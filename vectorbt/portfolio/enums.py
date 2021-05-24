@@ -26,6 +26,7 @@ __all__ = [
     'StatusInfo',
     'OrderResult',
     'RejectedOrderError',
+    'ProcessOrderState',
     'Direction',
     'order_dt',
     'TradeDirection',
@@ -57,8 +58,9 @@ class SimulationContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_shares: tp.Array1d
     last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_oidx: tp.Array1d
     last_lidx: tp.Array1d
-    last_ridx: tp.Array1d
 
 
 __pdoc__['SimulationContext'] = """A named tuple representing the context of a simulation.
@@ -154,7 +156,7 @@ gradually filled with order data. The number of initialized records depends upon
 but usually it's `target_shape[0] * target_shape[1]`, meaning there is maximal one order record per element.
 `max_orders` can be chosen lower if not every `order_func_nb` leads to a filled order, to save memory.
 
-You can use `last_ridx` to get the index of the last filled order of each column.
+You can use `last_oidx` to get the index of the last filled order of each column.
 
 ## Example
 
@@ -214,19 +216,25 @@ with cash sharing, the group is valued at $1400 before any `order_func_nb` is ca
 be later accessed via `OrderContext.value_now`.
 
 """
-__pdoc__['SimulationContext.last_ridx'] = """Index of the last order record of each column.
+__pdoc__['SimulationContext.last_value'] = """Last value per column, or per group if cash sharing is enabled.
+
+Has the same shape as `init_cash`.
+
+Gets updated using `last_val_price` right after `segment_prep_func_nb`.
+"""
+__pdoc__['SimulationContext.last_oidx'] = """Index of the last order record of each column.
 
 Points to `order_records` and has shape `(target_shape[1],)`.
 
 ## Example
 
-`last_ridx` of `np.array([1, 100, -1])` means the last filled order is `order_records[1]` for the
+`last_oidx` of `np.array([1, 100, -1])` means the last filled order is `order_records[1]` for the
 first column, `order_records[100]` for the second column, and no orders have been filled yet
 for the third column.
 """
 __pdoc__['SimulationContext.last_lidx'] = """Index of the last log record of each column.
 
-Similar to `last_ridx` but for log records.
+Similar to `last_oidx` but for log records.
 """
 
 
@@ -244,8 +252,9 @@ class GroupContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_shares: tp.Array1d
     last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_oidx: tp.Array1d
     last_lidx: tp.Array1d
-    last_ridx: tp.Array1d
     group: int
     group_len: int
     from_col: int
@@ -311,8 +320,9 @@ class RowContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_shares: tp.Array1d
     last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_oidx: tp.Array1d
     last_lidx: tp.Array1d
-    last_ridx: tp.Array1d
     i: int
 
 
@@ -347,8 +357,9 @@ class SegmentContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_shares: tp.Array1d
     last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_oidx: tp.Array1d
     last_lidx: tp.Array1d
-    last_ridx: tp.Array1d
     group: int
     group_len: int
     from_col: int
@@ -403,8 +414,9 @@ class OrderContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_shares: tp.Array1d
     last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_oidx: tp.Array1d
     last_lidx: tp.Array1d
-    last_ridx: tp.Array1d
     group: int
     group_len: int
     from_col: int
@@ -474,8 +486,9 @@ class AfterOrderContext(tp.NamedTuple):
     last_cash: tp.Array1d
     last_shares: tp.Array1d
     last_val_price: tp.Array1d
+    last_value: tp.Array1d
+    last_oidx: tp.Array1d
     last_lidx: tp.Array1d
-    last_ridx: tp.Array1d
     group: int
     group_len: int
     from_col: int
@@ -804,6 +817,24 @@ __pdoc__['OrderResult.status_info'] = "See `StatusInfo`."
 class RejectedOrderError(Exception):
     """Rejected order error."""
     pass
+
+
+class ProcessOrderState(tp.NamedTuple):
+    cash: float
+    shares: float
+    val_price: float
+    value: float
+    oidx: int
+    lidx: int
+
+
+__pdoc__['ProcessOrderState'] = "State before or after processing an order."
+__pdoc__['ProcessOrderState.cash'] = "Cash in the current column, or group if cash sharing is enabled."
+__pdoc__['ProcessOrderState.shares'] = "Shares in the current column."
+__pdoc__['ProcessOrderState.val_price'] = "Valuation price in the current column."
+__pdoc__['ProcessOrderState.value'] = "Value in the current column, or group if cash sharing is enabled."
+__pdoc__['ProcessOrderState.oidx'] = "Index of order record."
+__pdoc__['ProcessOrderState.lidx'] = "Index of log record."
 
 
 class DirectionT(tp.NamedTuple):

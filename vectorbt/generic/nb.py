@@ -1254,7 +1254,7 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
     ```
     """
     out = np.empty(ts.shape[0] * ts.shape[1], dtype=drawdown_dt)
-    ridx = 0
+    ddidx = 0
 
     for col in range(ts.shape[1]):
         drawdown_started = False
@@ -1302,13 +1302,13 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
 
                 if store_drawdown:
                     # Save drawdown to the records
-                    out[ridx]['id'] = ridx
-                    out[ridx]['col'] = col
-                    out[ridx]['start_idx'] = peak_idx
-                    out[ridx]['valley_idx'] = valley_idx
-                    out[ridx]['end_idx'] = i
-                    out[ridx]['status'] = status
-                    ridx += 1
+                    out[ddidx]['id'] = ddidx
+                    out[ddidx]['col'] = col
+                    out[ddidx]['start_idx'] = peak_idx
+                    out[ddidx]['valley_idx'] = valley_idx
+                    out[ddidx]['end_idx'] = i
+                    out[ddidx]['status'] = status
+                    ddidx += 1
 
                     # Reset running vars for a new drawdown
                     peak_idx = i
@@ -1318,7 +1318,7 @@ def find_drawdowns_nb(ts: tp.Array2d) -> tp.RecordArray:
                     store_drawdown = False
                     status = -1
 
-    return out[:ridx]
+    return out[:ddidx]
 
 
 @njit(cache=True)

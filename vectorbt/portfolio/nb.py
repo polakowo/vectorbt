@@ -74,6 +74,7 @@ from vectorbt.portfolio.enums import (
     StatusInfo,
     OrderResult,
     RejectedOrderError,
+    ProcessOrderState,
     Direction,
     order_dt,
     TradeDirection,
@@ -515,31 +516,19 @@ def raise_rejected_order_nb(order_result: OrderResult) -> None:
 def process_order_nb(i: int,
                      col: int,
                      group: int,
-                     cash_now: float,
-                     shares_now: float,
-                     val_price_now: float,
-                     value_now: float,
+                     order_state: ProcessOrderState,
                      update_value: bool,
                      order: Order,
                      order_records: tp.RecordArray,
-                     order_id: int,
-                     log_records: tp.RecordArray,
-                     log_id: int) -> tp.Tuple[float, float, float, float, int, int, OrderResult]:
-    """Process an order by executing it, updating the current state, and
-    saving relevant information to the logs."""
-
-    # Save old state for logs
-    cash_before = cash_now
-    shares_before = shares_now
-    val_price_before = val_price_now
-    value_before = value_now
+                     log_records: tp.RecordArray) -> tp.Tuple[OrderResult, ProcessOrderState]:
+    """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
-    cash_now, shares_now, order_result = execute_order_nb(
-        cash_now,
-        shares_now,
-        val_price_now,
-        value_now,
+    new_cash, new_shares, order_result = execute_order_nb(
+        order_state.cash,
+        order_state.shares,
+        order_state.val_price,
+        order_state.value,
         order
     )
 
@@ -551,56 +540,69 @@ def process_order_nb(i: int,
     # Update valuation price and value
     is_filled = order_result.status == OrderStatus.Filled
     if is_filled and update_value:
-        val_price_now, value_now = update_value_nb(
-            cash_before,
-            cash_now,
-            shares_before,
-            shares_now,
-            val_price_before,
+        new_val_price, new_value = update_value_nb(
+            order_state.cash,
+            new_cash,
+            order_state.shares,
+            new_shares,
+            order_state.val_price,
             order_result.price,
-            value_before
+            order_state.value
         )
+    else:
+        new_val_price = order_state.val_price
+        new_value = order_state.value
 
-    new_order_id = order_id
+    new_oidx = order_state.oidx
     if is_filled:
         # Fill order record
-        if order_id > len(order_records) - 1:
+        if order_state.oidx > len(order_records) - 1:
             raise IndexError("order_records index out of range. Set a higher max_orders.")
         fill_order_record_nb(
-            order_records[order_id],
-            order_id,
+            order_records[order_state.oidx],
+            order_state.oidx,
             i,
             col,
             order_result
         )
-        new_order_id += 1
+        new_oidx += 1
 
-    new_log_id = log_id
+    new_lidx = order_state.lidx
     if order.log:
         # Fill log record
-        if log_id > len(log_records) - 1:
+        if order_state.lidx > len(log_records) - 1:
             raise IndexError("log_records index out of range. Set a higher max_logs.")
         fill_log_record_nb(
-            log_records[log_id],
-            log_id,
+            log_records[order_state.lidx],
+            order_state.lidx,
             i,
             col,
             group,
-            cash_before,
-            shares_before,
-            val_price_before,
-            value_before,
+            order_state.cash,
+            order_state.shares,
+            order_state.val_price,
+            order_state.value,
             order,
-            cash_now,
-            shares_now,
-            val_price_now,
-            value_now,
+            new_cash,
+            new_shares,
+            new_val_price,
+            new_value,
             order_result,
-            order_id if is_filled else -1
+            order_state.oidx if is_filled else -1
         )
-        new_log_id += 1
+        new_lidx += 1
 
-    return cash_now, shares_now, val_price_now, value_now, new_order_id, new_log_id, order_result
+    # Create new state
+    new_state = ProcessOrderState(
+        cash=new_cash,
+        shares=new_shares,
+        val_price=new_val_price,
+        value=new_value,
+        oidx=new_oidx,
+        lidx=new_lidx
+    )
+
+    return order_result, new_state
 
 
 @njit(cache=True)
@@ -883,6 +885,20 @@ def update_value_nb(cash_before: float,
     asset_value_change = asset_value_now - asset_value_before
     value_now = value_before + cash_change + asset_value_change
     return val_price_now, value_now
+
+
+@njit(cache=True)
+def init_records_nb(target_shape: tp.Shape,
+                    max_orders: tp.Optional[int] = None,
+                    max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
+    """Initialize order and log records."""
+    if max_orders is None:
+        max_orders = target_shape[0] * target_shape[1]
+    order_records = np.empty(max_orders, dtype=order_dt)
+    if max_logs == 0:
+        max_logs = 1
+    log_records = np.empty(max_logs, dtype=log_dt)
+    return order_records, log_records
 
 
 PrepFuncT = tp.Callable[[SimulationContext, tp.VarArg()], tp.Args]
@@ -1224,19 +1240,15 @@ def simulate_nb(target_shape: tp.Shape,
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    if max_orders is None:
-        max_orders = target_shape[0] * target_shape[1]
-    order_records = np.empty(max_orders, dtype=order_dt)
-    ridx = 0
-    if max_logs == 0:
-        max_logs = 1
-    log_records = np.empty(max_logs, dtype=log_dt)
-    lidx = 0
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     last_cash = init_cash.copy()
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-    last_ridx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_value = init_cash.copy()
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    oidx = 0
+    lidx = 0
 
     # Run a function to prepare the simulation
     sim_ctx = SimulationContext(
@@ -1253,7 +1265,8 @@ def simulate_nb(target_shape: tp.Shape,
         last_cash=last_cash,
         last_shares=last_shares,
         last_val_price=last_val_price,
-        last_ridx=last_ridx,
+        last_value=last_value,
+        last_oidx=last_oidx,
         last_lidx=last_lidx
     )
     prep_out = prep_func_nb(sim_ctx, *prep_args)
@@ -1280,7 +1293,8 @@ def simulate_nb(target_shape: tp.Shape,
                 last_cash=last_cash,
                 last_shares=last_shares,
                 last_val_price=last_val_price,
-                last_ridx=last_ridx,
+                last_value=last_value,
+                last_oidx=last_oidx,
                 last_lidx=last_lidx,
                 group=group,
                 group_len=group_len,
@@ -1313,7 +1327,8 @@ def simulate_nb(target_shape: tp.Shape,
                         last_cash=last_cash,
                         last_shares=last_shares,
                         last_val_price=last_val_price,
-                        last_ridx=last_ridx,
+                        last_value=last_value,
+                        last_oidx=last_oidx,
                         last_lidx=last_lidx,
                         group=group,
                         group_len=group_len,
@@ -1324,10 +1339,17 @@ def simulate_nb(target_shape: tp.Shape,
                     )
                     segment_prep_out = segment_prep_func_nb(seg_ctx, *group_prep_out, *segment_prep_args)
 
-                    # Get running values per group
+                    # Get current values per group
                     if cash_sharing:
                         cash_now = last_cash[group]
-                        value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price)
+                        value_now = get_group_value_nb(
+                            from_col,
+                            to_col,
+                            cash_now,
+                            last_shares,
+                            last_val_price
+                        )
+                        last_value[group] = value_now
 
                     for k in range(group_len):
                         col_i = call_seq_now[k]
@@ -1335,7 +1357,7 @@ def simulate_nb(target_shape: tp.Shape,
                             raise ValueError("Call index exceeds bounds of the group")
                         col = from_col + col_i
 
-                        # Get running values per column
+                        # Get current values per column
                         shares_now = last_shares[col]
                         val_price_now = last_val_price[col]
                         if not cash_sharing:
@@ -1343,6 +1365,7 @@ def simulate_nb(target_shape: tp.Shape,
                             value_now = cash_now
                             if shares_now != 0:
                                 value_now += shares_now * val_price_now
+                            last_value[col] = value_now
 
                         # Generate the next order
                         order_ctx = OrderContext(
@@ -1359,7 +1382,8 @@ def simulate_nb(target_shape: tp.Shape,
                             last_cash=last_cash,
                             last_shares=last_shares,
                             last_val_price=last_val_price,
-                            last_ridx=last_ridx,
+                            last_value=last_value,
+                            last_oidx=last_oidx,
                             last_lidx=last_lidx,
                             group=group,
                             group_len=group_len,
@@ -1377,27 +1401,46 @@ def simulate_nb(target_shape: tp.Shape,
                         order = order_func_nb(order_ctx, *segment_prep_out, *order_args)
 
                         # Process the order
-                        cash_before = cash_now
-                        shares_before = shares_now
-                        val_price_before = val_price_now
-                        value_before = value_now
+                        old_state = ProcessOrderState(
+                            cash=cash_now,
+                            shares=shares_now,
+                            val_price=val_price_now,
+                            value=value_now,
+                            oidx=oidx,
+                            lidx=lidx
+                        )
 
-                        cash_now, shares_now, val_price_now, value_now, ridx, lidx, order_result = \
-                            process_order_nb(
-                                i, col, group,
-                                cash_now, shares_now, val_price_now, value_now,
-                                update_value,
-                                order,
-                                order_records, ridx,
-                                log_records, lidx
-                            )
+                        order_result, new_state = process_order_nb(
+                            i, col, group,
+                            old_state,
+                            update_value,
+                            order,
+                            order_records,
+                            log_records
+                        )
 
-                        # Now becomes last
+                        # Update state
+                        cash_now = new_state.cash
+                        shares_now = new_state.shares
+                        val_price_now = new_state.val_price
+                        value_now = new_state.value
+                        oidx = new_state.oidx
+                        lidx = new_state.lidx
+
                         if cash_sharing:
                             last_cash[group] = cash_now
                         else:
                             last_cash[col] = cash_now
                         last_shares[col] = shares_now
+                        last_val_price[col] = val_price_now
+                        if cash_sharing:
+                            last_value[group] = value_now
+                        else:
+                            last_value[col] = value_now
+                        if old_state.oidx != new_state.oidx:
+                            last_oidx[col] = old_state.oidx
+                        if old_state.lidx != new_state.lidx:
+                            last_lidx[col] = old_state.lidx
 
                         # After order callback
                         after_order_ctx = AfterOrderContext(
@@ -1414,7 +1457,8 @@ def simulate_nb(target_shape: tp.Shape,
                             last_cash=last_cash,
                             last_shares=last_shares,
                             last_val_price=last_val_price,
-                            last_ridx=last_ridx,
+                            last_value=last_value,
+                            last_oidx=last_oidx,
                             last_lidx=last_lidx,
                             group=group,
                             group_len=group_len,
@@ -1424,10 +1468,10 @@ def simulate_nb(target_shape: tp.Shape,
                             call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
-                            cash_before=cash_before,
-                            shares_before=shares_before,
-                            val_price_before=val_price_before,
-                            value_before=value_before,
+                            cash_before=old_state.cash,
+                            shares_before=old_state.shares,
+                            val_price_before=old_state.val_price,
+                            value_before=old_state.value,
                             order_result=order_result,
                             cash_now=cash_now,
                             shares_now=shares_now,
@@ -1438,7 +1482,7 @@ def simulate_nb(target_shape: tp.Shape,
 
             from_col = to_col
 
-    return order_records[:ridx], log_records[:lidx]
+    return order_records[:oidx], log_records[:lidx]
 
 
 @njit
@@ -1522,19 +1566,15 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    if max_orders is None:
-        max_orders = target_shape[0] * target_shape[1]
-    order_records = np.empty(max_orders, dtype=order_dt)
-    ridx = 0
-    if max_logs == 0:
-        max_logs = 1
-    log_records = np.empty(max_logs, dtype=log_dt)
-    lidx = 0
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     last_cash = init_cash.copy()
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-    last_ridx = np.full(target_shape[1], -1, dtype=np.int_)
+    last_value = init_cash.copy()
+    last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
+    oidx = 0
+    lidx = 0
 
     # Run a function to prepare the simulation
     sim_ctx = SimulationContext(
@@ -1551,7 +1591,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         last_cash=last_cash,
         last_shares=last_shares,
         last_val_price=last_val_price,
-        last_ridx=last_ridx,
+        last_value=last_value,
+        last_oidx=last_oidx,
         last_lidx=last_lidx
     )
     prep_out = prep_func_nb(sim_ctx, *prep_args)
@@ -1579,7 +1620,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                 last_cash=last_cash,
                 last_shares=last_shares,
                 last_val_price=last_val_price,
-                last_ridx=last_ridx,
+                last_value=last_value,
+                last_oidx=last_oidx,
                 last_lidx=last_lidx,
                 i=i
             )
@@ -1608,7 +1650,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         last_cash=last_cash,
                         last_shares=last_shares,
                         last_val_price=last_val_price,
-                        last_ridx=last_ridx,
+                        last_value=last_value,
+                        last_oidx=last_oidx,
                         last_lidx=last_lidx,
                         group=group,
                         group_len=group_len,
@@ -1619,10 +1662,11 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     )
                     segment_prep_out = segment_prep_func_nb(seg_ctx, *row_prep_out, *segment_prep_args)
 
-                    # Get running values per group
+                    # Get current values per group
                     if cash_sharing:
                         cash_now = last_cash[group]
                         value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price)
+                        last_value[group] = value_now
 
                     for k in range(group_len):
                         col_i = call_seq_now[k]
@@ -1630,7 +1674,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             raise ValueError("Call index exceeds bounds of the group")
                         col = from_col + col_i
 
-                        # Get running values per column
+                        # Get current values per column
                         shares_now = last_shares[col]
                         val_price_now = last_val_price[col]
                         if not cash_sharing:
@@ -1638,6 +1682,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             value_now = cash_now
                             if shares_now != 0:
                                 value_now += shares_now * val_price_now
+                            last_value[col] = value_now
 
                         # Generate the next order
                         order_ctx = OrderContext(
@@ -1654,7 +1699,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             last_cash=last_cash,
                             last_shares=last_shares,
                             last_val_price=last_val_price,
-                            last_ridx=last_ridx,
+                            last_value=last_value,
+                            last_oidx=last_oidx,
                             last_lidx=last_lidx,
                             group=group,
                             group_len=group_len,
@@ -1672,27 +1718,46 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         order = order_func_nb(order_ctx, *segment_prep_out, *order_args)
 
                         # Process the order
-                        cash_before = cash_now
-                        shares_before = shares_now
-                        val_price_before = val_price_now
-                        value_before = value_now
+                        old_state = ProcessOrderState(
+                            cash=cash_now,
+                            shares=shares_now,
+                            val_price=val_price_now,
+                            value=value_now,
+                            oidx=oidx,
+                            lidx=lidx
+                        )
 
-                        cash_now, shares_now, val_price_now, value_now, ridx, lidx, order_result = \
-                            process_order_nb(
-                                i, col, group,
-                                cash_now, shares_now, val_price_now, value_now,
-                                update_value,
-                                order,
-                                order_records, ridx,
-                                log_records, lidx
-                            )
+                        order_result, new_state = process_order_nb(
+                            i, col, group,
+                            old_state,
+                            update_value,
+                            order,
+                            order_records,
+                            log_records
+                        )
 
-                        # Now becomes last
+                        # Update state
+                        cash_now = new_state.cash
+                        shares_now = new_state.shares
+                        val_price_now = new_state.val_price
+                        value_now = new_state.value
+                        oidx = new_state.oidx
+                        lidx = new_state.lidx
+
                         if cash_sharing:
                             last_cash[group] = cash_now
                         else:
                             last_cash[col] = cash_now
                         last_shares[col] = shares_now
+                        last_val_price[col] = val_price_now
+                        if cash_sharing:
+                            last_value[group] = value_now
+                        else:
+                            last_value[col] = value_now
+                        if old_state.oidx != new_state.oidx:
+                            last_oidx[col] = old_state.oidx
+                        if old_state.lidx != new_state.lidx:
+                            last_lidx[col] = old_state.lidx
 
                         # After order callback
                         after_order_ctx = AfterOrderContext(
@@ -1709,7 +1774,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             last_cash=last_cash,
                             last_shares=last_shares,
                             last_val_price=last_val_price,
-                            last_ridx=last_ridx,
+                            last_value=last_value,
+                            last_oidx=last_oidx,
                             last_lidx=last_lidx,
                             group=group,
                             group_len=group_len,
@@ -1719,10 +1785,10 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
-                            cash_before=cash_before,
-                            shares_before=shares_before,
-                            val_price_before=val_price_before,
-                            value_before=value_before,
+                            cash_before=old_state.cash,
+                            shares_before=old_state.shares,
+                            val_price_before=old_state.val_price,
+                            value_before=old_state.value,
                             order_result=order_result,
                             cash_now=cash_now,
                             shares_now=shares_now,
@@ -1733,7 +1799,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                     from_col = to_col
 
-    return order_records[:ridx], log_records[:lidx]
+    return order_records[:oidx], log_records[:lidx]
 
 
 @njit(cache=True)
@@ -1772,24 +1838,19 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    if max_orders is None:
-        max_orders = target_shape[0] * target_shape[1]
-    order_records = np.empty(max_orders, dtype=order_dt)
-    ridx = 0
-    if max_logs == 0:
-        max_logs = 1
-    log_records = np.empty(max_logs, dtype=log_dt)
-    lidx = 0
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+    oidx = 0
+    lidx = 0
 
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
         group_len = to_col - from_col
 
-        # Get running values per group
+        # Get current values per group
         if cash_sharing:
             cash_now = last_cash[group]
 
@@ -1830,7 +1891,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                         raise ValueError("Call index exceeds bounds of the group")
                     col = from_col + col_i
 
-                # Get running values per column
+                # Get current values per column
                 shares_now = last_shares[col]
                 val_price_now = flex_select_auto_nb(i, col, val_price, flex_2d)
                 if not cash_sharing:
@@ -1857,15 +1918,31 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 )
 
                 # Process the order
-                cash_now, shares_now, val_price_now, value_now, ridx, lidx, order_result = \
-                    process_order_nb(
-                        i, col, group,
-                        cash_now, shares_now, val_price_now, value_now,
-                        update_value,
-                        order,
-                        order_records, ridx,
-                        log_records, lidx
-                    )
+                old_state = ProcessOrderState(
+                    cash=cash_now,
+                    shares=shares_now,
+                    val_price=val_price_now,
+                    value=value_now,
+                    oidx=oidx,
+                    lidx=lidx
+                )
+
+                order_result, new_state = process_order_nb(
+                    i, col, group,
+                    old_state,
+                    update_value,
+                    order,
+                    order_records,
+                    log_records
+                )
+
+                # Update state
+                cash_now = new_state.cash
+                shares_now = new_state.shares
+                val_price_now = new_state.val_price
+                value_now = new_state.value
+                oidx = new_state.oidx
+                lidx = new_state.lidx
 
                 # Now becomes last
                 if cash_sharing:
@@ -1876,7 +1953,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
         from_col = to_col
 
-    return order_records[:ridx], log_records[:lidx]
+    return order_records[:oidx], log_records[:lidx]
 
 
 @njit(cache=True)
@@ -2028,26 +2105,21 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
     cash_sharing = is_grouped_nb(group_lens)
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
-    if max_orders is None:
-        max_orders = target_shape[0] * target_shape[1]
-    order_records = np.empty(max_orders, dtype=order_dt)
-    ridx = 0
-    if max_logs == 0:
-        max_logs = 1
-    log_records = np.empty(max_logs, dtype=log_dt)
-    lidx = 0
+    order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
     order_size = np.empty(target_shape[1], dtype=np.float_)
     order_size_type = np.empty(target_shape[1], dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
+    oidx = 0
+    lidx = 0
 
     from_col = 0
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
         group_len = to_col - from_col
 
-        # Get running values per group
+        # Get current values per group
         if cash_sharing:
             cash_now = last_cash[group]
 
@@ -2106,7 +2178,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         raise ValueError("Call index exceeds bounds of the group")
                     col = from_col + col_i
 
-                # Get running values per column
+                # Get current values per column
                 shares_now = last_shares[col]
                 val_price_now = flex_select_auto_nb(i, col, val_price, flex_2d)
                 if not cash_sharing:
@@ -2144,15 +2216,31 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     )
 
                     # Process the order
-                    cash_now, shares_now, val_price_now, value_now, ridx, lidx, order_result = \
-                        process_order_nb(
-                            i, col, group,
-                            cash_now, shares_now, val_price_now, value_now,
-                            update_value,
-                            order,
-                            order_records, ridx,
-                            log_records, lidx
-                        )
+                    old_state = ProcessOrderState(
+                        cash=cash_now,
+                        shares=shares_now,
+                        val_price=val_price_now,
+                        value=value_now,
+                        oidx=oidx,
+                        lidx=lidx
+                    )
+
+                    order_result, new_state = process_order_nb(
+                        i, col, group,
+                        old_state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records
+                    )
+
+                    # Update state
+                    cash_now = new_state.cash
+                    shares_now = new_state.shares
+                    val_price_now = new_state.val_price
+                    value_now = new_state.value
+                    oidx = new_state.oidx
+                    lidx = new_state.lidx
 
                 # Now becomes last
                 if cash_sharing:
@@ -2163,7 +2251,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
         from_col = to_col
 
-    return order_records[:ridx], log_records[:lidx]
+    return order_records[:oidx], log_records[:lidx]
 
 
 # ############# Trades ############# #
@@ -2334,7 +2422,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     records = np.empty(len(order_records), dtype=trade_dt)
-    ridx = 0
+    tidx = 0
     entry_size_sum = 0.
     entry_gross_sum = 0.
     entry_fees_sum = 0.
@@ -2349,8 +2437,8 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
         last_id = -1
 
         for i in range(col_len):
-            r = col_idxs[col_start_idxs[col] + i]
-            record = order_records[r]
+            oidx = col_idxs[col_start_idxs[col] + i]
+            record = order_records[oidx]
 
             if record['id'] < last_id:
                 raise ValueError("id must come in ascending order per column")
@@ -2376,7 +2464,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
                     direction = TradeDirection.Short
                 position_id += 1
 
-                # Reset running vars for a new position
+                # Reset current vars for a new position
                 entry_size_sum = 0.
                 entry_gross_sum = 0.
                 entry_fees_sum = 0.
@@ -2400,7 +2488,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
                     exit_fees = order_fees
                     exit_idx = i
                     fill_trade_record_nb(
-                        records[ridx],
+                        records[tidx],
                         col,
                         entry_idx,
                         entry_size_sum,
@@ -2414,8 +2502,8 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
                         TradeStatus.Closed,
                         position_id
                     )
-                    records[ridx]['id'] = ridx
-                    ridx += 1
+                    records[tidx]['id'] = tidx
+                    tidx += 1
 
                     if is_close_nb(order_size, entry_size_sum):
                         # Position closed
@@ -2435,7 +2523,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
                     cl_exit_fees = cl_exit_size / order_size * order_fees
                     cl_exit_idx = i
                     fill_trade_record_nb(
-                        records[ridx],
+                        records[tidx],
                         col,
                         entry_idx,
                         entry_size_sum,
@@ -2449,8 +2537,8 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
                         TradeStatus.Closed,
                         position_id
                     )
-                    records[ridx]['id'] = ridx
-                    ridx += 1
+                    records[tidx]['id'] = tidx
+                    tidx += 1
 
                     # Open a new trade
                     entry_size_sum = order_size - cl_exit_size
@@ -2470,7 +2558,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
             exit_fees = 0.
             exit_idx = close.shape[0] - 1
             fill_trade_record_nb(
-                records[ridx],
+                records[tidx],
                 col,
                 entry_idx,
                 entry_size_sum,
@@ -2484,10 +2572,10 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
                 TradeStatus.Open,
                 position_id
             )
-            records[ridx]['id'] = ridx
-            ridx += 1
+            records[tidx]['id'] = tidx
+            tidx += 1
 
-    return records[:ridx]
+    return records[:tidx]
 
 
 # ############# Positions ############# #
@@ -2580,8 +2668,8 @@ def trades_to_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) ->
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     records = np.empty(len(trade_records), dtype=position_dt)
-    ridx = 0
-    from_r = -1
+    pidx = 0
+    from_tidx = -1
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
@@ -2591,8 +2679,8 @@ def trades_to_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) ->
         last_position_id = -1
 
         for i in range(col_len):
-            r = col_idxs[col_start_idxs[col] + i]
-            record = trade_records[r]
+            tidx = col_idxs[col_start_idxs[col] + i]
+            record = trade_records[tidx]
 
             if record['id'] < last_id:
                 raise ValueError("id must come in ascending order per column")
@@ -2602,25 +2690,25 @@ def trades_to_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) ->
 
             if position_id != last_position_id:
                 if last_position_id != -1:
-                    if r - from_r > 1:
-                        fill_position_record_nb(records[ridx], trade_records[from_r:r])
+                    if tidx - from_tidx > 1:
+                        fill_position_record_nb(records[pidx], trade_records[from_tidx:tidx])
                     else:
                         # Speed up
-                        copy_trade_record_nb(records[ridx], trade_records[from_r])
-                    records[ridx]['id'] = ridx
-                    ridx += 1
-                from_r = r
+                        copy_trade_record_nb(records[pidx], trade_records[from_tidx])
+                    records[pidx]['id'] = pidx
+                    pidx += 1
+                from_tidx = tidx
                 last_position_id = position_id
 
-        if r - from_r > 0:
-            fill_position_record_nb(records[ridx], trade_records[from_r:r + 1])
+        if tidx - from_tidx > 0:
+            fill_position_record_nb(records[pidx], trade_records[from_tidx:tidx + 1])
         else:
             # Speed up
-            copy_trade_record_nb(records[ridx], trade_records[from_r])
-        records[ridx]['id'] = ridx
-        ridx += 1
+            copy_trade_record_nb(records[pidx], trade_records[from_tidx])
+        records[pidx]['id'] = pidx
+        pidx += 1
 
-    return records[:ridx]
+    return records[:pidx]
 
 
 # ############# Shares ############# #
@@ -2668,8 +2756,8 @@ def share_flow_nb(target_shape: tp.Shape,
         shares_now = 0.
 
         for i in range(col_len):
-            r = col_idxs[col_start_idxs[col] + i]
-            record = order_records[r]
+            oidx = col_idxs[col_start_idxs[col] + i]
+            record = order_records[oidx]
 
             if record['id'] < last_id:
                 raise ValueError("id must come in ascending order per column")
@@ -2751,8 +2839,8 @@ def cash_flow_nb(target_shape: tp.Shape,
         debt_now = 0.
 
         for i in range(col_len):
-            r = col_idxs[col_start_idxs[col] + i]
-            record = order_records[r]
+            oidx = col_idxs[col_start_idxs[col] + i]
+            record = order_records[oidx]
 
             if record['id'] < last_id:
                 raise ValueError("id must come in ascending order per column")
@@ -2981,8 +3069,8 @@ def total_profit_nb(target_shape: tp.Shape,
         last_id = -1
 
         for i in range(col_len):
-            r = col_idxs[col_start_idxs[col] + i]
-            record = order_records[r]
+            oidx = col_idxs[col_start_idxs[col] + i]
+            record = order_records[oidx]
 
             if record['id'] < last_id:
                 raise ValueError("id must come in ascending order per column")
