@@ -46,6 +46,7 @@ records = vbt.records.Records(wrapper, records_arr)
 records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
 records_nosort = records.copy(records_arr=records.records_arr[::-1])
 
+
 # ############# col_mapper.py ############# #
 
 
@@ -260,7 +261,7 @@ class TestMappedArray:
     def test_top_n_mask(self):
         np.testing.assert_array_equal(
             mapped_array.top_n_mask(1),
-            np.array([False, False,  True, False, True, False, True, False, False])
+            np.array([False, False, True, False, True, False, True, False, False])
         )
 
     def test_bottom_n_mask(self):
@@ -1211,22 +1212,49 @@ class TestDrawdowns:
         )
 
     def test_records_readable(self):
-        pd.testing.assert_frame_equal(
-            drawdowns.records_readable,
-            pd.DataFrame({
-                'Drawdown Id': [0, 1, 2, 3, 4, 5],
-                'Column': ['a', 'a', 'a', 'b', 'b', 'c'],
-                'Start Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-03 00:00:00'),
-                               pd.Timestamp('2020-01-05 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
-                               pd.Timestamp('2020-01-04 00:00:00'), pd.Timestamp('2020-01-03 00:00:00')],
-                'Valley Date': [pd.Timestamp('2020-01-02 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                                pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-03 00:00:00'),
-                                pd.Timestamp('2020-01-05 00:00:00'), pd.Timestamp('2020-01-05 00:00:00')],
-                'End Date': [pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                             pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                             pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-06 00:00:00')],
-                'Status': ['Recovered', 'Recovered', 'Active', 'Recovered', 'Recovered', 'Active']
-            })
+        records_readable = drawdowns.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Drawdown Id'].values,
+            np.array([
+                0, 1, 2, 3, 4, 5
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Column'].values,
+            np.array([
+                'a', 'a', 'a', 'b', 'b', 'c'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Start Date'].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-04T00:00:00.000000000', '2020-01-03T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Valley Date'].values,
+            np.array([
+                '2020-01-02T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-05T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['End Date'].values,
+            np.array([
+                '2020-01-03T00:00:00.000000000', '2020-01-05T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-06T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Status'].values,
+            np.array([
+                'Recovered', 'Recovered', 'Active', 'Recovered', 'Recovered', 'Active'
+            ])
         )
 
     def test_start_value(self):
@@ -1554,55 +1582,76 @@ close = pd.Series([1, 2, 3, 4, 5, 6, 7, 8], index=[
     datetime(2020, 1, 8)
 ]).vbt.tile(4, keys=['a', 'b', 'c', 'd'])
 
-orders_records_arr = np.asarray([
-    (0, 0, 0, 1., 1., 0.01, 0), (1, 1, 0, 0.1, 2., 0.002, 0),
-    (2, 2, 0, 1., 3., 0.03, 1), (3, 3, 0, 0.1, 4., 0.004, 1),
-    (4, 5, 0, 1., 6., 0.06, 0), (5, 6, 0, 1., 7., 0.07, 1),
-    (6, 7, 0, 2., 8., 0.16, 0), (7, 0, 1, 1., 1., 0.01, 1),
-    (8, 1, 1, 0.1, 2., 0.002, 1), (9, 2, 1, 1., 3., 0.03, 0),
-    (10, 3, 1, 0.1, 4., 0.004, 0), (11, 5, 1, 1., 6., 0.06, 1),
-    (12, 6, 1, 1., 7., 0.07, 0), (13, 7, 1, 2., 8., 0.16, 1),
-    (14, 0, 2, 1., 1., 0.01, 0), (15, 1, 2, 0.1, 2., 0.002, 0),
-    (16, 2, 2, 1., 3., 0.03, 1), (17, 3, 2, 0.1, 4., 0.004, 1),
-    (18, 5, 2, 1., 6., 0.06, 0), (19, 6, 2, 2., 7., 0.14, 1),
-    (20, 7, 2, 2., 8., 0.16, 0)
-], dtype=order_dt)
-
-orders_wrapper = vbt.ArrayWrapper.from_obj(close, freq='1 days')
-orders = vbt.Orders(orders_wrapper, orders_records_arr, close)
-orders_grouped = vbt.Orders(orders_wrapper.regroup(group_by), orders_records_arr, close)
+size = np.full(close.shape, np.nan, dtype=np.float_)
+size[:, 0] = [1, 0.1, -1, -0.1, np.nan, 1, -1, 2]
+size[:, 1] = [-1, -0.1, 1, 0.1, np.nan, -1, 1, -2]
+size[:, 2] = [1, 0.1, -1, -0.1, np.nan, 1, -2, 2]
+orders = vbt.Portfolio.from_orders(close, size, fees=0.01, freq='1 days').orders
+orders_grouped = orders.regroup(group_by)
 
 
 class TestOrders:
     def test_records_readable(self):
-        pd.testing.assert_frame_equal(
-            orders.records_readable,
-            pd.DataFrame({
-                'Order Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20],
-                'Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
-                         pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                         pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-07 00:00:00'),
-                         pd.Timestamp('2020-01-08 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                         pd.Timestamp('2020-01-02 00:00:00'), pd.Timestamp('2020-01-03 00:00:00'),
-                         pd.Timestamp('2020-01-04 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                         pd.Timestamp('2020-01-07 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                         pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
-                         pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                         pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-07 00:00:00'),
-                         pd.Timestamp('2020-01-08 00:00:00')],
-                'Column': ['a', 'a', 'a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b',
-                           'b', 'c', 'c', 'c', 'c', 'c', 'c', 'c'],
-                'Size': [1.0, 0.1, 1.0, 0.1, 1.0, 1.0, 2.0, 1.0, 0.1, 1.0, 0.1, 1.0, 1.0,
-                         2.0, 1.0, 0.1, 1.0, 0.1, 1.0, 2.0, 2.0],
-                'Price': [1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 6.0, 7.0,
-                          8.0, 1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0],
-                'Fees': [0.01, 0.002, 0.03, 0.004, 0.06, 0.07, 0.16, 0.01, 0.002, 0.03,
-                         0.004, 0.06, 0.07, 0.16, 0.01, 0.002, 0.03, 0.004, 0.06, 0.14,
-                         0.16],
-                'Side': ['Buy', 'Buy', 'Sell', 'Sell', 'Buy', 'Sell', 'Buy', 'Sell', 'Sell',
-                         'Buy', 'Buy', 'Sell', 'Buy', 'Sell', 'Buy', 'Buy', 'Sell', 'Sell',
-                         'Buy', 'Sell', 'Buy']
-            })
+        records_readable = orders.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Order Id'].values,
+            np.array([
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Date'].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
+                '2020-01-02T00:00:00.000000000', '2020-01-03T00:00:00.000000000',
+                '2020-01-04T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Column'].values,
+            np.array([
+                'a', 'a', 'a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b',
+                'b', 'c', 'c', 'c', 'c', 'c', 'c', 'c'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Size'].values,
+            np.array([
+                1.0, 0.1, 1.0, 0.1, 1.0, 1.0, 2.0, 1.0, 0.1, 1.0, 0.1, 1.0, 1.0,
+                2.0, 1.0, 0.1, 1.0, 0.1, 1.0, 2.0, 2.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Price'].values,
+            np.array([
+                1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 6.0, 7.0,
+                8.0, 1.0, 2.0, 3.0, 4.0, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Fees'].values,
+            np.array([
+                0.01, 0.002, 0.03, 0.004, 0.06, 0.07, 0.16, 0.01, 0.002, 0.03,
+                0.004, 0.06, 0.07, 0.16, 0.01, 0.002, 0.03, 0.004, 0.06, 0.14,
+                0.16
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Side'].values,
+            np.array([
+                'Buy', 'Buy', 'Sell', 'Sell', 'Buy', 'Sell', 'Buy', 'Sell', 'Sell',
+                'Buy', 'Buy', 'Sell', 'Buy', 'Sell', 'Buy', 'Buy', 'Sell', 'Sell',
+                'Buy', 'Sell', 'Buy'
+            ])
         )
 
     def test_size(self):
@@ -1778,49 +1827,115 @@ class TestTrades:
         )
 
     def test_records_readable(self):
-        pd.testing.assert_frame_equal(
-            trades.records_readable,
-            pd.DataFrame({
-                'Trade Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-                'Column': ['a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'c'],
-                'Size': [1.0, 0.10000000000000009, 1.0, 2.0, 1.0, 0.10000000000000009, 1.0,
-                         2.0, 1.0, 0.10000000000000009, 1.0, 1.0, 1.0],
-                'Entry Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                               pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                               pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                               pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                               pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                               pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-07 00:00:00'),
-                               pd.Timestamp('2020-01-08 00:00:00')],
-                'Avg. Entry Price': [1.0909090909090908, 1.0909090909090908, 6.0, 8.0,
-                                1.0909090909090908, 1.0909090909090908, 6.0, 8.0,
-                                1.0909090909090908, 1.0909090909090908, 6.0, 7.0, 8.0],
-                'Entry Fees': [0.010909090909090908, 0.0010909090909090918, 0.06, 0.16,
-                               0.010909090909090908, 0.0010909090909090918, 0.06, 0.16,
-                               0.010909090909090908, 0.0010909090909090918, 0.06, 0.07, 0.08],
-                'Exit Date': [pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                              pd.Timestamp('2020-01-07 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                              pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                              pd.Timestamp('2020-01-07 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                              pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                              pd.Timestamp('2020-01-07 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                              pd.Timestamp('2020-01-08 00:00:00')],
-                'Avg. Exit Price': [3.0, 4.0, 7.0, 8.0, 3.0, 4.0, 7.0, 8.0, 3.0, 4.0, 7.0, 8.0, 8.0],
-                'Exit Fees': [0.03, 0.004, 0.07, 0.0, 0.03, 0.004, 0.07, 0.0, 0.03, 0.004, 0.07,
-                              0.08, 0.0],
-                'PnL': [1.8681818181818182, 0.2858181818181821, 0.8699999999999999, -0.16,
-                        -1.9500000000000002, -0.29600000000000026, -1.1300000000000001,
-                        -0.16, 1.8681818181818182, 0.2858181818181821, 0.8699999999999999,
-                        -1.1500000000000001, -0.08],
-                'Return': [1.7125000000000001, 2.62, 0.145, -0.01, -1.7875000000000003,
-                           -2.7133333333333334, -0.18833333333333335, -0.01,
-                           1.7125000000000001, 2.62, 0.145, -0.1642857142857143, -0.01],
-                'Direction': ['Long', 'Long', 'Long', 'Long', 'Short', 'Short', 'Short', 'Short',
-                              'Long', 'Long', 'Long', 'Short', 'Long'],
-                'Status': ['Closed', 'Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Closed',
-                           'Open', 'Closed', 'Closed', 'Closed', 'Closed', 'Open'],
-                'Position Id': [0, 0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9]
-            })
+        records_readable = trades.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Trade Id'].values,
+            np.array([
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Column'].values,
+            np.array([
+                'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'c'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Size'].values,
+            np.array([
+                1.0, 0.10000000000000009, 1.0, 2.0, 1.0, 0.10000000000000009, 1.0,
+                2.0, 1.0, 0.10000000000000009, 1.0, 1.0, 1.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Entry Date'].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Avg. Entry Price'].values,
+            np.array([
+                1.0909090909090908, 1.0909090909090908, 6.0, 8.0,
+                1.0909090909090908, 1.0909090909090908, 6.0, 8.0,
+                1.0909090909090908, 1.0909090909090908, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Entry Fees'].values,
+            np.array([
+                0.010909090909090908, 0.0010909090909090918, 0.06, 0.16,
+                0.010909090909090908, 0.0010909090909090918, 0.06, 0.16,
+                0.010909090909090908, 0.0010909090909090918, 0.06, 0.07, 0.08
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Exit Date'].values,
+            np.array([
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Avg. Exit Price'].values,
+            np.array([
+                3.0, 4.0, 7.0, 8.0, 3.0, 4.0, 7.0, 8.0, 3.0, 4.0, 7.0, 8.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Exit Fees'].values,
+            np.array([
+                0.03, 0.004, 0.07, 0.0, 0.03, 0.004, 0.07, 0.0, 0.03, 0.004, 0.07, 0.08, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['PnL'].values,
+            np.array([
+                1.8681818181818182, 0.2858181818181821, 0.8699999999999999, -0.16,
+                -1.9500000000000002, -0.29600000000000026, -1.1300000000000001,
+                -0.16, 1.8681818181818182, 0.2858181818181821, 0.8699999999999999,
+                -1.1500000000000001, -0.08
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Return'].values,
+            np.array([
+                1.7125000000000001, 2.62, 0.145, -0.01, -1.7875000000000003,
+                -2.7133333333333334, -0.18833333333333335, -0.01,
+                1.7125000000000001, 2.62, 0.145, -0.1642857142857143, -0.01
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Direction'].values,
+            np.array([
+                'Long', 'Long', 'Long', 'Long', 'Short', 'Short', 'Short',
+                'Short', 'Long', 'Long', 'Long', 'Short', 'Long'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Status'].values,
+            np.array([
+                'Closed', 'Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Closed',
+                'Open', 'Closed', 'Closed', 'Closed', 'Closed', 'Open'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Position Id'].values,
+            np.array([
+                0, 0, 1, 2, 3, 3, 4, 5, 6, 6, 7, 8, 9
+            ])
         )
 
     def test_duration(self):
@@ -2225,37 +2340,95 @@ class TestPositions:
         )
 
     def test_records_readable(self):
-        pd.testing.assert_frame_equal(
-            positions.records_readable,
-            pd.DataFrame({
-                'Position Id': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
-                'Column': ['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'c'],
-                'Size': [1.1, 1.0, 2.0, 1.1, 1.0, 2.0, 1.1, 1.0, 1.0, 1.0],
-                'Entry Date': [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                               pd.Timestamp('2020-01-08 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                               pd.Timestamp('2020-01-06 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                               pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
-                               pd.Timestamp('2020-01-07 00:00:00'), pd.Timestamp('2020-01-08 00:00:00')],
-                'Avg. Entry Price': [1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0,
-                                     8.0, 1.0909090909090908, 6.0, 7.0, 8.0],
-                'Entry Fees': [0.012, 0.06, 0.16, 0.012, 0.06, 0.16, 0.012, 0.06, 0.07, 0.08],
-                'Exit Date': [pd.Timestamp('2020-01-04 00:00:00'), pd.Timestamp('2020-01-07 00:00:00'),
-                              pd.Timestamp('2020-01-08 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                              pd.Timestamp('2020-01-07 00:00:00'), pd.Timestamp('2020-01-08 00:00:00'),
-                              pd.Timestamp('2020-01-04 00:00:00'), pd.Timestamp('2020-01-07 00:00:00'),
-                              pd.Timestamp('2020-01-08 00:00:00'), pd.Timestamp('2020-01-08 00:00:00')],
-                'Avg. Exit Price': [3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0,
-                                    8.0, 3.090909090909091, 7.0, 8.0, 8.0],
-                'Exit Fees': [0.034, 0.07, 0.0, 0.034, 0.07, 0.0, 0.034, 0.07, 0.08, 0.0],
-                'PnL': [2.1540000000000004, 0.8699999999999999, -0.16, -2.246, -1.1300000000000001,
-                        -0.16, 2.1540000000000004, 0.8699999999999999, -1.1500000000000001, -0.08],
-                'Return': [1.7950000000000004, 0.145, -0.01, -1.8716666666666668, -0.18833333333333335,
-                           -0.01, 1.7950000000000004, 0.145, -0.1642857142857143, -0.01],
-                'Direction': ['Long', 'Long', 'Long', 'Short', 'Short', 'Short', 'Long',
-                              'Long', 'Short', 'Long'],
-                'Status': ['Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Open', 'Closed',
-                           'Closed', 'Closed', 'Open']
-            })
+        records_readable = positions.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable['Position Id'].values,
+            np.array([
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Column'].values,
+            np.array([
+                'a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c', 'c'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Size'].values,
+            np.array([
+                1.1, 1.0, 2.0, 1.1, 1.0, 2.0, 1.1, 1.0, 1.0, 1.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Entry Date'].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000', '2020-01-01T00:00:00.000000000',
+                '2020-01-06T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Avg. Entry Price'].values,
+            np.array([
+                1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0, 8.0, 1.0909090909090908, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Entry Fees'].values,
+            np.array([
+                0.012, 0.06, 0.16, 0.012, 0.06, 0.16, 0.012, 0.06, 0.07, 0.08
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Exit Date'].values,
+            np.array([
+                '2020-01-04T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-04T00:00:00.000000000', '2020-01-07T00:00:00.000000000',
+                '2020-01-08T00:00:00.000000000', '2020-01-08T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable['Avg. Exit Price'].values,
+            np.array([
+                3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0, 8.0, 3.090909090909091, 7.0, 8.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Exit Fees'].values,
+            np.array([
+                0.034, 0.07, 0.0, 0.034, 0.07, 0.0, 0.034, 0.07, 0.08, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['PnL'].values,
+            np.array([
+                2.1540000000000004, 0.8699999999999999, -0.16, -2.246, -1.1300000000000001,
+                -0.16, 2.1540000000000004, 0.8699999999999999, -1.1500000000000001, -0.08
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Return'].values,
+            np.array([
+                1.7950000000000004, 0.145, -0.01, -1.8716666666666668, -0.18833333333333335,
+                -0.01, 1.7950000000000004, 0.145, -0.1642857142857143, -0.01
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Direction'].values,
+            np.array([
+                'Long', 'Long', 'Long', 'Short', 'Short', 'Short', 'Long', 'Long', 'Short', 'Long'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable['Status'].values,
+            np.array([
+                'Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Open', 'Closed', 'Closed', 'Closed', 'Open'
+            ])
         )
 
     def test_coverage(self):
@@ -2277,125 +2450,316 @@ class TestPositions:
 
 
 # ############# logs.py ############# #
-
-logs_records_arr = np.asarray([
-    (0, 0, 1, 0, 100., 0., 5., 100., 1., 0, 2, 5., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 94.95, 1., 94.95, 1., 1., 5., 0.05, 0, 0, -1, 0),
-    (1, 0, 0, 0, 94.95, 0., 1., 100., 1., 0, 2, 1., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 93.94, 1., 93.94, 1., 1., 1., 0.01, 0, 0, -1, 1),
-    (2, 1, 0, 0, 93.94, 1., 2., 99.94, 1., 0, 2, 2., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 91.92, 2., 91.92, 2., 1., 2., 0.02, 0, 0, -1, 2),
-    (3, 1, 1, 0, 91.92, 1., 4., 99.94, 1., 0, 2, 4., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 87.88, 2., 87.88, 2., 1., 4., 0.04, 0, 0, -1, 3),
-    (4, 2, 1, 0, 87.88, 2., 3., 99.88, 1., 0, 2, 3., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 84.85, 3., 84.85, 3., 1., 3., 0.03, 0, 0, -1, 4),
-    (5, 2, 0, 0, 84.85, 2., 3., 99.88, 1., 0, 2, 3., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 81.82, 3., 81.82, 3., 1., 3., 0.03, 0, 0, -1, 5),
-    (6, 3, 1, 0, 81.82, 3., 2., 99.82, 1., 0, 2, 2., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 79.8, 4., 79.8, 4., 1., 2., 0.02, 0, 0, -1, 6),
-    (7, 3, 0, 0, 79.8, 3., 4., 99.82, 1., 0, 2, 4., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 75.76, 4., 75.76, 4., 1., 4., 0.04, 0, 0, -1, 7),
-    (8, 4, 1, 0, 75.76, 4., 1., 99.76, 1., 0, 2, 1., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 74.75, 5., 74.75, 5., 1., 1., 0.01, 0, 0, -1, 8),
-    (9, 4, 0, 0, 74.75, 4., 5., 99.76, 1., 0, 2, 5., 0.01, 0., 0., 1e-08, np.inf, 0.,
-     True, False, True, 69.7, 5., 69.7, 5., 1., 5., 0.05, 0, 0, -1, 9)
-], dtype=log_dt)
-
-logs_wrapper = vbt.ArrayWrapper([
-    datetime(2020, 1, 1),
-    datetime(2020, 1, 2),
-    datetime(2020, 1, 3),
-    datetime(2020, 1, 4),
-    datetime(2020, 1, 5),
-    datetime(2020, 1, 6)
-], ['a', 'b', 'c'], 2)
-logs = vbt.Logs(logs_wrapper, logs_records_arr)
-logs_grouped = vbt.Logs(logs_wrapper.regroup(True), logs_records_arr)
+logs = vbt.Portfolio.from_orders(close, size, fees=0.01, log=True, freq='1 days').logs
+logs_grouped = logs.regroup(group_by)
 
 
 class TestLogs:
     def test_records_readable(self):
-        df = pd.DataFrame(columns=pd.MultiIndex.from_tuples([
-            ('Context', 'Log Id'),
-            ('Context', 'Date'),
-            ('Context', 'Column'),
-            ('Context', 'Group'),
-            ('Context', 'Cash'),
-            ('Context', 'Shares'),
-            ('Context', 'Val. Price'),
-            ('Context', 'Value'),
-            ('Order', 'Size'),
-            ('Order', 'Size Type'),
-            ('Order', 'Direction'),
-            ('Order', 'Price'),
-            ('Order', 'Fees'),
-            ('Order', 'Fixed Fees'),
-            ('Order', 'Slippage'),
-            ('Order', 'Min. Size'),
-            ('Order', 'Max. Size'),
-            ('Order', 'Rejection Prob.'),
-            ('Order', 'Allow Partial?'),
-            ('Order', 'Raise Rejection?'),
-            ('Order', 'Log?'),
-            ('Result', 'New Cash'),
-            ('Result', 'New Shares'),
-            ('Result', 'New Val. Price'),
-            ('Result', 'New Value'),
-            ('Result', 'Size'),
-            ('Result', 'Price'),
-            ('Result', 'Fees'),
-            ('Result', 'Side'),
-            ('Result', 'Status'),
-            ('Result', 'Status Info'),
-            ('Result', 'Order Id')
-        ]))
-        df.iloc[:, 0] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-        df.iloc[:, 1] = [pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-01 00:00:00'),
-                         pd.Timestamp('2020-01-02 00:00:00'), pd.Timestamp('2020-01-02 00:00:00'),
-                         pd.Timestamp('2020-01-03 00:00:00'), pd.Timestamp('2020-01-03 00:00:00'),
-                         pd.Timestamp('2020-01-04 00:00:00'), pd.Timestamp('2020-01-04 00:00:00'),
-                         pd.Timestamp('2020-01-05 00:00:00'), pd.Timestamp('2020-01-05 00:00:00')]
-        df.iloc[:, 2] = ['b', 'a', 'a', 'b', 'b', 'a', 'b', 'a', 'b', 'a']
-        df.iloc[:, 3] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        df.iloc[:, 4] = [100.0, 94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75]
-        df.iloc[:, 5] = [0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0]
-        df.iloc[:, 6] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
-        df.iloc[:, 7] = [100.0, 100.0, 99.94, 99.94, 99.88, 99.88, 99.82, 99.82, 99.76, 99.76]
-        df.iloc[:, 8] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        df.iloc[:, 9] = ['Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
-                         'Shares', 'Shares', 'Shares', 'Shares']
-        df.iloc[:, 10] = ['All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All']
-        df.iloc[:, 11] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
-        df.iloc[:, 12] = [0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
-        df.iloc[:, 13] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        df.iloc[:, 14] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        df.iloc[:, 15] = [1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08]
-        df.iloc[:, 16] = [np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf]
-        df.iloc[:, 17] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-        df.iloc[:, 18] = [True, True, True, True, True, True, True, True, True, True]
-        df.iloc[:, 19] = [False, False, False, False, False, False, False, False, False, False]
-        df.iloc[:, 20] = [True, True, True, True, True, True, True, True, True, True]
-        df.iloc[:, 21] = [94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75, 69.7]
-        df.iloc[:, 22] = [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0]
-        df.iloc[:, 23] = [94.95, 93.94, 91.92, 87.88, 84.85, 81.82, 79.8, 75.76, 74.75, 69.7]
-        df.iloc[:, 24] = [1.0, 1.0, 2.0, 2.0, 3.0, 3.0, 4.0, 4.0, 5.0, 5.0]
-        df.iloc[:, 25] = [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
-        df.iloc[:, 26] = [5.0, 1.0, 2.0, 4.0, 3.0, 3.0, 2.0, 4.0, 1.0, 5.0]
-        df.iloc[:, 27] = [0.05, 0.01, 0.02, 0.04, 0.03, 0.03, 0.02, 0.04, 0.01, 0.05]
-        df.iloc[:, 28] = ['Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy', 'Buy']
-        df.iloc[:, 29] = ['Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
-                          'Filled', 'Filled', 'Filled', 'Filled']
-        df.iloc[:, 30] = [None, None, None, None, None, None, None, None, None, None]
-        df.iloc[:, 31] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
-        pd.testing.assert_frame_equal(logs.records_readable, df)
+        records_readable = logs.records_readable
+
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Log Id')].values,
+            np.array([
+                0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27,
+                28, 29, 30, 31
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Date')].values,
+            np.array([
+                '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000',
+                '2020-01-01T00:00:00.000000000', '2020-01-02T00:00:00.000000000',
+                '2020-01-03T00:00:00.000000000', '2020-01-04T00:00:00.000000000',
+                '2020-01-05T00:00:00.000000000', '2020-01-06T00:00:00.000000000',
+                '2020-01-07T00:00:00.000000000', '2020-01-08T00:00:00.000000000'
+            ], dtype='datetime64[ns]')
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Column')].values,
+            np.array([
+                'a', 'a', 'a', 'a', 'a', 'a', 'a', 'a', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'b', 'c', 'c', 'c', 'c', 'c',
+                'c', 'c', 'c', 'd', 'd', 'd', 'd', 'd', 'd', 'd', 'd'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Group')].values,
+            np.array([
+                0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Cash')].values,
+            np.array([
+                100.0, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 100.0, 100.99, 101.18799999999999,
+                98.15799999999999, 97.75399999999999, 97.75399999999999, 103.69399999999999, 96.624, 100.0, 98.99,
+                98.788, 101.758, 102.154, 102.154, 96.094, 109.954, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0,
+                100.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Shares')].values,
+            np.array([
+                0.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, -1.1, -0.10000000000000009, 0.0, 0.0,
+                -1.0, 0.0, 0.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Debt')].values,
+            np.array([
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.2000000000000002, 0.0, 0.0, 0.0, 6.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Free Cash')].values,
+            np.array([
+                100.0, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 100.0, 98.99, 98.788, 98.158, 97.754,
+                97.754, 91.694, 96.624, 100.0, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 95.954, 100.0, 100.0,
+                100.0, 100.0, 100.0, 100.0, 100.0, 100.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Val Price')].values,
+            np.array([
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+                6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Context', 'Value')].values,
+            np.array([
+                100.0, 100.99, 102.088, 102.158, 102.154, 102.154, 103.094, 103.024, 100.0, 98.99, 97.88799999999999,
+                97.75799999999998, 97.75399999999999, 97.75399999999999, 96.69399999999999, 96.624, 100.0, 100.99,
+                102.088, 102.158, 102.154, 102.154, 103.094, 101.954, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0,
+                100.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Size')].values,
+            np.array([
+                1.0, 0.1, -1.0, -0.1, np.nan, 1.0, -1.0, 2.0, -1.0, -0.1, 1.0, 0.1, np.nan, -1.0, 1.0, -2.0, 1.0, 0.1,
+                -1.0, -0.1, np.nan, 1.0, -2.0, 2.0, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Size Type')].values,
+            np.array([
+                'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
+                'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
+                'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
+                'Shares', 'Shares'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Direction')].values,
+            np.array([
+                'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
+                'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
+                'All', 'All'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Price')].values,
+            np.array([
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+                6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Fees')].values,
+            np.array([
+                0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01,
+                0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Fixed Fees')].values,
+            np.array([
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Slippage')].values,
+            np.array([
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Min Size')].values,
+            np.array([
+                1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08,
+                1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08, 1e-08,
+                1e-08, 1e-08
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Max Size')].values,
+            np.array([
+                np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+                np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf,
+                np.inf, np.inf, np.inf, np.inf, np.inf, np.inf
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Rejection Prob')].values,
+            np.array([
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Allow Partial')].values,
+            np.array([
+                True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True, True, True, True, True, True, True, True
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Raise Rejection')].values,
+            np.array([
+                False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
+                False, False, False, False, False, False, False, False, False, False, False, False, False, False, False,
+                False, False
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order', 'Log')].values,
+            np.array([
+                True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True, True,
+                True, True, True, True, True, True, True, True, True, True, True, True, True, True, True
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('New Context', 'Cash')].values,
+            np.array([
+                98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 86.864, 100.99, 101.18799999999999,
+                98.15799999999999, 97.75399999999999, 97.75399999999999, 103.69399999999999, 96.624, 112.464, 98.99,
+                98.788, 101.758, 102.154, 102.154, 96.094, 109.954, 93.794, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0,
+                100.0, 100.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('New Context', 'Shares')].values,
+            np.array([
+                1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, 0.0, 2.0, -1.0, -1.1, -0.10000000000000009, 0.0, 0.0,
+                -1.0, 0.0, -2.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('New Context', 'Debt')].values,
+            np.array([
+                0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.2000000000000002, 0.0, 0.0, 0.0, 6.0, 0.0, 16.0, 0.0,
+                0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('New Context', 'Free Cash')].values,
+            np.array([
+                98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 103.024, 86.864, 98.99, 98.788, 98.158, 97.754,
+                97.754, 91.694, 96.624, 80.464, 98.99, 98.788, 101.758, 102.154, 102.154, 96.094, 95.954, 93.794, 100.0,
+                100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('New Context', 'Val Price')].values,
+            np.array([
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+                6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('New Context', 'Value')].values,
+            np.array([
+                100.0, 100.99, 102.088, 102.158, 102.154, 102.154, 103.094, 103.024, 100.0, 98.99, 97.88799999999999,
+                97.75799999999998, 97.75399999999999, 97.75399999999999, 96.69399999999999, 96.624, 100.0, 100.99,
+                102.088, 102.158, 102.154, 102.154, 103.094, 101.954, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0,
+                100.0
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Size')].values,
+            np.array([
+                1.0, 0.1, 1.0, 0.1, np.nan, 1.0, 1.0, 2.0, 1.0, 0.1, 1.0, 0.1, np.nan, 1.0, 1.0, 2.0, 1.0, 0.1, 1.0,
+                0.1, np.nan, 1.0, 2.0, 2.0, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Price')].values,
+            np.array([
+                1.0, 2.0, 3.0, 4.0, np.nan, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, np.nan, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0,
+                4.0, np.nan, 6.0, 7.0, 8.0, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Fees')].values,
+            np.array([
+                0.01, 0.002, 0.03, 0.004, np.nan, 0.06, 0.07, 0.16, 0.01, 0.002, 0.03, 0.004, np.nan, 0.06, 0.07, 0.16,
+                0.01, 0.002, 0.03, 0.004, np.nan, 0.06, 0.14, 0.16, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan,
+                np.nan, np.nan
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Side')].values,
+            np.array([
+                'Buy', 'Buy', 'Sell', 'Sell', None, 'Buy', 'Sell', 'Buy', 'Sell', 'Sell', 'Buy', 'Buy', None, 'Sell',
+                'Buy', 'Sell', 'Buy', 'Buy', 'Sell', 'Sell', None, 'Buy', 'Sell', 'Buy', None, None, None, None, None,
+                None, None, None
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Status')].values,
+            np.array([
+                'Filled', 'Filled', 'Filled', 'Filled', 'Ignored', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
+                'Filled', 'Filled', 'Ignored', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled', 'Filled',
+                'Ignored', 'Filled', 'Filled', 'Filled', 'Ignored', 'Ignored', 'Ignored', 'Ignored', 'Ignored',
+                'Ignored', 'Ignored', 'Ignored'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Status Info')].values,
+            np.array([
+                None, None, None, None, 'SizeNaN', None, None, None, None, None, None, None, 'SizeNaN', None, None,
+                None, None, None, None, None, 'SizeNaN', None, None, None, 'SizeNaN', 'SizeNaN', 'SizeNaN', 'SizeNaN',
+                'SizeNaN', 'SizeNaN', 'SizeNaN', 'SizeNaN'
+            ])
+        )
+        np.testing.assert_array_equal(
+            records_readable[('Order Result', 'Order Id')].values,
+            np.array([
+                0, 1, 2, 3, -1, 4, 5, 6, 7, 8, 9, 10, -1, 11, 12, 13, 14, 15, 16, 17, -1, 18, 19, 20, -1, -1, -1, -1,
+                -1, -1, -1, -1
+            ])
+        )
 
     def test_count(self):
-        assert logs['a'].count() == 5
+        assert logs['a'].count() == 8
         pd.testing.assert_series_equal(
             logs.count(),
             pd.Series(
-                np.array([5, 5, 0]),
-                index=pd.Index(['a', 'b', 'c'], dtype='object')
+                np.array([8, 8, 8, 8]),
+                index=pd.Index(['a', 'b', 'c', 'd'], dtype='object')
             ).rename('count')
         )
-        assert logs_grouped.count() == 10
+        pd.testing.assert_series_equal(
+            logs_grouped.count(),
+            pd.Series(
+                np.array([16, 16]),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('count')
+        )

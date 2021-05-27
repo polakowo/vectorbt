@@ -297,8 +297,8 @@ class SignalsAccessor(GenericAccessor):
             obj = args[0]
             if not isinstance(obj, (pd.Series, pd.DataFrame)):
                 wrapper = ArrayWrapper.from_shape(np.asarray(obj).shape)
-                obj = wrapper.wrap(obj, **merge_dicts({}, wrap_kwargs))
-            return obj.vbt.signals.first()
+                obj = wrapper.wrap(obj)
+            return obj.vbt.signals.first(wrap_kwargs=wrap_kwargs)
         elif len(args) == 2:
             if broadcast_kwargs is None:
                 broadcast_kwargs = {}

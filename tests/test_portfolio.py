@@ -49,117 +49,127 @@ def test_execute_order_nb():
 
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            -100., 100., 10., 1100.,
+            ProcessOrderState(-100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            np.nan, 100., 10., 1100.,
+            ProcessOrderState(np.nan, 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., np.inf, 10., 1100.,
+            ProcessOrderState(100., np.inf, 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., np.nan, 10., 1100.,
+            ProcessOrderState(100., np.nan, 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., np.nan, 100., 10., 1100., 0, 0),
+            nb.create_order_nb(10, 10))
+    with pytest.raises(Exception) as e_info:
+        _ = nb.execute_order_nb(
+            ProcessOrderState(100., 100., -10., 100., 10., 1100., 0, 0),
+            nb.create_order_nb(10, 10))
+    with pytest.raises(Exception) as e_info:
+        _ = nb.execute_order_nb(
+            ProcessOrderState(100., 100., 0., np.nan, 10., 1100., 0, 0),
+            nb.create_order_nb(10, 10))
+    with pytest.raises(Exception) as e_info:
+        _ = nb.execute_order_nb(
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, size_type=-2))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, size_type=20))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, direction=-2))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, direction=20))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., -100., 10., 1100.,
+            ProcessOrderState(100., -100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, direction=Direction.LongOnly))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, direction=Direction.ShortOnly))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, np.inf))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, -10))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, fees=np.inf))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, fees=-1))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, fixed_fees=np.inf))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, fixed_fees=-1))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, slippage=np.inf))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, slippage=-1))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, min_size=np.inf))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, min_size=-1))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, max_size=0))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, max_size=-10))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, reject_prob=np.nan))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, reject_prob=-1))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., 10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
             nb.create_order_nb(10, 10, reject_prob=2))
 
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., np.nan,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., np.nan, 0, 0),
         nb.create_order_nb(1, 10, size_type=SizeType.TargetPercent))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=3))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., -10.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., -10., 0, 0),
         nb.create_order_nb(1, 10, size_type=SizeType.TargetPercent))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=4))
     with pytest.raises(Exception) as e_info:
@@ -170,60 +180,52 @@ def test_execute_order_nb():
         _ = nb.execute_order_nb(
             100., 100., -10., 1100.,
             nb.create_order_nb(10, 10, size_type=SizeType.TargetValue))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., np.nan, 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., np.nan, 1100., 0, 0),
         nb.create_order_nb(10, 10, size_type=SizeType.TargetValue))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=2))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., -10., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., -10., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(np.inf, 10, direction=Direction.ShortOnly))
-    assert cash_now == 100.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=-10.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=6))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., -10., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., -10., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(-np.inf, 10, direction=Direction.All))
-    assert cash_now == 100.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=-10.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=6))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 10., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 10., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(0, 10))
-    assert cash_now == 100.
-    assert shares_now == 10.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=10.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=1, status_info=5))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(15, 10, max_size=10, allow_partial=False))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=9))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(10, 10, reject_prob=1.))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=10))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        0., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0., 100., 0., 0., 10., 1100., 0, 0),
         nb.create_order_nb(10, 10, direction=Direction.LongOnly))
-    assert cash_now == 0.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=100.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        0., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0., 100., 0., 0., 10., 1100., 0, 0),
         nb.create_order_nb(10, 10, direction=Direction.All))
-    assert cash_now == 0.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=100.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7))
     with pytest.raises(Exception) as e_info:
@@ -234,11 +236,10 @@ def test_execute_order_nb():
         _ = nb.execute_order_nb(
             np.inf, 100., 10., 1100.,
             nb.create_order_nb(np.inf, 10, direction=Direction.All))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(-10, 10, direction=Direction.ShortOnly))
-    assert cash_now == 100.
-    assert shares_now == 0.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=0.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=8))
     with pytest.raises(Exception) as e_info:
@@ -249,200 +250,173 @@ def test_execute_order_nb():
         _ = nb.execute_order_nb(
             np.inf, 100., 10., 1100.,
             nb.create_order_nb(-np.inf, 10, direction=Direction.All))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(-10, 10, direction=Direction.LongOnly))
-    assert cash_now == 100.
-    assert shares_now == 0.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=0.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=8))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(10, 10, fixed_fees=100))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=11))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(10, 10, min_size=100))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=12))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(100, 10, allow_partial=False))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=13))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(-10, 10, min_size=100))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=12))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(-200, 10, direction=Direction.LongOnly, allow_partial=False))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=13))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 100., 10., 1100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., 10., 1100., 0, 0),
         nb.create_order_nb(-10, 10, fixed_fees=1000))
-    assert cash_now == 100.
-    assert shares_now == 100.
+    assert exec_state == ExecuteOrderState(cash=100.0, shares=100.0, debt=0.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=11))
 
     # Calculations
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(10, 10, fees=0.1, fixed_fees=1, slippage=0.1))
-    assert cash_now == 0.
-    assert shares_now == 8.18181818181818
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=8.18181818181818, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=8.18181818181818, price=11.0, fees=10.000000000000014, side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(100, 10, fees=0.1, fixed_fees=1, slippage=0.1))
-    assert cash_now == 0.
-    assert shares_now == 8.18181818181818
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=8.18181818181818, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=8.18181818181818, price=11.0, fees=10.000000000000014, side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-10, 10, fees=0.1, fixed_fees=1, slippage=0.1))
-    assert cash_now == 180.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=180.0, shares=-10.0, debt=90.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10.0, price=9.0, fees=10.0, side=1, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-100, 10, fees=0.1, fixed_fees=1, slippage=0.1))
-    assert cash_now == 909.
-    assert shares_now == -100.
+    assert exec_state == ExecuteOrderState(cash=909.0, shares=-100.0, debt=900.0, free_cash=-891.0)
     assert_same_tuple(order_result, OrderResult(
         size=100.0, price=9.0, fees=91.0, side=1, status=0, status_info=-1))
 
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(10, 10, size_type=SizeType.TargetShares))
-    assert cash_now == 0.
-    assert shares_now == 10.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=10.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-10, 10, size_type=SizeType.TargetShares))
-    assert cash_now == 200.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=200.0, shares=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
 
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(100, 10, size_type=SizeType.TargetValue))
-    assert cash_now == 0.
-    assert shares_now == 10.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=10.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-100, 10, size_type=SizeType.TargetValue))
-    assert cash_now == 200.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=200.0, shares=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
 
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(1, 10, size_type=SizeType.TargetPercent))
-    assert cash_now == 0.
-    assert shares_now == 10.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=10.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-1, 10, size_type=SizeType.TargetPercent))
-    assert cash_now == 200.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=200.0, shares=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
 
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(1, 10, size_type=SizeType.Percent))
-    assert cash_now == 0.
-    assert shares_now == 10.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=10.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(0.5, 10, size_type=SizeType.Percent, fixed_fees=1.))
-    assert cash_now == 50.
-    assert shares_now == 4.9
+    assert exec_state == ExecuteOrderState(cash=50.0, shares=4.9, debt=0.0, free_cash=50.0)
     assert_same_tuple(order_result, OrderResult(
         size=4.9, price=10.0, fees=1., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        0., 10., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0., 10., 0., 0., 10., 100., 0, 0),
         nb.create_order_nb(-1, 10, size_type=SizeType.Percent))
-    assert cash_now == 200.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=200.0, shares=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=20., price=10.0, fees=0., side=1, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        0., 10., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0., 10., 0., 0., 10., 100., 0, 0),
         nb.create_order_nb(-0.5, 10, size_type=SizeType.Percent, fixed_fees=1.))
-    assert cash_now == 99.
-    assert shares_now == 0.
+    assert exec_state == ExecuteOrderState(cash=99.0, shares=0.0, debt=0.0, free_cash=99.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=1., side=1, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., -10., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., -10., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(1, 10, size_type=SizeType.Percent))
-    assert cash_now == 0.
-    assert shares_now == 0.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=0.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        0., -10., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(0., -10., 0., 0., 10., 100., 0, 0),
         nb.create_order_nb(-1, 10, size_type=SizeType.Percent))
-    assert cash_now == 0.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=-10.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=6))
 
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(np.inf, 10))
-    assert cash_now == 0.
-    assert shares_now == 10.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=10.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., -5., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., -5., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(np.inf, 10))
-    assert cash_now == 0.
-    assert shares_now == 5.
+    assert exec_state == ExecuteOrderState(cash=0.0, shares=5.0, debt=0.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        100., 0., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-np.inf, 10))
-    assert cash_now == 200.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=200.0, shares=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
-    cash_now, shares_now, order_result = nb.execute_order_nb(
-        150., -5., 10., 100.,
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(150., -5., 0., 150., 10., 100., 0, 0),
         nb.create_order_nb(-np.inf, 10))
-    assert cash_now == 200.
-    assert shares_now == -10.
+    assert exec_state == ExecuteOrderState(cash=200.0, shares=-10.0, debt=50.0, free_cash=100.0)
     assert_same_tuple(order_result, OrderResult(
         size=5., price=10.0, fees=0., side=1, status=0, status_info=-1))
 
@@ -864,10 +838,12 @@ class TestFromSignals:
         record_arrays_close(
             from_signals_all(log=True).log_records,
             np.array([
-                (0, 0, 0, 0, 100.0, 0.0, 1.0, 100.0, np.inf, 0, 2, 1.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 0.0, 100.0, 1.0, 100.0, 100.0, 1.0, 0.0, 0, 0, -1, 0),
-                (1, 3, 0, 0, 0.0, 100.0, 4.0, 400.0, -np.inf, 0, 2, 4.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 800.0, -100.0, 4.0, 400.0, 200.0, 4.0, 0.0, 1, 0, -1, 1)
+                (0, 0, 0, 0, 100.0, 0.0, 0.0, 100.0, 1.0, 100.0, np.inf, 0, 2, 1.0, 0.0,
+                 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 0.0, 100.0, 0.0, 0.0,
+                 1.0, 100.0, 100.0, 1.0, 0.0, 0, 0, -1, 0),
+                (1, 3, 0, 0, 0.0, 100.0, 0.0, 0.0, 4.0, 400.0, -np.inf, 0, 2, 4.0, 0.0,
+                 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 800.0, -100.0, 400.0,
+                 0.0, 4.0, 400.0, 200.0, 4.0, 0.0, 1, 0, -1, 1)
             ], dtype=log_dt)
         )
 
@@ -1645,16 +1621,21 @@ class TestFromOrders:
         record_arrays_close(
             from_orders_all(log=True).log_records,
             np.array([
-                (0, 0, 0, 0, 100.0, 0.0, 1.0, 100.0, np.inf, 0, 2, 1.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 0.0, 100.0, 1.0, 100.0, 100.0, 1.0, 0.0, 0, 0, -1, 0),
-                (1, 1, 0, 0, 0.0, 100.0, 2.0, 200.0, -np.inf, 0, 2, 2.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 400.0, -100.0, 2.0, 200.0, 200.0, 2.0, 0.0, 1, 0, -1, 1),
-                (2, 2, 0, 0, 400.0, -100.0, 3.0, 100.0, np.nan, 0, 2, 3.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 400.0, -100.0, 3.0, 100.0, np.nan, np.nan, np.nan, -1, 1, 0, -1),
-                (3, 3, 0, 0, 400.0, -100.0, 4.0, 0.0, np.inf, 0, 2, 4.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 0.0, 0.0, 4.0, 0.0, 100.0, 4.0, 0.0, 0, 0, -1, 2),
-                (4, 4, 0, 0, 0.0, 0.0, 5.0, 0.0, -np.inf, 0, 2, 5.0, 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0,
-                 True, False, True, 0.0, 0.0, 5.0, 0.0, np.nan, np.nan, np.nan, -1, 2, 6, -1)
+                (0, 0, 0, 0, 100.0, 0.0, 0.0, 100.0, 1.0, 100.0, np.inf, 0, 2, 1.0,
+                 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 0.0, 100.0,
+                 0.0, 0.0, 1.0, 100.0, 100.0, 1.0, 0.0, 0, 0, -1, 0),
+                (1, 1, 0, 0, 0.0, 100.0, 0.0, 0.0, 2.0, 200.0, -np.inf, 0, 2, 2.0,
+                 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 400.0, -100.0,
+                 200.0, 0.0, 2.0, 200.0, 200.0, 2.0, 0.0, 1, 0, -1, 1),
+                (2, 2, 0, 0, 400.0, -100.0, 200.0, 0.0, 3.0, 100.0, np.nan, 0, 2, 3.0,
+                 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 400.0, -100.0,
+                 200.0, 0.0, 3.0, 100.0, np.nan, np.nan, np.nan, -1, 1, 0, -1),
+                (3, 3, 0, 0, 400.0, -100.0, 200.0, 0.0, 4.0, 0.0, np.inf, 0, 2, 4.0,
+                 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 0.0, 0.0, 0.0,
+                 0.0, 4.0, 0.0, 100.0, 4.0, 0.0, 0, 0, -1, 2),
+                (4, 4, 0, 0, 0.0, 0.0, 0.0, 0.0, 5.0, 0.0, -np.inf, 0, 2, 5.0,
+                 0.0, 0.0, 0.0, 1e-08, np.inf, 0.0, True, False, True, 0.0, 0.0,
+                 0.0, 0.0, 5.0, 0.0, np.nan, np.nan, np.nan, -1, 2, 6, -1)
             ], dtype=log_dt)
         )
 
@@ -2716,90 +2697,107 @@ class TestFromOrderFunc:
             record_arrays_close(
                 c.log_records,
                 np.array([
-                    (0, 0, 0, 0, 100.0, 0.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 97.9799, 1.0, 1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 0),
-                    (1, 0, 1, 0, 97.9799, 0.0, np.nan, 98.9899, 1.0, 0, 2, 1.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 95.9598, 1.0, 1.01, 97.97980000000001, 1.0, 1.01, 1.0101, 0, 0, -1, 1),
-                    (2, 0, 2, 1, 100.0, 0.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 97.9799, 1.0, 1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 2),
-                    (3, 1, 0, 0, 95.9598, 1.0, 1.0, 97.9598, 1.0, 0, 2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 92.9196, 2.0, 2.02, 97.95960000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 3),
-                    (4, 1, 1, 0, 92.9196, 1.0, 1.0, 97.95960000000001, 1.0, 0, 2, 2.0, 0.01, 1.0,
-                     0.01, 0.0, np.inf, 0.0, True, False, True, 89.8794, 2.0, 2.02,
-                     97.95940000000002, 1.0, 2.02, 1.0202, 0, 0, -1, 4),
-                    (5, 1, 2, 1, 97.9799, 1.0, 1.0, 98.9799, 1.0, 0, 2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 94.9397, 2.0, 2.02, 98.97970000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 5),
-                    (6, 2, 0, 0, 89.8794, 2.0, 2.0, 97.8794, 1.0, 0, 2, 3.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 85.8191, 3.0, 3.0300000000000002, 98.90910000000001, 1.0,
-                     3.0300000000000002, 1.0303, 0, 0, -1, 6),
-                    (7, 2, 1, 0, 85.8191, 2.0, 2.0, 98.90910000000001, 1.0, 0, 2, 3.0, 0.01, 1.0, 0.01, 0.0,
-                     np.inf, 0.0, True, False, True, 81.75880000000001, 3.0, 3.0300000000000002,
-                     99.93880000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 7),
-                    (8, 2, 2, 1, 94.9397, 2.0, 2.0, 98.9397, 1.0, 0, 2, 3.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 90.8794, 3.0, 3.0300000000000002, 99.96940000000001,
-                     1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 8),
-                    (9, 3, 0, 0, 81.75880000000001, 3.0, 3.0, 99.75880000000001, 1.0, 0, 2, 4.0, 0.01,
-                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 76.67840000000001, 4.0, 4.04,
-                     101.83840000000001, 1.0, 4.04, 1.0404, 0, 0, -1, 9),
-                    (10, 3, 1, 0, 76.67840000000001, 3.0, 3.0, 101.83840000000001, 1.0, 0, 2, 4.0, 0.01,
-                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 71.59800000000001, 4.0, 4.04,
-                     103.918, 1.0, 4.04, 1.0404, 0, 0, -1, 10),
-                    (11, 3, 2, 1, 90.8794, 3.0, 3.0, 99.8794, 1.0, 0, 2, 4.0, 0.01, 1.0, 0.01, 0.0,
-                     np.inf, 0.0, True, False, True, 85.799, 4.0, 4.04, 101.959, 1.0, 4.04, 1.0404, 0, 0, -1, 11),
-                    (12, 4, 0, 0, 71.59800000000001, 4.0, 4.0, 103.59800000000001, 1.0, 0, 2, 5.0, 0.01,
-                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 65.49750000000002, 5.0,
-                     5.05, 106.74750000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 12),
-                    (13, 4, 1, 0, 65.49750000000002, 4.0, 4.0, 106.74750000000002, 1.0, 0, 2, 5.0,
-                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 59.39700000000002,
-                     5.0, 5.05, 109.89700000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 13),
-                    (14, 4, 2, 1, 85.799, 4.0, 4.0, 101.799, 1.0, 0, 2, 5.0, 0.01, 1.0,
-                     0.01, 0.0, np.inf, 0.0, True, False, True, 79.69850000000001, 5.0, 5.05,
-                     104.94850000000001, 1.0, 5.05, 1.0505, 0, 0, -1, 14)
+                    (0, 0, 0, 0, 100.0, 0.0, 0.0, 100.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01, 1.0,
+                     0.01, 0.0, np.inf, 0.0, True, False, True, 97.9799, 1.0, 0.0, 97.9799, 1.01,
+                     98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 0),
+                    (1, 0, 1, 0, 97.9799, 0.0, 0.0, 97.9799, np.nan, 98.9899, 1.0, 0, 2, 1.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 95.9598, 1.0, 0.0, 95.9598,
+                     1.01, 97.97980000000001, 1.0, 1.01, 1.0101, 0, 0, -1, 1),
+                    (2, 0, 2, 1, 100.0, 0.0, 0.0, 100.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01, 1.0,
+                     0.01, 0.0, np.inf, 0.0, True, False, True, 97.9799, 1.0, 0.0, 97.9799,
+                     1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 2),
+                    (3, 1, 0, 0, 95.9598, 1.0, 0.0, 95.9598, 1.0, 97.9598, 1.0, 0, 2, 2.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 92.9196, 2.0, 0.0, 92.9196,
+                     2.02, 97.95960000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 3),
+                    (4, 1, 1, 0, 92.9196, 1.0, 0.0, 92.9196, 1.0, 97.95960000000001, 1.0, 0, 2,
+                     2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 89.8794, 2.0,
+                     0.0, 89.8794, 2.02, 97.95940000000002, 1.0, 2.02, 1.0202, 0, 0, -1, 4),
+                    (5, 1, 2, 1, 97.9799, 1.0, 0.0, 97.9799, 1.0, 98.9799, 1.0, 0, 2, 2.0,
+                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 94.9397, 2.0, 0.0, 94.9397,
+                     2.02, 98.97970000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 5),
+                    (6, 2, 0, 0, 89.8794, 2.0, 0.0, 89.8794, 2.0, 97.8794, 1.0, 0, 2, 3.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 85.8191, 3.0, 0.0, 85.8191,
+                     3.0300000000000002, 98.90910000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 6),
+                    (7, 2, 1, 0, 85.8191, 2.0, 0.0, 85.8191, 2.0, 98.90910000000001, 1.0, 0, 2, 3.0,
+                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 81.75880000000001,
+                     3.0, 0.0, 81.75880000000001, 3.0300000000000002, 99.93880000000001,
+                     1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 7),
+                    (8, 2, 2, 1, 94.9397, 2.0, 0.0, 94.9397, 2.0, 98.9397, 1.0, 0, 2, 3.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 90.8794, 3.0, 0.0, 90.8794,
+                     3.0300000000000002, 99.96940000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 8),
+                    (9, 3, 0, 0, 81.75880000000001, 3.0, 0.0, 81.75880000000001, 3.0, 99.75880000000001,
+                     1.0, 0, 2, 4.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 76.67840000000001,
+                     4.0, 0.0, 76.67840000000001, 4.04, 101.83840000000001, 1.0, 4.04, 1.0404, 0, 0, -1, 9),
+                    (10, 3, 1, 0, 76.67840000000001, 3.0, 0.0, 76.67840000000001, 3.0, 101.83840000000001,
+                     1.0, 0, 2, 4.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 71.59800000000001,
+                     4.0, 0.0, 71.59800000000001, 4.04, 103.918, 1.0, 4.04, 1.0404, 0, 0, -1, 10),
+                    (11, 3, 2, 1, 90.8794, 3.0, 0.0, 90.8794, 3.0, 99.8794, 1.0, 0, 2, 4.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 85.799, 4.0, 0.0, 85.799, 4.04,
+                     101.959, 1.0, 4.04, 1.0404, 0, 0, -1, 11),
+                    (12, 4, 0, 0, 71.59800000000001, 4.0, 0.0, 71.59800000000001, 4.0,
+                     103.59800000000001, 1.0, 0, 2, 5.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
+                     True, False, True, 65.49750000000002, 5.0, 0.0, 65.49750000000002, 5.05,
+                     106.74750000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 12),
+                    (13, 4, 1, 0, 65.49750000000002, 4.0, 0.0, 65.49750000000002, 4.0,
+                     106.74750000000002, 1.0, 0, 2, 5.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
+                     True, False, True, 59.39700000000002, 5.0, 0.0, 59.39700000000002, 5.05,
+                     109.89700000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 13),
+                    (14, 4, 2, 1, 85.799, 4.0, 0.0, 85.799, 4.0, 101.799, 1.0, 0, 2, 5.0, 0.01, 1.0, 0.01,
+                     0.0, np.inf, 0.0, True, False, True, 79.69850000000001, 5.0, 0.0, 79.69850000000001,
+                     5.05, 104.94850000000001, 1.0, 5.05, 1.0505, 0, 0, -1, 14)
                 ], dtype=log_dt)
             )
         else:
             record_arrays_close(
                 c.log_records,
                 np.array([
-                    (0, 0, 0, 0, 100.0, 0.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 97.9799, 1.0, 1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 0),
-                    (1, 0, 1, 0, 97.9799, 0.0, np.nan, 98.9899, 1.0, 0, 2, 1.0, 0.01, 1.0, 0.01,
-                     0.0, np.inf, 0.0, True, False, True, 95.9598, 1.0, 1.01, 97.97980000000001,
-                     1.0, 1.01, 1.0101, 0, 0, -1, 1),
-                    (2, 1, 0, 0, 95.9598, 1.0, 1.0, 97.9598, 1.0, 0, 2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 92.9196, 2.0, 2.02, 97.95960000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 2),
-                    (3, 1, 1, 0, 92.9196, 1.0, 1.0, 97.95960000000001, 1.0, 0, 2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf,
-                     0.0, True, False, True, 89.8794, 2.0, 2.02, 97.95940000000002, 1.0, 2.02, 1.0202, 0, 0, -1, 3),
-                    (4, 2, 0, 0, 89.8794, 2.0, 2.0, 97.8794, 1.0, 0, 2, 3.0, 0.01, 1.0, 0.01, 0.0,
-                     np.inf, 0.0, True, False, True, 85.8191, 3.0, 3.0300000000000002,
-                     98.90910000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 4),
-                    (5, 2, 1, 0, 85.8191, 2.0, 2.0, 98.90910000000001, 1.0, 0, 2, 3.0, 0.01, 1.0,
-                     0.01, 0.0, np.inf, 0.0, True, False, True, 81.75880000000001, 3.0,
-                     3.0300000000000002, 99.93880000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 5),
-                    (6, 3, 0, 0, 81.75880000000001, 3.0, 3.0, 99.75880000000001, 1.0, 0, 2, 4.0,
-                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 76.67840000000001, 4.0,
+                    (0, 0, 0, 0, 100.0, 0.0, 0.0, 100.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 97.9799, 1.0, 0.0, 97.9799,
+                     1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 0),
+                    (1, 0, 1, 0, 97.9799, 0.0, 0.0, 97.9799, np.nan, 98.9899, 1.0, 0, 2,
+                     1.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 95.9598,
+                     1.0, 0.0, 95.9598, 1.01, 97.97980000000001, 1.0, 1.01, 1.0101, 0, 0, -1, 1),
+                    (2, 1, 0, 0, 95.9598, 1.0, 0.0, 95.9598, 1.0, 97.9598, 1.0, 0,
+                     2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 92.9196,
+                     2.0, 0.0, 92.9196, 2.02, 97.95960000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 2),
+                    (3, 1, 1, 0, 92.9196, 1.0, 0.0, 92.9196, 1.0, 97.95960000000001, 1.0,
+                     0, 2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 89.8794,
+                     2.0, 0.0, 89.8794, 2.02, 97.95940000000002, 1.0, 2.02, 1.0202, 0, 0, -1, 3),
+                    (4, 2, 0, 0, 89.8794, 2.0, 0.0, 89.8794, 2.0, 97.8794, 1.0, 0, 2, 3.0,
+                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 85.8191, 3.0, 0.0, 85.8191,
+                     3.0300000000000002, 98.90910000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 4),
+                    (5, 2, 1, 0, 85.8191, 2.0, 0.0, 85.8191, 2.0, 98.90910000000001, 1.0, 0, 2,
+                     3.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 81.75880000000001, 3.0, 0.0,
+                     81.75880000000001, 3.0300000000000002, 99.93880000000001, 1.0,
+                     3.0300000000000002, 1.0303, 0, 0, -1, 5),
+                    (6, 3, 0, 0, 81.75880000000001, 3.0, 0.0, 81.75880000000001, 3.0,
+                     99.75880000000001, 1.0, 0, 2, 4.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
+                     True, False, True, 76.67840000000001, 4.0, 0.0, 76.67840000000001,
                      4.04, 101.83840000000001, 1.0, 4.04, 1.0404, 0, 0, -1, 6),
-                    (7, 3, 1, 0, 76.67840000000001, 3.0, 3.0, 101.83840000000001, 1.0, 0, 2,
-                     4.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 71.59800000000001,
-                     4.0, 4.04, 103.918, 1.0, 4.04, 1.0404, 0, 0, -1, 7),
-                    (8, 4, 0, 0, 71.59800000000001, 4.0, 4.0, 103.59800000000001, 1.0, 0, 2, 5.0,
-                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 65.49750000000002, 5.0,
-                     5.05, 106.74750000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 8),
-                    (9, 4, 1, 0, 65.49750000000002, 4.0, 4.0, 106.74750000000002, 1.0, 0,
-                     2, 5.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 59.39700000000002,
-                     5.0, 5.05, 109.89700000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 9),
-                    (10, 0, 2, 1, 100.0, 0.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01, 1.0, 0.01, 0.0,
-                     np.inf, 0.0, True, False, True, 97.9799, 1.0, 1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 10),
-                    (11, 1, 2, 1, 97.9799, 1.0, 1.0, 98.9799, 1.0, 0, 2, 2.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 94.9397, 2.0, 2.02, 98.97970000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 11),
-                    (12, 2, 2, 1, 94.9397, 2.0, 2.0, 98.9397, 1.0, 0, 2, 3.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0,
-                     True, False, True, 90.8794, 3.0, 3.0300000000000002, 99.96940000000001,
-                     1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 12),
-                    (13, 3, 2, 1, 90.8794, 3.0, 3.0, 99.8794, 1.0, 0, 2, 4.0, 0.01, 1.0, 0.01, 0.0,
-                     np.inf, 0.0, True, False, True, 85.799, 4.0, 4.04, 101.959, 1.0, 4.04, 1.0404, 0, 0, -1, 13),
-                    (14, 4, 2, 1, 85.799, 4.0, 4.0, 101.799, 1.0, 0, 2, 5.0, 0.01, 1.0, 0.01, 0.0,
-                     np.inf, 0.0, True, False, True, 79.69850000000001, 5.0, 5.05,
-                     104.94850000000001, 1.0, 5.05, 1.0505, 0, 0, -1, 14)
+                    (7, 3, 1, 0, 76.67840000000001, 3.0, 0.0, 76.67840000000001, 3.0, 101.83840000000001,
+                     1.0, 0, 2, 4.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 71.59800000000001,
+                     4.0, 0.0, 71.59800000000001, 4.04, 103.918, 1.0, 4.04, 1.0404, 0, 0, -1, 7),
+                    (8, 4, 0, 0, 71.59800000000001, 4.0, 0.0, 71.59800000000001, 4.0, 103.59800000000001,
+                     1.0, 0, 2, 5.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 65.49750000000002,
+                     5.0, 0.0, 65.49750000000002, 5.05, 106.74750000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 8),
+                    (9, 4, 1, 0, 65.49750000000002, 4.0, 0.0, 65.49750000000002, 4.0, 106.74750000000002,
+                     1.0, 0, 2, 5.0, 0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 59.39700000000002,
+                     5.0, 0.0, 59.39700000000002, 5.05, 109.89700000000002, 1.0, 5.05, 1.0505, 0, 0, -1, 9),
+                    (10, 0, 2, 1, 100.0, 0.0, 0.0, 100.0, np.nan, 100.0, 1.0, 0, 2, 1.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 97.9799, 1.0, 0.0, 97.9799,
+                     1.01, 98.9899, 1.0, 1.01, 1.0101, 0, 0, -1, 10),
+                    (11, 1, 2, 1, 97.9799, 1.0, 0.0, 97.9799, 1.0, 98.9799, 1.0, 0, 2, 2.0,
+                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 94.9397, 2.0, 0.0,
+                     94.9397, 2.02, 98.97970000000001, 1.0, 2.02, 1.0202, 0, 0, -1, 11),
+                    (12, 2, 2, 1, 94.9397, 2.0, 0.0, 94.9397, 2.0, 98.9397, 1.0, 0, 2, 3.0,
+                     0.01, 1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 90.8794, 3.0, 0.0, 90.8794,
+                     3.0300000000000002, 99.96940000000001, 1.0, 3.0300000000000002, 1.0303, 0, 0, -1, 12),
+                    (13, 3, 2, 1, 90.8794, 3.0, 0.0, 90.8794, 3.0, 99.8794, 1.0, 0, 2, 4.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 85.799, 4.0, 0.0, 85.799, 4.04,
+                     101.959, 1.0, 4.04, 1.0404, 0, 0, -1, 13),
+                    (14, 4, 2, 1, 85.799, 4.0, 0.0, 85.799, 4.0, 101.799, 1.0, 0, 2, 5.0, 0.01,
+                     1.0, 0.01, 0.0, np.inf, 0.0, True, False, True, 79.69850000000001, 5.0, 0.0,
+                     79.69850000000001, 5.05, 104.94850000000001, 1.0, 5.05, 1.0505, 0, 0, -1, 14)
                 ], dtype=log_dt)
             )
         np.testing.assert_array_equal(
@@ -2817,6 +2815,14 @@ class TestFromOrderFunc:
         np.testing.assert_array_equal(
             c.last_value,
             np.array([109.89700000000002, 104.94850000000001])
+        )
+        np.testing.assert_array_equal(
+            c.last_debt,
+            np.array([0., 0., 0.])
+        )
+        np.testing.assert_array_equal(
+            c.last_free_cash,
+            np.array([59.39700000000002, 79.69850000000001])
         )
         if test_row_wise:
             np.testing.assert_array_equal(
@@ -2857,6 +2863,8 @@ class TestFromOrderFunc:
         assert c.shares_before == 4.0
         assert c.val_price_before == 4.0
         assert c.value_before == 101.799
+        assert c.debt_before == 0.0
+        assert c.free_cash_before == 85.799
         assert_same_tuple(
             c.order_result,
             OrderResult(size=1.0, price=5.05, fees=1.0505, side=0, status=0, status_info=-1)
@@ -2865,6 +2873,70 @@ class TestFromOrderFunc:
         assert c.shares_now == 5.0
         assert c.val_price_now == 5.05
         assert c.value_now == 104.94850000000001
+        assert c.debt_now == 0.0
+        assert c.free_cash_now == 79.69850000000001
+
+    @pytest.mark.parametrize(
+        "test_row_wise",
+        [False, True],
+    )
+    def test_free_cash(self, test_row_wise):
+        def order_func(c, size):
+            return nb.create_order_nb(
+                size[c.i, c.col],
+                c.close[c.i, c.col],
+                fees=0.01,
+                fixed_fees=1.,
+                slippage=0.01
+            )
+
+        def after_order_func(c, debt, free_cash):
+            debt[c.i, c.col] = c.debt_now
+            free_cash[c.i, c.group] = c.free_cash_now
+
+        size = np.array([
+            [1, 1, 1],
+            [-2, -2, -2],
+            [2, 2, 2],
+            [-2, -2, -2],
+            [2, 2, 2]
+        ])
+        debt = np.empty(price_wide.shape, dtype=np.float_)
+        free_cash = np.empty((price_wide.shape[0], 2), dtype=np.float_)
+        portfolio = vbt.Portfolio.from_order_func(
+            price_wide,
+            order_func, size,
+            after_order_func_nb=after_order_func,
+            after_order_args=(debt, free_cash,),
+            row_wise=test_row_wise,
+            use_numba=False,
+            group_by=[0, 0, 1],
+            cash_sharing=True
+        )
+        np.testing.assert_array_equal(
+            debt,
+            np.array([
+                [0.0, 0.0, 0.0],
+                [1.98, 1.98, 1.98],
+                [0.0, 0.0, 0.0],
+                [3.96, 3.96, 3.96],
+                [0.0, 0.0, 0.0]
+            ])
+        )
+        np.testing.assert_array_equal(
+            free_cash,
+            np.array([
+                [95.9598, 97.9799],
+                [93.88059999999999, 96.94030000000001],
+                [87.55939999999998, 93.7797],
+                [85.40099999999998, 92.7005],
+                [78.83899999999997, 89.4195]
+            ])
+        )
+        np.testing.assert_almost_equal(
+            free_cash,
+            portfolio.cash(free=True).values
+        )
 
     @pytest.mark.parametrize(
         "test_row_wise",
@@ -3388,40 +3460,55 @@ class TestPortfolio:
         record_arrays_close(
             portfolio.logs.values,
             np.array([
-                (0, 0, 0, 0, 100.0, 0.0, np.nan, 100.0, 1.0, 0, 0, np.nan, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 100.0, 0.0, np.nan, 100.0, np.nan, np.nan, np.nan, -1, 1, 1, -1),
-                (1, 1, 0, 0, 100.0, 0.0, 2.0, 100.0, 0.1, 0, 0, 2.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 99.69598, 0.1, 2.0, 100.0, 0.1, 2.02, 0.10202, 0, 0, -1, 0),
-                (2, 2, 0, 0, 99.69598, 0.1, 3.0, 99.99598, -1.0, 0, 0, 3.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 99.89001, 0.0, 3.0, 99.99598, 0.1, 2.9699999999999998, 0.10297, 1, 0, -1, 1),
-                (3, 3, 0, 0, 99.89001, 0.0, 4.0, 99.89001, -0.1, 0, 0, 4.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 99.89001, 0.0, 4.0, 99.89001, np.nan, np.nan, np.nan, -1, 2, 8, -1),
-                (4, 4, 0, 0, 99.89001, 0.0, 5.0, 99.89001, 1.0, 0, 0, 5.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 94.68951, 1.0, 5.0, 99.89001, 1.0, 5.05, 0.1505, 0, 0, -1, 2),
-                (5, 0, 1, 1, 100.0, 0.0, 1.0, 100.0, 1.0, 0, 1, 1.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 100.8801, -1.0, 1.0, 100.0, 1.0, 0.99, 0.10990000000000001, 1, 0, -1, 3),
-                (6, 1, 1, 1, 100.8801, -1.0, 2.0, 98.8801, 0.1, 0, 1, 2.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 100.97612, -1.1, 2.0, 98.8801, 0.1, 1.98, 0.10198, 1, 0, -1, 4),
-                (7, 2, 1, 1, 100.97612, -1.1, np.nan, np.nan, -1.0, 0, 1, np.nan, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 100.97612, -1.1, np.nan, np.nan, np.nan, np.nan, np.nan, -1, 1, 1, -1),
-                (8, 3, 1, 1, 100.97612, -1.1, 4.0, 96.57611999999999, -0.1, 0, 1, 4.0, 0.01,
-                 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 100.46808, -1.0, 4.0,
+                (0, 0, 0, 0, 100.0, 0.0, 0.0, 100.0, np.nan, 100.0, 1.0, 0, 0, np.nan, 0.01,
+                 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 100.0, 0.0, 0.0,
+                 100.0, np.nan, 100.0, np.nan, np.nan, np.nan, -1, 1, 1, -1),
+                (1, 1, 0, 0, 100.0, 0.0, 0.0, 100.0, 2.0, 100.0, 0.1, 0, 0, 2.0, 0.01,
+                 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 99.69598, 0.1, 0.0,
+                 99.69598, 2.0, 100.0, 0.1, 2.02, 0.10202, 0, 0, -1, 0),
+                (2, 2, 0, 0, 99.69598, 0.1, 0.0, 99.69598, 3.0, 99.99598, -1.0, 0, 0,
+                 3.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 99.89001,
+                 0.0, 0.0, 99.89001, 3.0, 99.99598, 0.1, 2.9699999999999998, 0.10297, 1, 0, -1, 1),
+                (3, 3, 0, 0, 99.89001, 0.0, 0.0, 99.89001, 4.0, 99.89001, -0.1, 0, 0,
+                 4.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 99.89001,
+                 0.0, 0.0, 99.89001, 4.0, 99.89001, np.nan, np.nan, np.nan, -1, 2, 8, -1),
+                (4, 4, 0, 0, 99.89001, 0.0, 0.0, 99.89001, 5.0, 99.89001, 1.0, 0, 0,
+                 5.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 94.68951,
+                 1.0, 0.0, 94.68951, 5.0, 99.89001, 1.0, 5.05, 0.1505, 0, 0, -1, 2),
+                (5, 0, 1, 1, 100.0, 0.0, 0.0, 100.0, 1.0, 100.0, 1.0, 0, 1, 1.0, 0.01,
+                 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 100.8801, -1.0, 0.99,
+                 98.9001, 1.0, 100.0, 1.0, 0.99, 0.10990000000000001, 1, 0, -1, 3),
+                (6, 1, 1, 1, 100.8801, -1.0, 0.99, 98.9001, 2.0, 98.8801, 0.1, 0, 1, 2.0,
+                 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 100.97612, -1.1,
+                 1.1880000000000002, 98.60011999999999, 2.0, 98.8801, 0.1, 1.98, 0.10198, 1, 0, -1, 4),
+                (7, 2, 1, 1, 100.97612, -1.1, 1.1880000000000002, 98.60011999999999, np.nan, np.nan,
+                 -1.0, 0, 1, np.nan, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 100.97612,
+                 -1.1, 1.1880000000000002, 98.60011999999999, np.nan, np.nan, np.nan, np.nan, np.nan, -1, 1, 1, -1),
+                (8, 3, 1, 1, 100.97612, -1.1, 1.1880000000000002, 98.60011999999999, 4.0,
+                 96.57611999999999, -0.1, 0, 1, 4.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True,
+                 False, True, 100.46808, -1.0, 0.6799600000000001, 99.10815999999998, 4.0,
                  96.57611999999999, 0.1, 4.04, 0.10404000000000001, 0, 0, -1, 5),
-                (9, 4, 1, 1, 100.46808, -1.0, 5.0, 95.46808, 1.0, 0, 1, 5.0, 0.01, 0.1,
-                 0.01, 1e-08, np.inf, 0.0, True, False, True, 105.26858, -2.0, 5.0, 95.46808,
-                 1.0, 4.95, 0.14950000000000002, 1, 0, -1, 6),
-                (10, 0, 2, 2, 100.0, 0.0, 1.0, 100.0, 1.0, 0, 2, 1.0, 0.01, 0.1, 0.01, 1e-08,
-                 np.inf, 0.0, True, False, True, 98.8799, 1.0, 1.0, 100.0, 1.0, 1.01, 0.1101, 0, 0, -1, 7),
-                (11, 1, 2, 2, 98.8799, 1.0, 2.0, 100.8799, 0.1, 0, 2, 2.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
-                 True, False, True, 98.57588000000001, 1.1, 2.0, 100.8799, 0.1, 2.02, 0.10202, 0, 0, -1, 8),
-                (12, 2, 2, 2, 98.57588000000001, 1.1, 3.0, 101.87588000000001, -1.0, 0, 2,
-                 3.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 101.41618000000001,
-                 0.10000000000000009, 3.0, 101.87588000000001, 1.0, 2.9699999999999998, 0.1297, 1, 0, -1, 9),
-                (13, 3, 2, 2, 101.41618000000001, 0.10000000000000009, 4.0, 101.81618000000002, -0.1, 0,
-                 2, 4.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 101.70822000000001,
-                 0.0, 4.0, 101.81618000000002, 0.1, 3.96, 0.10396000000000001, 1, 0, -1, 10),
-                (14, 4, 2, 2, 101.70822000000001, 0.0, np.nan, 101.70822000000001, 1.0, 0, 2, np.nan,
-                 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 101.70822000000001, 0.0,
+                (9, 4, 1, 1, 100.46808, -1.0, 0.6799600000000001, 99.10815999999998, 5.0,
+                 95.46808, 1.0, 0, 1, 5.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True,
+                 105.26858, -2.0, 5.6299600000000005, 94.00865999999998, 5.0, 95.46808, 1.0,
+                 4.95, 0.14950000000000002, 1, 0, -1, 6),
+                (10, 0, 2, 2, 100.0, 0.0, 0.0, 100.0, 1.0, 100.0, 1.0, 0, 2, 1.0, 0.01, 0.1,
+                 0.01, 1e-08, np.inf, 0.0, True, False, True, 98.8799, 1.0, 0.0, 98.8799, 1.0,
+                 100.0, 1.0, 1.01, 0.1101, 0, 0, -1, 7),
+                (11, 1, 2, 2, 98.8799, 1.0, 0.0, 98.8799, 2.0, 100.8799, 0.1, 0, 2, 2.0,
+                 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True, 98.57588000000001,
+                 1.1, 0.0, 98.57588000000001, 2.0, 100.8799, 0.1, 2.02, 0.10202, 0, 0, -1, 8),
+                (12, 2, 2, 2, 98.57588000000001, 1.1, 0.0, 98.57588000000001, 3.0, 101.87588000000001,
+                 -1.0, 0, 2, 3.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0, True, False, True,
+                 101.41618000000001, 0.10000000000000009, 0.0, 101.41618000000001, 3.0,
+                 101.87588000000001, 1.0, 2.9699999999999998, 0.1297, 1, 0, -1, 9),
+                (13, 3, 2, 2, 101.41618000000001, 0.10000000000000009, 0.0, 101.41618000000001,
+                 4.0, 101.81618000000002, -0.1, 0, 2, 4.0, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
+                 True, False, True, 101.70822000000001, 0.0, 0.0, 101.70822000000001, 4.0,
+                 101.81618000000002, 0.1, 3.96, 0.10396000000000001, 1, 0, -1, 10),
+                (14, 4, 2, 2, 101.70822000000001, 0.0, 0.0, 101.70822000000001, np.nan,
+                 101.70822000000001, 1.0, 0, 2, np.nan, 0.01, 0.1, 0.01, 1e-08, np.inf, 0.0,
+                 True, False, True, 101.70822000000001, 0.0, 0.0, 101.70822000000001,
                  np.nan, 101.70822000000001, np.nan, np.nan, np.nan, -1, 1, 1, -1)
             ], dtype=log_dt)
         )
@@ -3842,7 +3929,7 @@ class TestPortfolio:
 
     def test_cash_flow(self):
         pd.testing.assert_frame_equal(
-            portfolio.cash_flow(short_cash=False),
+            portfolio.cash_flow(free=True),
             pd.DataFrame(
                 np.array([
                     [0., -1.0999, -1.1201],
@@ -3982,7 +4069,7 @@ class TestPortfolio:
 
     def test_cash(self):
         pd.testing.assert_frame_equal(
-            portfolio.cash(short_cash=False),
+            portfolio.cash(free=True),
             pd.DataFrame(
                 np.array([
                     [100., 98.9001, 98.8799],
@@ -4206,11 +4293,11 @@ class TestPortfolio:
         )
         result = pd.DataFrame(
             np.array([
-                [-0.005003, 0.01001202],
-                [-0.01006684, 0.02183062],
-                [np.nan, 0.00294938],
-                [-0.02037095, 0.],
-                [-0.02564654, 0.]
+                [-0.00505305454620791, 0.010012024441354066],
+                [-0.010188689433972452, 0.021830620581035857],
+                [np.nan, 0.002949383274126105],
+                [-0.02053492557039221, 0.0],
+                [-0.02724942802088113, 0.0]
             ]),
             index=price_na.index,
             columns=pd.Index(['first', 'second'], dtype='object', name='group')
@@ -4264,11 +4351,11 @@ class TestPortfolio:
         )
         result = pd.DataFrame(
             np.array([
-                [-0.00495344, 0.01001202],
-                [-0.00984861, 0.02183062],
-                [np.nan, 0.00294938],
-                [-0.01957348, 0.],
-                [-0.02323332, 0.]
+                [-0.005002498748124688, 0.010012024441354066],
+                [-0.009965205542937988, 0.021830620581035857],
+                [np.nan, 0.002949383274126105],
+                [-0.01972482974883043, 0.0],
+                [-0.024539232242759373, 0.0]
             ]),
             index=price_na.index,
             columns=pd.Index(['first', 'second'], dtype='object', name='group')
@@ -4915,13 +5002,13 @@ class TestPortfolio:
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), 200.0, -5.0419100000000014,
-                    -2.5209550000000007, 275.0, 70.0, 2.46248125751388,
+                    pd.Timedelta('5 days 00:00:00'), 200.0, -5.04191,
+                    -2.520955, 275.0, 70.0, 2.46248125751388,
                     2.46248125751388, pd.Timedelta('4 days 00:00:00'),
                     pd.Timedelta('4 days 00:00:00'), 2, 0.0, -54.450495049504966,
                     -388.2424242424243, -221.34645964596461,
                     pd.Timedelta('3 days 00:00:00'), pd.Timedelta('2 days 00:00:00'),
-                    -0.2646459090909091, -1.711191707103453, -0.015271830375806438,
+                    -0.2646459090909091, -1.711191707103453, -0.015756524392863423,
                     -20.827914910501114, -13.477807138901431, -38.202477209943744
                 ]),
                 index=pd.Index([

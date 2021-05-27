@@ -27,6 +27,7 @@ __all__ = [
     'OrderResult',
     'RejectedOrderError',
     'ProcessOrderState',
+    'ExecuteOrderState',
     'Direction',
     'order_dt',
     'TradeDirection',
@@ -57,6 +58,8 @@ class SimulationContext(tp.NamedTuple):
     log_records: tp.RecordArray
     last_cash: tp.Array1d
     last_shares: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_oidx: tp.Array1d
@@ -92,7 +95,7 @@ Even if columns are not grouped, `group_lens` contains ones - one column per gro
 In pairs trading, `group_lens` would be `np.array([2])`, while three independent
 columns would require `group_lens` of `np.array([1, 1, 1])`.
 """
-__pdoc__['SimulationContext.init_cash'] = """Initial capital per column, or per group if cash sharing is enabled.
+__pdoc__['SimulationContext.init_cash'] = """Initial capital per column or group with cash sharing.
 
 If `cash_sharing`, has shape `(group_lens.shape[0],)`, otherwise has shape `(target_shape[1],)`.
 
@@ -175,7 +178,7 @@ array([(0, 0, 1, 50., 1., 0., 1)]
 __pdoc__['SimulationContext.log_records'] = """Log records.
 
 Similar to `SimulationContext.order_records` but of type `log_dt` and index `last_lidx`."""
-__pdoc__['SimulationContext.last_cash'] = """Last cash per column, or per group if cash sharing is enabled.
+__pdoc__['SimulationContext.last_cash'] = """Last cash per column or group with cash sharing.
 
 Has the same shape as `init_cash`.
 
@@ -191,6 +194,22 @@ In `order_func_nb` and `after_order_func_nb`, has the same value as `shares_now`
 
 Gets updated right after `order_func_nb`.
 """
+__pdoc__['SimulationContext.last_debt'] = """Last debt from shorting per column.
+
+Debt is the total value from shorting that hasn't been covered yet. Used to update `free_cash_now`.
+
+Has shape `(target_shape[1],)`. 
+
+Gets updated right after `order_func_nb`.
+"""
+__pdoc__['SimulationContext.last_free_cash'] = """Last free cash per column or group with cash sharing.
+
+Free cash never goes above the initial level, because an operation always costs money.
+
+Has shape `(target_shape[1],)`. 
+
+Gets updated right after `order_func_nb`.
+"""
 __pdoc__['SimulationContext.last_val_price'] = """Last valuation price per column.
 
 Has shape `(target_shape[1],)`.
@@ -203,6 +222,7 @@ The value of each column in a group with cash sharing is summed to get the value
 Defaults to the previous `close` right before `segment_prep_func_nb`.
 You can use `segment_prep_func_nb` to override `last_val_price` in-place.
 The valuation then happens right after `segment_prep_func_nb`.
+If `update_value`, gets also updated right after `order_func_nb`.
 
 !!! note
     Since the previous `close` is NaN in the first row, the first `last_val_price` is also NaN.
@@ -216,11 +236,12 @@ with cash sharing, the group is valued at $1400 before any `order_func_nb` is ca
 be later accessed via `OrderContext.value_now`.
 
 """
-__pdoc__['SimulationContext.last_value'] = """Last value per column, or per group if cash sharing is enabled.
+__pdoc__['SimulationContext.last_value'] = """Last value per column or group with cash sharing.
 
 Has the same shape as `init_cash`.
 
 Gets updated using `last_val_price` right after `segment_prep_func_nb`.
+If `update_value`, gets also updated right after `order_func_nb`.
 """
 __pdoc__['SimulationContext.last_oidx'] = """Index of the last order record of each column.
 
@@ -251,6 +272,8 @@ class GroupContext(tp.NamedTuple):
     log_records: tp.RecordArray
     last_cash: tp.Array1d
     last_shares: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_oidx: tp.Array1d
@@ -319,6 +342,8 @@ class RowContext(tp.NamedTuple):
     log_records: tp.RecordArray
     last_cash: tp.Array1d
     last_shares: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_oidx: tp.Array1d
@@ -356,6 +381,8 @@ class SegmentContext(tp.NamedTuple):
     log_records: tp.RecordArray
     last_cash: tp.Array1d
     last_shares: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_oidx: tp.Array1d
@@ -413,6 +440,8 @@ class OrderContext(tp.NamedTuple):
     log_records: tp.RecordArray
     last_cash: tp.Array1d
     last_shares: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_oidx: tp.Array1d
@@ -427,6 +456,8 @@ class OrderContext(tp.NamedTuple):
     call_idx: int
     cash_now: float
     shares_now: float
+    debt_now: float
+    free_cash_now: float
     val_price_now: float
     value_now: float
 
@@ -454,7 +485,7 @@ __pdoc__['OrderContext.call_idx'] = """Index of the current call in `call_seq_no
 
 Has range `[0, group_len)`.
 """
-__pdoc__['OrderContext.cash_now'] = """Cash in the current column, or group if cash sharing is enabled.
+__pdoc__['OrderContext.cash_now'] = """Cash in the current column or group with cash sharing.
 
 Scalar value. Has the same value as `last_cash` for the current column/group.
 """
@@ -462,13 +493,21 @@ __pdoc__['OrderContext.shares_now'] = """Shares in the current column.
 
 Scalar value. Has the same value as `last_shares` for the current column.
 """
+__pdoc__['OrderContext.debt_now'] = """Debt from shorting in the current column.
+
+Scalar value. Has the same value as `last_debt` for the current column.
+"""
+__pdoc__['OrderContext.free_cash_now'] = """Free cash in the current column or group with cash sharing.
+
+Scalar value. Has the same value as `last_free_cash` for the current column/group.
+"""
 __pdoc__['OrderContext.val_price_now'] = """Valuation price in the current column.
 
 Scalar value. Has the same value as `last_val_price` for the current column.
 """
-__pdoc__['OrderContext.value_now'] = """Value in the current column, or group if cash sharing is enabled.
+__pdoc__['OrderContext.value_now'] = """Value in the current column or group with cash sharing.
 
-Scalar value. Current value is calculated right after `segment_prep_func_nb` using `last_val_price`.
+Scalar value. Has the same value as `last_value` for the current column/group.
 """
 
 
@@ -485,6 +524,8 @@ class AfterOrderContext(tp.NamedTuple):
     log_records: tp.RecordArray
     last_cash: tp.Array1d
     last_shares: tp.Array1d
+    last_debt: tp.Array1d
+    last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
     last_oidx: tp.Array1d
@@ -499,11 +540,15 @@ class AfterOrderContext(tp.NamedTuple):
     call_idx: int
     cash_before: float
     shares_before: float
+    debt_before: float
+    free_cash_before: float
     val_price_before: float
     value_before: float
     order_result: "OrderResult"
     cash_now: float
     shares_now: float
+    debt_now: float
+    free_cash_now: float
     val_price_now: float
     value_now: float
 
@@ -527,6 +572,8 @@ for field in AfterOrderContext._fields:
         __pdoc__['AfterOrderContext.' + field] = f"See `OrderContext.{field}`."
 __pdoc__['AfterOrderContext.cash_before'] = "`OrderContext.cash_now` before execution."
 __pdoc__['AfterOrderContext.shares_before'] = "`OrderContext.shares_now` before execution."
+__pdoc__['AfterOrderContext.debt_before'] = "`OrderContext.debt_now` before execution."
+__pdoc__['AfterOrderContext.free_cash_before'] = "`OrderContext.free_cash_now` before execution."
 __pdoc__['AfterOrderContext.val_price_before'] = "`OrderContext.val_price_now` before execution."
 __pdoc__['AfterOrderContext.value_before'] = "`OrderContext.value_now` before execution."
 __pdoc__['AfterOrderContext.order_result'] = """Order result of type `OrderResult`.
@@ -822,19 +869,37 @@ class RejectedOrderError(Exception):
 class ProcessOrderState(tp.NamedTuple):
     cash: float
     shares: float
+    debt: float
+    free_cash: float
     val_price: float
     value: float
     oidx: int
     lidx: int
 
 
-__pdoc__['ProcessOrderState'] = "State before or after processing an order."
-__pdoc__['ProcessOrderState.cash'] = "Cash in the current column, or group if cash sharing is enabled."
+__pdoc__['ProcessOrderState'] = "State before or after order processing."
+__pdoc__['ProcessOrderState.cash'] = "Cash in the current column or group with cash sharing."
 __pdoc__['ProcessOrderState.shares'] = "Shares in the current column."
+__pdoc__['ProcessOrderState.debt'] = "Debt from shorting in the current column."
+__pdoc__['ProcessOrderState.free_cash'] = "Free cash in the current column or group with cash sharing."
 __pdoc__['ProcessOrderState.val_price'] = "Valuation price in the current column."
-__pdoc__['ProcessOrderState.value'] = "Value in the current column, or group if cash sharing is enabled."
+__pdoc__['ProcessOrderState.value'] = "Value in the current column or group with cash sharing."
 __pdoc__['ProcessOrderState.oidx'] = "Index of order record."
 __pdoc__['ProcessOrderState.lidx'] = "Index of log record."
+
+
+class ExecuteOrderState(tp.NamedTuple):
+    cash: float
+    shares: float
+    debt: float
+    free_cash: float
+
+
+__pdoc__['ExecuteOrderState'] = "State after order execution."
+__pdoc__['ExecuteOrderState.cash'] = "See `ProcessOrderState.cash`."
+__pdoc__['ExecuteOrderState.shares'] = "See `ProcessOrderState.shares`."
+__pdoc__['ExecuteOrderState.debt'] = "See `ProcessOrderState.debt`."
+__pdoc__['ExecuteOrderState.free_cash'] = "See `ProcessOrderState.free_cash`."
 
 
 class DirectionT(tp.NamedTuple):
@@ -954,10 +1019,12 @@ _log_fields = [
     ('idx', np.int_),
     ('col', np.int_),
     ('group', np.int_),
-    ('cash_now', np.float_),
-    ('shares_now', np.float_),
-    ('val_price_now', np.float_),
-    ('value_now', np.float_),
+    ('cash', np.float_),
+    ('shares', np.float_),
+    ('debt', np.float_),
+    ('free_cash', np.float_),
+    ('val_price', np.float_),
+    ('value', np.float_),
     ('size', np.float_),
     ('size_type', np.int_),
     ('direction', np.int_),
@@ -973,6 +1040,8 @@ _log_fields = [
     ('log', np.bool_),
     ('new_cash', np.float_),
     ('new_shares', np.float_),
+    ('new_debt', np.float_),
+    ('new_free_cash', np.float_),
     ('new_val_price', np.float_),
     ('new_value', np.float_),
     ('res_size', np.float_),

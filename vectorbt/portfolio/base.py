@@ -2239,14 +2239,14 @@ class Portfolio(Wrapping):
     # ############# Cash ############# #
 
     @cached_method
-    def cash_flow(self, group_by: tp.GroupByLike = None, short_cash: bool = True,
+    def cash_flow(self, group_by: tp.GroupByLike = None, free: bool = False,
                   wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
-        When `short_cash` is set to False, cash never goes above the initial level,
+        Use `free` to return the flow of free cash, which never goes above the initial level,
         because an operation always costs money."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            cash_flow = to_2d(self.cash_flow(group_by=False), raw=True)
+            cash_flow = to_2d(self.cash_flow(group_by=False, free=free), raw=True)
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             cash_flow = nb.cash_flow_grouped_nb(cash_flow, group_lens)
         else:
@@ -2254,7 +2254,7 @@ class Portfolio(Wrapping):
                 self.wrapper.shape_2d,
                 self.orders.values,
                 self.orders.col_mapper.col_map,
-                short_cash
+                free
             )
         return self.wrapper.wrap(cash_flow, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
@@ -2289,13 +2289,16 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap_reduced(init_cash, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def cash(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, short_cash: bool = True,
+    def cash(self, group_by: tp.GroupByLike = None, in_sim_order: bool = False, free: bool = False,
              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get cash balance series per column/group."""
+        """Get cash balance series per column/group.
+
+        See the explanation on `in_sim_order` in `Portfolio.value`.
+        For `free`, see `Portfolio.cash_flow`."""
         if in_sim_order and not self.cash_sharing:
             raise ValueError("Cash sharing must be enabled for in_sim_order=True")
 
-        cash_flow = to_2d(self.cash_flow(group_by=group_by, short_cash=short_cash), raw=True)
+        cash_flow = to_2d(self.cash_flow(group_by=group_by, free=free), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
             init_cash = to_1d(self.get_init_cash(group_by=group_by), raw=True)
@@ -2339,7 +2342,7 @@ class Portfolio(Wrapping):
                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get gross exposure."""
         holding_value = to_2d(self.holding_value(group_by=group_by, direction=direction), raw=True)
-        cash = to_2d(self.cash(group_by=group_by, short_cash=False), raw=True)
+        cash = to_2d(self.cash(group_by=group_by, free=True), raw=True)
         gross_exposure = nb.gross_exposure_nb(holding_value, cash)
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 

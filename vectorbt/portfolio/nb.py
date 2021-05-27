@@ -75,6 +75,7 @@ from vectorbt.portfolio.enums import (
     OrderResult,
     RejectedOrderError,
     ProcessOrderState,
+    ExecuteOrderState,
     Direction,
     order_dt,
     TradeDirection,
@@ -95,9 +96,8 @@ def order_not_filled_nb(status: int, status_info: int) -> OrderResult:
 
 
 @njit(cache=True)
-def buy_shares_nb(cash_now: float,
+def buy_shares_nb(exec_state: ExecuteOrderState,
                   cash_limit: float,
-                  shares_now: float,
                   size: float,
                   direction: int,
                   price: float,
@@ -105,20 +105,41 @@ def buy_shares_nb(cash_now: float,
                   fixed_fees: float,
                   slippage: float,
                   min_size: float,
-                  allow_partial: bool) -> tp.Tuple[float, float, OrderResult]:
+                  allow_partial: bool) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Buy or/and cover shares."""
+
+    if direction == Direction.LongOnly or direction == Direction.All:
+        if is_close_nb(exec_state.cash, 0):
+            new_exec_state = ExecuteOrderState(
+                cash=0.,
+                shares=exec_state.shares,
+                debt=exec_state.debt,
+                free_cash=exec_state.free_cash
+            )
+            return new_exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashLong)
+        if np.isinf(size) and np.isinf(exec_state.cash):
+            raise ValueError("Attempt to go in long direction infinitely")
+    else:
+        if is_close_nb(exec_state.shares, 0):
+            new_exec_state = ExecuteOrderState(
+                cash=exec_state.cash,
+                shares=0.,
+                debt=exec_state.debt,
+                free_cash=exec_state.free_cash
+            )
+            return new_exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
 
     # Get price adjusted with slippage
     adj_price = price * (1 + slippage)
 
     # Get optimal order size
     if direction == Direction.ShortOnly:
-        adj_size = min(-shares_now, size)
+        adj_size = min(-exec_state.shares, size)
     else:
         adj_size = size
 
     # Set cash limit
-    cash_limit = min(cash_now, cash_limit)
+    cash_limit = min(exec_state.cash, cash_limit)
 
     # Get cash required to complete this order
     req_cash = adj_size * adj_price
@@ -126,39 +147,46 @@ def buy_shares_nb(cash_now: float,
     adj_req_cash = req_cash + req_fees
 
     if is_close_or_less_nb(adj_req_cash, cash_limit):
-        # Sufficient cash
+        # Sufficient amount of cash
         final_size = adj_size
         fees_paid = req_fees
         final_cash = adj_req_cash
-
-        # Update current cash
-        new_cash = add_nb(cash_now, -final_cash)
     else:
-        # Insufficient cash, size will be less than requested
+        # Insufficient amount of cash, size will be less than requested
         if is_close_or_less_nb(cash_limit, fixed_fees):
-            return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
 
         # For fees of 10% and 1$ per transaction, you can buy shares for 90$ (final_cash)
         # to spend 100$ (cash_limit) in total
-        final_cash = (cash_limit - fixed_fees) / (1 + fees)
+        new_req_cash = (cash_limit - fixed_fees) / (1 + fees)
 
         # Update size and fees
-        final_size = final_cash / adj_price
-        fees_paid = cash_limit - final_cash
+        final_size = new_req_cash / adj_price
+        fees_paid = cash_limit - new_req_cash
 
-        # Update current cash
-        new_cash = add_nb(cash_now, -cash_limit)  # numerical stability
+        # Update final cash
+        final_cash = cash_limit
 
     # Check against minimum size
     if is_less_nb(final_size, min_size):
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MinSizeNotReached)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MinSizeNotReached)
 
     # Check against partial fill (np.inf doesn't count)
     if np.isfinite(size) and is_less_nb(final_size, size) and not allow_partial:
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.PartialFill)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.PartialFill)
 
     # Update current shares
-    new_shares = add_nb(shares_now, final_size)
+    new_cash = add_nb(exec_state.cash, -final_cash)
+    new_shares = add_nb(exec_state.shares, final_size)
+
+    # Update current debt and free cash
+    if exec_state.shares < 0:
+        new_debt = add_nb(max(exec_state.debt, final_cash), -final_cash)
+        free_cash_change = add_nb(2 * min(exec_state.debt, final_cash), -final_cash)
+        new_free_cash = add_nb(exec_state.free_cash, free_cash_change)
+    else:
+        new_debt = exec_state.debt
+        new_free_cash = add_nb(exec_state.free_cash, -final_cash)
 
     # Return filled order
     order_result = OrderResult(
@@ -169,12 +197,17 @@ def buy_shares_nb(cash_now: float,
         OrderStatus.Filled,
         -1
     )
-    return new_cash, new_shares, order_result
+    new_exec_state = ExecuteOrderState(
+        cash=new_cash,
+        shares=new_shares,
+        debt=new_debt,
+        free_cash=new_free_cash
+    )
+    return new_exec_state, order_result
 
 
 @njit(cache=True)
-def sell_shares_nb(cash_now: float,
-                   shares_now: float,
+def sell_shares_nb(exec_state: ExecuteOrderState,
                    size: float,
                    direction: int,
                    price: float,
@@ -182,25 +215,38 @@ def sell_shares_nb(cash_now: float,
                    fixed_fees: float,
                    slippage: float,
                    min_size: float,
-                   allow_partial: bool) -> tp.Tuple[float, float, OrderResult]:
+                   allow_partial: bool) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Sell or/and short sell shares."""
+
+    if direction == Direction.ShortOnly or direction == Direction.All:
+        if np.isinf(size):
+            raise ValueError("Attempt to go in short direction infinitely")
+    else:
+        if is_close_nb(exec_state.shares, 0):
+            new_exec_state = ExecuteOrderState(
+                cash=exec_state.cash,
+                shares=0.,
+                debt=exec_state.debt,
+                free_cash=exec_state.free_cash
+            )
+            return new_exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
 
     # Get price adjusted with slippage
     adj_price = price * (1 - slippage)
 
     # Get optimal order size
     if direction == Direction.LongOnly:
-        size_limit = min(shares_now, size)
+        size_limit = min(exec_state.shares, size)
     else:
         size_limit = size
 
     # Check against minimum size
     if is_less_nb(size_limit, min_size):
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MinSizeNotReached)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MinSizeNotReached)
 
     # Check against partial fill
     if np.isfinite(size) and is_less_nb(size_limit, size) and not allow_partial:  # np.inf doesn't count
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.PartialFill)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.PartialFill)
 
     # Get acquired cash
     acq_cash = size_limit * adj_price
@@ -210,12 +256,22 @@ def sell_shares_nb(cash_now: float,
 
     # Get final cash by subtracting costs
     if is_less_nb(acq_cash, fees_paid):
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
+        return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
     final_cash = acq_cash - fees_paid
 
     # Update current cash and shares
-    new_cash = cash_now + final_cash
-    new_shares = add_nb(shares_now, -size_limit)
+    new_cash = exec_state.cash + final_cash
+    new_shares = add_nb(exec_state.shares, -size_limit)
+
+    # Update current debt and free cash
+    if new_shares < 0:
+        short_size = get_short_size_nb(exec_state.shares, new_shares)
+        short_value = short_size * adj_price
+        new_debt = exec_state.debt + short_value
+        new_free_cash = exec_state.free_cash + add_nb(final_cash, -2 * short_value)
+    else:
+        new_debt = exec_state.debt
+        new_free_cash = exec_state.free_cash + final_cash
 
     # Return filled order
     order_result = OrderResult(
@@ -226,51 +282,57 @@ def sell_shares_nb(cash_now: float,
         OrderStatus.Filled,
         -1
     )
-    return new_cash, new_shares, order_result
+    new_exec_state = ExecuteOrderState(
+        cash=new_cash,
+        shares=new_shares,
+        debt=new_debt,
+        free_cash=new_free_cash
+    )
+    return new_exec_state, order_result
 
 
 @njit(cache=True)
-def execute_order_nb(cash_now: float,
-                     shares_now: float,
-                     val_price_now: float,
-                     value_now: float,
-                     order: Order) -> tp.Tuple[float, float, OrderResult]:
+def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Execute an order given the current state.
 
     Args:
-        cash_now (float): Cash available to this asset or group with cash sharing.
-        shares_now (float): Holdings of this particular asset.
-        val_price_now (float): Valuation price for this particular asset.
-
-            Used to convert `SizeType.TargetValue` to `SizeType.TargetShares`.
-        value_now (float): Value of this asset or group with cash sharing.
-
-            Used to convert `SizeType.TargetPercent` to `SizeType.TargetValue`.
+        state (ProcessOrderState): See `vectorbt.portfolio.enums.ProcessOrderState`.
         order (Order): See `vectorbt.portfolio.enums.Order`.
 
     Error is thrown if an input has value that is not expected.
     Order is ignored if its execution has no effect on current balance.
     Order is rejected if an input goes over a limit/restriction.
     """
+    exec_state = ExecuteOrderState(
+        cash=state.cash,
+        shares=state.shares,
+        debt=state.debt,
+        free_cash=state.free_cash
+    )
+    
     if np.isnan(order.size):
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeNaN)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeNaN)
     if np.isnan(order.price):
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.PriceNaN)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.PriceNaN)
 
-    # Check variables
-    if np.isnan(cash_now) or cash_now < 0:
-        raise ValueError("cash_now must be greater than 0")
-    if not np.isfinite(shares_now):
+    # Check execution state
+    if np.isnan(state.cash) or state.cash < 0:
+        raise ValueError("cash_now cannot be NaN and must be greater than 0")
+    if not np.isfinite(state.shares):
         raise ValueError("shares_now must be finite")
+    if not np.isfinite(state.debt) or state.debt < 0:
+        raise ValueError("debt must be finite and 0 or greater")
+    if np.isnan(state.free_cash):
+        raise ValueError("free_cash cannot be NaN")
 
     # Check order
     if order.size_type < 0 or order.size_type >= len(SizeType):
         raise ValueError("order.size_type is invalid")
     if order.direction < 0 or order.direction >= len(Direction):
         raise ValueError("order.direction is invalid")
-    if order.direction == Direction.LongOnly and shares_now < 0:
+    if order.direction == Direction.LongOnly and state.shares < 0:
         raise ValueError("shares_now is negative but order.direction is Direction.LongOnly")
-    if order.direction == Direction.ShortOnly and shares_now > 0:
+    if order.direction == Direction.ShortOnly and state.shares > 0:
         raise ValueError("shares_now is positive but order.direction is Direction.ShortOnly")
     if not np.isfinite(order.price) or order.price <= 0:
         raise ValueError("order.price must be finite and greater than 0")
@@ -296,27 +358,27 @@ def execute_order_nb(cash_now: float,
 
     if order_size_type == SizeType.TargetPercent:
         # Target percentage of current value
-        if np.isnan(value_now):
-            return cash_now, shares_now, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValueNaN)
-        if value_now <= 0:
-            return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.ValueZeroNeg)
+        if np.isnan(state.value):
+            return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValueNaN)
+        if state.value <= 0:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.ValueZeroNeg)
 
-        order_size *= value_now
+        order_size *= state.value
         order_size_type = SizeType.TargetValue
 
     if order_size_type == SizeType.TargetValue:
         # Target value
-        if np.isinf(val_price_now) or val_price_now <= 0:
+        if np.isinf(state.val_price) or state.val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
-        if np.isnan(val_price_now):
-            return cash_now, shares_now, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValPriceNaN)
+        if np.isnan(state.val_price):
+            return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValPriceNaN)
 
-        order_size /= val_price_now
+        order_size /= state.val_price
         order_size_type = SizeType.TargetShares
 
     if order_size_type == SizeType.TargetShares:
         # Target amount of shares
-        order_size -= shares_now
+        order_size -= state.shares
         order_size_type = SizeType.Shares
 
     if order_size_type == SizeType.Shares:
@@ -331,48 +393,36 @@ def execute_order_nb(cash_now: float,
         # Percentage of resources
         if order_size > 0:
             # Percentage of available cash
-            cash_limit = order_size * cash_now
+            cash_limit = order_size * state.cash
             order_size = np.inf
         elif order_size < 0:
             if order.direction == Direction.ShortOnly or order.direction == Direction.All:
                 # Percentage of available cash that can cover this short position
-                order_size *= 2 * shares_now + cash_now / order.price
+                order_size *= 2 * state.shares + state.cash / order.price
                 if order_size >= 0:
-                    return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashShort)
+                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashShort)
             else:
                 # Percentage of available shares to sell
-                order_size *= abs(shares_now)
+                order_size *= abs(state.shares)
         order_size_type = SizeType.Shares
 
     if is_close_nb(order_size, 0):
-        return cash_now, shares_now, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
 
     if abs(order_size) > order.max_size:
         if not order.allow_partial:
-            return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
 
         order_size = np.sign(order_size) * order.max_size
 
     if order.reject_prob > 0:
         if np.random.uniform(0, 1) < order.reject_prob:
-            return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.RandomEvent)
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.RandomEvent)
 
     if order_size > 0:
-        if order.direction == Direction.LongOnly or order.direction == Direction.All:
-            if is_close_nb(cash_now, 0):
-                cash_now = 0.
-                return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashLong)
-            if np.isinf(order_size) and np.isinf(cash_now):
-                raise ValueError("Attempt to go in long direction indefinitely. Set max_size or finite init_cash.")
-        else:
-            if is_close_nb(shares_now, 0):
-                shares_now = 0.
-                return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
-
-        new_cash, new_shares, order_result = buy_shares_nb(
-            cash_now,
+        new_exec_state, order_result = buy_shares_nb(
+            exec_state,
             cash_limit,
-            shares_now,
             order_size,
             order.direction,
             order.price,
@@ -383,17 +433,8 @@ def execute_order_nb(cash_now: float,
             order.allow_partial
         )
     else:
-        if order.direction == Direction.ShortOnly or order.direction == Direction.All:
-            if np.isinf(order_size):
-                raise ValueError("Attempt to go in short direction indefinitely. Set max_size or finite init_cash.")
-        else:
-            if is_close_nb(shares_now, 0):
-                shares_now = 0.
-                return cash_now, shares_now, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
-
-        new_cash, new_shares, order_result = sell_shares_nb(
-            cash_now,
-            shares_now,
+        new_exec_state, order_result = sell_shares_nb(
+            exec_state,
             -order_size,
             order.direction,
             order.price,
@@ -404,7 +445,7 @@ def execute_order_nb(cash_now: float,
             order.allow_partial
         )
 
-    return new_cash, new_shares, order_result
+    return new_exec_state, order_result
 
 
 @njit(cache=True)
@@ -413,13 +454,17 @@ def fill_log_record_nb(record: tp.Record,
                        i: int,
                        col: int,
                        group: int,
-                       cash_now: float,
-                       shares_now: float,
-                       val_price_now: float,
-                       value_now: float,
+                       cash: float,
+                       shares: float,
+                       debt: float,
+                       free_cash: float,
+                       val_price: float,
+                       value: float,
                        order: Order,
                        new_cash: float,
                        new_shares: float,
+                       new_debt: float,
+                       new_free_cash: float,
                        new_val_price: float,
                        new_value: float,
                        order_result: OrderResult,
@@ -430,10 +475,12 @@ def fill_log_record_nb(record: tp.Record,
     record['idx'] = i
     record['col'] = col
     record['group'] = group
-    record['cash_now'] = cash_now
-    record['shares_now'] = shares_now
-    record['val_price_now'] = val_price_now
-    record['value_now'] = value_now
+    record['cash'] = cash
+    record['shares'] = shares
+    record['debt'] = debt
+    record['free_cash'] = free_cash
+    record['val_price'] = val_price
+    record['value'] = value
     record['size'] = order.size
     record['size_type'] = order.size_type
     record['direction'] = order.direction
@@ -449,6 +496,8 @@ def fill_log_record_nb(record: tp.Record,
     record['log'] = order.log
     record['new_cash'] = new_cash
     record['new_shares'] = new_shares
+    record['new_debt'] = new_debt
+    record['new_free_cash'] = new_free_cash
     record['new_val_price'] = new_val_price
     record['new_value'] = new_value
     record['res_size'] = order_result.size
@@ -516,7 +565,7 @@ def raise_rejected_order_nb(order_result: OrderResult) -> None:
 def process_order_nb(i: int,
                      col: int,
                      group: int,
-                     order_state: ProcessOrderState,
+                     state: ProcessOrderState,
                      update_value: bool,
                      order: Order,
                      order_records: tp.RecordArray,
@@ -524,13 +573,7 @@ def process_order_nb(i: int,
     """Process an order by executing it, saving relevant information to the logs, and returning a new state."""
 
     # Execute the order
-    new_cash, new_shares, order_result = execute_order_nb(
-        order_state.cash,
-        order_state.shares,
-        order_state.val_price,
-        order_state.value,
-        order
-    )
+    exec_state, order_result = execute_order_nb(state, order)
 
     # Raise if order rejected
     is_rejected = order_result.status == OrderStatus.Rejected
@@ -541,61 +584,67 @@ def process_order_nb(i: int,
     is_filled = order_result.status == OrderStatus.Filled
     if is_filled and update_value:
         new_val_price, new_value = update_value_nb(
-            order_state.cash,
-            new_cash,
-            order_state.shares,
-            new_shares,
-            order_state.val_price,
+            state.cash,
+            exec_state.cash,
+            state.shares,
+            exec_state.shares,
+            state.val_price,
             order_result.price,
-            order_state.value
+            state.value
         )
     else:
-        new_val_price = order_state.val_price
-        new_value = order_state.value
+        new_val_price = state.val_price
+        new_value = state.value
 
-    new_oidx = order_state.oidx
+    new_oidx = state.oidx
     if is_filled:
         # Fill order record
-        if order_state.oidx > len(order_records) - 1:
+        if state.oidx > len(order_records) - 1:
             raise IndexError("order_records index out of range. Set a higher max_orders.")
         fill_order_record_nb(
-            order_records[order_state.oidx],
-            order_state.oidx,
+            order_records[state.oidx],
+            state.oidx,
             i,
             col,
             order_result
         )
         new_oidx += 1
 
-    new_lidx = order_state.lidx
+    new_lidx = state.lidx
     if order.log:
         # Fill log record
-        if order_state.lidx > len(log_records) - 1:
+        if state.lidx > len(log_records) - 1:
             raise IndexError("log_records index out of range. Set a higher max_logs.")
         fill_log_record_nb(
-            log_records[order_state.lidx],
-            order_state.lidx,
+            log_records[state.lidx],
+            state.lidx,
             i,
             col,
             group,
-            order_state.cash,
-            order_state.shares,
-            order_state.val_price,
-            order_state.value,
+            state.cash,
+            state.shares,
+            state.debt,
+            state.free_cash,
+            state.val_price,
+            state.value,
             order,
-            new_cash,
-            new_shares,
+            exec_state.cash,
+            exec_state.shares,
+            exec_state.debt,
+            exec_state.free_cash,
             new_val_price,
             new_value,
             order_result,
-            order_state.oidx if is_filled else -1
+            state.oidx if is_filled else -1
         )
         new_lidx += 1
 
     # Create new state
     new_state = ProcessOrderState(
-        cash=new_cash,
-        shares=new_shares,
+        cash=exec_state.cash,
+        shares=exec_state.shares,
+        debt=exec_state.debt,
+        free_cash=exec_state.free_cash,
         val_price=new_val_price,
         value=new_value,
         oidx=new_oidx,
@@ -852,15 +901,17 @@ def sort_call_seq_nb(seg_ctx: SegmentContext,
 
 
 @njit(cache=True)
-def try_order_nb(order_ctx: OrderContext, order: Order) -> tp.Tuple[float, float, OrderResult]:
+def try_order_nb(order_ctx: OrderContext, order: Order) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Execute an order without side effects."""
-    return execute_order_nb(
-        order_ctx.cash_now,
-        order_ctx.shares_now,
-        order_ctx.val_price_now,
-        order_ctx.value_now,
-        order
+    state = ProcessOrderState(
+        cash=order_ctx.cash_now,
+        shares=order_ctx.shares_now,
+        debt=order_ctx.debt_now,
+        free_cash=order_ctx.free_cash_now,
+        val_price=order_ctx.val_price_now,
+        value=order_ctx.value_now
     )
+    return execute_order_nb(state, order)
 
 
 @njit(cache=True)
@@ -1243,6 +1294,8 @@ def simulate_nb(target_shape: tp.Shape,
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     last_cash = init_cash.copy()
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
     last_value = init_cash.copy()
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
@@ -1264,6 +1317,8 @@ def simulate_nb(target_shape: tp.Shape,
         log_records=log_records,
         last_cash=last_cash,
         last_shares=last_shares,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
         last_oidx=last_oidx,
@@ -1292,6 +1347,8 @@ def simulate_nb(target_shape: tp.Shape,
                 log_records=log_records,
                 last_cash=last_cash,
                 last_shares=last_shares,
+                last_debt=last_debt,
+                last_free_cash=last_free_cash,
                 last_val_price=last_val_price,
                 last_value=last_value,
                 last_oidx=last_oidx,
@@ -1326,6 +1383,8 @@ def simulate_nb(target_shape: tp.Shape,
                         log_records=log_records,
                         last_cash=last_cash,
                         last_shares=last_shares,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_oidx=last_oidx,
@@ -1350,6 +1409,7 @@ def simulate_nb(target_shape: tp.Shape,
                             last_val_price
                         )
                         last_value[group] = value_now
+                        free_cash_now = last_free_cash[group]
 
                     for k in range(group_len):
                         col_i = call_seq_now[k]
@@ -1359,9 +1419,11 @@ def simulate_nb(target_shape: tp.Shape,
 
                         # Get current values per column
                         shares_now = last_shares[col]
+                        debt_now = last_debt[col]
                         val_price_now = last_val_price[col]
                         if not cash_sharing:
                             cash_now = last_cash[col]
+                            free_cash_now = last_free_cash[col]
                             value_now = cash_now
                             if shares_now != 0:
                                 value_now += shares_now * val_price_now
@@ -1381,6 +1443,8 @@ def simulate_nb(target_shape: tp.Shape,
                             log_records=log_records,
                             last_cash=last_cash,
                             last_shares=last_shares,
+                            last_debt=last_debt,
+                            last_free_cash=last_free_cash,
                             last_val_price=last_val_price,
                             last_value=last_value,
                             last_oidx=last_oidx,
@@ -1395,15 +1459,19 @@ def simulate_nb(target_shape: tp.Shape,
                             call_idx=k,
                             cash_now=cash_now,
                             shares_now=shares_now,
+                            debt_now=debt_now,
+                            free_cash_now=free_cash_now,
                             val_price_now=val_price_now,
                             value_now=value_now
                         )
                         order = order_func_nb(order_ctx, *segment_prep_out, *order_args)
 
                         # Process the order
-                        old_state = ProcessOrderState(
+                        state = ProcessOrderState(
                             cash=cash_now,
                             shares=shares_now,
+                            debt=debt_now,
+                            free_cash=free_cash_now,
                             val_price=val_price_now,
                             value=value_now,
                             oidx=oidx,
@@ -1412,7 +1480,7 @@ def simulate_nb(target_shape: tp.Shape,
 
                         order_result, new_state = process_order_nb(
                             i, col, group,
-                            old_state,
+                            state,
                             update_value,
                             order,
                             order_records,
@@ -1422,6 +1490,8 @@ def simulate_nb(target_shape: tp.Shape,
                         # Update state
                         cash_now = new_state.cash
                         shares_now = new_state.shares
+                        debt_now = new_state.debt
+                        free_cash_now = new_state.free_cash
                         val_price_now = new_state.val_price
                         value_now = new_state.value
                         oidx = new_state.oidx
@@ -1432,15 +1502,20 @@ def simulate_nb(target_shape: tp.Shape,
                         else:
                             last_cash[col] = cash_now
                         last_shares[col] = shares_now
+                        last_debt[col] = debt_now
+                        if cash_sharing:
+                            last_free_cash[group] = free_cash_now
+                        else:
+                            last_free_cash[col] = free_cash_now
                         last_val_price[col] = val_price_now
                         if cash_sharing:
                             last_value[group] = value_now
                         else:
                             last_value[col] = value_now
-                        if old_state.oidx != new_state.oidx:
-                            last_oidx[col] = old_state.oidx
-                        if old_state.lidx != new_state.lidx:
-                            last_lidx[col] = old_state.lidx
+                        if state.oidx != new_state.oidx:
+                            last_oidx[col] = state.oidx
+                        if state.lidx != new_state.lidx:
+                            last_lidx[col] = state.lidx
 
                         # After order callback
                         after_order_ctx = AfterOrderContext(
@@ -1456,6 +1531,8 @@ def simulate_nb(target_shape: tp.Shape,
                             log_records=log_records,
                             last_cash=last_cash,
                             last_shares=last_shares,
+                            last_debt=last_debt,
+                            last_free_cash=last_free_cash,
                             last_val_price=last_val_price,
                             last_value=last_value,
                             last_oidx=last_oidx,
@@ -1468,13 +1545,17 @@ def simulate_nb(target_shape: tp.Shape,
                             call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
-                            cash_before=old_state.cash,
-                            shares_before=old_state.shares,
-                            val_price_before=old_state.val_price,
-                            value_before=old_state.value,
+                            cash_before=state.cash,
+                            shares_before=state.shares,
+                            debt_before=state.debt,
+                            free_cash_before=state.free_cash,
+                            val_price_before=state.val_price,
+                            value_before=state.value,
                             order_result=order_result,
                             cash_now=cash_now,
                             shares_now=shares_now,
+                            debt_now=debt_now,
+                            free_cash_now=free_cash_now,
                             val_price_now=val_price_now,
                             value_now=value_now
                         )
@@ -1569,6 +1650,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
     last_cash = init_cash.copy()
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
+    last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
     last_value = init_cash.copy()
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
@@ -1590,6 +1673,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         log_records=log_records,
         last_cash=last_cash,
         last_shares=last_shares,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
         last_oidx=last_oidx,
@@ -1619,6 +1704,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                 log_records=log_records,
                 last_cash=last_cash,
                 last_shares=last_shares,
+                last_debt=last_debt,
+                last_free_cash=last_free_cash,
                 last_val_price=last_val_price,
                 last_value=last_value,
                 last_oidx=last_oidx,
@@ -1649,6 +1736,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         log_records=log_records,
                         last_cash=last_cash,
                         last_shares=last_shares,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
                         last_oidx=last_oidx,
@@ -1667,6 +1756,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         cash_now = last_cash[group]
                         value_now = get_group_value_nb(from_col, to_col, cash_now, last_shares, last_val_price)
                         last_value[group] = value_now
+                        free_cash_now = last_free_cash[group]
 
                     for k in range(group_len):
                         col_i = call_seq_now[k]
@@ -1676,9 +1766,11 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                         # Get current values per column
                         shares_now = last_shares[col]
+                        debt_now = last_debt[col]
                         val_price_now = last_val_price[col]
                         if not cash_sharing:
                             cash_now = last_cash[col]
+                            free_cash_now = last_free_cash[col]
                             value_now = cash_now
                             if shares_now != 0:
                                 value_now += shares_now * val_price_now
@@ -1698,6 +1790,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             log_records=log_records,
                             last_cash=last_cash,
                             last_shares=last_shares,
+                            last_debt=last_debt,
+                            last_free_cash=last_free_cash,
                             last_val_price=last_val_price,
                             last_value=last_value,
                             last_oidx=last_oidx,
@@ -1712,15 +1806,19 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             call_idx=k,
                             cash_now=cash_now,
                             shares_now=shares_now,
+                            debt_now=debt_now,
+                            free_cash_now=free_cash_now,
                             val_price_now=val_price_now,
                             value_now=value_now
                         )
                         order = order_func_nb(order_ctx, *segment_prep_out, *order_args)
 
                         # Process the order
-                        old_state = ProcessOrderState(
+                        state = ProcessOrderState(
                             cash=cash_now,
                             shares=shares_now,
+                            debt=debt_now,
+                            free_cash=free_cash_now,
                             val_price=val_price_now,
                             value=value_now,
                             oidx=oidx,
@@ -1729,7 +1827,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
                         order_result, new_state = process_order_nb(
                             i, col, group,
-                            old_state,
+                            state,
                             update_value,
                             order,
                             order_records,
@@ -1739,6 +1837,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         # Update state
                         cash_now = new_state.cash
                         shares_now = new_state.shares
+                        debt_now = new_state.debt
+                        free_cash_now = new_state.free_cash
                         val_price_now = new_state.val_price
                         value_now = new_state.value
                         oidx = new_state.oidx
@@ -1749,15 +1849,20 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         else:
                             last_cash[col] = cash_now
                         last_shares[col] = shares_now
+                        last_debt[col] = debt_now
+                        if cash_sharing:
+                            last_free_cash[group] = free_cash_now
+                        else:
+                            last_free_cash[col] = free_cash_now
                         last_val_price[col] = val_price_now
                         if cash_sharing:
                             last_value[group] = value_now
                         else:
                             last_value[col] = value_now
-                        if old_state.oidx != new_state.oidx:
-                            last_oidx[col] = old_state.oidx
-                        if old_state.lidx != new_state.lidx:
-                            last_lidx[col] = old_state.lidx
+                        if state.oidx != new_state.oidx:
+                            last_oidx[col] = state.oidx
+                        if state.lidx != new_state.lidx:
+                            last_lidx[col] = state.lidx
 
                         # After order callback
                         after_order_ctx = AfterOrderContext(
@@ -1773,6 +1878,8 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             log_records=log_records,
                             last_cash=last_cash,
                             last_shares=last_shares,
+                            last_debt=last_debt,
+                            last_free_cash=last_free_cash,
                             last_val_price=last_val_price,
                             last_value=last_value,
                             last_oidx=last_oidx,
@@ -1785,13 +1892,17 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                             call_seq_now=call_seq_now,
                             col=col,
                             call_idx=k,
-                            cash_before=old_state.cash,
-                            shares_before=old_state.shares,
-                            val_price_before=old_state.val_price,
-                            value_before=old_state.value,
+                            cash_before=state.cash,
+                            shares_before=state.shares,
+                            debt_before=state.debt,
+                            free_cash_before=state.free_cash,
+                            val_price_before=state.val_price,
+                            value_before=state.value,
                             order_result=order_result,
                             cash_now=cash_now,
                             shares_now=shares_now,
+                            debt_now=debt_now,
+                            free_cash_now=free_cash_now,
                             val_price_now=val_price_now,
                             value_now=value_now
                         )
@@ -1839,8 +1950,8 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
     oidx = 0
     lidx = 0
@@ -1849,10 +1960,8 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
         group_len = to_col - from_col
-
-        # Get current values per group
-        if cash_sharing:
-            cash_now = last_cash[group]
+        cash_now = init_cash[group]
+        free_cash_now = init_cash[group]
 
         for i in range(target_shape[0]):
             # Calculate group value and rearrange if cash sharing is enabled
@@ -1893,9 +2002,9 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
                 # Get current values per column
                 shares_now = last_shares[col]
+                debt_now = last_debt[col]
                 val_price_now = flex_select_auto_nb(i, col, val_price, flex_2d)
                 if not cash_sharing:
-                    cash_now = last_cash[col]
                     value_now = cash_now
                     if shares_now != 0:
                         value_now += shares_now * val_price_now
@@ -1918,9 +2027,11 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 )
 
                 # Process the order
-                old_state = ProcessOrderState(
+                state = ProcessOrderState(
                     cash=cash_now,
                     shares=shares_now,
+                    debt=debt_now,
+                    free_cash=free_cash_now,
                     val_price=val_price_now,
                     value=value_now,
                     oidx=oidx,
@@ -1929,7 +2040,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
 
                 order_result, new_state = process_order_nb(
                     i, col, group,
-                    old_state,
+                    state,
                     update_value,
                     order,
                     order_records,
@@ -1939,17 +2050,16 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                 # Update state
                 cash_now = new_state.cash
                 shares_now = new_state.shares
+                debt_now = new_state.debt
+                free_cash_now = new_state.free_cash
                 val_price_now = new_state.val_price
                 value_now = new_state.value
                 oidx = new_state.oidx
                 lidx = new_state.lidx
 
                 # Now becomes last
-                if cash_sharing:
-                    last_cash[group] = cash_now
-                else:
-                    last_cash[col] = cash_now
                 last_shares[col] = shares_now
+                last_debt[col] = debt_now
 
         from_col = to_col
 
@@ -2106,8 +2216,8 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
 
     order_records, log_records = init_records_nb(target_shape, max_orders, max_logs)
-    last_cash = init_cash.astype(np.float_)
     last_shares = np.full(target_shape[1], 0., dtype=np.float_)
+    last_debt = np.full(target_shape[1], 0., dtype=np.float_)
     order_size = np.empty(target_shape[1], dtype=np.float_)
     order_size_type = np.empty(target_shape[1], dtype=np.float_)
     temp_order_value = np.empty(target_shape[1], dtype=np.float_)
@@ -2118,10 +2228,8 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
     for group in range(len(group_lens)):
         to_col = from_col + group_lens[group]
         group_len = to_col - from_col
-
-        # Get current values per group
-        if cash_sharing:
-            cash_now = last_cash[group]
+        cash_now = init_cash[group]
+        free_cash_now = init_cash[group]
 
         for i in range(target_shape[0]):
 
@@ -2180,9 +2288,9 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                 # Get current values per column
                 shares_now = last_shares[col]
+                debt_now = last_debt[col]
                 val_price_now = flex_select_auto_nb(i, col, val_price, flex_2d)
                 if not cash_sharing:
-                    cash_now = last_cash[col]
                     value_now = cash_now
                     if shares_now != 0:
                         value_now += shares_now * val_price_now
@@ -2216,9 +2324,11 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     )
 
                     # Process the order
-                    old_state = ProcessOrderState(
+                    state = ProcessOrderState(
                         cash=cash_now,
                         shares=shares_now,
+                        debt=debt_now,
+                        free_cash=free_cash_now,
                         val_price=val_price_now,
                         value=value_now,
                         oidx=oidx,
@@ -2227,7 +2337,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                     order_result, new_state = process_order_nb(
                         i, col, group,
-                        old_state,
+                        state,
                         update_value,
                         order,
                         order_records,
@@ -2237,17 +2347,16 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     # Update state
                     cash_now = new_state.cash
                     shares_now = new_state.shares
+                    debt_now = new_state.debt
+                    free_cash_now = new_state.free_cash
                     val_price_now = new_state.val_price
                     value_now = new_state.value
                     oidx = new_state.oidx
                     lidx = new_state.lidx
 
                 # Now becomes last
-                if cash_sharing:
-                    last_cash[group] = cash_now
-                else:
-                    last_cash[col] = cash_now
                 last_shares[col] = shares_now
+                last_debt[col] = debt_now
 
         from_col = to_col
 
@@ -2715,27 +2824,27 @@ def trades_to_positions_nb(trade_records: tp.RecordArray, col_map: tp.ColMap) ->
 
 
 @njit(cache=True)
-def get_long_size_nb(shares_now: float, new_shares_now: float) -> float:
+def get_long_size_nb(shares_before: float, shares_now: float) -> float:
     """Get long size."""
-    if shares_now <= 0 and new_shares_now <= 0:
+    if shares_before <= 0 and shares_now <= 0:
         return 0.
-    if shares_now >= 0 and new_shares_now < 0:
-        return -shares_now
-    if shares_now < 0 and new_shares_now >= 0:
-        return new_shares_now
-    return add_nb(new_shares_now, -shares_now)
+    if shares_before >= 0 and shares_now < 0:
+        return -shares_before
+    if shares_before < 0 and shares_now >= 0:
+        return shares_now
+    return add_nb(shares_now, -shares_before)
 
 
 @njit(cache=True)
-def get_short_size_nb(shares_now: float, new_shares_now: float) -> float:
+def get_short_size_nb(shares_before: float, shares_now: float) -> float:
     """Get short size."""
-    if shares_now >= 0 and new_shares_now >= 0:
+    if shares_before >= 0 and shares_now >= 0:
         return 0.
-    if shares_now >= 0 and new_shares_now < 0:
-        return -new_shares_now
-    if shares_now < 0 and new_shares_now >= 0:
-        return shares_now
-    return add_nb(shares_now, -new_shares_now)
+    if shares_before >= 0 and shares_now < 0:
+        return -shares_now
+    if shares_before < 0 and shares_now >= 0:
+        return shares_before
+    return add_nb(shares_before, -shares_now)
 
 
 @njit(cache=True)
@@ -2771,11 +2880,12 @@ def share_flow_nb(target_shape: tp.Shape,
                 size *= -1
             new_shares_now = add_nb(shares_now, size)
             if direction == Direction.LongOnly:
-                out[i, col] += get_long_size_nb(shares_now, new_shares_now)
+                share_change = get_long_size_nb(shares_now, new_shares_now)
             elif direction == Direction.ShortOnly:
-                out[i, col] += get_short_size_nb(shares_now, new_shares_now)
+                share_change = get_short_size_nb(shares_now, new_shares_now)
             else:
-                out[i, col] += size
+                share_change = size
+            out[i, col] = add_nb(out[i, col], share_change)
             shares_now = new_shares_now
     return out
 
@@ -2821,11 +2931,43 @@ def pos_coverage_grouped_nb(pos_mask: tp.Array2d, group_lens: tp.Array1d) -> tp.
 
 
 @njit(cache=True)
+def get_free_cash_change_nb(shares_before: float,
+                            shares_now: float,
+                            debt_now: float,
+                            price: float,
+                            fees: float) -> tp.Tuple[float, float]:
+    """Get updated debt and change in free cash."""
+    size = add_nb(shares_now, -shares_before)
+    value = size * price
+    abs_value = abs(value)
+    short_size = get_short_size_nb(shares_before, shares_now)
+    short_value = short_size * price
+
+    if not is_close_nb(short_size, 0):
+        if short_size > 0:
+            debt_now += short_value
+            free_cash_change = add_nb(abs_value, -2 * short_value)
+        else:
+            if is_close_nb(abs_value, debt_now):
+                abs_value = debt_now
+            if abs_value >= debt_now:
+                free_cash_change = add_nb(2 * debt_now, -abs_value)
+                debt_now = 0.
+            else:
+                free_cash_change = abs_value
+                debt_now -= abs_value
+    else:
+        free_cash_change = -value
+    free_cash_change -= fees
+    return debt_now, free_cash_change
+
+
+@njit(cache=True)
 def cash_flow_nb(target_shape: tp.Shape,
                  order_records: tp.RecordArray,
                  col_map: tp.ColMap,
-                 short_cash: bool) -> tp.Array2d:
-    """Get cash flow series per column."""
+                 free: bool) -> tp.Array2d:
+    """Get (free) cash flow series per column."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
     out = np.full(target_shape, 0., dtype=np.float_)
@@ -2856,43 +2998,39 @@ def cash_flow_nb(target_shape: tp.Shape,
             if side == OrderSide.Sell:
                 size *= -1
             new_shares_now = add_nb(shares_now, size)
-            shorted_size = get_short_size_nb(shares_now, new_shares_now)
-
-            if not short_cash and shorted_size != 0:
-                if shorted_size > 0:
-                    debt_now += shorted_size * price
-                    out[i, col] += add_nb(value, -2 * shorted_size * price)
-                else:
-                    if is_close_nb(value, debt_now):
-                        value = debt_now
-                    if value >= debt_now:
-                        out[i, col] += add_nb(2 * debt_now, -value)
-                        debt_now = 0.
-                    else:
-                        out[i, col] += value
-                        debt_now -= value
+            if free:
+                debt_now, cash_change = get_free_cash_change_nb(
+                    shares_now,
+                    new_shares_now,
+                    debt_now,
+                    price,
+                    fees
+                )
             else:
-                if side == OrderSide.Buy:
-                    out[i, col] -= value
-                else:
-                    out[i, col] += value
-            out[i, col] -= fees
+                cash_change = -size * price - fees
+            out[i, col] = add_nb(out[i, col], cash_change)
             shares_now = new_shares_now
+    return out
+
+
+@njit(cache=True)
+def sum_grouped_nb(a: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
+    """Squeeze each group of columns into a single column using sum operation."""
+    check_group_lens(group_lens, a.shape[1])
+
+    out = np.empty((a.shape[0], len(group_lens)), dtype=np.float_)
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        out[:, group] = np.sum(a[:, from_col:to_col], axis=1)
+        from_col = to_col
     return out
 
 
 @njit(cache=True)
 def cash_flow_grouped_nb(cash_flow: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
     """Get cash flow series per group."""
-    check_group_lens(group_lens, cash_flow.shape[1])
-
-    out = np.empty((cash_flow.shape[0], len(group_lens)), dtype=np.float_)
-    from_col = 0
-    for group in range(len(group_lens)):
-        to_col = from_col + group_lens[group]
-        out[:, group] = np.sum(cash_flow[:, from_col:to_col], axis=1)
-        from_col = to_col
-    return out
+    return sum_grouped_nb(cash_flow, group_lens)
 
 
 @njit(cache=True)
@@ -2991,15 +3129,7 @@ def holding_value_nb(close: tp.Array2d, shares: tp.Array2d) -> tp.Array2d:
 @njit(cache=True)
 def holding_value_grouped_nb(holding_value: tp.Array2d, group_lens: tp.Array1d) -> tp.Array2d:
     """Get holding value series per group."""
-    check_group_lens(group_lens, holding_value.shape[1])
-
-    out = np.empty((holding_value.shape[0], len(group_lens)), dtype=np.float_)
-    from_col = 0
-    for group in range(len(group_lens)):
-        to_col = from_col + group_lens[group]
-        out[:, group] = np.sum(holding_value[:, from_col:to_col], axis=1)
-        from_col = to_col
-    return out
+    return sum_grouped_nb(holding_value, group_lens)
 
 
 @njit(cache=True)
