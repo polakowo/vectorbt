@@ -670,8 +670,10 @@ Attributes:
         Gets converted into `SizeType.TargetValue`.
     Percent: Percentage of available resources in either direction to use.
     
-        When buying, it's a percentage of `cash_now`. When selling, it's a percentage of `shares_now` 
-        and free `cash_now` - cash that doesn't cover any short position.
+        When buying, it's the percentage of `cash_now`. 
+        When selling, it's the percentage of `shares_now`.
+        When short selling, it's the percentage of the remaining free cash.
+        When selling and short selling (reversing position), it's the percentage of both.
 """
 
 
@@ -712,6 +714,7 @@ class Order(tp.NamedTuple):
     min_size: float
     max_size: float
     reject_prob: float
+    lock_cash: bool
     allow_partial: bool
     raise_reject: bool
     log: bool
@@ -727,7 +730,8 @@ __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
 __pdoc__['Order.min_size'] = "Minimum size in both directions. Lower than that will be rejected."
 __pdoc__['Order.max_size'] = "Maximum size in both directions. Higher than that will be partly filled."
-__pdoc__['Order.reject_prob'] = "Probability of rejecting this order to simulate a random event."
+__pdoc__['Order.reject_prob'] = "Probability of rejecting this order to simulate a random rejection event."
+__pdoc__['Order.lock_cash'] = "Whether to lock cash when shorting. Keeps free cash from turning negative."
 __pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
 __pdoc__['Order.raise_reject'] = "Whether to raise exception if order has been rejected."
 __pdoc__['Order.log'] = "Whether to log this order by filling a log record. Remember to increase `max_logs`."
@@ -743,6 +747,7 @@ NoOrder = Order(
     np.nan,
     np.nan,
     np.nan,
+    False,
     False,
     False,
     False
@@ -1035,6 +1040,7 @@ _log_fields = [
     ('min_size', np.float_),
     ('max_size', np.float_),
     ('reject_prob', np.float_),
+    ('lock_cash', np.bool_),
     ('allow_partial', np.bool_),
     ('raise_reject', np.bool_),
     ('log', np.bool_),

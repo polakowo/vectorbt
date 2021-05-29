@@ -304,7 +304,7 @@ class Records(Wrapping):
         self._idx_field = idx_field
         self._col_mapper = ColumnMapper(wrapper, records_arr['col'])
 
-    def _col_idxs_records(self, col_idxs: tp.Array1d) -> tp.RecordArray:
+    def get_by_col_idxs(self, col_idxs: tp.Array1d) -> tp.RecordArray:
         """Get records corresponding to column indices.
 
         Returns new records array."""
@@ -320,7 +320,7 @@ class Records(Wrapping):
         """Perform indexing on `Records` and return metadata."""
         new_wrapper, _, group_idxs, col_idxs = \
             self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
-        new_records_arr = self._col_idxs_records(col_idxs)
+        new_records_arr = self.get_by_col_idxs(col_idxs)
         return new_wrapper, new_records_arr, group_idxs, col_idxs
 
     def indexing_func(self: RecordsT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> RecordsT:

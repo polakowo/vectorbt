@@ -247,6 +247,7 @@ settings = SettingsConfig(
             reject_prob=0.,
             min_size=1e-8,
             max_size=np.inf,
+            lock_cash=False,
             allow_partial=True,
             raise_reject=False,
             close_first=False,

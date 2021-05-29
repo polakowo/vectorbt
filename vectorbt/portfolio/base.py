@@ -525,8 +525,8 @@ class Portfolio(Wrapping):
         new_wrapper, _, group_idxs, col_idxs = \
             self.wrapper.indexing_func_meta(pd_indexing_func, column_only_select=True, **kwargs)
         new_close = new_wrapper.wrap(to_2d(self.close, raw=True)[:, col_idxs], group_by=False)
-        new_order_records = self.orders._col_idxs_records(col_idxs)
-        new_log_records = self.logs._col_idxs_records(col_idxs)
+        new_order_records = self.orders.get_by_col_idxs(col_idxs)
+        new_log_records = self.logs.get_by_col_idxs(col_idxs)
         if isinstance(self._init_cash, int):
             new_init_cash = self._init_cash
         else:
@@ -630,6 +630,7 @@ class Portfolio(Wrapping):
                      min_size: tp.Optional[tp.ArrayLike] = None,
                      max_size: tp.Optional[tp.ArrayLike] = None,
                      reject_prob: tp.Optional[tp.ArrayLike] = None,
+                     lock_cash: tp.Optional[tp.ArrayLike] = None,
                      allow_partial: tp.Optional[tp.ArrayLike] = None,
                      raise_reject: tp.Optional[tp.ArrayLike] = None,
                      log: tp.Optional[tp.ArrayLike] = None,
@@ -713,6 +714,8 @@ class Portfolio(Wrapping):
                 Will be partially filled if exceeded. You might not be able to properly close
                 the position if accumulation is enabled and `max_size` is too low.
             reject_prob (float or array_like): Order rejection probability.
+                Will broadcast.
+            lock_cash (bool or array_like): Whether to lock cash when shorting.
                 Will broadcast.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
@@ -1000,6 +1003,8 @@ class Portfolio(Wrapping):
             max_size = portfolio_cfg['max_size']
         if reject_prob is None:
             reject_prob = portfolio_cfg['reject_prob']
+        if lock_cash is None:
+            lock_cash = portfolio_cfg['lock_cash']
         if allow_partial is None:
             allow_partial = portfolio_cfg['allow_partial']
         if raise_reject is None:
@@ -1064,6 +1069,7 @@ class Portfolio(Wrapping):
             min_size,
             max_size,
             reject_prob,
+            lock_cash,
             allow_partial,
             raise_reject,
             log,
@@ -1133,6 +1139,7 @@ class Portfolio(Wrapping):
                     min_size: tp.Optional[tp.ArrayLike] = None,
                     max_size: tp.Optional[tp.ArrayLike] = None,
                     reject_prob: tp.Optional[tp.ArrayLike] = None,
+                    lock_cash: tp.Optional[tp.ArrayLike] = None,
                     allow_partial: tp.Optional[tp.ArrayLike] = None,
                     raise_reject: tp.Optional[tp.ArrayLike] = None,
                     log: tp.Optional[tp.ArrayLike] = None,
@@ -1204,6 +1211,8 @@ class Portfolio(Wrapping):
 
                 Will be partially filled if exceeded.
             reject_prob (float or array_like): Order rejection probability.
+                Will broadcast.
+            lock_cash (bool or array_like): Whether to lock cash when shorting.
                 Will broadcast.
             allow_partial (bool or array_like): Whether to allow partial fills.
                 Will broadcast.
@@ -1403,6 +1412,8 @@ class Portfolio(Wrapping):
             max_size = portfolio_cfg['max_size']
         if reject_prob is None:
             reject_prob = portfolio_cfg['reject_prob']
+        if lock_cash is None:
+            lock_cash = portfolio_cfg['lock_cash']
         if allow_partial is None:
             allow_partial = portfolio_cfg['allow_partial']
         if raise_reject is None:
@@ -1458,6 +1469,7 @@ class Portfolio(Wrapping):
             min_size,
             max_size,
             reject_prob,
+            lock_cash,
             allow_partial,
             raise_reject,
             log,

@@ -97,37 +97,32 @@ def order_not_filled_nb(status: int, status_info: int) -> OrderResult:
 
 @njit(cache=True)
 def buy_shares_nb(exec_state: ExecuteOrderState,
-                  cash_limit: float,
                   size: float,
-                  direction: int,
                   price: float,
-                  fees: float,
-                  fixed_fees: float,
-                  slippage: float,
-                  min_size: float,
-                  allow_partial: bool) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+                  direction: int = Direction.All,
+                  fees: float = 0.,
+                  fixed_fees: float = 0.,
+                  slippage: float = 0.,
+                  min_size: float = 0.,
+                  max_size: float = 0.,
+                  allow_partial: bool = True,
+                  percent: float = np.nan) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Buy or/and cover shares."""
 
+    # Set cash limit
+    cash_limit = exec_state.cash
+    if not np.isnan(percent):
+        # Apply percentage
+        cash_limit = min(cash_limit, percent * cash_limit)
+
     if direction == Direction.LongOnly or direction == Direction.All:
-        if is_close_nb(exec_state.cash, 0):
-            new_exec_state = ExecuteOrderState(
-                cash=0.,
-                shares=exec_state.shares,
-                debt=exec_state.debt,
-                free_cash=exec_state.free_cash
-            )
-            return new_exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashLong)
-        if np.isinf(size) and np.isinf(exec_state.cash):
+        if cash_limit == 0:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashLong)
+        if np.isinf(size) and np.isinf(cash_limit):
             raise ValueError("Attempt to go in long direction infinitely")
     else:
-        if is_close_nb(exec_state.shares, 0):
-            new_exec_state = ExecuteOrderState(
-                cash=exec_state.cash,
-                shares=0.,
-                debt=exec_state.debt,
-                free_cash=exec_state.free_cash
-            )
-            return new_exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
+        if exec_state.shares == 0:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
 
     # Get price adjusted with slippage
     adj_price = price * (1 + slippage)
@@ -138,8 +133,14 @@ def buy_shares_nb(exec_state: ExecuteOrderState,
     else:
         adj_size = size
 
-    # Set cash limit
-    cash_limit = min(exec_state.cash, cash_limit)
+    if adj_size == 0:
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
+
+    if adj_size > max_size:
+        if not allow_partial:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
+
+        adj_size = max_size
 
     # Get cash required to complete this order
     req_cash = adj_size * adj_price
@@ -153,18 +154,15 @@ def buy_shares_nb(exec_state: ExecuteOrderState,
         final_cash = adj_req_cash
     else:
         # Insufficient amount of cash, size will be less than requested
-        if is_close_or_less_nb(cash_limit, fixed_fees):
+
+        # For fees of 10% and 1$ per transaction, you can buy shares for 90$ (new_req_cash)
+        # to spend 100$ (cash_limit) in total
+        new_req_cash = add_nb(cash_limit, -fixed_fees) / (1 + fees)
+        if new_req_cash <= 0:
             return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
 
-        # For fees of 10% and 1$ per transaction, you can buy shares for 90$ (final_cash)
-        # to spend 100$ (cash_limit) in total
-        new_req_cash = (cash_limit - fixed_fees) / (1 + fees)
-
-        # Update size and fees
         final_size = new_req_cash / adj_price
         fees_paid = cash_limit - new_req_cash
-
-        # Update final cash
         final_cash = cash_limit
 
     # Check against minimum size
@@ -181,9 +179,14 @@ def buy_shares_nb(exec_state: ExecuteOrderState,
 
     # Update current debt and free cash
     if exec_state.shares < 0:
-        new_debt = add_nb(max(exec_state.debt, final_cash), -final_cash)
-        free_cash_change = add_nb(2 * min(exec_state.debt, final_cash), -final_cash)
-        new_free_cash = add_nb(exec_state.free_cash, free_cash_change)
+        if new_shares < 0:
+            short_size = final_size
+        else:
+            short_size = abs(exec_state.shares)
+        avg_entry_price = exec_state.debt / abs(exec_state.shares)
+        debt_diff = short_size * avg_entry_price
+        new_debt = add_nb(exec_state.debt, -debt_diff)
+        new_free_cash = add_nb(exec_state.free_cash + 2 * debt_diff, -final_cash)
     else:
         new_debt = exec_state.debt
         new_free_cash = add_nb(exec_state.free_cash, -final_cash)
@@ -209,27 +212,17 @@ def buy_shares_nb(exec_state: ExecuteOrderState,
 @njit(cache=True)
 def sell_shares_nb(exec_state: ExecuteOrderState,
                    size: float,
-                   direction: int,
                    price: float,
-                   fees: float,
-                   fixed_fees: float,
-                   slippage: float,
-                   min_size: float,
-                   allow_partial: bool) -> tp.Tuple[ExecuteOrderState, OrderResult]:
+                   direction: int = Direction.All,
+                   fees: float = 0.,
+                   fixed_fees: float = 0.,
+                   slippage: float = 0.,
+                   min_size: float = 0.,
+                   max_size: float = np.inf,
+                   lock_cash: bool = False,
+                   allow_partial: bool = True,
+                   percent: float = np.nan) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Sell or/and short sell shares."""
-
-    if direction == Direction.ShortOnly or direction == Direction.All:
-        if np.isinf(size):
-            raise ValueError("Attempt to go in short direction infinitely")
-    else:
-        if is_close_nb(exec_state.shares, 0):
-            new_exec_state = ExecuteOrderState(
-                cash=exec_state.cash,
-                shares=0.,
-                debt=exec_state.debt,
-                free_cash=exec_state.free_cash
-            )
-            return new_exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
 
     # Get price adjusted with slippage
     adj_price = price * (1 - slippage)
@@ -238,7 +231,61 @@ def sell_shares_nb(exec_state: ExecuteOrderState,
     if direction == Direction.LongOnly:
         size_limit = min(exec_state.shares, size)
     else:
-        size_limit = size
+        if lock_cash or (np.isinf(size) and not np.isnan(percent)):
+            # Get the maximum size that can be (short) sold
+            long_size = max(exec_state.shares, 0)
+            long_cash = long_size * adj_price * (1 - fees)
+            total_free_cash = add_nb(exec_state.free_cash, long_cash)
+
+            if total_free_cash <= 0:
+                if exec_state.shares <= 0:
+                    # There is nothing to sell, and no free cash to short sell
+                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashShort)
+
+                # There are shares to sell, but no free cash to short sell
+                max_size_limit = long_size
+            else:
+                # There are shares to sell and/or free cash to short sell
+                max_short_size = add_nb(total_free_cash, -fixed_fees) / (adj_price * (1 + fees))
+                max_size_limit = add_nb(long_size, max_short_size)
+                if max_size_limit <= 0:
+                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
+
+            if lock_cash:
+                # Size has upper limit
+                if np.isinf(size) and not np.isnan(percent):
+                    size_limit = min(percent * max_size_limit, max_size_limit)
+                    percent = np.nan
+                elif not np.isnan(percent):
+                    size_limit = min(percent * size, max_size_limit)
+                    percent = np.nan
+                else:
+                    size_limit = min(size, max_size_limit)
+            else:  # np.isinf(size) and not np.isnan(percent)
+                # Size has no upper limit
+                size_limit = max_size_limit
+        else:
+            size_limit = size
+
+    if not np.isnan(percent):
+        # Apply percentage
+        size_limit = percent * size_limit
+
+    if size_limit > max_size:
+        if not allow_partial:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
+
+        size_limit = max_size
+
+    if direction == Direction.ShortOnly or direction == Direction.All:
+        if np.isinf(size_limit):
+            raise ValueError("Attempt to go in short direction infinitely")
+    else:
+        if exec_state.shares == 0:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
+
+    if is_close_nb(size_limit, 0):
+        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
 
     # Check against minimum size
     if is_less_nb(size_limit, min_size):
@@ -255,9 +302,9 @@ def sell_shares_nb(exec_state: ExecuteOrderState,
     fees_paid = acq_cash * fees + fixed_fees
 
     # Get final cash by subtracting costs
-    if is_less_nb(acq_cash, fees_paid):
+    final_cash = add_nb(acq_cash, -fees_paid)
+    if final_cash < 0:
         return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.CantCoverFees)
-    final_cash = acq_cash - fees_paid
 
     # Update current cash and shares
     new_cash = exec_state.cash + final_cash
@@ -265,10 +312,14 @@ def sell_shares_nb(exec_state: ExecuteOrderState,
 
     # Update current debt and free cash
     if new_shares < 0:
-        short_size = get_short_size_nb(exec_state.shares, new_shares)
+        if exec_state.shares < 0:
+            short_size = size_limit
+        else:
+            short_size = abs(new_shares)
         short_value = short_size * adj_price
         new_debt = exec_state.debt + short_value
-        new_free_cash = exec_state.free_cash + add_nb(final_cash, -2 * short_value)
+        free_cash_change = add_nb(final_cash, -2 * short_value)
+        new_free_cash = add_nb(exec_state.free_cash, free_cash_change)
     else:
         new_debt = exec_state.debt
         new_free_cash = exec_state.free_cash + final_cash
@@ -303,11 +354,31 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
     Order is ignored if its execution has no effect on current balance.
     Order is rejected if an input goes over a limit/restriction.
     """
+    # numerical stability
+    cash = state.cash
+    if is_close_nb(cash, 0):
+        cash = 0.
+    shares = state.shares
+    if is_close_nb(shares, 0):
+        shares = 0.
+    debt = state.debt
+    if is_close_nb(debt, 0):
+        debt = 0.
+    free_cash = state.free_cash
+    if is_close_nb(free_cash, 0):
+        free_cash = 0.
+    val_price = state.val_price
+    if is_close_nb(val_price, 0):
+        val_price = 0.
+    value = state.value
+    if is_close_nb(value, 0):
+        value = 0.
+
     exec_state = ExecuteOrderState(
-        cash=state.cash,
-        shares=state.shares,
-        debt=state.debt,
-        free_cash=state.free_cash
+        cash=cash,
+        shares=shares,
+        debt=debt,
+        free_cash=free_cash
     )
     
     if np.isnan(order.size):
@@ -316,13 +387,13 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.PriceNaN)
 
     # Check execution state
-    if np.isnan(state.cash) or state.cash < 0:
+    if np.isnan(cash) or cash < 0:
         raise ValueError("cash_now cannot be NaN and must be greater than 0")
-    if not np.isfinite(state.shares):
+    if not np.isfinite(shares):
         raise ValueError("shares_now must be finite")
-    if not np.isfinite(state.debt) or state.debt < 0:
+    if not np.isfinite(debt) or debt < 0:
         raise ValueError("debt must be finite and 0 or greater")
-    if np.isnan(state.free_cash):
+    if np.isnan(free_cash):
         raise ValueError("free_cash cannot be NaN")
 
     # Check order
@@ -330,9 +401,9 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         raise ValueError("order.size_type is invalid")
     if order.direction < 0 or order.direction >= len(Direction):
         raise ValueError("order.direction is invalid")
-    if order.direction == Direction.LongOnly and state.shares < 0:
+    if order.direction == Direction.LongOnly and shares < 0:
         raise ValueError("shares_now is negative but order.direction is Direction.LongOnly")
-    if order.direction == Direction.ShortOnly and state.shares > 0:
+    if order.direction == Direction.ShortOnly and shares > 0:
         raise ValueError("shares_now is positive but order.direction is Direction.ShortOnly")
     if not np.isfinite(order.price) or order.price <= 0:
         raise ValueError("order.price must be finite and greater than 0")
@@ -358,27 +429,27 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
 
     if order_size_type == SizeType.TargetPercent:
         # Target percentage of current value
-        if np.isnan(state.value):
+        if np.isnan(value):
             return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValueNaN)
-        if state.value <= 0:
+        if value <= 0:
             return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.ValueZeroNeg)
 
-        order_size *= state.value
+        order_size *= value
         order_size_type = SizeType.TargetValue
 
     if order_size_type == SizeType.TargetValue:
         # Target value
-        if np.isinf(state.val_price) or state.val_price <= 0:
+        if np.isinf(val_price) or val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
-        if np.isnan(state.val_price):
+        if np.isnan(val_price):
             return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValPriceNaN)
 
-        order_size /= state.val_price
+        order_size /= val_price
         order_size_type = SizeType.TargetShares
 
     if order_size_type == SizeType.TargetShares:
         # Target amount of shares
-        order_size -= state.shares
+        order_size -= shares
         order_size_type = SizeType.Shares
 
     if order_size_type == SizeType.Shares:
@@ -388,62 +459,46 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
                 order_size = -1.
                 order_size_type = SizeType.Percent
 
-    cash_limit = np.inf
+    percent = np.nan
     if order_size_type == SizeType.Percent:
         # Percentage of resources
-        if order_size > 0:
-            # Percentage of available cash
-            cash_limit = order_size * state.cash
-            order_size = np.inf
-        elif order_size < 0:
-            if order.direction == Direction.ShortOnly or order.direction == Direction.All:
-                # Percentage of available cash that can cover this short position
-                order_size *= 2 * state.shares + state.cash / order.price
-                if order_size >= 0:
-                    return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoCashShort)
-            else:
-                # Percentage of available shares to sell
-                order_size *= abs(state.shares)
+        percent = abs(order_size)
+        order_size = np.sign(order_size) * np.inf
         order_size_type = SizeType.Shares
-
-    if is_close_nb(order_size, 0):
-        return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.SizeZero)
-
-    if abs(order_size) > order.max_size:
-        if not order.allow_partial:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.MaxSizeExceeded)
-
-        order_size = np.sign(order_size) * order.max_size
-
-    if order.reject_prob > 0:
-        if np.random.uniform(0, 1) < order.reject_prob:
-            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.RandomEvent)
 
     if order_size > 0:
         new_exec_state, order_result = buy_shares_nb(
             exec_state,
-            cash_limit,
             order_size,
-            order.direction,
             order.price,
-            order.fees,
-            order.fixed_fees,
-            order.slippage,
-            order.min_size,
-            order.allow_partial
+            direction=order.direction,
+            fees=order.fees,
+            fixed_fees=order.fixed_fees,
+            slippage=order.slippage,
+            min_size=order.min_size,
+            max_size=order.max_size,
+            allow_partial=order.allow_partial,
+            percent=percent
         )
     else:
         new_exec_state, order_result = sell_shares_nb(
             exec_state,
             -order_size,
-            order.direction,
             order.price,
-            order.fees,
-            order.fixed_fees,
-            order.slippage,
-            order.min_size,
-            order.allow_partial
+            direction=order.direction,
+            fees=order.fees,
+            fixed_fees=order.fixed_fees,
+            slippage=order.slippage,
+            min_size=order.min_size,
+            max_size=order.max_size,
+            lock_cash=order.lock_cash,
+            allow_partial=order.allow_partial,
+            percent=percent
         )
+
+    if order.reject_prob > 0:
+        if np.random.uniform(0, 1) < order.reject_prob:
+            return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.RandomEvent)
 
     return new_exec_state, order_result
 
@@ -491,6 +546,7 @@ def fill_log_record_nb(record: tp.Record,
     record['min_size'] = order.min_size
     record['max_size'] = order.max_size
     record['reject_prob'] = order.reject_prob
+    record['lock_cash'] = order.lock_cash
     record['allow_partial'] = order.allow_partial
     record['raise_reject'] = order.raise_reject
     record['log'] = order.log
@@ -665,25 +721,27 @@ def create_order_nb(size: float,
                     min_size: float = 0.,
                     max_size: float = np.inf,
                     reject_prob: float = 0.,
+                    lock_cash: bool = False,
                     allow_partial: bool = True,
                     raise_reject: bool = False,
                     log: bool = False) -> Order:
     """Create an order with some defaults."""
 
     return Order(
-        float(size),
-        size_type,
-        direction,
-        float(price),
-        float(fees),
-        float(fixed_fees),
-        float(slippage),
-        float(min_size),
-        float(max_size),
-        float(reject_prob),
-        allow_partial,
-        raise_reject,
-        log
+        size=float(size),
+        size_type=size_type,
+        direction=direction,
+        price=float(price),
+        fees=float(fees),
+        fixed_fees=float(fixed_fees),
+        slippage=float(slippage),
+        min_size=float(min_size),
+        max_size=float(max_size),
+        reject_prob=float(reject_prob),
+        lock_cash=lock_cash,
+        allow_partial=allow_partial,
+        raise_reject=raise_reject,
+        log=log
     )
 
 
@@ -826,6 +884,7 @@ def approx_order_value_nb(size: float,
                           size_type: int,
                           cash_now: float,
                           shares_now: float,
+                          free_cash_now: float,
                           val_price_now: float,
                           value_now: float,
                           direction: int) -> float:
@@ -841,7 +900,7 @@ def approx_order_value_nb(size: float,
         else:
             if direction == Direction.LongOnly:
                 return size * holding_value_now
-            return size * (2 * holding_value_now + cash_now)
+            return size * (2 * max(holding_value_now, 0) + max(free_cash_now, 0))
     if size_type == SizeType.TargetShares:
         return size * val_price_now - holding_value_now
     if size_type == SizeType.TargetValue:
@@ -887,11 +946,16 @@ def sort_call_seq_nb(seg_ctx: SegmentContext,
             cash_now = seg_ctx.last_cash[seg_ctx.group]
         else:
             cash_now = seg_ctx.last_cash[col]
+        if seg_ctx.cash_sharing:
+            free_cash_now = seg_ctx.last_free_cash[seg_ctx.group]
+        else:
+            free_cash_now = seg_ctx.last_free_cash[col]
         order_value_out[k] = approx_order_value_nb(
             flex_select_auto_nb(k, 0, size_arr, False),
             flex_select_auto_nb(k, 0, size_type_arr, False),
             cash_now,
             seg_ctx.last_shares[col],
+            free_cash_now,
             seg_ctx.last_val_price[col],
             group_value_now,
             flex_select_auto_nb(k, 0, direction_arr, False)
@@ -1928,6 +1992,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                             min_size: tp.ArrayLike = 0.,
                             max_size: tp.ArrayLike = np.inf,
                             reject_prob: tp.ArrayLike = 0.,
+                            lock_cash: tp.ArrayLike = False,
                             allow_partial: tp.ArrayLike = True,
                             raise_reject: tp.ArrayLike = False,
                             log: tp.ArrayLike = False,
@@ -1984,6 +2049,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                             flex_select_auto_nb(i, col, size_type, flex_2d),
                             cash_now,
                             last_shares[col],
+                            free_cash_now,
                             flex_select_auto_nb(i, col, val_price, flex_2d),
                             value_now,
                             flex_select_auto_nb(i, col, direction, flex_2d)
@@ -2021,6 +2087,7 @@ def simulate_from_orders_nb(target_shape: tp.Shape,
                     min_size=flex_select_auto_nb(i, col, min_size, flex_2d),
                     max_size=flex_select_auto_nb(i, col, max_size, flex_2d),
                     reject_prob=flex_select_auto_nb(i, col, reject_prob, flex_2d),
+                    lock_cash=flex_select_auto_nb(i, col, lock_cash, flex_2d),
                     allow_partial=flex_select_auto_nb(i, col, allow_partial, flex_2d),
                     raise_reject=flex_select_auto_nb(i, col, raise_reject, flex_2d),
                     log=flex_select_auto_nb(i, col, log, flex_2d)
@@ -2193,6 +2260,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                              min_size: tp.ArrayLike = 0.,
                              max_size: tp.ArrayLike = np.inf,
                              reject_prob: tp.ArrayLike = 0.,
+                             lock_cash: tp.ArrayLike = False,
                              allow_partial: tp.ArrayLike = True,
                              raise_reject: tp.ArrayLike = False,
                              log: tp.ArrayLike = False,
@@ -2318,6 +2386,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         min_size=flex_select_auto_nb(i, col, min_size, flex_2d),
                         max_size=flex_select_auto_nb(i, col, max_size, flex_2d),
                         reject_prob=flex_select_auto_nb(i, col, reject_prob, flex_2d),
+                        lock_cash=flex_select_auto_nb(i, col, lock_cash, flex_2d),
                         allow_partial=flex_select_auto_nb(i, col, allow_partial, flex_2d),
                         raise_reject=flex_select_auto_nb(i, col, raise_reject, flex_2d),
                         log=flex_select_auto_nb(i, col, log, flex_2d)
@@ -2938,28 +3007,36 @@ def get_free_cash_change_nb(shares_before: float,
                             fees: float) -> tp.Tuple[float, float]:
     """Get updated debt and change in free cash."""
     size = add_nb(shares_now, -shares_before)
-    value = size * price
-    abs_value = abs(value)
-    short_size = get_short_size_nb(shares_before, shares_now)
-    short_value = short_size * price
-
-    if not is_close_nb(short_size, 0):
-        if short_size > 0:
-            debt_now += short_value
-            free_cash_change = add_nb(abs_value, -2 * short_value)
-        else:
-            if is_close_nb(abs_value, debt_now):
-                abs_value = debt_now
-            if abs_value >= debt_now:
-                free_cash_change = add_nb(2 * debt_now, -abs_value)
-                debt_now = 0.
+    final_cash = -size * price - fees
+    if is_close_nb(size, 0):
+        new_debt = debt_now
+        free_cash_change = 0.
+    elif size > 0:
+        if shares_before < 0:
+            if shares_now < 0:
+                short_size = abs(size)
             else:
-                free_cash_change = abs_value
-                debt_now -= abs_value
+                short_size = abs(shares_before)
+            avg_entry_price = debt_now / abs(shares_before)
+            debt_diff = short_size * avg_entry_price
+            new_debt = add_nb(debt_now, -debt_diff)
+            free_cash_change = add_nb(2 * debt_diff, final_cash)
+        else:
+            new_debt = debt_now
+            free_cash_change = final_cash
     else:
-        free_cash_change = -value
-    free_cash_change -= fees
-    return debt_now, free_cash_change
+        if shares_now < 0:
+            if shares_before < 0:
+                short_size = abs(size)
+            else:
+                short_size = abs(shares_now)
+            short_value = short_size * price
+            new_debt = debt_now + short_value
+            free_cash_change = add_nb(final_cash, -2 * short_value)
+        else:
+            new_debt = debt_now
+            free_cash_change = final_cash
+    return new_debt, free_cash_change
 
 
 @njit(cache=True)

@@ -66,6 +66,7 @@ class Logs(Records):
             ('Order', 'Min Size'),
             ('Order', 'Max Size'),
             ('Order', 'Rejection Prob'),
+            ('Order', 'Lock Cash'),
             ('Order', 'Allow Partial'),
             ('Order', 'Raise Rejection'),
             ('Order', 'Log'),
@@ -107,20 +108,21 @@ class Logs(Records):
         out.iloc[:, 17] = records_df['min_size']
         out.iloc[:, 18] = records_df['max_size']
         out.iloc[:, 19] = records_df['reject_prob']
-        out.iloc[:, 20] = records_df['allow_partial']
-        out.iloc[:, 21] = records_df['raise_reject']
-        out.iloc[:, 22] = records_df['log']
-        out.iloc[:, 23] = records_df['new_cash']
-        out.iloc[:, 24] = records_df['new_shares']
-        out.iloc[:, 25] = records_df['new_debt']
-        out.iloc[:, 26] = records_df['new_free_cash']
-        out.iloc[:, 27] = records_df['new_val_price']
-        out.iloc[:, 28] = records_df['new_value']
-        out.iloc[:, 29] = records_df['res_size']
-        out.iloc[:, 30] = records_df['res_price']
-        out.iloc[:, 31] = records_df['res_fees']
-        out.iloc[:, 32] = map_enum(records_df['res_side'], OrderSide)
-        out.iloc[:, 33] = map_enum(records_df['res_status'], OrderStatus)
-        out.iloc[:, 34] = map_enum(records_df['res_status_info'], StatusInfo)
-        out.iloc[:, 35] = records_df['order_id']
+        out.iloc[:, 20] = records_df['lock_cash']
+        out.iloc[:, 21] = records_df['allow_partial']
+        out.iloc[:, 22] = records_df['raise_reject']
+        out.iloc[:, 23] = records_df['log']
+        out.iloc[:, 24] = records_df['new_cash']
+        out.iloc[:, 25] = records_df['new_shares']
+        out.iloc[:, 26] = records_df['new_debt']
+        out.iloc[:, 27] = records_df['new_free_cash']
+        out.iloc[:, 28] = records_df['new_val_price']
+        out.iloc[:, 29] = records_df['new_value']
+        out.iloc[:, 30] = records_df['res_size']
+        out.iloc[:, 31] = records_df['res_price']
+        out.iloc[:, 32] = records_df['res_fees']
+        out.iloc[:, 33] = map_enum(records_df['res_side'], OrderSide)
+        out.iloc[:, 34] = map_enum(records_df['res_status'], OrderStatus)
+        out.iloc[:, 35] = map_enum(records_df['res_status_info'], StatusInfo)
+        out.iloc[:, 36] = records_df['order_id']
         return out
