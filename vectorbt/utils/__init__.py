@@ -1,6 +1,7 @@
 """Modules with utilities that are used throughout vectorbt."""
 
 from vectorbt.utils.config import atomic_dict, merge_dicts, Config, Configured, AtomicConfig
+from vectorbt.utils.template import Rep, Sub
 from vectorbt.utils.decorators import CacheCondition, cached_property, cached_method
 from vectorbt.utils.figure import Figure, FigureWidget, make_figure, make_subplots
 from vectorbt.utils.random import set_seed
@@ -13,6 +14,8 @@ __all__ = [
     'Config',
     'Configured',
     'AtomicConfig',
+    'Rep',
+    'Sub',
     'CacheCondition',
     'cached_property',
     'cached_method',

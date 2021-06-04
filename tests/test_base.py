@@ -929,21 +929,21 @@ class TestWrapping:
         )
         assert df4_grouped_wrapping.regroup(False).wrapper.grouper.group_by is None
 
-    def test_select_series(self):
-        assert sr2_wrapping.select_series() == sr2_wrapping
-        assert sr2_grouped_wrapping.select_series() == sr2_grouped_wrapping
+    def test_select_one(self):
+        assert sr2_wrapping.select_one() == sr2_wrapping
+        assert sr2_grouped_wrapping.select_one() == sr2_grouped_wrapping
         pd.testing.assert_index_equal(
-            df4_wrapping.select_series(column='a6').wrapper.get_columns(),
+            df4_wrapping.select_one(column='a6').wrapper.get_columns(),
             pd.Index(['a6'], dtype='object', name='c6')
         )
         pd.testing.assert_index_equal(
-            df4_grouped_wrapping.select_series(column='g1').wrapper.get_columns(),
+            df4_grouped_wrapping.select_one(column='g1').wrapper.get_columns(),
             pd.Index(['g1'], dtype='object')
         )
         with pytest.raises(Exception) as e_info:
-            df4_wrapping.select_series()
+            df4_wrapping.select_one()
         with pytest.raises(Exception) as e_info:
-            df4_grouped_wrapping.select_series()
+            df4_grouped_wrapping.select_one()
 
 
 # ############# index_fns.py ############# #

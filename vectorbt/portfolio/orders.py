@@ -185,13 +185,15 @@ class Orders(Records):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_series(column=column, group_by=False)
+        self_col = self.select_one(column=column, group_by=False)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(dict(
-            line_color=plotting_cfg['color_schema']['blue'],
-            name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
+            line=dict(
+                color=plotting_cfg['color_schema']['blue']
+            ),
+            name='Close'
         ), close_trace_kwargs)
         if buy_trace_kwargs is None:
             buy_trace_kwargs = {}

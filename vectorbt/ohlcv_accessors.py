@@ -135,8 +135,16 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             low=low,
             close=close,
             name=plot_type,
-            increasing_line_color=plotting_cfg['color_schema']['increasing'],
-            decreasing_line_color=plotting_cfg['color_schema']['decreasing']
+            increasing=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['increasing']
+                )
+            ),
+            decreasing=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['decreasing']
+                )
+            )
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **ohlc_add_trace_kwargs)

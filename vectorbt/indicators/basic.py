@@ -124,7 +124,7 @@ class _MA(MA):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -136,7 +136,9 @@ class _MA(MA):
             ma_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(dict(
             name='Close',
-            line_color=plotting_cfg['color_schema']['blue']
+            line=dict(
+                color=plotting_cfg['color_schema']['blue']
+            )
         ), close_trace_kwargs)
         ma_trace_kwargs = merge_dicts(dict(
             name='MA'
@@ -205,7 +207,7 @@ class _MSTD(MSTD):
 
         ![](/vectorbt/docs/img/MSTD.svg)
         """
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -299,7 +301,7 @@ class _BBANDS(BBANDS):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -315,11 +317,15 @@ class _BBANDS(BBANDS):
             lower_trace_kwargs = {}
         lower_trace_kwargs = merge_dicts(dict(
             name='Lower Band',
-            line_color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75),
+            line=dict(
+                color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75)
+            ),
         ), lower_trace_kwargs)
         upper_trace_kwargs = merge_dicts(dict(
             name='Upper Band',
-            line_color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75),
+            line=dict(
+                color=adjust_opacity(plotting_cfg['color_schema']['gray'], 0.75)
+            ),
             fill='tonexty',
             fillcolor='rgba(128, 128, 128, 0.2)'
         ), upper_trace_kwargs)  # default kwargs
@@ -410,7 +416,7 @@ class _RSI(RSI):
 
         ![](/vectorbt/docs/img/RSI.svg)
         """
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -513,7 +519,7 @@ class _STOCH(STOCH):
 
         ![](/vectorbt/docs/img/STOCH.svg)
         """
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -625,7 +631,7 @@ class _MACD(MACD):
         ```
 
         ![](/vectorbt/docs/img/MACD.svg)"""
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -737,7 +743,7 @@ class _ATR(ATR):
 
         ![](/vectorbt/docs/img/ATR.svg)
         """
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()
@@ -810,7 +816,7 @@ class _OBV(OBV):
 
         ![](/vectorbt/docs/img/OBV.svg)
         """
-        self_col = self.select_series(column=column)
+        self_col = self.select_one(column=column)
 
         if fig is None:
             fig = make_figure()

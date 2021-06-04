@@ -1402,8 +1402,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             pos_obj[~pos_mask] = other[~pos_mask]
             other.vbt.plot(
                 trace_kwargs=merge_dicts(dict(
-                    line_color='rgba(0, 0, 0, 0)',
-                    line_width=0,
+                    line=dict(
+                        color='rgba(0, 0, 0, 0)',
+                        width=0
+                    ),
                     opacity=0,
                     hoverinfo='skip',
                     showlegend=False,
@@ -1415,8 +1417,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             pos_obj.vbt.plot(
                 trace_kwargs=merge_dicts(dict(
                     fillcolor='rgba(0, 128, 0, 0.3)',
-                    line_color='rgba(0, 0, 0, 0)',
-                    line_width=0,
+                    line=dict(
+                        color='rgba(0, 0, 0, 0)',
+                        width=0
+                    ),
                     opacity=0,
                     fill='tonexty',
                     connectgaps=False,
@@ -1434,8 +1438,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             neg_obj[~neg_mask] = other[~neg_mask]
             other.vbt.plot(
                 trace_kwargs=merge_dicts(dict(
-                    line_color='rgba(0, 0, 0, 0)',
-                    line_width=0,
+                    line=dict(
+                        color='rgba(0, 0, 0, 0)',
+                        width=0
+                    ),
                     opacity=0,
                     hoverinfo='skip',
                     showlegend=False,
@@ -1446,9 +1452,11 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             )
             neg_obj.vbt.plot(
                 trace_kwargs=merge_dicts(dict(
+                    line=dict(
+                        color='rgba(0, 0, 0, 0)',
+                        width=0
+                    ),
                     fillcolor='rgba(255, 0, 0, 0.3)',
-                    line_color='rgba(0, 0, 0, 0)',
-                    line_width=0,
                     opacity=0,
                     fill='tonexty',
                     connectgaps=False,
@@ -1464,8 +1472,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         self.plot(trace_kwargs=trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         if other_trace_kwargs == 'hidden':
             other_trace_kwargs = dict(
-                line_color='rgba(0, 0, 0, 0)',
-                line_width=0,
+                line=dict(
+                    color='rgba(0, 0, 0, 0)',
+                    width=0
+                ),
                 opacity=0.,
                 hoverinfo='skip',
                 showlegend=False,
@@ -1519,7 +1529,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         other.vbt.ts_heatmap(**heatmap_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)
         self.plot(
-            trace_kwargs=merge_dicts(dict(line_color=plotting_cfg['color_schema']['blue']), trace_kwargs),
+            trace_kwargs=merge_dicts(dict(line=dict(color=plotting_cfg['color_schema']['blue'])), trace_kwargs),
             add_trace_kwargs=merge_dicts(dict(secondary_y=True), add_trace_kwargs),
             fig=fig
         )
@@ -1881,7 +1891,9 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 y0=y[0],
                 x1=x[1],
                 y1=y[1],
-                line_color='red'
+                line=dict(
+                    color='red'
+                )
             ), line_shape_kwargs))
 
         return fig

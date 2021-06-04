@@ -25,13 +25,22 @@ def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
 
 
 def get_func_kwargs(func: tp.Callable) -> dict:
-    """Get keyword arguments of the function."""
+    """Get keyword arguments with defaults of a function."""
     signature = inspect.signature(func)
     return {
         k: v.default
         for k, v in signature.parameters.items()
         if v.default is not inspect.Parameter.empty
     }
+
+
+def get_func_arg_names(func: tp.Callable) -> tp.List[str]:
+    """Get argument names of a function."""
+    signature = inspect.signature(func)
+    return [
+        p.name for p in signature.parameters.values()
+        if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
+    ]
 
 
 class atomic_dict(dict):
@@ -702,9 +711,9 @@ class Configured(Pickleable):
             return False
         return self.config == other.config
 
-    def getattr(self, attr_chain: tp.Union[str, tuple, list]) -> tp.Any:
+    def getattr(self, *args, **kwargs) -> tp.Any:
         """See `vectorbt.utils.attr.deep_getattr`."""
-        return deep_getattr(self, attr_chain)
+        return deep_getattr(self, *args, **kwargs)
 
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""

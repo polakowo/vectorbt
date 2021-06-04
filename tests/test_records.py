@@ -282,7 +282,7 @@ class TestMappedArray:
             np.array([0, 3, 8])
         )
 
-    def test_to_matrix(self):
+    def test_to_pd(self):
         target = pd.DataFrame(
             np.array([
                 [10., 13., 12., np.nan],
@@ -293,15 +293,15 @@ class TestMappedArray:
             columns=wrapper.columns
         )
         pd.testing.assert_series_equal(
-            mapped_array['a'].to_matrix(),
+            mapped_array['a'].to_pd(),
             target['a']
         )
         pd.testing.assert_frame_equal(
-            mapped_array.to_matrix(),
+            mapped_array.to_pd(),
             target
         )
         pd.testing.assert_frame_equal(
-            mapped_array.to_matrix(default_val=0.),
+            mapped_array.to_pd(default_val=0.),
             target.fillna(0.)
         )
         mapped_array2 = vbt.MappedArray(
@@ -311,7 +311,47 @@ class TestMappedArray:
             idx_arr=records_arr['idx'].tolist() + [2]
         )
         with pytest.raises(Exception) as e_info:
-            _ = mapped_array2.to_matrix()
+            _ = mapped_array2.to_pd()
+        pd.testing.assert_series_equal(
+            mapped_array['a'].to_pd(ignore_index=True),
+            pd.Series(np.array([10., 11., 12.]), name='a')
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array.to_pd(ignore_index=True),
+            pd.DataFrame(
+                np.array([
+                    [10., 13., 12., np.nan],
+                    [11., 14., 11., np.nan],
+                    [12., 13., 10., np.nan]
+                ]),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array.to_pd(default_val=0, ignore_index=True),
+            pd.DataFrame(
+                np.array([
+                    [10., 13., 12., 0.],
+                    [11., 14., 11., 0.],
+                    [12., 13., 10., 0.]
+                ]),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array_grouped.to_pd(ignore_index=True),
+            pd.DataFrame(
+                np.array([
+                    [10., 12.],
+                    [11., 11.],
+                    [12., 10.],
+                    [13., np.nan],
+                    [14., np.nan],
+                    [13., np.nan],
+                ]),
+                columns=pd.Index(['g1', 'g2'], dtype='object')
+            )
+        )
 
     def test_reduce(self):
         @njit
@@ -523,10 +563,10 @@ class TestMappedArray:
         )
 
     def test_min(self):
-        assert mapped_array['a'].min() == mapped_array['a'].to_matrix().min()
+        assert mapped_array['a'].min() == mapped_array['a'].to_pd().min()
         pd.testing.assert_series_equal(
             mapped_array.min(),
-            mapped_array.to_matrix().min().rename('min')
+            mapped_array.to_pd().min().rename('min')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.min(),
@@ -534,10 +574,10 @@ class TestMappedArray:
         )
 
     def test_max(self):
-        assert mapped_array['a'].max() == mapped_array['a'].to_matrix().max()
+        assert mapped_array['a'].max() == mapped_array['a'].to_pd().max()
         pd.testing.assert_series_equal(
             mapped_array.max(),
-            mapped_array.to_matrix().max().rename('max')
+            mapped_array.to_pd().max().rename('max')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.max(),
@@ -545,10 +585,10 @@ class TestMappedArray:
         )
 
     def test_mean(self):
-        assert mapped_array['a'].mean() == mapped_array['a'].to_matrix().mean()
+        assert mapped_array['a'].mean() == mapped_array['a'].to_pd().mean()
         pd.testing.assert_series_equal(
             mapped_array.mean(),
-            mapped_array.to_matrix().mean().rename('mean')
+            mapped_array.to_pd().mean().rename('mean')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.mean(),
@@ -556,10 +596,10 @@ class TestMappedArray:
         )
 
     def test_median(self):
-        assert mapped_array['a'].median() == mapped_array['a'].to_matrix().median()
+        assert mapped_array['a'].median() == mapped_array['a'].to_pd().median()
         pd.testing.assert_series_equal(
             mapped_array.median(),
-            mapped_array.to_matrix().median().rename('median')
+            mapped_array.to_pd().median().rename('median')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.median(),
@@ -567,14 +607,14 @@ class TestMappedArray:
         )
 
     def test_std(self):
-        assert mapped_array['a'].std() == mapped_array['a'].to_matrix().std()
+        assert mapped_array['a'].std() == mapped_array['a'].to_pd().std()
         pd.testing.assert_series_equal(
             mapped_array.std(),
-            mapped_array.to_matrix().std().rename('std')
+            mapped_array.to_pd().std().rename('std')
         )
         pd.testing.assert_series_equal(
             mapped_array.std(ddof=0),
-            mapped_array.to_matrix().std(ddof=0).rename('std')
+            mapped_array.to_pd().std(ddof=0).rename('std')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.std(),
@@ -582,10 +622,10 @@ class TestMappedArray:
         )
 
     def test_sum(self):
-        assert mapped_array['a'].sum() == mapped_array['a'].to_matrix().sum()
+        assert mapped_array['a'].sum() == mapped_array['a'].to_pd().sum()
         pd.testing.assert_series_equal(
             mapped_array.sum(),
-            mapped_array.to_matrix().sum().rename('sum')
+            mapped_array.to_pd().sum().rename('sum')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.sum(),
@@ -593,10 +633,10 @@ class TestMappedArray:
         )
 
     def test_count(self):
-        assert mapped_array['a'].count() == mapped_array['a'].to_matrix().count()
+        assert mapped_array['a'].count() == mapped_array['a'].to_pd().count()
         pd.testing.assert_series_equal(
             mapped_array.count(),
-            mapped_array.to_matrix().count().rename('count')
+            mapped_array.to_pd().count().rename('count')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.count(),
@@ -604,10 +644,10 @@ class TestMappedArray:
         )
 
     def test_idxmin(self):
-        assert mapped_array['a'].idxmin() == mapped_array['a'].to_matrix().idxmin()
+        assert mapped_array['a'].idxmin() == mapped_array['a'].to_pd().idxmin()
         pd.testing.assert_series_equal(
             mapped_array.idxmin(),
-            mapped_array.to_matrix().idxmin().rename('idxmin')
+            mapped_array.to_pd().idxmin().rename('idxmin')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmin(),
@@ -618,10 +658,10 @@ class TestMappedArray:
         )
 
     def test_idxmax(self):
-        assert mapped_array['a'].idxmax() == mapped_array['a'].to_matrix().idxmax()
+        assert mapped_array['a'].idxmax() == mapped_array['a'].to_pd().idxmax()
         pd.testing.assert_series_equal(
             mapped_array.idxmax(),
-            mapped_array.to_matrix().idxmax().rename('idxmax')
+            mapped_array.to_pd().idxmax().rename('idxmax')
         )
         pd.testing.assert_series_equal(
             mapped_array_grouped.idxmax(),
@@ -634,19 +674,19 @@ class TestMappedArray:
     def test_describe(self):
         pd.testing.assert_series_equal(
             mapped_array['a'].describe(),
-            mapped_array['a'].to_matrix().describe()
+            mapped_array['a'].to_pd().describe()
         )
         pd.testing.assert_frame_equal(
             mapped_array.describe(percentiles=None),
-            mapped_array.to_matrix().describe(percentiles=None)
+            mapped_array.to_pd().describe(percentiles=None)
         )
         pd.testing.assert_frame_equal(
             mapped_array.describe(percentiles=[]),
-            mapped_array.to_matrix().describe(percentiles=[])
+            mapped_array.to_pd().describe(percentiles=[])
         )
         pd.testing.assert_frame_equal(
             mapped_array.describe(percentiles=np.arange(0, 1, 0.1)),
-            mapped_array.to_matrix().describe(percentiles=np.arange(0, 1, 0.1))
+            mapped_array.to_pd().describe(percentiles=np.arange(0, 1, 0.1))
         )
         pd.testing.assert_frame_equal(
             mapped_array_grouped.describe(),
@@ -709,48 +749,6 @@ class TestMappedArray:
                     [1, 0]
                 ]),
                 index=pd.Float64Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype='float64'),
-                columns=pd.Index(['g1', 'g2'], dtype='object')
-            )
-        )
-
-    def test_stack(self):
-        pd.testing.assert_series_equal(
-            mapped_array['a'].stack(),
-            pd.Series(np.array([10., 11., 12.]), name='a')
-        )
-        pd.testing.assert_frame_equal(
-            mapped_array.stack(),
-            pd.DataFrame(
-                np.array([
-                    [10., 13., 12., np.nan],
-                    [11., 14., 11., np.nan],
-                    [12., 13., 10., np.nan]
-                ]),
-                columns=wrapper.columns
-            )
-        )
-        pd.testing.assert_frame_equal(
-            mapped_array.stack(default_val=0),
-            pd.DataFrame(
-                np.array([
-                    [10., 13., 12., 0.],
-                    [11., 14., 11., 0.],
-                    [12., 13., 10., 0.]
-                ]),
-                columns=wrapper.columns
-            )
-        )
-        pd.testing.assert_frame_equal(
-            mapped_array_grouped.stack(),
-            pd.DataFrame(
-                np.array([
-                    [10., 12.],
-                    [11., 11.],
-                    [12., 10.],
-                    [13., np.nan],
-                    [14., np.nan],
-                    [13., np.nan],
-                ]),
                 columns=pd.Index(['g1', 'g2'], dtype='object')
             )
         )
@@ -1297,7 +1295,7 @@ class TestDrawdowns:
             np.array([-0.5, -0.66666667, -0.75, -0.5, -0.66666667, -0.66666667])
         )
         pd.testing.assert_frame_equal(
-            drawdowns.drawdown.to_matrix(),
+            drawdowns.drawdown.to_pd(),
             pd.DataFrame(
                 np.array([
                     [np.nan, np.nan, np.nan, np.nan],
@@ -2509,7 +2507,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('Context', 'Shares')].values,
+            records_readable[('Context', 'Position')].values,
             np.array([
                 0.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, 0.0, 0.0, -1.0, -1.1, -0.10000000000000009, 0.0, 0.0,
                 -1.0, 0.0, 0.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -2555,12 +2553,19 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
+            records_readable[('Order', 'Price')].values,
+            np.array([
+                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
+                6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
+            ])
+        )
+        np.testing.assert_array_equal(
             records_readable[('Order', 'Size Type')].values,
             np.array([
-                'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
-                'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
-                'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares', 'Shares',
-                'Shares', 'Shares'
+                'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount',
+                'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount',
+                'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount', 'Amount',
+                'Amount', 'Amount'
             ])
         )
         np.testing.assert_array_equal(
@@ -2569,13 +2574,6 @@ class TestLogs:
                 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
                 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All', 'All',
                 'All', 'All'
-            ])
-        )
-        np.testing.assert_array_equal(
-            records_readable[('Order', 'Price')].values,
-            np.array([
-                1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0,
-                6.0, 7.0, 8.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0
             ])
         )
         np.testing.assert_array_equal(
@@ -2654,7 +2652,7 @@ class TestLogs:
             ])
         )
         np.testing.assert_array_equal(
-            records_readable[('New Context', 'Shares')].values,
+            records_readable[('New Context', 'Position')].values,
             np.array([
                 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, 0.0, 2.0, -1.0, -1.1, -0.10000000000000009, 0.0, 0.0,
                 -1.0, 0.0, -2.0, 1.0, 1.1, 0.10000000000000009, 0.0, 0.0, 1.0, -1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,

@@ -239,8 +239,8 @@ settings = SettingsConfig(
             call_seq='default',
             init_cash=100.,
             size=np.inf,
-            size_type='shares',
-            signal_size_type='shares',
+            size_type='amount',
+            signal_size_type='amount',
             fees=0.,
             fixed_fees=0.,
             slippage=0.,
@@ -263,8 +263,27 @@ settings = SettingsConfig(
             seed=None,
             freq=None,
             incl_unrealized=False,
-            use_filled_close=True,
-            subplots=['orders', 'trade_returns', 'cum_returns']
+            fillna_close=True,
+            plot=dict(
+                subplots=['orders', 'trade_returns', 'cum_returns'],
+                grouped_subplots=None,
+                show_titles=True,
+                hide_id_labels=True,
+                group_id_labels=True,
+                make_subplots_kwargs=Config(),  # flex
+                silence_warnings=False,
+                template_mapping=Config(),  # flex
+                hline_shape_kwargs=Config(  # flex
+                    dict(
+                        type='line',
+                        line=dict(
+                            color='gray',
+                            dash="dash",
+                        )
+                    )
+                ),
+                kwargs=Config()  # flex
+            )
         ),
         messaging=dict(
             telegram=Config(  # flex

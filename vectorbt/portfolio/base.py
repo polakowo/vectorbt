@@ -109,7 +109,7 @@ One of the key features of `Portfolio` is the ability to group columns. Groups c
 actual groups. Groups can be formed to share capital between columns or to compute metrics
 for a combined portfolio of multiple independent columns.
 
-For example, let's divide our portfolio into two groups sharing the same cash:
+For example, let's divide our portfolio into two groups sharing the same cash balance:
 
 ```python-repl
 >>> # Simulate combined portfolio
@@ -202,23 +202,23 @@ simulation from the beginning to the end, you can turn on logging.
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
 
 >>> portfolio.logs.records
-        id  idx  col  group  cash_now  shares_now  val_price_now  value_now  \\
-0        0    0    0      0       inf    0.000000    7194.892090        inf
-1        1    1    0      0       inf    0.000000    7202.551270        inf
-2        2    2    0      0       inf    0.000000    6984.428711        inf
-...    ...  ...  ...    ...       ...         ...            ...        ...
-1461  1461  241    5      5       inf  272.389644      57.207737        inf
-1462  1462  242    5      5       inf  274.137659      62.844059        inf
-1463  1463  243    5      5       inf  282.093860      61.105076        inf
+        id  idx  col  group  cash    position  debt  free_cash    val_price  \
+0        0    0    0      0   inf    0.000000   0.0        inf  7194.892090
+1        1    1    0      0   inf    0.000000   0.0        inf  7202.551270
+2        2    2    0      0   inf    0.000000   0.0        inf  6984.428711
+...    ...  ...  ...    ...   ...         ...   ...        ...          ...
+1461  1461  241    5      5   inf  272.389644   0.0        inf    57.207737
+1462  1462  242    5      5   inf  274.137659   0.0        inf    62.844059
+1463  1463  243    5      5   inf  282.093860   0.0        inf    61.105076
 
-          size  size_type  ...   log  new_cash  new_shares  res_size  \\
-0          NaN          0  ...  True       inf    0.000000       NaN
-1     0.000000          0  ...  True       inf    0.000000       NaN
-2     0.000000          0  ...  True       inf    0.000000       NaN
-...        ...        ...  ...   ...       ...         ...       ...
-1461  1.748015          0  ...  True       inf  274.137659  1.748015
-1462  7.956202          0  ...  True       inf  282.093860  7.956202
-1463 -1.636525          0  ...  True       inf  280.457335  1.636525
+      value  ...  new_free_cash  new_val_price  new_value  res_size  \
+0       inf  ...            inf    7194.892090        inf       NaN
+1       inf  ...            inf    7202.551270        inf       NaN
+2       inf  ...            inf    6984.428711        inf       NaN
+...     ...  ...            ...            ...        ...       ...
+1461    inf  ...            inf      57.207737        inf  1.748015
+1462    inf  ...            inf      62.844059        inf  7.956202
+1463    inf  ...            inf      61.105076        inf  1.636525
 
         res_price  res_fees  res_side  res_status  res_status_info  order_id
 0             NaN       NaN        -1           1                0        -1
@@ -229,7 +229,7 @@ simulation from the beginning to the end, you can turn on logging.
 1462    62.906903    0.5005         0           0               -1      1071
 1463    61.043971    0.0999         1           0               -1      1072
 
-[1464 rows x 30 columns]
+[1464 rows x 37 columns]
 ```
 
 Just as orders, logs are also records and thus can be easily analyzed:
@@ -267,7 +267,7 @@ ratio or other metrics based on returns, run and save `Portfolio.returns` and th
 
 Alternatively, you can precisely point at attributes and methods that should or shouldn't
 be cached. For example, you can blacklist the entire `Portfolio` class except a few most called
-methods such as `Portfolio.cash_flow` and `Portfolio.share_flow`:
+methods such as `Portfolio.cash_flow` and `Portfolio.asset_flow`:
 
 ```python-repl
 >>> vbt.settings.caching['blacklist'].append(
@@ -275,7 +275,7 @@ methods such as `Portfolio.cash_flow` and `Portfolio.share_flow`:
 ... )
 >>> vbt.settings.caching['whitelist'].extend([
 ...     vbt.CacheCondition(base_cls='Portfolio', func='cash_flow'),
-...     vbt.CacheCondition(base_cls='Portfolio', func='share_flow')
+...     vbt.CacheCondition(base_cls='Portfolio', func='asset_flow')
 ... ])
 ```
 
@@ -287,7 +287,7 @@ Define rules for one instance of `Portfolio`:
 ... )
 >>> vbt.settings.caching['whitelist'].extend([
 ...     vbt.CacheCondition(instance=portfolio, func='cash_flow'),
-...     vbt.CacheCondition(instance=portfolio, func='share_flow')
+...     vbt.CacheCondition(instance=portfolio, func='asset_flow')
 ... ])
 ```
 
@@ -339,7 +339,6 @@ Name: sharpe_ratio, dtype: float64
 
 import numpy as np
 import pandas as pd
-from inspect import signature
 from collections import OrderedDict
 import warnings
 
@@ -347,10 +346,11 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import prepare_enum_value
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.config import merge_dicts, get_func_arg_names
+from vectorbt.utils.template import deep_substitute, Rep
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
-from vectorbt.utils.figure import make_subplots
+from vectorbt.utils.figure import make_subplots, get_domain
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
@@ -409,8 +409,7 @@ def add_returns_methods(func_names: tp.Iterable[tp.Union[str, tp.Tuple[str, str]
                 # Select only those arguments in kwargs that are also in the method's signature
                 # This is done for Portfolio.stats which passes the same kwargs to multiple methods
                 method = getattr(returns_acc, _ret_func_name)
-                sig = signature(method)
-                arg_names = [p.name for p in sig.parameters.values() if p.kind == p.POSITIONAL_OR_KEYWORD]
+                arg_names = get_func_arg_names(method)
                 new_kwargs = {}
                 for arg_name in arg_names:
                     if arg_name in kwargs:
@@ -466,11 +465,11 @@ class Portfolio(Wrapping):
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (array_like of int): Sequence of calls per row and group.
         incl_unrealized (bool): Whether to include unrealized P&L in statistics.
-        use_filled_close (bool): Whether to forward-backward fill NaN values in `close`.
+        fillna_close (bool): Whether to forward and backward fill NaN values in `close`.
 
-            Doesn't affect simulation and only used for total profit and market value.
+            Applied after the simulation.
 
-            See `Portfolio.fill_close`.
+            See `Portfolio.get_fillna_close`.
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
@@ -488,7 +487,7 @@ class Portfolio(Wrapping):
                  cash_sharing: bool,
                  call_seq: tp.Array2d,
                  incl_unrealized: tp.Optional[bool] = None,
-                 use_filled_close: tp.Optional[bool] = None) -> None:
+                 fillna_close: tp.Optional[bool] = None) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -499,7 +498,7 @@ class Portfolio(Wrapping):
             cash_sharing=cash_sharing,
             call_seq=call_seq,
             incl_unrealized=incl_unrealized,
-            use_filled_close=use_filled_close
+            fillna_close=fillna_close
         )
         # Get defaults
         from vectorbt._settings import settings
@@ -507,8 +506,8 @@ class Portfolio(Wrapping):
 
         if incl_unrealized is None:
             incl_unrealized = portfolio_cfg['incl_unrealized']
-        if use_filled_close is None:
-            use_filled_close = portfolio_cfg['use_filled_close']
+        if fillna_close is None:
+            fillna_close = portfolio_cfg['fillna_close']
 
         # Store passed arguments
         self._close = broadcast_to(close, wrapper.dummy(group_by=False))
@@ -518,7 +517,7 @@ class Portfolio(Wrapping):
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
         self._incl_unrealized = incl_unrealized
-        self._use_filled_close = use_filled_close
+        self._fillna_close = fillna_close
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
@@ -652,13 +651,13 @@ class Portfolio(Wrapping):
                      **kwargs) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
-        Starting with initial cash `init_cash`, for each signal in `entries`, enters a long/short position
-        by buying/selling `size` of shares. For each signal in `exits`, closes the position by
-        selling/buying shares. Depending upon accumulation, each entry signal may increase
-        the position and each exit signal may decrease the position. When both entry and exit signals
-        are present, ignores them by default. When grouping is enabled with `group_by`, will compute
-        the performance of the entire group. When `cash_sharing` is enabled, will share the cash among
-        all columns in the group.
+        Starting with the initial cash balance `init_cash`, for each signal in `entries`, enters a
+        long/short position by buying/selling `size`. For each signal in `exits`, closes the position.
+        If accumulation is enabled, each entry signal is allowed to (gradually) increase the position
+        and each exit signal is allowed to decrease the position. When both entry and exit signals are
+        present, ignores them by default. When grouping is enabled with `group_by`, will compute the
+        performance of the entire group. When `cash_sharing` is enabled, will share the cash balance
+        among all columns in the group.
 
         Args:
             close (array_like): Reference price, such as close.
@@ -676,10 +675,10 @@ class Portfolio(Wrapping):
             size (float or array_like): Size to order.
                 Will broadcast.
 
-                * Set to any number to buy/sell some fixed amount of shares.
-                    Longs are limited by cash in the account, while shorts are unlimited.
-                * Set to `np.inf` to buy shares for all cash, or `-np.inf` to sell shares for
-                    initial margin of 100%. If `direction` is not `all`, `-np.inf` will close the position.
+                * Set to any number to buy/sell some fixed amount.
+                    Longs are limited by cash in the account, while shorts are only limited if `lock_cash`.
+                * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
+                    If `direction` is not `all`, `-np.inf` will close the position.
                 * Set to `np.nan` or 0 to skip.
 
                 !!! note
@@ -687,7 +686,7 @@ class Portfolio(Wrapping):
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
                 Will broadcast.
 
-                Only `SizeType.Shares` and `SizeType.Percent` are supported.
+                Only `SizeType.Amount` and `SizeType.Percent` are supported.
                 Other modes such as target percentage are not compatible with signals since
                 their logic may contradict the direction of the signal.
 
@@ -789,7 +788,7 @@ class Portfolio(Wrapping):
 
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='longonly')
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    1.0
         1    0.0
         2    0.0
@@ -802,7 +801,7 @@ class Portfolio(Wrapping):
         ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='shortonly')
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0   -1.0
         1    0.0
         2    0.0
@@ -815,7 +814,7 @@ class Portfolio(Wrapping):
         ```python-repl
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all')
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    1.0
         1    0.0
         2    0.0
@@ -829,7 +828,7 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=True)
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    1.0
         1    0.0
         2    0.0
@@ -843,7 +842,7 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=True, conflict_mode='exit')
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    1.0
         1    0.0
         2   -1.0
@@ -857,7 +856,7 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     accumulate=True)
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    1.0
         1    1.0
         2    0.0
@@ -873,7 +872,7 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, direction=[list(Direction)],
         ...     broadcast_kwargs=dict(columns_from=Direction._fields))
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
             Long  Short    All
         0  100.0 -100.0  100.0
         1    0.0    0.0    0.0
@@ -891,7 +890,7 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=close_first)
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    1.0
         1   -1.0
         2   -1.0
@@ -961,7 +960,7 @@ class Portfolio(Wrapping):
 
         >>> # 5. Simulate portfolio
         >>> portfolio = vbt.Portfolio.from_signals(close, entries, exits)
-        >>> portfolio.share_flow()
+        >>> portfolio.asset_flow()
         0    10.0
         1   -10.0
         2     0.0
@@ -1158,8 +1157,7 @@ class Portfolio(Wrapping):
                     **kwargs) -> PortfolioT:
         """Simulate portfolio from orders.
 
-        Starting with initial cash `init_cash`, orders the number of shares specified in `size`
-        for `price`.
+        Starting with initial cash `init_cash`, orders `size` for `price`.
 
         Args:
             close (array_like): Reference price, such as close.
@@ -1169,17 +1167,17 @@ class Portfolio(Wrapping):
             size (float or array_like): Size to order.
                 Will broadcast.
 
-                Behavior depends upon `size_type` and `direction`. For `SizeType.Shares`:
+                Behavior depends upon `size_type` and `direction`. For `SizeType.Amount`:
 
-                * Set to any number to buy/sell some fixed amount of shares.
-                    Longs are limited by cash in the account, while shorts are unlimited.
-                * Set to `np.inf` to buy shares for all cash, or `-np.inf` to sell shares for
-                    initial margin of 100%. If `direction` is not `all`, `-np.inf` will close the position.
+                * Set to any number to buy/sell some fixed amount.
+                    Longs are limited by cash in the account, while shorts are only limited if `lock_cash`.
+                * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
+                    If `direction` is not `all`, `-np.inf` will close the position.
                 * Set to `np.nan` or 0 to skip.
 
                 For any target size:
 
-                * Set to any number to buy/sell amount of shares relative to current holdings or value.
+                * Set to any number to buy/sell an amount relative to the current position or value.
                 * Set to 0 to close the current position.
                 * Set to `np.nan` to skip.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
@@ -1192,7 +1190,7 @@ class Portfolio(Wrapping):
                     Be cautious using `SizeType.Percent` with `call_seq` set to 'auto'.
                     To execute sell orders before buy orders, the value of each order in the group
                     needs to be approximated in advance. But since `SizeType.Percent` depends
-                    upon cash balance, which cannot be calculated in advance, the latest cash balance
+                    upon the cash balance, which cannot be calculated in advance, the latest cash balance
                     is used. This can yield wrong call sequence for buy orders.
             direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
                 Will broadcast.
@@ -1226,7 +1224,7 @@ class Portfolio(Wrapping):
                 Defaults to `price`. Will broadcast.
 
                 Used at the time of decision making to calculate value of each asset in the group,
-                for example, to convert target value into target shares.
+                for example, to convert target value into target amount.
 
                 !!! note
                     Make sure to use timestamp for `val_price` that comes before timestamps of
@@ -1315,7 +1313,7 @@ class Portfolio(Wrapping):
 
         ## Example
 
-        Buy 10 shares each tick:
+        Buy 10 units each tick:
         ```python-repl
         >>> import pandas as pd
         >>> import vectorbt as vbt
@@ -1323,7 +1321,7 @@ class Portfolio(Wrapping):
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> portfolio = vbt.Portfolio.from_orders(close, 10)
 
-        >>> portfolio.shares()
+        >>> portfolio.assets()
         0    10.0
         1    20.0
         2    30.0
@@ -1344,7 +1342,7 @@ class Portfolio(Wrapping):
         >>> size = [1, 0, -1, 0, 1]
         >>> portfolio = vbt.Portfolio.from_orders(close, size, size_type='targetpercent')
 
-        >>> portfolio.shares()
+        >>> portfolio.assets()
         0    100.000000
         1      0.000000
         2    -66.666667
@@ -1381,7 +1379,7 @@ class Portfolio(Wrapping):
         ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
         ... )
 
-        >>> portfolio.holding_value(group_by=False).vbt.plot()
+        >>> portfolio.asset_value(group_by=False).vbt.plot()
         ```
 
         ![](/vectorbt/docs/img/simulate_nb.svg)
@@ -1659,7 +1657,7 @@ class Portfolio(Wrapping):
 
         ## Example
 
-        Buy 10 shares each tick:
+        Buy 10 units each tick:
         ```python-repl
         >>> import pandas as pd
         >>> from numba import njit
@@ -1673,7 +1671,7 @@ class Portfolio(Wrapping):
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
 
-        >>> portfolio.shares()
+        >>> portfolio.assets()
         0    10.0
         1    20.0
         2    30.0
@@ -1701,10 +1699,10 @@ class Portfolio(Wrapping):
 
         >>> @njit
         ... def order_func_nb(c, last_pos_state):
-        ...     if c.shares_now > 0:
-        ...         size = -c.shares_now  # close long
-        ...     elif c.shares_now < 0:
-        ...         size = -c.shares_now  # close short
+        ...     if c.position_now > 0:
+        ...         size = -c.position_now  # close long
+        ...     elif c.position_now < 0:
+        ...         size = -c.position_now  # close short
         ...     else:
         ...         if last_pos_state[0] == 1:
         ...             size = -np.inf  # open short
@@ -1718,7 +1716,7 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_order_func(
         ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
 
-        >>> portfolio.shares()
+        >>> portfolio.assets()
         0    100.000000
         1      0.000000
         2    -66.666667
@@ -1786,7 +1784,7 @@ class Portfolio(Wrapping):
         ...     cash_sharing=True, group_by=True,  # one group with cash sharing
         ... )
 
-        >>> portfolio.holding_value(group_by=False).vbt.plot()
+        >>> portfolio.asset_value(group_by=False).vbt.plot()
         ```
 
         ![](/vectorbt/docs/img/simulate_nb.svg)
@@ -1798,8 +1796,8 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
 
         >>> @njit
-        ... def group_prep_func_nb(c):
-        ...     # We need to define stop price per column, thus we do it in group_prep_func_nb
+        ... def prep_func_nb(c):
+        ...     # We need to define stop price per column once
         ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
         ...     return (stop_price,)
 
@@ -1815,13 +1813,13 @@ class Portfolio(Wrapping):
         ...
         ...     # Our logic
         ...     if entries[c.i, c.col]:
-        ...         if c.shares_now == 0:
+        ...         if c.position_now == 0:
         ...             return create_order_nb(
         ...                 size_now,
         ...                 price_now,
         ...                 direction=Direction.LongOnly)
         ...     elif exits[c.i, c.col] or price_now >= stop_price_now:
-        ...         if c.shares_now > 0:
+        ...         if c.position_now > 0:
         ...             return create_order_nb(
         ...                 -size_now,
         ...                 price_now,
@@ -1829,14 +1827,14 @@ class Portfolio(Wrapping):
         ...     return NoOrder
 
         >>> @njit
-        ... def after_order_func_nb(c, order_result, stop_price, stop, flex_2d):
+        ... def after_order_func_nb(c, stop_price, stop, flex_2d):
         ...     # Same broadcasting as for size
         ...     stop_now = flex_select_auto_nb(c.i, c.col, np.asarray(stop), flex_2d)
         ...
-        ...     if order_result.status == OrderStatus.Filled:
-        ...         if order_result.side == OrderSide.Buy:
+        ...     if c.order_result.status == OrderStatus.Filled:
+        ...         if c.order_result.side == OrderSide.Buy:
         ...             # Position entered: Set stop condition
-        ...             stop_price[c.col] = (1 + stop_now) * order_result.price
+        ...             stop_price[c.col] = (1 + stop_now) * c.order_result.price
         ...         else:
         ...             # Position exited: Remove stop condition
         ...             stop_price[c.col] = np.nan
@@ -1849,7 +1847,7 @@ class Portfolio(Wrapping):
         ...         to_2d(exits, raw=True),  # 2-dim array
         ...         np.inf, # will broadcast
         ...         True,
-        ...         group_prep_func_nb=group_prep_func_nb,
+        ...         prep_func_nb=prep_func_nb,
         ...         after_order_func_nb=after_order_func_nb,
         ...         after_order_args=(
         ...             threshold,  # will broadcast
@@ -1860,21 +1858,21 @@ class Portfolio(Wrapping):
         >>> close = pd.Series([10, 11, 12, 13, 14])
         >>> entries = pd.Series([True, True, False, False, False])
         >>> exits = pd.Series([False, False, False, True, True])
-        >>> simulate(close, entries, exits, 0.1).share_flow()
+        >>> simulate(close, entries, exits, 0.1).asset_flow()
         0    10.0
         1     0.0
         2   -10.0
         3     0.0
         4     0.0
         dtype: float64
-        >>> simulate(close, entries, exits, 0.2).share_flow()
+        >>> simulate(close, entries, exits, 0.2).asset_flow()
         0    10.0
         1     0.0
         2   -10.0
         3     0.0
         4     0.0
         dtype: float64
-        >>> simulate(close, entries, exits, np.nan).share_flow()
+        >>> simulate(close, entries, exits, np.nan).asset_flow()
         0    10.0
         1     0.0
         2     0.0
@@ -2101,19 +2099,20 @@ class Portfolio(Wrapping):
         return self._incl_unrealized
 
     @property
-    def use_filled_close(self) -> bool:
+    def fillna_close(self) -> bool:
         """Whether to forward-backward fill NaN values in `Portfolio.close`."""
-        return self._use_filled_close
+        return self._fillna_close
 
     # ############# Reference price ############# #
 
     @property
     def close(self) -> tp.SeriesFrame:
-        """Price per share series."""
+        """Price per unit series."""
         return self._close
 
     @cached_method
-    def fill_close(self, ffill: bool = True, bfill: bool = True, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def get_fillna_close(self, ffill: bool = True, bfill: bool = True,
+                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Fill NaN values of `Portfolio.close`.
         Use `ffill` and `bfill` to fill forwards and backwards respectively."""
         close = to_2d(self.close, raw=True)
@@ -2139,7 +2138,7 @@ class Portfolio(Wrapping):
         """Get order records.
 
         See `vectorbt.portfolio.orders.Orders`."""
-        return self.orders.regroup(group_by=group_by)
+        return self.orders.regroup(group_by)
 
     @property
     def log_records(self) -> tp.RecordArray:
@@ -2155,7 +2154,7 @@ class Portfolio(Wrapping):
         """Get log records.
 
         See `vectorbt.portfolio.logs.Logs`."""
-        return self.logs.regroup(group_by=group_by)
+        return self.logs.regroup(group_by)
 
     @cached_property
     def trades(self) -> Trades:
@@ -2166,7 +2165,7 @@ class Portfolio(Wrapping):
         """Get trade records.
 
         See `vectorbt.portfolio.trades.Trades`."""
-        return self.trades.regroup(group_by=group_by)
+        return self.trades.regroup(group_by)
 
     @cached_property
     def positions(self) -> Positions:
@@ -2177,7 +2176,7 @@ class Portfolio(Wrapping):
         """Get position records.
 
         See `vectorbt.portfolio.trades.Positions`."""
-        return self.positions.regroup(group_by=group_by)
+        return self.positions.regroup(group_by)
 
     @cached_property
     def drawdowns(self) -> Drawdowns:
@@ -2193,60 +2192,66 @@ class Portfolio(Wrapping):
         `**kwargs` are passed to `Portfolio.value`."""
         return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
 
-    # ############# Shares ############# #
+    # ############# Assets ############# #
 
     @cached_method
-    def share_flow(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get share flow series per column."""
+    def asset_flow(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get asset flow series per column.
+
+        Returns the total transacted amount of assets at each time step."""
         direction = prepare_enum_value(Direction, direction)
-        share_flow = nb.share_flow_nb(
+        asset_flow = nb.asset_flow_nb(
             self.wrapper.shape_2d,
             self.orders.values,
             self.orders.col_mapper.col_map,
             direction
         )
-        return self.wrapper.wrap(share_flow, group_by=False, **merge_dicts({}, wrap_kwargs))
+        return self.wrapper.wrap(asset_flow, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def shares(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get share series per column."""
+    def assets(self, direction: str = 'all', wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get asset series per column.
+
+        Returns the current position at each time step."""
         direction = prepare_enum_value(Direction, direction)
-        share_flow = to_2d(self.share_flow(direction='all'), raw=True)
-        shares = nb.shares_nb(share_flow)
+        asset_flow = to_2d(self.asset_flow(direction='all'), raw=True)
+        assets = nb.assets_nb(asset_flow)
         if direction == Direction.LongOnly:
-            shares = np.where(shares > 0, shares, 0.)
+            assets = np.where(assets > 0, assets, 0.)
         if direction == Direction.ShortOnly:
-            shares = np.where(shares < 0, -shares, 0.)
-        return self.wrapper.wrap(shares, group_by=False, **merge_dicts({}, wrap_kwargs))
+            assets = np.where(assets < 0, -assets, 0.)
+        return self.wrapper.wrap(assets, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def pos_mask(self, direction: str = 'all', group_by: tp.GroupByLike = None,
-                 wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get position mask per column/group."""
+    def position_mask(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get position mask per column/group.
+
+        An element is True if the asset is in the market at this tick."""
         direction = prepare_enum_value(Direction, direction)
-        shares = to_2d(self.shares(direction=direction), raw=True)
+        assets = to_2d(self.assets(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            pos_mask = to_2d(self.pos_mask(direction=direction, group_by=False), raw=True)
+            position_mask = to_2d(self.position_mask(direction=direction, group_by=False), raw=True)
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            pos_mask = nb.pos_mask_grouped_nb(pos_mask, group_lens)
+            position_mask = nb.position_mask_grouped_nb(position_mask, group_lens)
         else:
-            pos_mask = shares != 0
-        return self.wrapper.wrap(pos_mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
+            position_mask = assets != 0
+        return self.wrapper.wrap(position_mask, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def pos_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def position_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
         direction = prepare_enum_value(Direction, direction)
-        shares = to_2d(self.shares(direction=direction), raw=True)
+        assets = to_2d(self.assets(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
-            pos_mask = to_2d(self.pos_mask(direction=direction, group_by=False), raw=True)
+            position_mask = to_2d(self.position_mask(direction=direction, group_by=False), raw=True)
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            pos_coverage = nb.pos_coverage_grouped_nb(pos_mask, group_lens)
+            position_coverage = nb.position_coverage_grouped_nb(position_mask, group_lens)
         else:
-            pos_coverage = np.mean(shares != 0, axis=0)
-        wrap_kwargs = merge_dicts(dict(name_or_index='pos_coverage'), wrap_kwargs)
-        return self.wrapper.wrap_reduced(pos_coverage, group_by=group_by, **wrap_kwargs)
+            position_coverage = np.mean(assets != 0, axis=0)
+        wrap_kwargs = merge_dicts(dict(name_or_index='position_coverage'), wrap_kwargs)
+        return self.wrapper.wrap_reduced(position_coverage, group_by=group_by, **wrap_kwargs)
 
     # ############# Cash ############# #
 
@@ -2255,7 +2260,7 @@ class Portfolio(Wrapping):
                   wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get cash flow series per column/group.
 
-        Use `free` to return the flow of free cash, which never goes above the initial level,
+        Use `free` to return the flow of the free cash, which never goes above the initial level,
         because an operation always costs money."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             cash_flow = to_2d(self.cash_flow(group_by=False, free=free), raw=True)
@@ -2280,9 +2285,9 @@ class Portfolio(Wrapping):
         """Initial amount of cash per column/group with default arguments.
 
         !!! note
-            If initial cash is found automatically and no own cash is used throughout simulation
-            (for example, when shorting), initial cash will be set to 1 instead of 0 to
-            enable smooth calculation of returns."""
+            If the initial cash balance is found automatically and no own cash is used throughout
+            the simulation (for example, when shorting), it will be set to 1 instead of 0 to enable
+            smooth calculation of returns."""
         if isinstance(self._init_cash, int):
             cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
             cash_min = np.min(np.cumsum(cash_flow, axis=0), axis=0)
@@ -2334,28 +2339,31 @@ class Portfolio(Wrapping):
     # ############# Performance ############# #
 
     @cached_method
-    def holding_value(self, direction: str = 'all', group_by: tp.GroupByLike = None,
-                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get holding value series per column/group."""
+    def asset_value(self, direction: str = 'all', group_by: tp.GroupByLike = None,
+                    wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get asset value series per column/group."""
         direction = prepare_enum_value(Direction, direction)
-        close = to_2d(self.close, raw=True).copy()
-        shares = to_2d(self.shares(direction=direction), raw=True)
-        close[shares == 0] = 0.  # for price being NaN
-        if self.wrapper.grouper.is_grouped(group_by=group_by):
-            holding_value = to_2d(self.holding_value(direction=direction, group_by=False), raw=True)
-            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-            holding_value = nb.holding_value_grouped_nb(holding_value, group_lens)
+        if self.fillna_close:
+            close = to_2d(self.get_fillna_close(), raw=True).copy()
         else:
-            holding_value = nb.holding_value_nb(close, shares)
-        return self.wrapper.wrap(holding_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
+            close = to_2d(self.close, raw=True).copy()
+        assets = to_2d(self.assets(direction=direction), raw=True)
+        close[assets == 0] = 0.  # for price being NaN
+        if self.wrapper.grouper.is_grouped(group_by=group_by):
+            asset_value = to_2d(self.asset_value(direction=direction, group_by=False), raw=True)
+            group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+            asset_value = nb.asset_value_grouped_nb(asset_value, group_lens)
+        else:
+            asset_value = nb.asset_value_nb(close, assets)
+        return self.wrapper.wrap(asset_value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
     def gross_exposure(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                        wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get gross exposure."""
-        holding_value = to_2d(self.holding_value(group_by=group_by, direction=direction), raw=True)
+        asset_value = to_2d(self.asset_value(group_by=group_by, direction=direction), raw=True)
         cash = to_2d(self.cash(group_by=group_by, free=True), raw=True)
-        gross_exposure = nb.gross_exposure_nb(holding_value, cash)
+        gross_exposure = nb.gross_exposure_nb(asset_value, cash)
         return self.wrapper.wrap(gross_exposure, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
@@ -2372,31 +2380,29 @@ class Portfolio(Wrapping):
         """Get portfolio value series per column/group.
 
         By default, will generate portfolio value for each asset based on cash flows and thus
-        independent from other assets, with initial cash and shares being that of the entire group.
-        Useful for generating returns and comparing assets within the same group.
+        independent from other assets, with the initial cash balance and position being that of the
+        entire group. Useful for generating returns and comparing assets within the same group.
 
         When `group_by` is False and `in_sim_order` is True, returns value generated in
         simulation order (see [row-major order](https://en.wikipedia.org/wiki/Row-_and_column-major_order).
         This value cannot be used for generating returns as-is. Useful to analyze how value
         evolved throughout simulation."""
         cash = to_2d(self.cash(group_by=group_by, in_sim_order=in_sim_order), raw=True)
-        holding_value = to_2d(self.holding_value(group_by=group_by), raw=True)
+        asset_value = to_2d(self.asset_value(group_by=group_by), raw=True)
         if self.wrapper.grouper.is_grouping_disabled(group_by=group_by) and in_sim_order:
             group_lens = self.wrapper.grouper.get_group_lens()
             call_seq = to_2d(self.call_seq, raw=True)
-            value = nb.value_in_sim_order_nb(cash, holding_value, group_lens, call_seq)
+            value = nb.value_in_sim_order_nb(cash, asset_value, group_lens, call_seq)
             # price of NaN is already addressed by ungrouped_value_nb
         else:
-            value = nb.value_nb(cash, holding_value)
+            value = nb.value_nb(cash, asset_value)
         return self.wrapper.wrap(value, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
     def total_profit(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Get total profit per column/group.
 
-        Calculated directly from order records (fast).
-
-        Uses filled close if `Portfolio.use_filled_close` is True."""
+        Calculated directly from order records (fast)."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             total_profit = to_1d(self.total_profit(group_by=False), raw=True)
             group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
@@ -2405,8 +2411,8 @@ class Portfolio(Wrapping):
                 group_lens
             )
         else:
-            if self.use_filled_close:
-                close = to_2d(self.fill_close(), raw=True)
+            if self.fillna_close:
+                close = to_2d(self.get_fillna_close(), raw=True)
             else:
                 close = to_2d(self.close, raw=True)
             total_profit = nb.total_profit_nb(
@@ -2455,27 +2461,25 @@ class Portfolio(Wrapping):
     def active_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get active return series per column/group.
 
-        This type of returns is based solely on cash flows and holding value rather than portfolio value.
-        It ignores passive cash and thus it will return the same numbers irrespective of the amount of
+        This type of returns is based solely on cash flows and asset value rather than portfolio
+        value. It ignores passive cash and thus it will return the same numbers irrespective of the amount of
         cash currently available, even `np.inf`. The scale of returns is comparable to that of going
         all in and keeping available cash at zero."""
         cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
-        holding_value = to_2d(self.holding_value(group_by=group_by), raw=True)
-        active_returns = nb.active_returns_nb(cash_flow, holding_value)
+        asset_value = to_2d(self.asset_value(group_by=group_by), raw=True)
+        active_returns = nb.active_returns_nb(cash_flow, asset_value)
         return self.wrapper.wrap(active_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
     def market_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get market (benchmark) value series per column/group.
 
-        If grouped, evenly distributes initial cash among assets in the group.
-
-        Uses filled close if `Portfolio.use_filled_close` is True.
+        If grouped, evenly distributes the initial cash among assets in the group.
 
         !!! note
             Does not take into account fees and slippage. For this, create a separate portfolio."""
-        if self.use_filled_close:
-            close = to_2d(self.fill_close(), raw=True)
+        if self.fillna_close:
+            close = to_2d(self.get_fillna_close(), raw=True)
         else:
             close = to_2d(self.close, raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
@@ -2550,7 +2554,7 @@ class Portfolio(Wrapping):
             'Total Profit': self.total_profit(group_by=group_by),
             'Total Return [%]': self.total_return(group_by=group_by) * 100,
             'Benchmark Return [%]': self.total_market_return(group_by=group_by) * 100,
-            'Position Coverage [%]': self.pos_coverage(group_by=group_by) * 100,
+            'Position Coverage [%]': self.position_coverage(group_by=group_by) * 100,
             'Max. Drawdown [%]': -drawdowns.max_drawdown() * 100,
             'Avg. Drawdown [%]': -drawdowns.avg_drawdown() * 100,
             'Max. Drawdown Duration': drawdowns.max_duration(),
@@ -2632,167 +2636,790 @@ class Portfolio(Wrapping):
 
     # ############# Plotting ############# #
 
-    subplot_settings: tp.ClassVar[tp.Dict[str, tp.Kwargs]] = OrderedDict(
+    def plot_asset_flow(self,
+                        column: tp.Optional[tp.Label] = None,
+                        direction: str = 'all',
+                        xref: str = 'x',
+                        yref: str = 'y',
+                        hline_shape_kwargs: tp.KwargsLike = None,
+                        **kwargs) -> tp.BaseFigure:
+        """Plot one column of asset flow.
+
+        Args:
+            column (str): Name of the column to plot.
+            direction (Direction): See `vectorbt.portfolio.enums.Direction`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['brown']
+                ),
+                name='Assets'
+            )
+        ), kwargs)
+        asset_flow = self.asset_flow(direction=direction)
+        asset_flow = self.select_one_from_obj(asset_flow, self.wrapper.regroup(False), column=column)
+        fig = asset_flow.vbt.plot(**kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=0,
+            x1=x_domain[1],
+            y1=0
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_cash_flow(self,
+                       column: tp.Optional[tp.Label] = None,
+                       group_by: tp.GroupByLike = None,
+                       free: bool = False,
+                       xref: str = 'x',
+                       yref: str = 'y',
+                       hline_shape_kwargs: tp.KwargsLike = None,
+                       **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of cash flow.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            free (bool): Whether to plot the flow of the free cash.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['green']
+                ),
+                name='Cash'
+            )
+        ), kwargs)
+        cash_flow = self.cash_flow(group_by=group_by, free=free)
+        cash_flow = self.select_one_from_obj(cash_flow, self.wrapper.regroup(group_by), column=column)
+        fig = cash_flow.vbt.plot(**kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=0.,
+            x1=x_domain[1],
+            y1=0.
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_assets(self,
+                    column: tp.Optional[tp.Label] = None,
+                    direction: str = 'all',
+                    xref: str = 'x',
+                    yref: str = 'y',
+                    hline_shape_kwargs: tp.KwargsLike = None,
+                    **kwargs) -> tp.BaseFigure:
+        """Plot one column of assets.
+
+        Args:
+            column (str): Name of the column to plot.
+            direction (Direction): See `vectorbt.portfolio.enums.Direction`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['brown']
+                ),
+                name='Assets'
+            ),
+            pos_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['brown'], 0.3)
+            ),
+            neg_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
+            ),
+            other_trace_kwargs='hidden'
+        ), kwargs)
+        assets = self.assets(direction=direction)
+        assets = self.select_one_from_obj(assets, self.wrapper.regroup(False), column=column)
+        fig = assets.vbt.plot_against(0, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=0.,
+            x1=x_domain[1],
+            y1=0.
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_cash(self,
+                  column: tp.Optional[tp.Label] = None,
+                  group_by: tp.GroupByLike = None,
+                  free: bool = False,
+                  xref: str = 'x',
+                  yref: str = 'y',
+                  hline_shape_kwargs: tp.KwargsLike = None,
+                  **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of cash balance.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            free (bool): Whether to plot the flow of the free cash.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['green']
+                ),
+                name='Cash'
+            ),
+            pos_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['green'], 0.3)
+            ),
+            neg_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3)
+            ),
+            other_trace_kwargs='hidden'
+        ), kwargs)
+        init_cash = self.get_init_cash(group_by=group_by)
+        init_cash = self.select_one_from_obj(init_cash, self.wrapper.regroup(group_by), column=column)
+        cash = self.cash(group_by=group_by, free=free)
+        cash = self.select_one_from_obj(cash, self.wrapper.regroup(group_by), column=column)
+        fig = cash.vbt.plot_against(init_cash, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=init_cash,
+            x1=x_domain[1],
+            y1=init_cash
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_asset_value(self,
+                         column: tp.Optional[tp.Label] = None,
+                         group_by: tp.GroupByLike = None,
+                         direction: str = 'all',
+                         xref: str = 'x',
+                         yref: str = 'y',
+                         hline_shape_kwargs: tp.KwargsLike = None,
+                         **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of asset value.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            direction (Direction): See `vectorbt.portfolio.enums.Direction`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['cyan']
+                ),
+                name='Asset Value'
+            ),
+            pos_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['cyan'], 0.3)
+            ),
+            neg_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
+            ),
+            other_trace_kwargs='hidden'
+        ), kwargs)
+        asset_value = self.asset_value(direction=direction, group_by=group_by)
+        asset_value = self.select_one_from_obj(asset_value, self.wrapper.regroup(group_by), column=column)
+        fig = asset_value.vbt.plot_against(0, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=0.,
+            x1=x_domain[1],
+            y1=0.
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_value(self,
+                   column: tp.Optional[tp.Label] = None,
+                   group_by: tp.GroupByLike = None,
+                   xref: str = 'x',
+                   yref: str = 'y',
+                   hline_shape_kwargs: tp.KwargsLike = None,
+                   **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of value.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            free (bool): Whether to plot free cash flow.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['purple']
+                ),
+                name='Value'
+            ),
+            other_trace_kwargs='hidden'
+        ), kwargs)
+        init_cash = self.get_init_cash(group_by=group_by)
+        init_cash = self.select_one_from_obj(init_cash, self.wrapper.regroup(group_by), column=column)
+        value = self.value(group_by=group_by)
+        value = self.select_one_from_obj(value, self.wrapper.regroup(group_by), column=column)
+        fig = value.vbt.plot_against(init_cash, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=init_cash,
+            x1=x_domain[1],
+            y1=init_cash
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_cum_returns(self,
+                         column: tp.Optional[tp.Label] = None,
+                         group_by: tp.GroupByLike = None,
+                         active_returns: bool = False,
+                         **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of cumulative returns.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            active_returns (bool): Whether to plot active returns.
+            **kwargs: Keyword arguments passed to `vectorbt.returns.accessors.ReturnsSRAccessor.plot_cum_returns`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        market_returns = self.market_returns(group_by=group_by)
+        market_returns = self.select_one_from_obj(market_returns, self.wrapper.regroup(group_by), column=column)
+        kwargs = merge_dicts(dict(
+            benchmark_rets=market_returns,
+            main_kwargs=dict(
+                trace_kwargs=dict(
+                    line=dict(
+                        color=plotting_cfg['color_schema']['purple']
+                    ),
+                    name='Value'
+                )
+            ),
+            hline_shape_kwargs=dict(
+                type='line',
+                line=dict(
+                    color='gray',
+                    dash="dash",
+                )
+            )
+        ), kwargs)
+        if active_returns:
+            returns = self.active_returns(group_by=group_by)
+        else:
+            returns = self.returns(group_by=group_by)
+        returns = self.select_one_from_obj(returns, self.wrapper.regroup(group_by), column=column)
+        return returns.vbt.returns.plot_cum_returns(**kwargs)
+
+    def plot_drawdowns(self,
+                       column: tp.Optional[tp.Label] = None,
+                       group_by: tp.GroupByLike = None,
+                       **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of drawdowns.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.drawdowns.Drawdowns.plot`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            ts_trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['purple']
+                ),
+                name='Value'
+            )
+        ), kwargs)
+        return self.get_drawdowns(group_by=group_by).plot(column=column, **kwargs)
+
+    def plot_underwater(self,
+                        column: tp.Optional[tp.Label] = None,
+                        group_by: tp.GroupByLike = None,
+                        xref: str = 'x',
+                        yref: str = 'y',
+                        hline_shape_kwargs: tp.KwargsLike = None,
+                        **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of underwater.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericAccessor.plot`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['red']
+                ),
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3),
+                fill='tozeroy',
+                name='Drawdown'
+            )
+        ), kwargs)
+        drawdown = self.drawdown(group_by=group_by)
+        drawdown = self.select_one_from_obj(drawdown, self.wrapper.regroup(group_by), column=column)
+        fig = drawdown.vbt.plot(**kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=0,
+            x1=x_domain[1],
+            y1=0
+        ), hline_shape_kwargs))
+        yaxis = 'yaxis' + yref[1:]
+        fig.layout[yaxis]['tickformat'] = '%'
+        return fig
+
+    def plot_gross_exposure(self,
+                            column: tp.Optional[tp.Label] = None,
+                            group_by: tp.GroupByLike = None,
+                            direction: str = 'all',
+                            xref: str = 'x',
+                            yref: str = 'y',
+                            hline_shape_kwargs: tp.KwargsLike = None,
+                            **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of gross exposure.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            direction (Direction): See `vectorbt.portfolio.enums.Direction`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['pink']
+                ),
+                name='Exposure'
+            ),
+            pos_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
+            ),
+            neg_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
+            ),
+            other_trace_kwargs='hidden'
+        ), kwargs)
+        gross_exposure = self.gross_exposure(direction=direction, group_by=group_by)
+        gross_exposure = self.select_one_from_obj(gross_exposure, self.wrapper.regroup(group_by), column=column)
+        fig = gross_exposure.vbt.plot_against(1, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=1,
+            x1=x_domain[1],
+            y1=1
+        ), hline_shape_kwargs))
+        return fig
+
+    def plot_net_exposure(self,
+                          column: tp.Optional[tp.Label] = None,
+                          group_by: tp.GroupByLike = None,
+                          xref: str = 'x',
+                          yref: str = 'y',
+                          hline_shape_kwargs: tp.KwargsLike = None,
+                          **kwargs) -> tp.BaseFigure:
+        """Plot one column/group of net exposure.
+
+        Args:
+            column (str): Name of the column/group to plot.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            xref (str): X coordinate axis.
+            yref (str): Y coordinate axis.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
+            **kwargs: Keyword arguments passed to `vectorbt.generic.accessors.GenericSRAccessor.plot_against`.
+        """
+        from vectorbt._settings import settings
+        plotting_cfg = settings['plotting']
+
+        kwargs = merge_dicts(dict(
+            trace_kwargs=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['pink']
+                ),
+                name='Exposure'
+            ),
+            pos_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
+            ),
+            neg_trace_kwargs=dict(
+                fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
+            ),
+            other_trace_kwargs='hidden'
+        ), kwargs)
+        net_exposure = self.net_exposure(group_by=group_by)
+        net_exposure = self.select_one_from_obj(net_exposure, self.wrapper.regroup(group_by), column=column)
+        fig = net_exposure.vbt.plot_against(0, **kwargs)
+        x_domain = get_domain(xref, fig)
+        fig.add_shape(**merge_dicts(dict(
+            type='line',
+            line=dict(
+                color='gray',
+                dash="dash",
+            ),
+            xref="paper",
+            yref=yref,
+            x0=x_domain[0],
+            y0=0,
+            x1=x_domain[1],
+            y1=0
+        ), hline_shape_kwargs))
+        return fig
+
+    subplots: tp.ClassVar[tp.Dict[str, tp.Kwargs]] = OrderedDict(
         orders=dict(
             title="Orders",
             yaxis_title="Price",
-            can_plot_groups=False
+            can_plot_groups=False,
+            plot_func=[('get_orders', (Rep('group_by'),)), 'plot']
         ),
         trades=dict(
             title="Trades",
             yaxis_title="Price",
-            can_plot_groups=False
+            can_plot_groups=False,
+            plot_func=[('get_trades', (Rep('group_by'),)), 'plot']
         ),
         positions=dict(
             title="Positions",
             yaxis_title="Price",
-            can_plot_groups=False
+            can_plot_groups=False,
+            plot_func=[('get_positions', (Rep('group_by'),)), 'plot']
         ),
         trade_pnl=dict(
             title="Trade P&L",
-            yaxis_title="P&L",
-            can_plot_groups=False
+            yaxis_title="Trade P&L",
+            can_plot_groups=False,
+            plot_func=[('get_trades', (Rep('group_by'),)), 'plot_pnl'],
+            pass_column=True,  # hidden behind **kwargs
+            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            pass_xref=True,  # hidden behind **kwargs
+            pass_yref=True  # hidden behind **kwargs
         ),
         position_pnl=dict(
             title="Position P&L",
-            yaxis_title="P&L",
-            can_plot_groups=False
+            yaxis_title="Position P&L",
+            can_plot_groups=False,
+            plot_func=[('get_positions', (Rep('group_by'),)), 'plot_pnl'],
+            pass_column=True,  # hidden behind **kwargs
+            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            pass_xref=True,  # hidden behind **kwargs
+            pass_yref=True  # hidden behind **kwargs
         ),
         trade_returns=dict(
             title="Trade Returns",
-            yaxis_title="Return",
-            can_plot_groups=False
+            yaxis_title="Trade returns",
+            can_plot_groups=False,
+            plot_func=[('get_trades', (Rep('group_by'),)), 'plot_returns'],
+            pass_column=True,  # hidden behind **kwargs
+            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            pass_xref=True,  # hidden behind **kwargs
+            pass_yref=True  # hidden behind **kwargs
         ),
         position_returns=dict(
             title="Position Returns",
-            yaxis_title="Return",
-            can_plot_groups=False
+            yaxis_title="Position returns",
+            can_plot_groups=False,
+            plot_func=[('get_positions', (Rep('group_by'),)), 'plot_returns'],
+            pass_column=True,  # hidden behind **kwargs
+            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            pass_xref=True,  # hidden behind **kwargs
+            pass_yref=True  # hidden behind **kwargs
         ),
-        cum_returns=dict(
-            title="Cumulative Returns",
-            yaxis_title="Cumulative returns"
-        ),
-        share_flow=dict(
-            title="Share Flow",
-            yaxis_title="Shares",
-            can_plot_groups=False
+        asset_flow=dict(
+            title="Asset Flow",
+            yaxis_title="Asset flow",
+            can_plot_groups=False,
+            plot_func='plot_asset_flow',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
         cash_flow=dict(
             title="Cash Flow",
-            yaxis_title="Cash"
+            yaxis_title="Cash flow",
+            plot_func='plot_cash_flow',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
-        shares=dict(
-            title="Shares",
-            yaxis_title="Shares",
-            can_plot_groups=False
+        assets=dict(
+            title="Assets",
+            yaxis_title="Assets",
+            can_plot_groups=False,
+            plot_func='plot_assets',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
         cash=dict(
             title="Cash",
-            yaxis_title="Cash"
+            yaxis_title="Cash",
+            plot_func='plot_cash',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
-        holding_value=dict(
-            title="Holding Value",
-            yaxis_title="Holding value"
+        asset_value=dict(
+            title="Asset Value",
+            yaxis_title="Asset value",
+            plot_func='plot_asset_value',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
         value=dict(
             title="Value",
-            yaxis_title="Value"
+            yaxis_title="Value",
+            plot_func='plot_value',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+        ),
+        cum_returns=dict(
+            title="Cumulative Returns",
+            yaxis_title="Cumulative returns",
+            plot_func='plot_cum_returns',
+            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            pass_xref=True,  # hidden behind **kwargs
+            pass_yref=True  # hidden behind **kwargs
         ),
         drawdowns=dict(
             title="Drawdowns",
-            yaxis_title="Value"
+            yaxis_title="Value",
+            plot_func='plot_drawdowns',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            pass_xref=True,  # hidden behind **kwargs
+            pass_yref=True  # hidden behind **kwargs
         ),
         underwater=dict(
             title="Underwater",
-            yaxis_title="Drawdown"
+            yaxis_title="Drawdown",
+            plot_func='plot_underwater',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
         gross_exposure=dict(
             title="Gross Exposure",
-            yaxis_title="Gross exposure"
+            yaxis_title="Gross exposure",
+            plot_func='plot_gross_exposure',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         ),
         net_exposure=dict(
             title="Net Exposure",
-            yaxis_title="Net exposure"
+            yaxis_title="Net exposure",
+            plot_func='plot_net_exposure',
+            pass_add_trace_kwargs=True,  # hidden behind **kwargs
         )
     )
     """Settings of subplots supported by `Portfolio.plot`."""
 
-    def plot(self, *,
+    def plot(self,
+             subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
              column: tp.Optional[tp.Label] = None,
-             subplots: tp.Optional[tp.Sequence[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
              group_by: tp.GroupByLike = None,
-             show_titles: bool = True,
-             hide_id_labels: bool = True,
-             group_id_labels: bool = True,
-             hline_shape_kwargs: tp.KwargsLike = None,
+             show_titles: bool = None,
+             hide_id_labels: bool = None,
+             group_id_labels: bool = None,
              make_subplots_kwargs: tp.KwargsLike = None,
+             silence_warnings: bool = None,
+             template_mapping: tp.Optional[tp.Mapping] = None,
+             hline_shape_kwargs: tp.KwargsLike = None,
              **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot various parts of this portfolio.
 
         Args:
-            subplots (list of str or list of tuple): List of subplots to plot.
+            subplots (str, tuple or iterable): List of subplots to plot.
 
                 Each element can be either:
 
-                * a subplot name, as listed in `Portfolio.subplot_settings`
-                * a tuple of a subplot name and a dict as in `Portfolio.subplot_settings` but with an
-                    additional optional key `plot_func`. The plot function should accept current portfolio
-                    object (with column already selected), other keyword arguments (optionally), and
-                    the figure object `fig` as the last keyword argument. It will also pass the following
-                    arguments if any of them can be found in the function's signature:
+                * a subplot name (see keys in `Portfolio.subplots`)
+                * a tuple of a subplot name and a settings dict as in `Portfolio.subplots`.
 
-                    * `add_trace_kwargs`
-                    * `xref`
-                    * `yref`
-                    * `xaxis`
-                    * `yaxis`
-                    * `x_domain`
-                    * `y_domain`
+                Each settings dict can contain the following keys:
+
+                * `title` - title of the subplot. Defaults to None.
+                * `yaxis_title` - title of the y-axis. Defaults to `title`.
+                * `can_plot_groups` - whether this subplot supports plotting grouped data. Defaults to True.
+                    Must be known beforehand and cannot be provided as a template.
+                * `plot_func` - plotting function for custom subplots. If the function can be accessed
+                    by traversing attributes of this portfolio, you can pass the path to this function
+                    as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
+                * `pass_{arg}` - whether to pass a reserved argument (see below). Defaults to True if
+                    this argument is found in the function's signature. Set to False to not pass.
+                * `template_mapping` - mapping to replace templates in subplot settings and keyword arguments.
+                    Used across all settings.
+                * Any other keyword argument is passed directly to `plot_func` and may override reserved arguments.
+
+                A plotting function may accept any keyword argument, but it should accept the current figure via
+                a `fig` keyword argument. It may also "request" any of the following reserved arguments by
+                accepting them or if `pass_{arg}` is found in the settings dict:
+
+                * `portfolio` - current portfolio, with no column selected
+                * `column`
+                * `group_by`
+                * `name` - passes subplot name
+                * `trace_names` - passes a list with the subplot name
+                * `add_trace_kwargs`
+                * `xref`
+                * `yref`
+                * `xaxis`
+                * `yaxis`
+                * `x_domain`
+                * `y_domain`
+                * `hline_shape_kwargs`
+
+                Pass `subplots='all'` to plot all supported subplots.
             column (str): Name of the column/group to plot.
 
-                Takes effect if portfolio contains multiple columns.
-            group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+                Won't have effect on this portfolio, but passed down to each plotting function.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
 
-                Used to select `group`.
-            show_titles (bool): Whether to show the title in the top left corner of each subplot.
+                Won't have effect on this portfolio, but passed down to each plotting function.
+            show_titles (bool): Whether to show the title of each subplot.
             hide_id_labels (bool): Whether to hide identical legend labels.
 
                 Two labels are identical if their name, marker style and line style match.
             group_id_labels (bool): Whether to group identical legend labels.
-            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for horizontal lines.
             make_subplots_kwargs (dict): Keyword arguments passed to `plotly.subplots.make_subplots`.
+            silence_warnings (bool): Whether to silence all warnings.
+            template_mapping (mapping): Global mapping to replace templates.
+
+                Applied on both subplot settings and `kwargs`.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
             **kwargs: Additional keyword arguments.
 
-                Can contain keyword arguments for each subplot, each specified as `{subplot_name}_kwargs`.
-                Other keyword arguments are used to update layout of the figure.
+                Can contain keyword arguments for each subplot, specified as `{subplot_name}_kwargs`.
+                Other keyword arguments are used to update the layout of the figure.
+
+        For template logic, see `vectorbt.utils.template`.
+
+        For defaults, see `portfolio.plot` in `vectorbt._settings.settings`.
 
         ## Example
 
         Plot portfolio of a random strategy:
         ```python-repl
-        >>> import numpy as np
-        >>> import pandas as pd
-        >>> from datetime import datetime
         >>> import vectorbt as vbt
 
-        >>> start = '2020-01-01 UTC'  # crypto is in UTC
-        >>> end = '2020-09-01 UTC'
-        >>> close = vbt.YFData.download("BTC-USD", start=start, end=end).get('Close')
+        >>> close = vbt.YFData.download(
+        ...     "BTC-USD",
+        ...     start='2020-01-01 UTC',
+        ...     end='2020-09-01 UTC'
+        ... ).get('Close')
 
-        >>> np.random.seed(42)
-        >>> size = pd.Series.vbt.empty_like(close, fill_value=0.)
-        >>> n_orders = 20
-        >>> rand_idxs = np.random.randint(0, len(size), size=n_orders)
-        >>> size.iloc[rand_idxs] = np.random.uniform(-1, 1, size=n_orders)
-        >>> portfolio = vbt.Portfolio.from_orders(
-        ...     close, size, direction='longonly',
-        ...     init_cash='auto', freq='1D')
+        >>> portfolio = vbt.Portfolio.from_random_signals(close, n=10, seed=42)
         >>> portfolio.plot()
         ```
 
         ![](/vectorbt/docs/img/portfolio_plot.svg)
 
-        You can choose any of the subplots in `Portfolio.subplot_settings`, in any order:
+        You can choose any of the subplots in `Portfolio.subplots`, in any order, and
+        control their appearance using keyword arguments:
 
         ```python-repl
         >>> from vectorbt.utils.colors import adjust_opacity
@@ -2802,7 +3429,7 @@ class Portfolio(Wrapping):
         ...     drawdowns_kwargs=dict(top_n=3),
         ...     underwater_kwargs=dict(
         ...         trace_kwargs=dict(
-        ...             line_color='#FF6F00',
+        ...             line=dict(color='#FF6F00'),
         ...             fillcolor=adjust_opacity('#FF6F00', 0.3)
         ...         )
         ...     )
@@ -2811,86 +3438,146 @@ class Portfolio(Wrapping):
 
         ![](/vectorbt/docs/img/portfolio_plot_drawdowns.svg)
 
-        You can also create a custom subplot by creating a placeholder that can be written later:
+        To create a new subplot, a preferred way is to pass a plotting function:
+
+        ```python-repl
+        >>> def plot_order_size(size, add_trace_kwargs=None, fig=None):
+        ...     size.rename('Order Size').vbt.barplot(
+        ...         add_trace_kwargs=add_trace_kwargs, fig=fig)
+
+        >>> order_size = portfolio.orders.size.to_pd(default_val=0.)
+        >>> portfolio.plot(subplots=[
+        ...     'orders',
+        ...     ('order_size', dict(
+        ...         title='Order Size',
+        ...         yaxis_title='Order size',
+        ...         can_plot_groups=False,
+        ...         plot_func=plot_order_size
+        ...     ))
+        ... ], order_size_kwargs=dict(size=order_size))
+        ```
+
+        Alternatively, you can create a placeholder and overwrite it manually later:
 
         ```python-repl
         >>> fig = portfolio.plot(subplots=[
         ...     'orders',
         ...     ('order_size', dict(
         ...         title='Order Size',
+        ...         yaxis_title='Order size',
         ...         can_plot_groups=False
         ...     ))  # placeholder
         ... ])
-        >>> size.rename('Order Size').vbt.plot(add_trace_kwargs=dict(row=2, col=1), fig=fig)
-        ```
-
-        Alternatively, you can pass a plot function:
-
-        ```python-repl
-        >>> def plot_order_size(portfolio, add_trace_kwargs=None, fig=None):
-        ...     size.rename('Order Size').vbt.plot(add_trace_kwargs=add_trace_kwargs, fig=fig)
-
-        >>> portfolio.plot(subplots=[
-        ...     'orders',
-        ...     ('order_size', dict(
-        ...         title='Order Size',
-        ...         can_plot_groups=False,
-        ...         plot_func=plot_order_size
-        ...     ))
-        ... ])
+        >>> order_size.rename('Order Size').vbt.barplot(
+        ...     add_trace_kwargs=dict(row=2, col=1), fig=fig)
         ```
 
         ![](/vectorbt/docs/img/portfolio_plot_custom.svg)
+
+        If a plotting function can in any way be accessed from the current portfolio, you can pass
+        the path to this function (see `vectorbt.utils.attr.deep_getattr` for the path format).
+        You can additionally use templates to make some parameters to depend upon passed keyword arguments:
+
+        ```python-repl
+        >>> subplots = [
+        ...     ('cumulative_returns', dict(
+        ...         title='Cumulative Returns',
+        ...         yaxis_title='Cumulative returns',
+        ...         plot_func='returns.vbt.returns.cumulative.vbt.plot',
+        ...         pass_add_trace_kwargs=True  # hidden behind **kwargs in vbt.plot
+        ...     )),
+        ...     ('rolling_drawdown', dict(
+        ...         title='Rolling Drawdown',
+        ...         yaxis_title='Rolling drawdown',
+        ...         plot_func=[
+        ...             'returns.vbt.returns',  # returns accessor
+        ...             (
+        ...                 'rolling_max_drawdown',  # function name
+        ...                 (vbt.Rep('window'),)),  # positional arguments
+        ...             'vbt.plot'  # plotting function
+        ...         ],
+        ...         pass_add_trace_kwargs=True,
+        ...         trace_names=[vbt.Sub('rolling_drawdown(${window})')],  # add window to the trace name
+        ...     ))
+        ... ]
+        >>> portfolio.plot(subplots, rolling_drawdown_kwargs=dict(template_mapping=dict(window=10)))
+        ```
+
+        You can also replace templates across all subplots by using the global template mapping:
+
+        ```python-repl
+        >>> portfolio.plot(subplots, template_mapping=dict(window=10))
+        ```
+
+        ![](/vectorbt/docs/img/portfolio_plot_path.svg)
         """
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
-        portfolio_cfg = settings['portfolio']
+        portfolio_plot_cfg = settings['portfolio']['plot']
 
-        # Select one column/group
-        self_col = self.select_series(column=column, group_by=group_by)
+        # Resolve defaults
+        if show_titles is None:
+            show_titles = portfolio_plot_cfg['show_titles']
+        if hide_id_labels is None:
+            hide_id_labels = portfolio_plot_cfg['hide_id_labels']
+        if group_id_labels is None:
+            group_id_labels = portfolio_plot_cfg['group_id_labels']
+        if silence_warnings is None:
+            silence_warnings = portfolio_plot_cfg['silence_warnings']
+        make_subplots_kwargs = merge_dicts(portfolio_plot_cfg['make_subplots_kwargs'], make_subplots_kwargs)
+        template_mapping = merge_dicts(portfolio_plot_cfg['template_mapping'], template_mapping)
+        hline_shape_kwargs = merge_dicts(portfolio_plot_cfg['hline_shape_kwargs'], hline_shape_kwargs)
+        kwargs = merge_dicts(portfolio_plot_cfg['kwargs'], kwargs)
+
+        # Check if grouped
+        is_grouped = self.wrapper.grouper.is_grouped(group_by=group_by)
+
+        # Replace templates
+        if len(template_mapping) > 0:
+            kwargs = deep_substitute(kwargs, mapping=template_mapping)
+
+        # Filter subplots
+        def _filter_grouped(subplot: tp.Tuple[str, tp.Kwargs]) -> bool:
+            if 'can_plot_groups' not in subplot[1]:
+                return True
+            if subplot[1]['can_plot_groups']:
+                return True
+            return False
 
         if subplots is None:
-            subplots = portfolio_cfg['subplots']
-            if self_col.wrapper.grouper.is_grouped():
-                def _filter(x: str) -> bool:
-                    _settings = self.subplot_settings[x]
-                    if 'can_plot_groups' in _settings and not _settings['can_plot_groups']:
-                        return False
-                    return True
-
-                subplots = filter(_filter, subplots)
+            subplots = portfolio_plot_cfg['subplots']
+            if is_grouped:
+                grouped_subplots = portfolio_plot_cfg['grouped_subplots']
+                if grouped_subplots is None:
+                    grouped_subplots = subplots
+                subplots = grouped_subplots
         elif subplots == 'all':
-            if self_col.wrapper.grouper.is_grouped():
-                supported_subplots = filter(lambda x: x[1].get('can_plot_groups', True), self.subplot_settings.items())
-            else:
-                supported_subplots = self.subplot_settings.items()
-            subplots = list(list(zip(*supported_subplots))[0])
-        if not isinstance(subplots, list):
+            subplots = self.subplots
+            silence_warnings = True
+        if isinstance(subplots, dict):
+            subplots = list(subplots.items())
+        if isinstance(subplots, (str, tuple)):
             subplots = [subplots]
+        new_subplots = []
+        for subplot in subplots:
+            if isinstance(subplot, str):
+                subplot = (subplot, self.subplots[subplot])
+            if not isinstance(subplot, tuple):
+                raise TypeError("Each subplot must be either a string or a tuple")
+            subplot = (subplot[0], merge_dicts(subplot[1], kwargs.pop(f'{subplot[0]}_kwargs', {})))
+            new_subplots.append(subplot)
+        subplots = new_subplots
+        if is_grouped:
+            filtered_subplots = list(filter(_filter_grouped, subplots))
+            if len(filtered_subplots) < len(subplots) and not silence_warnings:
+                warnings.warn("Some subplots do not support plotting grouped data", stacklevel=2)
+            subplots = filtered_subplots
         if len(subplots) == 0:
-            raise ValueError("You must select at least one subplot")
-        if hline_shape_kwargs is None:
-            hline_shape_kwargs = {}
-        hline_shape_kwargs = merge_dicts(
-            dict(
-                type='line',
-                line=dict(
-                    color='gray',
-                    dash="dash",
-                )
-            ),
-            hline_shape_kwargs
-        )
-        if make_subplots_kwargs is None:
-            make_subplots_kwargs = {}
+            raise ValueError("There is nothing to plot")
 
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))
         cols = make_subplots_kwargs.pop('cols', 1)
-        default_width = plotting_cfg['layout']['width']
-        default_height = plotting_cfg['layout']['height']
-        width = kwargs.get('width', default_width + 50)
-        height = kwargs.get('height', (default_height - 50) * rows if rows > 1 else default_height)
         specs = make_subplots_kwargs.pop('specs', [[{} for _ in range(cols)] for _ in range(rows)])
         row_col_tuples = []
         for row, row_spec in enumerate(specs):
@@ -2899,23 +3586,68 @@ class Portfolio(Wrapping):
                     row_col_tuples.append((row + 1, col + 1))
         shared_xaxes = make_subplots_kwargs.pop('shared_xaxes', True)
         shared_yaxes = make_subplots_kwargs.pop('shared_yaxes', False)
+        default_height = plotting_cfg['layout']['height']
+        default_width = plotting_cfg['layout']['width'] + 50
+        min_space = 10  # space between subplots with no axis sharing
+        max_title_spacing = 30
+        max_xaxis_spacing = 50
+        max_yaxis_spacing = 100
+        legend_height = 50
+        if show_titles:
+            title_spacing = max_title_spacing
+        else:
+            title_spacing = 0
+        if not shared_xaxes and rows > 1:
+            xaxis_spacing = max_xaxis_spacing
+        else:
+            xaxis_spacing = 0
+        if not shared_yaxes and cols > 1:
+            yaxis_spacing = max_yaxis_spacing
+        else:
+            yaxis_spacing = 0
+        if 'height' in kwargs:
+            height = kwargs.pop('height')
+        else:
+            height = default_height + title_spacing
+            if rows > 1:
+                height *= rows
+                height += min_space * rows - min_space
+                height += legend_height - legend_height * rows
+                if shared_xaxes:
+                    height += max_xaxis_spacing - max_xaxis_spacing * rows
+        if 'width' in kwargs:
+            width = kwargs.pop('width')
+        else:
+            width = default_width
+            if cols > 1:
+                width *= cols
+                width += min_space * cols - min_space
+                if shared_yaxes:
+                    width += max_yaxis_spacing - max_yaxis_spacing * cols
         if height is not None:
-            vertical_spacing = make_subplots_kwargs.pop('vertical_spacing', 40)
+            if 'vertical_spacing' in make_subplots_kwargs:
+                vertical_spacing = make_subplots_kwargs.pop('vertical_spacing')
+            else:
+                vertical_spacing = min_space + title_spacing + xaxis_spacing
             if vertical_spacing is not None and vertical_spacing > 1:
                 vertical_spacing /= height
+            legend_y = 1 + (min_space + title_spacing) / height
         else:
             vertical_spacing = make_subplots_kwargs.pop('vertical_spacing', None)
-        horizontal_spacing = make_subplots_kwargs.pop('horizontal_spacing', None)
+            legend_y = 1.02
         if width is not None:
+            if 'horizontal_spacing' in make_subplots_kwargs:
+                horizontal_spacing = make_subplots_kwargs.pop('horizontal_spacing')
+            else:
+                horizontal_spacing = min_space + yaxis_spacing
             if horizontal_spacing is not None and horizontal_spacing > 1:
                 horizontal_spacing /= width
+        else:
+            horizontal_spacing = make_subplots_kwargs.pop('horizontal_spacing', None)
         if show_titles:
             _subplot_titles = []
             for name in subplots:
-                if isinstance(name, tuple):
-                    _subplot_titles.append(name[1].get('title', None))
-                else:
-                    _subplot_titles.append(self_col.subplot_settings[name]['title'])
+                _subplot_titles.append(name[1].get('title', None))
         else:
             _subplot_titles = None
         fig = make_subplots(
@@ -2929,332 +3661,93 @@ class Portfolio(Wrapping):
             horizontal_spacing=horizontal_spacing,
             **make_subplots_kwargs
         )
-        default_layout = dict(
-            autosize=True,
+        kwargs = merge_dicts(dict(
             width=width,
             height=height,
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
-                y=(1 + 30 / height) if height is not None else 1.02,
+                y=legend_y,
                 xanchor="right",
                 x=1,
                 traceorder='normal'
             )
-        )
-        fig.update_layout(default_layout)
-
-        def _add_hline(value: tp.Any, x_domain: tp.Tuple[tp.Any, tp.Any], yref: str) -> None:
-            fig.add_shape(**merge_dicts(dict(
-                xref="paper",
-                yref=yref,
-                x0=x_domain[0],
-                y0=value,
-                x1=x_domain[1],
-                y1=value
-            ), hline_shape_kwargs))
-
-        def _get_arg_names(method: tp.Callable) -> tp.List[str]:
-            return [
-                p.name for p in signature(method).parameters.values()
-                if p.kind != p.VAR_POSITIONAL and p.kind != p.VAR_KEYWORD
-            ]
-
-        def _extract_method_kwargs(method: tp.Callable, kwargs: tp.Kwargs) -> tp.Kwargs:
-            arg_names = _get_arg_names(method)
-            method_kwargs = {}
-            for name in arg_names:
-                if name in kwargs:
-                    method_kwargs[name] = kwargs.pop(name)
-            return method_kwargs
+        ), kwargs)
+        fig.update_layout(**kwargs)  # final destination for kwargs
 
         # Show subplots
-        for i, name in enumerate(subplots):
+        for i, (name, settings) in enumerate(subplots):
+            settings = settings.copy()
             row, col = row_col_tuples[i]
             xref = 'x' if i == 0 else 'x' + str(i + 1)
             yref = 'y' if i == 0 else 'y' + str(i + 1)
-            xaxis = 'xaxis' if i == 0 else 'xaxis' + str(i + 1)
-            yaxis = 'yaxis' if i == 0 else 'yaxis' + str(i + 1)
-            x_domain = fig.layout[xaxis]['domain']
-            y_domain = fig.layout[yaxis]['domain']
+            xaxis = 'xaxis' + xref[1:]
+            yaxis = 'yaxis' + yref[1:]
+            x_domain = get_domain(xref, fig)
+            y_domain = get_domain(yref, fig)
 
-            if isinstance(name, tuple):
-                _name, settings = name
-                can_plot_groups = settings.get('can_plot_groups', True)
-                if self_col.wrapper.grouper.is_grouped() and not can_plot_groups:
-                    raise TypeError(f"Group is not supported by custom subplot with name '{_name}'")
-                plot_func = settings.get('plot_func', None)
+            # Check if the subplot can be plotted
+            can_plot_groups = settings.pop('can_plot_groups', True)
+            if is_grouped and not can_plot_groups:
+                raise ValueError(f"Subplot '{name}' does not support plotting grouped data")
 
-                if plot_func is not None:
-                    arg_names = _get_arg_names(plot_func)
-                    custom_kwargs = dict()
-                    if 'add_trace_kwargs' in arg_names:
-                        custom_kwargs['add_trace_kwargs'] = dict(row=row, col=col)
-                    if 'xref' in arg_names:
-                        custom_kwargs['xref'] = xref
-                    if 'yref' in arg_names:
-                        custom_kwargs['yref'] = yref
-                    if 'xaxis' in arg_names:
-                        custom_kwargs['xaxis'] = xaxis
-                    if 'yaxis' in arg_names:
-                        custom_kwargs['yaxis'] = yaxis
-                    if 'x_domain' in arg_names:
-                        custom_kwargs['x_domain'] = x_domain
-                    if 'y_domain' in arg_names:
-                        custom_kwargs['y_domain'] = y_domain
-                    custom_kwargs = merge_dicts(custom_kwargs, kwargs.pop(f'{_name}_kwargs', {}))
-                    plot_func(self_col, **custom_kwargs, fig=fig)
+            # Replace templates
+            subplot_template_mapping = settings.pop('template_mapping', {})
+            settings = merge_dicts(dict(
+                portfolio=self,
+                column=column,
+                group_by=group_by,
+                name=name,
+                trace_names=[name],
+                add_trace_kwargs=dict(row=row, col=col),
+                xref=xref,
+                yref=yref,
+                xaxis=xaxis,
+                yaxis=yaxis,
+                x_domain=x_domain,
+                y_domain=y_domain,
+                hline_shape_kwargs=hline_shape_kwargs,
+                fig=fig
+            ), settings)
+            mapping = merge_dicts(settings, template_mapping, subplot_template_mapping)
+            settings = deep_substitute(settings, mapping=mapping)
 
-            else:
-                settings = self.subplot_settings[name]
-                can_plot_groups = settings.get('can_plot_groups', True)
-                if self_col.wrapper.grouper.is_grouped() and not can_plot_groups:
-                    raise TypeError(f"Group is not supported by subplot with name '{name}'")
-
-                if name == 'orders':
-                    orders_kwargs = kwargs.pop('orders_kwargs', {})
-                    method_kwargs = _extract_method_kwargs(self_col.get_orders, orders_kwargs)
-                    self_col.get_orders(**method_kwargs).plot(
-                        **orders_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-
-                elif name == 'trades':
-                    trades_kwargs = kwargs.pop('trades_kwargs', {})
-                    method_kwargs = _extract_method_kwargs(self_col.get_trades, trades_kwargs)
-                    self_col.get_trades(**method_kwargs).plot(
-                        **trades_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'positions':
-                    positions_kwargs = kwargs.pop('positions_kwargs', {})
-                    method_kwargs = _extract_method_kwargs(self_col.get_positions, positions_kwargs)
-                    self_col.get_positions(**method_kwargs).plot(
-                        **positions_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'trade_pnl':
-                    trade_pnl_kwargs = merge_dicts(dict(
-                        hline_shape_kwargs=hline_shape_kwargs
-                    ), kwargs.pop('trade_pnl_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.get_trades, trade_pnl_kwargs)
-                    self_col.get_trades(**method_kwargs).plot_pnl(
-                        **trade_pnl_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'position_pnl':
-                    position_pnl_kwargs = kwargs.pop('position_pnl_kwargs', {})
-                    method_kwargs = _extract_method_kwargs(self_col.get_positions, position_pnl_kwargs)
-                    self_col.get_positions(**method_kwargs).plot_pnl(
-                        **position_pnl_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'trade_returns':
-                    trade_returns_kwargs = merge_dicts(dict(
-                        hline_shape_kwargs=hline_shape_kwargs
-                    ), kwargs.pop('trade_returns_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.get_trades, trade_returns_kwargs)
-                    self_col.get_trades(**method_kwargs).plot_returns(
-                        **trade_returns_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'position_returns':
-                    position_returns_kwargs = kwargs.pop('position_returns_kwargs', {})
-                    method_kwargs = _extract_method_kwargs(self_col.get_positions, position_returns_kwargs)
-                    self_col.get_positions(**method_kwargs).plot_returns(
-                        **position_returns_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'cum_returns':
-                    cum_returns_kwargs = merge_dicts(dict(
-                        benchmark_rets=self_col.market_returns(),
-                        main_kwargs=dict(
-                            trace_kwargs=dict(
-                                line_color=plotting_cfg['color_schema']['purple'],
-                                name='Value'
-                            )
-                        ),
-                        hline_shape_kwargs=hline_shape_kwargs
-                    ), kwargs.pop('cum_returns_kwargs', {}))
-                    active_returns = cum_returns_kwargs.pop('active_returns', False)
-                    in_sim_order = cum_returns_kwargs.pop('in_sim_order', False)
-                    if active_returns:
-                        returns = self_col.active_returns()
-                    else:
-                        returns = self_col.returns(in_sim_order=in_sim_order)
-                    returns.vbt.returns.plot_cum_returns(
-                        **cum_returns_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'drawdowns':
-                    drawdowns_kwargs = merge_dicts(dict(
-                        ts_trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['purple'],
-                            name='Value'
-                        )
-                    ), kwargs.pop('drawdowns_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.get_drawdowns, drawdowns_kwargs)
-                    self_col.get_drawdowns(**method_kwargs).plot(
-                        **drawdowns_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), xref=xref, yref=yref, fig=fig)
-
-                elif name == 'underwater':
-                    underwater_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['red'],
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3),
-                            fill='tozeroy',
-                            name='Drawdown'
-                        )
-                    ), kwargs.pop('underwater_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.drawdown, underwater_kwargs)
-                    self_col.drawdown(**method_kwargs).vbt.plot(
-                        **underwater_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(0, x_domain, yref)
-                    fig.layout[yaxis]['tickformat'] = '%'
-
-                elif name == 'share_flow':
-                    share_flow_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['brown'],
-                            name='Shares'
-                        )
-                    ), kwargs.pop('share_flow_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.share_flow, share_flow_kwargs)
-                    self_col.share_flow(**method_kwargs).vbt.plot(
-                        **share_flow_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(0, x_domain, yref)
-
-                elif name == 'cash_flow':
-                    cash_flow_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['green'],
-                            name='Cash'
-                        )
-                    ), kwargs.pop('cash_flow_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.cash_flow, cash_flow_kwargs)
-                    self_col.cash_flow(**method_kwargs).vbt.plot(
-                        **cash_flow_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(0, x_domain, yref)
-
-                elif name == 'shares':
-                    shares_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['brown'],
-                            name='Shares'
-                        ),
-                        pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['brown'], 0.3)
-                        ),
-                        neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-                        ),
-                        other_trace_kwargs='hidden'
-                    ), kwargs.pop('shares_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.shares, shares_kwargs)
-                    self_col.shares(**method_kwargs).vbt.plot_against(
-                        0, **shares_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(0, x_domain, yref)
-
-                elif name == 'cash':
-                    cash_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['green'],
-                            name='Cash'
-                        ),
-                        pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['green'], 0.3)
-                        ),
-                        neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['red'], 0.3)
-                        ),
-                        other_trace_kwargs='hidden'
-                    ), kwargs.pop('cash_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.cash, cash_kwargs)
-                    self_col.cash(**method_kwargs).vbt.plot_against(
-                        0, **cash_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(self_col.init_cash, x_domain, yref)
-
-                elif name == 'holding_value':
-                    holding_value_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['cyan'],
-                            name='Holding Value'
-                        ),
-                        pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['cyan'], 0.3)
-                        ),
-                        neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-                        ),
-                        other_trace_kwargs='hidden'
-                    ), kwargs.pop('holding_value_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.holding_value, holding_value_kwargs)
-                    self_col.holding_value(**method_kwargs).vbt.plot_against(
-                        0, **holding_value_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(0, x_domain, yref)
-
-                elif name == 'value':
-                    value_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['purple'],
-                            name='Value'
-                        ),
-                        other_trace_kwargs='hidden'
-                    ), kwargs.pop('value_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.value, value_kwargs)
-                    self_col.value(**method_kwargs).vbt.plot_against(
-                        self_col.init_cash, **value_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(self_col.init_cash, x_domain, yref)
-
-                elif name == 'gross_exposure':
-                    gross_exposure_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['pink'],
-                            name='Exposure'
-                        ),
-                        pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-                        ),
-                        neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
-                        ),
-                        other_trace_kwargs='hidden'
-                    ), kwargs.pop('gross_exposure_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.gross_exposure, gross_exposure_kwargs)
-                    self_col.gross_exposure(**method_kwargs).vbt.plot_against(
-                        1, **gross_exposure_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(1, x_domain, yref)
-
-                elif name == 'net_exposure':
-                    net_exposure_kwargs = merge_dicts(dict(
-                        trace_kwargs=dict(
-                            line_color=plotting_cfg['color_schema']['pink'],
-                            name='Exposure'
-                        ),
-                        pos_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['pink'], 0.3)
-                        ),
-                        neg_trace_kwargs=dict(
-                            fillcolor=adjust_opacity(plotting_cfg['color_schema']['orange'], 0.3)
-                        ),
-                        other_trace_kwargs='hidden'
-                    ), kwargs.pop('net_exposure_kwargs', {}))
-                    method_kwargs = _extract_method_kwargs(self_col.net_exposure, net_exposure_kwargs)
-                    self_col.net_exposure(**method_kwargs).vbt.plot_against(
-                        0, **net_exposure_kwargs,
-                        add_trace_kwargs=dict(row=row, col=col), fig=fig)
-                    _add_hline(0, x_domain, yref)
-
+            # Update global layout
             fig.layout[xaxis]['title'] = 'Date'
-            fig.layout[yaxis]['title'] = settings.get('yaxis_title', settings.get('title', None))
+            fig.layout[yaxis]['title'] = settings.pop('yaxis_title', settings.pop('title', None))
+
+            # Prepare and call plotting function
+            plot_func = settings.pop('plot_func', None)
+            if plot_func is not None:
+
+                # Prepare function and keyword arguments
+                reserved_args = [
+                    'portfolio',
+                    'column',
+                    'group_by',
+                    'name',
+                    'trace_names',
+                    'add_trace_kwargs',
+                    'xref',
+                    'yref',
+                    'xaxis',
+                    'yaxis',
+                    'x_domain',
+                    'y_domain',
+                    'hline_shape_kwargs'
+                ]
+                if not callable(plot_func):
+                    plot_func = self.getattr(plot_func, call_last_method=False)
+                func_arg_names = get_func_arg_names(plot_func)
+                for k in reserved_args:
+                    if 'pass_' + k in settings:
+                        if not settings.pop('pass_' + k):  # first priority
+                            del settings[k]
+                    elif k not in func_arg_names:  # second priority
+                        del settings[k]
+
+                # Call plotting function
+                plot_func(**settings)
 
         # Remove duplicate legend labels
         found_ids = dict()
@@ -3321,5 +3814,4 @@ class Portfolio(Wrapping):
                             fig.layout[yaxis]['title'] = None
                         i += 1
 
-        fig.update_layout(kwargs)
         return fig

@@ -10,10 +10,21 @@ import pytz
 from copy import copy, deepcopy
 
 from vectorbt import settings
-from vectorbt.utils import checks, config, decorators, math, array, random, enum, params, attr, datetime, schedule
+from vectorbt.utils import (
+    checks,
+    config,
+    decorators,
+    math,
+    array,
+    random,
+    enum,
+    params,
+    attr,
+    datetime,
+    schedule,
+    template
+)
 from datetime import datetime as _datetime, timedelta as _timedelta, time as _time, timezone as _timezone
-
-from tests.utils import hash
 
 seed = 42
 
@@ -868,6 +879,12 @@ class TestConfig:
 
         assert config.get_func_kwargs(f) == {'b': 2}
 
+    def test_get_func_arg_names(self):
+        def f(a, *args, b=2, **kwargs):
+            pass
+
+        assert config.get_func_arg_names(f) == ['a', 'b']
+
     def test_configured(self, tmp_path):
         class H(config.Configured):
             def __init__(self, a, b=2, **kwargs):
@@ -1454,6 +1471,7 @@ class TestAttrs:
         assert attr.deep_getattr(C(), ['b', ('b', (1,))]) == 1
         assert attr.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
         assert attr.deep_getattr(C(), 'b.b_prop') == 1
+        assert callable(attr.deep_getattr(C(), 'b.a.a', call_last_method=False))
 
 
 # ############# checks.py ############# #
@@ -2314,3 +2332,22 @@ class TestScheduleManager:
         loop = asyncio.get_event_loop()
         loop.run_until_complete(manager.async_start())
         assert kwargs['call_count'] == 5
+
+
+# ############# template.py ############# #
+
+
+class TestTemplate:
+    def test_deep_substitute(self):
+        assert template.deep_substitute(template.Rep('hello'), mapping={'hello': 100}) == 100
+        with pytest.raises(Exception):
+            _ = template.deep_substitute(template.Rep('hello2'), mapping={'hello': 100})
+        assert template.deep_substitute(template.Sub('$hello'), mapping={'hello': 100}) == '100'
+        with pytest.raises(Exception):
+            _ = template.deep_substitute(template.Sub('$hello2'), mapping={'hello': 100})
+        assert template.deep_substitute([template.Rep('hello')], mapping={'hello': 100}) == [100]
+        assert template.deep_substitute((template.Rep('hello'),), mapping={'hello': 100}) == (100,)
+        assert template.deep_substitute({'test': template.Rep('hello')}, mapping={'hello': 100}) == {'test': 100}
+        Tup = namedtuple('Tup', ['a'])
+        tup = Tup(template.Rep('hello'))
+        assert template.deep_substitute(tup, mapping={'hello': 100}) == Tup(100)

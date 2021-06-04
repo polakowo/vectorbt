@@ -8,42 +8,359 @@ from vectorbt import _typing as tp
 from vectorbt.utils.docs import to_doc
 
 __all__ = [
+    'RejectedOrderError',
+    'InitCashMode',
+    'CallSeqType',
+    'ConflictMode',
+    'SizeType',
+    'Direction',
+    'OrderStatus',
+    'OrderSide',
+    'StatusInfo',
+    'TradeDirection',
+    'TradeStatus',
+    'TradeType',
+    'ProcessOrderState',
+    'ExecuteOrderState',
     'SimulationContext',
     'GroupContext',
     'RowContext',
     'SegmentContext',
     'OrderContext',
     'AfterOrderContext',
-    'InitCashMode',
-    'CallSeqType',
-    'SizeType',
-    'ConflictMode',
     'Order',
     'NoOrder',
-    'OrderStatus',
-    'OrderSide',
-    'status_info_desc',
-    'StatusInfo',
     'OrderResult',
-    'RejectedOrderError',
-    'ProcessOrderState',
-    'ExecuteOrderState',
-    'Direction',
     'order_dt',
-    'TradeDirection',
-    'TradeStatus',
     'trade_dt',
     'position_dt',
-    'log_dt',
-    'TradeType'
+    'log_dt'
 ]
 
 __pdoc__ = {}
 
 
-# We use namedtuple for enums and classes to be able to use them in Numba
+# ############# Errors ############# #
 
-# ############# Portfolio ############# #
+
+class RejectedOrderError(Exception):
+    """Rejected order error."""
+    pass
+
+
+# ############# Enums ############# #
+
+
+class InitCashModeT(tp.NamedTuple):
+    Auto: int
+    AutoAlign: int
+
+
+InitCashMode = InitCashModeT(*range(2))
+"""_"""
+
+__pdoc__['InitCashMode'] = f"""Initial cash mode.
+
+```json
+{to_doc(InitCashMode)}
+```
+
+Attributes:
+    Auto: Initial cash is infinite within simulation, and then set to the total cash spent.
+    AutoAlign: Initial cash is set to the total cash spent across all columns.
+"""
+
+
+class CallSeqTypeT(tp.NamedTuple):
+    Default: int
+    Reversed: int
+    Random: int
+    Auto: int
+
+
+CallSeqType = CallSeqTypeT(*range(4))
+"""_"""
+
+__pdoc__['CallSeqType'] = f"""Call sequence type.
+
+```json
+{to_doc(CallSeqType)}
+```
+
+Attributes:
+    Default: Place calls from left to right.
+    Reversed: Place calls from right to left.
+    Random: Place calls randomly.
+    Auto: Place calls dynamically based on order value.
+"""
+
+
+class ConflictModeT(tp.NamedTuple):
+    Ignore: int
+    Entry: int
+    Exit: int
+    Opposite: int
+
+
+ConflictMode = ConflictModeT(*range(4))
+"""_"""
+
+__pdoc__['ConflictMode'] = f"""Conflict mode.
+
+```json
+{to_doc(ConflictMode)}
+```
+
+What should happen if both entry and exit signals occur simultaneously?
+
+Attributes:
+    Ignore: Ignore both signals.
+    Entry: Execute entry signal.
+    Exit: Execute exit signal.
+    Opposite: Execute opposite signal. Takes effect only when in position.
+"""
+
+
+class SizeTypeT(tp.NamedTuple):
+    Amount: int
+    TargetAmount: int
+    TargetValue: int
+    TargetPercent: int
+    Percent: int
+
+
+SizeType = SizeTypeT(*range(5))
+"""_"""
+
+__pdoc__['SizeType'] = f"""Size type.
+
+```json
+{to_doc(SizeType)}
+```
+
+Attributes:
+    Amount: Amount of assets to buy or sell.
+    TargetAmount: Target amount of assets to hold (= target position).
+
+        Uses `position_now` to get the current position.
+        Gets converted into `SizeType.Amount`.
+    TargetValue: Target asset value. 
+
+        Uses `val_price_now` to get the current asset value. 
+        Gets converted into `SizeType.TargetAmount`.
+    TargetPercent: Target percentage of total value. 
+
+        Uses `value_now` to get the current total value.
+        Gets converted into `SizeType.TargetValue`.
+    Percent: Percentage of available resources in either direction to use.
+
+        When buying, it's the percentage of `cash_now`. 
+        When selling, it's the percentage of `position_now`.
+        When short selling, it's the percentage of `free_cash_now`.
+        When selling and short selling (i.e. reversing position), it's the percentage of 
+        `position_now` and `free_cash_now`.
+"""
+
+
+class DirectionT(tp.NamedTuple):
+    LongOnly: int
+    ShortOnly: int
+    All: int
+
+
+Direction = DirectionT(*range(3))
+"""_"""
+
+__pdoc__['Direction'] = f"""Position direction.
+
+```json
+{to_doc(Direction)}
+```
+
+Attributes:
+    LongOnly: Only long positions.
+    ShortOnly: Only short positions.
+    All: Both long and short positions.
+"""
+
+
+class OrderStatusT(tp.NamedTuple):
+    Filled: int
+    Ignored: int
+    Rejected: int
+
+
+OrderStatus = OrderStatusT(*range(3))
+"""_"""
+
+__pdoc__['OrderStatus'] = f"""Order status.
+
+```json
+{to_doc(OrderStatus)}
+```
+
+Attributes:
+    Filled: Order has been filled.
+    Ignored: Order has been ignored.
+    Rejected: Order has been rejected.
+"""
+
+
+class OrderSideT(tp.NamedTuple):
+    Buy: int
+    Sell: int
+
+
+OrderSide = OrderSideT(*range(2))
+"""_"""
+
+__pdoc__['OrderSide'] = f"""Order side.
+
+```json
+{to_doc(OrderSide)}
+```
+"""
+
+
+class StatusInfoT(tp.NamedTuple):
+    SizeNaN: int
+    PriceNaN: int
+    ValPriceNaN: int
+    ValueNaN: int
+    ValueZeroNeg: int
+    SizeZero: int
+    NoCashShort: int
+    NoCashLong: int
+    NoOpenPosition: int
+    MaxSizeExceeded: int
+    RandomEvent: int
+    CantCoverFees: int
+    MinSizeNotReached: int
+    PartialFill: int
+
+
+StatusInfo = StatusInfoT(*range(14))
+"""_"""
+
+__pdoc__['StatusInfo'] = f"""Order status information.
+
+```json
+{to_doc(StatusInfo)}
+```
+"""
+
+status_info_desc = [
+    "Size is NaN",
+    "Price is NaN",
+    "Asset valuation price is NaN",
+    "Asset/group value is NaN",
+    "Asset/group value is zero or negative",
+    "Size is zero",
+    "Not enough cash to short",
+    "Not enough cash to long",
+    "No open position to reduce/close",
+    "Size is greater than maximum allowed",
+    "Random event happened",
+    "Not enough cash to cover fees",
+    "Final size is less than minimum allowed",
+    "Final size is less than requested"
+]
+"""_"""
+
+__pdoc__['status_info_desc'] = f"""Order status description.
+
+```json
+{to_doc(status_info_desc)}
+```
+"""
+
+
+class TradeDirectionT(tp.NamedTuple):
+    Long: int
+    Short: int
+
+
+TradeDirection = TradeDirectionT(*range(2))
+"""_"""
+
+__pdoc__['TradeDirection'] = f"""Event direction.
+
+```json
+{to_doc(TradeDirection)}
+```
+"""
+
+
+class TradeStatusT(tp.NamedTuple):
+    Open: int
+    Closed: int
+
+
+TradeStatus = TradeStatusT(*range(2))
+"""_"""
+
+__pdoc__['TradeStatus'] = f"""Event status.
+
+```json
+{to_doc(TradeStatus)}
+```
+"""
+
+
+class TradeTypeT(tp.NamedTuple):
+    Trade: int
+    Position: int
+
+
+TradeType = TradeTypeT(*range(2))
+"""_"""
+
+__pdoc__['TradeType'] = f"""Trade type.
+
+```json
+{to_doc(TradeType)}
+```
+"""
+
+
+# ############# Named tuples ############# #
+
+
+class ProcessOrderState(tp.NamedTuple):
+    cash: float
+    position: float
+    debt: float
+    free_cash: float
+    val_price: float
+    value: float
+    oidx: int
+    lidx: int
+
+
+__pdoc__['ProcessOrderState'] = "State before or after order processing."
+__pdoc__['ProcessOrderState.cash'] = "Cash in the current column or group with cash sharing."
+__pdoc__['ProcessOrderState.position'] = "Position in the current column."
+__pdoc__['ProcessOrderState.debt'] = "Debt from shorting in the current column."
+__pdoc__['ProcessOrderState.free_cash'] = "Free cash in the current column or group with cash sharing."
+__pdoc__['ProcessOrderState.val_price'] = "Valuation price in the current column."
+__pdoc__['ProcessOrderState.value'] = "Value in the current column or group with cash sharing."
+__pdoc__['ProcessOrderState.oidx'] = "Index of order record."
+__pdoc__['ProcessOrderState.lidx'] = "Index of log record."
+
+
+class ExecuteOrderState(tp.NamedTuple):
+    cash: float
+    position: float
+    debt: float
+    free_cash: float
+
+
+__pdoc__['ExecuteOrderState'] = "State after order execution."
+__pdoc__['ExecuteOrderState.cash'] = "See `ProcessOrderState.cash`."
+__pdoc__['ExecuteOrderState.position'] = "See `ProcessOrderState.position`."
+__pdoc__['ExecuteOrderState.debt'] = "See `ProcessOrderState.debt`."
+__pdoc__['ExecuteOrderState.free_cash'] = "See `ProcessOrderState.free_cash`."
+
 
 class SimulationContext(tp.NamedTuple):
     target_shape: tp.Shape
@@ -57,7 +374,7 @@ class SimulationContext(tp.NamedTuple):
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
-    last_shares: tp.Array1d
+    last_position: tp.Array1d
     last_debt: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
@@ -186,11 +503,11 @@ In `order_func_nb` and `after_order_func_nb`, has the same value as `cash_now`.
 
 Gets updated right after `order_func_nb`.
 """
-__pdoc__['SimulationContext.last_shares'] = """Last shares per column.
+__pdoc__['SimulationContext.last_position'] = """Last position per column.
 
 Has shape `(target_shape[1],)`.
 
-In `order_func_nb` and `after_order_func_nb`, has the same value as `shares_now`.
+In `order_func_nb` and `after_order_func_nb`, has the same value as `position_now`.
 
 Gets updated right after `order_func_nb`.
 """
@@ -216,7 +533,7 @@ Has shape `(target_shape[1],)`.
 
 Enables `SizeType.TargetValue` and `SizeType.TargetPercent`.
 
-Gets multiplied by the number of shares to get the current value of the column.
+Gets multiplied by the current position to get the value of the column.
 The value of each column in a group with cash sharing is summed to get the value of the entire group.
 
 Defaults to the previous `close` right before `segment_prep_func_nb`.
@@ -229,7 +546,7 @@ If `update_value`, gets also updated right after `order_func_nb`.
 
 ## Example
 
-Consider 10 shares in column 1 and 20 shares in column 2. The previous close of them is
+Consider 10 units in column 1 and 20 units in column 2. The previous close of them is
 $40 and $50 respectively, which is also the default valuation price in the current row,
 available as `last_val_price` in `segment_prep_func_nb`. If both columns are in the same group 
 with cash sharing, the group is valued at $1400 before any `order_func_nb` is called, and can 
@@ -271,7 +588,7 @@ class GroupContext(tp.NamedTuple):
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
-    last_shares: tp.Array1d
+    last_position: tp.Array1d
     last_debt: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
@@ -341,7 +658,7 @@ class RowContext(tp.NamedTuple):
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
-    last_shares: tp.Array1d
+    last_position: tp.Array1d
     last_debt: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
@@ -380,7 +697,7 @@ class SegmentContext(tp.NamedTuple):
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
-    last_shares: tp.Array1d
+    last_position: tp.Array1d
     last_debt: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
@@ -439,7 +756,7 @@ class OrderContext(tp.NamedTuple):
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
-    last_shares: tp.Array1d
+    last_position: tp.Array1d
     last_debt: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
@@ -455,7 +772,7 @@ class OrderContext(tp.NamedTuple):
     col: int
     call_idx: int
     cash_now: float
-    shares_now: float
+    position_now: float
     debt_now: float
     free_cash_now: float
     val_price_now: float
@@ -489,9 +806,9 @@ __pdoc__['OrderContext.cash_now'] = """Cash in the current column or group with 
 
 Scalar value. Has the same value as `last_cash` for the current column/group.
 """
-__pdoc__['OrderContext.shares_now'] = """Shares in the current column.
+__pdoc__['OrderContext.position_now'] = """Position in the current column.
 
-Scalar value. Has the same value as `last_shares` for the current column.
+Scalar value. Has the same value as `last_position` for the current column.
 """
 __pdoc__['OrderContext.debt_now'] = """Debt from shorting in the current column.
 
@@ -523,7 +840,7 @@ class AfterOrderContext(tp.NamedTuple):
     order_records: tp.RecordArray
     log_records: tp.RecordArray
     last_cash: tp.Array1d
-    last_shares: tp.Array1d
+    last_position: tp.Array1d
     last_debt: tp.Array1d
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
@@ -539,14 +856,14 @@ class AfterOrderContext(tp.NamedTuple):
     col: int
     call_idx: int
     cash_before: float
-    shares_before: float
+    position_before: float
     debt_before: float
     free_cash_before: float
     val_price_before: float
     value_before: float
     order_result: "OrderResult"
     cash_now: float
-    shares_now: float
+    position_now: float
     debt_now: float
     free_cash_now: float
     val_price_now: float
@@ -571,7 +888,7 @@ for field in AfterOrderContext._fields:
     elif field in OrderContext._fields:
         __pdoc__['AfterOrderContext.' + field] = f"See `OrderContext.{field}`."
 __pdoc__['AfterOrderContext.cash_before'] = "`OrderContext.cash_now` before execution."
-__pdoc__['AfterOrderContext.shares_before'] = "`OrderContext.shares_now` before execution."
+__pdoc__['AfterOrderContext.position_before'] = "`OrderContext.position_now` before execution."
 __pdoc__['AfterOrderContext.debt_before'] = "`OrderContext.debt_now` before execution."
 __pdoc__['AfterOrderContext.free_cash_before'] = "`OrderContext.free_cash_now` before execution."
 __pdoc__['AfterOrderContext.val_price_before'] = "`OrderContext.val_price_now` before execution."
@@ -581,7 +898,7 @@ __pdoc__['AfterOrderContext.order_result'] = """Order result of type `OrderResul
 Can be used to check whether the order has been filled, ignored, or rejected.
 """
 __pdoc__['AfterOrderContext.cash_now'] = "`OrderContext.cash_now` after execution."
-__pdoc__['AfterOrderContext.shares_now'] = "`OrderContext.shares_now` after execution."
+__pdoc__['AfterOrderContext.position_now'] = "`OrderContext.position_now` after execution."
 __pdoc__['AfterOrderContext.val_price_now'] = """`OrderContext.val_price_now` after execution.
 
 If `update_value`, gets replaced with the fill price, as it becomes the most recently known price.
@@ -593,138 +910,32 @@ If `update_value`, gets updated with the new cash and value of the column. Other
 """
 
 
-class InitCashModeT(tp.NamedTuple):
-    Auto: int
-    AutoAlign: int
-
-
-InitCashMode = InitCashModeT(*range(2))
-"""_"""
-
-__pdoc__['InitCashMode'] = f"""Initial cash mode.
-
-```json
-{to_doc(InitCashMode)}
-```
-
-Attributes:
-    Auto: Initial cash is infinite within simulation, and then set to the total cash spent.
-    AutoAlign: Initial cash is set to the total cash spent across all columns.
-"""
-
-
-class CallSeqTypeT(tp.NamedTuple):
-    Default: int
-    Reversed: int
-    Random: int
-    Auto: int
-
-
-CallSeqType = CallSeqTypeT(*range(4))
-"""_"""
-
-__pdoc__['CallSeqType'] = f"""Call sequence type.
-
-```json
-{to_doc(CallSeqType)}
-```
-
-Attributes:
-    Default: Place calls from left to right.
-    Reversed: Place calls from right to left.
-    Random: Place calls randomly.
-    Auto: Place calls dynamically based on order value.
-"""
-
-
-class SizeTypeT(tp.NamedTuple):
-    Shares: int
-    TargetShares: int
-    TargetValue: int
-    TargetPercent: int
-    Percent: int
-
-
-SizeType = SizeTypeT(*range(5))
-"""_"""
-
-__pdoc__['SizeType'] = f"""Size type.
-
-```json
-{to_doc(SizeType)}
-```
-
-Attributes:
-    Shares: Number of shares to buy or sell.
-    TargetShares: Target number of shares.
-    
-        Uses `shares_now` to get the current number of shares.
-        Gets converted into `SizeType.Shares`.
-    TargetValue: Target holding value. 
-    
-        Uses `val_price_now` to get the current holding value. 
-        Gets converted into `SizeType.TargetShares`.
-    TargetPercent: Target percentage of total value. 
-    
-        Uses `value_now` to get the current total value.
-        Gets converted into `SizeType.TargetValue`.
-    Percent: Percentage of available resources in either direction to use.
-    
-        When buying, it's the percentage of `cash_now`. 
-        When selling, it's the percentage of `shares_now`.
-        When short selling, it's the percentage of the remaining free cash.
-        When selling and short selling (reversing position), it's the percentage of both.
-"""
-
-
-class ConflictModeT(tp.NamedTuple):
-    Ignore: int
-    Entry: int
-    Exit: int
-    Opposite: int
-
-
-ConflictMode = ConflictModeT(*range(4))
-"""_"""
-
-__pdoc__['ConflictMode'] = f"""Conflict mode.
-
-```json
-{to_doc(ConflictMode)}
-```
-
-What should happen if both entry and exit signals occur simultaneously?
-
-Attributes:
-    Ignore: Ignore both signals.
-    Entry: Execute entry signal.
-    Exit: Execute exit signal.
-    Opposite: Execute opposite signal. Takes effect only when in position.
-"""
-
-
 class Order(tp.NamedTuple):
     size: float
-    size_type: int
-    direction: int
     price: float
-    fees: float
-    fixed_fees: float
-    slippage: float
-    min_size: float
-    max_size: float
-    reject_prob: float
-    lock_cash: bool
-    allow_partial: bool
-    raise_reject: bool
-    log: bool
+    size_type: int = SizeType.Amount
+    direction: int = Direction.All
+    fees: float = 0.0
+    fixed_fees: float = 0.0
+    slippage: float = 0.0
+    min_size: float = 0.0
+    max_size: float = np.inf
+    reject_prob: float = 0.0
+    lock_cash: bool = False
+    allow_partial: bool = True
+    raise_reject: bool = False
+    log: bool = False
 
 
-__pdoc__['Order'] = "A named tuple representing an order."
-__pdoc__['Order.size'] = "Size in shares."
+__pdoc__['Order'] = """A named tuple representing an order.
+
+!!! note
+    Currently, Numba has issues with using defaults when filling named tuples. 
+    Use `vectorbt.portfolio.nb.create_order_nb` for this."""
+__pdoc__['Order.size'] = "Size."
+__pdoc__['Order.price'] = "Price per unit. Final price will depend upon slippage."
 __pdoc__['Order.size_type'] = "See `SizeType`."
 __pdoc__['Order.direction'] = "See `Direction`."
-__pdoc__['Order.price'] = "Price per share. Final price will depend upon slippage."
 __pdoc__['Order.fees'] = "Fees in percentage of the order value."
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
 __pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
@@ -738,9 +949,9 @@ __pdoc__['Order.log'] = "Whether to log this order by filling a log record. Reme
 
 NoOrder = Order(
     np.nan,
-    -1,
-    -1,
     np.nan,
+    -1,
+    -1,
     np.nan,
     np.nan,
     np.nan,
@@ -757,97 +968,6 @@ NoOrder = Order(
 __pdoc__['NoOrder'] = "Order that should not be processed."
 
 
-class OrderStatusT(tp.NamedTuple):
-    Filled: int
-    Ignored: int
-    Rejected: int
-
-
-OrderStatus = OrderStatusT(*range(3))
-"""_"""
-
-__pdoc__['OrderStatus'] = f"""Order status.
-
-```json
-{to_doc(OrderStatus)}
-```
-
-Attributes:
-    Filled: Order has been filled.
-    Ignored: Order has been ignored.
-    Rejected: Order has been rejected.
-"""
-
-
-class OrderSideT(tp.NamedTuple):
-    Buy: int
-    Sell: int
-
-
-OrderSide = OrderSideT(*range(2))
-"""_"""
-
-__pdoc__['OrderSide'] = f"""Order side.
-
-```json
-{to_doc(OrderSide)}
-```
-"""
-
-
-class StatusInfoT(tp.NamedTuple):
-    SizeNaN: int
-    PriceNaN: int
-    ValPriceNaN: int
-    ValueNaN: int
-    ValueZeroNeg: int
-    SizeZero: int
-    NoCashShort: int
-    NoCashLong: int
-    NoOpenPosition: int
-    MaxSizeExceeded: int
-    RandomEvent: int
-    CantCoverFees: int
-    MinSizeNotReached: int
-    PartialFill: int
-
-
-StatusInfo = StatusInfoT(*range(14))
-"""_"""
-
-__pdoc__['StatusInfo'] = f"""Order status information.
-
-```json
-{to_doc(StatusInfo)}
-```
-"""
-
-status_info_desc = [
-    "Size is NaN",
-    "Price is NaN",
-    "Asset valuation price is NaN",
-    "Asset/group value is NaN",
-    "Asset/group value is zero or negative",
-    "Size is zero",
-    "Not enough cash to short",
-    "Not enough cash to long",
-    "No open position to reduce/close",
-    "Size is greater than maximum allowed",
-    "Random event happened",
-    "Not enough cash to cover fees",
-    "Final size is less than minimum allowed",
-    "Final size is less than requested"
-]
-"""_"""
-
-__pdoc__['status_info_desc'] = f"""Order status description.
-
-```json
-{to_doc(status_info_desc)}
-```
-"""
-
-
 class OrderResult(tp.NamedTuple):
     size: float
     price: float
@@ -858,75 +978,12 @@ class OrderResult(tp.NamedTuple):
 
 
 __pdoc__['OrderResult'] = "A named tuple representing an order result."
-__pdoc__['OrderResult.size'] = "Filled size in shares."
-__pdoc__['OrderResult.price'] = "Filled price per share, adjusted with slippage."
+__pdoc__['OrderResult.size'] = "Filled size."
+__pdoc__['OrderResult.price'] = "Filled price per unit, adjusted with slippage."
 __pdoc__['OrderResult.fees'] = "Total fees paid for this order."
 __pdoc__['OrderResult.side'] = "See `OrderSide`."
 __pdoc__['OrderResult.status'] = "See `OrderStatus`."
 __pdoc__['OrderResult.status_info'] = "See `StatusInfo`."
-
-
-class RejectedOrderError(Exception):
-    """Rejected order error."""
-    pass
-
-
-class ProcessOrderState(tp.NamedTuple):
-    cash: float
-    shares: float
-    debt: float
-    free_cash: float
-    val_price: float
-    value: float
-    oidx: int
-    lidx: int
-
-
-__pdoc__['ProcessOrderState'] = "State before or after order processing."
-__pdoc__['ProcessOrderState.cash'] = "Cash in the current column or group with cash sharing."
-__pdoc__['ProcessOrderState.shares'] = "Shares in the current column."
-__pdoc__['ProcessOrderState.debt'] = "Debt from shorting in the current column."
-__pdoc__['ProcessOrderState.free_cash'] = "Free cash in the current column or group with cash sharing."
-__pdoc__['ProcessOrderState.val_price'] = "Valuation price in the current column."
-__pdoc__['ProcessOrderState.value'] = "Value in the current column or group with cash sharing."
-__pdoc__['ProcessOrderState.oidx'] = "Index of order record."
-__pdoc__['ProcessOrderState.lidx'] = "Index of log record."
-
-
-class ExecuteOrderState(tp.NamedTuple):
-    cash: float
-    shares: float
-    debt: float
-    free_cash: float
-
-
-__pdoc__['ExecuteOrderState'] = "State after order execution."
-__pdoc__['ExecuteOrderState.cash'] = "See `ProcessOrderState.cash`."
-__pdoc__['ExecuteOrderState.shares'] = "See `ProcessOrderState.shares`."
-__pdoc__['ExecuteOrderState.debt'] = "See `ProcessOrderState.debt`."
-__pdoc__['ExecuteOrderState.free_cash'] = "See `ProcessOrderState.free_cash`."
-
-
-class DirectionT(tp.NamedTuple):
-    LongOnly: int
-    ShortOnly: int
-    All: int
-
-
-Direction = DirectionT(*range(3))
-"""_"""
-
-__pdoc__['Direction'] = f"""Position direction.
-
-```json
-{to_doc(Direction)}
-```
-
-Attributes:
-    LongOnly: Only long positions.
-    ShortOnly: Only short positions.
-    All: Both long and short positions.
-"""
 
 # ############# Records ############# #
 
@@ -945,38 +1002,6 @@ __pdoc__['order_dt'] = f"""`np.dtype` of order records.
 
 ```json
 {to_doc(order_dt)}
-```
-"""
-
-
-class TradeDirectionT(tp.NamedTuple):
-    Long: int
-    Short: int
-
-
-TradeDirection = TradeDirectionT(*range(2))
-"""_"""
-
-__pdoc__['TradeDirection'] = f"""Event direction.
-
-```json
-{to_doc(TradeDirection)}
-```
-"""
-
-
-class TradeStatusT(tp.NamedTuple):
-    Open: int
-    Closed: int
-
-
-TradeStatus = TradeStatusT(*range(2))
-"""_"""
-
-__pdoc__['TradeStatus'] = f"""Event status.
-
-```json
-{to_doc(TradeStatus)}
 ```
 """
 
@@ -1025,15 +1050,15 @@ _log_fields = [
     ('col', np.int_),
     ('group', np.int_),
     ('cash', np.float_),
-    ('shares', np.float_),
+    ('position', np.float_),
     ('debt', np.float_),
     ('free_cash', np.float_),
     ('val_price', np.float_),
     ('value', np.float_),
     ('size', np.float_),
+    ('price', np.float_),
     ('size_type', np.int_),
     ('direction', np.int_),
-    ('price', np.float_),
     ('fees', np.float_),
     ('fixed_fees', np.float_),
     ('slippage', np.float_),
@@ -1045,7 +1070,7 @@ _log_fields = [
     ('raise_reject', np.bool_),
     ('log', np.bool_),
     ('new_cash', np.float_),
-    ('new_shares', np.float_),
+    ('new_position', np.float_),
     ('new_debt', np.float_),
     ('new_free_cash', np.float_),
     ('new_val_price', np.float_),
@@ -1066,21 +1091,5 @@ __pdoc__['log_dt'] = f"""`np.dtype` of log records.
 
 ```json
 {to_doc(log_dt)}
-```
-"""
-
-
-class TradeTypeT(tp.NamedTuple):
-    Trade: int
-    Position: int
-
-
-TradeType = TradeTypeT(*range(2))
-"""_"""
-
-__pdoc__['TradeType'] = f"""Trade type.
-
-```json
-{to_doc(TradeType)}
 ```
 """

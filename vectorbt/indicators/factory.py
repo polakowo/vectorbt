@@ -972,7 +972,7 @@ Another way of defining own properties and methods is subclassing:
 ```python-repl
 >>> class MyIndExtended(MyInd):
 ...     def plot(self, column=None, **kwargs):
-...         self_col = self.select_series(column=column, group_by=False)
+...         self_col = self.select_one(column=column, group_by=False)
 ...         return self.ma.vbt.plot(**kwargs)
 
 >>> MyIndExtended.run(price, [2, 3])[(2, 'a')].plot()

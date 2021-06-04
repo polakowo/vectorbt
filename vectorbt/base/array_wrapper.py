@@ -628,10 +628,16 @@ class Wrapping(Configured, PandasIndexer):
             return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
 
-    def select_series(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
+    def select_one(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
         """Select one column/group."""
         _self = self.regroup(group_by, **kwargs)
         if column is not None:
+            if _self.wrapper.grouper.is_grouped():
+                if column not in _self.wrapper.get_columns():
+                    raise KeyError(f"Group '{column}' not found")
+            else:
+                if column not in _self.wrapper.columns:
+                    raise KeyError(f"Column '{column}' not found")
             return _self[column]
         if not _self.wrapper.grouper.is_grouped():
             if _self.wrapper.ndim == 1:
@@ -639,4 +645,23 @@ class Wrapping(Configured, PandasIndexer):
             raise TypeError("Only one column is allowed. Use indexing or column argument.")
         if _self.wrapper.grouped_ndim == 1:
             return _self
+        raise TypeError("Only one group is allowed. Use indexing or column argument.")
+
+    @staticmethod
+    def select_one_from_obj(obj: tp.SeriesFrame, wrapper: ArrayWrapper, column: tp.Any = None) -> tp.MaybeSeries:
+        """Select one column/group from a pandas object."""
+        if column is not None:
+            if wrapper.grouper.is_grouped():
+                if column not in wrapper.get_columns():
+                    raise KeyError(f"Group '{column}' not found")
+            else:
+                if column not in wrapper.columns:
+                    raise KeyError(f"Column '{column}' not found")
+            return obj[column]
+        if not wrapper.grouper.is_grouped():
+            if wrapper.ndim == 1:
+                return obj
+            raise TypeError("Only one column is allowed. Use indexing or column argument.")
+        if wrapper.grouped_ndim == 1:
+            return obj
         raise TypeError("Only one group is allowed. Use indexing or column argument.")

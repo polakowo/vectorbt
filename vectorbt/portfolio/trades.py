@@ -22,7 +22,7 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.figure import make_figure
+from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -412,7 +412,7 @@ class Trades(Records):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_series(column=column, group_by=False)
+        self_col = self.select_one(column=column, group_by=False)
 
         if closed_profit_trace_kwargs is None:
             closed_profit_trace_kwargs = {}
@@ -435,22 +435,16 @@ class Trades(Records):
             _layout_kwargs[yaxis] = dict(tickformat='.2%')
             fig.update_layout(**_layout_kwargs)
         fig.update_layout(**layout_kwargs)
-        x_domain = [0, 1]
-        if xaxis in fig.layout:
-            if 'domain' in fig.layout[xaxis]:
-                if fig.layout[xaxis]['domain'] is not None:
-                    x_domain = fig.layout[xaxis]['domain']
+        x_domain = get_domain(xref, fig)
 
         if len(self_col.values) > 0:
             # Extract information
-            _id = self.values['id']
-            _id_str = 'Trade Id' if self.trade_type == TradeType.Trade else 'Position Id'
             _pnl_str = '%{customdata[1]:.6f}' if as_pct else '%{y}'
             _return_str = '%{y}' if as_pct else '%{customdata[1]:.2%}'
-            exit_idx = self.values['exit_idx']
-            pnl = self.values['pnl']
-            returns = self.values['return']
-            status = self.values['status']
+            exit_idx = self_col.values['exit_idx']
+            pnl = self_col.values['pnl']
+            returns = self_col.values['return']
+            status = self_col.values['status']
 
             neutral_mask = pnl == 0
             profit_mask = pnl > 0
@@ -466,6 +460,26 @@ class Trades(Records):
 
             def _plot_scatter(mask: tp.Array1d, name: tp.TraceName, color: tp.Any, kwargs: tp.Kwargs) -> None:
                 if np.any(mask):
+                    if self_col.trade_type == TradeType.Trade:
+                        customdata = np.stack((
+                            self_col.values['id'][mask],
+                            self_col.values['position_id'][mask],
+                            pnl[mask] if as_pct else returns[mask]
+                        ), axis=1)
+                        hovertemplate = "Trade Id: %{customdata[0]}" \
+                                        "<br>Position Id: %{customdata[1]}" \
+                                        "<br>Date: %{x}" \
+                                        f"<br>PnL: {_pnl_str}" \
+                                        f"<br>Return: {_return_str}"
+                    else:
+                        customdata = np.stack((
+                            self_col.values['id'][mask],
+                            pnl[mask] if as_pct else returns[mask]
+                        ), axis=1)
+                        hovertemplate = "Position Id: %{customdata[0]}" \
+                                        "<br>Date: %{x}" \
+                                        f"<br>PnL: {_pnl_str}" \
+                                        f"<br>Return: {_return_str}"
                     scatter = go.Scatter(
                         x=self_col.wrapper.index[exit_idx[mask]],
                         y=returns[mask] if as_pct else pnl[mask],
@@ -481,14 +495,8 @@ class Trades(Records):
                             ),
                         ),
                         name=name,
-                        customdata=np.stack((
-                            _id[mask],
-                            pnl[mask] if as_pct else returns[mask]
-                        ), axis=1),
-                        hovertemplate=_id_str + ": %{customdata[0]}"
-                                                "<br>Date: %{x}"
-                                                f"<br>PnL: {_pnl_str}"
-                                                f"<br>Return: {_return_str}"
+                        customdata=customdata,
+                        hovertemplate=hovertemplate
                     )
                     scatter.update(**kwargs)
                     fig.add_trace(scatter, **add_trace_kwargs)
@@ -598,13 +606,15 @@ class Trades(Records):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_series(column=column, group_by=False)
+        self_col = self.select_one(column=column, group_by=False)
 
         if close_trace_kwargs is None:
             close_trace_kwargs = {}
         close_trace_kwargs = merge_dicts(dict(
-            line_color=plotting_cfg['color_schema']['blue'],
-            name='Close' if self_col.wrapper.name is None else self_col.wrapper.name
+            line=dict(
+                color=plotting_cfg['color_schema']['blue']
+            ),
+            name='Close'
         ), close_trace_kwargs)
         if entry_trace_kwargs is None:
             entry_trace_kwargs = {}

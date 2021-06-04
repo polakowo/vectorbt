@@ -51,15 +51,15 @@ class Logs(Records):
             ('Context', 'Column'),
             ('Context', 'Group'),
             ('Context', 'Cash'),
-            ('Context', 'Shares'),
+            ('Context', 'Position'),
             ('Context', 'Debt'),
             ('Context', 'Free Cash'),
             ('Context', 'Val Price'),
             ('Context', 'Value'),
             ('Order', 'Size'),
+            ('Order', 'Price'),
             ('Order', 'Size Type'),
             ('Order', 'Direction'),
-            ('Order', 'Price'),
             ('Order', 'Fees'),
             ('Order', 'Fixed Fees'),
             ('Order', 'Slippage'),
@@ -71,7 +71,7 @@ class Logs(Records):
             ('Order', 'Raise Rejection'),
             ('Order', 'Log'),
             ('New Context', 'Cash'),
-            ('New Context', 'Shares'),
+            ('New Context', 'Position'),
             ('New Context', 'Debt'),
             ('New Context', 'Free Cash'),
             ('New Context', 'Val Price'),
@@ -93,15 +93,15 @@ class Logs(Records):
         out.iloc[:, 2] = records_df['col'].map(lambda x: self.wrapper.columns[x])
         out.iloc[:, 3] = records_df['group']
         out.iloc[:, 4] = records_df['cash']
-        out.iloc[:, 5] = records_df['shares']
+        out.iloc[:, 5] = records_df['position']
         out.iloc[:, 6] = records_df['debt']
         out.iloc[:, 7] = records_df['free_cash']
         out.iloc[:, 8] = records_df['val_price']
         out.iloc[:, 9] = records_df['value']
         out.iloc[:, 10] = records_df['size']
-        out.iloc[:, 11] = map_enum(records_df['size_type'], SizeType)
-        out.iloc[:, 12] = map_enum(records_df['direction'], Direction)
-        out.iloc[:, 13] = records_df['price']
+        out.iloc[:, 11] = records_df['price']
+        out.iloc[:, 12] = map_enum(records_df['size_type'], SizeType)
+        out.iloc[:, 13] = map_enum(records_df['direction'], Direction)
         out.iloc[:, 14] = records_df['fees']
         out.iloc[:, 15] = records_df['fixed_fees']
         out.iloc[:, 16] = records_df['slippage']
@@ -113,7 +113,7 @@ class Logs(Records):
         out.iloc[:, 22] = records_df['raise_reject']
         out.iloc[:, 23] = records_df['log']
         out.iloc[:, 24] = records_df['new_cash']
-        out.iloc[:, 25] = records_df['new_shares']
+        out.iloc[:, 25] = records_df['new_position']
         out.iloc[:, 26] = records_df['new_debt']
         out.iloc[:, 27] = records_df['new_free_cash']
         out.iloc[:, 28] = records_df['new_val_price']

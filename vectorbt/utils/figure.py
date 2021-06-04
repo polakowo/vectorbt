@@ -1,10 +1,20 @@
-"""Utilities for displaying widgets."""
+"""Utilities for constructing and displaying figures."""
 
 from plotly.graph_objects import Figure as _Figure, FigureWidget as _FigureWidget
 from plotly.subplots import make_subplots as _make_subplots
 
 from vectorbt import _typing as tp
 from vectorbt.utils.config import merge_dicts
+
+
+def get_domain(ref: str, fig: tp.BaseFigure) -> tp.Tuple[int, int]:
+    """Get domain of a coordinate axis."""
+    axis = ref[0] + 'axis' + ref[1:]
+    if axis in fig.layout:
+        if 'domain' in fig.layout[axis]:
+            if fig.layout[axis]['domain'] is not None:
+                return fig.layout[axis]['domain']
+    return 0, 1
 
 
 class FigureMixin:

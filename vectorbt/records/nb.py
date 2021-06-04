@@ -235,12 +235,12 @@ def map_records_nb(records: tp.RecordArray, map_func_nb: tp.RecordMapFunc[float]
     return out
 
 
-# ############# Conversion to matrix ############# #
+# ############# Expansion ############# #
 
 
 @njit(cache=True)
-def mapped_matrix_compatible_nb(col_arr: tp.Array1d, idx_arr: tp.Array1d, target_shape: tp.Shape) -> bool:
-    """Check whether mapped array can be converted to a matrix without positional conflicts."""
+def is_mapped_expandable_nb(col_arr: tp.Array1d, idx_arr: tp.Array1d, target_shape: tp.Shape) -> bool:
+    """Check whether mapped array can be expanded without positional conflicts."""
     temp = np.zeros(target_shape)
 
     for i in range(len(col_arr)):
@@ -251,13 +251,30 @@ def mapped_matrix_compatible_nb(col_arr: tp.Array1d, idx_arr: tp.Array1d, target
 
 
 @njit(cache=True)
-def mapped_to_matrix_nb(mapped_arr: tp.Array1d, col_arr: tp.Array1d, idx_arr: tp.Array1d,
-                        target_shape: tp.Shape, default_val: float) -> tp.Array2d:
-    """Convert mapped array to the matrix form."""
+def expand_mapped_nb(mapped_arr: tp.Array1d, col_arr: tp.Array1d, idx_arr: tp.Array1d,
+                     target_shape: tp.Shape, default_val: float) -> tp.Array2d:
+    """Expand mapped array to the 2-dim array form using index and column data."""
     out = np.full(target_shape, default_val, dtype=np.float_)
 
     for r in range(mapped_arr.shape[0]):
         out[idx_arr[r], col_arr[r]] = mapped_arr[r]
+    return out
+
+
+@njit(cache=True)
+def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_val: float) -> tp.Array2d:
+    """Expand mapped array by stacking without using index data."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.full((np.max(col_lens), col_lens.shape[0]), default_val, dtype=np.float_)
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        start_idx = col_start_idxs[col]
+        idxs = col_idxs[start_idx:start_idx + col_len]
+        out[:col_len, col] = mapped_arr[idxs]
     return out
 
 
@@ -268,7 +285,7 @@ def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_val: fl
                      reduce_func_nb: tp.ReduceFunc[float], *args) -> tp.Array1d:
     """Reduce mapped array by column to a single value.
 
-    Faster than `mapped_to_matrix_nb` and `vbt.*` used together, and also
+    Faster than `expand_mapped_nb` and `vbt.*` used together, and also
     requires less memory. But does not take advantage of caching.
 
     `reduce_func_nb` should accept index of the column, mapped array and `*args`,
@@ -390,19 +407,3 @@ def mapped_value_counts_nb(mapped_codes: tp.Array1d, col_map: tp.ColMap) -> tp.A
             out[mapped_codes[col_idxs[start_idx + i]], col] += 1
     return out
 
-
-@njit(cache=True)
-def stack_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_val: float) -> tp.Array2d:
-    """Stack mapped array."""
-    col_idxs, col_lens = col_map
-    col_start_idxs = np.cumsum(col_lens) - col_lens
-    out = np.full((np.max(col_lens), col_lens.shape[0]), default_val, dtype=np.float_)
-
-    for col in range(col_lens.shape[0]):
-        col_len = col_lens[col]
-        if col_len == 0:
-            continue
-        start_idx = col_start_idxs[col]
-        idxs = col_idxs[start_idx:start_idx + col_len]
-        out[:col_len, col] = mapped_arr[idxs]
-    return out

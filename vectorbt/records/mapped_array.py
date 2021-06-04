@@ -1,7 +1,7 @@
 """Base class for working with mapped arrays.
 
 This class takes the mapped array and the corresponding column and (optionally) index arrays,
-and offers features to directly process the mapped array without converting it to the matrix form;
+and offers features to directly process the mapped array without converting it to pandas;
 for example, to compute various statistics by column, such as standard deviation.
 
 ## Reducing
@@ -30,10 +30,10 @@ c    17.0
 dtype: float64
 ```
 
-* Use `MappedArray.to_matrix` to map to a matrix and then reduce manually (expensive):
+* Use `MappedArray.to_pd` to map to pandas and then reduce manually (expensive):
 
 ```python-repl
->>> ma.to_matrix().mean()
+>>> ma.to_pd().mean()
 a    11.0
 b    14.0
 c    17.0
@@ -75,12 +75,12 @@ idxmax  z  z  z
 
 ## Conversion
 
-You can convert any `MappedArray` instance to the matrix form:
+You can expand any `MappedArray` instance to pandas:
 
 * Given `idx_arr` was provided:
 
 ```python-repl
->>> ma.to_matrix()
+>>> ma.to_pd()
       a     b     c
 x  10.0  13.0  16.0
 y  11.0  14.0  17.0
@@ -88,12 +88,12 @@ z  12.0  15.0  18.0
 ```
 
 !!! note
-    Will raise an error if there are multiple records pointing to the same matrix element.
+    Will raise an error if there are multiple values pointing to the same position.
 
-* Given `group_by` was provided, index can be ignored, or there are position conflicts:
+* In case `group_by` was provided, index can be ignored, or there are position conflicts:
 
 ```python-repl
->>> ma.stack(group_by=np.array(['first', 'first', 'second']))
+>>> ma.to_pd(group_by=np.array(['first', 'first', 'second']), ignore_index=True)
    first  second
 0   10.0    16.0
 1   11.0    17.0
@@ -130,13 +130,13 @@ You can build histograms and boxplots of `MappedArray` directly:
 
 ![](/vectorbt/docs/img/mapped_boxplot.svg)
 
-To use scatterplots or any other plots that require index, convert to matrix first:
+To use scatterplots or any other plots that require index, convert to pandas first:
 
 ```python-repl
->>> ma.to_matrix().vbt.plot()
+>>> ma.to_pd().vbt.plot()
 ```
 
-![](/vectorbt/docs/img/mapped_matrix_plot.svg)
+![](/vectorbt/docs/img/mapped_to_pd_plot.svg)
 
 ## Grouping
 
@@ -268,7 +268,6 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
 from vectorbt.records import nb
 from vectorbt.records.col_mapper import ColumnMapper
-
 
 MappedArrayT = tp.TypeVar("MappedArrayT", bound="MappedArray")
 IndexingMetaT = tp.Tuple[
@@ -493,37 +492,53 @@ class MappedArray(Wrapping):
         return self.filter_by_mask(self.bottom_n_mask(n), **kwargs)
 
     @cached_method
-    def is_matrix_compatible(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
-        """See `vectorbt.records.nb.mapped_matrix_compatible_nb`."""
+    def is_expandable(self, idx_arr: tp.Optional[tp.Array1d] = None, group_by: tp.GroupByLike = None) -> bool:
+        """See `vectorbt.records.nb.is_mapped_expandable_nb`."""
         if idx_arr is None:
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        return nb.mapped_matrix_compatible_nb(col_arr, idx_arr, target_shape)
+        return nb.is_mapped_expandable_nb(col_arr, idx_arr, target_shape)
 
-    def to_matrix(self, idx_arr: tp.Optional[tp.Array1d] = None, default_val: float = np.nan,
-                  group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Convert mapped array to the matrix form.
+    def to_pd(self, idx_arr: tp.Optional[tp.Array1d] = None, ignore_index: bool = False,
+              default_val: float = np.nan, group_by: tp.GroupByLike = None,
+              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Expand mapped array to a Series/DataFrame.
 
-        See `vectorbt.records.nb.mapped_to_matrix_nb`.
+        If `ignore_index`, will ignore the index and stack data points on top of each other in every column
+        (see `vectorbt.records.nb.stack_expand_mapped_nb`). Otherwise, see `vectorbt.records.nb.expand_mapped_nb`.
 
         !!! note
-            Will raise an error if there are multiple values pointing to the same matrix element.
+            Will raise an error if there are multiple values pointing to the same position.
+            Set `ignore_index` to True in this case.
 
         !!! warning
             Mapped arrays represent information in the most memory-friendly format.
-            Mapping back to the matrix form may occupy lots of memory if records are sparse."""
+            Mapping back to pandas may occupy lots of memory if records are sparse."""
+        if ignore_index:
+            if self.wrapper.ndim == 1:
+                return self.wrapper.wrap(
+                    self.values,
+                    index=np.arange(len(self.values)),
+                    group_by=group_by,
+                    **merge_dicts({}, wrap_kwargs)
+                )
+            col_map = self.col_mapper.get_col_map(group_by=group_by)
+            out = nb.stack_expand_mapped_nb(self.values, col_map, default_val)
+            return self.wrapper.wrap(
+                out, index=np.arange(out.shape[0]),
+                group_by=group_by, **merge_dicts({}, wrap_kwargs))
         if idx_arr is None:
             if self.idx_arr is None:
                 raise ValueError("Must pass idx_arr")
             idx_arr = self.idx_arr
-        if not self.is_matrix_compatible(idx_arr=idx_arr, group_by=group_by):
-            raise ValueError("Multiple values are pointing to the same matrix element")
+        if not self.is_expandable(idx_arr=idx_arr, group_by=group_by):
+            raise ValueError("Multiple values are pointing to the same position. Use ignore_index.")
         col_arr = self.col_mapper.get_col_arr(group_by=group_by)
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
-        out = nb.mapped_to_matrix_nb(self.values, col_arr, idx_arr, target_shape, default_val)
+        out = nb.expand_mapped_nb(self.values, col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def reduce(self, reduce_func_nb: tp.ReduceFunc, *args, idx_arr: tp.Optional[tp.Array1d] = None,
@@ -717,31 +732,10 @@ class MappedArray(Wrapping):
             value_counts_df.index = value_counts_df.index.map(value_map)
         return value_counts_df
 
-    def stack(self, group_by: tp.GroupByLike = None, default_val: float = np.nan,
-              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Stack into a matrix.
-
-        Will lose index information and fill missing values with `default_val`."""
-        if self.wrapper.ndim == 1:
-            return self.wrapper.wrap(
-                self.values,
-                index=np.arange(len(self.values)),
-                group_by=group_by,
-                **merge_dicts({}, wrap_kwargs)
-            )
-        col_map = self.col_mapper.get_col_map(group_by=group_by)
-        out = nb.stack_mapped_nb(self.values, col_map, default_val)
-        return self.wrapper.wrap(
-            out, index=np.arange(out.shape[0]),
-            group_by=group_by, **merge_dicts({}, wrap_kwargs))
-
     def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot histogram by column."""
-        return self.stack(group_by=group_by).vbt.histplot(**kwargs)
+        return self.to_pd(group_by=group_by, ignore_index=True).vbt.histplot(**kwargs)
 
     def boxplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot box plot by column."""
-        return self.stack(group_by=group_by).vbt.boxplot(**kwargs)
-
-
-
+        return self.to_pd(group_by=group_by, ignore_index=True).vbt.boxplot(**kwargs)

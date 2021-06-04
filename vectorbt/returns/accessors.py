@@ -37,7 +37,7 @@ from vectorbt import _typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
-from vectorbt.utils.figure import make_figure
+from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
 from vectorbt.generic.drawdowns import Drawdowns
@@ -621,12 +621,7 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
-        x_domain = [0, 1]
-        xaxis = 'xaxis' + xref[1:]
-        if xaxis in fig.layout:
-            if 'domain' in fig.layout[xaxis]:
-                if fig.layout[xaxis]['domain'] is not None:
-                    x_domain = fig.layout[xaxis]['domain']
+        x_domain = get_domain(xref, fig)
         fill_to_benchmark = fill_to_benchmark and benchmark_rets is not None
 
         if benchmark_rets is not None:
@@ -636,7 +631,9 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
                 benchmark_kwargs = {}
             benchmark_kwargs = merge_dicts(dict(
                 trace_kwargs=dict(
-                    line_color=plotting_cfg['color_schema']['gray'],
+                    line=dict(
+                        color=plotting_cfg['color_schema']['gray']
+                    ),
                     name='Benchmark'
                 )
             ), benchmark_kwargs)
@@ -650,7 +647,9 @@ class ReturnsSRAccessor(ReturnsAccessor, GenericSRAccessor):
             main_kwargs = {}
         main_kwargs = merge_dicts(dict(
             trace_kwargs=dict(
-                line_color=plotting_cfg['color_schema']['purple'],
+                line=dict(
+                    color=plotting_cfg['color_schema']['purple']
+                )
             ),
             other_trace_kwargs='hidden'
         ), main_kwargs)

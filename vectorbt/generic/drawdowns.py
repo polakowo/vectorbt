@@ -26,7 +26,7 @@ from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeIndexes
 from vectorbt.utils.enum import to_value_map
-from vectorbt.utils.figure import make_figure
+from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.base.reshape_fns import to_1d, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.generic import nb
@@ -306,7 +306,8 @@ class Drawdowns(Records):
              vtr_shape_kwargs: tp.KwargsLike = None,
              active_shape_kwargs: tp.KwargsLike = None,
              add_trace_kwargs: tp.KwargsLike = None,
-             xref: str = 'x', yref: str = 'y',
+             xref: str = 'x',
+             yref: str = 'y',
              fig: tp.Optional[tp.BaseFigure] = None,
              **layout_kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot drawdowns over `Drawdowns.ts`.
@@ -345,7 +346,7 @@ class Drawdowns(Records):
         from vectorbt._settings import settings
         plotting_cfg = settings['plotting']
 
-        self_col = self.select_series(column=column, group_by=False)
+        self_col = self.select_one(column=column, group_by=False)
         if top_n is not None:
             # Drawdowns is negative, thus top_n becomes bottom_n
             self_col = self_col.filter_by_mask(self_col.drawdown.bottom_n_mask(top_n))
@@ -353,7 +354,9 @@ class Drawdowns(Records):
         if ts_trace_kwargs is None:
             ts_trace_kwargs = {}
         ts_trace_kwargs = merge_dicts(dict(
-            line_color=plotting_cfg['color_schema']['blue']
+            line=dict(
+                color=plotting_cfg['color_schema']['blue']
+            )
         ), ts_trace_kwargs)
         if peak_trace_kwargs is None:
             peak_trace_kwargs = {}
@@ -375,12 +378,7 @@ class Drawdowns(Records):
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
-        y_domain = [0, 1]
-        yaxis = 'yaxis' + yref[1:]
-        if yaxis in fig.layout:
-            if 'domain' in fig.layout[yaxis]:
-                if fig.layout[yaxis]['domain'] is not None:
-                    y_domain = fig.layout[yaxis]['domain']
+        y_domain = get_domain(yref, fig)
 
         if plot_ts:
             fig = self_col.ts.vbt.plot(trace_kwargs=ts_trace_kwargs, add_trace_kwargs=add_trace_kwargs, fig=fig)

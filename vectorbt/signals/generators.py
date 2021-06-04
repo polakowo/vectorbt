@@ -480,8 +480,16 @@ def _bind_ohlcstex_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pr
             low=self.low,
             close=self.close,
             name=plot_type,
-            increasing_line_color=plotting_cfg['color_schema']['increasing'],
-            decreasing_line_color=plotting_cfg['color_schema']['decreasing']
+            increasing=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['increasing']
+                )
+            ),
+            decreasing=dict(
+                line=dict(
+                    color=plotting_cfg['color_schema']['decreasing']
+                )
+            )
         )
         ohlc.update(**ohlc_kwargs)
         fig.add_trace(ohlc, **add_trace_kwargs)

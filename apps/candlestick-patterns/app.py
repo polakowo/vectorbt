@@ -1364,7 +1364,9 @@ def update_stats(window_width, subplots, df_json, symbol, interval, date_range, 
         subplot_kwags['cum_returns_kwargs'] = dict(
             benchmark_kwargs=dict(
                 trace_kwargs=dict(
-                    line_color=adjust_opacity(color_schema['yellow'], 0.5),
+                    line=dict(
+                        color=adjust_opacity(color_schema['yellow'], 0.5)
+                    ),
                     name=symbol
                 )
             )
