@@ -675,18 +675,14 @@ class Portfolio(Wrapping):
             size (float or array_like): Size to order.
                 Will broadcast.
 
-                * Set to any number to buy/sell some fixed amount.
-                    Longs are limited by cash in the account, while shorts are only limited if `lock_cash`.
-                * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
-                    If `direction` is not `all`, `-np.inf` will close the position.
-                * Set to `np.nan` or 0 to skip.
+                See fixed size behavior under `size` in `Portfolio.from_orders`.
 
                 !!! note
                     Sign will be ignored.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
                 Will broadcast.
 
-                Only `SizeType.Amount` and `SizeType.Percent` are supported.
+                Only `SizeType.Amount`, `SizeType.Value`, and `SizeType.Percent` are supported.
                 Other modes such as target percentage are not compatible with signals since
                 their logic may contradict the direction of the signal.
 
@@ -1167,9 +1163,11 @@ class Portfolio(Wrapping):
             size (float or array_like): Size to order.
                 Will broadcast.
 
-                Behavior depends upon `size_type` and `direction`. For `SizeType.Amount`:
+                Behavior depends upon `size_type` and `direction`.
 
-                * Set to any number to buy/sell some fixed amount.
+                For any fixed size:
+
+                * Set to any number to buy/sell some fixed amount or value.
                     Longs are limited by cash in the account, while shorts are only limited if `lock_cash`.
                 * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
                     If `direction` is not `all`, `-np.inf` will close the position.
@@ -1190,8 +1188,8 @@ class Portfolio(Wrapping):
                     Be cautious using `SizeType.Percent` with `call_seq` set to 'auto'.
                     To execute sell orders before buy orders, the value of each order in the group
                     needs to be approximated in advance. But since `SizeType.Percent` depends
-                    upon the cash balance, which cannot be calculated in advance, the latest cash balance
-                    is used. This can yield wrong call sequence for buy orders.
+                    upon the cash balance, which cannot be calculated in advance since it may change
+                    after each order, this can yield a non-optimal call sequence.
             direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
                 Will broadcast.
             price (array_like of float): Order price.

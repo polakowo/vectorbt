@@ -411,7 +411,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
         order_size *= value
         order_size_type = SizeType.TargetValue
 
-    if order_size_type == SizeType.TargetValue:
+    if order_size_type == SizeType.Value or order_size_type == SizeType.TargetValue:
         # Target value
         if np.isinf(val_price) or val_price <= 0:
             raise ValueError("val_price_now must be finite and greater than 0")
@@ -419,7 +419,10 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
             return exec_state, order_not_filled_nb(OrderStatus.Ignored, StatusInfo.ValPriceNaN)
 
         order_size /= val_price
-        order_size_type = SizeType.TargetAmount
+        if order_size_type == SizeType.Value:
+            order_size_type = SizeType.Amount
+        else:
+            order_size_type = SizeType.TargetAmount
 
     if order_size_type == SizeType.TargetAmount:
         # Target amount
@@ -868,6 +871,8 @@ def approx_order_value_nb(size: float,
     asset_value_now = position_now * val_price_now
     if size_type == SizeType.Amount:
         return size * val_price_now
+    if size_type == SizeType.Value:
+        return size
     if size_type == SizeType.Percent:
         if size >= 0:
             return size * cash_now
@@ -1087,8 +1092,9 @@ def simulate_nb(target_shape: tp.Shape,
                 Use `last_val_price` to manipulate group valuation. By default, `last_val_price`
                 contains the last `close` for a column. You can change it in-place.
                 The column/group is then valuated after `segment_prep_func_nb`, and the value is
-                passed as `value_now` to `order_func_nb` and internally used for converting
-                `SizeType.TargetPercent` and `SizeType.TargetValue` to `SizeType.TargetAmount`.
+                passed as `value_now` to `order_func_nb`. Internally used for converting
+                `SizeType.Value` to `SizeType.Amount` and `SizeType.TargetPercent` and
+                `SizeType.TargetValue` to `SizeType.TargetAmount`.
         segment_prep_args (tuple): Packed arguments passed to `segment_prep_func_nb`.
         order_func_nb (callable): Order generation function.
 
@@ -2119,10 +2125,11 @@ def signal_to_size_nb(position_now: float,
                       direction: int,
                       accumulate: bool,
                       conflict_mode: int,
-                      close_first: bool) -> tp.Tuple[bool, bool, float, int]:
+                      close_first: bool,
+                      val_price_now: float) -> tp.Tuple[bool, bool, float, int]:
     """Get order size given signals."""
-    if size_type != SizeType.Amount and size_type != SizeType.Percent:
-        raise ValueError("Only SizeType.Amount and SizeType.Percent are supported")
+    if size_type != SizeType.Amount and size_type != SizeType.Value and size_type != SizeType.Percent:
+        raise ValueError("Only SizeType.Amount, SizeType.Value, and SizeType.Percent are supported")
     order_size = 0.
     abs_position_now = abs(position_now)
     abs_size = abs(size)
@@ -2166,8 +2173,11 @@ def signal_to_size_nb(position_now: float,
                         size_type = SizeType.Amount
                     else:
                         if size_type == SizeType.Percent:
-                            raise ValueError("SizeType.Percent does not support Direction.All")
-                        order_size = abs_position_now + abs_size
+                            raise ValueError("SizeType.Percent does not support position reversal under Direction.All")
+                        if size_type == SizeType.Value:
+                            order_size = abs_position_now + abs_size / val_price_now
+                        else:
+                            order_size = abs_position_now + abs_size
                 elif position_now == 0:
                     # Open long position
                     order_size = abs_size
@@ -2193,8 +2203,11 @@ def signal_to_size_nb(position_now: float,
                         size_type = SizeType.Amount
                     else:
                         if size_type == SizeType.Percent:
-                            raise ValueError("SizeType.Percent does not support Direction.All")
-                        order_size = -abs_position_now - abs_size
+                            raise ValueError("SizeType.Percent does not support position reversal under Direction.All")
+                        if size_type == SizeType.Value:
+                            order_size = -abs_position_now - abs_size / val_price_now
+                        else:
+                            order_size = -abs_position_now - abs_size
                 elif position_now == 0:
                     # Open short position
                     order_size = -abs_size
@@ -2291,7 +2304,8 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     flex_select_auto_nb(i, col, direction, flex_2d),
                     flex_select_auto_nb(i, col, accumulate, flex_2d),
                     flex_select_auto_nb(i, col, conflict_mode, flex_2d),
-                    flex_select_auto_nb(i, col, close_first, flex_2d)
+                    flex_select_auto_nb(i, col, close_first, flex_2d),
+                    flex_select_auto_nb(i, col, val_price, flex_2d)
                 )  # already takes into account direction
                 order_size[col] = _order_size
                 order_size_type[col] = _order_size_type
@@ -2300,16 +2314,23 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     if _order_size == 0:
                         temp_order_value[k] = 0.
                     else:
-                        _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
                         # Approximate order value
+                        _val_price = flex_select_auto_nb(i, col, val_price, flex_2d)
+                        _direction = flex_select_auto_nb(i, col, direction, flex_2d)
                         if _order_size_type == SizeType.Amount:
                             temp_order_value[k] = _order_size * _val_price
-                        else:
-                            if _order_size > 0:
+                        elif _order_size_type == SizeType.Value:
+                            temp_order_value[k] = _order_size
+                        else:  # SizeType.Percent
+                            if _order_size >= 0:
                                 temp_order_value[k] = _order_size * cash_now
                             else:
                                 asset_value_now = last_position[col] * _val_price
-                                temp_order_value[k] = _order_size * abs(asset_value_now)
+                                if _direction == Direction.LongOnly:
+                                    temp_order_value[k] = _order_size * asset_value_now
+                                else:
+                                    max_exposure = (2 * max(asset_value_now, 0) + max(free_cash_now, 0))
+                                    temp_order_value[k] = _order_size * max_exposure
 
             if cash_sharing:
                 # Dynamically sort by order value -> selling comes first to release funds early

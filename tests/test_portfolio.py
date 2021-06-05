@@ -174,11 +174,23 @@ def test_execute_order_nb():
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=4))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., np.inf, 1100.,
+            ProcessOrderState(100., 100., 0., 100., np.inf, 1100., 0, 0),
+            nb.create_order_nb(10, 10, size_type=SizeType.Value))
+    with pytest.raises(Exception) as e_info:
+        _ = nb.execute_order_nb(
+            ProcessOrderState(100., 100., 0., 100., -10., 1100, 0, 0),
+            nb.create_order_nb(10, 10, size_type=SizeType.Value))
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 100., 0., 100., np.nan, 1100., 0, 0),
+        nb.create_order_nb(10, 10, size_type=SizeType.Value))
+    assert exec_state == ExecuteOrderState(cash=100.0, position=100.0, debt=0.0, free_cash=100.0)
+    with pytest.raises(Exception) as e_info:
+        _ = nb.execute_order_nb(
+            ProcessOrderState(100., 100., 0., 100., np.inf, 1100., 0, 0),
             nb.create_order_nb(10, 10, size_type=SizeType.TargetValue))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            100., 100., -10., 1100.,
+            ProcessOrderState(100., 100., 0., 100., -10., 1100, 0, 0),
             nb.create_order_nb(10, 10, size_type=SizeType.TargetValue))
     exec_state, order_result = nb.execute_order_nb(
         ProcessOrderState(100., 100., 0., 100., np.nan, 1100., 0, 0),
@@ -230,11 +242,11 @@ def test_execute_order_nb():
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=7))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            np.inf, 100., 10., 1100.,
+            ProcessOrderState(np.inf, 100, 0., np.inf, np.nan, 1100., 0, 0),
             nb.create_order_nb(np.inf, 10, direction=Direction.LongOnly))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            np.inf, 100., 10., 1100.,
+            ProcessOrderState(np.inf, 100., 0., np.inf, 10., 1100., 0, 0),
             nb.create_order_nb(np.inf, 10, direction=Direction.All))
     exec_state, order_result = nb.execute_order_nb(
         ProcessOrderState(100., 0., 0., 100., 10., 1100., 0, 0),
@@ -244,11 +256,11 @@ def test_execute_order_nb():
         size=np.nan, price=np.nan, fees=np.nan, side=-1, status=2, status_info=8))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            np.inf, 100., 10., 1100.,
+            ProcessOrderState(np.inf, 100., 0., np.inf, 10., 1100., 0, 0),
             nb.create_order_nb(-np.inf, 10, direction=Direction.ShortOnly))
     with pytest.raises(Exception) as e_info:
         _ = nb.execute_order_nb(
-            np.inf, 100., 10., 1100.,
+            ProcessOrderState(np.inf, 100., 0., np.inf, 10., 1100., 0, 0),
             nb.create_order_nb(-np.inf, 10, direction=Direction.All))
     exec_state, order_result = nb.execute_order_nb(
         ProcessOrderState(100., 0., 0., 100., 10., 1100., 0, 0),
@@ -328,6 +340,19 @@ def test_execute_order_nb():
     exec_state, order_result = nb.execute_order_nb(
         ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
         nb.create_order_nb(-10, 10, size_type=SizeType.TargetAmount))
+    assert exec_state == ExecuteOrderState(cash=200.0, position=-10.0, debt=100.0, free_cash=0.0)
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
+
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
+        nb.create_order_nb(100, 10, size_type=SizeType.Value))
+    assert exec_state == ExecuteOrderState(cash=0.0, position=10.0, debt=0.0, free_cash=0.0)
+    assert_same_tuple(order_result, OrderResult(
+        size=10., price=10.0, fees=0., side=0, status=0, status_info=-1))
+    exec_state, order_result = nb.execute_order_nb(
+        ProcessOrderState(100., 0., 0., 100., 10., 100., 0, 0),
+        nb.create_order_nb(-100, 10, size_type=SizeType.Value))
     assert exec_state == ExecuteOrderState(cash=200.0, position=-10.0, debt=100.0, free_cash=0.0)
     assert_same_tuple(order_result, OrderResult(
         size=10., price=10.0, fees=0., side=1, status=0, status_info=-1))
@@ -1942,6 +1967,29 @@ class TestFromOrders:
                 [2, 1, 0],
                 [1, 0, 2]
             ])
+        )
+
+    def test_value(self):
+        record_arrays_close(
+            from_orders_all(size=order_size_one, size_type='value').order_records,
+            np.array([
+                (0, 0, 0, 1.0, 1.0, 0.0, 0), (1, 1, 0, 0.5, 2.0, 0.0, 1),
+                (2, 3, 0, 0.25, 4.0, 0.0, 0), (3, 4, 0, 0.2, 5.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_orders_longonly(size=order_size_one, size_type='value').order_records,
+            np.array([
+                (0, 0, 0, 1.0, 1.0, 0.0, 0), (1, 1, 0, 0.5, 2.0, 0.0, 1),
+                (2, 3, 0, 0.25, 4.0, 0.0, 0), (3, 4, 0, 0.2, 5.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_orders_shortonly(size=order_size_one, size_type='value').order_records,
+            np.array([
+                (0, 0, 0, 1.0, 1.0, 0.0, 1), (1, 1, 0, 0.5, 2.0, 0.0, 0),
+                (2, 3, 0, 0.25, 4.0, 0.0, 1), (3, 4, 0, 0.2, 5.0, 0.0, 0)
+            ], dtype=order_dt)
         )
 
     def test_target_amount(self):

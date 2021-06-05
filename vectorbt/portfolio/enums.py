@@ -123,13 +123,14 @@ Attributes:
 
 class SizeTypeT(tp.NamedTuple):
     Amount: int
+    Value: int
+    Percent: int
     TargetAmount: int
     TargetValue: int
     TargetPercent: int
-    Percent: int
 
 
-SizeType = SizeTypeT(*range(5))
+SizeType = SizeTypeT(*range(6))
 """_"""
 
 __pdoc__['SizeType'] = f"""Size type.
@@ -139,9 +140,24 @@ __pdoc__['SizeType'] = f"""Size type.
 ```
 
 Attributes:
-    Amount: Amount of assets to buy or sell.
+    Amount: Amount of assets to trade.
+    Value: Asset value to trade.
+    
+        Gets converted into `SizeType.Amount` using `val_price_now`.
+    Percent: Percentage of available resources to use in either direction (not to be confused with 
+        the percentage of position value!)
+    
+        * When buying, it's the percentage of `cash_now`. 
+        * When selling, it's the percentage of `position_now`.
+        * When short selling, it's the percentage of `free_cash_now`.
+        * When selling and short selling (i.e. reversing position), it's the percentage of 
+        `position_now` and `free_cash_now`.
+        
+        !!! note
+            Takes into account fees and slippage to find the limit.
+            In reality, slippage and fees are not known beforehand.
     TargetAmount: Target amount of assets to hold (= target position).
-
+    
         Uses `position_now` to get the current position.
         Gets converted into `SizeType.Amount`.
     TargetValue: Target asset value. 
@@ -152,13 +168,6 @@ Attributes:
 
         Uses `value_now` to get the current total value.
         Gets converted into `SizeType.TargetValue`.
-    Percent: Percentage of available resources in either direction to use.
-
-        When buying, it's the percentage of `cash_now`. 
-        When selling, it's the percentage of `position_now`.
-        When short selling, it's the percentage of `free_cash_now`.
-        When selling and short selling (i.e. reversing position), it's the percentage of 
-        `position_now` and `free_cash_now`.
 """
 
 
