@@ -379,6 +379,7 @@ class SimulationContext(tp.NamedTuple):
     cash_sharing: bool
     call_seq: tp.Array2d
     active_mask: tp.Array2d
+    ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
@@ -406,9 +407,7 @@ A tuple with exactly two elements: the number of rows and columns.
 One day of minute data for three assets would yield a `target_shape` of `(1440, 3)`,
 where the first axis are rows (minutes) and the second axis are columns (assets).
 """
-__pdoc__['SimulationContext.close'] = """Reference price, such as close price.
-
-Reference price should be the last price known in each row.
+__pdoc__['SimulationContext.close'] = """Last asset price at each time step.
 
 Has shape `target_shape`.
 """
@@ -427,9 +426,9 @@ If `cash_sharing`, has shape `(group_lens.shape[0],)`, otherwise has shape `(tar
 
 ## Example
 
-Consider a group of two columns sharing $100 and an another column with $200.
-The `init_cash` would then be `np.array([100, 200])`. Without cash sharing, 
-the `init_cash` would be `np.array([100, 100, 200])`.
+Consider three columns, each having $100 of starting capital. If we built one group of two columns
+with cash sharing and one (imaginary) group with the last column, the `init_cash` would be 
+`np.array([200, 100])`. Without cash sharing, the `init_cash` would be `np.array([100, 100, 100])`.
 """
 __pdoc__['SimulationContext.cash_sharing'] = "Whether cash sharing is enabled."
 __pdoc__['SimulationContext.call_seq'] = """Default sequence of calls per segment.
@@ -475,6 +474,9 @@ array([[ True, False],
 Only the first group is executed in the first row and only the second group is executed
 in the second row.
 """
+__pdoc__['SimulationContext.ffill_val_price'] = """Whether to track valuation price only if it's known.
+
+Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp."""
 __pdoc__['SimulationContext.update_value'] = "Whether to update group value after each filled order."
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
@@ -545,8 +547,11 @@ Enables `SizeType.TargetValue` and `SizeType.TargetPercent`.
 Gets multiplied by the current position to get the value of the column.
 The value of each column in a group with cash sharing is summed to get the value of the entire group.
 
-Defaults to the previous `close` right before `segment_prep_func_nb`.
+Defaults to the previous `close` right before `segment_prep_func_nb`, but only if it's not NaN.
+For example, close of `[1, 2, np.nan, np.nan, 5]` yields valuation price of `[1, 2, 2, 2, 5]`.
+
 You can use `segment_prep_func_nb` to override `last_val_price` in-place.
+You are not allowed to use `-np.inf` or `np.inf`.
 The valuation then happens right after `segment_prep_func_nb`.
 If `update_value`, gets also updated right after `order_func_nb`.
 
@@ -593,6 +598,7 @@ class GroupContext(tp.NamedTuple):
     cash_sharing: bool
     call_seq: tp.Array2d
     active_mask: tp.Array2d
+    ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
@@ -663,6 +669,7 @@ class RowContext(tp.NamedTuple):
     cash_sharing: bool
     call_seq: tp.Array2d
     active_mask: tp.Array2d
+    ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
@@ -702,6 +709,7 @@ class SegmentContext(tp.NamedTuple):
     cash_sharing: bool
     call_seq: tp.Array2d
     active_mask: tp.Array2d
+    ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
@@ -761,6 +769,7 @@ class OrderContext(tp.NamedTuple):
     cash_sharing: bool
     call_seq: tp.Array2d
     active_mask: tp.Array2d
+    ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
@@ -845,6 +854,7 @@ class AfterOrderContext(tp.NamedTuple):
     cash_sharing: bool
     call_seq: tp.Array2d
     active_mask: tp.Array2d
+    ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
     log_records: tp.RecordArray
@@ -920,8 +930,8 @@ If `update_value`, gets updated with the new cash and value of the column. Other
 
 
 class Order(tp.NamedTuple):
-    size: float
-    price: float
+    size: float = np.inf
+    price: float = np.inf
     size_type: int = SizeType.Amount
     direction: int = Direction.All
     fees: float = 0.0
@@ -940,21 +950,66 @@ __pdoc__['Order'] = """A named tuple representing an order.
 
 !!! note
     Currently, Numba has issues with using defaults when filling named tuples. 
-    Use `vectorbt.portfolio.nb.create_order_nb` for this."""
-__pdoc__['Order.size'] = "Size."
-__pdoc__['Order.price'] = "Price per unit. Final price will depend upon slippage."
+    Use `vectorbt.portfolio.nb.order_nb` to create an order."""
+__pdoc__['Order.size'] = """Size in units.
+
+Behavior depends upon `Order.size_type` and `Order.direction`.
+
+For any fixed size:
+
+* Set to any number to buy/sell some fixed amount or value.
+    Longs are limited by the current cash balance, while shorts are only limited if `Order.lock_cash`.
+* Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
+    If `Order.direction` is not `Direction.All`, `-np.inf` will close the position.
+* Set to `np.nan` or 0 to skip.
+
+For any target size:
+
+* Set to any number to buy/sell an amount relative to the current position or value.
+* Set to 0 to close the current position.
+* Set to `np.nan` to skip.
+"""
+__pdoc__['Order.price'] = """Price per unit. 
+
+Final price will depend upon slippage.
+
+* If `-np.inf`, replaced by the previous close (~ the current open).
+* If `np.inf`, replaced by the current close.
+
+!!! note
+    Make sure to use timestamps that come between (and ideally not including) the current open and close."""
 __pdoc__['Order.size_type'] = "See `SizeType`."
 __pdoc__['Order.direction'] = "See `Direction`."
-__pdoc__['Order.fees'] = "Fees in percentage of the order value."
+__pdoc__['Order.fees'] = """Fees in percentage of the order value. 
+
+Note that 0.01 = 1%."""
 __pdoc__['Order.fixed_fees'] = "Fixed amount of fees to pay for this order."
-__pdoc__['Order.slippage'] = "Slippage in percentage of `price`."
-__pdoc__['Order.min_size'] = "Minimum size in both directions. Lower than that will be rejected."
-__pdoc__['Order.max_size'] = "Maximum size in both directions. Higher than that will be partly filled."
-__pdoc__['Order.reject_prob'] = "Probability of rejecting this order to simulate a random rejection event."
-__pdoc__['Order.lock_cash'] = "Whether to lock cash when shorting. Keeps free cash from turning negative."
-__pdoc__['Order.allow_partial'] = "Whether to allow partial fill."
-__pdoc__['Order.raise_reject'] = "Whether to raise exception if order has been rejected."
-__pdoc__['Order.log'] = "Whether to log this order by filling a log record. Remember to increase `max_logs`."
+__pdoc__['Order.slippage'] = """Slippage in percentage of `Order.price`. 
+
+Note that 0.01 = 1%."""
+__pdoc__['Order.min_size'] = """Minimum size in both directions. 
+
+Lower than that will be rejected."""
+__pdoc__['Order.max_size'] = """Maximum size in both directions. 
+
+Higher than that will be partly filled."""
+__pdoc__['Order.reject_prob'] = """Probability of rejecting this order to simulate a random rejection event.
+
+Not everything goes smoothly in real life. Use random rejections to test your order management for robustness."""
+__pdoc__['Order.lock_cash'] = """Whether to lock cash when shorting. 
+
+Keeps free cash from turning negative."""
+__pdoc__['Order.allow_partial'] = """Whether to allow partial fill.
+
+Otherwise, the order gets rejected.
+
+Does not apply when `Order.size` is `np.inf`."""
+__pdoc__['Order.raise_reject'] = """Whether to raise exception if order has been rejected.
+
+Terminates the simulation."""
+__pdoc__['Order.log'] = """Whether to log this order by filling a log record. 
+
+Remember to increase `max_logs`."""
 
 NoOrder = Order(
     np.nan,

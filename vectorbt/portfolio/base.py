@@ -458,7 +458,7 @@ class Portfolio(Wrapping):
         wrapper (ArrayWrapper): Array wrapper.
 
             See `vectorbt.base.array_wrapper.ArrayWrapper`.
-        close (array_like): Reference price, such as close.
+        close (array_like): Last asset price at each time step.
         order_records (array_like): A structured NumPy array of order records.
         log_records (array_like): A structured NumPy array of log records.
         init_cash (InitCashMode, float or array_like of float): Initial capital.
@@ -467,7 +467,7 @@ class Portfolio(Wrapping):
         incl_unrealized (bool): Whether to include unrealized P&L in statistics.
         fillna_close (bool): Whether to forward and backward fill NaN values in `close`.
 
-            Applied after the simulation.
+            Applied after the simulation to avoid NaNs in asset value.
 
             See `Portfolio.get_fillna_close`.
 
@@ -640,6 +640,7 @@ class Portfolio(Wrapping):
                      init_cash: tp.Optional[tp.ArrayLike] = None,
                      cash_sharing: tp.Optional[bool] = None,
                      call_seq: tp.Optional[tp.ArrayLike] = None,
+                     ffill_val_price: tp.Optional[tp.ArrayLike] = None,
                      update_value: tp.Optional[tp.ArrayLike] = None,
                      max_orders: tp.Optional[int] = None,
                      max_logs: tp.Optional[int] = None,
@@ -651,19 +652,8 @@ class Portfolio(Wrapping):
                      **kwargs) -> PortfolioT:
         """Simulate portfolio from entry and exit signals.
 
-        Starting with the initial cash balance `init_cash`, for each signal in `entries`, enters a
-        long/short position by buying/selling `size`. For each signal in `exits`, closes the position.
-        If accumulation is enabled, each entry signal is allowed to (gradually) increase the position
-        and each exit signal is allowed to decrease the position. When both entry and exit signals are
-        present, ignores them by default. When grouping is enabled with `group_by`, will compute the
-        performance of the entire group. When `cash_sharing` is enabled, will share the cash balance
-        among all columns in the group.
-
         Args:
-            close (array_like): Reference price, such as close.
-                Will broadcast.
-
-                Will be used for calculating unrealized P&L and portfolio value.
+            close (array_like): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
                 Will broadcast.
 
@@ -672,15 +662,11 @@ class Portfolio(Wrapping):
                 Will broadcast.
 
                 Becomes a short signal if `direction` is `all` or `longonly`, otherwise long.
-            size (float or array_like): Size to order.
-                Will broadcast.
-
-                See fixed size behavior under `size` in `Portfolio.from_orders`.
+            size (float or array_like): See `Portfolio.from_orders`.
 
                 !!! note
-                    Sign will be ignored.
-            size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
-                Will broadcast.
+                    Negative size is not allowed. You should express direction using signals.
+            size_type (SizeType or array_like): See `Portfolio.from_orders`.
 
                 Only `SizeType.Amount`, `SizeType.Value`, and `SizeType.Percent` are supported.
                 Other modes such as target percentage are not compatible with signals since
@@ -690,40 +676,27 @@ class Portfolio(Wrapping):
                     `SizeType.Percent` does not support position reversal. Switch to a single
                     direction or use `close_first`.
 
-                See warning on `size_type` in `Portfolio.from_orders`.
-            direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
-                Will broadcast.
-            price (array_like of float): Order price.
-                Defaults to `close`. Will broadcast.
-            fees (float or array_like): Fees in percentage of the order value.
-                Will broadcast. Note that 0.01 = 1%.
-            fixed_fees (float or array_like): Fixed amount of fees to pay per order.
-                Will broadcast.
-            slippage (float or array_like): Slippage in percentage of price.
-                Will broadcast. Note that 0.01 = 1%.
-            min_size (float or array_like): Minimum size for an order to be accepted.
-                Will broadcast.
-            max_size (float or array_like): Maximum size for an order.
-                Will broadcast.
+                See warning in `Portfolio.from_orders`.
+            direction (Direction or array_like): See `Portfolio.from_orders`.
+            price (array_like of float): See `Portfolio.from_orders`.
+            fees (float or array_like): See `Portfolio.from_orders`.
+            fixed_fees (float or array_like): See `Portfolio.from_orders`.
+            slippage (float or array_like): See `Portfolio.from_orders`.
+            min_size (float or array_like): See `Portfolio.from_orders`.
+            max_size (float or array_like): See `Portfolio.from_orders`.
 
                 Will be partially filled if exceeded. You might not be able to properly close
                 the position if accumulation is enabled and `max_size` is too low.
-            reject_prob (float or array_like): Order rejection probability.
-                Will broadcast.
-            lock_cash (bool or array_like): Whether to lock cash when shorting.
-                Will broadcast.
-            allow_partial (bool or array_like): Whether to allow partial fills.
-                Will broadcast.
-
-                Does not apply when size is `np.inf`.
-            raise_reject (bool or array_like): Whether to raise an exception if order gets rejected.
-                Will broadcast.
-            log (bool or array_like): Whether to log orders.
-                Will broadcast.
+            reject_prob (float or array_like): See `Portfolio.from_orders`.
+            lock_cash (bool or array_like): See `Portfolio.from_orders`.
+            allow_partial (bool or array_like): See `Portfolio.from_orders`.
+            raise_reject (bool or array_like): See `Portfolio.from_orders`.
+            log (bool or array_like): See `Portfolio.from_orders`.
             accumulate (bool or array_like): Whether to accumulate signals.
                 Will broadcast.
 
-                Behaves similarly to `Portfolio.from_orders`.
+                Allows gradually increasing and decreasing positions using `size`.
+                When enabled, `Portfolio.from_signals` behaves like `Portfolio.from_orders`.
             conflict_mode (ConflictMode or array_like): See `vectorbt.portfolio.enums.ConflictMode`.
                 Will broadcast.
             close_first (bool or array_like): Whether to close the position first before reversal.
@@ -733,30 +706,19 @@ class Portfolio(Wrapping):
                 Takes only effect under `Direction.All`. Requires a second signal to enter
                 the opposite position. This allows to define parameters such as `fixed_fees` for long
                 and short positions separately.
-            val_price (array_like of float): Asset valuation price.
-
-                See `val_price` in `Portfolio.from_orders`.
-            init_cash (InitCashMode, float or array_like of float): Initial capital.
-
-                See `init_cash` in `Portfolio.from_orders`.
-            cash_sharing (bool): Whether to share cash within the same group.
-
-                See `cash_sharing` in `Portfolio.from_orders`.
-            call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
-
-                See `call_seq` in `Portfolio.from_orders`.
-            update_value (bool): Whether to update group value after each filled order.
-            max_orders (int): Size of the order records array.
-
-                See `max_orders` in `Portfolio.from_orders`.
-            max_logs (int): Size of the log records array.
-
-                See `max_logs` in `Portfolio.from_orders`.
-            seed (int): Seed to be set for both `call_seq` and at the beginning of the simulation.
-            group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
-            broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
-            wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
-            freq (any): Index frequency in case `close.index` is not datetime-like.
+            val_price (array_like of float): See `Portfolio.from_orders`.
+            init_cash (InitCashMode, float or array_like of float): See `Portfolio.from_orders`.
+            cash_sharing (bool): See `Portfolio.from_orders`.
+            call_seq (CallSeqType or array_like of int): See `Portfolio.from_orders`.
+            ffill_val_price (bool): See `Portfolio.from_orders`.
+            update_value (bool): See `Portfolio.from_orders`.
+            max_orders (int): See `Portfolio.from_orders`.
+            max_logs (int): See `Portfolio.from_orders`.
+            seed (int): See `Portfolio.from_orders`.
+            group_by (any): See `Portfolio.from_orders`.
+            broadcast_kwargs (dict): See `Portfolio.from_orders`.
+            wrapper_kwargs (dict): See `Portfolio.from_orders`.
+            freq (any): See `Portfolio.from_orders`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         All broadcastable arguments will broadcast using `vectorbt.base.reshape_fns.broadcast`
@@ -985,7 +947,7 @@ class Portfolio(Wrapping):
             direction = portfolio_cfg['signal_direction']
         direction = prepare_enum_value(Direction, direction)
         if price is None:
-            price = close
+            price = np.inf
         if fees is None:
             fees = portfolio_cfg['fees']
         if fixed_fees is None:
@@ -1014,7 +976,7 @@ class Portfolio(Wrapping):
         if close_first is None:
             close_first = portfolio_cfg['close_first']
         if val_price is None:
-            val_price = price
+            val_price = np.inf
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
         init_cash = prepare_enum_value(InitCashMode, init_cash)
@@ -1033,6 +995,8 @@ class Portfolio(Wrapping):
             if call_seq == CallSeqType.Auto:
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
+        if ffill_val_price is None:
+            ffill_val_price = portfolio_cfg['ffill_val_price']
         if update_value is None:
             update_value = portfolio_cfg['update_value']
         if seed is None:
@@ -1098,11 +1062,13 @@ class Portfolio(Wrapping):
         # Perform calculation
         order_records, log_records = nb.simulate_from_signals_nb(
             target_shape_2d,
+            to_2d(close, raw=True),
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
             *broadcasted_args[1:],
             auto_call_seq,
+            ffill_val_price,
             update_value,
             max_orders,
             max_logs,
@@ -1142,6 +1108,7 @@ class Portfolio(Wrapping):
                     init_cash: tp.Optional[tp.ArrayLike] = None,
                     cash_sharing: tp.Optional[bool] = None,
                     call_seq: tp.Optional[tp.ArrayLike] = None,
+                    ffill_val_price: tp.Optional[tp.ArrayLike] = None,
                     update_value: tp.Optional[tp.ArrayLike] = None,
                     max_orders: tp.Optional[int] = None,
                     max_logs: tp.Optional[int] = None,
@@ -1153,33 +1120,15 @@ class Portfolio(Wrapping):
                     **kwargs) -> PortfolioT:
         """Simulate portfolio from orders.
 
-        Starting with initial cash `init_cash`, orders `size` for `price`.
-
         Args:
-            close (array_like): Reference price, such as close.
+            close (array_like): Last asset price at each time step.
                 Will broadcast.
 
-                Will be used for calculating unrealized P&L and portfolio value.
+                Used for calculating unrealized P&L and portfolio value.
             size (float or array_like): Size to order.
-                Will broadcast.
-
-                Behavior depends upon `size_type` and `direction`.
-
-                For any fixed size:
-
-                * Set to any number to buy/sell some fixed amount or value.
-                    Longs are limited by cash in the account, while shorts are only limited if `lock_cash`.
-                * Set to `np.inf` to buy for all cash, or `-np.inf` to sell for all free cash.
-                    If `direction` is not `all`, `-np.inf` will close the position.
-                * Set to `np.nan` or 0 to skip.
-
-                For any target size:
-
-                * Set to any number to buy/sell an amount relative to the current position or value.
-                * Set to 0 to close the current position.
-                * Set to `np.nan` to skip.
+                See `vectorbt.portfolio.enums.Order.size`. Will broadcast.
             size_type (SizeType or array_like): See `vectorbt.portfolio.enums.SizeType`.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.size_type`. Will broadcast.
 
                 !!! note
                     `SizeType.Percent` does not support position reversal. Switch to a single direction.
@@ -1191,35 +1140,43 @@ class Portfolio(Wrapping):
                     upon the cash balance, which cannot be calculated in advance since it may change
                     after each order, this can yield a non-optimal call sequence.
             direction (Direction or array_like): See `vectorbt.portfolio.enums.Direction`.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.direction`. Will broadcast.
             price (array_like of float): Order price.
-                Defaults to `close`. Will broadcast.
+                See `vectorbt.portfolio.enums.Order.price`. Defaults to `np.inf`. Will broadcast.
+
+                !!! note
+                    Make sure to use the same timestamp for all order prices in the group with cash sharing
+                    and `call_seq` set to `CallSeqType.Auto`.
             fees (float or array_like): Fees in percentage of the order value.
-                Will broadcast. Note that 0.01 = 1%.
+                See `vectorbt.portfolio.enums.Order.fees`. Will broadcast.
             fixed_fees (float or array_like): Fixed amount of fees to pay per order.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.fixed_fees`. Will broadcast.
             slippage (float or array_like): Slippage in percentage of price.
-                Will broadcast. Note that 0.01 = 1%.
+                See `vectorbt.portfolio.enums.Order.slippage`. Will broadcast.
             min_size (float or array_like): Minimum size for an order to be accepted.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.min_size`. Will broadcast.
             max_size (float or array_like): Maximum size for an order.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.max_size`. Will broadcast.
 
                 Will be partially filled if exceeded.
             reject_prob (float or array_like): Order rejection probability.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.reject_prob`. Will broadcast.
             lock_cash (bool or array_like): Whether to lock cash when shorting.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.lock_cash`. Will broadcast.
             allow_partial (bool or array_like): Whether to allow partial fills.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.allow_partial`. Will broadcast.
 
                 Does not apply when size is `np.inf`.
             raise_reject (bool or array_like): Whether to raise an exception if order gets rejected.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.raise_reject`. Will broadcast.
             log (bool or array_like): Whether to log orders.
-                Will broadcast.
+                See `vectorbt.portfolio.enums.Order.log`. Will broadcast.
             val_price (array_like of float): Asset valuation price.
-                Defaults to `price`. Will broadcast.
+                Defaults to `np.inf`. Will broadcast.
+
+                * Any `-np.inf` element is replaced by the latest valuation price (the previous `close` or
+                    the latest known valuation price if `ffill_val_price`).
+                * Any `np.inf` element is replaced by the current order price.
 
                 Used at the time of decision making to calculate value of each asset in the group,
                 for example, to convert target value into target amount.
@@ -1274,6 +1231,9 @@ class Portfolio(Wrapping):
                         leave them without required funds.
 
                     For more control, use `Portfolio.from_order_func`.
+            ffill_val_price (bool): Whether to track valuation price only if it's known.
+
+                Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
             max_orders (int): Size of the order records array.
                 Defaults to the number of elements in the broadcasted shape.
@@ -1395,7 +1355,7 @@ class Portfolio(Wrapping):
             direction = portfolio_cfg['order_direction']
         direction = prepare_enum_value(Direction, direction)
         if price is None:
-            price = close
+            price = np.inf
         if fees is None:
             fees = portfolio_cfg['fees']
         if fixed_fees is None:
@@ -1417,7 +1377,7 @@ class Portfolio(Wrapping):
         if log is None:
             log = portfolio_cfg['log']
         if val_price is None:
-            val_price = price
+            val_price = np.inf
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
         init_cash = prepare_enum_value(InitCashMode, init_cash)
@@ -1436,6 +1396,8 @@ class Portfolio(Wrapping):
             if call_seq == CallSeqType.Auto:
                 call_seq = CallSeqType.Default
                 auto_call_seq = True
+        if ffill_val_price is None:
+            ffill_val_price = portfolio_cfg['ffill_val_price']
         if update_value is None:
             update_value = portfolio_cfg['update_value']
         if seed is None:
@@ -1496,11 +1458,13 @@ class Portfolio(Wrapping):
         # Perform calculation
         order_records, log_records = nb.simulate_from_orders_nb(
             target_shape_2d,
+            to_2d(close, raw=True),
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
             *broadcasted_args[1:],
             auto_call_seq,
+            ffill_val_price,
             update_value,
             max_orders,
             max_logs,
@@ -1540,6 +1504,7 @@ class Portfolio(Wrapping):
                         segment_prep_args: tp.Optional[tp.Args] = None,
                         after_order_func_nb: tp.Optional[nb.AfterOrderFuncT] = None,
                         after_order_args: tp.Optional[tp.Args] = None,
+                        ffill_val_price: tp.Optional[tp.ArrayLike] = None,
                         update_value: tp.Optional[tp.ArrayLike] = None,
                         row_wise: tp.Optional[bool] = None,
                         use_numba: tp.Optional[bool] = None,
@@ -1558,10 +1523,10 @@ class Portfolio(Wrapping):
         if `row_wise` is True, also see `vectorbt.portfolio.nb.simulate_row_wise_nb`.
 
         Args:
-            close (array_like): Reference price, such as close.
+            close (array_like): Last asset price at each time step.
                 Will broadcast to `target_shape`.
 
-                Will be used for calculating unrealized P&L and portfolio value.
+                Used for calculating unrealized P&L and portfolio value.
             order_func_nb (callable): Order generation function.
             *order_args: Arguments passed to `order_func_nb`.
             target_shape (tuple): Target shape to iterate over. Defaults to `close.shape`.
@@ -1612,6 +1577,9 @@ class Portfolio(Wrapping):
             after_order_args (tuple): Packed arguments passed to `after_order_func_nb`.
 
                 Defaults to `()`.
+            ffill_val_price (bool): Whether to track valuation price only if it's known.
+
+                Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
 
@@ -1655,16 +1623,16 @@ class Portfolio(Wrapping):
 
         ## Example
 
-        Buy 10 units each tick:
+        Buy 10 units each tick using closing price:
         ```python-repl
         >>> import pandas as pd
         >>> from numba import njit
         >>> import vectorbt as vbt
-        >>> from vectorbt.portfolio.nb import create_order_nb
+        >>> from vectorbt.portfolio.nb import order_nb
 
         >>> @njit
         ... def order_func_nb(c, size):
-        ...     return create_order_nb(size, c.close[c.i, c.col])
+        ...     return order_nb(size=size)
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
         >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
@@ -1689,6 +1657,7 @@ class Portfolio(Wrapping):
         which position to open next (just as an example, there are easier ways to do this):
         ```python-repl
         >>> import numpy as np
+        >>> from vectorbt.portfolio.nb import close_position_nb
 
         >>> @njit
         ... def group_prep_func_nb(c):
@@ -1697,19 +1666,16 @@ class Portfolio(Wrapping):
 
         >>> @njit
         ... def order_func_nb(c, last_pos_state):
-        ...     if c.position_now > 0:
-        ...         size = -c.position_now  # close long
-        ...     elif c.position_now < 0:
-        ...         size = -c.position_now  # close short
-        ...     else:
-        ...         if last_pos_state[0] == 1:
-        ...             size = -np.inf  # open short
-        ...             last_pos_state[0] = -1
-        ...         else:
-        ...             size = np.inf  # open long
-        ...             last_pos_state[0] = 1
+        ...     if c.position_now != 0:
+        ...         return close_position_nb()
         ...
-        ...     return create_order_nb(size, c.close[c.i, c.col])
+        ...     if last_pos_state[0] == 1:
+        ...         size = -np.inf  # open short
+        ...         last_pos_state[0] = -1
+        ...     else:
+        ...         size = np.inf  # open long
+        ...         last_pos_state[0] = 1
+        ...     return order_nb(size=size)
 
         >>> portfolio = vbt.Portfolio.from_order_func(
         ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
@@ -1757,9 +1723,8 @@ class Portfolio(Wrapping):
         >>> @njit
         ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
         ...     '''Place an order.'''
-        ...     return create_order_nb(
-        ...         size,
-        ...         c.close[c.i, c.col],
+        ...     return order_nb(
+        ...         size=size,
         ...         size_type=size_type,
         ...         direction=direction,
         ...         fees=fees,
@@ -1805,22 +1770,21 @@ class Portfolio(Wrapping):
         ...     # flex_select_auto_nb allows us to pass size as single number, 1-dim or 2-dim array
         ...     # If flex_2d is True, 1-dim array will be per column, otherwise per row
         ...     size_now = flex_select_auto_nb(c.i, c.col, np.asarray(size), flex_2d)
-        ...     # close is always 2-dim array
-        ...     price_now = c.close[c.i, c.col]
+        ...     price_now = c.close[c.i, c.col]  # close is always 2-dim array
         ...     stop_price_now = stop_price[c.col]
         ...
         ...     # Our logic
         ...     if entries[c.i, c.col]:
         ...         if c.position_now == 0:
-        ...             return create_order_nb(
-        ...                 size_now,
-        ...                 price_now,
+        ...             return order_nb(
+        ...                 size=size_now,
+        ...                 price=price_now,
         ...                 direction=Direction.LongOnly)
         ...     elif exits[c.i, c.col] or price_now >= stop_price_now:
         ...         if c.position_now > 0:
-        ...             return create_order_nb(
-        ...                 -size_now,
-        ...                 price_now,
+        ...             return order_nb(
+        ...                 size=-size_now,
+        ...                 price=price_now,
         ...                 direction=Direction.LongOnly)
         ...     return NoOrder
 
@@ -1911,6 +1875,8 @@ class Portfolio(Wrapping):
                                  "Use sort_call_seq_nb in segment_prep_func_nb.")
         if active_mask is None:
             active_mask = True
+        if ffill_val_price is None:
+            ffill_val_price = portfolio_cfg['ffill_val_price']
         if update_value is None:
             update_value = portfolio_cfg['update_value']
         if row_wise is None:
@@ -2015,6 +1981,7 @@ class Portfolio(Wrapping):
                 order_args,
                 after_order_func_nb,
                 after_order_args,
+                ffill_val_price,
                 update_value,
                 max_orders,
                 max_logs
@@ -2042,6 +2009,7 @@ class Portfolio(Wrapping):
                 order_args,
                 after_order_func_nb,
                 after_order_args,
+                ffill_val_price,
                 update_value,
                 max_orders,
                 max_logs

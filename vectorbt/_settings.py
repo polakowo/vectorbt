@@ -257,6 +257,7 @@ settings = SettingsConfig(
             signal_direction='longonly',
             order_direction='all',
             cash_sharing=False,
+            ffill_val_price=True,
             update_value=False,
             row_wise=False,
             use_numba=True,
