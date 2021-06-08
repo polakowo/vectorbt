@@ -617,9 +617,6 @@ class SignalsAccessor(GenericAccessor):
         >>> exits = sig.vbt.signals.generate_ohlc_stop_exits(
         ...     price['open'], price['high'], price['low'], price['close'],
         ...     out_dict=out_dict, sl_stop=0.2, ts_stop=0.2, tp_stop=0.2)
-        >>> out_dict['hit_price'][~exits] = np.nan
-        >>> out_dict['stop_type'][~exits] = -1
-
         >>> exits
                         a      b      c
         2020-01-01  False  False  False
@@ -636,8 +633,7 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04   NaN   NaN  NaN
         2020-01-05   NaN   NaN  9.6
 
-        >>> out_dict['stop_type'].applymap(
-        ...     lambda x: StopType._fields[x] if x in StopType else '')
+        >>> out_dict['stop_type'].vbt.map_enum(StopType)
                              a           b         c
         2020-01-01
         2020-01-02  TakeProfit  TakeProfit
@@ -656,9 +652,12 @@ class SignalsAccessor(GenericAccessor):
         if close is None:
             close = open
         if out_dict is None:
+            out_dict_passed = False
             out_dict = {}
-        hit_price_out = out_dict.get('hit_price', None)
-        stop_type_out = out_dict.get('stop_type', None)
+        else:
+            out_dict_passed = True
+        hit_price_out = out_dict.get('hit_price', np.nan if out_dict_passed else None)
+        stop_type_out = out_dict.get('stop_type', -1 if out_dict_passed else None)
         out_args = ()
         if hit_price_out is not None:
             out_args += (hit_price_out,)
@@ -674,15 +673,13 @@ class SignalsAccessor(GenericAccessor):
             hit_price_out = np.empty_like(entries, dtype=np.float_)
         else:
             hit_price_out = out_args[0]
-            if checks.is_pandas(hit_price_out):
-                hit_price_out = hit_price_out.vbt.to_2d_array()
             out_args = out_args[1:]
         if stop_type_out is None:
             stop_type_out = np.empty_like(entries, dtype=np.int_)
         else:
             stop_type_out = out_args[0]
-            if checks.is_pandas(stop_type_out):
-                stop_type_out = stop_type_out.vbt.to_2d_array()
+        hit_price_out = reshape_fns.to_2d(hit_price_out, raw=True)
+        stop_type_out = reshape_fns.to_2d(stop_type_out, raw=True)
 
         # Perform generation
         if iteratively:

@@ -1184,6 +1184,21 @@ class GenericAccessor(BaseAccessor):
         """
         return self.split(ExpandingSplitter(), **kwargs)
 
+    # ############# Enums ############# #
+
+    def map_enum(self, enum: tp.NamedTuple) -> tp.SeriesFrame:
+        """Map integer values to field names of an enum."""
+        def _mapper(x: int) -> str:
+            if x in enum:
+                return enum._fields[x]
+            if x == -1:
+                return ''
+            return 'UNK'
+
+        if self.is_series():
+            return self._obj.map(_mapper)
+        return self._obj.applymap(_mapper)
+
     # ############# Plotting ############# #
 
     def plot(self,

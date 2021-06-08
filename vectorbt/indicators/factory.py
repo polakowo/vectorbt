@@ -2405,9 +2405,7 @@ class IndicatorFactory:
 
             if checks.is_namedtuple(dtype):
                 def attr_readable(self, _attr_name: str = attr_name, enum: tp.NamedTuple = dtype) -> tp.SeriesFrame:
-                    if self.wrapper.ndim == 1:
-                        return getattr(self, _attr_name).map(lambda x: '' if x == -1 else enum._fields[x])
-                    return getattr(self, _attr_name).applymap(lambda x: '' if x == -1 else enum._fields[x])
+                    return getattr(self, _attr_name).vbt.map_enum(enum)
 
                 attr_readable.__qualname__ = f'{Indicator.__name__}.{attr_name}_readable'
                 attr_readable.__doc__ = f"""{attr_name} in readable format based on enum {dtype}."""
