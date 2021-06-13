@@ -1173,7 +1173,7 @@ def update_pos_record_nb(record: tp.Record,
 
 @njit
 def no_pre_func_nb(context: tp.NamedTuple, *args) -> tp.Args:
-    """Placeholder before-block function that forwards received arguments down the stack."""
+    """Placeholder preprocessing function that forwards received arguments down the stack."""
     return args
 
 
@@ -1185,20 +1185,20 @@ def no_order_func_nb(context: OrderContext, *args) -> Order:
 
 @njit
 def no_post_func_nb(context: tp.NamedTuple, *args) -> None:
-    """Placeholder after-block function that returns nothing."""
+    """Placeholder postprocessing function that returns nothing."""
     return None
 
 
-BeforeSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], tp.Args]
-AfterSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], None]
-BeforeGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], tp.Args]
-AfterGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], None]
-BeforeRowFuncT = tp.Callable[[RowContext, tp.VarArg()], tp.Args]
-AfterRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
-BeforeSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], tp.Args]
-AfterSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], None]
+PreSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], tp.Args]
+PostSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], None]
+PreGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], tp.Args]
+PostGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], None]
+PreRowFuncT = tp.Callable[[RowContext, tp.VarArg()], tp.Args]
+PostRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
+PreSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], tp.Args]
+PostSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], None]
 OrderFuncT = tp.Callable[[OrderContext, tp.VarArg()], Order]
-AfterOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
+PostOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
 
 
 @njit
@@ -1209,21 +1209,21 @@ def simulate_nb(target_shape: tp.Shape,
                 cash_sharing: bool,
                 call_seq: tp.Array2d,
                 segment_mask: tp.Array2d,
-                pre_sim_func_nb: BeforeSimFuncT = no_pre_func_nb,
+                pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
                 pre_sim_args: tp.Args = (),
-                post_sim_func_nb: AfterSimFuncT = no_post_func_nb,
+                post_sim_func_nb: PostSimFuncT = no_post_func_nb,
                 post_sim_args: tp.Args = (),
-                pre_group_func_nb: BeforeGroupFuncT = no_pre_func_nb,
+                pre_group_func_nb: PreGroupFuncT = no_pre_func_nb,
                 pre_group_args: tp.Args = (),
-                post_group_func_nb: AfterGroupFuncT = no_post_func_nb,
+                post_group_func_nb: PostGroupFuncT = no_post_func_nb,
                 post_group_args: tp.Args = (),
-                pre_segment_func_nb: BeforeSegmentFuncT = no_pre_func_nb,
+                pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
                 pre_segment_args: tp.Args = (),
-                post_segment_func_nb: AfterSegmentFuncT = no_post_func_nb,
+                post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
                 post_segment_args: tp.Args = (),
                 order_func_nb: OrderFuncT = no_order_func_nb,
                 order_args: tp.Args = (),
-                post_order_func_nb: AfterOrderFuncT = no_post_func_nb,
+                post_order_func_nb: PostOrderFuncT = no_post_func_nb,
                 post_order_args: tp.Args = (),
                 call_pre_segment: bool = False,
                 call_post_segment: bool = False,
@@ -2098,21 +2098,21 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                          cash_sharing: bool,
                          call_seq: tp.Array2d,
                          segment_mask: tp.Array2d,
-                         pre_sim_func_nb: BeforeSimFuncT = no_pre_func_nb,
+                         pre_sim_func_nb: PreSimFuncT = no_pre_func_nb,
                          pre_sim_args: tp.Args = (),
-                         post_sim_func_nb: AfterSimFuncT = no_post_func_nb,
+                         post_sim_func_nb: PostSimFuncT = no_post_func_nb,
                          post_sim_args: tp.Args = (),
-                         pre_row_func_nb: BeforeRowFuncT = no_pre_func_nb,
+                         pre_row_func_nb: PreRowFuncT = no_pre_func_nb,
                          pre_row_args: tp.Args = (),
-                         post_row_func_nb: AfterRowFuncT = no_post_func_nb,
+                         post_row_func_nb: PostRowFuncT = no_post_func_nb,
                          post_row_args: tp.Args = (),
-                         pre_segment_func_nb: BeforeSegmentFuncT = no_pre_func_nb,
+                         pre_segment_func_nb: PreSegmentFuncT = no_pre_func_nb,
                          pre_segment_args: tp.Args = (),
-                         post_segment_func_nb: AfterSegmentFuncT = no_post_func_nb,
+                         post_segment_func_nb: PostSegmentFuncT = no_post_func_nb,
                          post_segment_args: tp.Args = (),
                          order_func_nb: OrderFuncT = no_order_func_nb,
                          order_args: tp.Args = (),
-                         post_order_func_nb: AfterOrderFuncT = no_post_func_nb,
+                         post_order_func_nb: PostOrderFuncT = no_post_func_nb,
                          post_order_args: tp.Args = (),
                          call_pre_segment: bool = False,
                          call_post_segment: bool = False,
