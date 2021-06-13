@@ -202,7 +202,7 @@ simulation from the beginning to the end, you can turn on logging.
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
 
 >>> portfolio.logs.records
-        id  idx  col  group  cash    position  debt  free_cash    val_price  \
+        id  idx  col  group  cash    position  debt  free_cash    val_price  \\
 0        0    0    0      0   inf    0.000000   0.0        inf  7194.892090
 1        1    1    0      0   inf    0.000000   0.0        inf  7202.551270
 2        2    2    0      0   inf    0.000000   0.0        inf  6984.428711
@@ -211,7 +211,7 @@ simulation from the beginning to the end, you can turn on logging.
 1462  1462  242    5      5   inf  274.137659   0.0        inf    62.844059
 1463  1463  243    5      5   inf  282.093860   0.0        inf    61.105076
 
-      value  ...  new_free_cash  new_val_price  new_value  res_size  \
+      value  ...  new_free_cash  new_val_price  new_value  res_size  \\
 0       inf  ...            inf    7194.892090        inf       NaN
 1       inf  ...            inf    7202.551270        inf       NaN
 2       inf  ...            inf    6984.428711        inf       NaN
@@ -469,7 +469,7 @@ class Portfolio(Wrapping):
 
             Applied after the simulation to avoid NaNs in asset value.
 
-            See `Portfolio.get_fillna_close`.
+            See `Portfolio.get_filled_close`.
 
     !!! note
         Use class methods with `from_` prefix to build a portfolio.
@@ -640,8 +640,8 @@ class Portfolio(Wrapping):
                      init_cash: tp.Optional[tp.ArrayLike] = None,
                      cash_sharing: tp.Optional[bool] = None,
                      call_seq: tp.Optional[tp.ArrayLike] = None,
-                     ffill_val_price: tp.Optional[tp.ArrayLike] = None,
-                     update_value: tp.Optional[tp.ArrayLike] = None,
+                     ffill_val_price: tp.Optional[bool] = None,
+                     update_value: tp.Optional[bool] = None,
                      max_orders: tp.Optional[int] = None,
                      max_logs: tp.Optional[int] = None,
                      seed: tp.Optional[int] = None,
@@ -1090,7 +1090,7 @@ class Portfolio(Wrapping):
     @classmethod
     def from_orders(cls: tp.Type[PortfolioT],
                     close: tp.ArrayLike,
-                    size: tp.ArrayLike,
+                    size: tp.Optional[tp.ArrayLike] = None,
                     size_type: tp.Optional[tp.ArrayLike] = None,
                     direction: tp.Optional[tp.ArrayLike] = None,
                     price: tp.Optional[tp.ArrayLike] = None,
@@ -1108,8 +1108,8 @@ class Portfolio(Wrapping):
                     init_cash: tp.Optional[tp.ArrayLike] = None,
                     cash_sharing: tp.Optional[bool] = None,
                     call_seq: tp.Optional[tp.ArrayLike] = None,
-                    ffill_val_price: tp.Optional[tp.ArrayLike] = None,
-                    update_value: tp.Optional[tp.ArrayLike] = None,
+                    ffill_val_price: tp.Optional[bool] = None,
+                    update_value: tp.Optional[bool] = None,
                     max_orders: tp.Optional[int] = None,
                     max_logs: tp.Optional[int] = None,
                     seed: tp.Optional[int] = None,
@@ -1356,6 +1356,8 @@ class Portfolio(Wrapping):
         direction = prepare_enum_value(Direction, direction)
         if price is None:
             price = np.inf
+        if size is None:
+            size = portfolio_cfg['size']
         if fees is None:
             fees = portfolio_cfg['fees']
         if fixed_fees is None:
@@ -1493,19 +1495,30 @@ class Portfolio(Wrapping):
                         init_cash: tp.Optional[tp.ArrayLike] = None,
                         cash_sharing: tp.Optional[bool] = None,
                         call_seq: tp.Optional[tp.ArrayLike] = None,
-                        active_mask: tp.Optional[tp.ArrayLike] = None,
-                        prep_func_nb: tp.Optional[nb.PrepFuncT] = None,
-                        prep_args: tp.Optional[tp.Args] = None,
-                        group_prep_func_nb: tp.Optional[nb.GroupPrepFuncT] = None,
-                        group_prep_args: tp.Optional[tp.Args] = None,
-                        row_prep_func_nb: tp.Optional[nb.RowPrepFuncT] = None,
-                        row_prep_args: tp.Optional[tp.Args] = None,
-                        segment_prep_func_nb: tp.Optional[nb.SegmentPrepFuncT] = None,
-                        segment_prep_args: tp.Optional[tp.Args] = None,
-                        after_order_func_nb: tp.Optional[nb.AfterOrderFuncT] = None,
-                        after_order_args: tp.Optional[tp.Args] = None,
-                        ffill_val_price: tp.Optional[tp.ArrayLike] = None,
-                        update_value: tp.Optional[tp.ArrayLike] = None,
+                        segment_mask: tp.Optional[tp.ArrayLike] = None,
+                        pre_sim_func_nb: tp.Optional[nb.BeforeSimFuncT] = None,
+                        pre_sim_args: tp.Optional[tp.Args] = None,
+                        post_sim_func_nb: tp.Optional[nb.AfterSimFuncT] = None,
+                        post_sim_args: tp.Optional[tp.Args] = None,
+                        pre_group_func_nb: tp.Optional[nb.BeforeGroupFuncT] = None,
+                        pre_group_args: tp.Optional[tp.Args] = None,
+                        post_group_func_nb: tp.Optional[nb.AfterGroupFuncT] = None,
+                        post_group_args: tp.Optional[tp.Args] = None,
+                        pre_row_func_nb: tp.Optional[nb.BeforeRowFuncT] = None,
+                        pre_row_args: tp.Optional[tp.Args] = None,
+                        post_row_func_nb: tp.Optional[nb.AfterRowFuncT] = None,
+                        post_row_args: tp.Optional[tp.Args] = None,
+                        pre_segment_func_nb: tp.Optional[nb.BeforeSegmentFuncT] = None,
+                        pre_segment_args: tp.Optional[tp.Args] = None,
+                        post_segment_func_nb: tp.Optional[nb.AfterSegmentFuncT] = None,
+                        post_segment_args: tp.Optional[tp.Args] = None,
+                        post_order_func_nb: tp.Optional[nb.AfterOrderFuncT] = None,
+                        post_order_args: tp.Optional[tp.Args] = None,
+                        call_pre_segment: tp.Optional[bool] = None,
+                        call_post_segment: tp.Optional[bool] = None,
+                        ffill_val_price: tp.Optional[bool] = None,
+                        update_value: tp.Optional[bool] = None,
+                        fill_pos_record: tp.Optional[bool] = None,
                         row_wise: tp.Optional[bool] = None,
                         use_numba: tp.Optional[bool] = None,
                         max_orders: tp.Optional[int] = None,
@@ -1548,39 +1561,63 @@ class Portfolio(Wrapping):
 
                 !!! note
                     CallSeqType.Auto should be implemented manually.
-                    Use `sort_call_seq_nb` in `segment_prep_func_nb`.
-            active_mask (int or array_like of bool): Mask of whether a particular segment should be executed.
+                    Use `sort_call_seq_nb` in `pre_segment_func_nb`.
+            segment_mask (int or array_like of bool): Mask of whether a particular segment should be executed.
 
                 Supplying an integer will activate every n-th row (just for convenience).
                 Supplying a boolean will broadcast to the number of rows and groups.
-            prep_func_nb (callable): Simulation preparation function.
-            prep_args (tuple): Packed arguments passed to `prep_func_nb`.
-
+            pre_sim_func_nb (callable): Function called before simulation.
+                Defaults to `vectorbt.portfolio.nb.no_pre_func_nb`.
+            pre_sim_args (tuple): Packed arguments passed to `pre_sim_func_nb`.
                 Defaults to `()`.
-            group_prep_func_nb (callable): Group preparation function.
+            post_sim_func_nb (callable): Function called after simulation.
+                Defaults to `vectorbt.portfolio.nb.no_post_func_nb`.
+            post_sim_args (tuple): Packed arguments passed to `post_sim_func_nb`.
+                Defaults to `()`.
+            pre_group_func_nb (callable): Function called before each group.
+                Defaults to `vectorbt.portfolio.nb.no_pre_func_nb`.
 
                 Called only if `row_wise` is False.
-            group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
-
+            pre_group_args (tuple): Packed arguments passed to `pre_group_func_nb`.
                 Defaults to `()`.
-            row_prep_func_nb (callable): Row preparation function.
+            post_group_func_nb (callable): Function called after each group.
+                Defaults to `vectorbt.portfolio.nb.no_post_func_nb`.
+
+                Called only if `row_wise` is False.
+            post_group_args (tuple): Packed arguments passed to `post_group_func_nb`.
+                Defaults to `()`.
+            pre_row_func_nb (callable): Function called before each row.
+                Defaults to `vectorbt.portfolio.nb.no_pre_func_nb`.
 
                 Called only if `row_wise` is True.
-            row_prep_args (tuple): Packed arguments passed to `row_prep_func_nb`.
-
+            pre_row_args (tuple): Packed arguments passed to `pre_row_func_nb`.
                 Defaults to `()`.
-            segment_prep_func_nb (callable): Segment preparation function.
-            segment_prep_args (tuple): Packed arguments passed to `segment_prep_func_nb`.
+            post_row_func_nb (callable): Function called after each row.
+                Defaults to `vectorbt.portfolio.nb.no_post_func_nb`.
 
+                Called only if `row_wise` is True.
+            post_row_args (tuple): Packed arguments passed to `post_row_func_nb`.
                 Defaults to `()`.
-            after_order_func_nb (callable): Callback that is called after the order has been processed.
-            after_order_args (tuple): Packed arguments passed to `after_order_func_nb`.
-
+            pre_segment_func_nb (callable): Function called before each segment.
+                Defaults to `vectorbt.portfolio.nb.no_pre_func_nb`.
+            pre_segment_args (tuple): Packed arguments passed to `pre_segment_func_nb`.
                 Defaults to `()`.
+            post_segment_func_nb (callable): Function called after each segment.
+                Defaults to `vectorbt.portfolio.nb.no_post_func_nb`.
+            post_segment_args (tuple): Packed arguments passed to `post_segment_func_nb`.
+                Defaults to `()`.
+            post_order_func_nb (callable): Callback that is called after the order has been processed.
+            post_order_args (tuple): Packed arguments passed to `post_order_func_nb`.
+                Defaults to `()`.
+            call_pre_segment (bool): Whether to call `pre_segment_func_nb` regardless of `segment_mask`.
+            call_post_segment (bool): Whether to call `post_segment_func_nb` regardless of `segment_mask`.
             ffill_val_price (bool): Whether to track valuation price only if it's known.
 
                 Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
             update_value (bool): Whether to update group value after each filled order.
+            fill_pos_record (bool): Whether to fill position record.
+
+                Disable this to make simulation a bit faster for simple use cases.
             row_wise (bool): Whether to iterate over rows rather than columns/groups.
 
                 See `vectorbt.portfolio.nb.simulate_row_wise_nb`.
@@ -1619,7 +1656,7 @@ class Portfolio(Wrapping):
         !!! note
             In contrast to other methods, the valuation price is previous `close`
             instead of order price, since the price of an order is unknown before call.
-            You can still set valuation price explicitly in `segment_prep_func_nb`.
+            You can still set valuation price explicitly in `pre_segment_func_nb`.
 
         ## Example
 
@@ -1660,7 +1697,7 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.nb import close_position_nb
 
         >>> @njit
-        ... def group_prep_func_nb(c):
+        ... def pre_group_func_nb(c):
         ...     last_pos_state = np.array([-1])
         ...     return (last_pos_state,)
 
@@ -1678,7 +1715,7 @@ class Portfolio(Wrapping):
         ...     return order_nb(size=size)
 
         >>> portfolio = vbt.Portfolio.from_order_func(
-        ...     close, order_func_nb, group_prep_func_nb=group_prep_func_nb)
+        ...     close, order_func_nb, pre_group_func_nb=pre_group_func_nb)
 
         >>> portfolio.assets()
         0    100.000000
@@ -1702,13 +1739,13 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.enums import SizeType, Direction
 
         >>> @njit
-        ... def group_prep_func_nb(c):
+        ... def pre_group_func_nb(c):
         ...     '''Define empty arrays for each group.'''
         ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
         ...     return (order_value_out,)
 
         >>> @njit
-        ... def segment_prep_func_nb(c, order_value_out):
+        ... def pre_segment_func_nb(c, order_value_out):
         ...     '''Perform rebalancing at each segment.'''
         ...     for col in range(c.from_col, c.to_col):
         ...         # Here we use order price for group valuation
@@ -1741,9 +1778,9 @@ class Portfolio(Wrapping):
         >>> portfolio = vbt.Portfolio.from_order_func(
         ...     close,  # acts both as reference and order price here
         ...     order_func_nb, fees, fixed_fees, slippage,  # order_args as *args
-        ...     active_mask=2,  # rebalance every second tick
-        ...     group_prep_func_nb=group_prep_func_nb,
-        ...     segment_prep_func_nb=segment_prep_func_nb,
+        ...     segment_mask=2,  # rebalance every second tick
+        ...     pre_group_func_nb=pre_group_func_nb,
+        ...     pre_segment_func_nb=pre_segment_func_nb,
         ...     cash_sharing=True, group_by=True,  # one group with cash sharing
         ... )
 
@@ -1759,7 +1796,7 @@ class Portfolio(Wrapping):
         >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
 
         >>> @njit
-        ... def prep_func_nb(c):
+        ... def pre_sim_func_nb(c):
         ...     # We need to define stop price per column once
         ...     stop_price = np.full(c.target_shape[1], np.nan, dtype=np.float_)
         ...     return (stop_price,)
@@ -1789,7 +1826,7 @@ class Portfolio(Wrapping):
         ...     return NoOrder
 
         >>> @njit
-        ... def after_order_func_nb(c, stop_price, stop, flex_2d):
+        ... def post_order_func_nb(c, stop_price, stop, flex_2d):
         ...     # Same broadcasting as for size
         ...     stop_now = flex_select_auto_nb(c.i, c.col, np.asarray(stop), flex_2d)
         ...
@@ -1809,9 +1846,9 @@ class Portfolio(Wrapping):
         ...         to_2d(exits, raw=True),  # 2-dim array
         ...         np.inf, # will broadcast
         ...         True,
-        ...         prep_func_nb=prep_func_nb,
-        ...         after_order_func_nb=after_order_func_nb,
-        ...         after_order_args=(
+        ...         pre_sim_func_nb=pre_sim_func_nb,
+        ...         post_order_func_nb=post_order_func_nb,
+        ...         post_order_args=(
         ...             threshold,  # will broadcast
         ...             True
         ...         )
@@ -1872,13 +1909,19 @@ class Portfolio(Wrapping):
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually. "
-                                 "Use sort_call_seq_nb in segment_prep_func_nb.")
-        if active_mask is None:
-            active_mask = True
+                                 "Use sort_call_seq_nb in pre_segment_func_nb.")
+        if segment_mask is None:
+            segment_mask = True
+        if call_pre_segment is None:
+            call_pre_segment = portfolio_cfg['call_pre_segment']
+        if call_post_segment is None:
+            call_post_segment = portfolio_cfg['call_post_segment']
         if ffill_val_price is None:
             ffill_val_price = portfolio_cfg['ffill_val_price']
         if update_value is None:
             update_value = portfolio_cfg['update_value']
+        if fill_pos_record is None:
+            fill_pos_record = portfolio_cfg['fill_pos_record']
         if row_wise is None:
             row_wise = portfolio_cfg['row_wise']
         if use_numba is None:
@@ -1915,13 +1958,13 @@ class Portfolio(Wrapping):
         cs_group_lens = wrapper.grouper.get_group_lens(group_by=None if cash_sharing else False)
         init_cash = np.require(np.broadcast_to(init_cash, (len(cs_group_lens),)), dtype=np.float_)
         group_lens = wrapper.grouper.get_group_lens(group_by=group_by)
-        if isinstance(active_mask, int):
-            _active_mask = np.full((target_shape_2d[0], len(group_lens)), False)
-            _active_mask[0::active_mask] = True
-            active_mask = _active_mask
+        if isinstance(segment_mask, int):
+            _segment_mask = np.full((target_shape_2d[0], len(group_lens)), False)
+            _segment_mask[0::segment_mask] = True
+            segment_mask = _segment_mask
         else:
-            active_mask = broadcast(
-                active_mask,
+            segment_mask = broadcast(
+                segment_mask,
                 to_shape=(target_shape_2d[0], len(group_lens)),
                 to_pd=False,
                 **require_kwargs
@@ -1936,26 +1979,46 @@ class Portfolio(Wrapping):
             max_logs = target_shape_2d[0] * target_shape_2d[1]
 
         # Prepare arguments
-        if prep_func_nb is None:
-            prep_func_nb = nb.empty_prep_func_nb
-        if prep_args is None:
-            prep_args = ()
-        if group_prep_func_nb is None:
-            group_prep_func_nb = nb.empty_prep_func_nb
-        if group_prep_args is None:
-            group_prep_args = ()
-        if row_prep_func_nb is None:
-            row_prep_func_nb = nb.empty_prep_func_nb
-        if row_prep_args is None:
-            row_prep_args = ()
-        if segment_prep_func_nb is None:
-            segment_prep_func_nb = nb.empty_prep_func_nb
-        if segment_prep_args is None:
-            segment_prep_args = ()
-        if after_order_func_nb is None:
-            after_order_func_nb = nb.empty_after_order_func_nb
-        if after_order_args is None:
-            after_order_args = ()
+        if pre_sim_func_nb is None:
+            pre_sim_func_nb = nb.no_pre_func_nb
+        if pre_sim_args is None:
+            pre_sim_args = ()
+        if post_sim_func_nb is None:
+            post_sim_func_nb = nb.no_post_func_nb
+        if post_sim_args is None:
+            post_sim_args = ()
+
+        if pre_group_func_nb is None:
+            pre_group_func_nb = nb.no_pre_func_nb
+        if pre_group_args is None:
+            pre_group_args = ()
+        if post_group_func_nb is None:
+            post_group_func_nb = nb.no_post_func_nb
+        if post_group_args is None:
+            post_group_args = ()
+
+        if pre_row_func_nb is None:
+            pre_row_func_nb = nb.no_pre_func_nb
+        if pre_row_args is None:
+            pre_row_args = ()
+        if post_row_func_nb is None:
+            post_row_func_nb = nb.no_post_func_nb
+        if post_row_args is None:
+            post_row_args = ()
+
+        if pre_segment_func_nb is None:
+            pre_segment_func_nb = nb.no_pre_func_nb
+        if pre_segment_args is None:
+            pre_segment_args = ()
+        if post_segment_func_nb is None:
+            post_segment_func_nb = nb.no_post_func_nb
+        if post_segment_args is None:
+            post_segment_args = ()
+
+        if post_order_func_nb is None:
+            post_order_func_nb = nb.no_post_func_nb
+        if post_order_args is None:
+            post_order_args = ()
 
         # Perform calculation
         if row_wise:
@@ -1964,27 +2027,36 @@ class Portfolio(Wrapping):
             else:
                 simulate_func = nb.simulate_row_wise_nb.py_func
             order_records, log_records = simulate_func(
-                target_shape_2d,
-                to_2d(close, raw=True),
-                group_lens,
-                init_cash,
-                cash_sharing,
-                call_seq,
-                active_mask,
-                prep_func_nb,
-                prep_args,
-                row_prep_func_nb,
-                row_prep_args,
-                segment_prep_func_nb,
-                segment_prep_args,
-                order_func_nb,
-                order_args,
-                after_order_func_nb,
-                after_order_args,
-                ffill_val_price,
-                update_value,
-                max_orders,
-                max_logs
+                target_shape=target_shape_2d,
+                close=to_2d(close, raw=True),
+                group_lens=group_lens,
+                init_cash=init_cash,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                segment_mask=segment_mask,
+                pre_sim_func_nb=pre_sim_func_nb,
+                pre_sim_args=pre_sim_args,
+                post_sim_func_nb=post_sim_func_nb,
+                post_sim_args=post_sim_args,
+                pre_row_func_nb=pre_row_func_nb,
+                pre_row_args=pre_row_args,
+                post_row_func_nb=post_row_func_nb,
+                post_row_args=post_row_args,
+                pre_segment_func_nb=pre_segment_func_nb,
+                pre_segment_args=pre_segment_args,
+                post_segment_func_nb=post_segment_func_nb,
+                post_segment_args=post_segment_args,
+                order_func_nb=order_func_nb,
+                order_args=order_args,
+                post_order_func_nb=post_order_func_nb,
+                post_order_args=post_order_args,
+                call_pre_segment=call_pre_segment,
+                call_post_segment=call_post_segment,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                fill_pos_record=fill_pos_record,
+                max_orders=max_orders,
+                max_logs=max_logs
             )
         else:
             if use_numba:
@@ -1992,27 +2064,36 @@ class Portfolio(Wrapping):
             else:
                 simulate_func = nb.simulate_nb.py_func
             order_records, log_records = simulate_func(
-                target_shape_2d,
-                to_2d(close, raw=True),
-                group_lens,
-                init_cash,
-                cash_sharing,
-                call_seq,
-                active_mask,
-                prep_func_nb,
-                prep_args,
-                group_prep_func_nb,
-                group_prep_args,
-                segment_prep_func_nb,
-                segment_prep_args,
-                order_func_nb,
-                order_args,
-                after_order_func_nb,
-                after_order_args,
-                ffill_val_price,
-                update_value,
-                max_orders,
-                max_logs
+                target_shape=target_shape_2d,
+                close=to_2d(close, raw=True),
+                group_lens=group_lens,
+                init_cash=init_cash,
+                cash_sharing=cash_sharing,
+                call_seq=call_seq,
+                segment_mask=segment_mask,
+                pre_sim_func_nb=pre_sim_func_nb,
+                pre_sim_args=pre_sim_args,
+                post_sim_func_nb=post_sim_func_nb,
+                post_sim_args=post_sim_args,
+                pre_group_func_nb=pre_group_func_nb,
+                pre_group_args=pre_group_args,
+                post_group_func_nb=post_group_func_nb,
+                post_group_args=post_group_args,
+                pre_segment_func_nb=pre_segment_func_nb,
+                pre_segment_args=pre_segment_args,
+                post_segment_func_nb=post_segment_func_nb,
+                post_segment_args=post_segment_args,
+                order_func_nb=order_func_nb,
+                order_args=order_args,
+                post_order_func_nb=post_order_func_nb,
+                post_order_args=post_order_args,
+                call_pre_segment=call_pre_segment,
+                call_post_segment=call_post_segment,
+                ffill_val_price=ffill_val_price,
+                update_value=update_value,
+                fill_pos_record=fill_pos_record,
+                max_orders=max_orders,
+                max_logs=max_logs
             )
 
         # Create an instance
@@ -2077,15 +2158,9 @@ class Portfolio(Wrapping):
         return self._close
 
     @cached_method
-    def get_fillna_close(self, ffill: bool = True, bfill: bool = True,
-                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Fill NaN values of `Portfolio.close`.
-        Use `ffill` and `bfill` to fill forwards and backwards respectively."""
-        close = to_2d(self.close, raw=True)
-        if ffill and np.any(np.isnan(close[-1, :])):
-            close = generic_nb.ffill_nb(close)
-        if bfill and np.any(np.isnan(close[0, :])):
-            close = generic_nb.ffill_nb(close[::-1, :])[::-1, :]
+    def get_filled_close(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Forward-backward-fill NaN values in `Portfolio.close`"""
+        close = to_2d(self.close.ffill().bfill(), raw=True)
         return self.wrapper.wrap(close, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Records ############# #
@@ -2310,7 +2385,7 @@ class Portfolio(Wrapping):
         """Get asset value series per column/group."""
         direction = prepare_enum_value(Direction, direction)
         if self.fillna_close:
-            close = to_2d(self.get_fillna_close(), raw=True).copy()
+            close = to_2d(self.get_filled_close(), raw=True).copy()
         else:
             close = to_2d(self.close, raw=True).copy()
         assets = to_2d(self.assets(direction=direction), raw=True)
@@ -2378,7 +2453,7 @@ class Portfolio(Wrapping):
             )
         else:
             if self.fillna_close:
-                close = to_2d(self.get_fillna_close(), raw=True)
+                close = to_2d(self.get_filled_close(), raw=True)
             else:
                 close = to_2d(self.close, raw=True)
             total_profit = nb.total_profit_nb(
@@ -2445,7 +2520,7 @@ class Portfolio(Wrapping):
         !!! note
             Does not take into account fees and slippage. For this, create a separate portfolio."""
         if self.fillna_close:
-            close = to_2d(self.get_fillna_close(), raw=True)
+            close = to_2d(self.get_filled_close(), raw=True)
         else:
             close = to_2d(self.close, raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):

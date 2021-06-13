@@ -4,6 +4,7 @@ from numba import njit, typeof
 from numba.typed import List
 from datetime import datetime, timedelta
 import pytest
+from copy import deepcopy
 
 import vectorbt as vbt
 from vectorbt.portfolio.enums import *
@@ -2815,7 +2816,7 @@ class TestFromOrderFunc:
         }, index=price.index)
 
         @njit
-        def segment_prep_func_nb(c, target_hold_value):
+        def pre_segment_func_nb(c, target_hold_value):
             order_size = np.copy(target_hold_value[c.i, c.from_col:c.to_col])
             order_size_type = np.full(c.group_len, SizeType.TargetValue)
             direction = np.full(c.group_len, Direction.All)
@@ -2836,8 +2837,8 @@ class TestFromOrderFunc:
 
         portfolio = vbt.Portfolio.from_order_func(
             price_wide * 0 + 1, pct_order_func_nb, group_by=np.array([0, 0, 0]),
-            cash_sharing=True, segment_prep_func_nb=segment_prep_func_nb,
-            segment_prep_args=(target_hold_value.values,), row_wise=test_row_wise)
+            cash_sharing=True, pre_segment_func_nb=pre_segment_func_nb,
+            pre_segment_args=(target_hold_value.values,), row_wise=test_row_wise)
         np.testing.assert_array_equal(
             portfolio.call_seq.values,
             np.array([
@@ -2859,7 +2860,7 @@ class TestFromOrderFunc:
     )
     def test_target_value(self, test_row_wise):
         @njit
-        def target_val_segment_prep_func_nb(c, val_price):
+        def target_val_pre_segment_func_nb(c, val_price):
             c.last_val_price[c.from_col:c.to_col] = val_price[c.i]
             return ()
 
@@ -2887,8 +2888,8 @@ class TestFromOrderFunc:
             )
         portfolio = vbt.Portfolio.from_order_func(
             price.iloc[1:], target_val_order_func_nb,
-            segment_prep_func_nb=target_val_segment_prep_func_nb,
-            segment_prep_args=(price.iloc[:-1].values,), row_wise=test_row_wise)
+            pre_segment_func_nb=target_val_pre_segment_func_nb,
+            pre_segment_args=(price.iloc[:-1].values,), row_wise=test_row_wise)
         if test_row_wise:
             record_arrays_close(
                 portfolio.order_records,
@@ -2912,7 +2913,7 @@ class TestFromOrderFunc:
     )
     def test_target_percent(self, test_row_wise):
         @njit
-        def target_pct_segment_prep_func_nb(c, val_price):
+        def target_pct_pre_segment_func_nb(c, val_price):
             c.last_val_price[c.from_col:c.to_col] = val_price[c.i]
             return ()
 
@@ -2940,8 +2941,8 @@ class TestFromOrderFunc:
             )
         portfolio = vbt.Portfolio.from_order_func(
             price.iloc[1:], target_pct_order_func_nb,
-            segment_prep_func_nb=target_pct_segment_prep_func_nb,
-            segment_prep_args=(price.iloc[:-1].values,), row_wise=test_row_wise)
+            pre_segment_func_nb=target_pct_pre_segment_func_nb,
+            pre_segment_args=(price.iloc[:-1].values,), row_wise=test_row_wise)
         if test_row_wise:
             record_arrays_close(
                 portfolio.order_records,
@@ -2975,7 +2976,7 @@ class TestFromOrderFunc:
             )
 
         @njit
-        def after_order_func_nb(c, value_before, value_now):
+        def post_order_func_nb(c, value_before, value_now):
             value_before[c.i, c.col] = c.value_before
             value_now[c.i, c.col] = c.value_now
 
@@ -2985,8 +2986,8 @@ class TestFromOrderFunc:
         _ = vbt.Portfolio.from_order_func(
             price,
             order_func_nb,
-            after_order_func_nb=after_order_func_nb,
-            after_order_args=(value_before, value_now),
+            post_order_func_nb=post_order_func_nb,
+            post_order_args=(value_before, value_now),
             row_wise=test_row_wise,
             update_value=False)
 
@@ -2998,8 +2999,8 @@ class TestFromOrderFunc:
         _ = vbt.Portfolio.from_order_func(
             price,
             order_func_nb,
-            after_order_func_nb=after_order_func_nb,
-            after_order_args=(value_before, value_now),
+            post_order_func_nb=post_order_func_nb,
+            post_order_args=(value_before, value_now),
             row_wise=test_row_wise,
             update_value=True)
 
@@ -3028,7 +3029,264 @@ class TestFromOrderFunc:
         "test_row_wise",
         [False, True],
     )
-    def test_after_order_context(self, test_row_wise):
+    def test_states(self, test_row_wise):
+        close = np.array([
+            [1, 1, 1],
+            [np.nan, 2, 2],
+            [3, np.nan, 3],
+            [4, 4, np.nan],
+            [5, 5, 5]
+        ])
+        size = np.array([
+            [1, 1, 1],
+            [-1, -1, -1],
+            [1, 1, 1],
+            [-1, -1, -1],
+            [1, 1, 1]
+        ])
+        value_arr1 = np.empty((size.shape[0], 2), dtype=np.float_)
+        value_arr2 = np.empty(size.shape, dtype=np.float_)
+        value_arr3 = np.empty(size.shape, dtype=np.float_)
+        return_arr1 = np.empty((size.shape[0], 2), dtype=np.float_)
+        return_arr2 = np.empty(size.shape, dtype=np.float_)
+        return_arr3 = np.empty(size.shape, dtype=np.float_)
+        pos_record_arr1 = np.empty(size.shape, dtype=position_dt)
+        pos_record_arr2 = np.empty(size.shape, dtype=position_dt)
+        pos_record_arr3 = np.empty(size.shape, dtype=position_dt)
+
+        def pre_segment_func_nb(c):
+            value_arr1[c.i, c.group] = c.last_value[c.group]
+            return_arr1[c.i, c.group] = c.last_return[c.group]
+            for col in range(c.from_col, c.to_col):
+                pos_record_arr1[c.i, col] = c.last_pos_record[col]
+            if c.i > 0:
+                c.last_val_price[c.from_col:c.to_col] = c.last_val_price[c.from_col:c.to_col] + 0.5
+            return ()
+
+        def order_func_nb(c):
+            value_arr2[c.i, c.col] = c.value_now
+            return_arr2[c.i, c.col] = c.return_now
+            pos_record_arr2[c.i, c.col] = c.pos_record_now
+            return nb.order_nb(size[c.i, c.col], fixed_fees=1.)
+
+        def post_order_func_nb(c):
+            value_arr3[c.i, c.col] = c.value_now
+            return_arr3[c.i, c.col] = c.return_now
+            pos_record_arr3[c.i, c.col] = c.pos_record_now
+
+        _ = vbt.Portfolio.from_order_func(
+            close,
+            order_func_nb,
+            pre_segment_func_nb=pre_segment_func_nb,
+            post_order_func_nb=post_order_func_nb,
+            use_numba=False,
+            row_wise=test_row_wise,
+            update_value=True,
+            ffill_val_price=True,
+            group_by=[0, 0, 1],
+            cash_sharing=True
+        )
+
+        np.testing.assert_array_equal(
+            value_arr1,
+            np.array([
+                [100.0, 100.0],
+                [98.0, 99.0],
+                [98.5, 99.0],
+                [99.0, 98.0],
+                [99.0, 98.5]
+            ])
+        )
+        np.testing.assert_array_equal(
+            value_arr2,
+            np.array([
+                [100.0, 99.0, 100.0],
+                [99.0, 99.0, 99.5],
+                [99.0, 99.0, 99.0],
+                [100.0, 100.0, 98.5],
+                [99.0, 98.5, 99.0]
+            ])
+        )
+        np.testing.assert_array_equal(
+            value_arr3,
+            np.array([
+                [99.0, 98.0, 99.0],
+                [99.0, 98.5, 99.0],
+                [99.0, 99.0, 98.0],
+                [100.0, 99.0, 98.5],
+                [98.5, 97.0, 99.0]
+            ])
+        )
+        np.testing.assert_array_equal(
+            return_arr1,
+            np.array([
+                [np.nan, np.nan],
+                [-0.02, -0.01],
+                [0.00510204081632653, 0.0],
+                [0.005076142131979695, -0.010101010101010102],
+                [0.0, 0.00510204081632653]
+            ])
+        )
+        np.testing.assert_array_equal(
+            return_arr2,
+            np.array([
+                [0.0, -0.01, 0.0],
+                [-0.01, -0.01, -0.005],
+                [0.01020408163265306, 0.01020408163265306, 0.0],
+                [0.015228426395939087, 0.015228426395939087, -0.005050505050505051],
+                [0.0, -0.005050505050505051, 0.01020408163265306]
+            ])
+        )
+        np.testing.assert_array_equal(
+            return_arr3,
+            np.array([
+                [-0.01, -0.02, -0.01],
+                [-0.01, -0.015, -0.01],
+                [0.01020408163265306, 0.01020408163265306, -0.010101010101010102],
+                [0.015228426395939087, 0.005076142131979695, -0.005050505050505051],
+                [-0.005050505050505051, -0.020202020202020204, 0.01020408163265306]
+            ])
+        )
+        record_arrays_close(
+            pos_record_arr1.flatten()[3:],
+            np.array([
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -1.0, -0.3333333333333333, 0, 0),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.0, 0.25, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.0, -0.25, 1, 0),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0)
+            ], dtype=position_dt)
+        )
+        record_arrays_close(
+            pos_record_arr2.flatten()[3:],
+            np.array([
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 1.0, 0.25, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.5, 0.375, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.5, -0.375, 1, 0),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0)
+            ], dtype=position_dt)
+        )
+        record_arrays_close(
+            pos_record_arr3.flatten(),
+            np.array([
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
+                (0, 2, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -1.0, -1.0, 0, 0),
+                (0, 0, 1.0, 0, 1.0, 1.0, -1, np.nan, 0.0, -0.5, -0.5, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (0, 2, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0),
+                (0, 1, 1.0, 0, 1.0, 1.0, 1, 2.0, 1.0, -1.0, -1.0, 0, 1),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -1.0, -0.3333333333333333, 0, 0),
+                (0, 0, 2.0, 0, 2.0, 2.0, -1, 4.0, 1.0, 1.0, 0.25, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, -1, np.nan, 0.0, -1.0, -0.25, 1, 0),
+                (1, 2, 1.0, 2, 3.0, 1.0, -1, np.nan, 0.0, -0.5, -0.16666666666666666, 0, 0),
+                (0, 0, 3.0, 0, 3.0, 3.0, -1, 4.0, 1.0, 1.0, 0.1111111111111111, 0, 0),
+                (1, 1, 1.0, 3, 4.0, 1.0, 4, 5.0, 1.0, -3.0, -0.75, 1, 1),
+                (1, 2, 2.0, 2, 4.0, 2.0, -1, np.nan, 0.0, 0.0, 0.0, 0, 0)
+            ], dtype=position_dt)
+        )
+
+        cash_arr = np.empty((size.shape[0], 2), dtype=np.float_)
+        position_arr = np.empty(size.shape, dtype=np.float_)
+        val_price_arr = np.empty(size.shape, dtype=np.float_)
+        value_arr = np.empty((size.shape[0], 2), dtype=np.float_)
+        return_arr = np.empty((size.shape[0], 2), dtype=np.float_)
+        sim_order_cash_arr = np.empty(size.shape, dtype=np.float_)
+        sim_order_value_arr = np.empty(size.shape, dtype=np.float_)
+        sim_order_return_arr = np.empty(size.shape, dtype=np.float_)
+
+        def post_order_func_nb(c):
+            sim_order_cash_arr[c.i, c.col] = c.cash_now
+            sim_order_value_arr[c.i, c.col] = c.value_now
+            sim_order_return_arr[c.i, c.col] = c.value_now
+            if c.i == 0 and c.call_idx == 0:
+                sim_order_return_arr[c.i, c.col] -= c.init_cash[c.group]
+                sim_order_return_arr[c.i, c.col] /= c.init_cash[c.group]
+            else:
+                if c.call_idx == 0:
+                    prev_i = c.i - 1
+                    prev_col = c.to_col - 1
+                else:
+                    prev_i = c.i
+                    prev_col = c.from_col + c.call_idx - 1
+                sim_order_return_arr[c.i, c.col] -= sim_order_value_arr[prev_i, prev_col]
+                sim_order_return_arr[c.i, c.col] /= sim_order_value_arr[prev_i, prev_col]
+
+        def post_segment_func_nb(c):
+            cash_arr[c.i, c.group] = c.last_cash[c.group]
+            for col in range(c.from_col, c.to_col):
+                position_arr[c.i, col] = c.last_position[col]
+                val_price_arr[c.i, col] = c.last_val_price[col]
+            value_arr[c.i, c.group] = c.last_value[c.group]
+            return_arr[c.i, c.group] = c.last_return[c.group]
+
+        portfolio = vbt.Portfolio.from_order_func(
+            close,
+            order_func_nb,
+            post_order_func_nb=post_order_func_nb,
+            post_segment_func_nb=post_segment_func_nb,
+            use_numba=False,
+            row_wise=test_row_wise,
+            update_value=True,
+            ffill_val_price=True,
+            group_by=[0, 0, 1],
+            cash_sharing=True
+        )
+
+        np.testing.assert_array_equal(
+            cash_arr,
+            portfolio.cash().values
+        )
+        np.testing.assert_array_equal(
+            position_arr,
+            portfolio.assets().values
+        )
+        np.testing.assert_array_equal(
+            val_price_arr,
+            portfolio.get_filled_close().values
+        )
+        np.testing.assert_array_equal(
+            value_arr,
+            portfolio.value().values
+        )
+        np.testing.assert_array_equal(
+            return_arr,
+            portfolio.returns().values
+        )
+        np.testing.assert_array_equal(
+            sim_order_cash_arr,
+            portfolio.cash(in_sim_order=True, group_by=False).values
+        )
+        np.testing.assert_array_equal(
+            sim_order_value_arr,
+            portfolio.value(in_sim_order=True, group_by=False).values
+        )
+        np.testing.assert_array_equal(
+            sim_order_return_arr,
+            portfolio.returns(in_sim_order=True, group_by=False).values
+        )
+
+    @pytest.mark.parametrize(
+        "test_row_wise",
+        [False, True],
+    )
+    def test_post_sim_ctx(self, test_row_wise):
         def order_func(c):
             return nb.order_nb(
                 1.,
@@ -3039,16 +3297,16 @@ class TestFromOrderFunc:
                 log=True
             )
 
-        def after_order_func(c, lst):
-            lst.append(c)
+        def post_sim_func(c, lst):
+            lst.append(deepcopy(c))
 
         lst = []
 
         _ = vbt.Portfolio.from_order_func(
             price_wide,
             order_func,
-            after_order_func_nb=after_order_func,
-            after_order_args=(lst,),
+            post_sim_func_nb=post_sim_func,
+            post_sim_args=(lst,),
             row_wise=test_row_wise,
             update_value=True,
             max_logs=price_wide.shape[0] * price_wide.shape[1],
@@ -3084,7 +3342,7 @@ class TestFromOrderFunc:
             ])
         )
         np.testing.assert_array_equal(
-            c.active_mask,
+            c.segment_mask,
             np.array([
                 [True, True],
                 [True, True],
@@ -3249,11 +3507,19 @@ class TestFromOrderFunc:
         )
         np.testing.assert_array_equal(
             c.last_val_price,
-            np.array([5.05, 5.05, 5.05])
+            np.array([5.0, 5.0, 5.0])
         )
         np.testing.assert_array_equal(
             c.last_value,
-            np.array([109.89700000000002, 104.94850000000001])
+            np.array([109.39700000000002, 104.69850000000001])
+        )
+        np.testing.assert_array_equal(
+            c.second_last_value,
+            np.array([103.59800000000001, 101.799])
+        )
+        np.testing.assert_array_equal(
+            c.last_return,
+            np.array([0.05597598409235705, 0.028482598060884715])
         )
         np.testing.assert_array_equal(
             c.last_debt,
@@ -3287,33 +3553,6 @@ class TestFromOrderFunc:
         assert c.log_records[c.last_lidx[0]]['col'] == 0
         assert c.log_records[c.last_lidx[1]]['col'] == 1
         assert c.log_records[c.last_lidx[2]]['col'] == 2
-        assert c.group == 1
-        assert c.group_len == 1
-        assert c.from_col == 2
-        assert c.to_col == 3
-        assert c.i == 4
-        np.testing.assert_array_equal(
-            c.call_seq_now,
-            np.array([0])
-        )
-        assert c.col == 2
-        assert c.call_idx == 0
-        assert c.cash_before == 85.799
-        assert c.position_before == 4.0
-        assert c.val_price_before == 4.0
-        assert c.value_before == 101.799
-        assert c.debt_before == 0.0
-        assert c.free_cash_before == 85.799
-        assert_same_tuple(
-            c.order_result,
-            OrderResult(size=1.0, price=5.05, fees=1.0505, side=0, status=0, status_info=-1)
-        )
-        assert c.cash_now == 79.69850000000001
-        assert c.position_now == 5.0
-        assert c.val_price_now == 5.05
-        assert c.value_now == 104.94850000000001
-        assert c.debt_now == 0.0
-        assert c.free_cash_now == 79.69850000000001
 
     @pytest.mark.parametrize(
         "test_row_wise",
@@ -3329,7 +3568,7 @@ class TestFromOrderFunc:
                 slippage=0.01
             )
 
-        def after_order_func(c, debt, free_cash):
+        def post_order_func(c, debt, free_cash):
             debt[c.i, c.col] = c.debt_now
             if c.cash_sharing:
                 free_cash[c.i, c.group] = c.free_cash_now
@@ -3348,8 +3587,8 @@ class TestFromOrderFunc:
         portfolio = vbt.Portfolio.from_order_func(
             price_wide,
             order_func, size,
-            after_order_func_nb=after_order_func,
-            after_order_args=(debt, free_cash,),
+            post_order_func_nb=post_order_func,
+            post_order_args=(debt, free_cash,),
             row_wise=test_row_wise,
             use_numba=False
         )
@@ -3383,8 +3622,8 @@ class TestFromOrderFunc:
         portfolio = vbt.Portfolio.from_order_func(
             price_wide.vbt.wrapper.wrap(price_wide.values[::-1]),
             order_func, size,
-            after_order_func_nb=after_order_func,
-            after_order_args=(debt, free_cash,),
+            post_order_func_nb=post_order_func,
+            post_order_args=(debt, free_cash,),
             row_wise=test_row_wise,
             use_numba=False
         )
@@ -3418,8 +3657,8 @@ class TestFromOrderFunc:
         portfolio = vbt.Portfolio.from_order_func(
             price_wide,
             order_func, size,
-            after_order_func_nb=after_order_func,
-            after_order_args=(debt, free_cash,),
+            post_order_func_nb=post_order_func,
+            post_order_args=(debt, free_cash,),
             row_wise=test_row_wise,
             use_numba=False,
             group_by=[0, 0, 1],
@@ -3505,101 +3744,39 @@ class TestFromOrderFunc:
 
     def test_func_calls(self):
         @njit
-        def prep_func_nb(c, call_i, sim_lst):
+        def pre_sim_func_nb(c, call_i, pre_sim_lst):
             call_i[0] += 1
-            sim_lst.append(call_i[0])
+            pre_sim_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def group_prep_func_nb(c, call_i, group_lst):
+        def post_sim_func_nb(c, call_i, post_sim_lst):
             call_i[0] += 1
-            group_lst.append(call_i[0])
+            post_sim_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def segment_prep_func_nb(c, call_i, segment_lst):
+        def pre_group_func_nb(c, call_i, pre_group_lst):
             call_i[0] += 1
-            segment_lst.append(call_i[0])
+            pre_group_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def order_func_nb(c, call_i, order_lst):
+        def post_group_func_nb(c, call_i, post_group_lst):
             call_i[0] += 1
-            order_lst.append(call_i[0])
-            return NoOrder
-
-        @njit
-        def after_order_func_nb(c, call_i, after_order_lst):
-            call_i[0] += 1
-            after_order_lst.append(call_i[0])
-
-        call_i = np.array([0])
-        sim_lst = List.empty_list(typeof(0))
-        group_lst = List.empty_list(typeof(0))
-        segment_lst = List.empty_list(typeof(0))
-        order_lst = List.empty_list(typeof(0))
-        after_order_lst = List.empty_list(typeof(0))
-        _ = vbt.Portfolio.from_order_func(
-            price_wide, order_func_nb, order_lst,
-            group_by=np.array([0, 0, 1]),
-            prep_func_nb=prep_func_nb, prep_args=(call_i, sim_lst),
-            group_prep_func_nb=group_prep_func_nb, group_prep_args=(group_lst,),
-            segment_prep_func_nb=segment_prep_func_nb, segment_prep_args=(segment_lst,),
-            after_order_func_nb=after_order_func_nb, after_order_args=(after_order_lst,)
-        )
-        assert call_i[0] == 43
-        assert list(sim_lst) == [1]
-        assert list(group_lst) == [2, 28]
-        assert list(segment_lst) == [3, 8, 13, 18, 23, 29, 32, 35, 38, 41]
-        assert list(order_lst) == [4, 6, 9, 11, 14, 16, 19, 21, 24, 26, 30, 33, 36, 39, 42]
-        assert list(after_order_lst) == [5, 7, 10, 12, 15, 17, 20, 22, 25, 27, 31, 34, 37, 40, 43]
-
-        call_i = np.array([0])
-        sim_lst = List.empty_list(typeof(0))
-        group_lst = List.empty_list(typeof(0))
-        segment_lst = List.empty_list(typeof(0))
-        order_lst = List.empty_list(typeof(0))
-        after_order_lst = List.empty_list(typeof(0))
-        active_mask = np.array([
-            [False, True],
-            [False, False],
-            [False, True],
-            [False, False],
-            [False, True],
-        ])
-        _ = vbt.Portfolio.from_order_func(
-            price_wide, order_func_nb, order_lst,
-            group_by=np.array([0, 0, 1]),
-            prep_func_nb=prep_func_nb, prep_args=(call_i, sim_lst),
-            group_prep_func_nb=group_prep_func_nb, group_prep_args=(group_lst,),
-            segment_prep_func_nb=segment_prep_func_nb, segment_prep_args=(segment_lst,),
-            after_order_func_nb=after_order_func_nb, after_order_args=(after_order_lst,),
-            active_mask=active_mask
-        )
-        assert call_i[0] == 11
-        assert list(sim_lst) == [1]
-        assert list(group_lst) == [2]
-        assert list(segment_lst) == [3, 6, 9]
-        assert list(order_lst) == [4, 7, 10]
-        assert list(after_order_lst) == [5, 8, 11]
-
-    def test_func_calls_row_wise(self):
-        @njit
-        def prep_func_nb(c, call_i, sim_lst):
-            call_i[0] += 1
-            sim_lst.append(call_i[0])
+            post_group_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def row_prep_func_nb(c, call_i, row_lst):
+        def pre_segment_func_nb(c, call_i, pre_segment_lst):
             call_i[0] += 1
-            row_lst.append(call_i[0])
+            pre_segment_lst.append(call_i[0])
             return (call_i,)
 
         @njit
-        def segment_prep_func_nb(c, call_i, segment_lst):
+        def post_segment_func_nb(c, call_i, post_segment_lst):
             call_i[0] += 1
-            segment_lst.append(call_i[0])
+            post_segment_lst.append(call_i[0])
             return (call_i,)
 
         @njit
@@ -3609,61 +3786,261 @@ class TestFromOrderFunc:
             return NoOrder
 
         @njit
-        def after_order_func_nb(c, call_i, after_order_lst):
+        def post_order_func_nb(c, call_i, post_order_lst):
             call_i[0] += 1
-            after_order_lst.append(call_i[0])
+            post_order_lst.append(call_i[0])
 
         call_i = np.array([0])
-        sim_lst = List.empty_list(typeof(0))
-        row_lst = List.empty_list(typeof(0))
-        segment_lst = List.empty_list(typeof(0))
+        pre_sim_lst = List.empty_list(typeof(0))
+        post_sim_lst = List.empty_list(typeof(0))
+        pre_group_lst = List.empty_list(typeof(0))
+        post_group_lst = List.empty_list(typeof(0))
+        pre_segment_lst = List.empty_list(typeof(0))
+        post_segment_lst = List.empty_list(typeof(0))
         order_lst = List.empty_list(typeof(0))
-        after_order_lst = List.empty_list(typeof(0))
+        post_order_lst = List.empty_list(typeof(0))
         _ = vbt.Portfolio.from_order_func(
             price_wide, order_func_nb, order_lst,
             group_by=np.array([0, 0, 1]),
-            prep_func_nb=prep_func_nb, prep_args=(call_i, sim_lst),
-            row_prep_func_nb=row_prep_func_nb, row_prep_args=(row_lst,),
-            segment_prep_func_nb=segment_prep_func_nb, segment_prep_args=(segment_lst,),
-            after_order_func_nb=after_order_func_nb, after_order_args=(after_order_lst,),
-            row_wise=True
+            pre_sim_func_nb=pre_sim_func_nb, pre_sim_args=(call_i, pre_sim_lst),
+            post_sim_func_nb=post_sim_func_nb, post_sim_args=(call_i, post_sim_lst),
+            pre_group_func_nb=pre_group_func_nb, pre_group_args=(pre_group_lst,),
+            post_group_func_nb=post_group_func_nb, post_group_args=(post_group_lst,),
+            pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
+            post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
+            post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
+            row_wise=False
         )
-        assert call_i[0] == 46
-        assert list(sim_lst) == [1]
-        assert list(row_lst) == [2, 11, 20, 29, 38]
-        assert list(segment_lst) == [3, 8, 12, 17, 21, 26, 30, 35, 39, 44]
-        assert list(order_lst) == [4, 6, 9, 13, 15, 18, 22, 24, 27, 31, 33, 36, 40, 42, 45]
-        assert list(after_order_lst) == [5, 7, 10, 14, 16, 19, 23, 25, 28, 32, 34, 37, 41, 43, 46]
+        assert call_i[0] == 56
+        assert list(pre_sim_lst) == [1]
+        assert list(post_sim_lst) == [56]
+        assert list(pre_group_lst) == [2, 34]
+        assert list(post_group_lst) == [33, 55]
+        assert list(pre_segment_lst) == [3, 9, 15, 21, 27, 35, 39, 43, 47, 51]
+        assert list(post_segment_lst) == [8, 14, 20, 26, 32, 38, 42, 46, 50, 54]
+        assert list(order_lst) == [4, 6, 10, 12, 16, 18, 22, 24, 28, 30, 36, 40, 44, 48, 52]
+        assert list(post_order_lst) == [5, 7, 11, 13, 17, 19, 23, 25, 29, 31, 37, 41, 45, 49, 53]
 
-        call_i = np.array([0])
-        sim_lst = List.empty_list(typeof(0))
-        row_lst = List.empty_list(typeof(0))
-        segment_lst = List.empty_list(typeof(0))
-        order_lst = List.empty_list(typeof(0))
-        after_order_lst = List.empty_list(typeof(0))
-        active_mask = np.array([
+        segment_mask = np.array([
             [False, False],
             [False, True],
             [True, False],
             [True, True],
             [False, False],
         ])
+        call_i = np.array([0])
+        pre_sim_lst = List.empty_list(typeof(0))
+        post_sim_lst = List.empty_list(typeof(0))
+        pre_group_lst = List.empty_list(typeof(0))
+        post_group_lst = List.empty_list(typeof(0))
+        pre_segment_lst = List.empty_list(typeof(0))
+        post_segment_lst = List.empty_list(typeof(0))
+        order_lst = List.empty_list(typeof(0))
+        post_order_lst = List.empty_list(typeof(0))
         _ = vbt.Portfolio.from_order_func(
             price_wide, order_func_nb, order_lst,
             group_by=np.array([0, 0, 1]),
-            prep_func_nb=prep_func_nb, prep_args=(call_i, sim_lst),
-            row_prep_func_nb=row_prep_func_nb, row_prep_args=(row_lst,),
-            segment_prep_func_nb=segment_prep_func_nb, segment_prep_args=(segment_lst,),
-            after_order_func_nb=after_order_func_nb, after_order_args=(after_order_lst,),
-            active_mask=active_mask,
+            pre_sim_func_nb=pre_sim_func_nb, pre_sim_args=(call_i, pre_sim_lst),
+            post_sim_func_nb=post_sim_func_nb, post_sim_args=(call_i, post_sim_lst),
+            pre_group_func_nb=pre_group_func_nb, pre_group_args=(pre_group_lst,),
+            post_group_func_nb=post_group_func_nb, post_group_args=(post_group_lst,),
+            pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
+            post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
+            post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
+            segment_mask=segment_mask, call_pre_segment=True, call_post_segment=True,
+            row_wise=False
+        )
+        assert call_i[0] == 38
+        assert list(pre_sim_lst) == [1]
+        assert list(post_sim_lst) == [38]
+        assert list(pre_group_lst) == [2, 22]
+        assert list(post_group_lst) == [21, 37]
+        assert list(pre_segment_lst) == [3, 5, 7, 13, 19, 23, 25, 29, 31, 35]
+        assert list(post_segment_lst) == [4, 6, 12, 18, 20, 24, 28, 30, 34, 36]
+        assert list(order_lst) == [8, 10, 14, 16, 26, 32]
+        assert list(post_order_lst) == [9, 11, 15, 17, 27, 33]
+
+        call_i = np.array([0])
+        pre_sim_lst = List.empty_list(typeof(0))
+        post_sim_lst = List.empty_list(typeof(0))
+        pre_group_lst = List.empty_list(typeof(0))
+        post_group_lst = List.empty_list(typeof(0))
+        pre_segment_lst = List.empty_list(typeof(0))
+        post_segment_lst = List.empty_list(typeof(0))
+        order_lst = List.empty_list(typeof(0))
+        post_order_lst = List.empty_list(typeof(0))
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, order_func_nb, order_lst,
+            group_by=np.array([0, 0, 1]),
+            pre_sim_func_nb=pre_sim_func_nb, pre_sim_args=(call_i, pre_sim_lst),
+            post_sim_func_nb=post_sim_func_nb, post_sim_args=(call_i, post_sim_lst),
+            pre_group_func_nb=pre_group_func_nb, pre_group_args=(pre_group_lst,),
+            post_group_func_nb=post_group_func_nb, post_group_args=(post_group_lst,),
+            pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
+            post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
+            post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
+            segment_mask=segment_mask, call_pre_segment=False, call_post_segment=False,
+            row_wise=False
+        )
+        assert call_i[0] == 26
+        assert list(pre_sim_lst) == [1]
+        assert list(post_sim_lst) == [26]
+        assert list(pre_group_lst) == [2, 16]
+        assert list(post_group_lst) == [15, 25]
+        assert list(pre_segment_lst) == [3, 9, 17, 21]
+        assert list(post_segment_lst) == [8, 14, 20, 24]
+        assert list(order_lst) == [4, 6, 10, 12, 18, 22]
+        assert list(post_order_lst) == [5, 7, 11, 13, 19, 23]
+
+    def test_func_calls_row_wise(self):
+        @njit
+        def pre_sim_func_nb(c, call_i, pre_sim_lst):
+            call_i[0] += 1
+            pre_sim_lst.append(call_i[0])
+            return (call_i,)
+
+        @njit
+        def post_sim_func_nb(c, call_i, post_sim_lst):
+            call_i[0] += 1
+            post_sim_lst.append(call_i[0])
+            return (call_i,)
+
+        @njit
+        def pre_row_func_nb(c, call_i, pre_row_lst):
+            call_i[0] += 1
+            pre_row_lst.append(call_i[0])
+            return (call_i,)
+
+        @njit
+        def post_row_func_nb(c, call_i, post_row_lst):
+            call_i[0] += 1
+            post_row_lst.append(call_i[0])
+            return (call_i,)
+
+        @njit
+        def pre_segment_func_nb(c, call_i, pre_segment_lst):
+            call_i[0] += 1
+            pre_segment_lst.append(call_i[0])
+            return (call_i,)
+
+        @njit
+        def post_segment_func_nb(c, call_i, post_segment_lst):
+            call_i[0] += 1
+            post_segment_lst.append(call_i[0])
+            return (call_i,)
+
+        @njit
+        def order_func_nb(c, call_i, order_lst):
+            call_i[0] += 1
+            order_lst.append(call_i[0])
+            return NoOrder
+
+        @njit
+        def post_order_func_nb(c, call_i, post_order_lst):
+            call_i[0] += 1
+            post_order_lst.append(call_i[0])
+
+        call_i = np.array([0])
+        pre_sim_lst = List.empty_list(typeof(0))
+        post_sim_lst = List.empty_list(typeof(0))
+        pre_row_lst = List.empty_list(typeof(0))
+        post_row_lst = List.empty_list(typeof(0))
+        pre_segment_lst = List.empty_list(typeof(0))
+        post_segment_lst = List.empty_list(typeof(0))
+        order_lst = List.empty_list(typeof(0))
+        post_order_lst = List.empty_list(typeof(0))
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, order_func_nb, order_lst,
+            group_by=np.array([0, 0, 1]),
+            pre_sim_func_nb=pre_sim_func_nb, pre_sim_args=(call_i, pre_sim_lst),
+            post_sim_func_nb=post_sim_func_nb, post_sim_args=(call_i, post_sim_lst),
+            pre_row_func_nb=pre_row_func_nb, pre_row_args=(pre_row_lst,),
+            post_row_func_nb=post_row_func_nb, post_row_args=(post_row_lst,),
+            pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
+            post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
+            post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
             row_wise=True
         )
-        assert call_i[0] == 20
-        assert list(sim_lst) == [1]
-        assert list(row_lst) == [2, 6, 12]
-        assert list(segment_lst) == [3, 7, 13, 18]
-        assert list(order_lst) == [4, 8, 10, 14, 16, 19]
-        assert list(after_order_lst) == [5, 9, 11, 15, 17, 20]
+        assert call_i[0] == 62
+        assert list(pre_sim_lst) == [1]
+        assert list(post_sim_lst) == [62]
+        assert list(pre_row_lst) == [2, 14, 26, 38, 50]
+        assert list(post_row_lst) == [13, 25, 37, 49, 61]
+        assert list(pre_segment_lst) == [3, 9, 15, 21, 27, 33, 39, 45, 51, 57]
+        assert list(post_segment_lst) == [8, 12, 20, 24, 32, 36, 44, 48, 56, 60]
+        assert list(order_lst) == [4, 6, 10, 16, 18, 22, 28, 30, 34, 40, 42, 46, 52, 54, 58]
+        assert list(post_order_lst) == [5, 7, 11, 17, 19, 23, 29, 31, 35, 41, 43, 47, 53, 55, 59]
+
+        segment_mask = np.array([
+            [False, False],
+            [False, True],
+            [True, False],
+            [True, True],
+            [False, False],
+        ])
+        call_i = np.array([0])
+        pre_sim_lst = List.empty_list(typeof(0))
+        post_sim_lst = List.empty_list(typeof(0))
+        pre_row_lst = List.empty_list(typeof(0))
+        post_row_lst = List.empty_list(typeof(0))
+        pre_segment_lst = List.empty_list(typeof(0))
+        post_segment_lst = List.empty_list(typeof(0))
+        order_lst = List.empty_list(typeof(0))
+        post_order_lst = List.empty_list(typeof(0))
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, order_func_nb, order_lst,
+            group_by=np.array([0, 0, 1]),
+            pre_sim_func_nb=pre_sim_func_nb, pre_sim_args=(call_i, pre_sim_lst),
+            post_sim_func_nb=post_sim_func_nb, post_sim_args=(call_i, post_sim_lst),
+            pre_row_func_nb=pre_row_func_nb, pre_row_args=(pre_row_lst,),
+            post_row_func_nb=post_row_func_nb, post_row_args=(post_row_lst,),
+            pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
+            post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
+            post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
+            segment_mask=segment_mask, call_pre_segment=True, call_post_segment=True,
+            row_wise=True
+        )
+        assert call_i[0] == 44
+        assert list(pre_sim_lst) == [1]
+        assert list(post_sim_lst) == [44]
+        assert list(pre_row_lst) == [2, 8, 16, 26, 38]
+        assert list(post_row_lst) == [7, 15, 25, 37, 43]
+        assert list(pre_segment_lst) == [3, 5, 9, 11, 17, 23, 27, 33, 39, 41]
+        assert list(post_segment_lst) == [4, 6, 10, 14, 22, 24, 32, 36, 40, 42]
+        assert list(order_lst) == [12, 18, 20, 28, 30, 34]
+        assert list(post_order_lst) == [13, 19, 21, 29, 31, 35]
+
+        call_i = np.array([0])
+        pre_sim_lst = List.empty_list(typeof(0))
+        post_sim_lst = List.empty_list(typeof(0))
+        pre_row_lst = List.empty_list(typeof(0))
+        post_row_lst = List.empty_list(typeof(0))
+        pre_segment_lst = List.empty_list(typeof(0))
+        post_segment_lst = List.empty_list(typeof(0))
+        order_lst = List.empty_list(typeof(0))
+        post_order_lst = List.empty_list(typeof(0))
+        _ = vbt.Portfolio.from_order_func(
+            price_wide, order_func_nb, order_lst,
+            group_by=np.array([0, 0, 1]),
+            pre_sim_func_nb=pre_sim_func_nb, pre_sim_args=(call_i, pre_sim_lst),
+            post_sim_func_nb=post_sim_func_nb, post_sim_args=(call_i, post_sim_lst),
+            pre_row_func_nb=pre_row_func_nb, pre_row_args=(pre_row_lst,),
+            post_row_func_nb=post_row_func_nb, post_row_args=(post_row_lst,),
+            pre_segment_func_nb=pre_segment_func_nb, pre_segment_args=(pre_segment_lst,),
+            post_segment_func_nb=post_segment_func_nb, post_segment_args=(post_segment_lst,),
+            post_order_func_nb=post_order_func_nb, post_order_args=(post_order_lst,),
+            segment_mask=segment_mask, call_pre_segment=False, call_post_segment=False,
+            row_wise=True
+        )
+        assert call_i[0] == 32
+        assert list(pre_sim_lst) == [1]
+        assert list(post_sim_lst) == [32]
+        assert list(pre_row_lst) == [2, 4, 10, 18, 30]
+        assert list(post_row_lst) == [3, 9, 17, 29, 31]
+        assert list(pre_segment_lst) == [5, 11, 19, 25]
+        assert list(post_segment_lst) == [8, 16, 24, 28]
+        assert list(order_lst) == [6, 12, 14, 20, 22, 26]
+        assert list(post_order_lst) == [7, 13, 15, 21, 23, 27]
 
     @pytest.mark.parametrize(
         "test_row_wise",
@@ -4199,21 +4576,9 @@ class TestPortfolio:
         pd.testing.assert_frame_equal(portfolio_grouped.close, price_na)
         pd.testing.assert_frame_equal(portfolio_shared.close, price_na)
 
-    def test_get_fillna_close(self):
+    def test_get_filled_close(self):
         pd.testing.assert_frame_equal(
-            portfolio.get_fillna_close(ffill=False, bfill=False),
-            price_na
-        )
-        pd.testing.assert_frame_equal(
-            portfolio.get_fillna_close(ffill=True, bfill=False),
-            price_na.ffill()
-        )
-        pd.testing.assert_frame_equal(
-            portfolio.get_fillna_close(ffill=False, bfill=True),
-            price_na.bfill()
-        )
-        pd.testing.assert_frame_equal(
-            portfolio.get_fillna_close(ffill=True, bfill=True),
+            portfolio.get_filled_close(),
             price_na.ffill().bfill()
         )
 
@@ -5519,8 +5884,8 @@ class TestPortfolio:
                     pd.Timedelta('4 days 00:00:00'), 2, 0.0, -54.450495049504966,
                     -388.2424242424243, -221.34645964596461,
                     pd.Timedelta('3 days 00:00:00'), pd.Timedelta('2 days 00:00:00'),
-                    -0.2646459090909091, -1.711191707103453, -0.01716935548563326,
-                    -17.828382866511035, -12.417661888716555, -29.395593091285203
+                    -0.2646459090909091, -1.711191707103453, -0.014876959289761857,
+                    -16.697884366310568, -12.093485199472159, -29.39559309128514
                 ]),
                 index=pd.Index([
                     'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
@@ -5593,11 +5958,11 @@ class TestPortfolio:
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
-                    pd.Timedelta('5 days 00:00:00'), -2.5209550000000025, 275.0, -72.38609704079437,
-                    7.187935871660704, -17.828382866511035, -29.395593091285203, -2.462481257513882,
-                    0.0, -12.417661888716555, -0.19681929158210584, -1.5821971095816858,
-                    0.05430622731792859, 0.014996068912378419, -0.010308823936793889,
-                    -0.21603224384824826, -0.012303869004819437
+                    pd.Timedelta('5 days 00:00:00'), -2.5209550000000136, 275.0, -72.38609704079454,
+                    7.672843755728151, -16.697884366310568, -29.39559309128514, -2.4624812575138932,
+                    0.0, -12.093485199472159, -0.2547821486147648, -1.363875757616844,
+                    0.013427062091730372, 0.0037077358962826876, -0.010720112114907941,
+                    -0.03756411921635805, -0.01512065272545035
                 ]),
                 index=pd.Index([
                     'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',

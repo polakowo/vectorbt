@@ -843,18 +843,6 @@ def build_call_seq(target_shape: tp.Shape,
 
 
 @njit(cache=True)
-def empty_prep_func_nb(context: tp.NamedTuple, *args) -> tp.Args:
-    """Preparation function that forwards received arguments down the stack."""
-    return args
-
-
-@njit(cache=True)
-def empty_after_order_func_nb(context: tp.NamedTuple, *args) -> None:
-    """After order callback that does nothing."""
-    return None
-
-
-@njit(cache=True)
 def get_group_value_nb(from_col: int,
                        to_col: int,
                        cash_now: float,
@@ -876,7 +864,7 @@ def get_group_value_ctx_nb(seg_ctx: SegmentContext) -> float:
 
     Accepts `vectorbt.portfolio.enums.SegmentContext`.
 
-    Best called once from `segment_prep_func_nb`.
+    Best called once from `pre_segment_func_nb`.
     To set the valuation price, change `last_val_price` of the context in-place.
 
     !!! note
@@ -941,7 +929,7 @@ def sort_call_seq_nb(seg_ctx: SegmentContext,
     of columns in the group. Array `order_value_out` should be empty and will contain
     sorted order values after execution.
 
-    Best called once from `segment_prep_func_nb`.
+    Best called once from `pre_segment_func_nb`.
 
     !!! note
         Cash sharing must be enabled and `call_seq_now` should follow `CallSeqType.Default`."""
@@ -1066,12 +1054,151 @@ def init_records_nb(target_shape: tp.Shape,
     return order_records, log_records
 
 
-PrepFuncT = tp.Callable[[SimulationContext, tp.VarArg()], tp.Args]
-GroupPrepFuncT = tp.Callable[[GroupContext, tp.VarArg()], tp.Args]
-RowPrepFuncT = tp.Callable[[RowContext, tp.VarArg()], tp.Args]
-SegmentPrepFuncT = tp.Callable[[SegmentContext, tp.VarArg()], tp.Args]
+@njit(cache=True)
+def update_open_pos_stats_nb(record: tp.Record, position_now: float, price: float) -> None:
+    """Update statistics of an open position record using custom price."""
+    if record['id'] >= 0 and record['status'] == TradeStatus.Open:
+        if np.isnan(record['exit_price']):
+            exit_price = price
+        else:
+            exit_size_sum = record['size'] - abs(position_now)
+            exit_gross_sum = exit_size_sum * record['exit_price']
+            exit_gross_sum += abs(position_now) * price
+            exit_price = exit_gross_sum / record['size']
+        pnl, ret = get_trade_stats_nb(
+            record['size'],
+            record['entry_price'],
+            record['entry_fees'],
+            exit_price,
+            record['exit_fees'],
+            record['direction']
+        )
+        record['pnl'] = pnl
+        record['return'] = ret
+
+
+@njit(cache=True)
+def update_pos_record_nb(record: tp.Record,
+                         i: int,
+                         col: int,
+                         position_before: float,
+                         position_now: float,
+                         order_result: OrderResult) -> None:
+    """Update position record after filling an order."""
+    if order_result.status == OrderStatus.Filled:
+        if position_before == 0 and position_now != 0:
+            # New position opened
+            record['id'] += 1
+            record['col'] = col
+            record['size'] = order_result.size
+            record['entry_idx'] = i
+            record['entry_price'] = order_result.price
+            record['entry_fees'] = order_result.fees
+            record['exit_idx'] = -1
+            record['exit_price'] = np.nan
+            record['exit_fees'] = 0.
+            if order_result.side == OrderSide.Buy:
+                record['direction'] = TradeDirection.Long
+            else:
+                record['direction'] = TradeDirection.Short
+            record['status'] = TradeStatus.Open
+        elif position_before != 0 and position_now == 0:
+            # Position closed
+            record['exit_idx'] = i
+            if np.isnan(record['exit_price']):
+                exit_price = order_result.price
+            else:
+                exit_size_sum = record['size'] - abs(position_before)
+                exit_gross_sum = exit_size_sum * record['exit_price']
+                exit_gross_sum += abs(position_before) * order_result.price
+                exit_price = exit_gross_sum / record['size']
+            record['exit_price'] = exit_price
+            record['exit_fees'] += order_result.fees
+            pnl, ret = get_trade_stats_nb(
+                record['size'],
+                record['entry_price'],
+                record['entry_fees'],
+                record['exit_price'],
+                record['exit_fees'],
+                record['direction']
+            )
+            record['pnl'] = pnl
+            record['return'] = ret
+            record['status'] = TradeStatus.Closed
+        elif np.sign(position_before) != np.sign(position_now):
+            # Position reversed
+            record['id'] += 1
+            record['size'] = abs(position_now)
+            record['entry_idx'] = i
+            record['entry_price'] = order_result.price
+            new_pos_fraction = abs(position_now) / abs(position_now - position_before)
+            record['entry_fees'] = new_pos_fraction * order_result.fees
+            record['exit_idx'] = -1
+            record['exit_price'] = np.nan
+            record['exit_fees'] = 0.
+            if order_result.side == OrderSide.Buy:
+                record['direction'] = TradeDirection.Long
+            else:
+                record['direction'] = TradeDirection.Short
+            record['status'] = TradeStatus.Open
+        else:
+            # Position changed
+            if abs(position_before) <= abs(position_now):
+                # Position increased
+                entry_gross_sum = record['size'] * record['entry_price']
+                entry_gross_sum += order_result.size * order_result.price
+                entry_price = entry_gross_sum / (record['size'] + order_result.size)
+                record['entry_price'] = entry_price
+                record['entry_fees'] += order_result.fees
+                record['size'] += order_result.size
+            else:
+                # Position decreased
+                if np.isnan(record['exit_price']):
+                    exit_price = order_result.price
+                else:
+                    exit_size_sum = record['size'] - abs(position_before)
+                    exit_gross_sum = exit_size_sum * record['exit_price']
+                    exit_gross_sum += order_result.size * order_result.price
+                    exit_price = exit_gross_sum / (exit_size_sum + order_result.size)
+                record['exit_price'] = exit_price
+                record['exit_fees'] += order_result.fees
+
+        # Update open position stats
+        update_open_pos_stats_nb(
+            record,
+            position_now,
+            order_result.price
+        )
+
+
+@njit
+def no_pre_func_nb(context: tp.NamedTuple, *args) -> tp.Args:
+    """Placeholder before-block function that forwards received arguments down the stack."""
+    return args
+
+
+@njit
+def no_order_func_nb(context: OrderContext, *args) -> Order:
+    """Placeholder order function that returns no order."""
+    return NoOrder
+
+
+@njit
+def no_post_func_nb(context: tp.NamedTuple, *args) -> None:
+    """Placeholder after-block function that returns nothing."""
+    return None
+
+
+BeforeSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], tp.Args]
+AfterSimFuncT = tp.Callable[[SimulationContext, tp.VarArg()], None]
+BeforeGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], tp.Args]
+AfterGroupFuncT = tp.Callable[[GroupContext, tp.VarArg()], None]
+BeforeRowFuncT = tp.Callable[[RowContext, tp.VarArg()], tp.Args]
+AfterRowFuncT = tp.Callable[[RowContext, tp.VarArg()], None]
+BeforeSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], tp.Args]
+AfterSegmentFuncT = tp.Callable[[SegmentContext, tp.VarArg()], None]
 OrderFuncT = tp.Callable[[OrderContext, tp.VarArg()], Order]
-AfterOrderFuncT = tp.Callable[[AfterOrderContext, OrderResult, tp.VarArg()], None]
+AfterOrderFuncT = tp.Callable[[PostOrderContext, OrderResult, tp.VarArg()], None]
 
 
 @njit
@@ -1081,19 +1208,28 @@ def simulate_nb(target_shape: tp.Shape,
                 init_cash: tp.Array1d,
                 cash_sharing: bool,
                 call_seq: tp.Array2d,
-                active_mask: tp.Array2d,
-                prep_func_nb: PrepFuncT,
-                prep_args: tp.Args,
-                group_prep_func_nb: GroupPrepFuncT,
-                group_prep_args: tp.Args,
-                segment_prep_func_nb: SegmentPrepFuncT,
-                segment_prep_args: tp.Args,
-                order_func_nb: OrderFuncT,
-                order_args: tp.Args,
-                after_order_func_nb: AfterOrderFuncT,
-                after_order_args: tp.Args,
+                segment_mask: tp.Array2d,
+                pre_sim_func_nb: BeforeSimFuncT = no_pre_func_nb,
+                pre_sim_args: tp.Args = (),
+                post_sim_func_nb: AfterSimFuncT = no_post_func_nb,
+                post_sim_args: tp.Args = (),
+                pre_group_func_nb: BeforeGroupFuncT = no_pre_func_nb,
+                pre_group_args: tp.Args = (),
+                post_group_func_nb: AfterGroupFuncT = no_post_func_nb,
+                post_group_args: tp.Args = (),
+                pre_segment_func_nb: BeforeSegmentFuncT = no_pre_func_nb,
+                pre_segment_args: tp.Args = (),
+                post_segment_func_nb: AfterSegmentFuncT = no_post_func_nb,
+                post_segment_args: tp.Args = (),
+                order_func_nb: OrderFuncT = no_order_func_nb,
+                order_args: tp.Args = (),
+                post_order_func_nb: AfterOrderFuncT = no_post_func_nb,
+                post_order_args: tp.Args = (),
+                call_pre_segment: bool = False,
+                call_post_segment: bool = False,
                 ffill_val_price: bool = True,
                 update_value: bool = False,
+                fill_pos_record: bool = True,
                 max_orders: tp.Optional[int] = None,
                 max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Simulate a portfolio by generating and filling orders.
@@ -1130,61 +1266,98 @@ def simulate_nb(target_shape: tp.Shape,
 
             !!! note
                 To use `sort_call_seq_nb`, should be generated using `CallSeqType.Default`.
-        active_mask (array_like of bool): Mask of whether a particular segment should be executed.
+        segment_mask (array_like of bool): Mask of whether order functions of a particular segment
+            should be executed.
 
             A segment is simply a sequence of `order_func_nb` calls under the same group and row.
 
+            The segment pre- and postprocessing functions are executed regardless of the mask.
+
+            You can change this mask in-place to dynamically disable future segments.
+
             Should have shape `(target_shape[0], group_lens.shape[0])`.
-        prep_func_nb (callable): Simulation preparation function.
+        pre_sim_func_nb (callable): Function called before simulation.
 
-            Can be used for creation of global arrays and setting the seed, and is executed at the
-            beginning of the simulation. It should accept `*prep_args`, and return a tuple of any
-            content, which is then passed to `group_prep_func_nb`.
-        prep_args (tuple): Packed arguments passed to `prep_func_nb`.
-        group_prep_func_nb (callable): Group preparation function.
+            Can be used for creation of global arrays and setting the seed.
 
-            Executed before each group. Should accept the current group context
-            `vectorbt.portfolio.enums.GroupContext`, unpacked tuple from `prep_func_nb`, and
-            `*group_prep_args`. Should return a tuple of any content, which is then passed to
-            `segment_prep_func_nb`.
-        group_prep_args (tuple): Packed arguments passed to `group_prep_func_nb`.
-        segment_prep_func_nb (callable): Segment preparation function.
+            Should accept `vectorbt.portfolio.enums.SimulationContext` and `*pre_sim_args`.
+            Should return a tuple of any content, which is then passed to `pre_group_func_nb` and
+            `post_group_func_nb`.
+        pre_sim_args (tuple): Packed arguments passed to `pre_sim_func_nb`.
+        post_sim_func_nb (callable): Function called after simulation.
 
-            Executed before each row in a group. Should accept the current segment context
-            `vectorbt.portfolio.enums.SegmentContext`, unpacked tuple from `group_prep_func_nb`,
-            and `*segment_prep_args`. Should return a tuple of any content, which is then
-            passed to `order_func_nb`.
+            Should accept `vectorbt.portfolio.enums.SimulationContext` and `*post_sim_args`.
+            Should return nothing.
+        post_sim_args (tuple): Packed arguments passed to `post_sim_func_nb`.
+        pre_group_func_nb (callable): Function called before each group.
+
+            Should accept `vectorbt.portfolio.enums.GroupContext`, unpacked tuple from `pre_sim_func_nb`,
+            and `*pre_group_args`. Should return a tuple of any content, which is then passed to
+            `pre_segment_func_nb` and `post_segment_func_nb`.
+        pre_group_args (tuple): Packed arguments passed to `pre_group_func_nb`.
+        post_group_func_nb (callable): Function called after each group.
+
+            Should accept `vectorbt.portfolio.enums.GroupContext`, unpacked tuple from `pre_sim_func_nb`,
+            and `*post_group_args`. Should return nothing.
+        post_group_args (tuple): Packed arguments passed to `post_group_func_nb`.
+        pre_segment_func_nb (callable): Function called before each segment.
+
+            Called if `segment_mask` or `call_pre_segment` is True.
+
+            Should accept `vectorbt.portfolio.enums.SegmentContext`, unpacked tuple from `pre_group_func_nb`,
+            and `*pre_segment_args`. Should return a tuple of any content, which is then passed to
+            `order_func_nb` and `post_order_func_nb`.
+
+            This is the right place to change call sequence and set the valuation price.
+            Group re-valuation and update of the open position stats happens right after this function,
+            regardless of whether it has been called.
 
             !!! note
-                To change the call sequence of the segment, access `SegmentContext.call_seq_now`
-                and change it in-place. Make sure to not generate any new arrays as it may
-                negatively impact performance. Assigning `SegmentContext.call_seq_now` is not allowed.
+                To change the call sequence of a segment, access
+                `vectorbt.portfolio.enums.SegmentContext.call_seq_now` and change it in-place.
+                Make sure to not generate any new arrays as it may negatively impact performance.
+                Assigning `SegmentContext.call_seq_now` as any other context (named tuple) value
+                is not supported. See `vectorbt.portfolio.enums.SegmentContext.call_seq_now`.
 
             !!! note
-                Use `last_val_price` to manipulate group valuation. By default, `last_val_price`
-                contains the last `close` for a column. You can change it in-place.
-                The column/group is then valuated after `segment_prep_func_nb`, and the value is
-                passed as `value_now` to `order_func_nb`. Internally used for converting
-                `SizeType.Value` to `SizeType.Amount` and `SizeType.TargetPercent` and
-                `SizeType.TargetValue` to `SizeType.TargetAmount`.
-        segment_prep_args (tuple): Packed arguments passed to `segment_prep_func_nb`.
+                You can override elements of `last_val_price` to manipulate group valuation.
+                See `vectorbt.portfolio.enums.SimulationContext.last_val_price`.
+        pre_segment_args (tuple): Packed arguments passed to `pre_segment_func_nb`.
+        post_segment_func_nb (callable): Function called after each segment.
+
+            Called if `segment_mask` or `call_post_segment` is True.
+
+            The last group re-valuation and update of the open position stats happens right before this function,
+            regardless of whether it has been called.
+
+            Should accept `vectorbt.portfolio.enums.SegmentContext`, unpacked tuple from `pre_group_func_nb`,
+            and `*post_segment_args`. Should return nothing.
+        post_segment_args (tuple): Packed arguments passed to `post_segment_func_nb`.
         order_func_nb (callable): Order generation function.
 
-            Used for either generating an order or skipping. Should accept the current order context
-            `vectorbt.portfolio.enums.OrderContext`, unpacked tuple from `segment_prep_func_nb`, and
-            `*order_args`. Should either return `vectorbt.portfolio.enums.Order`, or
-            `vectorbt.portfolio.enums.NoOrder` to do nothing.
+            Used for either generating an order or skipping.
+
+            Should accept `vectorbt.portfolio.enums.OrderContext`, unpacked tuple from `pre_segment_func_nb`,
+            and `*order_args`. Should return `vectorbt.portfolio.enums.Order`.
 
             !!! note
                 If the returned order has been rejected, there is no way of issuing a new order.
                 You should make sure that the order passes, for example, by using `try_order_nb`.
         order_args (tuple): Arguments passed to `order_func_nb`.
-        after_order_func_nb (callable): Callback that is called after the order has been processed.
+        post_order_func_nb (callable): Callback that is called after the order has been processed.
 
-            Used for checking the order status and doing some post-processing. Should accept the
-            current after order context `vectorbt.portfolio.enums.AfterOrderContext`,
-            unpacked tuple from `segment_prep_func_nb`, and `*after_order_args`. Should return nothing.
-        after_order_args (tuple): Arguments passed to `after_order_func_nb`.
+            Used for checking the order status and doing some post-processing.
+
+            Should accept `vectorbt.portfolio.enums.PostOrderContext`, unpacked tuple from
+            `pre_segment_func_nb`, and `*post_order_args`. Should return nothing.
+        post_order_args (tuple): Arguments passed to `post_order_func_nb`.
+        call_pre_segment (bool): Whether to call `pre_segment_func_nb` regardless of `segment_mask`.
+
+            Allows, for example, to active/deactivate a segment from `pre_segment_func_nb`.
+        call_post_segment (bool): Whether to call `post_segment_func_nb` regardless of `segment_mask`.
+
+            Allows, for example, to write user-defined arrays such as returns at the end of each segment,
+            even if it's inactive.
         ffill_val_price (bool): Whether to track valuation price only if it's known.
 
             Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp.
@@ -1194,6 +1367,9 @@ def simulate_nb(target_shape: tp.Shape,
             only once, before executing any order).
 
             The change is marginal and mostly driven by transaction costs and slippage.
+        fill_pos_record (bool): Whether to fill position record.
+
+            Disable this to make simulation a bit faster for simple use cases.
         max_orders (int): Size of the order records array.
         max_logs (int): Size of the log records array.
 
@@ -1205,10 +1381,10 @@ def simulate_nb(target_shape: tp.Shape,
         Also remember that indexing of 2-dim arrays in vectorbt follows that of pandas: `a[i, col]`.
 
     !!! note
-        Function `group_prep_func_nb` is only called if there is at least on active segment in
-        the group. Functions `segment_prep_func_nb` and `order_func_nb` are only called if their
-        segment is active. If the main task of `group_prep_func_nb` is to activate/deactivate segments,
-        all segments should be activated by default to allow `group_prep_func_nb` to be called.
+        Function `pre_group_func_nb` is only called if there is at least on active segment in
+        the group. Functions `pre_segment_func_nb` and `order_func_nb` are only called if their
+        segment is active. If the main task of `pre_group_func_nb` is to activate/deactivate segments,
+        all segments should be activated by default to allow `pre_group_func_nb` to be called.
 
     !!! warning
         You can only safely access data of columns that are to the left of the current group and
@@ -1237,10 +1413,11 @@ def simulate_nb(target_shape: tp.Shape,
     Each segment can also define a custom sequence (so-called call sequence) in which orders are executed.
 
     You can imagine each of these blocks as a rectangle drawn over different parts of the frame,
-    and having its own context and preparation function. The preparation function is a simple callback
-    is called before entering the block, and can be provided by the user to, for example, prepare arrays
-    or do some custom calculations. It can also return a tuple that is then unpacked and passed as arguments
-    to preparation functions coming next in the call hierarchy.
+    and having its own context and pre/post-processing function. The pre-processing function is a
+    simple callback that is called before entering the block, and can be provided by the user to, for example,
+    prepare arrays or do some custom calculations. It must return a tuple (can be empty) that is then unpacked and
+    passed as arguments to the pre- and postprocessing function coming next in the call hierarchy.
+    The postprocessing function can be used, for example, to write user-defined arrays.
 
     Let's demonstrate a frame with one group of two columns and one group of one column, and the
     following call sequence:
@@ -1271,6 +1448,7 @@ def simulate_nb(target_shape: tp.Shape,
     >>> from vectorbt.portfolio.nb import (
     ...     order_nb,
     ...     simulate_nb,
+    ...     simulate_row_wise_nb,
     ...     build_call_seq,
     ...     sort_call_seq_nb,
     ...     asset_flow_nb,
@@ -1279,36 +1457,36 @@ def simulate_nb(target_shape: tp.Shape,
     ... )
 
     >>> @njit
-    ... def prep_func_nb(c):  # do nothing
-    ...     print('preparing simulation')
-    ...     return ()
-
-    >>> @njit
-    ... def group_prep_func_nb(c):
-    ...     '''Define empty arrays for each group.'''
-    ...     # Try to create new arrays as rarely as possible
-    ...     print('\\tpreparing group', c.group)
-    ...     order_value_out = np.empty(c.group_len, dtype=np.float_)
+    ... def pre_sim_func_nb(c):
+    ...     print('before simulation')
+    ...     # Prepare empty arrays and pass them down the stack
+    ...     order_value_out = np.empty(c.target_shape[1], dtype=np.float_)
     ...     return (order_value_out,)
 
     >>> @njit
-    ... def segment_prep_func_nb(c, order_value_out):
-    ...     '''Perform rebalancing at each segment.'''
-    ...     print('\\t\\tpreparing segment', c.i, '(row)')
+    ... def pre_group_func_nb(c, order_value_out):
+    ...     print('\\tbefore group', c.group)
+    ...     # Forward down the stack
+    ...     return (order_value_out,)
+
+    >>> @njit
+    ... def pre_segment_func_nb(c, order_value_out):
+    ...     print('\\t\\tbefore segment', c.i)
+    ...     # Reorder call sequence such that selling orders come first and buying last
     ...     for col in range(c.from_col, c.to_col):
     ...         # Here we use order price for group valuation (just for illustration!)
     ...         c.last_val_price[col] = close[c.i, col]
-    ...     # Reorder call sequence such that selling orders come first and buying last
     ...     size = 1 / c.group_len
     ...     size_type = SizeType.TargetPercent
-    ...     direction = Direction.LongOnly  # long positions only
+    ...     direction = Direction.LongOnly
+    ...     order_value_out = order_value_out[c.from_col:c.to_col]
     ...     sort_call_seq_nb(c, size, size_type, direction, order_value_out)
     ...     return (size, size_type, direction)
 
     >>> @njit
     ... def order_func_nb(c, size, size_type, direction, fees, fixed_fees, slippage):
-    ...     '''Place an order.'''
-    ...     print('\\t\\t\\tprocessing order', c.call_idx, 'at column', c.col)
+    ...     print('\\t\\t\\tcreating order', c.call_idx, 'at column', c.col)
+    ...     # Create an order
     ...     return order_nb(
     ...         size=size,
     ...         price=close[c.i, c.col],
@@ -1320,9 +1498,23 @@ def simulate_nb(target_shape: tp.Shape,
     ...     )
 
     >>> @njit
-    ... def after_order_func_nb(c, size, size_type, direction):
-    ...     '''Check order status.'''
+    ... def post_order_func_nb(c, size, size_type, direction):
     ...     print('\\t\\t\\t\\torder status:', c.order_result.status)
+
+    >>> @njit
+    ... def post_segment_func_nb(c, order_value_out):
+    ...     print('\\t\\tafter segment', c.i)
+    ...     return None
+
+    >>> @njit
+    ... def post_group_func_nb(c, order_value_out):
+    ...     print('\\tafter group', c.group)
+    ...     return None
+
+    >>> @njit
+    ... def post_sim_func_nb(c):
+    ...     print('after simulation')
+    ...     return None
 
     >>> target_shape = (5, 3)
     >>> np.random.seed(42)
@@ -1331,49 +1523,65 @@ def simulate_nb(target_shape: tp.Shape,
     >>> init_cash = np.array([100.])  # one capital per group
     >>> cash_sharing = True
     >>> call_seq = build_call_seq(target_shape, group_lens)  # will be overridden
-    >>> active_mask = np.array([True, False, True, False, True])[:, None]
-    >>> active_mask = np.copy(np.broadcast_to(active_mask, target_shape))
+    >>> segment_mask = np.array([True, False, True, False, True])[:, None]
+    >>> segment_mask = np.copy(np.broadcast_to(segment_mask, target_shape))
     >>> fees = 0.001
     >>> fixed_fees = 1.
     >>> slippage = 0.001
 
     >>> order_records, log_records = simulate_nb(
-    ...     target_shape,
-    ...     close,
-    ...     group_lens,
-    ...     init_cash,
-    ...     cash_sharing,
-    ...     call_seq,
-    ...     active_mask,
-    ...     prep_func_nb, (),
-    ...     group_prep_func_nb, (),
-    ...     segment_prep_func_nb, (),
-    ...     order_func_nb, (fees, fixed_fees, slippage),
-    ...     after_order_func_nb, ()
+    ...     target_shape=target_shape,
+    ...     close=close,
+    ...     group_lens=group_lens,
+    ...     init_cash=init_cash,
+    ...     cash_sharing=cash_sharing,
+    ...     call_seq=call_seq,
+    ...     segment_mask=segment_mask,
+    ...     pre_sim_func_nb=pre_sim_func_nb,
+    ...     pre_sim_args=(),
+    ...     post_sim_func_nb=post_sim_func_nb,
+    ...     post_sim_args=(),
+    ...     pre_group_func_nb=pre_group_func_nb,
+    ...     pre_group_args=(),
+    ...     post_group_func_nb=post_group_func_nb,
+    ...     post_group_args=(),
+    ...     pre_segment_func_nb=pre_segment_func_nb,
+    ...     pre_segment_args=(),
+    ...     post_segment_func_nb=post_segment_func_nb,
+    ...     post_segment_args=(),
+    ...     order_func_nb=order_func_nb,
+    ...     order_args=(fees, fixed_fees, slippage),
+    ...     post_order_func_nb=post_order_func_nb,
+    ...     post_order_args=()
     ... )
-    preparing simulation
-        preparing group 0
-            preparing segment 0 (row)
-                processing order 0 at column 0
+    before simulation
+        before group 0
+            before segment 0
+                creating order 0 at column 0
                     order status: 0
-                processing order 1 at column 1
+                creating order 1 at column 1
                     order status: 0
-                processing order 2 at column 2
+                creating order 2 at column 2
                     order status: 0
-            preparing segment 2 (row)
-                processing order 0 at column 1
+            after segment 0
+            before segment 2
+                creating order 0 at column 1
                     order status: 0
-                processing order 1 at column 2
+                creating order 1 at column 2
                     order status: 0
-                processing order 2 at column 0
+                creating order 2 at column 0
                     order status: 0
-            preparing segment 4 (row)
-                processing order 0 at column 0
+            after segment 2
+            before segment 4
+                creating order 0 at column 0
                     order status: 0
-                processing order 1 at column 2
+                creating order 1 at column 2
                     order status: 0
-                processing order 2 at column 1
+                creating order 2 at column 1
                     order status: 0
+            after segment 4
+        after group 0
+    after simulation
 
     >>> pd.DataFrame.from_records(order_records)
        id  idx  col       size     price      fees  side
@@ -1418,20 +1626,25 @@ def simulate_nb(target_shape: tp.Shape,
     last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
     last_value = init_cash.copy()
+    second_last_value = init_cash.copy()
+    temp_value = init_cash.copy()
+    last_return = np.full_like(last_value, np.nan)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
     oidx = 0
     lidx = 0
+    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record['id'][:] = -1
 
-    # Run a function to prepare the simulation
-    sim_ctx = SimulationContext(
+    # Call function before the simulation
+    pre_sim_ctx = SimulationContext(
         target_shape=target_shape,
         close=close,
         group_lens=group_lens,
         init_cash=init_cash,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
-        active_mask=active_mask,
+        segment_mask=segment_mask,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         order_records=order_records,
@@ -1442,65 +1655,150 @@ def simulate_nb(target_shape: tp.Shape,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
         last_oidx=last_oidx,
-        last_lidx=last_lidx
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
     )
-    prep_out = prep_func_nb(sim_ctx, *prep_args)
+    pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
     from_col = 0
     for group in range(len(group_lens)):
-        # Is this group active?
-        if np.any(active_mask[:, group]):
-            to_col = from_col + group_lens[group]
-            group_len = to_col - from_col
+        to_col = from_col + group_lens[group]
+        group_len = to_col - from_col
 
-            # Run a function to preprocess this entire group
-            group_ctx = GroupContext(
-                target_shape=target_shape,
-                close=close,
-                group_lens=group_lens,
-                init_cash=init_cash,
-                cash_sharing=cash_sharing,
-                call_seq=call_seq,
-                active_mask=active_mask,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                order_records=order_records,
-                log_records=log_records,
-                last_cash=last_cash,
-                last_position=last_position,
-                last_debt=last_debt,
-                last_free_cash=last_free_cash,
-                last_val_price=last_val_price,
-                last_value=last_value,
-                last_oidx=last_oidx,
-                last_lidx=last_lidx,
-                group=group,
-                group_len=group_len,
-                from_col=from_col,
-                to_col=to_col
-            )
-            group_prep_out = group_prep_func_nb(group_ctx, *prep_out, *group_prep_args)
+        # Call function before the group
+        pre_group_ctx = GroupContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=call_seq,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            group=group,
+            group_len=group_len,
+            from_col=from_col,
+            to_col=to_col
+        )
+        pre_group_out = pre_group_func_nb(pre_group_ctx, *pre_sim_out, *pre_group_args)
 
-            for i in range(target_shape[0]):
-                # Is this row segment active?
-                if active_mask[i, group]:
-                    # Update valuation price
-                    if i > 0:
-                        for col in range(from_col, to_col):
-                            if not np.isnan(close[i - 1, col]) or not ffill_val_price:
-                                last_val_price[col] = close[i - 1, col]
+        for i in range(target_shape[0]):
+            call_seq_now = call_seq[i, from_col:to_col]
 
-                    # Run a function to preprocess this group within this row
-                    call_seq_now = call_seq[i, from_col:to_col]
-                    seg_ctx = SegmentContext(
+            # Is this segment active?
+            if call_pre_segment or segment_mask[i, group]:
+
+                # Call function before the segment
+                pre_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=call_seq_now
+                )
+                pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_group_out, *pre_segment_args)
+
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
+
+            # Update value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+
+            # Is this segment active?
+            if segment_mask[i, group]:
+
+                for k in range(group_len):
+                    col_i = call_seq_now[k]
+                    if col_i >= group_len:
+                        raise ValueError("Call index exceeds bounds of the group")
+                    col = from_col + col_i
+
+                    # Get current values
+                    position_now = last_position[col]
+                    debt_now = last_debt[col]
+                    val_price_now = last_val_price[col]
+                    pos_record_now = last_pos_record[col]
+                    if cash_sharing:
+                        cash_now = last_cash[group]
+                        free_cash_now = last_free_cash[group]
+                        value_now = last_value[group]
+                        return_now = last_return[group]
+                    else:
+                        cash_now = last_cash[col]
+                        free_cash_now = last_free_cash[col]
+                        value_now = last_value[col]
+                        return_now = last_return[col]
+
+                    # Generate the next order
+                    order_ctx = OrderContext(
                         target_shape=target_shape,
                         close=close,
                         group_lens=group_lens,
                         init_cash=init_cash,
                         cash_sharing=cash_sharing,
                         call_seq=call_seq,
-                        active_mask=active_mask,
+                        segment_mask=segment_mask,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         order_records=order_records,
@@ -1511,192 +1809,283 @@ def simulate_nb(target_shape: tp.Shape,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
                         last_oidx=last_oidx,
                         last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
                         to_col=to_col,
                         i=i,
-                        call_seq_now=call_seq_now
+                        call_seq_now=call_seq_now,
+                        col=col,
+                        call_idx=k,
+                        cash_now=cash_now,
+                        position_now=position_now,
+                        debt_now=debt_now,
+                        free_cash_now=free_cash_now,
+                        val_price_now=val_price_now,
+                        value_now=value_now,
+                        return_now=return_now,
+                        pos_record_now=pos_record_now
                     )
-                    segment_prep_out = segment_prep_func_nb(seg_ctx, *group_prep_out, *segment_prep_args)
+                    order = order_func_nb(order_ctx, *pre_segment_out, *order_args)
+                    if np.isinf(order.price):
+                        if i > 0:
+                            _prev_close = close[i - 1, col]
+                        else:
+                            _prev_close = np.nan
+                        _close = close[i, col]
+                        order = replace_order_price_nb(_prev_close, _close, order)
 
-                    # Get current values per group
+                    # Process the order
+                    state = ProcessOrderState(
+                        cash=cash_now,
+                        position=position_now,
+                        debt=debt_now,
+                        free_cash=free_cash_now,
+                        val_price=val_price_now,
+                        value=value_now,
+                        oidx=oidx,
+                        lidx=lidx
+                    )
+
+                    order_result, new_state = process_order_nb(
+                        i, col, group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records
+                    )
+
+                    # Update state
+                    cash_now = new_state.cash
+                    position_now = new_state.position
+                    debt_now = new_state.debt
+                    free_cash_now = new_state.free_cash
+                    val_price_now = new_state.val_price
+                    value_now = new_state.value
                     if cash_sharing:
-                        cash_now = last_cash[group]
-                        value_now = get_group_value_nb(
-                            from_col,
-                            to_col,
-                            cash_now,
-                            last_position,
-                            last_val_price
-                        )
+                        return_now = get_return_nb(second_last_value[group], value_now)
+                    else:
+                        return_now = get_return_nb(second_last_value[col], value_now)
+                    oidx = new_state.oidx
+                    lidx = new_state.lidx
+
+                    # Now becomes last
+                    last_position[col] = position_now
+                    last_debt[col] = debt_now
+                    if not np.isnan(val_price_now) or not ffill_val_price:
+                        last_val_price[col] = val_price_now
+                    if cash_sharing:
+                        last_cash[group] = cash_now
+                        last_free_cash[group] = free_cash_now
                         last_value[group] = value_now
-                        free_cash_now = last_free_cash[group]
+                        last_return[group] = return_now
+                    else:
+                        last_cash[col] = cash_now
+                        last_free_cash[col] = free_cash_now
+                        last_value[col] = value_now
+                        last_return[col] = return_now
+                    if state.oidx != new_state.oidx:
+                        last_oidx[col] = state.oidx
+                    if state.lidx != new_state.lidx:
+                        last_lidx[col] = state.lidx
 
-                    for k in range(group_len):
-                        col_i = call_seq_now[k]
-                        if col_i >= group_len:
-                            raise ValueError("Call index exceeds bounds of the group")
-                        col = from_col + col_i
-
-                        # Get current values per column
-                        position_now = last_position[col]
-                        debt_now = last_debt[col]
-                        val_price_now = last_val_price[col]
-                        if not cash_sharing:
-                            cash_now = last_cash[col]
-                            free_cash_now = last_free_cash[col]
-                            value_now = cash_now
-                            if position_now != 0:
-                                value_now += position_now * val_price_now
-                            last_value[col] = value_now
-
-                        # Generate the next order
-                        order_ctx = OrderContext(
-                            target_shape=target_shape,
-                            close=close,
-                            group_lens=group_lens,
-                            init_cash=init_cash,
-                            cash_sharing=cash_sharing,
-                            call_seq=call_seq,
-                            active_mask=active_mask,
-                            ffill_val_price=ffill_val_price,
-                            update_value=update_value,
-                            order_records=order_records,
-                            log_records=log_records,
-                            last_cash=last_cash,
-                            last_position=last_position,
-                            last_debt=last_debt,
-                            last_free_cash=last_free_cash,
-                            last_val_price=last_val_price,
-                            last_value=last_value,
-                            last_oidx=last_oidx,
-                            last_lidx=last_lidx,
-                            group=group,
-                            group_len=group_len,
-                            from_col=from_col,
-                            to_col=to_col,
-                            i=i,
-                            call_seq_now=call_seq_now,
-                            col=col,
-                            call_idx=k,
-                            cash_now=cash_now,
-                            position_now=position_now,
-                            debt_now=debt_now,
-                            free_cash_now=free_cash_now,
-                            val_price_now=val_price_now,
-                            value_now=value_now
-                        )
-                        order = order_func_nb(order_ctx, *segment_prep_out, *order_args)
-                        if np.isinf(order.price):
-                            if i > 0:
-                                _prev_close = close[i - 1, col]
-                            else:
-                                _prev_close = np.nan
-                            _close = close[i, col]
-                            order = replace_order_price_nb(_prev_close, _close, order)
-
-                        # Process the order
-                        state = ProcessOrderState(
-                            cash=cash_now,
-                            position=position_now,
-                            debt=debt_now,
-                            free_cash=free_cash_now,
-                            val_price=val_price_now,
-                            value=value_now,
-                            oidx=oidx,
-                            lidx=lidx
+                    # Update position record
+                    if fill_pos_record:
+                        update_pos_record_nb(
+                            pos_record_now,
+                            i, col,
+                            state.position, position_now,
+                            order_result
                         )
 
-                        order_result, new_state = process_order_nb(
-                            i, col, group,
-                            state,
-                            update_value,
-                            order,
-                            order_records,
-                            log_records
-                        )
+                    # Post-order callback
+                    post_order_ctx = PostOrderContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=call_seq,
+                        segment_mask=segment_mask,
+                        ffill_val_price=ffill_val_price,
+                        update_value=update_value,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_position=last_position,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
+                        last_val_price=last_val_price,
+                        last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
+                        last_oidx=last_oidx,
+                        last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
+                        call_seq_now=call_seq_now,
+                        col=col,
+                        call_idx=k,
+                        cash_before=state.cash,
+                        position_before=state.position,
+                        debt_before=state.debt,
+                        free_cash_before=state.free_cash,
+                        val_price_before=state.val_price,
+                        value_before=state.value,
+                        order_result=order_result,
+                        cash_now=cash_now,
+                        position_now=position_now,
+                        debt_now=debt_now,
+                        free_cash_now=free_cash_now,
+                        val_price_now=val_price_now,
+                        value_now=value_now,
+                        return_now=return_now,
+                        pos_record_now=pos_record_now
+                    )
+                    post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
-                        # Update state
-                        cash_now = new_state.cash
-                        position_now = new_state.position
-                        debt_now = new_state.debt
-                        free_cash_now = new_state.free_cash
-                        val_price_now = new_state.val_price
-                        value_now = new_state.value
-                        oidx = new_state.oidx
-                        lidx = new_state.lidx
+            # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
+            # Update valuation price
+            for col in range(from_col, to_col):
+                if not np.isnan(close[i, col]) or not ffill_val_price:
+                    last_val_price[col] = close[i, col]
 
-                        # Now becomes last
-                        if cash_sharing:
-                            last_cash[group] = cash_now
-                        else:
-                            last_cash[col] = cash_now
-                        last_position[col] = position_now
-                        last_debt[col] = debt_now
-                        if cash_sharing:
-                            last_free_cash[group] = free_cash_now
-                        else:
-                            last_free_cash[col] = free_cash_now
-                        if not np.isnan(val_price_now) or not ffill_val_price:
-                            last_val_price[col] = val_price_now
-                        if cash_sharing:
-                            last_value[group] = value_now
-                        else:
-                            last_value[col] = value_now
-                        if state.oidx != new_state.oidx:
-                            last_oidx[col] = state.oidx
-                        if state.lidx != new_state.lidx:
-                            last_lidx[col] = state.lidx
+            # Update previous value, current value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                second_last_value[group] = temp_value[group]
+                temp_value[group] = last_value[group]
+                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    second_last_value[col] = temp_value[col]
+                    temp_value[col] = last_value[col]
+                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
 
-                        # After order callback
-                        after_order_ctx = AfterOrderContext(
-                            target_shape=target_shape,
-                            close=close,
-                            group_lens=group_lens,
-                            init_cash=init_cash,
-                            cash_sharing=cash_sharing,
-                            call_seq=call_seq,
-                            active_mask=active_mask,
-                            ffill_val_price=ffill_val_price,
-                            update_value=update_value,
-                            order_records=order_records,
-                            log_records=log_records,
-                            last_cash=last_cash,
-                            last_position=last_position,
-                            last_debt=last_debt,
-                            last_free_cash=last_free_cash,
-                            last_val_price=last_val_price,
-                            last_value=last_value,
-                            last_oidx=last_oidx,
-                            last_lidx=last_lidx,
-                            group=group,
-                            group_len=group_len,
-                            from_col=from_col,
-                            to_col=to_col,
-                            i=i,
-                            call_seq_now=call_seq_now,
-                            col=col,
-                            call_idx=k,
-                            cash_before=state.cash,
-                            position_before=state.position,
-                            debt_before=state.debt,
-                            free_cash_before=state.free_cash,
-                            val_price_before=state.val_price,
-                            value_before=state.value,
-                            order_result=order_result,
-                            cash_now=cash_now,
-                            position_now=position_now,
-                            debt_now=debt_now,
-                            free_cash_now=free_cash_now,
-                            val_price_now=val_price_now,
-                            value_now=value_now
-                        )
-                        after_order_func_nb(after_order_ctx, *segment_prep_out, *after_order_args)
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
 
-            from_col = to_col
+            # Is this segment active?
+            if call_post_segment or segment_mask[i, group]:
+
+                # Call function before the segment
+                post_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=call_seq_now
+                )
+                post_segment_func_nb(post_seg_ctx, *pre_group_out, *post_segment_args)
+
+        # Call function after the group
+        post_group_ctx = GroupContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=call_seq,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            group=group,
+            group_len=group_len,
+            from_col=from_col,
+            to_col=to_col
+        )
+        post_group_func_nb(post_group_ctx, *pre_sim_out, *post_group_args)
+
+        from_col = to_col
+
+    # Call function after the simulation
+    post_sim_ctx = SimulationContext(
+        target_shape=target_shape,
+        close=close,
+        group_lens=group_lens,
+        init_cash=init_cash,
+        cash_sharing=cash_sharing,
+        call_seq=call_seq,
+        segment_mask=segment_mask,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        order_records=order_records,
+        log_records=log_records,
+        last_cash=last_cash,
+        last_position=last_position,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
+        last_val_price=last_val_price,
+        last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
+        last_oidx=last_oidx,
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
+    )
+    post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
     return order_records[:oidx], log_records[:lidx]
 
@@ -1708,32 +2097,41 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                          init_cash: tp.Array1d,
                          cash_sharing: bool,
                          call_seq: tp.Array2d,
-                         active_mask: tp.Array2d,
-                         prep_func_nb: PrepFuncT,
-                         prep_args: tp.Args,
-                         row_prep_func_nb: RowPrepFuncT,
-                         row_prep_args: tp.Args,
-                         segment_prep_func_nb: SegmentPrepFuncT,
-                         segment_prep_args: tp.Args,
-                         order_func_nb: OrderFuncT,
-                         order_args: tp.Args,
-                         after_order_func_nb: AfterOrderFuncT,
-                         after_order_args: tp.Args,
+                         segment_mask: tp.Array2d,
+                         pre_sim_func_nb: BeforeSimFuncT = no_pre_func_nb,
+                         pre_sim_args: tp.Args = (),
+                         post_sim_func_nb: AfterSimFuncT = no_post_func_nb,
+                         post_sim_args: tp.Args = (),
+                         pre_row_func_nb: BeforeRowFuncT = no_pre_func_nb,
+                         pre_row_args: tp.Args = (),
+                         post_row_func_nb: AfterRowFuncT = no_post_func_nb,
+                         post_row_args: tp.Args = (),
+                         pre_segment_func_nb: BeforeSegmentFuncT = no_pre_func_nb,
+                         pre_segment_args: tp.Args = (),
+                         post_segment_func_nb: AfterSegmentFuncT = no_post_func_nb,
+                         post_segment_args: tp.Args = (),
+                         order_func_nb: OrderFuncT = no_order_func_nb,
+                         order_args: tp.Args = (),
+                         post_order_func_nb: AfterOrderFuncT = no_post_func_nb,
+                         post_order_args: tp.Args = (),
+                         call_pre_segment: bool = False,
+                         call_post_segment: bool = False,
                          ffill_val_price: bool = True,
                          update_value: bool = False,
+                         fill_pos_record: bool = True,
                          max_orders: tp.Optional[int] = None,
                          max_logs: int = 0) -> tp.Tuple[tp.RecordArray, tp.RecordArray]:
     """Same as `simulate_nb`, but iterates using row-major order, with the rows
     changing fastest, and the columns/groups changing slowest.
 
-    The main difference is that instead of `group_prep_func_nb` it now exposes `row_prep_func_nb`,
+    The main difference is that instead of `pre_group_func_nb` it now exposes `pre_row_func_nb`,
     which is executed per entire row. It should accept `vectorbt.portfolio.enums.RowContext`.
 
     !!! note
-        Function `row_prep_func_nb` is only called if there is at least on active segment in
-        the row. Functions `segment_prep_func_nb` and `order_func_nb` are only called if their
-        segment is active. If the main task of `row_prep_func_nb` is to activate/deactivate segments,
-        all segments should be activated by default to allow `row_prep_func_nb` to be called.
+        Function `pre_row_func_nb` is only called if there is at least on active segment in
+        the row. Functions `pre_segment_func_nb` and `order_func_nb` are only called if their
+        segment is active. If the main task of `pre_row_func_nb` is to activate/deactivate segments,
+        all segments should be activated by default to allow `pre_row_func_nb` to be called.
 
     !!! warning
         You can only safely access data points that are to the left of the current group and
@@ -1749,36 +2147,80 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
 
     Running the same example as in `simulate_nb` but adapted for this function:
     ```python-repl
-    preparing simulation
-        preparing row 0
-            preparing segment 0 (group)
-                processing order 0 at column 0
-                    order status: 0
-                processing order 1 at column 1
-                    order status: 0
-                processing order 2 at column 2
-                    order status: 0
-        preparing row 2
-            preparing segment 2 (group)
-                processing order 0 at column 1
-                    order status: 0
-                processing order 1 at column 2
-                    order status: 0
-                processing order 2 at column 0
-                    order status: 0
-        preparing row 4
-            preparing segment 4 (group)
-                processing order 0 at column 0
-                    order status: 0
-                processing order 1 at column 2
-                    order status: 0
-                processing order 2 at column 1
-                    order status: 0
-    ```
+    >>> @njit
+    ... def pre_row_func_nb(c, order_value_out):
+    ...     print('\\tbefore row', c.i)
+    ...     # Forward down the stack
+    ...     return (order_value_out,)
 
-    Note, however, that we cannot create NumPy arrays per group anymore as there is no
-    `group_prep_func_nb`, so you would need to move this part to `prep_func_nb`,
-    make arrays wider, and use only the part of the array that points to the current group.
+    >>> @njit
+    ... def post_row_func_nb(c, order_value_out):
+    ...     print('\\tafter row', c.i)
+    ...     return None
+
+    >>> call_seq = build_call_seq(target_shape, group_lens)
+    >>> order_records, log_records = simulate_row_wise_nb(
+    ...     target_shape=target_shape,
+    ...     close=close,
+    ...     group_lens=group_lens,
+    ...     init_cash=init_cash,
+    ...     cash_sharing=cash_sharing,
+    ...     call_seq=call_seq,
+    ...     segment_mask=segment_mask,
+    ...     pre_sim_func_nb=pre_sim_func_nb,
+    ...     pre_sim_args=(),
+    ...     post_sim_func_nb=post_sim_func_nb,
+    ...     post_sim_args=(),
+    ...     pre_row_func_nb=pre_row_func_nb,
+    ...     pre_row_args=(),
+    ...     post_row_func_nb=post_row_func_nb,
+    ...     post_row_args=(),
+    ...     pre_segment_func_nb=pre_segment_func_nb,
+    ...     pre_segment_args=(),
+    ...     post_segment_func_nb=post_segment_func_nb,
+    ...     post_segment_args=(),
+    ...     order_func_nb=order_func_nb,
+    ...     order_args=(fees, fixed_fees, slippage),
+    ...     post_order_func_nb=post_order_func_nb,
+    ...     post_order_args=()
+    ... )
+    before simulation
+        before row 0
+            before segment 0
+                creating order 0 at column 0
+                    order status: 0
+                creating order 1 at column 1
+                    order status: 0
+                creating order 2 at column 2
+                    order status: 0
+            after segment 0
+        after row 0
+        before row 1
+        after row 1
+        before row 2
+            before segment 2
+                creating order 0 at column 1
+                    order status: 0
+                creating order 1 at column 2
+                    order status: 0
+                creating order 2 at column 0
+                    order status: 0
+            after segment 2
+        after row 2
+        before row 3
+        after row 3
+        before row 4
+            before segment 4
+                creating order 0 at column 0
+                    order status: 0
+                creating order 1 at column 2
+                    order status: 0
+                creating order 2 at column 1
+                    order status: 0
+            after segment 4
+        after row 4
+    after simulation
+    ```
     """
     check_group_lens(group_lens, target_shape[1])
     check_group_init_cash(group_lens, target_shape[1], init_cash, cash_sharing)
@@ -1791,20 +2233,25 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
     last_free_cash = init_cash.copy()
     last_val_price = np.full(target_shape[1], np.nan, dtype=np.float_)
     last_value = init_cash.copy()
+    second_last_value = init_cash.copy()
+    temp_value = init_cash.copy()
+    last_return = np.full_like(last_value, np.nan)
     last_oidx = np.full(target_shape[1], -1, dtype=np.int_)
     last_lidx = np.full(target_shape[1], -1, dtype=np.int_)
     oidx = 0
     lidx = 0
+    last_pos_record = np.empty(target_shape[1], dtype=position_dt)
+    last_pos_record['id'][:] = -1
 
-    # Run a function to prepare the simulation
-    sim_ctx = SimulationContext(
+    # Call function before the simulation
+    pre_sim_ctx = SimulationContext(
         target_shape=target_shape,
         close=close,
         group_lens=group_lens,
         init_cash=init_cash,
         cash_sharing=cash_sharing,
         call_seq=call_seq,
-        active_mask=active_mask,
+        segment_mask=segment_mask,
         ffill_val_price=ffill_val_price,
         update_value=update_value,
         order_records=order_records,
@@ -1815,62 +2262,147 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
         last_free_cash=last_free_cash,
         last_val_price=last_val_price,
         last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
         last_oidx=last_oidx,
-        last_lidx=last_lidx
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
     )
-    prep_out = prep_func_nb(sim_ctx, *prep_args)
+    pre_sim_out = pre_sim_func_nb(pre_sim_ctx, *pre_sim_args)
 
     for i in range(target_shape[0]):
-        # Is this row active?
-        if np.any(active_mask[i, :]):
-            # Update valuation price
-            if i > 0:
-                for col in range(target_shape[1]):
-                    if not np.isnan(close[i - 1, col]) or not ffill_val_price:
-                        last_val_price[col] = close[i - 1, col]
 
-            # Run a function to preprocess this entire row
-            row_ctx = RowContext(
-                target_shape=target_shape,
-                close=close,
-                group_lens=group_lens,
-                init_cash=init_cash,
-                cash_sharing=cash_sharing,
-                call_seq=call_seq,
-                active_mask=active_mask,
-                ffill_val_price=ffill_val_price,
-                update_value=update_value,
-                order_records=order_records,
-                log_records=log_records,
-                last_cash=last_cash,
-                last_position=last_position,
-                last_debt=last_debt,
-                last_free_cash=last_free_cash,
-                last_val_price=last_val_price,
-                last_value=last_value,
-                last_oidx=last_oidx,
-                last_lidx=last_lidx,
-                i=i
-            )
-            row_prep_out = row_prep_func_nb(row_ctx, *prep_out, *row_prep_args)
+        # Call function before the row
+        pre_row_ctx = RowContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=call_seq,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            i=i
+        )
+        pre_row_out = pre_row_func_nb(pre_row_ctx, *pre_sim_out, *pre_row_args)
 
-            from_col = 0
-            for group in range(len(group_lens)):
-                # Is this group segment active?
-                if active_mask[i, group]:
-                    to_col = from_col + group_lens[group]
-                    group_len = to_col - from_col
+        from_col = 0
+        for group in range(len(group_lens)):
+            to_col = from_col + group_lens[group]
+            group_len = to_col - from_col
+            call_seq_now = call_seq[i, from_col:to_col]
 
-                    # Run a function to preprocess this row within this group
-                    call_seq_now = call_seq[i, from_col:to_col]
-                    seg_ctx = SegmentContext(
+            # Is this segment active?
+            if call_pre_segment or segment_mask[i, group]:
+
+                # Call function before the segment
+                pre_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=call_seq_now
+                )
+                pre_segment_out = pre_segment_func_nb(pre_seg_ctx, *pre_row_out, *pre_segment_args)
+
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
+
+            # Update value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+
+            # Is this segment active?
+            if segment_mask[i, group]:
+
+                for k in range(group_len):
+                    col_i = call_seq_now[k]
+                    if col_i >= group_len:
+                        raise ValueError("Call index exceeds bounds of the group")
+                    col = from_col + col_i
+
+                    # Get current values
+                    position_now = last_position[col]
+                    debt_now = last_debt[col]
+                    val_price_now = last_val_price[col]
+                    pos_record_now = last_pos_record[col]
+                    if cash_sharing:
+                        cash_now = last_cash[group]
+                        free_cash_now = last_free_cash[group]
+                        value_now = last_value[group]
+                        return_now = last_return[group]
+                    else:
+                        cash_now = last_cash[col]
+                        free_cash_now = last_free_cash[col]
+                        value_now = last_value[col]
+                        return_now = last_return[col]
+
+                    # Generate the next order
+                    order_ctx = OrderContext(
                         target_shape=target_shape,
                         close=close,
                         group_lens=group_lens,
                         init_cash=init_cash,
                         cash_sharing=cash_sharing,
                         call_seq=call_seq,
-                        active_mask=active_mask,
+                        segment_mask=segment_mask,
                         ffill_val_price=ffill_val_price,
                         update_value=update_value,
                         order_records=order_records,
@@ -1881,186 +2413,280 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         last_free_cash=last_free_cash,
                         last_val_price=last_val_price,
                         last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
                         last_oidx=last_oidx,
                         last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
                         group=group,
                         group_len=group_len,
                         from_col=from_col,
                         to_col=to_col,
                         i=i,
-                        call_seq_now=call_seq_now
+                        call_seq_now=call_seq_now,
+                        col=col,
+                        call_idx=k,
+                        cash_now=cash_now,
+                        position_now=position_now,
+                        debt_now=debt_now,
+                        free_cash_now=free_cash_now,
+                        val_price_now=val_price_now,
+                        value_now=value_now,
+                        return_now=return_now,
+                        pos_record_now=pos_record_now
                     )
-                    segment_prep_out = segment_prep_func_nb(seg_ctx, *row_prep_out, *segment_prep_args)
+                    order = order_func_nb(order_ctx, *pre_segment_out, *order_args)
+                    if np.isinf(order.price):
+                        if i > 0:
+                            _prev_close = close[i - 1, col]
+                        else:
+                            _prev_close = np.nan
+                        _close = close[i, col]
+                        order = replace_order_price_nb(_prev_close, _close, order)
 
-                    # Get current values per group
+                    # Process the order
+                    state = ProcessOrderState(
+                        cash=cash_now,
+                        position=position_now,
+                        debt=debt_now,
+                        free_cash=free_cash_now,
+                        val_price=val_price_now,
+                        value=value_now,
+                        oidx=oidx,
+                        lidx=lidx
+                    )
+
+                    order_result, new_state = process_order_nb(
+                        i, col, group,
+                        state,
+                        update_value,
+                        order,
+                        order_records,
+                        log_records
+                    )
+
+                    # Update state
+                    cash_now = new_state.cash
+                    position_now = new_state.position
+                    debt_now = new_state.debt
+                    free_cash_now = new_state.free_cash
+                    val_price_now = new_state.val_price
+                    value_now = new_state.value
                     if cash_sharing:
-                        cash_now = last_cash[group]
-                        value_now = get_group_value_nb(from_col, to_col, cash_now, last_position, last_val_price)
+                        return_now = get_return_nb(second_last_value[group], value_now)
+                    else:
+                        return_now = get_return_nb(second_last_value[col], value_now)
+                    oidx = new_state.oidx
+                    lidx = new_state.lidx
+
+                    # Now becomes last
+                    last_position[col] = position_now
+                    last_debt[col] = debt_now
+                    if not np.isnan(val_price_now) or not ffill_val_price:
+                        last_val_price[col] = val_price_now
+                    if cash_sharing:
+                        last_cash[group] = cash_now
+                        last_free_cash[group] = free_cash_now
                         last_value[group] = value_now
-                        free_cash_now = last_free_cash[group]
+                        last_return[group] = return_now
+                    else:
+                        last_cash[col] = cash_now
+                        last_free_cash[col] = free_cash_now
+                        last_value[col] = value_now
+                        last_return[col] = return_now
+                    if state.oidx != new_state.oidx:
+                        last_oidx[col] = state.oidx
+                    if state.lidx != new_state.lidx:
+                        last_lidx[col] = state.lidx
 
-                    for k in range(group_len):
-                        col_i = call_seq_now[k]
-                        if col_i >= group_len:
-                            raise ValueError("Call index exceeds bounds of the group")
-                        col = from_col + col_i
-
-                        # Get current values per column
-                        position_now = last_position[col]
-                        debt_now = last_debt[col]
-                        val_price_now = last_val_price[col]
-                        if not cash_sharing:
-                            cash_now = last_cash[col]
-                            free_cash_now = last_free_cash[col]
-                            value_now = cash_now
-                            if position_now != 0:
-                                value_now += position_now * val_price_now
-                            last_value[col] = value_now
-
-                        # Generate the next order
-                        order_ctx = OrderContext(
-                            target_shape=target_shape,
-                            close=close,
-                            group_lens=group_lens,
-                            init_cash=init_cash,
-                            cash_sharing=cash_sharing,
-                            call_seq=call_seq,
-                            active_mask=active_mask,
-                            ffill_val_price=ffill_val_price,
-                            update_value=update_value,
-                            order_records=order_records,
-                            log_records=log_records,
-                            last_cash=last_cash,
-                            last_position=last_position,
-                            last_debt=last_debt,
-                            last_free_cash=last_free_cash,
-                            last_val_price=last_val_price,
-                            last_value=last_value,
-                            last_oidx=last_oidx,
-                            last_lidx=last_lidx,
-                            group=group,
-                            group_len=group_len,
-                            from_col=from_col,
-                            to_col=to_col,
-                            i=i,
-                            call_seq_now=call_seq_now,
-                            col=col,
-                            call_idx=k,
-                            cash_now=cash_now,
-                            position_now=position_now,
-                            debt_now=debt_now,
-                            free_cash_now=free_cash_now,
-                            val_price_now=val_price_now,
-                            value_now=value_now
-                        )
-                        order = order_func_nb(order_ctx, *segment_prep_out, *order_args)
-                        if np.isinf(order.price):
-                            if i > 0:
-                                _prev_close = close[i - 1, col]
-                            else:
-                                _prev_close = np.nan
-                            _close = close[i, col]
-                            order = replace_order_price_nb(_prev_close, _close, order)
-
-                        # Process the order
-                        state = ProcessOrderState(
-                            cash=cash_now,
-                            position=position_now,
-                            debt=debt_now,
-                            free_cash=free_cash_now,
-                            val_price=val_price_now,
-                            value=value_now,
-                            oidx=oidx,
-                            lidx=lidx
+                    # Update position record
+                    if fill_pos_record:
+                        update_pos_record_nb(
+                            pos_record_now,
+                            i, col,
+                            state.position, position_now,
+                            order_result
                         )
 
-                        order_result, new_state = process_order_nb(
-                            i, col, group,
-                            state,
-                            update_value,
-                            order,
-                            order_records,
-                            log_records
-                        )
+                    # Post-order callback
+                    post_order_ctx = PostOrderContext(
+                        target_shape=target_shape,
+                        close=close,
+                        group_lens=group_lens,
+                        init_cash=init_cash,
+                        cash_sharing=cash_sharing,
+                        call_seq=call_seq,
+                        segment_mask=segment_mask,
+                        ffill_val_price=ffill_val_price,
+                        update_value=update_value,
+                        order_records=order_records,
+                        log_records=log_records,
+                        last_cash=last_cash,
+                        last_position=last_position,
+                        last_debt=last_debt,
+                        last_free_cash=last_free_cash,
+                        last_val_price=last_val_price,
+                        last_value=last_value,
+                        second_last_value=second_last_value,
+                        last_return=last_return,
+                        last_oidx=last_oidx,
+                        last_lidx=last_lidx,
+                        last_pos_record=last_pos_record,
+                        group=group,
+                        group_len=group_len,
+                        from_col=from_col,
+                        to_col=to_col,
+                        i=i,
+                        call_seq_now=call_seq_now,
+                        col=col,
+                        call_idx=k,
+                        cash_before=state.cash,
+                        position_before=state.position,
+                        debt_before=state.debt,
+                        free_cash_before=state.free_cash,
+                        val_price_before=state.val_price,
+                        value_before=state.value,
+                        order_result=order_result,
+                        cash_now=cash_now,
+                        position_now=position_now,
+                        debt_now=debt_now,
+                        free_cash_now=free_cash_now,
+                        val_price_now=val_price_now,
+                        value_now=value_now,
+                        return_now=return_now,
+                        pos_record_now=pos_record_now
+                    )
+                    post_order_func_nb(post_order_ctx, *pre_segment_out, *post_order_args)
 
-                        # Update state
-                        cash_now = new_state.cash
-                        position_now = new_state.position
-                        debt_now = new_state.debt
-                        free_cash_now = new_state.free_cash
-                        val_price_now = new_state.val_price
-                        value_now = new_state.value
-                        oidx = new_state.oidx
-                        lidx = new_state.lidx
+            # NOTE: Regardless of segment_mask, we still need to update stats to be accessed by future rows
+            # Update valuation price
+            for col in range(from_col, to_col):
+                if not np.isnan(close[i, col]) or not ffill_val_price:
+                    last_val_price[col] = close[i, col]
 
-                        # Now becomes last
-                        if cash_sharing:
-                            last_cash[group] = cash_now
-                        else:
-                            last_cash[col] = cash_now
-                        last_position[col] = position_now
-                        last_debt[col] = debt_now
-                        if cash_sharing:
-                            last_free_cash[group] = free_cash_now
-                        else:
-                            last_free_cash[col] = free_cash_now
-                        if not np.isnan(val_price_now) or not ffill_val_price:
-                            last_val_price[col] = val_price_now
-                        if cash_sharing:
-                            last_value[group] = value_now
-                        else:
-                            last_value[col] = value_now
-                        if state.oidx != new_state.oidx:
-                            last_oidx[col] = state.oidx
-                        if state.lidx != new_state.lidx:
-                            last_lidx[col] = state.lidx
+            # Update previous value, current value and return
+            if cash_sharing:
+                last_value[group] = get_group_value_nb(
+                    from_col,
+                    to_col,
+                    last_cash[group],
+                    last_position,
+                    last_val_price
+                )
+                second_last_value[group] = temp_value[group]
+                temp_value[group] = last_value[group]
+                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+            else:
+                for col in range(from_col, to_col):
+                    if last_position[col] == 0:
+                        last_value[col] = last_cash[col]
+                    else:
+                        last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
+                    second_last_value[col] = temp_value[col]
+                    temp_value[col] = last_value[col]
+                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
 
-                        # After order callback
-                        after_order_ctx = AfterOrderContext(
-                            target_shape=target_shape,
-                            close=close,
-                            group_lens=group_lens,
-                            init_cash=init_cash,
-                            cash_sharing=cash_sharing,
-                            call_seq=call_seq,
-                            active_mask=active_mask,
-                            ffill_val_price=ffill_val_price,
-                            update_value=update_value,
-                            order_records=order_records,
-                            log_records=log_records,
-                            last_cash=last_cash,
-                            last_position=last_position,
-                            last_debt=last_debt,
-                            last_free_cash=last_free_cash,
-                            last_val_price=last_val_price,
-                            last_value=last_value,
-                            last_oidx=last_oidx,
-                            last_lidx=last_lidx,
-                            group=group,
-                            group_len=group_len,
-                            from_col=from_col,
-                            to_col=to_col,
-                            i=i,
-                            call_seq_now=call_seq_now,
-                            col=col,
-                            call_idx=k,
-                            cash_before=state.cash,
-                            position_before=state.position,
-                            debt_before=state.debt,
-                            free_cash_before=state.free_cash,
-                            val_price_before=state.val_price,
-                            value_before=state.value,
-                            order_result=order_result,
-                            cash_now=cash_now,
-                            position_now=position_now,
-                            debt_now=debt_now,
-                            free_cash_now=free_cash_now,
-                            val_price_now=val_price_now,
-                            value_now=value_now
-                        )
-                        after_order_func_nb(after_order_ctx, *segment_prep_out, *after_order_args)
+            # Update open position stats
+            if fill_pos_record:
+                for col in range(from_col, to_col):
+                    update_open_pos_stats_nb(
+                        last_pos_record[col],
+                        last_position[col],
+                        last_val_price[col]
+                    )
 
-                    from_col = to_col
+            # Is this segment active?
+            if call_post_segment or segment_mask[i, group]:
+
+                # Call function after the segment
+                post_seg_ctx = SegmentContext(
+                    target_shape=target_shape,
+                    close=close,
+                    group_lens=group_lens,
+                    init_cash=init_cash,
+                    cash_sharing=cash_sharing,
+                    call_seq=call_seq,
+                    segment_mask=segment_mask,
+                    ffill_val_price=ffill_val_price,
+                    update_value=update_value,
+                    order_records=order_records,
+                    log_records=log_records,
+                    last_cash=last_cash,
+                    last_position=last_position,
+                    last_debt=last_debt,
+                    last_free_cash=last_free_cash,
+                    last_val_price=last_val_price,
+                    last_value=last_value,
+                    second_last_value=second_last_value,
+                    last_return=last_return,
+                    last_oidx=last_oidx,
+                    last_lidx=last_lidx,
+                    last_pos_record=last_pos_record,
+                    group=group,
+                    group_len=group_len,
+                    from_col=from_col,
+                    to_col=to_col,
+                    i=i,
+                    call_seq_now=call_seq_now
+                )
+                post_segment_func_nb(post_seg_ctx, *pre_row_out, *post_segment_args)
+
+            from_col = to_col
+
+        # Call function after the row
+        post_row_ctx = RowContext(
+            target_shape=target_shape,
+            close=close,
+            group_lens=group_lens,
+            init_cash=init_cash,
+            cash_sharing=cash_sharing,
+            call_seq=call_seq,
+            segment_mask=segment_mask,
+            ffill_val_price=ffill_val_price,
+            update_value=update_value,
+            order_records=order_records,
+            log_records=log_records,
+            last_cash=last_cash,
+            last_position=last_position,
+            last_debt=last_debt,
+            last_free_cash=last_free_cash,
+            last_val_price=last_val_price,
+            last_value=last_value,
+            second_last_value=second_last_value,
+            last_return=last_return,
+            last_oidx=last_oidx,
+            last_lidx=last_lidx,
+            last_pos_record=last_pos_record,
+            i=i
+        )
+        post_row_func_nb(post_row_ctx, *pre_sim_out, *post_row_args)
+
+    # Call function after the simulation
+    post_sim_ctx = SimulationContext(
+        target_shape=target_shape,
+        close=close,
+        group_lens=group_lens,
+        init_cash=init_cash,
+        cash_sharing=cash_sharing,
+        call_seq=call_seq,
+        segment_mask=segment_mask,
+        ffill_val_price=ffill_val_price,
+        update_value=update_value,
+        order_records=order_records,
+        log_records=log_records,
+        last_cash=last_cash,
+        last_position=last_position,
+        last_debt=last_debt,
+        last_free_cash=last_free_cash,
+        last_val_price=last_val_price,
+        last_value=last_value,
+        second_last_value=second_last_value,
+        last_return=last_return,
+        last_oidx=last_oidx,
+        last_lidx=last_lidx,
+        last_pos_record=last_pos_record
+    )
+    post_sim_func_nb(post_sim_ctx, *post_sim_args)
 
     return order_records[:oidx], log_records[:lidx]
 
@@ -2754,13 +3380,7 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     >>> import pandas as pd
     >>> from numba import njit
     >>> from vectorbt.records.nb import col_map_nb
-    >>> from vectorbt.portfolio.nb import (
-    ...     simulate_nb,
-    ...     order_nb,
-    ...     empty_prep_func_nb,
-    ...     empty_after_order_func_nb,
-    ...     orders_to_trades_nb
-    ... )
+    >>> from vectorbt.portfolio.nb import simulate_nb, order_nb, orders_to_trades_nb
 
     >>> @njit
     ... def order_func_nb(c, order_size, order_price):
@@ -2792,16 +3412,13 @@ def orders_to_trades_nb(close: tp.Array2d, order_records: tp.RecordArray, col_ma
     >>> init_cash = np.full(target_shape[1], 100)
     >>> cash_sharing = False
     >>> call_seq = np.full(target_shape, 0)
-    >>> active_mask = np.full(target_shape, True)
+    >>> segment_mask = np.full(target_shape, True)
 
     >>> order_records, log_records = simulate_nb(
     ...     target_shape, close, group_lens,
-    ...     init_cash, cash_sharing, call_seq, active_mask,
-    ...     empty_prep_func_nb, (),
-    ...     empty_prep_func_nb, (),
-    ...     empty_prep_func_nb, (),
-    ...     order_func_nb, (order_size, order_price),
-    ...     empty_after_order_func_nb, ()
+    ...     init_cash, cash_sharing, call_seq, segment_mask,
+    ...     order_func_nb=order_func_nb,
+    ...     order_args=(order_size, order_price)
     ... )
 
     >>> col_map = col_map_nb(order_records['col'], target_shape[1])

@@ -27,7 +27,7 @@ __all__ = [
     'RowContext',
     'SegmentContext',
     'OrderContext',
-    'AfterOrderContext',
+    'PostOrderContext',
     'Order',
     'NoOrder',
     'OrderResult',
@@ -143,30 +143,30 @@ Attributes:
     Amount: Amount of assets to trade.
     Value: Asset value to trade.
     
-        Gets converted into `SizeType.Amount` using `val_price_now`.
+        Gets converted into `SizeType.Amount` using `OrderContext.val_price_now`.
     Percent: Percentage of available resources to use in either direction (not to be confused with 
         the percentage of position value!)
     
-        * When buying, it's the percentage of `cash_now`. 
-        * When selling, it's the percentage of `position_now`.
-        * When short selling, it's the percentage of `free_cash_now`.
+        * When buying, it's the percentage of `OrderContext.cash_now`. 
+        * When selling, it's the percentage of `OrderContext.position_now`.
+        * When short selling, it's the percentage of `OrderContext.free_cash_now`.
         * When selling and short selling (i.e. reversing position), it's the percentage of 
-        `position_now` and `free_cash_now`.
+        `OrderContext.position_now` and `OrderContext.free_cash_now`.
         
         !!! note
             Takes into account fees and slippage to find the limit.
             In reality, slippage and fees are not known beforehand.
     TargetAmount: Target amount of assets to hold (= target position).
     
-        Uses `position_now` to get the current position.
+        Uses `OrderContext.position_now` to get the current position.
         Gets converted into `SizeType.Amount`.
     TargetValue: Target asset value. 
 
-        Uses `val_price_now` to get the current asset value. 
+        Uses `OrderContext.val_price_now` to get the current asset value. 
         Gets converted into `SizeType.TargetAmount`.
     TargetPercent: Target percentage of total value. 
 
-        Uses `value_now` to get the current total value.
+        Uses `OrderContext.value_now` to get the current total value.
         Gets converted into `SizeType.TargetValue`.
 """
 
@@ -378,7 +378,7 @@ class SimulationContext(tp.NamedTuple):
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Array2d
-    active_mask: tp.Array2d
+    segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
@@ -389,15 +389,18 @@ class SimulationContext(tp.NamedTuple):
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
     last_oidx: tp.Array1d
     last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
 
 
 __pdoc__['SimulationContext'] = """A named tuple representing the context of a simulation.
 
 Contains general information available to all other contexts.
 
-Passed to `prep_func_nb`."""
+Passed to `pre_sim_func_nb` and `post_sim_func_nb`."""
 __pdoc__['SimulationContext.target_shape'] = """Target shape of the simulation.
 
 A tuple with exactly two elements: the number of rows and columns.
@@ -409,7 +412,7 @@ where the first axis are rows (minutes) and the second axis are columns (assets)
 """
 __pdoc__['SimulationContext.close'] = """Last asset price at each time step.
 
-Has shape `target_shape`.
+Has shape `SimulationContext.target_shape`.
 """
 __pdoc__['SimulationContext.group_lens'] = """Number of columns per each group.
 
@@ -422,7 +425,8 @@ columns would require `group_lens` of `np.array([1, 1, 1])`.
 """
 __pdoc__['SimulationContext.init_cash'] = """Initial capital per column or group with cash sharing.
 
-If `cash_sharing`, has shape `(group_lens.shape[0],)`, otherwise has shape `(target_shape[1],)`.
+If `SimulationContext.cash_sharing`, has shape `(group_lens.shape[0],)`, 
+otherwise has shape `(target_shape[1],)`.
 
 ## Example
 
@@ -435,10 +439,10 @@ __pdoc__['SimulationContext.call_seq'] = """Default sequence of calls per segmen
 
 Controls the sequence in which `order_func_nb` is executed within each segment.
 
-Has shape `target_shape` and each value must exist in the range `[0, group_len)`.
+Has shape `SimulationContext.target_shape` and each value must exist in the range `[0, group_len)`.
 
 !!! note
-    To change the call sequence dynamically, better change `call_seq_now` in-place.
+    To change the call sequence dynamically, better change `SegmentContext.call_seq_now` in-place.
     
 ## Example
 
@@ -452,11 +456,12 @@ np.array([
 ])
 ```
 """
-__pdoc__['SimulationContext.active_mask'] = """Mask of whether a particular segment is executed.
+__pdoc__['SimulationContext.segment_mask'] = """Mask of whether order functions of a particular segment 
+should be executed.
 
-A segment is simply a sequence of `order_func_nb` calls within a group and row.
-If a segment is not active, `segment_prep_func_nb`, `order_prep_func_nb` and `after_order_prep_func_nb`
-are not executed for this group and row.
+A segment is simply a sequence of `order_func_nb` calls under the same group and row.
+
+The segment pre- and postprocessing functions are executed regardless of the mask.
 
 You can change this mask in-place to dynamically disable future segments.
 
@@ -467,8 +472,8 @@ Has shape `(target_shape[0], group_lens.shape[0])`.
 Consider two groups with two columns each and the following activity mask:
 
 ```python
-array([[ True, False],
-       [False,  True]])
+np.array([[ True, False], 
+          [False,  True]])
 ```
 
 Only the first group is executed in the first row and only the second group is executed
@@ -476,7 +481,7 @@ in the second row.
 """
 __pdoc__['SimulationContext.ffill_val_price'] = """Whether to track valuation price only if it's known.
 
-Otherwise, unknown `close` will lead to NaN in valuation price at the next timestamp."""
+Otherwise, unknown `SimulationContext.close` will lead to NaN in valuation price at the next timestamp."""
 __pdoc__['SimulationContext.update_value'] = "Whether to update group value after each filled order."
 __pdoc__['SimulationContext.order_records'] = """Order records.
 
@@ -487,30 +492,28 @@ gradually filled with order data. The number of initialized records depends upon
 but usually it's `target_shape[0] * target_shape[1]`, meaning there is maximal one order record per element.
 `max_orders` can be chosen lower if not every `order_func_nb` leads to a filled order, to save memory.
 
-You can use `last_oidx` to get the index of the last filled order of each column.
+You can use `SimulationContext.last_oidx` to get the index of the last filled order of each column.
 
 ## Example
 
 Before filling, each order record looks like this:
 
 ```python
-array([(-8070450532247928832, -8070450532247928832, 4, 0., 0., 0., 5764616306889786413)]
+np.array([(-8070450532247928832, -8070450532247928832, 4, 0., 0., 0., 5764616306889786413)]
 ```
 
 After filling, it becomes like this:
 
 ```python
-array([(0, 0, 1, 50., 1., 0., 1)]
+np.array([(0, 0, 1, 50., 1., 0., 1)]
 ```
 """
 __pdoc__['SimulationContext.log_records'] = """Log records.
 
-Similar to `SimulationContext.order_records` but of type `log_dt` and index `last_lidx`."""
+Similar to `SimulationContext.order_records` but of type `log_dt` and index `SimulationContext.last_lidx`."""
 __pdoc__['SimulationContext.last_cash'] = """Last cash per column or group with cash sharing.
 
-Has the same shape as `init_cash`.
-
-In `order_func_nb` and `after_order_func_nb`, has the same value as `cash_now`.
+Has the same shape as `SimulationContext.init_cash`.
 
 Gets updated right after `order_func_nb`.
 """
@@ -518,13 +521,11 @@ __pdoc__['SimulationContext.last_position'] = """Last position per column.
 
 Has shape `(target_shape[1],)`.
 
-In `order_func_nb` and `after_order_func_nb`, has the same value as `position_now`.
-
 Gets updated right after `order_func_nb`.
 """
 __pdoc__['SimulationContext.last_debt'] = """Last debt from shorting per column.
 
-Debt is the total value from shorting that hasn't been covered yet. Used to update `free_cash_now`.
+Debt is the total value from shorting that hasn't been covered yet. Used to update `OrderContext.free_cash_now`.
 
 Has shape `(target_shape[1],)`. 
 
@@ -542,41 +543,67 @@ __pdoc__['SimulationContext.last_val_price'] = """Last valuation price per colum
 
 Has shape `(target_shape[1],)`.
 
-Enables `SizeType.TargetValue` and `SizeType.TargetPercent`.
+Enables `SizeType.Value`, `SizeType.TargetValue`, and `SizeType.TargetPercent`.
 
-Gets multiplied by the current position to get the value of the column.
-The value of each column in a group with cash sharing is summed to get the value of the entire group.
+Gets multiplied by the current position to get the value of the column (see `SimulationContext.last_value`).
 
-Defaults to the previous `close` right before `segment_prep_func_nb`, but only if it's not NaN.
+Defaults to the `SimulationContext.close` before `post_segment_func_nb`.
+If `SimulationContext.ffill_val_price`, gets updated only if `SimulationContext.close` is not NaN.
 For example, close of `[1, 2, np.nan, np.nan, 5]` yields valuation price of `[1, 2, 2, 2, 5]`.
 
-You can use `segment_prep_func_nb` to override `last_val_price` in-place.
-You are not allowed to use `-np.inf` or `np.inf`.
-The valuation then happens right after `segment_prep_func_nb`.
-If `update_value`, gets also updated right after `order_func_nb`.
+Also gets updated right after `pre_segment_func_nb` - you can use `pre_segment_func_nb` to
+override `last_val_price` in-place, such that `order_func_nb` can use the new group value. 
+You are not allowed to use `-np.inf` or `np.inf` - only finite values.
+If `SimulationContext.update_value`, gets also updated right after `order_func_nb` using 
+filled order price as the latest known price.
 
 !!! note
-    Since the previous `close` is NaN in the first row, the first `last_val_price` is also NaN.
+    Since the previous `SimulationContext.close` is NaN in the first row, the first `last_val_price` is also NaN.
+    
+    Overriding `last_val_price` with NaN won't apply `SimulationContext.ffill_val_price`,
+    so your entire group will become NaN.
 
 ## Example
 
 Consider 10 units in column 1 and 20 units in column 2. The previous close of them is
 $40 and $50 respectively, which is also the default valuation price in the current row,
-available as `last_val_price` in `segment_prep_func_nb`. If both columns are in the same group 
+available as `last_val_price` in `pre_segment_func_nb`. If both columns are in the same group 
 with cash sharing, the group is valued at $1400 before any `order_func_nb` is called, and can 
 be later accessed via `OrderContext.value_now`.
 
 """
 __pdoc__['SimulationContext.last_value'] = """Last value per column or group with cash sharing.
 
-Has the same shape as `init_cash`.
+Has the same shape as `SimulationContext.init_cash`.
 
-Gets updated using `last_val_price` right after `segment_prep_func_nb`.
-If `update_value`, gets also updated right after `order_func_nb`.
+Calculated by multiplying valuation price by the current position.
+The value of each column in a group with cash sharing is summed to get the value of the entire group.
+
+Gets updated using `SimulationContext.last_val_price` after `pre_segment_func_nb` and 
+before `post_segment_func_nb`. If `SimulationContext.update_value`, gets also updated right after 
+`order_func_nb` using filled order price as the latest known price (the difference will be minimal, 
+only affected by costs).
+"""
+__pdoc__['SimulationContext.second_last_value'] = """Second-last value per column or group with cash sharing.
+
+Has the same shape as `SimulationContext.last_value`.
+
+Contains the latest known value two rows before (`i - 2`) to be compared either with the latest known value 
+one row before (`i - 1`) or now (`i`).
+
+Gets updated at the end of each segment/row. 
+"""
+__pdoc__['SimulationContext.last_return'] = """Last return per column or group with cash sharing.
+
+Has the same shape as `SimulationContext.last_value`.
+
+Calculated by comparing `SimulationContext.last_value` to `SimulationContext.second_last_value`.
+
+Gets updated each time `SimulationContext.last_value` is updated.
 """
 __pdoc__['SimulationContext.last_oidx'] = """Index of the last order record of each column.
 
-Points to `order_records` and has shape `(target_shape[1],)`.
+Points to `SimulationContext.order_records` and has shape `(target_shape[1],)`.
 
 ## Example
 
@@ -586,7 +613,69 @@ for the third column.
 """
 __pdoc__['SimulationContext.last_lidx'] = """Index of the last log record of each column.
 
-Similar to `last_oidx` but for log records.
+Similar to `SimulationContext.last_oidx` but for log records.
+"""
+__pdoc__['SimulationContext.last_pos_record'] = """Last position record of each column.
+
+It's a 1-dimensional array with records of type `position_dt`.
+
+Has shape `(target_shape[1],)`.
+
+The array is initialized with empty records first (they contain random data)
+and the field `id` is set to -1. Once the first position is entered in a column,
+the `id` becomes 0 and the record materializes. Once the position is closed, the record
+fixes its identifier and other data until the next position is entered. 
+
+The fields `entry_price` and `exit_price` are average entry and exit price respectively.
+The fields `pnl` and `return` contain statistics as if the position has been closed and are 
+re-calculated using `SimulationContext.last_val_price` after `pre_segment_func_nb` 
+(in case `SimulationContext.last_val_price` has been overridden) and before `post_segment_func_nb`.
+
+!!! note
+    In an open position record, the field `exit_price` doesn't reflect the latest valuation price,
+    but keeps the average price at which the position has been reduced.
+
+The position record is updated after successfully filling an order (after `order_func_nb` and
+before `post_order_func_nb`).
+
+## Example
+
+Consider a simulation that orders `order_size` for `order_price` and $1 fixed fees.
+Here's order info from `order_func_nb` and the updated position info from `post_order_func_nb`:
+
+```plaintext
+    order_size  order_price  id  col  size  entry_idx  entry_price  \\
+0          NaN            1  -1    0   1.0         13    14.000000   
+1          0.5            2   0    0   0.5          1     2.000000   
+2          1.0            3   0    0   1.5          1     2.666667   
+3          NaN            4   0    0   1.5          1     2.666667   
+4         -1.0            5   0    0   1.5          1     2.666667   
+5         -0.5            6   0    0   1.5          1     2.666667   
+6          NaN            7   0    0   1.5          1     2.666667   
+7         -0.5            8   1    0   0.5          7     8.000000   
+8         -1.0            9   1    0   1.5          7     8.666667   
+9          1.0           10   1    0   1.5          7     8.666667   
+10         0.5           11   1    0   1.5          7     8.666667   
+11         1.0           12   2    0   1.0         11    12.000000   
+12        -2.0           13   3    0   1.0         12    13.000000   
+13         2.0           14   4    0   1.0         13    14.000000   
+
+    entry_fees  exit_idx  exit_price  exit_fees   pnl    return  direction  status
+0          0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
+1          1.0        -1         NaN        0.0 -1.00 -1.000000          0       0
+2          2.0        -1         NaN        0.0 -1.50 -0.375000          0       0
+3          2.0        -1         NaN        0.0 -0.75 -0.187500          0       0
+4          2.0        -1    5.000000        1.0  0.50  0.125000          0       0
+5          2.0         5    5.333333        2.0  0.00  0.000000          0       1
+6          2.0         5    5.333333        2.0  0.00  0.000000          0       1
+7          1.0        -1         NaN        0.0 -1.00 -0.250000          1       0
+8          2.0        -1         NaN        0.0 -2.50 -0.192308          1       0
+9          2.0        -1   10.000000        1.0 -5.00 -0.384615          1       0
+10         2.0        10   10.333333        2.0 -6.50 -0.500000          1       1
+11         1.0        -1         NaN        0.0 -1.00 -0.083333          0       0
+12         0.5        -1         NaN        0.0 -0.50 -0.038462          1       0
+13         0.5        -1         NaN        0.0 -0.50 -0.035714          0       0
+```
 """
 
 
@@ -597,7 +686,7 @@ class GroupContext(tp.NamedTuple):
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Array2d
-    active_mask: tp.Array2d
+    segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
@@ -608,8 +697,11 @@ class GroupContext(tp.NamedTuple):
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
     last_oidx: tp.Array1d
     last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -623,7 +715,7 @@ In each row, the columns under the same group are bound to the same segment.
 
 Contains all fields from `SimulationContext` plus fields describing the current group.
 
-Passed to `group_prep_func_nb`.
+Passed to `pre_group_func_nb` and `post_group_func_nb`.
 
 ## Example
 
@@ -668,7 +760,7 @@ class RowContext(tp.NamedTuple):
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Array2d
-    active_mask: tp.Array2d
+    segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
@@ -679,8 +771,11 @@ class RowContext(tp.NamedTuple):
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
     last_oidx: tp.Array1d
     last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
     i: int
 
 
@@ -690,7 +785,7 @@ A row is a time step in which segments are executed.
 
 Contains all fields from `SimulationContext` plus fields describing the current row.
 
-Passed to `row_prep_func_nb`.
+Passed to `pre_row_func_nb` and `post_row_func_nb`.
 """
 for field in RowContext._fields:
     if field in SimulationContext._fields:
@@ -708,7 +803,7 @@ class SegmentContext(tp.NamedTuple):
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Array2d
-    active_mask: tp.Array2d
+    segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
@@ -719,8 +814,11 @@ class SegmentContext(tp.NamedTuple):
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
     last_oidx: tp.Array1d
     last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -737,7 +835,7 @@ how and in which order elements within the same group and row are processed.
 Contains all fields from `SimulationContext`, `GroupContext`, and `RowContext`, plus fields 
 describing the current segment.
 
-Passed to `segment_prep_func_nb`.
+Passed to `pre_segment_func_nb` and `post_segment_func_nb`.
 """
 for field in SegmentContext._fields:
     if field in SimulationContext._fields:
@@ -753,7 +851,7 @@ Has shape `(group_len,)`.
 Each value in this sequence should indicate the position of column in the group to
 call next. Processing goes always from left to right.
 
-You can use `segment_prep_func_nb` to override `call_seq_now`.
+You can use `pre_segment_func_nb` to override `call_seq_now`.
     
 ## Example
 
@@ -768,7 +866,7 @@ class OrderContext(tp.NamedTuple):
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Array2d
-    active_mask: tp.Array2d
+    segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
@@ -779,8 +877,11 @@ class OrderContext(tp.NamedTuple):
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
     last_oidx: tp.Array1d
     last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -795,6 +896,8 @@ class OrderContext(tp.NamedTuple):
     free_cash_now: float
     val_price_now: float
     value_now: float
+    return_now: float
+    pos_record_now: tp.Record
 
 
 __pdoc__['OrderContext'] = """A named tuple representing the context of an order.
@@ -816,44 +919,28 @@ __pdoc__['OrderContext.col'] = """Current column.
 
 Has range `[0, target_shape[1])` and is always within `[from_col, to_col)`.
 """
-__pdoc__['OrderContext.call_idx'] = """Index of the current call in `call_seq_now`.
+__pdoc__['OrderContext.call_idx'] = """Index of the current call in `SegmentContext.call_seq_now`.
 
 Has range `[0, group_len)`.
 """
-__pdoc__['OrderContext.cash_now'] = """Cash in the current column or group with cash sharing.
-
-Scalar value. Has the same value as `last_cash` for the current column/group.
-"""
-__pdoc__['OrderContext.position_now'] = """Position in the current column.
-
-Scalar value. Has the same value as `last_position` for the current column.
-"""
-__pdoc__['OrderContext.debt_now'] = """Debt from shorting in the current column.
-
-Scalar value. Has the same value as `last_debt` for the current column.
-"""
-__pdoc__['OrderContext.free_cash_now'] = """Free cash in the current column or group with cash sharing.
-
-Scalar value. Has the same value as `last_free_cash` for the current column/group.
-"""
-__pdoc__['OrderContext.val_price_now'] = """Valuation price in the current column.
-
-Scalar value. Has the same value as `last_val_price` for the current column.
-"""
-__pdoc__['OrderContext.value_now'] = """Value in the current column or group with cash sharing.
-
-Scalar value. Has the same value as `last_value` for the current column/group.
-"""
+__pdoc__['OrderContext.cash_now'] = "`SimulationContext.last_cash` for the current column/group."
+__pdoc__['OrderContext.position_now'] = "`SimulationContext.last_position` for the current column."
+__pdoc__['OrderContext.debt_now'] = "`SimulationContext.last_debt` for the current column."
+__pdoc__['OrderContext.free_cash_now'] = "`SimulationContext.last_free_cash` for the current column/group."
+__pdoc__['OrderContext.val_price_now'] = "`SimulationContext.last_val_price` for the current column."
+__pdoc__['OrderContext.value_now'] = "`SimulationContext.last_value` for the current column/group."
+__pdoc__['OrderContext.return_now'] = "`SimulationContext.last_return` for the current column/group."
+__pdoc__['OrderContext.pos_record_now'] = "`SimulationContext.last_pos_record` for the current column."
 
 
-class AfterOrderContext(tp.NamedTuple):
+class PostOrderContext(tp.NamedTuple):
     target_shape: tp.Shape
     close: tp.Array2d
     group_lens: tp.Array1d
     init_cash: tp.Array1d
     cash_sharing: bool
     call_seq: tp.Array2d
-    active_mask: tp.Array2d
+    segment_mask: tp.Array2d
     ffill_val_price: bool
     update_value: bool
     order_records: tp.RecordArray
@@ -864,8 +951,11 @@ class AfterOrderContext(tp.NamedTuple):
     last_free_cash: tp.Array1d
     last_val_price: tp.Array1d
     last_value: tp.Array1d
+    second_last_value: tp.Array1d
+    last_return: tp.Array1d
     last_oidx: tp.Array1d
     last_lidx: tp.Array1d
+    last_pos_record: tp.RecordArray
     group: int
     group_len: int
     from_col: int
@@ -887,46 +977,52 @@ class AfterOrderContext(tp.NamedTuple):
     free_cash_now: float
     val_price_now: float
     value_now: float
+    return_now: float
+    pos_record_now: tp.Record
 
 
-__pdoc__['AfterOrderContext'] = """A named tuple representing the context of an order.
+__pdoc__['PostOrderContext'] = """A named tuple representing the context after an order has been processed.
 
 Contains all fields from `OrderContext` plus fields describing the order result and the previous state.
 
-Passed to `after_order_func_nb`.
+Passed to `post_order_func_nb`.
 """
-for field in AfterOrderContext._fields:
+for field in PostOrderContext._fields:
     if field in SimulationContext._fields:
-        __pdoc__['AfterOrderContext.' + field] = f"See `SimulationContext.{field}`."
+        __pdoc__['PostOrderContext.' + field] = f"See `SimulationContext.{field}`."
     elif field in GroupContext._fields:
-        __pdoc__['AfterOrderContext.' + field] = f"See `GroupContext.{field}`."
+        __pdoc__['PostOrderContext.' + field] = f"See `GroupContext.{field}`."
     elif field in RowContext._fields:
-        __pdoc__['AfterOrderContext.' + field] = f"See `RowContext.{field}`."
+        __pdoc__['PostOrderContext.' + field] = f"See `RowContext.{field}`."
     elif field in SegmentContext._fields:
-        __pdoc__['AfterOrderContext.' + field] = f"See `SegmentContext.{field}`."
+        __pdoc__['PostOrderContext.' + field] = f"See `SegmentContext.{field}`."
     elif field in OrderContext._fields:
-        __pdoc__['AfterOrderContext.' + field] = f"See `OrderContext.{field}`."
-__pdoc__['AfterOrderContext.cash_before'] = "`OrderContext.cash_now` before execution."
-__pdoc__['AfterOrderContext.position_before'] = "`OrderContext.position_now` before execution."
-__pdoc__['AfterOrderContext.debt_before'] = "`OrderContext.debt_now` before execution."
-__pdoc__['AfterOrderContext.free_cash_before'] = "`OrderContext.free_cash_now` before execution."
-__pdoc__['AfterOrderContext.val_price_before'] = "`OrderContext.val_price_now` before execution."
-__pdoc__['AfterOrderContext.value_before'] = "`OrderContext.value_now` before execution."
-__pdoc__['AfterOrderContext.order_result'] = """Order result of type `OrderResult`.
+        __pdoc__['PostOrderContext.' + field] = f"See `OrderContext.{field}`."
+__pdoc__['PostOrderContext.cash_before'] = "`OrderContext.cash_now` before execution."
+__pdoc__['PostOrderContext.position_before'] = "`OrderContext.position_now` before execution."
+__pdoc__['PostOrderContext.debt_before'] = "`OrderContext.debt_now` before execution."
+__pdoc__['PostOrderContext.free_cash_before'] = "`OrderContext.free_cash_now` before execution."
+__pdoc__['PostOrderContext.val_price_before'] = "`OrderContext.val_price_now` before execution."
+__pdoc__['PostOrderContext.value_before'] = "`OrderContext.value_now` before execution."
+__pdoc__['PostOrderContext.order_result'] = """Order result of type `OrderResult`.
 
 Can be used to check whether the order has been filled, ignored, or rejected.
 """
-__pdoc__['AfterOrderContext.cash_now'] = "`OrderContext.cash_now` after execution."
-__pdoc__['AfterOrderContext.position_now'] = "`OrderContext.position_now` after execution."
-__pdoc__['AfterOrderContext.val_price_now'] = """`OrderContext.val_price_now` after execution.
+__pdoc__['PostOrderContext.cash_now'] = "`OrderContext.cash_now` after execution."
+__pdoc__['PostOrderContext.position_now'] = "`OrderContext.position_now` after execution."
+__pdoc__['PostOrderContext.debt_now'] = "`OrderContext.debt_now` after execution."
+__pdoc__['PostOrderContext.free_cash_now'] = "`OrderContext.free_cash_now` after execution."
+__pdoc__['PostOrderContext.val_price_now'] = """`OrderContext.val_price_now` after execution.
 
-If `update_value`, gets replaced with the fill price, as it becomes the most recently known price.
-Otherwise, stays the same.
+If `SimulationContext.update_value`, gets replaced with the fill price, 
+as it becomes the most recently known price. Otherwise, stays the same.
 """
-__pdoc__['AfterOrderContext.value_now'] = """`OrderContext.value_now` after execution.
+__pdoc__['PostOrderContext.value_now'] = """`OrderContext.value_now` after execution.
 
-If `update_value`, gets updated with the new cash and value of the column. Otherwise, stays the same.
+If `SimulationContext.update_value`, gets updated with the new cash and value of the column. Otherwise, stays the same.
 """
+__pdoc__['PostOrderContext.return_now'] = "`OrderContext.return_now` after execution."
+__pdoc__['PostOrderContext.pos_record_now'] = "`OrderContext.pos_record_now` after execution."
 
 
 class Order(tp.NamedTuple):
