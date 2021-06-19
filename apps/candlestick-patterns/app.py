@@ -27,8 +27,8 @@ from talib._ta_lib import (
     _ta_set_candle_settings
 )
 import vectorbt as vbt
+from vectorbt import settings
 from vectorbt.utils.config import merge_dicts
-from vectorbt.settings import color_schema
 from vectorbt.utils.colors import adjust_opacity
 
 USE_CACHING = os.environ.get(
@@ -82,8 +82,9 @@ plot_types = ['OHLC', 'Candlestick']
 subplots = OrderedDict([(k, v['title']) for k, v in vbt.Portfolio.subplot_settings.items()])
 
 # Colors
-bgcolor = "#1f2536"
-dark_bgcolor = "#171b26"
+color_schema = settings['plotting']['color_schema']
+bgcolor = "#272a32"
+dark_bgcolor = "#1d2026"
 fontcolor = "#9fa6b7"
 dark_fontcolor = "#7b7d8d"
 gridcolor = "#323b56"
@@ -1155,13 +1156,13 @@ def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, e
                 height=max(500, height),
                 margin=dict(r=40),
                 hovermode="closest",
-                xaxis=dict(
+                xaxis2=dict(
                     title='Date'
                 ),
-                yaxis=dict(
+                yaxis2=dict(
                     title='Volume'
                 ),
-                yaxis2=dict(
+                yaxis=dict(
                     title='Price',
                 )
             )
@@ -1172,10 +1173,9 @@ def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, e
         trace_kwargs=dict(
             customdata=entry_patterns[:, None],
             hovertemplate='%{x}<br>%{customdata[0]}',
-            yaxis="y2",
-            xaxis="x",
             name='Bullish signal'
         ),
+        add_trace_kwargs=dict(row=1, col=1),
         fig=fig
     )
     exit_signals.vbt.signals.plot_as_exit_markers(
@@ -1183,10 +1183,9 @@ def update_ohlcv(window_width, plot_type, df_json, date_range, entry_patterns, e
         trace_kwargs=dict(
             customdata=exit_patterns[:, None],
             hovertemplate='%{x}<br>%{customdata[0]}',
-            yaxis="y2",
-            xaxis="x",
             name='Bearish signal'
         ),
+        add_trace_kwargs=dict(row=1, col=1),
         fig=fig
     )
     fig.update_xaxes(gridcolor=gridcolor)

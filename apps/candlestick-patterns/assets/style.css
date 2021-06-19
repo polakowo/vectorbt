@@ -1,3 +1,13 @@
+:root {
+    --bgcolor: #272a32;
+    --dark_bgcolor: #1d2026;
+    --fontcolor: #9fa6b7;
+    --dark_fontcolor: #7b7d8d;
+    --gridcolor: #323b56;
+    --loadcolor: #387c9e;
+    --active_color: #88ccee;
+}
+
 .container.scalable {
     width: 100%;
     max-width: none;
@@ -10,22 +20,22 @@
 }
 
 body {
-    background-color: #171b26;
-    color: #9fa6b7;
+    background-color: var(--dark_bgcolor);
+    color: var(--fontcolor);
     overflow-x: hidden;
     padding: 15px 30px;
     margin: 0px;
 }
 
 button, .button {
-    background-color: #171b26 !important;
-    color: #7b7d8d !important;
+    background-color: var(--dark_bgcolor) !important;
+    color: var(--dark_fontcolor) !important;
     border: 1px solid dimgrey !important;
 }
 
 button:hover, .button:hover {
-    color: #88ccee !important;
-    border: 1px solid #88ccee !important;
+    color: var(--active_color) !important;
+    border: 1px solid var(--active_color) !important;
 }
 
 .banner {
@@ -69,8 +79,8 @@ Select--single,
 .Select-multi-value-wrapper,
 .Select-input input,
 .input-control {
-    background-color: #171b26 !important;
-    color: #7b7d8d !important;
+    background-color: var(--dark_bgcolor) !important;
+    color: var(--dark_fontcolor) !important;
 }
 
 .Select-control,
@@ -79,18 +89,18 @@ Select--single,
 }
 
 .Select.is-focused .Select-input input {
-    color: #88ccee !important;
+    color: var(--active_color) !important;
 }
 
 .Select.is-focused .Select-value .Select-value-label {
-    color: #88ccee !important;
+    color: var(--active_color) !important;
 }
 
 .Select-menu-outer,
 .Select.is-focused .Select-control,
 .input-control:focus {
-    color: #88ccee !important;
-    border: 1px solid #88ccee !important;
+    color: var(--active_color) !important;
+    border: 1px solid var(--active_color) !important;
 }
 
 .input-control {
@@ -105,17 +115,17 @@ span.Select-clear-zone {
 .Select-menu-outer,
 .Select-menu-outer div,
 .Select--multi {
-    background-color: #171b26 !important;
-    color: #7b7d8d !important;
+    background-color: var(--dark_bgcolor) !important;
+    color: var(--dark_fontcolor) !important;
 }
 
 .Select-menu-outer div:hover {
-    color: #88ccee !important;
+    color: var(--active_color) !important;
     cursor: pointer;
 }
 
 label, small {
-    color: #7b7d8d;
+    color: var(--dark_fontcolor);
 }
 
 .control-outer {
@@ -147,13 +157,13 @@ label, small {
 .pretty-container {
     margin: 15px 0px;
     padding: 25px;
-    background-color: #1f2536;
+    background-color: var(--bgcolor);
     border-radius: 5px;
     box-shadow: 0 10px 20px rgba(0,0,0,0.19), 0 6px 6px rgba(0,0,0,0.23);
 }
 
 #yfinance_checklist {
-    color: #7b7d8d;
+    color: var(--dark_fontcolor);
 }
 
 .rc-slider {
@@ -161,16 +171,16 @@ label, small {
 }
 
 .rc-slider-rail {
-    background-color: #171b26 !important
+    background-color: var(--dark_bgcolor) !important
 }
 
 .rc-slider-track {
-    background-color: #387c9e !important
+    background-color: var(--loadcolor) !important
 }
 
 .rc-slider-dot-active, .rc-slider-handle {
-    border-color: #88ccee !important;
-    background-color: #88ccee;
+    border-color: var(--active_color) !important;
+    background-color: var(--active_color);
 }
 
 .rc-slider-handle {
@@ -183,7 +193,7 @@ label, small {
 
 .dash-cell.column-2 .input-active,
 .dash-cell.column-3 .input-active {
-    color: #88ccee !important;
+    color: var(--active_color) !important;
 }
 
 .dash-spreadsheet-inner .row {
