@@ -12,6 +12,10 @@ __all__ = [
     'InitCashMode',
     'CallSeqType',
     'ConflictMode',
+    'StopEntryPrice',
+    'StopExitPrice',
+    'StopExitMode',
+    'StopUpdateMode',
     'SizeType',
     'Direction',
     'OrderStatus',
@@ -52,11 +56,11 @@ class RejectedOrderError(Exception):
 
 
 class InitCashModeT(tp.NamedTuple):
-    Auto: int
-    AutoAlign: int
+    Auto: int = 0
+    AutoAlign: int = 1
 
 
-InitCashMode = InitCashModeT(*range(2))
+InitCashMode = InitCashModeT()
 """_"""
 
 __pdoc__['InitCashMode'] = f"""Initial cash mode.
@@ -72,13 +76,13 @@ Attributes:
 
 
 class CallSeqTypeT(tp.NamedTuple):
-    Default: int
-    Reversed: int
-    Random: int
-    Auto: int
+    Default: int = 0
+    Reversed: int = 1
+    Random: int = 2
+    Auto: int = 3
 
 
-CallSeqType = CallSeqTypeT(*range(4))
+CallSeqType = CallSeqTypeT()
 """_"""
 
 __pdoc__['CallSeqType'] = f"""Call sequence type.
@@ -96,13 +100,13 @@ Attributes:
 
 
 class ConflictModeT(tp.NamedTuple):
-    Ignore: int
-    Entry: int
-    Exit: int
-    Opposite: int
+    Ignore: int = 0
+    Entry: int = 1
+    Exit: int = 2
+    Opposite: int = 3
 
 
-ConflictMode = ConflictModeT(*range(4))
+ConflictMode = ConflictModeT()
 """_"""
 
 __pdoc__['ConflictMode'] = f"""Conflict mode.
@@ -121,16 +125,128 @@ Attributes:
 """
 
 
+class StopEntryPriceT(tp.NamedTuple):
+    ValPrice: int = 0
+    Price: int = 1
+    FillPrice: int = 2
+    Close: int = 3
+
+
+StopEntryPrice = StopEntryPriceT()
+"""_"""
+
+__pdoc__['StopEntryPrice'] = f"""Stop entry price.
+
+```json
+{to_doc(StopEntryPrice)}
+```
+
+Which price to use as an initial stop price?
+
+Attributes:
+    ValPrice: Asset valuation price.
+    Price: Default price.
+    FillPrice: Fill price (that is, slippage is already applied).
+    Close: Closing price.
+"""
+
+
+class StopExitPriceT(tp.NamedTuple):
+    StopLimit: int = 0
+    StopMarket: int = 1
+    Price: int = 2
+    Close: int = 3
+
+
+StopExitPrice = StopExitPriceT()
+"""_"""
+
+__pdoc__['StopExitPrice'] = f"""Stop exit price.
+
+```json
+{to_doc(StopExitPrice)}
+```
+
+Which price to use when exiting a position upon a stop signal?
+
+Attributes:
+    StopLimit: Stop price as from a limit order.
+    
+        If the stop was hit before, it becomes the opening price.
+        User-defined slippage is not applied.
+    StopMarket: Stop price as from a market order.
+    
+        If the stop was hit before, it becomes the opening price.
+        User-defined slippage is applied.
+    Price: Default price.
+                
+        User-defined slippage is applied.
+    
+        !!! warning
+            Make sure to use `StopExitPrice.Price` only together with `StopEntryPrice.Close`.
+            Otherwise, there is no proof that the price comes after the stop price.
+    Close: Closing price.
+    
+        User-defined slippage is applied.
+"""
+
+
+class StopExitModeT(tp.NamedTuple):
+    Close: int = 0
+    Exit: int = 1
+
+
+StopExitMode = StopExitModeT()
+"""_"""
+
+__pdoc__['StopExitMode'] = f"""Stop exit mode.
+
+```json
+{to_doc(StopExitMode)}
+```
+
+How to exit the current position upon a stop signal?
+
+Attributes:
+    Close: Close the position (regardless of accumulation or direction).
+    Exit: Handle as an exit signal.
+"""
+
+
+class StopUpdateModeT(tp.NamedTuple):
+    Keep: int = 0
+    Override: int = 1
+    OverrideNaN: int = 2
+
+
+StopUpdateMode = StopUpdateModeT()
+"""_"""
+
+__pdoc__['StopUpdateMode'] = f"""Stop update mode.
+
+```json
+{to_doc(StopUpdateMode)}
+```
+
+What to do with the old stop upon new acquisition? 
+
+Attributes:
+    Keep: Keep the old stop.
+    Override: Override the old stop, but only if the new stop is not NaN.
+    OverrideNaN: Override the old stop, even if the new stop is NaN.
+"""
+
+
 class SizeTypeT(tp.NamedTuple):
-    Amount: int
-    Value: int
-    Percent: int
-    TargetAmount: int
-    TargetValue: int
-    TargetPercent: int
+    Amount: int = 0
+    Value: int = 1
+    Percent: int = 2
+    TargetAmount: int = 3
+    TargetValue: int = 4
+    TargetPercent: int = 5
 
 
-SizeType = SizeTypeT(*range(6))
+SizeType = SizeTypeT()
 """_"""
 
 __pdoc__['SizeType'] = f"""Size type.
@@ -172,12 +288,12 @@ Attributes:
 
 
 class DirectionT(tp.NamedTuple):
-    LongOnly: int
-    ShortOnly: int
-    All: int
+    LongOnly: int = 0
+    ShortOnly: int = 1
+    All: int = 2
 
 
-Direction = DirectionT(*range(3))
+Direction = DirectionT()
 """_"""
 
 __pdoc__['Direction'] = f"""Position direction.
@@ -194,12 +310,12 @@ Attributes:
 
 
 class OrderStatusT(tp.NamedTuple):
-    Filled: int
-    Ignored: int
-    Rejected: int
+    Filled: int = 0
+    Ignored: int = 1
+    Rejected: int = 2
 
 
-OrderStatus = OrderStatusT(*range(3))
+OrderStatus = OrderStatusT()
 """_"""
 
 __pdoc__['OrderStatus'] = f"""Order status.
@@ -216,11 +332,11 @@ Attributes:
 
 
 class OrderSideT(tp.NamedTuple):
-    Buy: int
-    Sell: int
+    Buy: int = 0
+    Sell: int = 1
 
 
-OrderSide = OrderSideT(*range(2))
+OrderSide = OrderSideT()
 """_"""
 
 __pdoc__['OrderSide'] = f"""Order side.
@@ -232,23 +348,23 @@ __pdoc__['OrderSide'] = f"""Order side.
 
 
 class StatusInfoT(tp.NamedTuple):
-    SizeNaN: int
-    PriceNaN: int
-    ValPriceNaN: int
-    ValueNaN: int
-    ValueZeroNeg: int
-    SizeZero: int
-    NoCashShort: int
-    NoCashLong: int
-    NoOpenPosition: int
-    MaxSizeExceeded: int
-    RandomEvent: int
-    CantCoverFees: int
-    MinSizeNotReached: int
-    PartialFill: int
+    SizeNaN: int = 0
+    PriceNaN: int = 1
+    ValPriceNaN: int = 2
+    ValueNaN: int = 3
+    ValueZeroNeg: int = 4
+    SizeZero: int = 5
+    NoCashShort: int = 6
+    NoCashLong: int = 7
+    NoOpenPosition: int = 8
+    MaxSizeExceeded: int = 9
+    RandomEvent: int = 10
+    CantCoverFees: int = 11
+    MinSizeNotReached: int = 12
+    PartialFill: int = 13
 
 
-StatusInfo = StatusInfoT(*range(14))
+StatusInfo = StatusInfoT()
 """_"""
 
 __pdoc__['StatusInfo'] = f"""Order status information.
@@ -285,11 +401,11 @@ __pdoc__['status_info_desc'] = f"""Order status description.
 
 
 class TradeDirectionT(tp.NamedTuple):
-    Long: int
-    Short: int
+    Long: int = 0
+    Short: int = 1
 
 
-TradeDirection = TradeDirectionT(*range(2))
+TradeDirection = TradeDirectionT()
 """_"""
 
 __pdoc__['TradeDirection'] = f"""Event direction.
@@ -301,11 +417,11 @@ __pdoc__['TradeDirection'] = f"""Event direction.
 
 
 class TradeStatusT(tp.NamedTuple):
-    Open: int
-    Closed: int
+    Open: int = 0
+    Closed: int = 1
 
 
-TradeStatus = TradeStatusT(*range(2))
+TradeStatus = TradeStatusT()
 """_"""
 
 __pdoc__['TradeStatus'] = f"""Event status.
@@ -317,11 +433,11 @@ __pdoc__['TradeStatus'] = f"""Event status.
 
 
 class TradeTypeT(tp.NamedTuple):
-    Trade: int
-    Position: int
+    Trade: int = 0
+    Position: int = 1
 
 
-TradeType = TradeTypeT(*range(2))
+TradeType = TradeTypeT()
 """_"""
 
 __pdoc__['TradeType'] = f"""Trade type.
@@ -1069,7 +1185,7 @@ __pdoc__['Order.price'] = """Price per unit.
 
 Final price will depend upon slippage.
 
-* If `-np.inf`, replaced by the previous close (~ the current open).
+* If `-np.inf`, replaced by the current open (if available) or the previous close (≈ the current open in crypto).
 * If `np.inf`, replaced by the current close.
 
 !!! note

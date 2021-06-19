@@ -2122,25 +2122,78 @@ Enum = namedtuple('Enum', ['Attr1', 'Attr2'])(*range(2))
 
 
 class TestEnum:
-    def test_get_caseins_enum_attr(self):
-        assert enum.get_caseins_enum_attr(Enum, 'Attr1') == 0
-        assert enum.get_caseins_enum_attr(Enum, 'attr1') == 0
-        assert enum.get_caseins_enum_attr(Enum, 'Attr2') == 1
-        assert enum.get_caseins_enum_attr(Enum, 'attr2') == 1
+    def test_enum_to_field_map(self):
+        assert enum.enum_to_field_map(Enum) == {None: -1, 'attr1': 0, 'attr2': 1}
+
+    def test_enum_to_value_map(self):
+        assert enum.enum_to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}
+
+    def test_cast_enum_value(self):
+        assert enum.cast_enum_value(0, Enum) == 0
+        assert enum.cast_enum_value(10, Enum) == 10
+        assert enum.cast_enum_value(10., Enum) == 10.
+        assert enum.cast_enum_value('Attr1', Enum) == 0
+        assert enum.cast_enum_value('attr1', Enum) == 0
+        assert enum.cast_enum_value(('attr1', 'attr2'), Enum) == (0, 1)
+        assert enum.cast_enum_value([['attr1', 'attr2']], Enum) == [[0, 1]]
+        np.testing.assert_array_equal(
+            enum.cast_enum_value(np.array([]), Enum),
+            np.array([])
+        )
+        np.testing.assert_array_equal(
+            enum.cast_enum_value(np.array([[0., 1.]]), Enum),
+            np.array([[0., 1.]])
+        )
+        np.testing.assert_array_equal(
+            enum.cast_enum_value(np.array([[0, 1]]), Enum),
+            np.array([[0, 1]])
+        )
+        np.testing.assert_array_equal(
+            enum.cast_enum_value(np.array([['attr1', 'attr2']]), Enum),
+            np.array([[0, 1]])
+        )
         with pytest.raises(Exception):
-            enum.get_caseins_enum_attr(Enum, 'Attr3')
-
-    def test_prepare_enum_value(self):
-        assert enum.prepare_enum_value(Enum, 0) == 0
-        assert enum.prepare_enum_value(Enum, 10) == 10
-        assert enum.prepare_enum_value(Enum, 10.) == 10.
-        assert enum.prepare_enum_value(Enum, 'Attr1') == 0
-        assert enum.prepare_enum_value(Enum, 'attr1') == 0
-        assert enum.prepare_enum_value(Enum, ('attr1', 'attr2')) == (0, 1)
-        assert enum.prepare_enum_value(Enum, [['attr1', 'attr2']]) == [[0, 1]]
-
-    def test_to_value_map(self):
-        assert enum.to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}
+            _ = enum.cast_enum_value(np.array([['attr1', 0]]), Enum)
+        pd.testing.assert_series_equal(
+            enum.cast_enum_value(pd.Series([]), Enum),
+            pd.Series([])
+        )
+        pd.testing.assert_series_equal(
+            enum.cast_enum_value(pd.Series([0., 1.]), Enum),
+            pd.Series([0., 1.])
+        )
+        pd.testing.assert_series_equal(
+            enum.cast_enum_value(pd.Series([0, 1]), Enum),
+            pd.Series([0, 1])
+        )
+        pd.testing.assert_series_equal(
+            enum.cast_enum_value(pd.Series(['attr1', 'attr2']), Enum),
+            pd.Series([0, 1])
+        )
+        pd.testing.assert_series_equal(
+            enum.cast_enum_value(pd.Series(['attr1', 0]), Enum),
+            pd.Series([0, 0])
+        )
+        pd.testing.assert_frame_equal(
+            enum.cast_enum_value(pd.DataFrame([]), Enum),
+            pd.DataFrame([])
+        )
+        pd.testing.assert_frame_equal(
+            enum.cast_enum_value(pd.DataFrame([[0., 1.]]), Enum),
+            pd.DataFrame([[0., 1.]])
+        )
+        pd.testing.assert_frame_equal(
+            enum.cast_enum_value(pd.DataFrame([[0, 1]]), Enum),
+            pd.DataFrame([[0, 1]])
+        )
+        pd.testing.assert_frame_equal(
+            enum.cast_enum_value(pd.DataFrame([['attr1', 'attr2']]), Enum),
+            pd.DataFrame([[0, 1]])
+        )
+        pd.testing.assert_frame_equal(
+            enum.cast_enum_value(pd.DataFrame([['attr1', 0]]), Enum),
+            pd.DataFrame([[0, 0]])
+        )
 
 
 # ############# params.py ############# #

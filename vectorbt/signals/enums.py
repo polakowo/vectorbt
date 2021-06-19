@@ -13,12 +13,12 @@ __pdoc__ = {}
 
 
 class StopTypeT(tp.NamedTuple):
-    StopLoss: int
-    TrailStop: int
-    TakeProfit: int
+    StopLoss: int = 0
+    TrailStop: int = 1
+    TakeProfit: int = 2
 
 
-StopType = StopTypeT(*range(3))
+StopType = StopTypeT()
 """_"""
 
 __pdoc__['StopType'] = f"""Stop type.

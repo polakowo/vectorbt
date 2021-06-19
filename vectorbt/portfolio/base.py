@@ -345,7 +345,7 @@ import warnings
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.enum import prepare_enum_value
+from vectorbt.utils.enum import cast_enum_value
 from vectorbt.utils.config import merge_dicts, get_func_arg_names
 from vectorbt.utils.template import deep_substitute, Rep
 from vectorbt.utils.random import set_seed
@@ -353,20 +353,13 @@ from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.figure import make_subplots, get_domain
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
-from vectorbt.generic import nb as generic_nb
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.signals.generators import RAND, RPROB
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
 from vectorbt.portfolio.logs import Logs
-from vectorbt.portfolio.enums import (
-    InitCashMode,
-    CallSeqType,
-    SizeType,
-    ConflictMode,
-    Direction
-)
+from vectorbt.portfolio.enums import *
 
 
 def _mean_agg_func(df: tp.Frame) -> tp.Series:
@@ -617,8 +610,8 @@ class Portfolio(Wrapping):
     @classmethod
     def from_signals(cls: tp.Type[PortfolioT],
                      close: tp.ArrayLike,
-                     entries: tp.ArrayLike,
-                     exits: tp.ArrayLike,
+                     entries: tp.Optional[tp.ArrayLike] = None,
+                     exits: tp.Optional[tp.ArrayLike] = None,
                      size: tp.Optional[tp.ArrayLike] = None,
                      size_type: tp.Optional[tp.ArrayLike] = None,
                      direction: tp.Optional[tp.ArrayLike] = None,
@@ -637,6 +630,22 @@ class Portfolio(Wrapping):
                      conflict_mode: tp.Optional[tp.ArrayLike] = None,
                      close_first: tp.Optional[tp.ArrayLike] = None,
                      val_price: tp.Optional[tp.ArrayLike] = None,
+                     open: tp.Optional[tp.ArrayLike] = None,
+                     high: tp.Optional[tp.ArrayLike] = None,
+                     low: tp.Optional[tp.ArrayLike] = None,
+                     sl_stop: tp.Optional[tp.ArrayLike] = None,
+                     sl_trail: tp.Optional[tp.ArrayLike] = None,
+                     tp_stop: tp.Optional[tp.ArrayLike] = None,
+                     stop_entry_price: tp.Optional[tp.ArrayLike] = None,
+                     stop_exit_price: tp.Optional[tp.ArrayLike] = None,
+                     stop_conflict_mode: tp.Optional[tp.ArrayLike] = None,
+                     stop_exit_mode: tp.Optional[tp.ArrayLike] = None,
+                     stop_update_mode: tp.Optional[tp.ArrayLike] = None,
+                     adjust_sl_func_nb: nb.AdjustSLFuncT = nb.no_adjust_sl_func_nb,
+                     adjust_sl_args: tp.Args = (),
+                     adjust_tp_func_nb: nb.AdjustTPFuncT = nb.no_adjust_tp_func_nb,
+                     adjust_tp_args: tp.Args = (),
+                     use_stops: tp.Optional[bool] = None,
                      init_cash: tp.Optional[tp.ArrayLike] = None,
                      cash_sharing: tp.Optional[bool] = None,
                      call_seq: tp.Optional[tp.ArrayLike] = None,
@@ -655,11 +664,11 @@ class Portfolio(Wrapping):
         Args:
             close (array_like): See `Portfolio.from_orders`.
             entries (array_like of bool): Boolean array of entry signals.
-                Will broadcast.
+                Defaults to True. Will broadcast.
 
                 Becomes a long signal if `direction` is `all` or `longonly`, otherwise short.
             exits (array_like of bool): Boolean array of exit signals.
-                Will broadcast.
+                Defaults to False. Will broadcast.
 
                 Becomes a short signal if `direction` is `all` or `longonly`, otherwise long.
             size (float or array_like): See `Portfolio.from_orders`.
@@ -707,9 +716,81 @@ class Portfolio(Wrapping):
                 the opposite position. This allows to define parameters such as `fixed_fees` for long
                 and short positions separately.
             val_price (array_like of float): See `Portfolio.from_orders`.
+            open (array_like of float): First asset price at each time step.
+                Defaults to `np.nan`, which gets replaced by `close`. Will broadcast.
+
+                Used solely for stop signals.
+            high (array_like of float): Highest asset price at each time step.
+                Defaults to `np.nan`, which gets replaced by the maximum out of `open` and `close`. Will broadcast.
+
+                Used solely for stop signals.
+            low (array_like of float): Lowest asset price at each time step.
+                Defaults to `np.nan`, which gets replaced by the minimum out of `open` and `close`. Will broadcast.
+
+                Used solely for stop signals.
+            sl_stop (array_like of float): Stop loss.
+                Will broadcast.
+
+                A percentage below/above the acquisition price for long/short position.
+                Note that 0.01 = 1%.
+            sl_trail (array_like of bool): Whether `sl_stop` should be trailing.
+                Will broadcast.
+            tp_stop (array_like of float): Take profit.
+                Will broadcast.
+
+                A percentage above/below the acquisition price for long/short position.
+                Note that 0.01 = 1%.
+            stop_entry_price (StopEntryPrice or array_like): See `vectorbt.portfolio.enums.StopEntryPrice`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon entry.
+            stop_exit_price (StopExitPrice or array_like): See `vectorbt.portfolio.enums.StopExitPrice`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon exit.
+            stop_conflict_mode (StopConflictMode or array_like): See `vectorbt.portfolio.enums.StopConflictMode`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon exit.
+            stop_exit_mode (StopExitMode or array_like): See `vectorbt.portfolio.enums.StopExitMode`.
+                Will broadcast.
+
+                If provided on per-element basis, gets applied upon exit.
+            stop_update_mode (StopUpdateMode or array_like): See `vectorbt.portfolio.enums.StopUpdateMode`.
+                Will broadcast.
+
+                Only has effect is `accumulate` is True.
+
+                If provided on per-element basis, gets applied upon repeated entry.
+            adjust_sl_func_nb (callable): Function to adjust stop loss.
+                Defaults to `vectorbt.portfolio.nb.no_adjust_sl_func_nb`.
+
+                Called for each element before each row.
+
+                Should accept index of the current row, index of the current column, the current position size,
+                the latest asset price, initial index of the stop, initial price of the stop, initial value
+                of the stop, initial trailing flag of the stop, and `*adjust_sl_args`.
+                Should return a tuple of a new stop value and trailing flag.
+            adjust_sl_args (tuple): Packed arguments passed to `adjust_sl_func_nb`.
+                Defaults to `()`.
+            adjust_tp_func_nb (callable): Function to adjust take profit.
+                Defaults to `vectorbt.portfolio.nb.no_adjust_tp_func_nb`.
+
+                Called for each element before each row.
+
+                Should accept index of the current row, index of the current column, the current position size,
+                the latest asset price, initial index of the stop, initial price of the stop, initial value
+                of the stop, and `*adjust_tp_args`. Should return a new stop value.
+            adjust_tp_args (tuple): Packed arguments passed to `adjust_tp_func_nb`.
+                Defaults to `()`.
+            use_stops (bool): Whether to use stops.
+                Defaults to None, which becomes True if any of the stops are not NaN or
+                any of the adjustment functions are custom.
+
+                Disable this to make simulation a bit faster for simple use cases.
             init_cash (InitCashMode, float or array_like of float): See `Portfolio.from_orders`.
             cash_sharing (bool): See `Portfolio.from_orders`.
-            call_seq (CallSeqType or array_like of int): See `Portfolio.from_orders`.
+            call_seq (CallSeqType or array_like): See `Portfolio.from_orders`.
             ffill_val_price (bool): See `Portfolio.from_orders`.
             update_value (bool): See `Portfolio.from_orders`.
             max_orders (int): See `Portfolio.from_orders`.
@@ -857,6 +938,77 @@ class Portfolio(Wrapping):
         dtype: float64
         ```
 
+        Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
+        ```python-repl
+        >>> close = pd.Series([10, 11, 12, 11, 10, 9])
+        >>> entries = pd.Series([True, False, False, False, False, False])
+        >>> exits = pd.Series([False, False, False, False, False, True])
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits,
+        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.2)  # take profit hit
+        >>> portfolio.asset_flow()
+        0    10.0
+        1     0.0
+        2   -10.0
+        3     0.0
+        4     0.0
+        5     0.0
+        dtype: float64
+
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits,
+        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.3)  # stop loss hit
+        >>> portfolio.asset_flow()
+        0    10.0
+        1     0.0
+        2     0.0
+        3     0.0
+        4   -10.0
+        5     0.0
+        dtype: float64
+
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, entries, exits,
+        ...     sl_stop=np.inf, sl_trail=True, tp_stop=np.inf)  # nothing hit, exit as usual
+        >>> portfolio.asset_flow()
+        0    10.0
+        1     0.0
+        2     0.0
+        3     0.0
+        4     0.0
+        5   -10.0
+        dtype: float64
+        ```
+
+        You can implement your own stop loss or take profit, or adjust the existing one at each time step.
+        Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
+
+        ```python-repl
+        >>> from numba import njit
+
+        >>> @njit
+        ... def adjust_sl_func_nb(i, col, position, val_price, init_i, init_price, init_stop, init_trail):
+        ...     current_profit = (val_price - init_price) / init_price
+        ...     if current_profit >= 0.40:
+        ...         return 0.25, True
+        ...     elif current_profit >= 0.25:
+        ...         return 0.15, True
+        ...     elif current_profit >= 0.20:
+        ...         return 0.07, True
+        ...     return init_stop, init_trail
+
+        >>> close = pd.Series([10, 11, 12, 11, 10])
+        >>> portfolio = vbt.Portfolio.from_signals(
+        ...     close, adjust_sl_func_nb=adjust_sl_func_nb)
+        >>> portfolio.asset_flow()
+        0    10.0
+        1     0.0
+        2     0.0
+        3   -10.0  # 7% from 12 hit
+        4    11.0
+        dtype: float64
+        ```
+
         Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
         ```python-repl
         >>> close = pd.Series([10, 11, 12, 13, 14, 15])
@@ -932,20 +1084,24 @@ class Portfolio(Wrapping):
             By cleaning signals, you lose information. Moreover, this automatically assumes
             that each entry/signal signal succeeds (= order gets filled). Use this with caution,
             and consider rewriting your strategy with `Portfolio.from_order_func`, which is a
-            preferred way of defining complex logic in vectorbt.
+            preferred way of defining a complex logic in vectorbt.
         """
         # Get defaults
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
 
+        if entries is None:
+            entries = True
+        if exits is None:
+            exits = False
         if size is None:
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['signal_size_type']
-        size_type = prepare_enum_value(SizeType, size_type)
+        size_type = cast_enum_value(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['signal_direction']
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         if price is None:
             price = np.inf
         if fees is None:
@@ -972,14 +1128,54 @@ class Portfolio(Wrapping):
             accumulate = portfolio_cfg['accumulate']
         if conflict_mode is None:
             conflict_mode = portfolio_cfg['conflict_mode']
-        conflict_mode = prepare_enum_value(ConflictMode, conflict_mode)
+        conflict_mode = cast_enum_value(conflict_mode, ConflictMode)
         if close_first is None:
             close_first = portfolio_cfg['close_first']
         if val_price is None:
-            val_price = np.inf
+            val_price = portfolio_cfg['val_price']
+        if open is None:
+            open = np.nan
+        if high is None:
+            high = np.nan
+        if low is None:
+            low = np.nan
+        if sl_stop is None:
+            sl_stop = portfolio_cfg['sl_stop']
+        if sl_trail is None:
+            sl_trail = portfolio_cfg['sl_trail']
+        if tp_stop is None:
+            tp_stop = portfolio_cfg['tp_stop']
+        if stop_entry_price is None:
+            stop_entry_price = portfolio_cfg['stop_entry_price']
+        stop_entry_price = cast_enum_value(stop_entry_price, StopEntryPrice)
+        if stop_exit_price is None:
+            stop_exit_price = portfolio_cfg['stop_exit_price']
+        stop_exit_price = cast_enum_value(stop_exit_price, StopExitPrice)
+        if stop_conflict_mode is None:
+            stop_conflict_mode = portfolio_cfg['stop_conflict_mode']
+        stop_conflict_mode = cast_enum_value(stop_conflict_mode, ConflictMode)
+        if stop_exit_mode is None:
+            stop_exit_mode = portfolio_cfg['stop_exit_mode']
+        stop_exit_mode = cast_enum_value(stop_exit_mode, StopExitMode)
+        if stop_update_mode is None:
+            stop_update_mode = portfolio_cfg['stop_update_mode']
+        stop_update_mode = cast_enum_value(stop_update_mode, StopUpdateMode)
+        if use_stops is None:
+            use_stops = portfolio_cfg['use_stops']
+        if use_stops is None:
+            if isinstance(sl_stop, float) and \
+                    np.isnan(sl_stop) and \
+                    isinstance(tp_stop, float) and \
+                    np.isnan(tp_stop) and \
+                    adjust_sl_func_nb == nb.no_adjust_sl_func_nb and \
+                    adjust_tp_func_nb == nb.no_adjust_tp_func_nb:
+                use_stops = False
+            else:
+                use_stops = True
+
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
-        init_cash = prepare_enum_value(InitCashMode, init_cash)
+        init_cash = cast_enum_value(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -987,9 +1183,11 @@ class Portfolio(Wrapping):
             init_cash_mode = None
         if cash_sharing is None:
             cash_sharing = portfolio_cfg['cash_sharing']
+        if cash_sharing and group_by is None:
+            group_by = True
         if call_seq is None:
             call_seq = portfolio_cfg['call_seq']
-        call_seq = prepare_enum_value(CallSeqType, call_seq)
+        call_seq = cast_enum_value(call_seq, CallSeqType)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1035,11 +1233,24 @@ class Portfolio(Wrapping):
             accumulate,
             conflict_mode,
             close_first,
-            val_price
+            val_price,
+            open,
+            high,
+            low,
+            sl_stop,
+            sl_trail,
+            tp_stop,
+            stop_entry_price,
+            stop_exit_price,
+            stop_conflict_mode,
+            stop_exit_mode,
+            stop_update_mode
         )
-        keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
-        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs, keep_raw=keep_raw)
+        broadcast_kwargs = merge_dicts(dict(
+            keep_raw=[False] + [True] * (len(broadcastable_args) - 1),
+            require_kwargs=dict(requirements='W')
+        ), broadcast_kwargs)
+        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs)
         close = broadcasted_args[0]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
@@ -1066,7 +1277,12 @@ class Portfolio(Wrapping):
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            *broadcasted_args[1:],
+            *map(np.asarray, broadcasted_args[1:]),
+            adjust_sl_func_nb,
+            adjust_sl_args,
+            adjust_tp_func_nb,
+            adjust_tp_args,
+            use_stops,
             auto_call_seq,
             ffill_val_price,
             update_value,
@@ -1172,7 +1388,7 @@ class Portfolio(Wrapping):
             log (bool or array_like): Whether to log orders.
                 See `vectorbt.portfolio.enums.Order.log`. Will broadcast.
             val_price (array_like of float): Asset valuation price.
-                Defaults to `np.inf`. Will broadcast.
+                Will broadcast.
 
                 * Any `-np.inf` element is replaced by the latest valuation price (the previous `close` or
                     the latest known valuation price if `ffill_val_price`).
@@ -1180,6 +1396,11 @@ class Portfolio(Wrapping):
 
                 Used at the time of decision making to calculate value of each asset in the group,
                 for example, to convert target value into target amount.
+
+                !!! note
+                    In contrast to `Portfolio.from_order_func`, order price is known beforehand (kind of),
+                    thus `val_price` is set to the current order price (using `np.inf`) by default.
+                    To valuate using previous close, set it in the settings to `-np.inf`.
 
                 !!! note
                     Make sure to use timestamp for `val_price` that comes before timestamps of
@@ -1197,6 +1418,8 @@ class Portfolio(Wrapping):
                     will change the initial cash, so be aware when indexing.
             cash_sharing (bool): Whether to share cash within the same group.
 
+                If `group_by` is None, `group_by` becomes True to form a single group with cash sharing.
+
                 !!! warning
                     Introduces cross-asset dependencies.
 
@@ -1204,7 +1427,7 @@ class Portfolio(Wrapping):
                     orders will be executed within the same tick and retain their price regardless
                     of their position in the queue, even though they depend upon each other and thus
                     cannot be executed in parallel.
-            call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
+            call_seq (CallSeqType or array_like): Default sequence of calls per row and group.
 
                 Each value in this sequence should indicate the position of column in the group to
                 call next. Processing of `call_seq` goes always from left to right.
@@ -1350,10 +1573,10 @@ class Portfolio(Wrapping):
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
-        size_type = prepare_enum_value(SizeType, size_type)
+        size_type = cast_enum_value(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['order_direction']
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         if price is None:
             price = np.inf
         if size is None:
@@ -1379,10 +1602,10 @@ class Portfolio(Wrapping):
         if log is None:
             log = portfolio_cfg['log']
         if val_price is None:
-            val_price = np.inf
+            val_price = portfolio_cfg['val_price']
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
-        init_cash = prepare_enum_value(InitCashMode, init_cash)
+        init_cash = cast_enum_value(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1390,9 +1613,11 @@ class Portfolio(Wrapping):
             init_cash_mode = None
         if cash_sharing is None:
             cash_sharing = portfolio_cfg['cash_sharing']
+        if cash_sharing and group_by is None:
+            group_by = True
         if call_seq is None:
             call_seq = portfolio_cfg['call_seq']
-        call_seq = prepare_enum_value(CallSeqType, call_seq)
+        call_seq = cast_enum_value(call_seq, CallSeqType)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -1435,9 +1660,11 @@ class Portfolio(Wrapping):
             log,
             val_price
         )
-        keep_raw = [False] + [True] * (len(broadcastable_args) - 1)
-        broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs, keep_raw=keep_raw)
+        broadcast_kwargs = merge_dicts(dict(
+            keep_raw=[False] + [True] * (len(broadcastable_args) - 1),
+            require_kwargs=dict(requirements='W')
+        ), broadcast_kwargs)
+        broadcasted_args = broadcast(*broadcastable_args, **broadcast_kwargs)
         close = broadcasted_args[0]
         if not checks.is_pandas(close):
             close = pd.Series(close) if close.ndim == 1 else pd.DataFrame(close)
@@ -1464,7 +1691,7 @@ class Portfolio(Wrapping):
             cs_group_lens,  # group only if cash sharing is enabled to speed up
             init_cash,
             call_seq,
-            *broadcasted_args[1:],
+            *map(np.asarray, broadcasted_args[1:]),
             auto_call_seq,
             ffill_val_price,
             update_value,
@@ -1496,24 +1723,24 @@ class Portfolio(Wrapping):
                         cash_sharing: tp.Optional[bool] = None,
                         call_seq: tp.Optional[tp.ArrayLike] = None,
                         segment_mask: tp.Optional[tp.ArrayLike] = None,
-                        pre_sim_func_nb: tp.Optional[nb.PreSimFuncT] = None,
-                        pre_sim_args: tp.Optional[tp.Args] = None,
-                        post_sim_func_nb: tp.Optional[nb.PostSimFuncT] = None,
-                        post_sim_args: tp.Optional[tp.Args] = None,
-                        pre_group_func_nb: tp.Optional[nb.PreGroupFuncT] = None,
-                        pre_group_args: tp.Optional[tp.Args] = None,
-                        post_group_func_nb: tp.Optional[nb.PostGroupFuncT] = None,
-                        post_group_args: tp.Optional[tp.Args] = None,
-                        pre_row_func_nb: tp.Optional[nb.PreRowFuncT] = None,
-                        pre_row_args: tp.Optional[tp.Args] = None,
-                        post_row_func_nb: tp.Optional[nb.PostRowFuncT] = None,
-                        post_row_args: tp.Optional[tp.Args] = None,
-                        pre_segment_func_nb: tp.Optional[nb.PreSegmentFuncT] = None,
-                        pre_segment_args: tp.Optional[tp.Args] = None,
-                        post_segment_func_nb: tp.Optional[nb.PostSegmentFuncT] = None,
-                        post_segment_args: tp.Optional[tp.Args] = None,
-                        post_order_func_nb: tp.Optional[nb.PostOrderFuncT] = None,
-                        post_order_args: tp.Optional[tp.Args] = None,
+                        pre_sim_func_nb: nb.PreSimFuncT = nb.no_pre_func_nb,
+                        pre_sim_args: tp.Args = (),
+                        post_sim_func_nb: nb.PostSimFuncT = nb.no_post_func_nb,
+                        post_sim_args: tp.Args = (),
+                        pre_group_func_nb: nb.PreGroupFuncT = nb.no_pre_func_nb,
+                        pre_group_args: tp.Args = (),
+                        post_group_func_nb: nb.PostGroupFuncT = nb.no_post_func_nb,
+                        post_group_args: tp.Args = (),
+                        pre_row_func_nb: nb.PreRowFuncT = nb.no_pre_func_nb,
+                        pre_row_args: tp.Args = (),
+                        post_row_func_nb: nb.PostRowFuncT = nb.no_post_func_nb,
+                        post_row_args: tp.Args = (),
+                        pre_segment_func_nb: nb.PreSegmentFuncT = nb.no_pre_func_nb,
+                        pre_segment_args: tp.Args = (),
+                        post_segment_func_nb: nb.PostSegmentFuncT = nb.no_post_func_nb,
+                        post_segment_args: tp.Args = (),
+                        post_order_func_nb: nb.PostOrderFuncT = nb.no_post_func_nb,
+                        post_order_args: tp.Args = (),
                         call_pre_segment: tp.Optional[bool] = None,
                         call_post_segment: tp.Optional[bool] = None,
                         ffill_val_price: tp.Optional[bool] = None,
@@ -1552,9 +1779,11 @@ class Portfolio(Wrapping):
                 See `init_cash` in `Portfolio.from_orders`.
             cash_sharing (bool): Whether to share cash within the same group.
 
+                If `group_by` is None, `group_by` becomes True to form a single group with cash sharing.
+
                 !!! warning
                     Introduces cross-asset dependencies.
-            call_seq (CallSeqType or array_like of int): Default sequence of calls per row and group.
+            call_seq (CallSeqType or array_like): Default sequence of calls per row and group.
 
                 * Use `vectorbt.portfolio.enums.CallSeqType` to select a sequence type.
                 * Set to array to specify custom sequence. Will not broadcast.
@@ -1895,7 +2124,7 @@ class Portfolio(Wrapping):
             target_shape = close.shape
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
-        init_cash = prepare_enum_value(InitCashMode, init_cash)
+        init_cash = cast_enum_value(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1903,9 +2132,11 @@ class Portfolio(Wrapping):
             init_cash_mode = None
         if cash_sharing is None:
             cash_sharing = portfolio_cfg['cash_sharing']
+        if cash_sharing and group_by is None:
+            group_by = True
         if call_seq is None:
             call_seq = portfolio_cfg['call_seq']
-        call_seq = prepare_enum_value(CallSeqType, call_seq)
+        call_seq = cast_enum_value(call_seq, CallSeqType)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually. "
@@ -1977,48 +2208,6 @@ class Portfolio(Wrapping):
             max_orders = target_shape_2d[0] * target_shape_2d[1]
         if max_logs is None:
             max_logs = target_shape_2d[0] * target_shape_2d[1]
-
-        # Prepare arguments
-        if pre_sim_func_nb is None:
-            pre_sim_func_nb = nb.no_pre_func_nb
-        if pre_sim_args is None:
-            pre_sim_args = ()
-        if post_sim_func_nb is None:
-            post_sim_func_nb = nb.no_post_func_nb
-        if post_sim_args is None:
-            post_sim_args = ()
-
-        if pre_group_func_nb is None:
-            pre_group_func_nb = nb.no_pre_func_nb
-        if pre_group_args is None:
-            pre_group_args = ()
-        if post_group_func_nb is None:
-            post_group_func_nb = nb.no_post_func_nb
-        if post_group_args is None:
-            post_group_args = ()
-
-        if pre_row_func_nb is None:
-            pre_row_func_nb = nb.no_pre_func_nb
-        if pre_row_args is None:
-            pre_row_args = ()
-        if post_row_func_nb is None:
-            post_row_func_nb = nb.no_post_func_nb
-        if post_row_args is None:
-            post_row_args = ()
-
-        if pre_segment_func_nb is None:
-            pre_segment_func_nb = nb.no_pre_func_nb
-        if pre_segment_args is None:
-            pre_segment_args = ()
-        if post_segment_func_nb is None:
-            post_segment_func_nb = nb.no_post_func_nb
-        if post_segment_args is None:
-            post_segment_args = ()
-
-        if post_order_func_nb is None:
-            post_order_func_nb = nb.no_post_func_nb
-        if post_order_args is None:
-            post_order_args = ()
 
         # Perform calculation
         if row_wise:
@@ -2240,7 +2429,7 @@ class Portfolio(Wrapping):
         """Get asset flow series per column.
 
         Returns the total transacted amount of assets at each time step."""
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         asset_flow = nb.asset_flow_nb(
             self.wrapper.shape_2d,
             self.orders.values,
@@ -2254,7 +2443,7 @@ class Portfolio(Wrapping):
         """Get asset series per column.
 
         Returns the current position at each time step."""
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         asset_flow = to_2d(self.asset_flow(direction='all'), raw=True)
         assets = nb.assets_nb(asset_flow)
         if direction == Direction.LongOnly:
@@ -2269,7 +2458,7 @@ class Portfolio(Wrapping):
         """Get position mask per column/group.
 
         An element is True if the asset is in the market at this tick."""
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         assets = to_2d(self.assets(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             position_mask = to_2d(self.position_mask(direction=direction, group_by=False), raw=True)
@@ -2283,7 +2472,7 @@ class Portfolio(Wrapping):
     def position_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         assets = to_2d(self.assets(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             position_mask = to_2d(self.position_mask(direction=direction, group_by=False), raw=True)
@@ -2383,7 +2572,7 @@ class Portfolio(Wrapping):
     def asset_value(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
-        direction = prepare_enum_value(Direction, direction)
+        direction = cast_enum_value(direction, Direction)
         if self.fillna_close:
             close = to_2d(self.get_filled_close(), raw=True).copy()
         else:

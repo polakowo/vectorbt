@@ -1091,7 +1091,7 @@ class TestFromSignals:
 
     def test_conflict_mode(self):
         kwargs = dict(
-            close=price.iloc[:3],
+            close=price[:3],
             entries=pd.DataFrame([
                 [True, True, True, True, True],
                 [True, True, True, True, False],
@@ -1361,6 +1361,664 @@ class TestFromSignals:
                 [0, 1, 2],
                 [2, 0, 1]
             ])
+        )
+
+    def test_sl_stop(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        with pytest.raises(Exception) as e_info:
+            _ = from_signals_all(sl_stop=-0.1)
+
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0),
+                (1, 0, 1, 20.0, 5.0, 0.0, 0), (2, 1, 1, 20.0, 4.0, 0.0, 1),
+                (3, 0, 2, 20.0, 5.0, 0.0, 0), (4, 3, 2, 20.0, 2.0, 0.0, 1),
+                (5, 0, 3, 20.0, 5.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 1),
+                (1, 0, 1, 20.0, 5.0, 0.0, 1),
+                (2, 0, 2, 20.0, 5.0, 0.0, 1),
+                (3, 0, 3, 20.0, 5.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=exits, exits=entries,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0),
+                (1, 0, 1, 20.0, 5.0, 0.0, 0), (2, 1, 1, 20.0, 4.25, 0.0, 1),
+                (3, 0, 2, 20.0, 5.0, 0.0, 0), (4, 1, 2, 20.0, 4.25, 0.0, 1),
+                (5, 0, 3, 20.0, 5.0, 0.0, 0), (6, 1, 3, 20.0, 4.0, 0.0, 1),
+                (7, 0, 4, 20.0, 5.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 1),
+                (1, 0, 1, 20.0, 5.0, 0.0, 1),
+                (2, 0, 2, 20.0, 5.0, 0.0, 1),
+                (3, 0, 3, 20.0, 5.0, 0.0, 1),
+                (4, 0, 4, 20.0, 5.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+        close = pd.Series([1., 2., 3., 4., 5.], index=price.index)
+        open = close - 0.25
+        high = close + 0.5
+        low = close - 0.5
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 0),
+                (1, 0, 1, 100.0, 1.0, 0.0, 0),
+                (2, 0, 2, 100.0, 1.0, 0.0, 0),
+                (3, 0, 3, 100.0, 1.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 1),
+                (1, 0, 1, 100.0, 1.0, 0.0, 1), (2, 1, 1, 100.0, 2.0, 0.0, 0),
+                (3, 0, 2, 100.0, 1.0, 0.0, 1), (4, 3, 2, 50.0, 4.0, 0.0, 0),
+                (5, 0, 3, 100.0, 1.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=exits, exits=entries,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.5, 0.75, 1., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 0),
+                (1, 0, 1, 100.0, 1.0, 0.0, 0),
+                (2, 0, 2, 100.0, 1.0, 0.0, 0),
+                (3, 0, 3, 100.0, 1.0, 0.0, 0),
+                (4, 0, 4, 100.0, 1.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.5, 0.75, 1., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 1),
+                (1, 0, 1, 100.0, 1.0, 0.0, 1), (2, 1, 1, 100.0, 1.75, 0.0, 0),
+                (3, 0, 2, 100.0, 1.0, 0.0, 1), (4, 1, 2, 100.0, 1.75, 0.0, 0),
+                (5, 0, 3, 100.0, 1.0, 0.0, 1), (6, 1, 3, 100.0, 2.0, 0.0, 0),
+                (7, 0, 4, 100.0, 1.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_ts_stop(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        with pytest.raises(Exception) as e_info:
+            _ = from_signals_all(ts_stop=-0.1)
+
+        close = pd.Series([4., 5., 4., 3., 2.], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 25.0, 4.0, 0.0, 0),
+                (1, 0, 1, 25.0, 4.0, 0.0, 0), (2, 2, 1, 25.0, 4.0, 0.0, 1),
+                (3, 0, 2, 25.0, 4.0, 0.0, 0), (4, 4, 2, 25.0, 2.0, 0.0, 1),
+                (5, 0, 3, 25.0, 4.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 25.0, 4.0, 0.0, 1),
+                (1, 0, 1, 25.0, 4.0, 0.0, 1), (2, 1, 1, 25.0, 5.0, 0.0, 0),
+                (3, 0, 2, 25.0, 4.0, 0.0, 1),
+                (4, 0, 3, 25.0, 4.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records,
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=exits, exits=entries,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records,
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.1, 0.5, np.inf]], sl_trail=True).order_records
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 25.0, 4.0, 0.0, 0),
+                (1, 0, 1, 25.0, 4.0, 0.0, 0), (2, 2, 1, 25.0, 4.25, 0.0, 1),
+                (3, 0, 2, 25.0, 4.0, 0.0, 0), (4, 2, 2, 25.0, 4.25, 0.0, 1),
+                (5, 0, 3, 25.0, 4.0, 0.0, 0), (6, 2, 3, 25.0, 4.125, 0.0, 1),
+                (7, 0, 4, 25.0, 4.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.15, 0.2, 0.25, np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 25.0, 4.0, 0.0, 1),
+                (1, 0, 1, 25.0, 4.0, 0.0, 1), (2, 1, 1, 25.0, 5.25, 0.0, 0),
+                (3, 0, 2, 25.0, 4.0, 0.0, 1), (4, 1, 2, 25.0, 5.25, 0.0, 0),
+                (5, 0, 3, 25.0, 4.0, 0.0, 1), (6, 1, 3, 25.0, 5.25, 0.0, 0),
+                (7, 0, 4, 25.0, 4.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+        close = pd.Series([2., 1., 2., 3., 4.], index=price.index)
+        open = close - 0.25
+        high = close + 0.5
+        low = close - 0.5
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 50.0, 2.0, 0.0, 0),
+                (1, 0, 1, 50.0, 2.0, 0.0, 0), (2, 1, 1, 50.0, 1.0, 0.0, 1),
+                (3, 0, 2, 50.0, 2.0, 0.0, 0),
+                (4, 0, 3, 50.0, 2.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 50.0, 2.0, 0.0, 1),
+                (1, 0, 1, 50.0, 2.0, 0.0, 1), (2, 2, 1, 50.0, 2.0, 0.0, 0),
+                (3, 0, 2, 50.0, 2.0, 0.0, 1), (4, 4, 2, 50.0, 4.0, 0.0, 0),
+                (5, 0, 3, 50.0, 2.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records,
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=exits, exits=entries,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records,
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=[[np.nan, 0.5, 3., np.inf]], sl_trail=True).order_records
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.5, 0.75, 1., np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 50.0, 2.0, 0.0, 0),
+                (1, 0, 1, 50.0, 2.0, 0.0, 0), (2, 1, 1, 50.0, 0.75, 0.0, 1),
+                (3, 0, 2, 50.0, 2.0, 0.0, 0), (4, 1, 2, 50.0, 0.5, 0.0, 1),
+                (5, 0, 3, 50.0, 2.0, 0.0, 0),
+                (6, 0, 4, 50.0, 2.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[np.nan, 0.5, 0.75, 1., np.inf]], sl_trail=True).order_records,
+            np.array([
+                (0, 0, 0, 50.0, 2.0, 0.0, 1),
+                (1, 0, 1, 50.0, 2.0, 0.0, 1), (2, 2, 1, 50.0, 1.75, 0.0, 0),
+                (3, 0, 2, 50.0, 2.0, 0.0, 1), (4, 2, 2, 50.0, 1.75, 0.0, 0),
+                (5, 0, 3, 50.0, 2.0, 0.0, 1), (6, 2, 3, 50.0, 1.75, 0.0, 0),
+                (7, 0, 4, 50.0, 2.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_tp_stop(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+
+        with pytest.raises(Exception) as e_info:
+            _ = from_signals_all(sl_stop=-0.1)
+
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0),
+                (1, 0, 1, 20.0, 5.0, 0.0, 0),
+                (2, 0, 2, 20.0, 5.0, 0.0, 0),
+                (3, 0, 3, 20.0, 5.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 1),
+                (1, 0, 1, 20.0, 5.0, 0.0, 1), (2, 1, 1, 20.0, 4.0, 0.0, 0),
+                (3, 0, 2, 20.0, 5.0, 0.0, 1), (4, 3, 2, 20.0, 2.0, 0.0, 0),
+                (5, 0, 3, 20.0, 5.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=exits, exits=entries,
+                tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records,
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.1, 0.5, np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                tp_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0),
+                (1, 0, 1, 20.0, 5.0, 0.0, 0),
+                (2, 0, 2, 20.0, 5.0, 0.0, 0),
+                (3, 0, 3, 20.0, 5.0, 0.0, 0),
+                (4, 0, 4, 20.0, 5.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                tp_stop=[[np.nan, 0.1, 0.15, 0.2, np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 1),
+                (1, 0, 1, 20.0, 5.0, 0.0, 1), (2, 1, 1, 20.0, 4.25, 0.0, 0),
+                (3, 0, 2, 20.0, 5.0, 0.0, 1), (4, 1, 2, 20.0, 4.25, 0.0, 0),
+                (5, 0, 3, 20.0, 5.0, 0.0, 1), (6, 1, 3, 20.0, 4.0, 0.0, 0),
+                (7, 0, 4, 20.0, 5.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+        close = pd.Series([1., 2., 3., 4., 5.], index=price.index)
+        open = close - 0.25
+        high = close + 0.5
+        low = close - 0.5
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 0),
+                (1, 0, 1, 100.0, 1.0, 0.0, 0), (2, 1, 1, 100.0, 2.0, 0.0, 1),
+                (3, 0, 2, 100.0, 1.0, 0.0, 0), (4, 3, 2, 100.0, 4.0, 0.0, 1),
+                (5, 0, 3, 100.0, 1.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 1),
+                (1, 0, 1, 100.0, 1.0, 0.0, 1),
+                (2, 0, 2, 100.0, 1.0, 0.0, 1),
+                (3, 0, 3, 100.0, 1.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=exits, exits=entries,
+                tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records,
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=[[np.nan, 0.5, 3., np.inf]]).order_records
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                tp_stop=[[np.nan, 0.5, 0.75, 1., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 0),
+                (1, 0, 1, 100.0, 1.0, 0.0, 0), (2, 1, 1, 100.0, 1.75, 0.0, 1),
+                (3, 0, 2, 100.0, 1.0, 0.0, 0), (4, 1, 2, 100.0, 1.75, 0.0, 1),
+                (5, 0, 3, 100.0, 1.0, 0.0, 0), (6, 1, 3, 100.0, 2.0, 0.0, 1),
+                (7, 0, 4, 100.0, 1.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_shortonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                tp_stop=[[np.nan, 0.5, 0.75, 1., np.inf]]).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 1),
+                (1, 0, 1, 100.0, 1.0, 0.0, 1),
+                (2, 0, 2, 100.0, 1.0, 0.0, 1),
+                (3, 0, 3, 100.0, 1.0, 0.0, 1),
+                (4, 0, 4, 100.0, 1.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_stop_entry_price(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close, val_price=1.05 * close,
+                stop_entry_price='val_price',
+                stop_exit_price='stoplimit', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (1, 1, 0, 16.52892561983471, 4.25, 0.0, 1),
+                (2, 0, 1, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (3, 2, 1, 16.52892561983471, 2.625, 0.0, 1),
+                (4, 0, 2, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (5, 4, 2, 16.52892561983471, 1.25, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close, val_price=1.05 * close,
+                stop_entry_price='price',
+                stop_exit_price='stoplimit', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (1, 1, 0, 16.52892561983471, 4.25, 0.0, 1),
+                (2, 0, 1, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (3, 2, 1, 16.52892561983471, 2.75, 0.0, 1),
+                (4, 0, 2, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (5, 4, 2, 16.52892561983471, 1.25, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close, val_price=1.05 * close,
+                stop_entry_price='fillprice',
+                stop_exit_price='stoplimit', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (1, 1, 0, 16.52892561983471, 4.25, 0.0, 1),
+                (2, 0, 1, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (3, 2, 1, 16.52892561983471, 3.0250000000000004, 0.0, 1),
+                (4, 0, 2, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (5, 3, 2, 16.52892561983471, 1.5125000000000002, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close, val_price=1.05 * close,
+                stop_entry_price='close',
+                stop_exit_price='stoplimit', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (1, 1, 0, 16.52892561983471, 4.25, 0.0, 1),
+                (2, 0, 1, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (3, 2, 1, 16.52892561983471, 2.5, 0.0, 1),
+                (4, 0, 2, 16.52892561983471, 6.050000000000001, 0.0, 0),
+                (5, 4, 2, 16.52892561983471, 1.25, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_stop_exit_price(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        open = close + 0.25
+        high = close + 0.5
+        low = close - 0.5
+
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close,
+                stop_exit_price='stoplimit', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.528926, 6.05, 0.0, 0), (1, 1, 0, 16.528926, 4.25, 0.0, 1),
+                (2, 0, 1, 16.528926, 6.05, 0.0, 0), (3, 2, 1, 16.528926, 2.5, 0.0, 1),
+                (4, 0, 2, 16.528926, 6.05, 0.0, 0), (5, 4, 2, 16.528926, 1.25, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close,
+                stop_exit_price='stopmarket', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.528926, 6.05, 0.0, 0), (1, 1, 0, 16.528926, 3.825, 0.0, 1),
+                (2, 0, 1, 16.528926, 6.05, 0.0, 0), (3, 2, 1, 16.528926, 2.25, 0.0, 1),
+                (4, 0, 2, 16.528926, 6.05, 0.0, 0), (5, 4, 2, 16.528926, 1.125, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close,
+                stop_exit_price='close', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.528926, 6.05, 0.0, 0), (1, 1, 0, 16.528926, 3.6, 0.0, 1),
+                (2, 0, 1, 16.528926, 6.05, 0.0, 0), (3, 2, 1, 16.528926, 2.7, 0.0, 1),
+                (4, 0, 2, 16.528926, 6.05, 0.0, 0), (5, 4, 2, 16.528926, 0.9, 0.0, 1)
+            ], dtype=order_dt)
+        )
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                open=open, high=high, low=low,
+                sl_stop=[[0.05, 0.5, 0.75]], price=1.1 * close,
+                stop_exit_price='price', slippage=0.1).order_records,
+            np.array([
+                (0, 0, 0, 16.528926, 6.05, 0.0, 0), (1, 1, 0, 16.528926, 3.9600000000000004, 0.0, 1),
+                (2, 0, 1, 16.528926, 6.05, 0.0, 0), (3, 2, 1, 16.528926, 2.97, 0.0, 1),
+                (4, 0, 2, 16.528926, 6.05, 0.0, 0), (5, 4, 2, 16.528926, 0.9900000000000001, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_stop_conflict_mode(self):
+        entries = pd.Series([True, True, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                stop_update_mode='keep',
+                sl_stop=0.1, stop_conflict_mode=[['ignore', 'entry', 'exit', 'opposite']]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 2, 0, 20.0, 3.0, 0.0, 1),
+                (2, 0, 1, 20.0, 5.0, 0.0, 0), (3, 2, 1, 20.0, 3.0, 0.0, 1),
+                (4, 0, 2, 20.0, 5.0, 0.0, 0), (5, 1, 2, 20.0, 4.0, 0.0, 1),
+                (6, 0, 3, 20.0, 5.0, 0.0, 0), (7, 1, 3, 20.0, 4.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_stop_exit_mode(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        record_arrays_close(
+            from_signals_all(
+                close=close, entries=entries, exits=exits,
+                sl_stop=0.1, stop_exit_mode=[['close', 'exit']]).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 1, 0, 20.0, 4.0, 0.0, 1),
+                (2, 0, 1, 20.0, 5.0, 0.0, 0), (3, 1, 1, 40.0, 4.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_stop_update_mode(self):
+        entries = pd.Series([True, True, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+        sl_stop = pd.Series([0.4, np.nan, np.nan, np.nan, np.nan])
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits, accumulate=True, size=1.,
+                sl_stop=sl_stop, stop_update_mode=[['keep', 'override', 'overridenan']]).order_records,
+            np.array([
+                (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 1, 0, 1.0, 4.0, 0.0, 0), (2, 2, 0, 2.0, 3.0, 0.0, 1),
+                (3, 0, 1, 1.0, 5.0, 0.0, 0), (4, 1, 1, 1.0, 4.0, 0.0, 0), (5, 2, 1, 2.0, 3.0, 0.0, 1),
+                (6, 0, 2, 1.0, 5.0, 0.0, 0), (7, 1, 2, 1.0, 4.0, 0.0, 0)
+            ], dtype=order_dt)
+        )
+        sl_stop = pd.Series([0.4, 0.4, np.nan, np.nan, np.nan])
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits, accumulate=True, size=1.,
+                sl_stop=sl_stop, stop_update_mode=[['keep', 'override']]).order_records,
+            np.array([
+                (0, 0, 0, 1.0, 5.0, 0.0, 0), (1, 1, 0, 1.0, 4.0, 0.0, 0), (2, 2, 0, 2.0, 3.0, 0.0, 1),
+                (3, 0, 1, 1.0, 5.0, 0.0, 0), (4, 1, 1, 1.0, 4.0, 0.0, 0), (5, 3, 1, 2.0, 2.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_adjust_sl_func(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
+
+        @njit
+        def adjust_sl_func_nb(i, col, position, val_price, init_i, init_price, init_stop, init_trail, dur):
+            return 0. if i - init_i >= dur else init_stop, init_trail
+
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=np.inf, adjust_sl_func_nb=adjust_sl_func_nb, adjust_sl_args=(2,)).order_records,
+            np.array([
+                (0, 0, 0, 20.0, 5.0, 0.0, 0), (1, 2, 0, 20.0, 3.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
+    def test_adjust_tp_func(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([1., 2., 3., 4., 5.], index=price.index)
+
+        @njit
+        def adjust_tp_func_nb(i, col, position, val_price, init_i, init_price, init_stop, dur):
+            return 0. if i - init_i >= dur else init_stop
+
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                tp_stop=np.inf, adjust_tp_func_nb=adjust_tp_func_nb, adjust_tp_args=(2,)).order_records,
+            np.array([
+                (0, 0, 0, 100.0, 1.0, 0.0, 0), (1, 2, 0, 100.0, 3.0, 0.0, 1)
+            ], dtype=order_dt)
         )
 
     def test_max_orders(self):

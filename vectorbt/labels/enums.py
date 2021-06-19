@@ -13,14 +13,14 @@ __pdoc__ = {}
 
 
 class TrendModeT(tp.NamedTuple):
-    Binary: int
-    BinaryCont: int
-    BinaryContSat: int
-    PctChange: int
-    PctChangeNorm: int
+    Binary: int = 0
+    BinaryCont: int = 1
+    BinaryContSat: int = 2
+    PctChange: int = 3
+    PctChangeNorm: int = 4
 
 
-TrendMode = TrendModeT(*range(5))
+TrendMode = TrendModeT()
 """_"""
 
 __pdoc__['TrendMode'] = f"""Trend mode.

@@ -1,48 +1,59 @@
 """Enum utilities.
 
 In vectorbt, enums are represented by instances of named tuples to be easily used in Numba."""
+import numpy as np
+import pandas as pd
 
 from vectorbt import _typing as tp
 
 
-def get_caseins_enum_attr(enum: tp.NamedTuple, attr: str) -> tp.Any:
-    """Case-insensitive `getattr` for enums."""
-    lower_attr_keys = list(map(lambda x: x.lower(), enum._fields))
-    attr_idx = lower_attr_keys.index(attr.lower())
-    orig_attr = enum._fields[attr_idx]
-    return getattr(enum, orig_attr)
+def enum_to_field_map(enum: tp.NamedTuple) -> tp.Dict[tp.Optional[str], int]:
+    """Convert an enum to a field map."""
+    field_map = {k.lower(): v for k, v in enum._asdict().items()}
+    if -1 not in enum:
+        field_map[None] = -1
+    return field_map
 
 
-def prepare_enum_value(enum: tp.NamedTuple, value: tp.Any) -> tp.Any:
-    """Prepare value of an enum.
+def enum_to_value_map(enum: tp.NamedTuple) -> tp.Dict[int, tp.Optional[str]]:
+    """Convert an enum to a value map."""
+    value_map = {v: k for k, v in enum._asdict().items()}
+    if -1 not in enum:
+        value_map[-1] = None
+    return value_map
+
+
+def cast_enum_value(value: tp.Any, enum: tp.NamedTuple) -> tp.Any:
+    """Cast string to an enum value.
 
     `enum` is expected to be an instance of `collections.namedtuple`.
-    `value` can a string of any case or a tuple/list of such, otherwise returns unmodified value."""
+    `value` can a string of any case and with any number of underscores, or a tuple/list/array of such,
+    otherwise returns the unmodified value.
+
+    !!! note
+        Will only cast array/Series/DataFrame if the first element is a string.
+    """
+    field_map = enum_to_field_map(enum)
 
     def _converter(x):
         if isinstance(x, str):
-            return get_caseins_enum_attr(enum, str(x))
+            return field_map[x.lower().replace('_', '')]
         return x
 
     if isinstance(value, str):
-        # Convert str to int
         value = _converter(value)
-    elif isinstance(value, (tuple, list)):
-        # Convert each in the list
-        value_type = type(value)
-        value = list(value)
-        for i in range(len(value)):
-            if isinstance(value[i], (tuple, list)):
-                value[i] = prepare_enum_value(enum, value[i])
-            else:
-                value[i] = _converter(value[i])
-        return value_type(value)
+    if isinstance(value, (tuple, list)):
+        result = [cast_enum_value(v, enum) for v in value]
+        if isinstance(value, tuple):
+            result = tuple(result)
+        return result
+    if isinstance(value, np.ndarray):
+        if value.size > 0 and isinstance(value.item(0), str):
+            return np.vectorize(_converter)(value)
+    if isinstance(value, pd.Series):
+        if value.size > 0 and isinstance(value.iloc[0], str):
+            return value.map(_converter)
+    if isinstance(value, pd.DataFrame):
+        if value.size > 0 and isinstance(value.iloc[0, 0], str):
+            return value.applymap(_converter)
     return value
-
-
-def to_value_map(enum: tp.NamedTuple) -> dict:
-    """Create value map from enum."""
-    value_map = dict(zip(tuple(enum), enum._fields))
-    if -1 not in value_map:
-        value_map[-1] = None
-    return value_map

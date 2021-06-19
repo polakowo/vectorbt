@@ -21,7 +21,7 @@ from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.datetime import DatetimeIndexes
-from vectorbt.utils.enum import to_value_map
+from vectorbt.utils.enum import enum_to_value_map
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.array import min_rel_rescale, max_rel_rescale
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
@@ -214,8 +214,8 @@ class Trades(Records):
         out['Exit Fees'] = records_df['exit_fees']
         out['PnL'] = records_df['pnl']
         out['Return'] = records_df['return']
-        out['Direction'] = records_df['direction'].map(to_value_map(TradeDirection))
-        out['Status'] = records_df['status'].map(to_value_map(TradeStatus))
+        out['Direction'] = records_df['direction'].map(enum_to_value_map(TradeDirection))
+        out['Status'] = records_df['status'].map(enum_to_value_map(TradeStatus))
         if self.trade_type == TradeType.Trade:
             out['Position Id'] = records_df['position_id']
         return out
@@ -654,7 +654,7 @@ class Trades(Records):
             exit_fees = self_col.values['exit_fees']
             pnl = self_col.values['pnl']
             ret = self_col.values['return']
-            direction_value_map = to_value_map(TradeDirection)
+            direction_value_map = enum_to_value_map(TradeDirection)
             direction = self_col.values['direction']
             direction = np.vectorize(lambda x: str(direction_value_map[x]))(direction)
             status = self_col.values['status']

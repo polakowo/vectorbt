@@ -255,7 +255,7 @@ import pandas as pd
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.enum import to_value_map
+from vectorbt.utils.enum import enum_to_value_map
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.class_helpers import (
@@ -350,7 +350,7 @@ class MappedArray(Wrapping):
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
         if value_map is not None:
             if checks.is_namedtuple(value_map):
-                value_map = to_value_map(value_map)
+                value_map = enum_to_value_map(value_map)
 
         self._mapped_arr = mapped_arr
         self._id_arr = id_arr
@@ -728,7 +728,7 @@ class MappedArray(Wrapping):
             value_map = self.value_map
         if value_map is not None:
             if checks.is_namedtuple(value_map):
-                value_map = to_value_map(value_map)
+                value_map = enum_to_value_map(value_map)
             value_counts_df.index = value_counts_df.index.map(value_map)
         return value_counts_df
 

@@ -31,7 +31,7 @@ def clean_labels(labels: tp.ArrayLikeSequence) -> tp.ArrayLikeSequence:
     Plotly doesn't support multi-indexes."""
     if isinstance(labels, pd.MultiIndex):
         labels = labels.to_flat_index()
-    if isinstance(labels[0], tuple):
+    if len(labels) > 0 and isinstance(labels[0], tuple):
         labels = list(map(str, labels))
     return labels
 
