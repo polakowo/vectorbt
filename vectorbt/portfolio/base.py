@@ -2022,7 +2022,7 @@ class Portfolio(Wrapping):
         (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
         ```python-repl
         >>> from vectorbt.base.reshape_fns import flex_select_auto_nb, to_2d
-        >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
+        >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide, Direction
 
         >>> @njit
         ... def pre_sim_func_nb(c):
