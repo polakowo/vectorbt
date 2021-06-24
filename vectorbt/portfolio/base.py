@@ -2205,10 +2205,9 @@ class Portfolio(Wrapping):
 
         # Perform calculation
         if row_wise:
-            if use_numba:
-                simulate_func = nb.simulate_row_wise_nb
-            else:
-                simulate_func = nb.simulate_row_wise_nb.py_func
+            simulate_func = nb.simulate_row_wise_nb
+            if not use_numba and hasattr(simulate_func, 'py_func'):
+                simulate_func = simulate_func.py_func
             order_records, log_records = simulate_func(
                 target_shape=target_shape_2d,
                 close=to_2d(close, raw=True),
@@ -2242,10 +2241,9 @@ class Portfolio(Wrapping):
                 max_logs=max_logs
             )
         else:
-            if use_numba:
-                simulate_func = nb.simulate_nb
-            else:
-                simulate_func = nb.simulate_nb.py_func
+            simulate_func = nb.simulate_nb
+            if not use_numba and hasattr(simulate_func, 'py_func'):
+                simulate_func = simulate_func.py_func
             order_records, log_records = simulate_func(
                 target_shape=target_shape_2d,
                 close=to_2d(close, raw=True),
