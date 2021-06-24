@@ -28,7 +28,7 @@ def group_by_to_index(index: tp.Index, group_by: tp.GroupByLike) -> GroupByT:
     if group_by is None or group_by is False:
         return group_by
     if group_by is True:
-        group_by = pd.Index(np.full(len(index), 0))  # one group
+        group_by = pd.Index(['group'] * len(index))  # one group
     elif isinstance(group_by, (int, str)):
         group_by = index_fns.select_levels(index, group_by)
     elif checks.is_sequence(group_by):

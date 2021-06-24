@@ -333,38 +333,34 @@ Name: sharpe_ratio, dtype: float64
 
 !!! note
     Save files won't include neither cached results nor global defaults. For example,
-    passing `incl_unrealized` as None will also use None when the portfolio is loaded from disk.
+    passing `fillna_close` as None will also use None when the portfolio is loaded from disk.
     Make sure to either pass all arguments explicitly or to save and load the `vectorbt._settings.settings` config.
 """
-
 import numpy as np
 import pandas as pd
-from collections import OrderedDict
+from collections import Counter
 import warnings
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.enum import cast_enum_value
-from vectorbt.utils.config import merge_dicts, get_func_arg_names
+from vectorbt.utils.config import merge_dicts, get_func_arg_names, Config
 from vectorbt.utils.template import deep_substitute, Rep
 from vectorbt.utils.random import set_seed
 from vectorbt.utils.colors import adjust_opacity
 from vectorbt.utils.figure import make_subplots, get_domain
+from vectorbt.utils.datetime import freq_to_timedelta
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.signals.generators import RAND, RPROB
+from vectorbt.returns.accessors import ReturnsAccessor
 from vectorbt.portfolio import nb
 from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import *
-
-
-def _mean_agg_func(df: tp.Frame) -> tp.Series:
-    """Compute mean for `Portfolio.stats`."""
-    return df.mean(axis=0)
 
 
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
@@ -382,31 +378,28 @@ def add_returns_methods(func_names: tp.Iterable[tp.Union[str, tp.Tuple[str, str]
                 ret_func_name = func_name
 
             def returns_method(
-                    self,
+                    self: "Portfolio",
                     *args,
                     group_by: tp.GroupByLike = None,
+                    freq: tp.Optional[tp.FrequencyLike] = None,
                     year_freq: tp.Optional[tp.FrequencyLike] = None,
                     _ret_func_name: str = ret_func_name,
-                    active_returns: bool = False,
-                    in_sim_order: bool = False,
-                    reuse_returns: tp.Optional[tp.SeriesFrame] = None,
-                    **kwargs) -> tp.Any:
-                if reuse_returns is not None:
-                    returns = reuse_returns
-                else:
-                    if active_returns:
-                        returns = self.active_returns(group_by=group_by)
-                    else:
-                        returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
-                returns_acc = returns.vbt.returns(freq=self.wrapper.freq, year_freq=year_freq)
+                    use_active_returns: bool = False,
+                    **ret_func_kwargs) -> tp.Any:
+                returns_acc = self.returns_acc(
+                    group_by=group_by,
+                    freq=freq,
+                    year_freq=year_freq,
+                    use_active_returns=use_active_returns
+                )
                 # Select only those arguments in kwargs that are also in the method's signature
                 # This is done for Portfolio.stats which passes the same kwargs to multiple methods
                 method = getattr(returns_acc, _ret_func_name)
                 arg_names = get_func_arg_names(method)
                 new_kwargs = {}
                 for arg_name in arg_names:
-                    if arg_name in kwargs:
-                        new_kwargs[arg_name] = kwargs[arg_name]
+                    if arg_name in ret_func_kwargs:
+                        new_kwargs[arg_name] = ret_func_kwargs[arg_name]
                 return method(*args, **new_kwargs)
 
             if isinstance(func_name, tuple):
@@ -457,7 +450,6 @@ class Portfolio(Wrapping):
         init_cash (InitCashMode, float or array_like of float): Initial capital.
         cash_sharing (bool): Whether to share cash within the same group.
         call_seq (array_like of int): Sequence of calls per row and group.
-        incl_unrealized (bool): Whether to include unrealized P&L in statistics.
         fillna_close (bool): Whether to forward and backward fill NaN values in `close`.
 
             Applied after the simulation to avoid NaNs in asset value.
@@ -471,6 +463,9 @@ class Portfolio(Wrapping):
     !!! note
         This class is meant to be immutable. To change any attribute, use `Portfolio.copy`."""
 
+    writeable_attrs: tp.ClassVar[tp.List[str]] = ['metrics', 'subplots']
+    """List of writeable attributes that will be saved/copied along with the config."""
+
     def __init__(self,
                  wrapper: ArrayWrapper,
                  close: tp.ArrayLike,
@@ -479,7 +474,6 @@ class Portfolio(Wrapping):
                  init_cash: tp.ArrayLike,
                  cash_sharing: bool,
                  call_seq: tp.Array2d,
-                 incl_unrealized: tp.Optional[bool] = None,
                  fillna_close: tp.Optional[bool] = None) -> None:
         Wrapping.__init__(
             self,
@@ -490,15 +484,12 @@ class Portfolio(Wrapping):
             init_cash=init_cash,
             cash_sharing=cash_sharing,
             call_seq=call_seq,
-            incl_unrealized=incl_unrealized,
             fillna_close=fillna_close
         )
         # Get defaults
         from vectorbt._settings import settings
         portfolio_cfg = settings['portfolio']
 
-        if incl_unrealized is None:
-            incl_unrealized = portfolio_cfg['incl_unrealized']
         if fillna_close is None:
             fillna_close = portfolio_cfg['fillna_close']
 
@@ -509,8 +500,11 @@ class Portfolio(Wrapping):
         self._init_cash = init_cash
         self._cash_sharing = cash_sharing
         self._call_seq = call_seq
-        self._incl_unrealized = incl_unrealized
         self._fillna_close = fillna_close
+
+        # Copy dicts
+        self.metrics = self.__class__.metrics.copy()
+        self.subplots = self.__class__.subplots.copy()
 
     def indexing_func(self: PortfolioT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> PortfolioT:
         """Perform indexing on `Portfolio`."""
@@ -1471,7 +1465,7 @@ class Portfolio(Wrapping):
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
-            freq (any): Index frequency in case `close.index` is not datetime-like.
+            freq (any): Index frequency in case it cannot be parsed from `close`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         All broadcastable arguments will broadcast using `vectorbt.base.reshape_fns.broadcast`
@@ -1869,7 +1863,7 @@ class Portfolio(Wrapping):
             group_by (any): Group columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
             broadcast_kwargs (dict): Keyword arguments passed to `vectorbt.base.reshape_fns.broadcast`.
             wrapper_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper`.
-            freq (any): Index frequency in case `close.index` is not datetime-like.
+            freq (any): Index frequency in case it cannot be parsed from `close`.
             **kwargs: Keyword arguments passed to the `__init__` method.
 
         For defaults, see `portfolio` in `vectorbt._settings.settings`.
@@ -2313,7 +2307,10 @@ class Portfolio(Wrapping):
     def regroup(self: PortfolioT, group_by: tp.GroupByLike, **kwargs) -> PortfolioT:
         """Regroup this object.
 
-        See `vectorbt.base.array_wrapper.Wrapping.regroup`."""
+        See `vectorbt.base.array_wrapper.Wrapping.regroup`.
+
+        !!! note
+            All cached objects will be lost."""
         if self.cash_sharing:
             if self.wrapper.grouper.is_grouping_modified(group_by=group_by):
                 raise ValueError("Cannot modify grouping globally when cash_sharing=True")
@@ -2328,11 +2325,6 @@ class Portfolio(Wrapping):
     def call_seq(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Sequence of calls per row and group."""
         return self.wrapper.wrap(self._call_seq, group_by=False, **merge_dicts({}, wrap_kwargs))
-
-    @property
-    def incl_unrealized(self) -> bool:
-        """Whether to include unrealized trade P&L in statistics."""
-        return self._incl_unrealized
 
     @property
     def fillna_close(self) -> bool:
@@ -2364,6 +2356,7 @@ class Portfolio(Wrapping):
         """`Portfolio.get_orders` with default arguments."""
         return Orders(self.wrapper, self.order_records, self.close)
 
+    @cached_method
     def get_orders(self, group_by: tp.GroupByLike = None) -> Orders:
         """Get order records.
 
@@ -2380,6 +2373,7 @@ class Portfolio(Wrapping):
         """`Portfolio.get_logs` with default arguments."""
         return Logs(self.wrapper, self.log_records)
 
+    @cached_method
     def get_logs(self, group_by: tp.GroupByLike = None) -> Logs:
         """Get log records.
 
@@ -2391,6 +2385,7 @@ class Portfolio(Wrapping):
         """`Portfolio.get_trades` with default arguments."""
         return Trades.from_orders(self.orders)
 
+    @cached_method
     def get_trades(self, group_by: tp.GroupByLike = None) -> Trades:
         """Get trade records.
 
@@ -2402,6 +2397,7 @@ class Portfolio(Wrapping):
         """`Portfolio.get_positions` with default arguments."""
         return Positions.from_trades(self.trades)
 
+    @cached_method
     def get_positions(self, group_by: tp.GroupByLike = None) -> Positions:
         """Get position records.
 
@@ -2414,13 +2410,13 @@ class Portfolio(Wrapping):
         return self.get_drawdowns()
 
     @cached_method
-    def get_drawdowns(self, **kwargs) -> Drawdowns:
+    def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
         """Get drawdown records from `Portfolio.value`.
 
         See `vectorbt.generic.drawdowns.Drawdowns`.
 
         `**kwargs` are passed to `Portfolio.value`."""
-        return Drawdowns.from_ts(self.value(**kwargs), freq=self.wrapper.freq)
+        return Drawdowns.from_ts(self.value(group_by=group_by, **kwargs), freq=self.wrapper.freq)
 
     # ############# Assets ############# #
 
@@ -2515,7 +2511,7 @@ class Portfolio(Wrapping):
         """Initial amount of cash per column/group with default arguments.
 
         !!! note
-            If the initial cash balance is found automatically and no own cash is used throughout
+            If the initial cash balance was found automatically and no own cash is used throughout
             the simulation (for example, when shorting), it will be set to 1 instead of 0 to enable
             smooth calculation of returns."""
         if isinstance(self._init_cash, int):
@@ -2701,6 +2697,24 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(active_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
+    def returns_acc(self,
+                    group_by: tp.GroupByLike = None,
+                    freq: tp.Optional[tp.FrequencyLike] = None,
+                    year_freq: tp.Optional[tp.FrequencyLike] = None,
+                    use_active_returns: bool = False) -> ReturnsAccessor:
+        """Get returns accessor of type `vectorbt.returns.accessors.ReturnsAccessor`.
+
+        !!! hint
+            You can find most methods of this accessor as (cacheable) attributes of this portfolio."""
+        if freq is None:
+            freq = self.wrapper.freq
+        if use_active_returns:
+            returns = self.active_returns(group_by=group_by)
+        else:
+            returns = self.returns(group_by=group_by)
+        return returns.vbt.returns(freq=freq, year_freq=year_freq)
+
+    @cached_method
     def market_value(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get market (benchmark) value series per column/group.
 
@@ -2729,6 +2743,8 @@ class Portfolio(Wrapping):
         market_returns = nb.returns_nb(market_value, init_cash)
         return self.wrapper.wrap(market_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
+    benchmark_rets = market_returns
+
     @cached_method
     def total_market_return(self, group_by: tp.GroupByLike = None,
                             wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
@@ -2738,96 +2754,881 @@ class Portfolio(Wrapping):
         wrap_kwargs = merge_dicts(dict(name_or_index='total_market_return'), wrap_kwargs)
         return self.wrapper.wrap_reduced(total_market_return, group_by=group_by, **wrap_kwargs)
 
-    @cached_method
+    # ############# Stats ############# #
+
+    @property
+    def common_settings(self) -> tp.Kwargs:
+        """Return dictionary of most commonly used settings.
+
+        * freq: Index frequency in case it cannot be parsed from `close`.
+        * year_freq: Year frequency for annualization purposes.
+        * incl_unrealized: Whether to include open trades/positions in statistics.
+        * use_active_returns: Whether to use `Portfolio.active_returns` when resolving `returns` argument.
+        * use_positions: Whether to use `Portfolio.positions` when resolving `trades` argument.
+        * use_caching: Whether to use built-in caching for resolved arguments.
+
+            Works even if global caching is disabled."""
+        from vectorbt._settings import settings
+        portfolio_stats_cfg = settings['portfolio']['stats']
+        returns_stats_cfg = settings['returns']
+
+        return dict(
+            freq=self.wrapper.freq,
+            year_freq=returns_stats_cfg['year_freq'],
+            incl_unrealized=portfolio_stats_cfg['incl_unrealized'],
+            use_active_returns=portfolio_stats_cfg['use_active_returns'],
+            use_positions=portfolio_stats_cfg['use_positions'],
+            use_caching=portfolio_stats_cfg['use_caching']
+        )
+
+    def resolve_attr(self,
+                     attr: str,
+                     args: tp.ArgsLike = None,
+                     cond_kwargs: tp.KwargsLike = None,
+                     kwargs: tp.KwargsLike = None,
+                     custom_arg_names: tp.Optional[tp.Container[str]] = None,
+                     cache_dct: tp.KwargsLike = None) -> tp.Any:
+        """Resolve attribute of the portfolio using keyword arguments and built-in caching.
+
+        * If `attr` is a property, simply returns it.
+        * If `attr` is a method, passes `*args`, `**kwargs`, and `**cond_kwargs` with keys found in the signature.
+        * If `attr` is a property and there is a `get_{arg}` method, calls the `get_{arg}` method.
+
+        Won't cache if any passed argument is in `custom_arg_names`."""
+        # Resolve defaults
+        if custom_arg_names is None:
+            custom_arg_names = list()
+        if cache_dct is None:
+            cache_dct = {}
+        if args is None:
+            args = ()
+        if kwargs is None:
+            kwargs = {}
+        final_kwargs = merge_dicts(self.common_settings, cond_kwargs, kwargs)
+
+        # Resolve attribute
+        if attr == 'returns' and final_kwargs['use_active_returns']:
+            attr = 'active_returns'
+        if attr == 'trades' and final_kwargs['use_positions']:
+            attr = 'positions'
+        cls = type(self)
+        _attr = attr
+        if 'get_' + attr in dir(cls):
+            _attr = 'get_' + attr
+        if callable(getattr(cls, _attr)):
+            attr_func = getattr(self, _attr)
+            attr_func_kwargs = dict()
+            attr_func_arg_names = get_func_arg_names(attr_func)
+            custom_k = False
+            for k, v in final_kwargs.items():
+                if k in attr_func_arg_names or k in kwargs:
+                    if k in custom_arg_names:
+                        custom_k = True
+                    attr_func_kwargs[k] = v
+            if final_kwargs['use_caching'] and not custom_k and attr in cache_dct:
+                out = cache_dct[attr]
+            else:
+                out = attr_func(*args, **attr_func_kwargs)
+                if attr in ['trades', 'positions', 'drawdowns']:
+                    if self.wrapper.freq != final_kwargs['freq']:
+                        out = out.copy(wrapper=out.wrapper.copy(freq=final_kwargs['freq']))
+                if attr in ['trades', 'positions'] and not final_kwargs['incl_unrealized']:
+                    out = out.closed
+                if final_kwargs['use_caching'] and not custom_k:
+                    cache_dct[attr] = out
+        else:
+            if final_kwargs['use_caching'] and attr in cache_dct:
+                out = cache_dct[attr]
+            else:
+                out = getattr(self, _attr)
+                if final_kwargs['use_caching']:
+                    cache_dct[attr] = out
+        return out
+
+    metrics: tp.ClassVar[Config] = Config(
+        dict(
+            bt_start=dict(
+                title='Start',
+                calc_func=lambda portfolio: portfolio.wrapper.index[0]
+            ),
+            bt_end=dict(
+                title='End',
+                calc_func=lambda portfolio: portfolio.wrapper.index[-1]
+            ),
+            bt_duration=dict(
+                title='Duration',
+                calc_func=lambda portfolio, freq: len(portfolio.wrapper.index) * (freq if freq is not None else 1)
+            ),
+            init_cash=dict(
+                title='Initial Cash',
+                calc_func=lambda portfolio, group_by: portfolio.get_init_cash(group_by=group_by)
+            ),
+            total_profit=dict(
+                title='Total Profit',
+                calc_func=lambda portfolio, group_by: portfolio.total_profit(group_by=group_by)
+            ),
+            total_return=dict(
+                title='Total Return [%]',
+                calc_func=lambda portfolio, group_by: portfolio.total_return(group_by=group_by) * 100
+            ),
+            benchmark_return=dict(
+                title='Benchmark Return [%]',
+                calc_func=lambda benchmark_rets: benchmark_rets.vbt.returns.total() * 100
+            ),
+            pos_coverage=dict(
+                title='Position Coverage [%]',
+                calc_func=lambda portfolio, group_by: portfolio.position_coverage(group_by=group_by) * 100
+            ),
+            max_dd=dict(
+                title='Max Drawdown [%]',
+                calc_func=lambda drawdowns: -drawdowns.max_drawdown() * 100
+            ),
+            avg_dd=dict(
+                title='Avg Drawdown [%]',
+                calc_func=lambda drawdowns: -drawdowns.avg_drawdown() * 100
+            ),
+            max_dd_duration=dict(
+                title='Max Drawdown Duration',
+                calc_func=lambda drawdowns, freq: drawdowns.max_duration(
+                    wrap_kwargs=dict(time_units=freq is not None))
+            ),
+            avg_dd_duration=dict(
+                title='Avg Drawdown Duration',
+                calc_func=lambda drawdowns, freq: drawdowns.avg_duration(
+                    wrap_kwargs=dict(time_units=freq is not None))
+            ),
+            trade_cnt=dict(
+                title='Trade Count',
+                calc_func=lambda trades: trades.count()
+            ),
+            win_rate=dict(
+                title='Win Rate [%]',
+                calc_func=lambda trades: trades.win_rate() * 100
+            ),
+            best_trade=dict(
+                title='Best Trade [%]',
+                calc_func=lambda trades: trades.returns.max() * 100
+            ),
+            worst_trade=dict(
+                title='Worst Trade [%]',
+                calc_func=lambda trades: trades.returns.min() * 100
+            ),
+            avg_trade=dict(
+                title='Avg Trade [%]',
+                calc_func=lambda trades: trades.returns.mean() * 100
+            ),
+            max_trade_duration=dict(
+                title='Max Trade Duration',
+                calc_func=lambda trades, freq: trades.duration.max(
+                    wrap_kwargs=dict(time_units=freq is not None))
+            ),
+            avg_trade_duration=dict(
+                title='Avg Trade Duration',
+                calc_func=lambda trades, freq: trades.duration.mean(
+                    wrap_kwargs=dict(time_units=freq is not None))
+            ),
+            expectancy=dict(
+                title='Expectancy',
+                calc_func=lambda trades: trades.expectancy()
+            ),
+            sqn=dict(
+                title='SQN',
+                calc_func=lambda trades: trades.sqn()
+            ),
+            gross_exposure=dict(
+                title='Gross Exposure',
+                calc_func=lambda portfolio, group_by: portfolio.gross_exposure(group_by=group_by).mean()
+            ),
+            sharpe_ratio=dict(
+                title='Sharpe Ratio',
+                req_freq=True,
+                calc_func='returns_acc.sharpe_ratio'
+            ),
+            sortino_ratio=dict(
+                title='Sortino Ratio',
+                req_freq=True,
+                calc_func='returns_acc.sortino_ratio'
+            ),
+            calmar_ratio=dict(
+                title='Calmar Ratio',
+                req_freq=True,
+                calc_func='returns_acc.calmar_ratio'
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+    """Metrics supported by `Portfolio.stats`.
+    
+    !!! note
+        It's safe to change this config - this instance variable is a (deep) copy of the class variable.
+        
+        Copying portfolio using `Portfolio.copy` won't create a copy of the config!"""
+
     def stats(self,
+              metrics: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
               column: tp.Optional[tp.Label] = None,
               group_by: tp.GroupByLike = None,
-              incl_unrealized: tp.Optional[bool] = None,
-              active_returns: bool = False,
-              in_sim_order: bool = False,
-              agg_func: tp.Optional[tp.Callable] = _mean_agg_func,
-              wrap_kwargs: tp.KwargsLike = None,
+              agg_func: tp.Optional[tp.Callable] = np.mean,
+              silence_warnings: tp.Optional[bool] = None,
+              template_mapping: tp.Optional[tp.Mapping] = None,
+              global_settings: tp.DictLike = None,
               **kwargs) -> tp.SeriesFrame:
-        """Compute various statistics on this portfolio.
+        """Compute various metrics on this portfolio.
 
-        `kwargs` will be passed to each `vectorbt.returns.accessors.ReturnsAccessor` method.
+        Args:
+            metrics (str, tuple, iterable, or dict): List of metrics to calculate.
 
-        Can either return aggregated statistics by reducing metrics of all columns with
-        `agg_func` (mean by default) or return statistics for a single column if `column`
-        was specified or portfolio contains only one column of data. To display rich data types
-        such as durations correctly, use an aggregation function that can be applied on `pd.Series`.
+                Each element can be either:
+
+                * a metric name (see keys in `Portfolio.metrics`)
+                * a tuple of a metric name and a settings dict as in `Portfolio.metrics`.
+
+                Each settings dict can contain the following keys:
+
+                * `title`: title of the metric. Defaults to the name.
+                * `allow_grouped`: whether this metric supports using grouped data. Defaults to True.
+                    Must be known beforehand and cannot be provided as a template.
+                * `req_freq`: whether this metric requires frequency. Defaults to False.
+                    Must be known beforehand and cannot be provided as a template.
+                * `calc_func`: calculation function for custom metrics. If the function can be accessed
+                    by traversing attributes of this portfolio, you can pass the path to this function
+                    as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
+                    Should return either a scalar for one column/group or pd.Series for multiple columns/groups.
+                * `pass_{arg}`: whether to pass a reserved argument (see below). Defaults to True if
+                    this argument was found in the function's signature. Set to False to not pass.
+                * `glob_pass_{arg}`: whether to pass an argument from `global_settings`. Defaults to True if
+                    this argument was found both in `global_settings` and the function's signature.
+                    Set to False to not pass.
+                * `resolve_{arg}`: whether to resolve an argument that is meant to be an attribute of
+                    the portfolio (see `Portfolio.resolve_attr`). Defaults to True if this argument was found
+                    in the function's signature. Set to False to not resolve.
+                * `template_mapping`: mapping to replace templates in metric settings and keyword arguments.
+                    Used across all settings.
+                * Any other keyword argument overrides reserved arguments or is passed directly to `calc_func`.
+
+                A calculation function may accept any keyword argument. It may "request" any of the
+                following reserved arguments by accepting them or if `pass_{arg}` was found in the settings dict:
+
+                * `pf` or `portfolio`: original portfolio (ungrouped and with no column selected)
+                * `column`
+                * `group_by`
+                * `metric_name`
+                * `agg_func`
+                * Any argument from `Portfolio.common_settings`
+                * Any attribute of the portfolio if it meant to be resolved (see `Portfolio.resolve_attr`)
+
+                Pass `metrics='all'` to calculate all supported metrics.
+            column (str): Name of the column/group.
+
+                !!! hint
+                    There are two ways to select a column: `pf['a'].stats()` and `pf.stats(column='a')`.
+                    They both accomplish the same thing but in different ways: `pf['a'].stats()` computes
+                    statistics of the column 'a' only, while `pf.stats(column='a')` computes statistics of
+                    all columns first and only then selects the column 'a'. The first method is preferred
+                    when you have a lot of data or caching is disabled. The second method is preferred when
+                    most attributes have already been cached.
+            group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
+            agg_func (callable): Aggregation function to aggregate statistics across all columns.
+                Defaults to mean.
+
+                Should take `pd.Series` and return a const.
+
+                Has only effect if `column` was specified or portfolio contains only one column of data.
+                If `agg_func` has been overridden by a metric, it only takes effect if global `agg_func` is not None.
+            silence_warnings (bool): Whether to silence all warnings.
+            template_mapping (mapping): Global mapping to replace templates.
+
+                Applied on `Portfolio.common_settings`, `global_settings`, and `kwargs`.
+            global_settings (dict): Keyword arguments that override default settings for each metric.
+                Additionally, passes any argument that has the matching key in the signature of `calc_func`.
+                Use `glob_pass_{arg}` to force or ignore passing an argument.
+            **kwargs: Additional keyword arguments.
+
+                Can contain keyword arguments for each metric, specified as `{metric_name}_kwargs`.
+                Can also contain keyword arguments that override arguments from `Portfolio.common_settings`.
+
+        For template logic, see `vectorbt.utils.template`.
+
+        For defaults, see `portfolio.stats` in `vectorbt._settings.settings`.
+
+        !!! hint
+            This method is very similar to `Portfolio.plot`.
+
+            Make sure to resolve and then to re-use as many portfolio artifcats as possible to
+            utilize built-in caching (even if global caching is disabled).
 
         !!! note
-            Use `column` only if caching is enabled, otherwise it may re-compute the same
-            objects multiple times."""
-        if self.wrapper.freq is None:
-            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
+            This method is not cacheable as it depends on global defaults.
+            But the portfolio artifacts it depends on are cacheable.
 
-        # Pre-calculate
-        trades = self.get_trades(group_by=group_by)
-        if incl_unrealized is None:
-            incl_unrealized = self.incl_unrealized
-        if not incl_unrealized:
-            trades = trades.closed
-        drawdowns = self.get_drawdowns(group_by=group_by)
-        if active_returns:
-            returns = self.active_returns(group_by=group_by)
-        else:
-            returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
+        ## Example
+
+        Let's simulate a portfolio with two columns:
+
+        ```python-repl
+        >>> import vectorbt as vbt
+
+        >>> close = vbt.YFData.download(
+        ...     "BTC-USD",
+        ...     start='2020-01-01 UTC',
+        ...     end='2020-09-01 UTC'
+        ... ).get('Close')
+
+        >>> portfolio = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42)
+        >>> portfolio.wrapper.columns
+        Int64Index([10, 20], dtype='int64', name='rand_n')
+        ```
+
+        To return the statistics for a particular column/group, use the `column` argument:
+
+        ```python-repl
+        >>> portfolio.stats(column=10)
+        UserWarning: Metrics {'calmar_ratio', 'sharpe_ratio', 'sortino_ratio'} require frequency of index.
+        Pass it as `freq` or define it globally under `settings.array_wrapper`.
+
+        Start                    2020-01-01 00:00:00+00:00
+        End                      2020-09-01 00:00:00+00:00
+        Duration                                       244
+        Initial Cash                                   100
+        Total Profit                               6.72158
+        Total Return [%]                           6.72158
+        Benchmark Return [%]                       66.2526
+        Position Coverage [%]                      51.2295
+        Max Drawdown [%]                           22.1909
+        Avg Drawdown [%]                           5.86559
+        Max Drawdown Duration                          101
+        Avg Drawdown Duration                       26.125
+        Trade Count                                     10
+        Win Rate [%]                                    60
+        Best Trade [%]                             15.3196
+        Worst Trade [%]                           -9.90422
+        Avg Trade [%]                             0.862693
+        Max Trade Duration                              23
+        Avg Trade Duration                            12.5
+        Expectancy                                0.672158
+        SQN                                       0.324787
+        Gross Exposure                            0.512295
+        Name: 10, dtype: object
+        ```
+
+        If vectorbt couldn't parse the frequency of our `close`, it 1) won't return duration in
+        time units and 2) won't return metrics that require annualization. We can provide the frequency
+        manually either upon portfolio simulation or here:
+
+        ```python-repl
+        >>> portfolio.stats(column=10, freq='d')
+        Start                    2020-01-01 00:00:00+00:00
+        End                      2020-09-01 00:00:00+00:00
+        Duration                         244 days 00:00:00
+        Initial Cash                                   100
+        Total Profit                               6.72158
+        Total Return [%]                           6.72158
+        Benchmark Return [%]                       66.2526
+        Position Coverage [%]                      51.2295
+        Max Drawdown [%]                           22.1909
+        Avg Drawdown [%]                           5.86559
+        Max Drawdown Duration            101 days 00:00:00
+        Avg Drawdown Duration             26 days 03:00:00
+        Trade Count                                     10
+        Win Rate [%]                                    60
+        Best Trade [%]                             15.3196
+        Worst Trade [%]                           -9.90422
+        Avg Trade [%]                             0.862693
+        Max Trade Duration                23 days 00:00:00
+        Avg Trade Duration                12 days 12:00:00
+        Expectancy                                0.672158
+        SQN                                       0.324787
+        Gross Exposure                            0.512295
+        Sharpe Ratio                              0.369947
+        Sortino Ratio                             0.587442
+        Calmar Ratio                              0.313166
+        Name: 10, dtype: object
+        ```
+
+        We can change the grouping of the portfolio on the fly. Let's form a single group:
+
+        ```python-repl
+        >>> portfolio.stats(group_by=True, freq='d')
+        Start                     2020-01-01 00:00:00+00:00
+        End                       2020-09-01 00:00:00+00:00
+        Duration                          244 days 00:00:00
+        Initial Cash                                    200
+        Total Profit                                 77.493
+        Total Return [%]                            38.7465
+        Benchmark Return [%]                        66.2526
+        Position Coverage [%]                       48.9754
+        Max Drawdown [%]                            14.2193
+        Avg Drawdown [%]                            5.34082
+        Max Drawdown Duration              86 days 00:00:00
+        Avg Drawdown Duration    16 days 14:46:09.230769231
+        Trade Count                                      30
+        Win Rate [%]                                66.6667
+        Best Trade [%]                              18.3326
+        Worst Trade [%]                            -9.90422
+        Avg Trade [%]                               2.26356
+        Max Trade Duration                 23 days 00:00:00
+        Avg Trade Duration                  7 days 23:12:00
+        Expectancy                                   2.5831
+        SQN                                         1.70984
+        Gross Exposure                             0.488308
+        Sharpe Ratio                                1.31206
+        Sortino Ratio                               2.15761
+        Calmar Ratio                                2.83025
+        Name: group, dtype: object
+        ```
+
+        We can see how the initial cash has changed from $100 to $200, indicating that both columns
+        contribute to the performance.
+
+        If the portfolio consists of multiple columns/groups and no column/group has been selected,
+        each metric is aggregated across all columns/groups based on `agg_func`, which is mean by default.
+
+        ```python-repl
+        >>> portfolio.stats(freq='d')
+        Taking mean across columns. To return a DataFrame, pass agg_func=None.
+
+        Start                    2020-01-01 00:00:00+00:00
+        End                      2020-09-01 00:00:00+00:00
+        Duration                         244 days 00:00:00
+        Initial Cash                                   100
+        Total Profit                               38.7465
+        Total Return [%]                           38.7465
+        Benchmark Return [%]                       66.2526
+        Position Coverage [%]                      48.9754
+        Max Drawdown [%]                           20.3587
+        Avg Drawdown [%]                           6.85197
+        Max Drawdown Duration             93 days 00:00:00
+        Avg Drawdown Duration             24 days 01:30:00
+        Trade Count                                     15
+        Win Rate [%]                                    65
+        Best Trade [%]                             16.8261
+        Worst Trade [%]                           -9.70127
+        Avg Trade [%]                              1.91334
+        Max Trade Duration                21 days 12:00:00
+        Avg Trade Duration                 9 days 02:24:00
+        Expectancy                                 2.10536
+        SQN                                        1.03975
+        Gross Exposure                            0.489754
+        Sharpe Ratio                              0.968587
+        Sortino Ratio                              1.73209
+        Calmar Ratio                               2.14818
+        Name: stats_mean, dtype: object
+        ```
+
+        Here, the Calmar ratio of 0.313166 (column=10) and 3.98318 (column=20) lead to the avarage of 2.14818.
+
+        We can also return a DataFrame with statistics per column/group by passing `agg_func=None`:
+
+        ```python-repl
+        >>> portfolio.stats(agg_func=None, freq='d')
+                                   Start                       End Duration  ...  Calmar Ratio
+        rand_n                                                               ...
+        10     2020-01-01 00:00:00+00:00 2020-09-01 00:00:00+00:00 244 days  ...      0.313166
+        20     2020-01-01 00:00:00+00:00 2020-09-01 00:00:00+00:00 244 days  ...      3.983185
+
+        [2 rows x 25 columns]
+        ```
+
+        To select metrics, use the `metrics` argument (see `Portfolio.metrics` for supported metrics):
+
+        ```python-repl
+        >>> portfolio.stats(metrics=['sharpe_ratio', 'sortino_ratio'], column=10, freq='d')
+        Sharpe Ratio     0.369947
+        Sortino Ratio    0.587442
+        Name: stats, dtype: float64
+        ```
+
+        To calculate a custom metric, we need to provide at least two things: short name and a settings
+        dict with the title and calculation function (see arguments):
+
+        ```python-repl
+        >>> profit_factor = (
+        ...     'profit_factor',
+        ...     dict(
+        ...         title='Profit Factor',
+        ...         calc_func=lambda trades: trades.profit_factor()
+        ...     )
+        ... )
+        >>> portfolio.stats(metrics=profit_factor, column=10, freq='d')
+        Profit Factor    1.347457
+        Name: stats, dtype: float64
+        ```
+
+        Since `profit_factor` method can be expressed as a path from this portfolio, we can simply write:
+
+        ```python-repl
+        >>> profit_factor = (
+        ...     'profit_factor',
+        ...     dict(
+        ...         title='Profit Factor',
+        ...         calc_func='trades.profit_factor'
+        ...     )
+        ... )
+        ```
+
+        In both cases, `trades` argument is an attribute of this portfolio and vectorbt automatically "resolves" it
+        by passing any reserved argument that was found in its signature, such as `group_by`.
+        If we want to stop `trades` (or any other attribute) from being resolved, just pass `resolve_trades=False`.
+        In this case, vectorbt would simply call `portfolio.get_trades()` and give it to us.
+
+        Any default metric setting or even global setting can be overridden by the user using metric-specific
+        keyword arguments. Here, we override the global aggregation function for `max_trade_duration`:
+
+        ```python-repl
+        >>> portfolio.stats(freq='d', agg_func=lambda sr: sr.mean(),
+        ...     max_trade_duration_kwargs=dict(agg_func=lambda sr: sr.max()))
+        ```
+
+        Let's create a simple metric that returns frequency to demonstrate how vectorbt overrides settings,
+        from least to most important:
+        ```python-repl
+        >>> # common_defaults
+        >>> freq_metric = ('freq_metric', dict(title='Freq', calc_func=lambda freq: freq))
+        >>> portfolio.stats(freq_metric, column=10)
+        Freq    None
+        Name: 10, dtype: object
+
+        >>> # kwargs with keys from common_defaults >>> common_defaults
+        >>> portfolio.stats(freq_metric, column=10, freq='1m')
+        Freq   0 days 00:01:00
+        Name: 10, dtype: timedelta64[ns]
+
+        >>> # metric settings >>> kwargs with keys from common_defaults
+        >>> def_freq_metric = ('freq_metric', dict(title='Freq', freq='2m', calc_func=lambda freq: freq))
+        >>> portfolio.stats(def_freq_metric, column=10, freq='1m')
+        Freq   0 days 00:02:00
+        Name: 10, dtype: timedelta64[ns]
+
+        >>> # global_settings >>> metric settings
+        >>> portfolio.stats(def_freq_metric, column=10, freq='1m',
+        ...     global_settings=dict(freq='3m'))
+        Freq   0 days 00:03:00
+        Name: 10, dtype: timedelta64[ns]
+
+        >>> # metric kwargs >>> global_settings
+        >>> portfolio.stats(def_freq_metric, column=10, freq='1m',
+        ...     global_settings=dict(freq='3m'), freq_metric_kwargs=dict(freq='4m'))
+        Freq   0 days 00:04:00
+        Name: 10, dtype: timedelta64[ns]
+        ```
+
+        Here's an example of a parametrized metric. Let's get the number of trades with P&L over some amount:
+
+        ```python-repl
+        >>> trade_min_pnl_cnt = (
+        ...     'trade_min_pnl_cnt',
+        ...     dict(
+        ...         title=vbt.Sub('Trades with P&L over $$${min_pnl}'),
+        ...         calc_func=lambda trades, min_pnl: trades.filter_by_mask(
+        ...             trades.pnl.values >= min_pnl).count()
+        ...     )
+        ... )
+        >>> portfolio.stats(
+        ...     metrics=trade_min_pnl_cnt, column=10, freq='d',
+        ...     trade_min_pnl_cnt_kwargs=dict(min_pnl=0))
+        Trades with P&L over $0    6
+        Name: stats, dtype: int64
+
+        >>> portfolio.stats(
+        ...     metrics=trade_min_pnl_cnt, column=10, freq='d',
+        ...     trade_min_pnl_cnt_kwargs=dict(min_pnl=10))
+        Trades with P&L over $10    1
+        Name: stats, dtype: int64
+        ```
+
+        If the same metric name was encountered more than once, vectorbt automaticallu appends an
+        underscore and its position, so we can pass keyword arguments to each metric separately:
+
+        ```python-repl
+        >>> portfolio.stats(
+        ...     metrics=[
+        ...         trade_min_pnl_cnt,
+        ...         trade_min_pnl_cnt,
+        ...         trade_min_pnl_cnt
+        ...     ],
+        ...     column=10, freq='d',
+        ...     trade_min_pnl_cnt_0_kwargs=dict(min_pnl=0),
+        ...     trade_min_pnl_cnt_1_kwargs=dict(min_pnl=10),
+        ...     trade_min_pnl_cnt_2_kwargs=dict(min_pnl=20))
+        Trades with P&L over $0     6
+        Trades with P&L over $10    1
+        Trades with P&L over $20    0
+        Name: stats, dtype: int64
+        ```
+
+        To add a custom metric to the list of all metrics, we have three options.
+        First, we can change the `Portfolio.metrics` dict in-place (this will append to the end):
+        ```python-repl
+        >>> portfolio.metrics['profit_factor'] = profit_factor[1]
+        >>> portfolio.stats(column=10, freq='d')
+        Start                    2020-01-01 00:00:00+00:00
+        End                      2020-09-01 00:00:00+00:00
+        Duration                         244 days 00:00:00
+        Initial Cash                                   100
+        Total Profit                               6.72158
+        Total Return [%]                           6.72158
+        Benchmark Return [%]                       66.2526
+        Position Coverage [%]                      51.2295
+        Max Drawdown [%]                           22.1909
+        Avg Drawdown [%]                           5.86559
+        Max Drawdown Duration            101 days 00:00:00
+        Avg Drawdown Duration             26 days 03:00:00
+        Trade Count                                     10
+        Win Rate [%]                                    60
+        Best Trade [%]                             15.3196
+        Worst Trade [%]                           -9.90422
+        Avg Trade [%]                             0.862693
+        Max Trade Duration                23 days 00:00:00
+        Avg Trade Duration                12 days 12:00:00
+        Expectancy                                0.672158
+        SQN                                       0.324787
+        Gross Exposure                            0.512295
+        Sharpe Ratio                              0.369947
+        Sortino Ratio                             0.587442
+        Calmar Ratio                              0.313166
+        Profit Factor                              1.34746   << here
+        Name: stats, dtype: object
+        ```
+
+        Since `Portfolio.metrics` is of type `vectorbt.utils.config.Config`, we can reset it at any time
+        to get default metrics:
+        ```python-repl
+        >>> portfolio.metrics.reset()
+        ```
+
+        The second option is to copy `Portfolio.metrics`, append our metric, and pass as `metrics` argument:
+        ```python-repl
+        >>> my_metrics = list(portfolio.metrics.items()) + [profit_factor]
+        >>> portfolio.stats(metrics=my_metrics, column=10, freq='d')
+        ```
+
+        The last option is to set `metrics` globally under `portfolio.stats` in `vectorbt._settings.settings`.
+        >>> vbt.settings['portfolio']['stats']['metrics'] = my_metrics
+        >>> portfolio.stats(column=10, freq='d')
+        """
+        from vectorbt._settings import settings
+        portfolio_stats_cfg = settings['portfolio']['stats']
+
+        # Resolve defaults
+        common_settings = self.common_settings
+        for k in list(kwargs.keys()):
+            if k in common_settings:
+                common_settings[k] = kwargs.pop(k)
+        if silence_warnings is None:
+            silence_warnings = portfolio_stats_cfg['silence_warnings']
+        template_mapping = merge_dicts(portfolio_stats_cfg['template_mapping'], template_mapping)
+        global_settings = merge_dicts(portfolio_stats_cfg['global_settings'], global_settings)
+        kwargs = merge_dicts(portfolio_stats_cfg['kwargs'], kwargs)
+
+        # Check if grouped
+        is_grouped = self.wrapper.grouper.is_grouped(group_by=group_by)
+
+        # Check if frequency is set
+        has_freq = common_settings['freq'] is not None
+
+        # Replace templates globally
+        if len(template_mapping) > 0:
+            common_settings = deep_substitute(common_settings, mapping=template_mapping)
+            global_settings = deep_substitute(global_settings, mapping=template_mapping)
+            kwargs = deep_substitute(kwargs, mapping=template_mapping)
+
+        # Prepare metrics
+        if metrics is None:
+            metrics = portfolio_stats_cfg['metrics']
+        if metrics == 'all':
+            metrics = self.metrics
+        if isinstance(metrics, dict):
+            metrics = list(metrics.items())
+        if isinstance(metrics, (str, tuple)):
+            metrics = [metrics]
+        # Bring to the same shape
+        new_metrics = []
+        for i, metric in enumerate(metrics):
+            if isinstance(metric, str):
+                metric = (metric, self.metrics[metric])
+            if not isinstance(metric, tuple):
+                raise TypeError(f"Metric at index {i} must be either a string or a tuple")
+            new_metrics.append(metric)
+        metrics = new_metrics
+        # Handle duplicate names
+        metric_counts = Counter(list(map(lambda x: x[0], metrics)))
+        metric_i = {k: -1 for k in metric_counts.keys()}
+        metrics_dct = {}
+        for i, (metric_name, metric_settings) in enumerate(metrics):
+            if metric_counts[metric_name] > 1:
+                metric_i[metric_name] += 1
+                metric_name = metric_name + '_' + str(metric_i[metric_name])
+            metrics_dct[metric_name] = metric_settings
+        # Merge settings
+        custom_arg_names_dct = {}
+        for metric_name, metric_settings in metrics_dct.items():
+            passed_settings = kwargs.pop(f'{metric_name}_kwargs', {})
+            metrics_dct[metric_name] = merge_dicts(
+                metric_settings,
+                global_settings,
+                passed_settings
+            )
+            custom_arg_names_dct[metric_name] = set(metric_settings.keys()).union(set(passed_settings.keys()))
+        # Filter metrics
+        if is_grouped:
+            left_out_names = []
+            for metric_name in list(metrics_dct.keys()):
+                if not metrics_dct[metric_name].get('allow_grouped', True):
+                    metrics_dct.pop(metric_name, None)
+                    custom_arg_names_dct.pop(metric_name, None)
+                    left_out_names.append(metric_name)
+            if len(left_out_names) > 0 and not silence_warnings:
+                warnings.warn(f"Metrics {left_out_names} do not support grouped data", stacklevel=2)
+        if not has_freq:
+            left_out_names = []
+            for metric_name in list(metrics_dct.keys()):
+                if metrics_dct[metric_name].get('req_freq', False):
+                    metrics_dct.pop(metric_name, None)
+                    custom_arg_names_dct.pop(metric_name, None)
+                    left_out_names.append(metric_name)
+            if len(left_out_names) > 0 and not silence_warnings:
+                warnings.warn(f"Metrics {left_out_names} require frequency of index. "
+                              f"Pass it as `freq` or define it globally under `settings.array_wrapper`.", stacklevel=2)
+        if len(metrics_dct) == 0:
+            raise ValueError("There is no metric to calculate")
+
+        # Check kwargs
+        if len(kwargs) > 0:
+            raise ValueError(f"Keys {list(kwargs.keys())} could not be matched")
 
         # Run stats
-        stats_df = pd.DataFrame({
-            'Start': self.wrapper.index[0],
-            'End': self.wrapper.index[-1],
-            'Duration': self.wrapper.shape[0] * self.wrapper.freq,
-            'Init. Cash': self.get_init_cash(group_by=group_by),
-            'Total Profit': self.total_profit(group_by=group_by),
-            'Total Return [%]': self.total_return(group_by=group_by) * 100,
-            'Benchmark Return [%]': self.total_market_return(group_by=group_by) * 100,
-            'Position Coverage [%]': self.position_coverage(group_by=group_by) * 100,
-            'Max. Drawdown [%]': -drawdowns.max_drawdown() * 100,
-            'Avg. Drawdown [%]': -drawdowns.avg_drawdown() * 100,
-            'Max. Drawdown Duration': drawdowns.max_duration(),
-            'Avg. Drawdown Duration': drawdowns.avg_duration(),
-            'Num. Trades': trades.count(),
-            'Win Rate [%]': trades.win_rate() * 100,
-            'Best Trade [%]': trades.returns.max() * 100,
-            'Worst Trade [%]': trades.returns.min() * 100,
-            'Avg. Trade [%]': trades.returns.mean() * 100,
-            'Max. Trade Duration': trades.duration.max(wrap_kwargs=dict(time_units=True)),
-            'Avg. Trade Duration': trades.duration.mean(wrap_kwargs=dict(time_units=True)),
-            'Expectancy': trades.expectancy(),
-            'SQN': trades.sqn(),
-            'Gross Exposure': self.gross_exposure(group_by=group_by).mean(),
-            'Sharpe Ratio': self.sharpe_ratio(reuse_returns=returns, **kwargs),
-            'Sortino Ratio': self.sortino_ratio(reuse_returns=returns, **kwargs),
-            'Calmar Ratio': self.calmar_ratio(reuse_returns=returns, **kwargs)
-        }, index=self.wrapper.grouper.get_columns(group_by=group_by))
+        arg_cache_dct = {}
+        stats_dct = {}
+        for i, (metric_name, metric_settings) in enumerate(metrics_dct.items()):
+            final_settings = metric_settings.copy()
+            final_settings.pop('allow_grouped', None)
+            final_settings.pop('req_freq', None)
 
-        # Select columns or reduce
+            # Replace templates
+            reserved_settings = merge_dicts(
+                dict(
+                    pf=self,
+                    portfolio=self,
+                    column=column,
+                    group_by=group_by,
+                    metric_name=metric_name,
+                    agg_func=agg_func
+                ),
+                common_settings
+            )
+            reserved_arg_names = set(reserved_settings.keys())
+            final_settings = merge_dicts(reserved_settings, final_settings)
+            metric_template_mapping = final_settings.pop('template_mapping', {})
+            mapping = merge_dicts(final_settings, template_mapping, metric_template_mapping)
+            final_settings = deep_substitute(final_settings, mapping=mapping)
+            if final_settings['freq'] is not None:
+                final_settings['freq'] = freq_to_timedelta(final_settings['freq'])
+
+            # Get and pop values
+            _column = final_settings.get('column')
+            _group_by = final_settings.get('group_by')
+            _agg_func = final_settings.get('agg_func')
+            title = final_settings.pop('title', metric_name)
+            calc_func = final_settings.pop('calc_func')
+
+            # Prepare function and keyword arguments
+            custom_arg_names = custom_arg_names_dct[metric_name]
+            if not callable(calc_func):
+                def _getattr_func(obj: tp.Any,
+                                  attr: str,
+                                  args: tp.ArgsLike = None,
+                                  kwargs: tp.KwargsLike = None,
+                                  call_attr: bool = True,
+                                  _custom_arg_names: tp.Set[str] = custom_arg_names,
+                                  _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                                  _final_settings: tp.Kwargs = final_settings) -> tp.Any:
+                    if args is None:
+                        args = ()
+                    if kwargs is None:
+                        kwargs = {}
+                    if obj is self and _final_settings.pop('resolve_' + attr, True):
+                        if call_attr:
+                            return self.resolve_attr(
+                                attr,
+                                args=args,
+                                cond_kwargs=_final_settings,
+                                kwargs=kwargs,
+                                custom_arg_names=_custom_arg_names,
+                                cache_dct=_arg_cache_dct
+                            )
+                        return getattr(obj, attr)
+                    out = getattr(obj, attr)
+                    if callable(out) and call_attr:
+                        return out(*args, **kwargs)
+                    return out
+
+                calc_func = self.getattr(calc_func, getattr_func=_getattr_func, call_last_attr=False)
+            if not callable(calc_func):
+                raise TypeError("calc_func must be callable")
+
+            func_arg_names = get_func_arg_names(calc_func)
+            for k in func_arg_names:
+                if k not in final_settings:
+                    if final_settings.pop('resolve_' + k, True):
+                        try:
+                            arg_out = self.resolve_attr(
+                                k,
+                                cond_kwargs=final_settings,
+                                custom_arg_names=custom_arg_names,
+                                cache_dct=arg_cache_dct
+                            )
+                        except AttributeError:
+                            continue
+                        final_settings[k] = arg_out
+
+            for k in reserved_arg_names:
+                if 'pass_' + k in final_settings:
+                    if not final_settings.pop('pass_' + k):  # first priority
+                        final_settings.pop(k, None)
+                elif k not in func_arg_names:  # second priority
+                    final_settings.pop(k, None)
+            for k in list(final_settings.keys()):
+                if 'glob_pass_' + k in final_settings:
+                    if k not in global_settings or not final_settings.pop('glob_pass_' + k, True):
+                        final_settings.pop(k, None)  # global setting should not be utilized
+                else:
+                    if k in global_settings and k not in custom_arg_names and k not in func_arg_names:
+                        final_settings.pop(k, None)  # global setting not utilized
+            for k in list(final_settings.keys()):
+                if k.startswith('glob_pass_'):
+                    final_settings.pop(k, None)  # cleanup
+
+            # Call calculation function
+            out = calc_func(**final_settings)
+
+            # Post-process and store the metric
+            if checks.is_any_array(out) and not checks.is_series(out):
+                raise TypeError("calc_func must return either a scalar for one column/group "
+                                "or pd.Series for multiple columns/groups")
+            if checks.is_series(out):
+                if _column is not None:
+                    out = self.select_one_from_obj(out, self.wrapper.regroup(_group_by), column=_column)
+                elif _agg_func is not None and agg_func is not None:
+                    out = _agg_func(out)
+            stats_dct[title] = out
+
+        # Return the stats
         if self.wrapper.get_ndim(group_by=group_by) == 1:
-            wrap_kwargs = merge_dicts(dict(name_or_index=stats_df.columns), wrap_kwargs)
-            return self.wrapper.wrap_reduced(stats_df.iloc[0], group_by=group_by, **wrap_kwargs)
+            return pd.Series(stats_dct, name=self.wrapper.get_columns(group_by=group_by)[0])
         if column is not None:
-            return stats_df.loc[column]
+            return pd.Series(stats_dct, name=column)
         if agg_func is not None:
-            if agg_func == _mean_agg_func:
-                warnings.warn("Taking mean across columns. To return a DataFrame, pass agg_func=None.", stacklevel=2)
-                func_name = 'stats_mean'
-            else:
-                func_name = 'stats_' + agg_func.__name__
-            agg_stats_sr = pd.Series(index=stats_df.columns, name=func_name)
-            agg_stats_sr.iloc[:3] = stats_df.iloc[0, :3]
-            agg_stats_sr.iloc[3:] = agg_func(stats_df.iloc[:, 3:])
-            return agg_stats_sr
+            return pd.Series(stats_dct, name='agg_func_' + agg_func.__name__)
+        new_index = self.wrapper.grouper.get_columns(group_by=group_by)
+        stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df
 
     def returns_stats(self,
                       column: tp.Optional[tp.Label] = None,
                       group_by: tp.GroupByLike = None,
-                      active_returns: bool = False,
+                      use_active_returns: bool = False,
                       in_sim_order: bool = False,
-                      agg_func: tp.Optional[tp.Callable] = _mean_agg_func,
+                      agg_func: tp.Optional[tp.Callable] = np.mean,
                       year_freq: tp.Optional[tp.FrequencyLike] = None,
                       **kwargs) -> tp.SeriesFrame:
         """Compute various statistics on returns of this portfolio.
@@ -2837,7 +3638,7 @@ class Portfolio(Wrapping):
         `kwargs` will be passed to `vectorbt.returns.accessors.ReturnsAccessor.stats` method.
         If `benchmark_rets` is not set, uses `Portfolio.market_returns`."""
         # Pre-calculate
-        if active_returns:
+        if use_active_returns:
             returns = self.active_returns(group_by=group_by)
         else:
             returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
@@ -2853,7 +3654,7 @@ class Portfolio(Wrapping):
         if column is not None:
             return stats_obj.loc[column]
         if agg_func is not None:
-            if agg_func == _mean_agg_func:
+            if agg_func == np.mean:
                 warnings.warn("Taking mean across columns. To return a DataFrame, pass agg_func=None.", stacklevel=2)
                 func_name = 'stats_mean'
             else:
@@ -3409,144 +4210,152 @@ class Portfolio(Wrapping):
         ), hline_shape_kwargs))
         return fig
 
-    subplots: tp.ClassVar[tp.Dict[str, tp.Kwargs]] = OrderedDict(
-        orders=dict(
-            title="Orders",
-            yaxis_title="Price",
-            can_plot_groups=False,
-            plot_func=[('get_orders', (Rep('group_by'),)), 'plot']
+    subplots: tp.ClassVar[Config] = Config(
+        dict(
+            orders=dict(
+                title="Orders",
+                yaxis_title="Price",
+                allow_grouped=False,
+                plot_func=[('get_orders', (Rep('group_by'),)), 'plot']
+            ),
+            trades=dict(
+                title="Trades",
+                yaxis_title="Price",
+                allow_grouped=False,
+                plot_func=[('get_trades', (Rep('group_by'),)), 'plot']
+            ),
+            positions=dict(
+                title="Positions",
+                yaxis_title="Price",
+                allow_grouped=False,
+                plot_func=[('get_positions', (Rep('group_by'),)), 'plot']
+            ),
+            trade_pnl=dict(
+                title="Trade P&L",
+                yaxis_title="Trade P&L",
+                allow_grouped=False,
+                plot_func=[('get_trades', (Rep('group_by'),)), 'plot_pnl'],
+                pass_column=True,  # hidden behind **kwargs
+                pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+                pass_xref=True,  # hidden behind **kwargs
+                pass_yref=True  # hidden behind **kwargs
+            ),
+            position_pnl=dict(
+                title="Position P&L",
+                yaxis_title="Position P&L",
+                allow_grouped=False,
+                plot_func=[('get_positions', (Rep('group_by'),)), 'plot_pnl'],
+                pass_column=True,  # hidden behind **kwargs
+                pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+                pass_xref=True,  # hidden behind **kwargs
+                pass_yref=True  # hidden behind **kwargs
+            ),
+            trade_returns=dict(
+                title="Trade Returns",
+                yaxis_title="Trade returns",
+                allow_grouped=False,
+                plot_func=[('get_trades', (Rep('group_by'),)), 'plot_returns'],
+                pass_column=True,  # hidden behind **kwargs
+                pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+                pass_xref=True,  # hidden behind **kwargs
+                pass_yref=True  # hidden behind **kwargs
+            ),
+            position_returns=dict(
+                title="Position Returns",
+                yaxis_title="Position returns",
+                allow_grouped=False,
+                plot_func=[('get_positions', (Rep('group_by'),)), 'plot_returns'],
+                pass_column=True,  # hidden behind **kwargs
+                pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+                pass_xref=True,  # hidden behind **kwargs
+                pass_yref=True  # hidden behind **kwargs
+            ),
+            asset_flow=dict(
+                title="Asset Flow",
+                yaxis_title="Asset flow",
+                allow_grouped=False,
+                plot_func='plot_asset_flow',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            cash_flow=dict(
+                title="Cash Flow",
+                yaxis_title="Cash flow",
+                plot_func='plot_cash_flow',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            assets=dict(
+                title="Assets",
+                yaxis_title="Assets",
+                allow_grouped=False,
+                plot_func='plot_assets',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            cash=dict(
+                title="Cash",
+                yaxis_title="Cash",
+                plot_func='plot_cash',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            asset_value=dict(
+                title="Asset Value",
+                yaxis_title="Asset value",
+                plot_func='plot_asset_value',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            value=dict(
+                title="Value",
+                yaxis_title="Value",
+                plot_func='plot_value',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            cum_returns=dict(
+                title="Cumulative Returns",
+                yaxis_title="Cumulative returns",
+                plot_func='plot_cum_returns',
+                pass_hline_shape_kwargs=True,  # hidden behind **kwargs
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+                pass_xref=True,  # hidden behind **kwargs
+                pass_yref=True  # hidden behind **kwargs
+            ),
+            drawdowns=dict(
+                title="Drawdowns",
+                yaxis_title="Value",
+                plot_func='plot_drawdowns',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+                pass_xref=True,  # hidden behind **kwargs
+                pass_yref=True  # hidden behind **kwargs
+            ),
+            underwater=dict(
+                title="Underwater",
+                yaxis_title="Drawdown",
+                plot_func='plot_underwater',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            gross_exposure=dict(
+                title="Gross Exposure",
+                yaxis_title="Gross exposure",
+                plot_func='plot_gross_exposure',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            ),
+            net_exposure=dict(
+                title="Net Exposure",
+                yaxis_title="Net exposure",
+                plot_func='plot_net_exposure',
+                pass_add_trace_kwargs=True,  # hidden behind **kwargs
+            )
         ),
-        trades=dict(
-            title="Trades",
-            yaxis_title="Price",
-            can_plot_groups=False,
-            plot_func=[('get_trades', (Rep('group_by'),)), 'plot']
-        ),
-        positions=dict(
-            title="Positions",
-            yaxis_title="Price",
-            can_plot_groups=False,
-            plot_func=[('get_positions', (Rep('group_by'),)), 'plot']
-        ),
-        trade_pnl=dict(
-            title="Trade P&L",
-            yaxis_title="Trade P&L",
-            can_plot_groups=False,
-            plot_func=[('get_trades', (Rep('group_by'),)), 'plot_pnl'],
-            pass_column=True,  # hidden behind **kwargs
-            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-            pass_xref=True,  # hidden behind **kwargs
-            pass_yref=True  # hidden behind **kwargs
-        ),
-        position_pnl=dict(
-            title="Position P&L",
-            yaxis_title="Position P&L",
-            can_plot_groups=False,
-            plot_func=[('get_positions', (Rep('group_by'),)), 'plot_pnl'],
-            pass_column=True,  # hidden behind **kwargs
-            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-            pass_xref=True,  # hidden behind **kwargs
-            pass_yref=True  # hidden behind **kwargs
-        ),
-        trade_returns=dict(
-            title="Trade Returns",
-            yaxis_title="Trade returns",
-            can_plot_groups=False,
-            plot_func=[('get_trades', (Rep('group_by'),)), 'plot_returns'],
-            pass_column=True,  # hidden behind **kwargs
-            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-            pass_xref=True,  # hidden behind **kwargs
-            pass_yref=True  # hidden behind **kwargs
-        ),
-        position_returns=dict(
-            title="Position Returns",
-            yaxis_title="Position returns",
-            can_plot_groups=False,
-            plot_func=[('get_positions', (Rep('group_by'),)), 'plot_returns'],
-            pass_column=True,  # hidden behind **kwargs
-            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-            pass_xref=True,  # hidden behind **kwargs
-            pass_yref=True  # hidden behind **kwargs
-        ),
-        asset_flow=dict(
-            title="Asset Flow",
-            yaxis_title="Asset flow",
-            can_plot_groups=False,
-            plot_func='plot_asset_flow',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        cash_flow=dict(
-            title="Cash Flow",
-            yaxis_title="Cash flow",
-            plot_func='plot_cash_flow',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        assets=dict(
-            title="Assets",
-            yaxis_title="Assets",
-            can_plot_groups=False,
-            plot_func='plot_assets',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        cash=dict(
-            title="Cash",
-            yaxis_title="Cash",
-            plot_func='plot_cash',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        asset_value=dict(
-            title="Asset Value",
-            yaxis_title="Asset value",
-            plot_func='plot_asset_value',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        value=dict(
-            title="Value",
-            yaxis_title="Value",
-            plot_func='plot_value',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        cum_returns=dict(
-            title="Cumulative Returns",
-            yaxis_title="Cumulative returns",
-            plot_func='plot_cum_returns',
-            pass_hline_shape_kwargs=True,  # hidden behind **kwargs
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-            pass_xref=True,  # hidden behind **kwargs
-            pass_yref=True  # hidden behind **kwargs
-        ),
-        drawdowns=dict(
-            title="Drawdowns",
-            yaxis_title="Value",
-            plot_func='plot_drawdowns',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-            pass_xref=True,  # hidden behind **kwargs
-            pass_yref=True  # hidden behind **kwargs
-        ),
-        underwater=dict(
-            title="Underwater",
-            yaxis_title="Drawdown",
-            plot_func='plot_underwater',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        gross_exposure=dict(
-            title="Gross Exposure",
-            yaxis_title="Gross exposure",
-            plot_func='plot_gross_exposure',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        ),
-        net_exposure=dict(
-            title="Net Exposure",
-            yaxis_title="Net exposure",
-            plot_func='plot_net_exposure',
-            pass_add_trace_kwargs=True,  # hidden behind **kwargs
-        )
+        copy_kwargs=dict(copy_mode='deep')
     )
-    """Settings of subplots supported by `Portfolio.plot`."""
+    """Subplots supported by `Portfolio.plot`.
+    
+    !!! note
+        It's safe to change this config - this instance variable is a (deep) copy of the class variable.
+        
+        Copying portfolio using `Portfolio.copy` won't create a copy of the config!"""
 
     def plot(self,
              subplots: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
@@ -3556,14 +4365,14 @@ class Portfolio(Wrapping):
              hide_id_labels: bool = None,
              group_id_labels: bool = None,
              make_subplots_kwargs: tp.KwargsLike = None,
+             hline_shape_kwargs: tp.KwargsLike = None,
              silence_warnings: bool = None,
              template_mapping: tp.Optional[tp.Mapping] = None,
-             hline_shape_kwargs: tp.KwargsLike = None,
              **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot various parts of this portfolio.
 
         Args:
-            subplots (str, tuple or iterable): List of subplots to plot.
+            subplots (str, tuple, iterable, or dict): List of subplots to plot.
 
                 Each element can be either:
 
@@ -3572,28 +4381,29 @@ class Portfolio(Wrapping):
 
                 Each settings dict can contain the following keys:
 
-                * `title` - title of the subplot. Defaults to None.
-                * `yaxis_title` - title of the y-axis. Defaults to `title`.
-                * `can_plot_groups` - whether this subplot supports plotting grouped data. Defaults to True.
+                * `title`: title of the subplot. Defaults to None.
+                * `yaxis_title`: title of the y-axis. Defaults to `title`.
+                * `xaxis_title`: title of the x-axis. Defaults to 'Date'.
+                * `allow_grouped`: whether this subplot supports grouped data. Defaults to True.
                     Must be known beforehand and cannot be provided as a template.
-                * `plot_func` - plotting function for custom subplots. If the function can be accessed
+                * `plot_func`: plotting function for custom subplots. If the function can be accessed
                     by traversing attributes of this portfolio, you can pass the path to this function
                     as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
-                * `pass_{arg}` - whether to pass a reserved argument (see below). Defaults to True if
-                    this argument is found in the function's signature. Set to False to not pass.
-                * `template_mapping` - mapping to replace templates in subplot settings and keyword arguments.
+                * `pass_{arg}`: whether to pass a reserved argument (see below). Defaults to True if
+                    this argument was found in the function's signature. Set to False to not pass.
+                * `template_mapping`: mapping to replace templates in subplot settings and keyword arguments.
                     Used across all settings.
-                * Any other keyword argument is passed directly to `plot_func` and may override reserved arguments.
+                * Any other keyword argument overrides reserved arguments or is passed directly to `plot_func`.
 
                 A plotting function may accept any keyword argument, but it should accept the current figure via
                 a `fig` keyword argument. It may also "request" any of the following reserved arguments by
-                accepting them or if `pass_{arg}` is found in the settings dict:
+                accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * `portfolio` - current portfolio, with no column selected
+                * `portfolio`: original portfolio (ungrouped and with no column selected)
                 * `column`
                 * `group_by`
-                * `name` - passes subplot name
-                * `trace_names` - passes a list with the subplot name
+                * `subplot_name`
+                * `trace_names`: list with the subplot name
                 * `add_trace_kwargs`
                 * `xref`
                 * `yref`
@@ -3616,11 +4426,11 @@ class Portfolio(Wrapping):
                 Two labels are identical if their name, marker style and line style match.
             group_id_labels (bool): Whether to group identical legend labels.
             make_subplots_kwargs (dict): Keyword arguments passed to `plotly.subplots.make_subplots`.
+            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
             silence_warnings (bool): Whether to silence all warnings.
             template_mapping (mapping): Global mapping to replace templates.
 
                 Applied on both subplot settings and `kwargs`.
-            hline_shape_kwargs (dict): Keyword arguments passed to `plotly.graph_objects.Figure.add_shape` for zeroline.
             **kwargs: Additional keyword arguments.
 
                 Can contain keyword arguments for each subplot, specified as `{subplot_name}_kwargs`.
@@ -3629,6 +4439,9 @@ class Portfolio(Wrapping):
         For template logic, see `vectorbt.utils.template`.
 
         For defaults, see `portfolio.plot` in `vectorbt._settings.settings`.
+
+        !!! hint
+            This method is very similar to `Portfolio.stats`.
 
         ## Example
 
@@ -3681,7 +4494,7 @@ class Portfolio(Wrapping):
         ...     ('order_size', dict(
         ...         title='Order Size',
         ...         yaxis_title='Order size',
-        ...         can_plot_groups=False,
+        ...         allow_grouped=False,
         ...         plot_func=plot_order_size
         ...     ))
         ... ], order_size_kwargs=dict(size=order_size))
@@ -3695,7 +4508,7 @@ class Portfolio(Wrapping):
         ...     ('order_size', dict(
         ...         title='Order Size',
         ...         yaxis_title='Order size',
-        ...         can_plot_groups=False
+        ...         allow_grouped=False
         ...     ))  # placeholder
         ... ])
         >>> order_size.rename('Order Size').vbt.barplot(
@@ -3762,18 +4575,11 @@ class Portfolio(Wrapping):
         # Check if grouped
         is_grouped = self.wrapper.grouper.is_grouped(group_by=group_by)
 
-        # Replace templates
+        # Replace templates globally
         if len(template_mapping) > 0:
             kwargs = deep_substitute(kwargs, mapping=template_mapping)
 
-        # Filter subplots
-        def _filter_grouped(subplot: tp.Tuple[str, tp.Kwargs]) -> bool:
-            if 'can_plot_groups' not in subplot[1]:
-                return True
-            if subplot[1]['can_plot_groups']:
-                return True
-            return False
-
+        # Prepare subplots
         if subplots is None:
             subplots = portfolio_plot_cfg['subplots']
             if is_grouped:
@@ -3781,29 +4587,53 @@ class Portfolio(Wrapping):
                 if grouped_subplots is None:
                     grouped_subplots = subplots
                 subplots = grouped_subplots
-        elif subplots == 'all':
+        if subplots == 'all':
             subplots = self.subplots
-            silence_warnings = True
         if isinstance(subplots, dict):
             subplots = list(subplots.items())
         if isinstance(subplots, (str, tuple)):
             subplots = [subplots]
+        # Bring to the same shape
         new_subplots = []
-        for subplot in subplots:
+        for i, subplot in enumerate(subplots):
             if isinstance(subplot, str):
                 subplot = (subplot, self.subplots[subplot])
             if not isinstance(subplot, tuple):
-                raise TypeError("Each subplot must be either a string or a tuple")
+                raise TypeError(f"Subplot at index {i} must be either a string or a tuple")
+            new_subplots.append(subplot)
+        subplots = new_subplots
+        # Handle duplicate names
+        subplot_counts = Counter(list(map(lambda x: x[0], subplots)))
+        subplot_i = {k: -1 for k in subplot_counts.keys()}
+        new_subplots = []
+        for i, (name, settings) in enumerate(subplots):
+            if subplot_counts[name] > 1:
+                subplot_i[name] += 1
+                name = name + '_' + str(subplot_i[name])
+            new_subplots.append((name, settings))
+        subplots = new_subplots
+        # Merge settings
+        new_subplots = []
+        for i, subplot in enumerate(subplots):
             subplot = (subplot[0], merge_dicts(subplot[1], kwargs.pop(f'{subplot[0]}_kwargs', {})))
             new_subplots.append(subplot)
         subplots = new_subplots
+        # Filter subplots
         if is_grouped:
-            filtered_subplots = list(filter(_filter_grouped, subplots))
-            if len(filtered_subplots) < len(subplots) and not silence_warnings:
-                warnings.warn("Some subplots do not support plotting grouped data", stacklevel=2)
-            subplots = filtered_subplots
+            def _filter_grouped(subplot: tp.Tuple[str, tp.Kwargs]) -> bool:
+                if 'allow_grouped' not in subplot[1]:
+                    return True
+                if subplot[1]['allow_grouped']:
+                    return True
+                return False
+
+            new_subplots = list(filter(_filter_grouped, subplots))
+            left_out_names = set(map(lambda x: x[0], subplots)).difference(set(map(lambda x: x[0], new_subplots)))
+            if len(left_out_names) > 0 and not silence_warnings:
+                warnings.warn(f"Subplots {left_out_names} do not support grouped data", stacklevel=2)
+            subplots = new_subplots
         if len(subplots) == 0:
-            raise ValueError("There is nothing to plot")
+            raise ValueError("There is no subplot to plot")
 
         # Set up figure
         rows = make_subplots_kwargs.pop('rows', len(subplots))
@@ -3907,7 +4737,10 @@ class Portfolio(Wrapping):
 
         # Show subplots
         for i, (name, settings) in enumerate(subplots):
-            settings = settings.copy()
+            _settings = settings.copy()
+            _settings.pop('allow_grouped', None)
+
+            # Compute figure artifacts
             row, col = row_col_tuples[i]
             xref = 'x' if i == 0 else 'x' + str(i + 1)
             yref = 'y' if i == 0 else 'y' + str(i + 1)
@@ -3916,18 +4749,12 @@ class Portfolio(Wrapping):
             x_domain = get_domain(xref, fig)
             y_domain = get_domain(yref, fig)
 
-            # Check if the subplot can be plotted
-            can_plot_groups = settings.pop('can_plot_groups', True)
-            if is_grouped and not can_plot_groups:
-                raise ValueError(f"Subplot '{name}' does not support plotting grouped data")
-
             # Replace templates
-            subplot_template_mapping = settings.pop('template_mapping', {})
-            settings = merge_dicts(dict(
+            default_settings = dict(
                 portfolio=self,
                 column=column,
                 group_by=group_by,
-                name=name,
+                subplot_name=name,
                 trace_names=[name],
                 add_trace_kwargs=dict(row=row, col=col),
                 xref=xref,
@@ -3938,46 +4765,39 @@ class Portfolio(Wrapping):
                 y_domain=y_domain,
                 hline_shape_kwargs=hline_shape_kwargs,
                 fig=fig
-            ), settings)
-            mapping = merge_dicts(settings, template_mapping, subplot_template_mapping)
-            settings = deep_substitute(settings, mapping=mapping)
+            )
+            reserved_args = list(default_settings.keys())
+            reserved_args.remove('fig')
+            _settings = merge_dicts(default_settings, _settings)
+            subplot_template_mapping = _settings.pop('template_mapping', {})
+            mapping = merge_dicts(_settings, template_mapping, subplot_template_mapping)
+            _settings = deep_substitute(_settings, mapping=mapping)
 
-            # Update global layout
-            fig.layout[xaxis]['title'] = 'Date'
-            fig.layout[yaxis]['title'] = settings.pop('yaxis_title', settings.pop('title', None))
+            # Pop values
+            plot_func = _settings.pop('plot_func', None)
+            xaxis_title = _settings.pop('xaxis_title', 'Date')
+            yaxis_title = _settings.pop('yaxis_title', _settings.pop('title', None))
 
-            # Prepare and call plotting function
-            plot_func = settings.pop('plot_func', None)
+            # Prepare function and keyword arguments
             if plot_func is not None:
-
-                # Prepare function and keyword arguments
-                reserved_args = [
-                    'portfolio',
-                    'column',
-                    'group_by',
-                    'name',
-                    'trace_names',
-                    'add_trace_kwargs',
-                    'xref',
-                    'yref',
-                    'xaxis',
-                    'yaxis',
-                    'x_domain',
-                    'y_domain',
-                    'hline_shape_kwargs'
-                ]
                 if not callable(plot_func):
-                    plot_func = self.getattr(plot_func, call_last_method=False)
+                    plot_func = self.getattr(plot_func, call_last_attr=False)
+                if not callable(plot_func):
+                    raise TypeError("plot_func must be callable")
                 func_arg_names = get_func_arg_names(plot_func)
                 for k in reserved_args:
-                    if 'pass_' + k in settings:
-                        if not settings.pop('pass_' + k):  # first priority
-                            del settings[k]
+                    if 'pass_' + k in _settings:
+                        if not _settings.pop('pass_' + k):  # first priority
+                            del _settings[k]
                     elif k not in func_arg_names:  # second priority
-                        del settings[k]
+                        _settings.pop(k, None)
 
                 # Call plotting function
-                plot_func(**settings)
+                plot_func(**_settings)
+
+            # Update global layout
+            fig.layout[xaxis]['title'] = xaxis_title
+            fig.layout[yaxis]['title'] = yaxis_title
 
         # Remove duplicate legend labels
         found_ids = dict()

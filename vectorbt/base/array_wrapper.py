@@ -209,7 +209,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 
         if column_only_select:
             if i_wrapper.ndim == 1:
-                raise IndexingError("Columns only: Attempting to select a column on a Series")
+                raise IndexingError("Columns only: This object already contains one column of data")
             try:
                 col_mapper = pd_indexing_func(i_wrapper.wrap_reduced(np.arange(n_cols), columns=columns))
             except pd.core.indexing.IndexingError as e:
@@ -435,7 +435,8 @@ class ArrayWrapper(Configured, PandasIndexer):
     def to_time_units(self, a: tp.MaybeArray[float]) -> tp.Union[pd.Timedelta, tp.Array]:
         """Convert array to time units."""
         if self.freq is None:
-            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
+            raise ValueError("Couldn't parse the frequency of index. "
+                             "Pass it as `freq` or define it globally under `settings.array_wrapper`.")
         return a * self.freq
 
     @property

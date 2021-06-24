@@ -4762,10 +4762,15 @@ portfolio_shared = vbt.Portfolio.from_orders(
 
 class TestPortfolio:
     def test_config(self, tmp_path):
-        assert vbt.Portfolio.loads(portfolio['a'].dumps()) == portfolio['a']
-        assert vbt.Portfolio.loads(portfolio.dumps()) == portfolio
-        portfolio.save(tmp_path / 'portfolio')
-        assert vbt.Portfolio.load(tmp_path / 'portfolio') == portfolio
+        portfolio2 = portfolio.copy()
+        portfolio2.metrics = portfolio2.metrics.copy()
+        portfolio2.metrics['hello'] = 'world'
+        portfolio2.subplots = portfolio2.subplots.copy()
+        portfolio2.subplots['hello'] = 'world'
+        assert vbt.Portfolio.loads(portfolio2['a'].dumps()) == portfolio2['a']
+        assert vbt.Portfolio.loads(portfolio2.dumps()) == portfolio2
+        portfolio2.save(tmp_path / 'portfolio')
+        assert vbt.Portfolio.load(tmp_path / 'portfolio') == portfolio2
 
     def test_wrapper(self):
         pd.testing.assert_index_equal(
@@ -4953,10 +4958,6 @@ class TestPortfolio:
                 columns=price_na.columns
             )
         )
-
-    def test_incl_unrealized(self):
-        assert not vbt.Portfolio.from_orders(price_na, 1000., incl_unrealized=False).incl_unrealized
-        assert vbt.Portfolio.from_orders(price_na, 1000., incl_unrealized=True).incl_unrealized
 
     def test_orders(self):
         record_arrays_close(
@@ -6406,6 +6407,15 @@ class TestPortfolio:
         )
 
     def test_stats(self):
+        stat_cols = pd.Index([
+            'Start', 'End', 'Duration', 'Initial Cash', 'Total Profit',
+            'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
+            'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
+            'Avg Drawdown Duration', 'Trade Count', 'Win Rate [%]',
+            'Best Trade [%]', 'Worst Trade [%]', 'Avg Trade [%]',
+            'Max Trade Duration', 'Avg Trade Duration', 'Expectancy', 'SQN',
+            'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
+        ], dtype='object')
         pd.testing.assert_series_equal(
             portfolio.stats(),
             pd.Series(
@@ -6421,16 +6431,8 @@ class TestPortfolio:
                     0.10827272727272726, 1.2350921335789007, -0.008766789792898303,
                     -5.609478162762282, 26.256548486255838, 5720.684444410799
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max. Drawdown [%]', 'Avg. Drawdown [%]', 'Max. Drawdown Duration',
-                    'Avg. Drawdown Duration', 'Num. Trades', 'Win Rate [%]',
-                    'Best Trade [%]', 'Worst Trade [%]', 'Avg. Trade [%]',
-                    'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
-                ], dtype='object'),
-                name='stats_mean')
+                index=stat_cols,
+                name='agg_func_mean')
         )
         pd.testing.assert_series_equal(
             portfolio['a'].stats(),
@@ -6446,19 +6448,27 @@ class TestPortfolio:
                     -0.10999000000000003, np.nan, 0.010431562217554364,
                     -11.057783842772304, -9.75393669809172, -46.721467294341814
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max. Drawdown [%]', 'Avg. Drawdown [%]', 'Max. Drawdown Duration',
-                    'Avg. Drawdown Duration', 'Num. Trades', 'Win Rate [%]',
-                    'Best Trade [%]', 'Worst Trade [%]', 'Avg. Trade [%]',
-                    'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
-                ], dtype='object'),
+                index=stat_cols,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            portfolio['a'].stats(required_return=0.1, risk_free=0.01),
+            portfolio['a'].stats(freq=None),
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
+                    5, 100.0, -0.3104900000000015,
+                    -0.3104900000000015, 150.0, 40.0, 0.3104900000000015,
+                    0.3104900000000015, 4,
+                    4, 1, 0.0, -54.450495049504966,
+                    -54.450495049504966, -54.450495049504966,
+                    1, 1,
+                    -0.10999000000000003, np.nan, 0.010431562217554364
+                ]),
+                index=stat_cols[:-3],
+                name='a')
+        )
+        pd.testing.assert_series_equal(
+            portfolio['a'].stats(global_settings=dict(required_return=0.1, risk_free=0.01)),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
@@ -6471,19 +6481,11 @@ class TestPortfolio:
                     -0.10999000000000003, np.nan, 0.010431562217554364,
                     -188.9975847831419, -15.874008737030774, -46.721467294341814
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max. Drawdown [%]', 'Avg. Drawdown [%]', 'Max. Drawdown Duration',
-                    'Avg. Drawdown Duration', 'Num. Trades', 'Win Rate [%]',
-                    'Best Trade [%]', 'Worst Trade [%]', 'Avg. Trade [%]',
-                    'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
-                ], dtype='object'),
+                index=stat_cols,
                 name='a')
         )
         pd.testing.assert_series_equal(
-            portfolio['a'].stats(active_returns=True),
+            portfolio['a'].stats(use_active_returns=True),
             pd.Series(
                 np.array([
                     pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
@@ -6495,15 +6497,7 @@ class TestPortfolio:
                     pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
                     -0.10999000000000003, np.nan, 0.010431562217554364, np.nan, np.nan, np.nan
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max. Drawdown [%]', 'Avg. Drawdown [%]', 'Max. Drawdown Duration',
-                    'Avg. Drawdown Duration', 'Num. Trades', 'Win Rate [%]',
-                    'Best Trade [%]', 'Worst Trade [%]', 'Avg. Trade [%]',
-                    'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
-                ], dtype='object'),
+                index=stat_cols,
                 name='a')
         )
         pd.testing.assert_series_equal(
@@ -6520,15 +6514,7 @@ class TestPortfolio:
                     -0.1552449999999999, -3.43044967406917, 0.010431562217554364,
                     -11.057783842772304, -9.75393669809172, -46.721467294341814
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max. Drawdown [%]', 'Avg. Drawdown [%]', 'Max. Drawdown Duration',
-                    'Avg. Drawdown Duration', 'Num. Trades', 'Win Rate [%]',
-                    'Best Trade [%]', 'Worst Trade [%]', 'Avg. Trade [%]',
-                    'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
-                ], dtype='object'),
+                index=stat_cols,
                 name='a')
         )
         pd.testing.assert_series_equal(
@@ -6545,15 +6531,7 @@ class TestPortfolio:
                     -0.2646459090909091, -1.711191707103453, -0.014876959289761857,
                     -16.697884366310568, -12.093485199472159, -29.39559309128514
                 ]),
-                index=pd.Index([
-                    'Start', 'End', 'Duration', 'Init. Cash', 'Total Profit',
-                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
-                    'Max. Drawdown [%]', 'Avg. Drawdown [%]', 'Max. Drawdown Duration',
-                    'Avg. Drawdown Duration', 'Num. Trades', 'Win Rate [%]',
-                    'Best Trade [%]', 'Worst Trade [%]', 'Avg. Trade [%]',
-                    'Max. Trade Duration', 'Avg. Trade Duration', 'Expectancy', 'SQN',
-                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
-                ], dtype='object'),
+                index=stat_cols,
                 name='first')
         )
         pd.testing.assert_series_equal(
@@ -6567,6 +6545,34 @@ class TestPortfolio:
         pd.testing.assert_series_equal(
             portfolio_grouped['second'].stats(),
             portfolio_grouped.stats(column='second')
+        )
+        stats_df = portfolio.stats(agg_func=None)
+        assert stats_df.shape == (3, 25)
+        pd.testing.assert_index_equal(stats_df.index, portfolio.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stat_cols)
+        freq_metric = ('freq_metric', dict(title='Freq', calc_func=lambda freq: freq))
+        pd.testing.assert_series_equal(
+            portfolio.stats(freq_metric, column='a'),
+            pd.Series([day_dt], index=['Freq'], name='a')
+        )
+        pd.testing.assert_series_equal(
+            portfolio.stats(freq_metric, column='a', freq=day_dt * 2),
+            pd.Series([day_dt * 2], index=['Freq'], name='a')
+        )
+        def_freq_metric = ('freq_metric', dict(title='Freq', freq=day_dt * 3, calc_func=lambda freq: freq))
+        pd.testing.assert_series_equal(
+            portfolio.stats(def_freq_metric, column='a', freq=day_dt * 2),
+            pd.Series([day_dt * 3], index=['Freq'], name='a')
+        )
+        pd.testing.assert_series_equal(
+            portfolio.stats(def_freq_metric, column='a', freq=day_dt * 2, global_settings=dict(freq=day_dt * 4)),
+            pd.Series([day_dt * 4], index=['Freq'], name='a')
+        )
+        pd.testing.assert_series_equal(
+            portfolio.stats(
+                def_freq_metric, column='a', freq=day_dt * 2,
+                global_settings=dict(freq=day_dt * 4), freq_metric_kwargs=dict(freq=day_dt * 5)),
+            pd.Series([day_dt * 5], index=['Freq'], name='a')
         )
 
     def test_returns_stats(self):
@@ -6584,7 +6590,7 @@ class TestPortfolio:
                 index=pd.Index([
                     'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',
                     'Annual Return [%]', 'Annual Volatility [%]', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Max. Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
+                    'Calmar Ratio', 'Max Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
                     'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
                     'Alpha', 'Beta'
                 ], dtype='object'),
@@ -6605,7 +6611,7 @@ class TestPortfolio:
                 index=pd.Index([
                     'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',
                     'Annual Return [%]', 'Annual Volatility [%]', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Max. Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
+                    'Calmar Ratio', 'Max Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
                     'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
                     'Alpha', 'Beta'
                 ], dtype='object'),
@@ -6625,7 +6631,7 @@ class TestPortfolio:
                 index=pd.Index([
                     'Start', 'End', 'Duration', 'Total Return [%]', 'Benchmark Return [%]',
                     'Annual Return [%]', 'Annual Volatility [%]', 'Sharpe Ratio',
-                    'Calmar Ratio', 'Max. Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
+                    'Calmar Ratio', 'Max Drawdown [%]', 'Omega Ratio', 'Sortino Ratio',
                     'Skew', 'Kurtosis', 'Tail Ratio', 'Common Sense Ratio', 'Value at Risk',
                     'Alpha', 'Beta'
                 ], dtype='object'),

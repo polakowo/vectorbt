@@ -887,8 +887,12 @@ class TestConfig:
 
     def test_configured(self, tmp_path):
         class H(config.Configured):
+            writeable_attrs = ['my_attr', 'my_cfg']
+
             def __init__(self, a, b=2, **kwargs):
                 super().__init__(a=a, b=b, **kwargs)
+                self.my_attr = 100
+                self.my_cfg = config.Config(dict(sr=pd.Series([1, 2, 3])))
 
         assert H(1).config == {'a': 1, 'b': 2}
         assert H(1).copy(b=3).config == {'a': 1, 'b': 3}
@@ -904,10 +908,24 @@ class TestConfig:
         assert H(None) == H(None)
         assert H(None) != H(10.)
 
-        H(1).save(tmp_path / "configured")
-        new_cfgd = H.load(tmp_path / "configured")
-        assert new_cfgd == H(1)
-        assert new_cfgd.__dict__ == H(1).__dict__
+        h = H(1)
+        h.writeable_attrs.append('my_attr2')
+        assert H.writeable_attrs == ['my_attr', 'my_cfg']
+        assert h != H(1)
+        h = H(1)
+        h.my_attr = 200
+        h.my_cfg['df'] = pd.DataFrame([1, 2, 3])
+        h2 = H(1)
+        h2.my_attr = 200
+        h2.my_cfg['df'] = pd.DataFrame([1, 2, 3])
+        h.save(tmp_path / "configured")
+        new_h = H.load(tmp_path / "configured")
+        assert new_h == h2
+        assert new_h != H(1)
+        assert new_h.__dict__ == h2.__dict__
+        assert new_h.__dict__ != H(1).__dict__
+        assert new_h.my_attr == h.my_attr
+        assert new_h.my_cfg == h.my_cfg
 
 
 # ############# decorators.py ############# #
@@ -1471,7 +1489,7 @@ class TestAttrs:
         assert attr.deep_getattr(C(), ['b', ('b', (1,))]) == 1
         assert attr.deep_getattr(C(), ['b', ('a',), ('a', (1,), {'y': 1})]) == 2
         assert attr.deep_getattr(C(), 'b.b_prop') == 1
-        assert callable(attr.deep_getattr(C(), 'b.a.a', call_last_method=False))
+        assert callable(attr.deep_getattr(C(), 'b.a.a', call_last_attr=False))
 
 
 # ############# checks.py ############# #

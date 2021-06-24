@@ -88,7 +88,7 @@ portfolio.total_profit()
 ```
 
 ```plaintext
-8412.436065824717
+7528.904276220327
 ```
 
 The crossover of 10-day SMA and 50-day SMA under the same conditions:
@@ -104,7 +104,7 @@ portfolio.total_profit()
 ```
 
 ```plaintext
-12642.617149066731
+15852.799327152732
 ```
 
 Quickly assessing the performance of 1000 random signal strategies on BTC and ETH:
@@ -155,31 +155,31 @@ portfolio[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
-Start                      2015-08-07 00:00:00+00:00
-End                        2021-05-02 00:00:00+00:00
-Duration                          2092 days 00:00:00
-Init. Cash                                       100
-Total Profit                                  846151
-Total Return [%]                              846151
-Benchmark Return [%]                          106176
-Position Coverage [%]                        56.1185
-Max. Drawdown [%]                             70.735
-Avg. Drawdown [%]                            12.2078
-Max. Drawdown Duration             760 days 00:00:00
-Avg. Drawdown Duration    29 days 14:19:42.089552239
-Num. Trades                                       50
-Win Rate [%]                                      54
-Best Trade [%]                                1075.8
-Worst Trade [%]                             -29.5934
-Avg. Trade [%]                               47.8175
-Max. Trade Duration                 80 days 00:00:00
-Avg. Trade Duration                 22 days 20:38:24
-Expectancy                                   12322.9
-SQN                                          1.43759
-Gross Exposure                              0.561185
-Sharpe Ratio                                 2.17109
-Sortino Ratio                                3.81812
-Calmar Ratio                                 5.43505
+Start                     2015-08-07 00:00:00+00:00
+End                       2021-06-24 00:00:00+00:00
+Duration                         2145 days 00:00:00
+Initial Cash                                    100
+Total Profit                                 637467
+Total Return [%]                             637467
+Benchmark Return [%]                        72649.5
+Position Coverage [%]                       55.8042
+Max Drawdown [%]                             70.735
+Avg Drawdown [%]                            12.4471
+Max Drawdown Duration             760 days 00:00:00
+Avg Drawdown Duration    29 days 01:01:42.857142857
+Trade Count                                      52
+Win Rate [%]                                53.8462
+Best Trade [%]                               1075.8
+Worst Trade [%]                            -29.5934
+Avg Trade [%]                               46.0668
+Max Trade Duration                 80 days 00:00:00
+Avg Trade Duration       23 days 00:27:41.538461538
+Expectancy                                    12259
+SQN                                         1.44836
+Gross Exposure                             0.558042
+Sharpe Ratio                                1.71742
+Sortino Ratio                               2.96685
+Calmar Ratio                                2.54295
 Name: (10, 20, ETH-USD), dtype: object
 ```
 

@@ -73,7 +73,7 @@ class TestColumnGrouper:
         assert column_grouper.group_by_to_index(grouped_columns, group_by=None) is None
         pd.testing.assert_index_equal(
             column_grouper.group_by_to_index(grouped_columns, group_by=True),
-            pd.Int64Index([0, 0, 0, 0, 0, 0, 0, 0], dtype='int64')
+            pd.Index(['group'] * len(grouped_columns))
         )
         pd.testing.assert_index_equal(
             column_grouper.group_by_to_index(grouped_columns, group_by=0),

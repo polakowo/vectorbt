@@ -2120,6 +2120,7 @@ class TestFactory:
             'tuple_loc',
             'update_config',
             'wrapper',
+            'writeable_attrs',
             'xs'
         ]
 

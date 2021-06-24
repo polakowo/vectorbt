@@ -86,7 +86,8 @@ class ReturnsAccessor(GenericAccessor):
     def ann_factor(self) -> float:
         """Annualization factor."""
         if self.wrapper.freq is None:
-            raise ValueError("Couldn't parse the frequency of index. You must set `freq`.")
+            raise ValueError("Couldn't parse the frequency of index. "
+                             "Pass it as `freq` or define it globally under `settings.array_wrapper`.")
         return self.year_freq / self.wrapper.freq
 
     def daily(self, **kwargs) -> tp.SeriesFrame:
@@ -147,7 +148,8 @@ class ReturnsAccessor(GenericAccessor):
         """Annualized volatility of a strategy.
 
         Args:
-            levy_alpha (float): Scaling relation (Levy stability exponent)."""
+            levy_alpha (float): Scaling relation (Levy stability exponent).
+            ddof (int): Means Delta Degrees of Freedom."""
         result = nb.annualized_volatility_nb(self.to_2d_array(), self.ann_factor, levy_alpha, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='annualized_volatility'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, **wrap_kwargs)
@@ -197,7 +199,8 @@ class ReturnsAccessor(GenericAccessor):
         """Sharpe ratio of a strategy.
 
         Args:
-            risk_free (float): Constant risk-free return throughout the period."""
+            risk_free (float): Constant risk-free return throughout the period.
+            ddof (int): Means Delta Degrees of Freedom."""
         result = nb.sharpe_ratio_nb(self.to_2d_array(), self.ann_factor, risk_free, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='sharpe_ratio'), wrap_kwargs)
         return self.wrapper.wrap_reduced(result, **wrap_kwargs)
@@ -277,7 +280,9 @@ class ReturnsAccessor(GenericAccessor):
         """Information ratio of a strategy.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
+            benchmark_rets (array_like): Benchmark return to compare returns against.
+                Will broadcast per element.
+            ddof (int): Means Delta Degrees of Freedom."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self._obj, raw=True))
         result = nb.information_ratio_nb(self.to_2d_array(), benchmark_rets, ddof)
         wrap_kwargs = merge_dicts(dict(name_or_index='information_ratio'), wrap_kwargs)
@@ -295,7 +300,8 @@ class ReturnsAccessor(GenericAccessor):
         """Beta.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
+            benchmark_rets (array_like): Benchmark return to compare returns against.
+                Will broadcast per element."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self._obj, raw=True))
         result = nb.beta_nb(self.to_2d_array(), benchmark_rets)
         wrap_kwargs = merge_dicts(dict(name_or_index='beta'), wrap_kwargs)
@@ -314,7 +320,8 @@ class ReturnsAccessor(GenericAccessor):
         """Annualized alpha.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast.
+            benchmark_rets (array_like): Benchmark return to compare returns against.
+                Will broadcast per element.
             risk_free (float): Constant risk-free return throughout the period."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self._obj, raw=True))
         result = nb.alpha_nb(self.to_2d_array(), benchmark_rets, self.ann_factor, risk_free)
@@ -395,7 +402,8 @@ class ReturnsAccessor(GenericAccessor):
         """Capture ratio.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
+            benchmark_rets (array_like): Benchmark return to compare returns against.
+                Will broadcast per element."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self._obj, raw=True))
         result = nb.capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='capture'), wrap_kwargs)
@@ -413,7 +421,8 @@ class ReturnsAccessor(GenericAccessor):
         """Capture ratio for periods when the benchmark return is positive.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
+            benchmark_rets (array_like): Benchmark return to compare returns against.
+                Will broadcast per element."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self._obj, raw=True))
         result = nb.up_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='up_capture'), wrap_kwargs)
@@ -431,7 +440,8 @@ class ReturnsAccessor(GenericAccessor):
         """Capture ratio for periods when the benchmark return is negative.
 
         Args:
-            benchmark_rets (array_like): Benchmark return to compare returns against. Will broadcast."""
+            benchmark_rets (array_like): Benchmark return to compare returns against. 
+                Will broadcast per element."""
         benchmark_rets = broadcast_to(to_2d(benchmark_rets, raw=True), to_2d(self._obj, raw=True))
         result = nb.down_capture_nb(self.to_2d_array(), benchmark_rets, self.ann_factor)
         wrap_kwargs = merge_dicts(dict(name_or_index='down_capture'), wrap_kwargs)
@@ -495,6 +505,7 @@ class ReturnsAccessor(GenericAccessor):
                 Will broadcast per column.
             required_return (float): Minimum acceptance return of the investor.
                 Will broadcast per column.
+            wrap_kwargs (dict): Keyword arguments passed to `vectorbt.base.array_wrapper.ArrayWrapper.wrap`.
 
         ## Example
 
@@ -516,7 +527,7 @@ class ReturnsAccessor(GenericAccessor):
         Annual Volatility [%]                88.4466
         Sharpe Ratio                         1.66841
         Calmar Ratio                         2.34193
-        Max. Drawdown [%]                   -83.0363
+        Max Drawdown [%]                    -83.0363
         Omega Ratio                          1.31107
         Sortino Ratio                        2.54018
         Skew                               0.0101324
@@ -541,7 +552,7 @@ class ReturnsAccessor(GenericAccessor):
             'Annual Volatility [%]': self.annualized_volatility(levy_alpha=levy_alpha) * 100,
             'Sharpe Ratio': self.sharpe_ratio(risk_free=risk_free),
             'Calmar Ratio': self.calmar_ratio(),
-            'Max. Drawdown [%]': self.max_drawdown() * 100,
+            'Max Drawdown [%]': self.max_drawdown() * 100,
             'Omega Ratio': self.omega_ratio(required_return=required_return),
             'Sortino Ratio': self.sortino_ratio(required_return=required_return),
             'Skew': self._obj.skew(axis=0),

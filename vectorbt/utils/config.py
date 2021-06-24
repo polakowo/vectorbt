@@ -119,7 +119,11 @@ def copy_dict(dct: InConfigLikeT, copy_mode: str = 'shallow', nested: bool = Tru
     return dct_copy
 
 
-def update_dict(x: InConfigLikeT, y: InConfigLikeT, nested: bool = True, force: bool = False) -> None:
+def update_dict(x: InConfigLikeT,
+                y: InConfigLikeT,
+                nested: bool = True,
+                force: bool = False,
+                same_keys: bool = False) -> None:
     """Update dict with keys and values from other dict.
 
     Set `nested` to True to update all child dicts in recursive manner.
@@ -144,22 +148,26 @@ def update_dict(x: InConfigLikeT, y: InConfigLikeT, nested: bool = True, force: 
                 and not isinstance(v, atomic_dict):
             update_dict(x[k], v, force=force)
         else:
+            if same_keys and k not in x:
+                continue
             set_dict_item(x, k, v, force=force)
 
 
 def merge_dicts(*dicts: InConfigLikeT,
                 to_dict: bool = True,
                 copy_mode: tp.Optional[str] = 'shallow',
-                nested: bool = True) -> OutConfigLikeT:
+                nested: bool = True,
+                same_keys: bool = False) -> OutConfigLikeT:
     """Merge dicts.
 
     Args:
         *dicts (dict): Dicts.
-        to_dict: Whether to call `convert_to_dict` on each dict prior to copying.
-        copy_mode: Mode for `copy_dict` to copy each dict prior to merging.
+        to_dict (bool): Whether to call `convert_to_dict` on each dict prior to copying.
+        copy_mode (str): Mode for `copy_dict` to copy each dict prior to merging.
 
             Pass None to not copy.
-        nested: Whether to merge all child dicts in recursive manner."""
+        nested (bool): Whether to merge all child dicts in recursive manner.
+        same_keys (bool): Whether to merge on the overlapping keys only."""
     # copy only once
     if to_dict:
         dicts = tuple([convert_to_dict(dct, nested=nested) for dct in dicts])
@@ -169,13 +177,14 @@ def merge_dicts(*dicts: InConfigLikeT,
     if isinstance(x, atomic_dict) or isinstance(y, atomic_dict):
         x = y
     else:
-        update_dict(x, y, nested=nested, force=True)
+        update_dict(x, y, nested=nested, force=True, same_keys=same_keys)
     if len(dicts) > 2:
         return merge_dicts(
             x, *dicts[2:],
             to_dict=False,  # executed only once
             copy_mode=None,  # executed only once
-            nested=nested
+            nested=nested,
+            same_keys=same_keys
         )
     return x
 
@@ -668,47 +677,69 @@ ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 class Configured(Pickleable):
     """Class with an initialization config.
 
-    All operations are done using config rather than the instance, which makes it easier to pickle.
+    All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
 
     Config settings are defined under `config.configured` in `vectorbt._settings.settings`.
 
     !!! warning
-        If the instance has writable attributes or depends upon global defaults,
+        If any attribute has been overwritten that isn't listed in `Configured.writeable_attrs`,
+        or if any `Configured.__init__` argument depends upon global defaults,
         their values won't be copied over. Make sure to pass them explicitly to
         make the saved & loaded / copied instance resilient to changes in globals."""
+
+    writeable_attrs: tp.ClassVar[tp.List[str]] = []
+    """List of writeable attributes that will be saved/copied along with the config."""
 
     def __init__(self, **config) -> None:
         from vectorbt._settings import settings
         configured_cfg = settings['config']['configured']
 
         self._config = Config(config, **configured_cfg)
+        self.writeable_attrs = copy(self.writeable_attrs)
 
     @property
     def config(self) -> Config:
         """Initialization config."""
         return self._config
 
-    def copy(self: ConfiguredT, **new_config) -> ConfiguredT:
-        """Create a new instance based on the config.
+    def copy(self: ConfiguredT, nested: tp.Optional[bool] = None, **new_config) -> ConfiguredT:
+        """Copy config and writeable attributes to initialize a new instance.
 
         !!! warning
             This "copy" operation won't return a copy of the instance but a new instance
-            initialized with the same config."""
-        return self.__class__(**self.config.merge_with(new_config))
+            initialized with the same config and writeable attributes."""
+        new_instance = self.__class__(**self.config.merge_with(new_config, nested=nested))
+        for attr in self.writeable_attrs:
+            setattr(new_instance, attr, getattr(self, attr))
+        return new_instance
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        return self.config.dumps(**kwargs)
+        config_dumps = self.config.dumps(**kwargs)
+        attr_dct = PickleableDict({attr: getattr(self, attr) for attr in self.writeable_attrs})
+        attr_dct_dumps = attr_dct.dumps(**kwargs)
+        return dill.dumps((config_dumps, attr_dct_dumps), **kwargs)
 
     @classmethod
     def loads(cls: tp.Type[ConfiguredT], dumps: bytes, **kwargs) -> ConfiguredT:
         """Unpickle from bytes."""
-        return cls(**Config.loads(dumps, **kwargs))
+        config_dumps, attr_dct_dumps = dill.loads(dumps, **kwargs)
+        config = Config.loads(config_dumps, **kwargs)
+        attr_dct = PickleableDict.loads(attr_dct_dumps, **kwargs)
+        new_instance = cls(**config)
+        for attr, obj in attr_dct.items():
+            setattr(new_instance, attr, obj)
+        return new_instance
 
     def __eq__(self, other: tp.Any) -> bool:
-        """Objects are equal if their configs are equal."""
+        """Objects are equal if their configs and writeable attributes are equal."""
         if type(self) != type(other):
             return False
+        if self.writeable_attrs != other.writeable_attrs:
+            return False
+        for attr in self.writeable_attrs:
+            if not checks.is_deep_equal(getattr(self, attr), getattr(other, attr)):
+                return False
         return self.config == other.config
 
     def getattr(self, *args, **kwargs) -> tp.Any:
