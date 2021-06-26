@@ -83,12 +83,12 @@ Date
 >>> size = result / ohlcv['Open']
 
 >>> # Simulate portfolio
->>> portfolio = vbt.Portfolio.from_orders(
+>>> pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001)
 
 >>> # Visualize portfolio value
->>> portfolio.value().vbt.plot()
+>>> pf.value().vbt.plot()
 ```
 
 ![](/vectorbt/docs/img/portfolio_value.svg)
@@ -117,13 +117,13 @@ For example, let's divide our portfolio into two groups sharing the same cash ba
 ...     'first', 'first', 'first',
 ...     'second', 'second', 'second'
 ... ], name='group')
->>> comb_portfolio = vbt.Portfolio.from_orders(
+>>> comb_pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001,
 ...     group_by=group_by, cash_sharing=True)
 
 >>> # Get total profit per group
->>> comb_portfolio.total_profit()
+>>> comb_pf.total_profit()
 group
 first     26221.571200
 second    10141.952674
@@ -134,7 +134,7 @@ Not only can you analyze each group, but also each column in the group:
 
 ```python-repl
 >>> # Get total profit per column
->>> comb_portfolio.total_profit(group_by=False)
+>>> comb_pf.total_profit(group_by=False)
 symbol
 BTC-USD     5792.120252
 ETH-USD    16380.039692
@@ -149,7 +149,7 @@ In the same way, you can introduce new grouping to the method itself:
 
 ```python-repl
 >>> # Get total profit per group
->>> portfolio.total_profit(group_by=group_by)
+>>> pf.total_profit(group_by=group_by)
 group
 first     26221.571200
 second    10141.952674
@@ -165,26 +165,26 @@ Like any other class subclassing `vectorbt.base.array_wrapper.Wrapping`, we can 
 on a `Portfolio` instance, which forwards indexing operation to each object with columns:
 
 ```python-repl
->>> portfolio['BTC-USD']
+>>> pf['BTC-USD']
 <vectorbt.portfolio.base.Portfolio at 0x7fac7517ac88>
 
->>> portfolio['BTC-USD'].total_profit()
+>>> pf['BTC-USD'].total_profit()
 5792.120252189081
 ```
 
 Combined portfolio is indexed by group:
 
 ```python-repl
->>> comb_portfolio['first']
+>>> comb_pf['first']
 <vectorbt.portfolio.base.Portfolio at 0x7fac5756b828>
 
->>> comb_portfolio['first'].total_profit()
+>>> comb_pf['first'].total_profit()
 26221.57120014546
 ```
 
 !!! note
     Changing index (time axis) is not supported. The object should be treated as a Series
-    rather than a DataFrame; for example, use `portfolio.iloc[0]` instead of `portfolio.iloc[:, 0]`.
+    rather than a DataFrame; for example, use `pf.iloc[0]` instead of `pf.iloc[:, 0]`.
 
     Indexing behavior depends solely upon `vectorbt.base.array_wrapper.ArrayWrapper`.
     For example, if `group_select` is enabled indexing will be performed on groups,
@@ -197,11 +197,11 @@ simulation from the beginning to the end, you can turn on logging.
 
 ```python-repl
 >>> # Simulate portfolio with logging
->>> portfolio = vbt.Portfolio.from_orders(
+>>> pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, log=True)
 
->>> portfolio.logs.records
+>>> pf.logs.records
         id  idx  col  group  cash    position  debt  free_cash    val_price  \\
 0        0    0    0      0   inf    0.000000   0.0        inf  7194.892090
 1        1    1    0      0   inf    0.000000   0.0        inf  7202.551270
@@ -237,7 +237,7 @@ Just as orders, logs are also records and thus can be easily analyzed:
 ```python-repl
 >>> from vectorbt.portfolio.enums import OrderStatus
 
->>> portfolio.logs.map_field('res_status', value_map=OrderStatus).value_counts()
+>>> pf.logs.map_field('res_status', value_map=OrderStatus).value_counts()
 symbol   BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
 Ignored       60       72       67       66       67       59
 Filled       184      172      177      178      177      185
@@ -283,11 +283,11 @@ Define rules for one instance of `Portfolio`:
 
 ```python-repl
 >>> vbt.settings.caching['blacklist'].append(
-...     vbt.CacheCondition(instance=portfolio)
+...     vbt.CacheCondition(instance=pf)
 ... )
 >>> vbt.settings.caching['whitelist'].extend([
-...     vbt.CacheCondition(instance=portfolio, func='cash_flow'),
-...     vbt.CacheCondition(instance=portfolio, func='asset_flow')
+...     vbt.CacheCondition(instance=pf, func='cash_flow'),
+...     vbt.CacheCondition(instance=pf, func='asset_flow')
 ... ])
 ```
 
@@ -305,10 +305,10 @@ Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save
 instance to the disk with `Portfolio.save` and load it with `Portfolio.load`:
 
 ```python-repl
->>> portfolio = vbt.Portfolio.from_orders(
+>>> pf = vbt.Portfolio.from_orders(
 ...     ohlcv['Close'], size, price=ohlcv['Open'],
 ...     init_cash='autoalign', fees=0.001, slippage=0.001, freq='1D')
->>> portfolio.sharpe_ratio()
+>>> pf.sharpe_ratio()
 symbol
 BTC-USD    1.743437
 ETH-USD    2.800903
@@ -318,9 +318,9 @@ BCH-USD    0.269392
 LTC-USD    1.040494
 Name: sharpe_ratio, dtype: float64
 
->>> portfolio.save('portfolio_config')
->>> portfolio = vbt.Portfolio.load('portfolio_config')
->>> portfolio.sharpe_ratio()
+>>> pf.save('my_pf')
+>>> pf = vbt.Portfolio.load('my_pf')
+>>> pf.sharpe_ratio()
 symbol
 BTC-USD    1.743437
 ETH-USD    2.800903
@@ -334,7 +334,7 @@ Name: sharpe_ratio, dtype: float64
 !!! note
     Save files won't include neither cached results nor global defaults. For example,
     passing `fillna_close` as None will also use None when the portfolio is loaded from disk.
-    Make sure to either pass all arguments explicitly or to save and load the `vectorbt._settings.settings` config.
+    Make sure to either pass all arguments explicitly or to also save the `vectorbt._settings.settings` config.
 """
 import numpy as np
 import pandas as pd
@@ -384,13 +384,13 @@ def add_returns_methods(func_names: tp.Iterable[tp.Union[str, tp.Tuple[str, str]
                     freq: tp.Optional[tp.FrequencyLike] = None,
                     year_freq: tp.Optional[tp.FrequencyLike] = None,
                     _ret_func_name: str = ret_func_name,
-                    use_active_returns: bool = False,
+                    use_asset_returns: bool = False,
                     **ret_func_kwargs) -> tp.Any:
                 returns_acc = self.returns_acc(
                     group_by=group_by,
                     freq=freq,
                     year_freq=year_freq,
-                    use_active_returns=use_active_returns
+                    use_asset_returns=use_asset_returns
                 )
                 # Select only those arguments in kwargs that are also in the method's signature
                 # This is done for Portfolio.stats which passes the same kwargs to multiple methods
@@ -811,6 +811,7 @@ class Portfolio(Wrapping):
         ## Example
 
         Entry opens long, exit closes long:
+
         ```python-repl
         >>> import pandas as pd
         >>> import vectorbt as vbt
@@ -819,9 +820,9 @@ class Portfolio(Wrapping):
         >>> entries = pd.Series([True, True, True, False, False])
         >>> exits = pd.Series([False, False, True, True, True])
 
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='longonly')
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    1.0
         1    0.0
         2    0.0
@@ -831,10 +832,11 @@ class Portfolio(Wrapping):
         ```
 
         Entry opens short, exit closes short:
+
         ```python-repl
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='shortonly')
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0   -1.0
         1    0.0
         2    0.0
@@ -844,10 +846,11 @@ class Portfolio(Wrapping):
         ```
 
         Reversal within one tick. Entry opens long and closes short, exit closes long and opens short:
+
         ```python-repl
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all')
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    1.0
         1    0.0
         2    0.0
@@ -857,11 +860,12 @@ class Portfolio(Wrapping):
         ```
 
         Reversal within two ticks. First signal closes position, second signal opens the opposite one:
+
         ```python-repl
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=True)
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    1.0
         1    0.0
         2    0.0
@@ -871,11 +875,12 @@ class Portfolio(Wrapping):
         ```
 
         If entry and exit, chooses exit:
+
         ```python-repl
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=True, conflict_mode='exit')
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    1.0
         1    0.0
         2   -1.0
@@ -885,11 +890,12 @@ class Portfolio(Wrapping):
         ```
 
         Entry means long order, exit means short order (acts similar to `from_orders`):
+
         ```python-repl
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     accumulate=True)
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    1.0
         1    1.0
         2    0.0
@@ -899,13 +905,14 @@ class Portfolio(Wrapping):
         ```
 
         Testing multiple parameters (via broadcasting):
+
         ```python-repl
         >>> from vectorbt.portfolio.enums import Direction
 
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, direction=[list(Direction)],
         ...     broadcast_kwargs=dict(columns_from=Direction._fields))
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
             Long  Short    All
         0  100.0 -100.0  100.0
         1    0.0    0.0    0.0
@@ -916,14 +923,15 @@ class Portfolio(Wrapping):
 
         Specifying information in a more granular way thanks to broadcasting.
         Reverse the first long position by first closing it, and all other immediately:
+
         ```python-repl
         >>> entries = pd.Series([True, False, False, True, False])
         >>> exits = pd.Series([False, True, True, False, True])
         >>> close_first = pd.Series([False, True, False, False, False])
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits, size=1., direction='all',
         ...     close_first=close_first)
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    1.0
         1   -1.0
         2   -1.0
@@ -933,14 +941,15 @@ class Portfolio(Wrapping):
         ```
 
         Set risk/reward ratio by passing trailing stop loss and take profit thresholds:
+
         ```python-repl
         >>> close = pd.Series([10, 11, 12, 11, 10, 9])
         >>> entries = pd.Series([True, False, False, False, False, False])
         >>> exits = pd.Series([False, False, False, False, False, True])
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits,
         ...     sl_stop=0.1, sl_trail=True, tp_stop=0.2)  # take profit hit
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    10.0
         1     0.0
         2   -10.0
@@ -949,10 +958,10 @@ class Portfolio(Wrapping):
         5     0.0
         dtype: float64
 
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits,
         ...     sl_stop=0.1, sl_trail=True, tp_stop=0.3)  # stop loss hit
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    10.0
         1     0.0
         2     0.0
@@ -961,10 +970,10 @@ class Portfolio(Wrapping):
         5     0.0
         dtype: float64
 
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, entries, exits,
         ...     sl_stop=np.inf, sl_trail=True, tp_stop=np.inf)  # nothing hit, exit as usual
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    10.0
         1     0.0
         2     0.0
@@ -974,7 +983,7 @@ class Portfolio(Wrapping):
         dtype: float64
         ```
 
-        You can implement your own stop loss or take profit, or adjust the existing one at each time step.
+        We can implement our own stop loss or take profit, or adjust the existing one at each time step.
         Let's implement [stepped stop-loss](https://www.freqtrade.io/en/stable/strategy-advanced/#stepped-stoploss):
 
         ```python-repl
@@ -992,9 +1001,9 @@ class Portfolio(Wrapping):
         ...     return init_stop, init_trail
 
         >>> close = pd.Series([10, 11, 12, 11, 10])
-        >>> portfolio = vbt.Portfolio.from_signals(
+        >>> pf = vbt.Portfolio.from_signals(
         ...     close, adjust_sl_func_nb=adjust_sl_func_nb)
-        >>> portfolio.asset_flow()
+        >>> pf.asset_flow()
         0    10.0
         1     0.0
         2     0.0
@@ -1004,6 +1013,7 @@ class Portfolio(Wrapping):
         ```
 
         Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit:
+
         ```python-repl
         >>> close = pd.Series([10, 11, 12, 13, 14, 15])
         >>> entries = pd.Series([True, True, True, False, False, False])
@@ -1063,8 +1073,8 @@ class Portfolio(Wrapping):
         dtype: bool
 
         >>> # 5. Simulate portfolio
-        >>> portfolio = vbt.Portfolio.from_signals(close, entries, exits)
-        >>> portfolio.asset_flow()
+        >>> pf = vbt.Portfolio.from_signals(close, entries, exits)
+        >>> pf.asset_flow()
         0    10.0
         1   -10.0
         2     0.0
@@ -1075,7 +1085,7 @@ class Portfolio(Wrapping):
         ```
 
         !!! note
-            By cleaning signals, you lose information. Moreover, this automatically assumes
+            By cleaning signals, we lose information. Moreover, this automatically assumes
             that each entry/signal signal succeeds (= order gets filled). Use this with caution,
             and consider rewriting your strategy with `Portfolio.from_order_func`, which is a
             preferred way of defining a complex logic in vectorbt.
@@ -1489,21 +1499,22 @@ class Portfolio(Wrapping):
         ## Example
 
         Buy 10 units each tick:
+
         ```python-repl
         >>> import pandas as pd
         >>> import vectorbt as vbt
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> portfolio = vbt.Portfolio.from_orders(close, 10)
+        >>> pf = vbt.Portfolio.from_orders(close, 10)
 
-        >>> portfolio.assets()
+        >>> pf.assets()
         0    10.0
         1    20.0
         2    30.0
         3    40.0
         4    40.0
         dtype: float64
-        >>> portfolio.cash()
+        >>> pf.cash()
         0    90.0
         1    70.0
         2    40.0
@@ -1513,18 +1524,19 @@ class Portfolio(Wrapping):
         ```
 
         Reverse each position by first closing it:
+
         ```python-repl
         >>> size = [1, 0, -1, 0, 1]
-        >>> portfolio = vbt.Portfolio.from_orders(close, size, size_type='targetpercent')
+        >>> pf = vbt.Portfolio.from_orders(close, size, size_type='targetpercent')
 
-        >>> portfolio.assets()
+        >>> pf.assets()
         0    100.000000
         1      0.000000
         2    -66.666667
         3      0.000000
         4     26.666667
         dtype: float64
-        >>> portfolio.cash()
+        >>> pf.cash()
         0      0.000000
         1    200.000000
         2    400.000000
@@ -1544,7 +1556,7 @@ class Portfolio(Wrapping):
         >>> size = pd.Series(np.full(5, 1/3))  # each column 33.3%
         >>> size[1::2] = np.nan  # skip every second tick
 
-        >>> portfolio = vbt.Portfolio.from_orders(
+        >>> pf = vbt.Portfolio.from_orders(
         ...     close,  # acts both as reference and order price here
         ...     size,
         ...     size_type='targetpercent',
@@ -1554,7 +1566,7 @@ class Portfolio(Wrapping):
         ...     fees=0.001, fixed_fees=1., slippage=0.001  # costs
         ... )
 
-        >>> portfolio.asset_value(group_by=False).vbt.plot()
+        >>> pf.asset_value(group_by=False).vbt.plot()
         ```
 
         ![](/vectorbt/docs/img/simulate_nb.svg)
@@ -1884,6 +1896,7 @@ class Portfolio(Wrapping):
         ## Example
 
         Buy 10 units each tick using closing price:
+
         ```python-repl
         >>> import pandas as pd
         >>> from numba import njit
@@ -1895,16 +1908,16 @@ class Portfolio(Wrapping):
         ...     return order_nb(size=size)
 
         >>> close = pd.Series([1, 2, 3, 4, 5])
-        >>> portfolio = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
+        >>> pf = vbt.Portfolio.from_order_func(close, order_func_nb, 10)
 
-        >>> portfolio.assets()
+        >>> pf.assets()
         0    10.0
         1    20.0
         2    30.0
         3    40.0
         4    40.0
         dtype: float64
-        >>> portfolio.cash()
+        >>> pf.cash()
         0    90.0
         1    70.0
         2    40.0
@@ -1915,6 +1928,7 @@ class Portfolio(Wrapping):
 
         Reverse each position by first closing it. Keep state of last position to determine
         which position to open next (just as an example, there are easier ways to do this):
+
         ```python-repl
         >>> import numpy as np
         >>> from vectorbt.portfolio.nb import close_position_nb
@@ -1937,17 +1951,17 @@ class Portfolio(Wrapping):
         ...         last_pos_state[0] = 1
         ...     return order_nb(size=size)
 
-        >>> portfolio = vbt.Portfolio.from_order_func(
+        >>> pf = vbt.Portfolio.from_order_func(
         ...     close, order_func_nb, pre_group_func_nb=pre_group_func_nb)
 
-        >>> portfolio.assets()
+        >>> pf.assets()
         0    100.000000
         1      0.000000
         2    -66.666667
         3      0.000000
         4     26.666667
         dtype: float64
-        >>> portfolio.cash()
+        >>> pf.cash()
         0      0.000000
         1    200.000000
         2    400.000000
@@ -1957,6 +1971,7 @@ class Portfolio(Wrapping):
         ```
 
         Equal-weighted portfolio as in `vectorbt.portfolio.nb.simulate_nb` example:
+
         ```python-repl
         >>> from vectorbt.portfolio.nb import sort_call_seq_nb
         >>> from vectorbt.portfolio.enums import SizeType, Direction
@@ -1998,7 +2013,7 @@ class Portfolio(Wrapping):
         >>> fixed_fees = 1.
         >>> slippage = 0.001
 
-        >>> portfolio = vbt.Portfolio.from_order_func(
+        >>> pf = vbt.Portfolio.from_order_func(
         ...     close,  # acts both as reference and order price here
         ...     order_func_nb, fees, fixed_fees, slippage,  # order_args as *args
         ...     segment_mask=2,  # rebalance every second tick
@@ -2007,13 +2022,14 @@ class Portfolio(Wrapping):
         ...     cash_sharing=True, group_by=True,  # one group with cash sharing
         ... )
 
-        >>> portfolio.asset_value(group_by=False).vbt.plot()
+        >>> pf.asset_value(group_by=False).vbt.plot()
         ```
 
         ![](/vectorbt/docs/img/simulate_nb.svg)
 
         Combine multiple exit conditions. Exit early if the price hits some threshold before an actual exit
         (similar to the example under `Portfolio.from_signals`, but doesn't remove any information):
+
         ```python-repl
         >>> from vectorbt.base.reshape_fns import flex_select_auto_nb, to_2d
         >>> from vectorbt.portfolio.enums import NoOrder, OrderStatus, OrderSide
@@ -2682,8 +2698,8 @@ class Portfolio(Wrapping):
         return self.wrapper.wrap(returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
-    def active_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Get active return series per column/group.
+    def asset_returns(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+        """Get asset return series per column/group.
 
         This type of returns is based solely on cash flows and asset value rather than portfolio
         value. It ignores passive cash and thus it will return the same numbers irrespective of the amount of
@@ -2691,23 +2707,23 @@ class Portfolio(Wrapping):
         all in and keeping available cash at zero."""
         cash_flow = to_2d(self.cash_flow(group_by=group_by), raw=True)
         asset_value = to_2d(self.asset_value(group_by=group_by), raw=True)
-        active_returns = nb.active_returns_nb(cash_flow, asset_value)
-        return self.wrapper.wrap(active_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
+        asset_returns = nb.asset_returns_nb(cash_flow, asset_value)
+        return self.wrapper.wrap(asset_returns, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     @cached_method
     def returns_acc(self,
                     group_by: tp.GroupByLike = None,
                     freq: tp.Optional[tp.FrequencyLike] = None,
                     year_freq: tp.Optional[tp.FrequencyLike] = None,
-                    use_active_returns: bool = False) -> ReturnsAccessor:
+                    use_asset_returns: bool = False) -> ReturnsAccessor:
         """Get returns accessor of type `vectorbt.returns.accessors.ReturnsAccessor`.
 
         !!! hint
             You can find most methods of this accessor as (cacheable) attributes of this portfolio."""
         if freq is None:
             freq = self.wrapper.freq
-        if use_active_returns:
-            returns = self.active_returns(group_by=group_by)
+        if use_asset_returns:
+            returns = self.asset_returns(group_by=group_by)
         else:
             returns = self.returns(group_by=group_by)
         return returns.vbt.returns(freq=freq, year_freq=year_freq)
@@ -2761,7 +2777,7 @@ class Portfolio(Wrapping):
         * freq: Index frequency in case it cannot be parsed from `close`.
         * year_freq: Year frequency for annualization purposes.
         * incl_unrealized: Whether to include open trades/positions in statistics.
-        * use_active_returns: Whether to use `Portfolio.active_returns` when resolving `returns` argument.
+        * use_asset_returns: Whether to use `Portfolio.asset_returns` when resolving `returns` argument.
         * use_positions: Whether to use `Portfolio.positions` when resolving `trades` argument.
         * use_caching: Whether to use built-in caching for resolved arguments.
 
@@ -2774,7 +2790,7 @@ class Portfolio(Wrapping):
             freq=self.wrapper.freq,
             year_freq=returns_stats_cfg['year_freq'],
             incl_unrealized=portfolio_stats_cfg['incl_unrealized'],
-            use_active_returns=portfolio_stats_cfg['use_active_returns'],
+            use_asset_returns=portfolio_stats_cfg['use_asset_returns'],
             use_positions=portfolio_stats_cfg['use_positions'],
             use_caching=portfolio_stats_cfg['use_caching']
         )
@@ -2805,8 +2821,8 @@ class Portfolio(Wrapping):
         final_kwargs = merge_dicts(self.common_settings, cond_kwargs, kwargs)
 
         # Resolve attribute
-        if attr == 'returns' and final_kwargs['use_active_returns']:
-            attr = 'active_returns'
+        if attr == 'returns' and final_kwargs['use_asset_returns']:
+            attr = 'asset_returns'
         if attr == 'trades' and final_kwargs['use_positions']:
             attr = 'positions'
         cls = type(self)
@@ -2847,27 +2863,27 @@ class Portfolio(Wrapping):
         dict(
             bt_start=dict(
                 title='Start',
-                calc_func=lambda portfolio: portfolio.wrapper.index[0]
+                calc_func=lambda pf: pf.wrapper.index[0]
             ),
             bt_end=dict(
                 title='End',
-                calc_func=lambda portfolio: portfolio.wrapper.index[-1]
+                calc_func=lambda pf: pf.wrapper.index[-1]
             ),
             bt_duration=dict(
                 title='Duration',
-                calc_func=lambda portfolio, freq: len(portfolio.wrapper.index) * (freq if freq is not None else 1)
+                calc_func=lambda pf, freq: len(pf.wrapper.index) * (freq if freq is not None else 1)
             ),
             init_cash=dict(
                 title='Initial Cash',
-                calc_func=lambda portfolio, group_by: portfolio.get_init_cash(group_by=group_by)
+                calc_func=lambda pf, group_by: pf.get_init_cash(group_by=group_by)
             ),
             total_profit=dict(
                 title='Total Profit',
-                calc_func=lambda portfolio, group_by: portfolio.total_profit(group_by=group_by)
+                calc_func=lambda pf, group_by: pf.total_profit(group_by=group_by)
             ),
             total_return=dict(
                 title='Total Return [%]',
-                calc_func=lambda portfolio, group_by: portfolio.total_return(group_by=group_by) * 100
+                calc_func=lambda pf, group_by: pf.total_return(group_by=group_by) * 100
             ),
             benchmark_return=dict(
                 title='Benchmark Return [%]',
@@ -2875,7 +2891,7 @@ class Portfolio(Wrapping):
             ),
             pos_coverage=dict(
                 title='Position Coverage [%]',
-                calc_func=lambda portfolio, group_by: portfolio.position_coverage(group_by=group_by) * 100
+                calc_func=lambda pf, group_by: pf.position_coverage(group_by=group_by) * 100
             ),
             max_dd=dict(
                 title='Max Drawdown [%]',
@@ -2935,7 +2951,7 @@ class Portfolio(Wrapping):
             ),
             gross_exposure=dict(
                 title='Gross Exposure',
-                calc_func=lambda portfolio, group_by: portfolio.gross_exposure(group_by=group_by).mean()
+                calc_func=lambda pf, group_by: pf.gross_exposure(group_by=group_by).mean()
             ),
             sharpe_ratio=dict(
                 title='Sharpe Ratio',
@@ -3072,15 +3088,15 @@ class Portfolio(Wrapping):
         ...     end='2020-09-01 UTC'
         ... ).get('Close')
 
-        >>> portfolio = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42)
-        >>> portfolio.wrapper.columns
+        >>> pf = vbt.Portfolio.from_random_signals(close, n=[10, 20], seed=42)
+        >>> pf.wrapper.columns
         Int64Index([10, 20], dtype='int64', name='rand_n')
         ```
 
         To return the statistics for a particular column/group, use the `column` argument:
 
         ```python-repl
-        >>> portfolio.stats(column=10)
+        >>> pf.stats(column=10)
         UserWarning: Metrics {'calmar_ratio', 'sharpe_ratio', 'sortino_ratio'} require frequency of index.
         Pass it as `freq` or define it globally under `settings.array_wrapper`.
 
@@ -3114,7 +3130,7 @@ class Portfolio(Wrapping):
         manually either upon portfolio simulation or here:
 
         ```python-repl
-        >>> portfolio.stats(column=10, freq='d')
+        >>> pf.stats(column=10, freq='d')
         Start                    2020-01-01 00:00:00+00:00
         End                      2020-09-01 00:00:00+00:00
         Duration                         244 days 00:00:00
@@ -3146,7 +3162,7 @@ class Portfolio(Wrapping):
         We can change the grouping of the portfolio on the fly. Let's form a single group:
 
         ```python-repl
-        >>> portfolio.stats(group_by=True, freq='d')
+        >>> pf.stats(group_by=True, freq='d')
         Start                     2020-01-01 00:00:00+00:00
         End                       2020-09-01 00:00:00+00:00
         Duration                          244 days 00:00:00
@@ -3182,7 +3198,7 @@ class Portfolio(Wrapping):
         each metric is aggregated across all columns/groups based on `agg_func`, which is mean by default.
 
         ```python-repl
-        >>> portfolio.stats(freq='d')
+        >>> pf.stats(freq='d')
         Taking mean across columns. To return a DataFrame, pass agg_func=None.
 
         Start                    2020-01-01 00:00:00+00:00
@@ -3218,7 +3234,7 @@ class Portfolio(Wrapping):
         We can also return a DataFrame with statistics per column/group by passing `agg_func=None`:
 
         ```python-repl
-        >>> portfolio.stats(agg_func=None, freq='d')
+        >>> pf.stats(agg_func=None, freq='d')
                                    Start                       End Duration  ...  Calmar Ratio
         rand_n                                                               ...
         10     2020-01-01 00:00:00+00:00 2020-09-01 00:00:00+00:00 244 days  ...      0.313166
@@ -3230,7 +3246,7 @@ class Portfolio(Wrapping):
         To select metrics, use the `metrics` argument (see `Portfolio.metrics` for supported metrics):
 
         ```python-repl
-        >>> portfolio.stats(metrics=['sharpe_ratio', 'sortino_ratio'], column=10, freq='d')
+        >>> pf.stats(metrics=['sharpe_ratio', 'sortino_ratio'], column=10, freq='d')
         Sharpe Ratio     0.369947
         Sortino Ratio    0.587442
         Name: stats, dtype: float64
@@ -3247,7 +3263,7 @@ class Portfolio(Wrapping):
         ...         calc_func=lambda trades: trades.profit_factor()
         ...     )
         ... )
-        >>> portfolio.stats(metrics=profit_factor, column=10, freq='d')
+        >>> pf.stats(metrics=profit_factor, column=10, freq='d')
         Profit Factor    1.347457
         Name: stats, dtype: float64
         ```
@@ -3273,38 +3289,39 @@ class Portfolio(Wrapping):
         keyword arguments. Here, we override the global aggregation function for `max_trade_duration`:
 
         ```python-repl
-        >>> portfolio.stats(freq='d', agg_func=lambda sr: sr.mean(),
+        >>> pf.stats(freq='d', agg_func=lambda sr: sr.mean(),
         ...     max_trade_duration_kwargs=dict(agg_func=lambda sr: sr.max()))
         ```
 
         Let's create a simple metric that returns frequency to demonstrate how vectorbt overrides settings,
         from least to most important:
+
         ```python-repl
         >>> # common_defaults
         >>> freq_metric = ('freq_metric', dict(title='Freq', calc_func=lambda freq: freq))
-        >>> portfolio.stats(freq_metric, column=10)
+        >>> pf.stats(freq_metric, column=10)
         Freq    None
         Name: 10, dtype: object
 
         >>> # kwargs with keys from common_defaults >>> common_defaults
-        >>> portfolio.stats(freq_metric, column=10, freq='1m')
+        >>> pf.stats(freq_metric, column=10, freq='1m')
         Freq   0 days 00:01:00
         Name: 10, dtype: timedelta64[ns]
 
         >>> # metric settings >>> kwargs with keys from common_defaults
         >>> def_freq_metric = ('freq_metric', dict(title='Freq', freq='2m', calc_func=lambda freq: freq))
-        >>> portfolio.stats(def_freq_metric, column=10, freq='1m')
+        >>> pf.stats(def_freq_metric, column=10, freq='1m')
         Freq   0 days 00:02:00
         Name: 10, dtype: timedelta64[ns]
 
         >>> # global_settings >>> metric settings
-        >>> portfolio.stats(def_freq_metric, column=10, freq='1m',
+        >>> pf.stats(def_freq_metric, column=10, freq='1m',
         ...     global_settings=dict(freq='3m'))
         Freq   0 days 00:03:00
         Name: 10, dtype: timedelta64[ns]
 
         >>> # metric kwargs >>> global_settings
-        >>> portfolio.stats(def_freq_metric, column=10, freq='1m',
+        >>> pf.stats(def_freq_metric, column=10, freq='1m',
         ...     global_settings=dict(freq='3m'), freq_metric_kwargs=dict(freq='4m'))
         Freq   0 days 00:04:00
         Name: 10, dtype: timedelta64[ns]
@@ -3321,24 +3338,24 @@ class Portfolio(Wrapping):
         ...             trades.pnl.values >= min_pnl).count()
         ...     )
         ... )
-        >>> portfolio.stats(
+        >>> pf.stats(
         ...     metrics=trade_min_pnl_cnt, column=10, freq='d',
         ...     trade_min_pnl_cnt_kwargs=dict(min_pnl=0))
         Trades with P&L over $0    6
         Name: stats, dtype: int64
 
-        >>> portfolio.stats(
+        >>> pf.stats(
         ...     metrics=trade_min_pnl_cnt, column=10, freq='d',
         ...     trade_min_pnl_cnt_kwargs=dict(min_pnl=10))
         Trades with P&L over $10    1
         Name: stats, dtype: int64
         ```
 
-        If the same metric name was encountered more than once, vectorbt automaticallu appends an
+        If the same metric name was encountered more than once, vectorbt automatically appends an
         underscore and its position, so we can pass keyword arguments to each metric separately:
 
         ```python-repl
-        >>> portfolio.stats(
+        >>> pf.stats(
         ...     metrics=[
         ...         trade_min_pnl_cnt,
         ...         trade_min_pnl_cnt,
@@ -3356,9 +3373,10 @@ class Portfolio(Wrapping):
 
         To add a custom metric to the list of all metrics, we have three options.
         First, we can change the `Portfolio.metrics` dict in-place (this will append to the end):
+
         ```python-repl
-        >>> portfolio.metrics['profit_factor'] = profit_factor[1]
-        >>> portfolio.stats(column=10, freq='d')
+        >>> pf.metrics['profit_factor'] = profit_factor[1]
+        >>> pf.stats(column=10, freq='d')
         Start                    2020-01-01 00:00:00+00:00
         End                      2020-09-01 00:00:00+00:00
         Duration                         244 days 00:00:00
@@ -3390,19 +3408,22 @@ class Portfolio(Wrapping):
 
         Since `Portfolio.metrics` is of type `vectorbt.utils.config.Config`, we can reset it at any time
         to get default metrics:
+
         ```python-repl
-        >>> portfolio.metrics.reset()
+        >>> pf.metrics.reset()
         ```
 
         The second option is to copy `Portfolio.metrics`, append our metric, and pass as `metrics` argument:
+
         ```python-repl
-        >>> my_metrics = list(portfolio.metrics.items()) + [profit_factor]
-        >>> portfolio.stats(metrics=my_metrics, column=10, freq='d')
+        >>> my_metrics = list(pf.metrics.items()) + [profit_factor]
+        >>> pf.stats(metrics=my_metrics, column=10, freq='d')
         ```
 
         The last option is to set `metrics` globally under `portfolio.stats` in `vectorbt._settings.settings`.
+
         >>> vbt.settings['portfolio']['stats']['metrics'] = my_metrics
-        >>> portfolio.stats(column=10, freq='d')
+        >>> pf.stats(column=10, freq='d')
         """
         from vectorbt._settings import settings
         portfolio_stats_cfg = settings['portfolio']['stats']
@@ -3624,7 +3645,7 @@ class Portfolio(Wrapping):
     def returns_stats(self,
                       column: tp.Optional[tp.Label] = None,
                       group_by: tp.GroupByLike = None,
-                      use_active_returns: bool = False,
+                      use_asset_returns: bool = False,
                       in_sim_order: bool = False,
                       agg_func: tp.Optional[tp.Callable] = np.mean,
                       year_freq: tp.Optional[tp.FrequencyLike] = None,
@@ -3636,8 +3657,8 @@ class Portfolio(Wrapping):
         `kwargs` will be passed to `vectorbt.returns.accessors.ReturnsAccessor.stats` method.
         If `benchmark_rets` is not set, uses `Portfolio.market_returns`."""
         # Pre-calculate
-        if use_active_returns:
-            returns = self.active_returns(group_by=group_by)
+        if use_asset_returns:
+            returns = self.asset_returns(group_by=group_by)
         else:
             returns = self.returns(group_by=group_by, in_sim_order=in_sim_order)
 
@@ -3983,14 +4004,14 @@ class Portfolio(Wrapping):
     def plot_cum_returns(self,
                          column: tp.Optional[tp.Label] = None,
                          group_by: tp.GroupByLike = None,
-                         active_returns: bool = False,
+                         asset_returns: bool = False,
                          **kwargs) -> tp.BaseFigure:
         """Plot one column/group of cumulative returns.
 
         Args:
             column (str): Name of the column/group to plot.
             group_by (any): Group or ungroup columns. See `vectorbt.base.column_grouper.ColumnGrouper`.
-            active_returns (bool): Whether to plot active returns.
+            asset_returns (bool): Whether to plot asset returns.
             **kwargs: Keyword arguments passed to `vectorbt.returns.accessors.ReturnsSRAccessor.plot_cum_returns`.
         """
         from vectorbt._settings import settings
@@ -4016,8 +4037,8 @@ class Portfolio(Wrapping):
                 )
             )
         ), kwargs)
-        if active_returns:
-            returns = self.active_returns(group_by=group_by)
+        if asset_returns:
+            returns = self.asset_returns(group_by=group_by)
         else:
             returns = self.returns(group_by=group_by)
         returns = self.select_one_from_obj(returns, self.wrapper.regroup(group_by), column=column)
@@ -4444,6 +4465,7 @@ class Portfolio(Wrapping):
         ## Example
 
         Plot portfolio of a random strategy:
+
         ```python-repl
         >>> import vectorbt as vbt
 
@@ -4453,8 +4475,8 @@ class Portfolio(Wrapping):
         ...     end='2020-09-01 UTC'
         ... ).get('Close')
 
-        >>> portfolio = vbt.Portfolio.from_random_signals(close, n=10, seed=42)
-        >>> portfolio.plot()
+        >>> pf = vbt.Portfolio.from_random_signals(close, n=10, seed=42)
+        >>> pf.plot()
         ```
 
         ![](/vectorbt/docs/img/portfolio_plot.svg)
@@ -4465,7 +4487,7 @@ class Portfolio(Wrapping):
         ```python-repl
         >>> from vectorbt.utils.colors import adjust_opacity
 
-        >>> portfolio.plot(
+        >>> pf.plot(
         ...     subplots=['drawdowns', 'underwater'],
         ...     drawdowns_kwargs=dict(top_n=3),
         ...     underwater_kwargs=dict(
@@ -4486,8 +4508,8 @@ class Portfolio(Wrapping):
         ...     size.rename('Order Size').vbt.barplot(
         ...         add_trace_kwargs=add_trace_kwargs, fig=fig)
 
-        >>> order_size = portfolio.orders.size.to_pd(default_val=0.)
-        >>> portfolio.plot(subplots=[
+        >>> order_size = pf.orders.size.to_pd(default_val=0.)
+        >>> pf.plot(subplots=[
         ...     'orders',
         ...     ('order_size', dict(
         ...         title='Order Size',
@@ -4501,7 +4523,7 @@ class Portfolio(Wrapping):
         Alternatively, you can create a placeholder and overwrite it manually later:
 
         ```python-repl
-        >>> fig = portfolio.plot(subplots=[
+        >>> fig = pf.plot(subplots=[
         ...     'orders',
         ...     ('order_size', dict(
         ...         title='Order Size',
@@ -4541,13 +4563,13 @@ class Portfolio(Wrapping):
         ...         trace_names=[vbt.Sub('rolling_drawdown(${window})')],  # add window to the trace name
         ...     ))
         ... ]
-        >>> portfolio.plot(subplots, rolling_drawdown_kwargs=dict(template_mapping=dict(window=10)))
+        >>> pf.plot(subplots, rolling_drawdown_kwargs=dict(template_mapping=dict(window=10)))
         ```
 
         You can also replace templates across all subplots by using the global template mapping:
 
         ```python-repl
-        >>> portfolio.plot(subplots, template_mapping=dict(window=10))
+        >>> pf.plot(subplots, template_mapping=dict(window=10))
         ```
 
         ![](/vectorbt/docs/img/portfolio_plot_path.svg)

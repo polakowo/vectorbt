@@ -285,8 +285,8 @@ Date
 2020-01-01 00:00:00+00:00    False
 Freq: D, Length: 366, dtype: bool
 
->>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> portfolio.total_return()
+>>> pf = vbt.Portfolio.from_signals(btc_price, entries, exits)
+>>> pf.total_return()
 0.636680693047752
 ```
 
@@ -331,8 +331,8 @@ Date
 
 [366 rows x 2 columns]
 
->>> portfolio = vbt.Portfolio.from_signals(btc_price, entries, exits)
->>> portfolio.total_return()
+>>> pf = vbt.Portfolio.from_signals(btc_price, entries, exits)
+>>> pf.total_return()
 fast_window  slow_window
 10           30             0.848840
 20           30             0.543411
@@ -403,8 +403,8 @@ Date
 
 [366 rows x 4 columns]
 
->>> portfolio = vbt.Portfolio.from_signals(comb_price, entries, exits)
->>> portfolio.total_return()
+>>> pf = vbt.Portfolio.from_signals(comb_price, entries, exits)
+>>> pf.total_return()
 fast_window  slow_window  symbol
 10           30           BTC       0.848840
                           ETH       0.244204
@@ -412,7 +412,7 @@ fast_window  slow_window  symbol
                           ETH      -0.319102
 Name: total_return, dtype: float64
 
->>> mean_return = portfolio.total_return().groupby('symbol').mean()
+>>> mean_return = pf.total_return().groupby('symbol').mean()
 >>> mean_return.vbt.barplot(xaxis_title='Symbol', yaxis_title='Mean total return')
 ```
 
@@ -446,8 +446,8 @@ symbol              BTC         ETH           BTC         ETH
 >>> entries = fast_ma.ma_above(slow_ma, crossover=True)
 >>> exits = fast_ma.ma_below(slow_ma, crossover=True)
 
->>> portfolio = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
->>> portfolio.total_return()
+>>> pf = vbt.Portfolio.from_signals(mult_comb_price, entries, exits, freq='1D')
+>>> pf.total_return()
 fast_window  slow_window  split_idx  symbol
 10           30           0          BTC       1.632259
                                      ETH       0.946786
@@ -468,7 +468,7 @@ The index hierarchy of the final performance series can be then used to group th
 by any feature, such as window pair, symbol, and time period.
 
 ```python-repl
->>> mean_return = portfolio.total_return().groupby(['split_idx', 'symbol']).mean()
+>>> mean_return = pf.total_return().groupby(['split_idx', 'symbol']).mean()
 >>> mean_return.unstack(level=-1).vbt.barplot(
 ...     xaxis_title='Split index',
 ...     yaxis_title='Mean total return',

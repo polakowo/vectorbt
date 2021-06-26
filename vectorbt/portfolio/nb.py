@@ -79,12 +79,37 @@ def buy_nb(exec_state: ExecuteOrderState,
            slippage: float = 0.,
            min_size: float = 0.,
            max_size: float = np.inf,
+           lock_cash: bool = False,
            allow_partial: bool = True,
            percent: float = np.nan) -> tp.Tuple[ExecuteOrderState, OrderResult]:
     """Buy or/and cover."""
 
+    # Get price adjusted with slippage
+    adj_price = price * (1 + slippage)
+
     # Set cash limit
-    cash_limit = exec_state.cash
+    if lock_cash:
+        if exec_state.position >= 0:
+            # cash == free_cash in a long position, unless other column(s) locked some of the cash
+            cash_limit = exec_state.free_cash
+        else:
+            # How much free cash remains after closing out the short position?
+            cover_req_cash = abs(exec_state.position) * adj_price * (1 + fees) + fixed_fees
+            cover_free_cash = add_nb(exec_state.free_cash + 2 * exec_state.debt, -cover_req_cash)
+            if cover_free_cash > 0:
+                # Enough cash to close out the short position and open a long one
+                cash_limit = exec_state.free_cash + 2 * exec_state.debt
+            elif cover_free_cash < 0:
+                # Not enough cash to close out the short position
+                avg_entry_price = exec_state.debt / abs(exec_state.position)
+                max_short_size = ((exec_state.free_cash - fixed_fees) / (adj_price * (1 + fees) - 2 * avg_entry_price))
+                cash_limit = max_short_size * adj_price * (1 + fees) + fixed_fees
+            else:
+                # Exact amount of cash to close out the short position
+                cash_limit = exec_state.cash
+    else:
+        cash_limit = exec_state.cash
+    cash_limit = min(cash_limit, exec_state.cash)
     if not np.isnan(percent):
         # Apply percentage
         cash_limit = min(cash_limit, percent * cash_limit)
@@ -97,9 +122,6 @@ def buy_nb(exec_state: ExecuteOrderState,
     else:
         if exec_state.position == 0:
             return exec_state, order_not_filled_nb(OrderStatus.Rejected, StatusInfo.NoOpenPosition)
-
-    # Get price adjusted with slippage
-    adj_price = price * (1 + slippage)
 
     # Get optimal order size
     if direction == Direction.ShortOnly:
@@ -456,6 +478,7 @@ def execute_order_nb(state: ProcessOrderState, order: Order) -> tp.Tuple[Execute
             slippage=order.slippage,
             min_size=order.min_size,
             max_size=order.max_size,
+            lock_cash=order.lock_cash,
             allow_partial=order.allow_partial,
             percent=percent
         )
@@ -4499,8 +4522,8 @@ def returns_in_sim_order_nb(value_iso: tp.Array2d,
 
 
 @njit(cache=True)
-def active_returns_nb(cash_flow: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
-    """Get active return series per column/group."""
+def asset_returns_nb(cash_flow: tp.Array2d, asset_value: tp.Array2d) -> tp.Array2d:
+    """Get asset return series per column/group."""
     out = np.empty_like(cash_flow)
     for col in range(cash_flow.shape[1]):
         for i in range(cash_flow.shape[0]):

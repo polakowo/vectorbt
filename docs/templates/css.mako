@@ -14,6 +14,13 @@ body {
     line-height: 1.5em;
 }
 
+.version {
+    font-weight: normal;
+    font-style: italic;
+    font-size: .75em;
+    color: #56b6c2;
+}
+
 #content {
     padding: 20px;
 }

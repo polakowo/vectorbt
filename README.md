@@ -83,8 +83,8 @@ import vectorbt as vbt
 
 price = vbt.YFData.download('BTC-USD').get('Close')
 
-portfolio = vbt.Portfolio.from_holding(price, init_cash=100)
-portfolio.total_profit()
+pf = vbt.Portfolio.from_holding(price, init_cash=100)
+pf.total_profit()
 ```
 
 ```plaintext
@@ -99,8 +99,8 @@ slow_ma = vbt.MA.run(price, 50)
 entries = fast_ma.ma_above(slow_ma, crossover=True)
 exits = fast_ma.ma_below(slow_ma, crossover=True)
 
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
-portfolio.total_profit()
+pf = vbt.Portfolio.from_signals(price, entries, exits, init_cash=100)
+pf.total_profit()
 ```
 
 ```plaintext
@@ -116,9 +116,9 @@ symbols = ["BTC-USD", "ETH-USD"]
 price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
 
 n = np.random.randint(10, 101, size=1000).tolist()
-portfolio = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
+pf = vbt.Portfolio.from_random_signals(price, n=n, init_cash=100, seed=42)
 
-mean_expectancy = portfolio.trades.expectancy().groupby(['rand_n', 'symbol']).mean()
+mean_expectancy = pf.trades.expectancy().groupby(['rand_n', 'symbol']).mean()
 fig = mean_expectancy.unstack().vbt.scatterplot(xaxis_title='rand_n', yaxis_title='mean_expectancy')
 fig.show()
 ```
@@ -137,10 +137,10 @@ fast_ma, slow_ma = vbt.MA.run_combs(price, window=windows, r=2, short_names=['fa
 entries = fast_ma.ma_above(slow_ma, crossover=True)
 exits = fast_ma.ma_below(slow_ma, crossover=True)
 
-portfolio_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
-portfolio = vbt.Portfolio.from_signals(price, entries, exits, **portfolio_kwargs)
+pf_kwargs = dict(size=np.inf, fees=0.001, freq='1D')
+pf = vbt.Portfolio.from_signals(price, entries, exits, **pf_kwargs)
 
-fig = portfolio.total_return().vbt.heatmap(
+fig = pf.total_return().vbt.heatmap(
     x_level='fast_window', y_level='slow_window', slider_level='symbol', symmetric=True,
     trace_kwargs=dict(colorbar=dict(title='Total return', tickformat='%')))
 fig.show()
@@ -151,7 +151,7 @@ fig.show()
 Digging into each strategy configuration is as simple as indexing with pandas:
 
 ```python
-portfolio[(10, 20, 'ETH-USD')].stats()
+pf[(10, 20, 'ETH-USD')].stats()
 ```
 
 ```plaintext
@@ -184,7 +184,7 @@ Name: (10, 20, ETH-USD), dtype: object
 ```
 
 ```python
-portfolio[(10, 20, 'ETH-USD')].plot().show()
+pf[(10, 20, 'ETH-USD')].plot().show()
 ```
 
 ![dmac_portfolio.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/dmac_portfolio.svg)
@@ -388,8 +388,8 @@ rand_n      0      1      2
 >>> price = [1., 2., 3., 2., 1.]
 >>> entries = [True, False, True, False, False]
 >>> exits = [False, True, False, True, False]
->>> portfolio = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
->>> portfolio.trades.plot().show()
+>>> pf = vbt.Portfolio.from_signals(price, entries, exits, freq='1D')
+>>> pf.trades.plot().show()
 ```
 
 ![trades.svg](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/trades.svg)

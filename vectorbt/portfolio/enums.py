@@ -1210,7 +1210,8 @@ __pdoc__['Order.reject_prob'] = """Probability of rejecting this order to simula
 Not everything goes smoothly in real life. Use random rejections to test your order management for robustness."""
 __pdoc__['Order.lock_cash'] = """Whether to lock cash when shorting. 
 
-Keeps free cash from turning negative."""
+If enabled, prevents `free_cash` from turning negative when buying or short selling.
+A negative `free_cash` means one column used collateral of another column, which is generally undesired."""
 __pdoc__['Order.allow_partial'] = """Whether to allow partial fill.
 
 Otherwise, the order gets rejected.

@@ -111,9 +111,9 @@ class Trades(Records):
     ```python-repl
     >>> price = pd.Series([1., 2., 3., 4., 3., 2., 1.])
     >>> orders = pd.Series([1., -0.5, -0.5, 2., -0.5, -0.5, -0.5])
-    >>> portfolio = vbt.Portfolio.from_orders(price, orders)
+    >>> pf = vbt.Portfolio.from_orders(price, orders)
 
-    >>> trades = vbt.Trades.from_orders(portfolio.orders)
+    >>> trades = vbt.Trades.from_orders(pf.orders)
     >>> trades.count()
     6
     >>> trades.pnl.sum()
