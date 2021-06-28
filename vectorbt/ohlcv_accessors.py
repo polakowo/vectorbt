@@ -83,10 +83,10 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             volume_add_trace_kwargs = merge_dicts(dict(row=2, col=1), volume_add_trace_kwargs)
 
         column_names = ohlcv_cfg['column_names'] if self._column_names is None else self._column_names
-        open = self._obj[column_names['open']]
-        high = self._obj[column_names['high']]
-        low = self._obj[column_names['low']]
-        close = self._obj[column_names['close']]
+        open = self.obj[column_names['open']]
+        high = self.obj[column_names['high']]
+        low = self.obj[column_names['low']]
+        close = self.obj[column_names['close']]
 
         # Set up figure
         if fig is None:
@@ -150,7 +150,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         fig.add_trace(ohlc, **ohlc_add_trace_kwargs)
 
         if display_volume:
-            volume = self._obj[column_names['volume']]
+            volume = self.obj[column_names['volume']]
 
             marker_colors = np.empty(volume.shape, dtype=object)
             marker_colors[(close.values - open.values) > 0] = plotting_cfg['color_schema']['increasing']

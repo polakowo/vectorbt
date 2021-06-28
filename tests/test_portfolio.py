@@ -6591,6 +6591,30 @@ class TestPortfolio:
                 name='a')
         )
         pd.testing.assert_series_equal(
+            pf['a'].stats(use_positions=True),
+            pd.Series(
+                np.array([
+                    pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-05 00:00:00'),
+                    pd.Timedelta('5 days 00:00:00'), 100.0, -0.3104899999999997,
+                    -0.3104899999999997, 150.0, 40.0, 0.3104900000000015, 0.3104900000000015,
+                    pd.Timedelta('4 days 00:00:00'), pd.Timedelta('4 days 00:00:00'), 1, 0.0,
+                    -54.450495049504966, -54.450495049504966, -54.450495049504966,
+                    pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'),
+                    -0.10999000000000003, np.nan, 0.010431562217554364, -11.057783842772304,
+                    -9.75393669809172, -46.721467294341814
+                ]),
+                index=pd.Index([
+                    'Start', 'End', 'Duration', 'Initial Cash', 'Total Profit',
+                    'Total Return [%]', 'Benchmark Return [%]', 'Position Coverage [%]',
+                    'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
+                    'Avg Drawdown Duration', 'Position Count', 'Win Rate [%]',
+                    'Best Position [%]', 'Worst Position [%]', 'Avg Position [%]',
+                    'Max Position Duration', 'Avg Position Duration', 'Expectancy', 'SQN',
+                    'Gross Exposure', 'Sharpe Ratio', 'Sortino Ratio', 'Calmar Ratio'
+                ], dtype='object'),
+                name='a')
+        )
+        pd.testing.assert_series_equal(
             pf['a'].stats(global_settings=dict(required_return=0.1, risk_free=0.01)),
             pd.Series(
                 np.array([

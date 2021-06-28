@@ -31,14 +31,14 @@ def add_px_methods(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
                 # Fix category_orders
                 if 'color' in kwargs:
                     if isinstance(kwargs['color'], str):
-                        if isinstance(self._obj, pd.DataFrame):
-                            if kwargs['color'] in self._obj.columns:
+                        if isinstance(self.obj, pd.DataFrame):
+                            if kwargs['color'] in self.obj.columns:
                                 category_orders = dict()
-                                category_orders[kwargs['color']] = sorted(self._obj[kwargs['color']].unique())
+                                category_orders[kwargs['color']] = sorted(self.obj[kwargs['color']].unique())
                                 kwargs = merge_dicts(dict(category_orders=category_orders), kwargs)
 
                 # Fix Series name
-                obj = self._obj.copy(deep=False)
+                obj = self.obj.copy(deep=False)
                 if isinstance(obj, pd.Series):
                     if obj.name is not None:
                         obj = obj.rename(str(obj.name))

@@ -334,7 +334,7 @@ class GenericAccessor(BaseAccessor):
         """
         checks.assert_numba_func(apply_func_nb)
 
-        regrouped = self._obj.groupby(by, axis=0, **kwargs)
+        regrouped = self.obj.groupby(by, axis=0, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
@@ -374,7 +374,7 @@ class GenericAccessor(BaseAccessor):
         """
         checks.assert_numba_func(apply_func_nb)
 
-        resampled = self._obj.resample(freq, axis=0, **kwargs)
+        resampled = self.obj.resample(freq, axis=0, **kwargs)
         groups = Dict()
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
@@ -849,11 +849,11 @@ class GenericAccessor(BaseAccessor):
         See `vectorbt.generic.drawdowns.Drawdowns`."""
         if group_by is None:
             group_by = self.wrapper.grouper.group_by
-        return Drawdowns.from_ts(self._obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
+        return Drawdowns.from_ts(self.obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
 
     def to_mapped_array(self, dropna: bool = True, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
         """Convert this object into an instance of `vectorbt.records.mapped_array.MappedArray`."""
-        mapped_arr = reshape_fns.to_2d(self._obj, raw=True).flatten(order='F')
+        mapped_arr = reshape_fns.to_2d(self.obj, raw=True).flatten(order='F')
         col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
         idx_arr = np.tile(np.arange(self.wrapper.shape_2d[0]), self.wrapper.shape_2d[1])
         if dropna:
@@ -985,7 +985,7 @@ class GenericAccessor(BaseAccessor):
             split_dfs = []
             split_indexes = []
             for split_idx, idxs in enumerate(idxs_by_split):
-                split_dfs.append(self._obj.iloc[idxs].reset_index(drop=True))
+                split_dfs.append(self.obj.iloc[idxs].reset_index(drop=True))
                 if keys is not None:
                     split_name = keys[split_idx]
                 else:
@@ -1196,8 +1196,8 @@ class GenericAccessor(BaseAccessor):
             return 'UNK'
 
         if self.is_series():
-            return self._obj.map(_mapper)
-        return self._obj.applymap(_mapper)
+            return self.obj.map(_mapper)
+        return self.obj.applymap(_mapper)
 
     # ############# Plotting ############# #
 
@@ -1403,17 +1403,17 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             neg_trace_kwargs = {}
         if hidden_trace_kwargs is None:
             hidden_trace_kwargs = {}
-        obj, other = reshape_fns.broadcast(self._obj, other, columns_from='keep')
+        obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
         checks.assert_type(other, pd.Series)
         if fig is None:
             fig = make_figure()
         fig.update_layout(**layout_kwargs)
 
         # TODO: Using masks feels hacky
-        pos_mask = self._obj > other
+        pos_mask = self.obj > other
         if pos_mask.any():
             # Fill positive area
-            pos_obj = self._obj.copy()
+            pos_obj = self.obj.copy()
             pos_obj[~pos_mask] = other[~pos_mask]
             other.vbt.plot(
                 trace_kwargs=merge_dicts(dict(
@@ -1446,10 +1446,10 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
                 add_trace_kwargs=add_trace_kwargs,
                 fig=fig
             )
-        neg_mask = self._obj < other
+        neg_mask = self.obj < other
         if neg_mask.any():
             # Fill negative area
-            neg_obj = self._obj.copy()
+            neg_obj = self.obj.copy()
             neg_obj[~neg_mask] = other[~neg_mask]
             other.vbt.plot(
                 trace_kwargs=merge_dicts(dict(
@@ -1534,7 +1534,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if add_trace_kwargs is None:
             add_trace_kwargs = {}
 
-        obj, other = reshape_fns.broadcast(self._obj, other, columns_from='keep')
+        obj, other = reshape_fns.broadcast(self.obj, other, columns_from='keep')
         checks.assert_type(other, pd.Series)
         if fig is None:
             fig = make_subplots(specs=[[{"secondary_y": True}]])
@@ -1620,7 +1620,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         ![](/vectorbt/docs/img/sr_heatmap_slider.gif)
         """
         if not isinstance(self.wrapper.index, pd.MultiIndex):
-            return self._obj.to_frame().vbt.heatmap(
+            return self.obj.to_frame().vbt.heatmap(
                 x_labels=x_labels, y_labels=y_labels,
                 return_fig=return_fig, fig=fig, **kwargs)
 
@@ -1657,7 +1657,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         if not return_fig:
             raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
         _slider_labels = []
-        for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
+        for i, (name, group) in enumerate(self.obj.groupby(level=slider_level)):
             if slider_labels is not None:
                 name = slider_labels[i]
             _slider_labels.append(name)
@@ -1710,7 +1710,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
     def ts_heatmap(self, **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
-        return self._obj.to_frame().vbt.ts_heatmap(**kwargs)
+        return self.obj.to_frame().vbt.ts_heatmap(**kwargs)
 
     def volume(self,
                x_level: tp.Optional[tp.Level] = None,
@@ -1816,7 +1816,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
             if not return_fig:
                 raise ValueError("Cannot use return_fig=False and slider_level simultaneously")
             _slider_labels = []
-            for i, (name, group) in enumerate(self._obj.groupby(level=slider_level)):
+            for i, (name, group) in enumerate(self.obj.groupby(level=slider_level)):
                 if slider_labels is not None:
                     name = slider_labels[i]
                 _slider_labels.append(name)
@@ -1890,7 +1890,7 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
 
         ![](/vectorbt/docs/img/sr_qqplot.svg)
         """
-        qq = stats.probplot(self._obj, sparams=sparams, dist=dist)
+        qq = stats.probplot(self.obj, sparams=sparams, dist=dist)
         fig = pd.Series(qq[0][1], index=qq[0][0]).vbt.scatterplot(fig=fig, **kwargs)
 
         if plot_line:
@@ -1963,4 +1963,4 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
     def ts_heatmap(self, is_y_category: bool = True,
                    **kwargs) -> tp.Union[tp.BaseFigure, plotting.Heatmap]:  # pragma: no cover
         """Heatmap of time-series data."""
-        return self._obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)
+        return self.obj.transpose().iloc[::-1].vbt.heatmap(is_y_category=is_y_category, **kwargs)

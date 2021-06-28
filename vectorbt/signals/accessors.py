@@ -292,7 +292,7 @@ class SignalsAccessor(GenericAccessor):
         If one array passed, see `SignalsAccessor.first`.
         If two arrays passed, entries and exits, see `vectorbt.signals.nb.clean_enex_nb`."""
         if not isinstance(self_or_cls, type):
-            args = (self_or_cls._obj, *args)
+            args = (self_or_cls.obj, *args)
         if len(args) == 1:
             obj = args[0]
             if not isinstance(obj, (pd.Series, pd.DataFrame)):
@@ -495,7 +495,7 @@ class SignalsAccessor(GenericAccessor):
         ```
         """
         if prob is not None:
-            obj, prob = reshape_fns.broadcast(self._obj, prob, keep_raw=[False, True])
+            obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
             exits = nb.generate_rand_ex_by_prob_nb(obj.vbt.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed)
             return obj.vbt.wrapper.wrap(exits, **merge_dicts({}, wrap_kwargs))
         exits = nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed)
@@ -548,7 +548,7 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        entries = self._obj
+        entries = self.obj
 
         keep_raw = (False, True, True, True)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
@@ -644,7 +644,7 @@ class SignalsAccessor(GenericAccessor):
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
-        entries = self._obj
+        entries = self.obj
         if high is None:
             high = open
         if low is None:
@@ -756,7 +756,7 @@ class SignalsAccessor(GenericAccessor):
             return self.wrapper.wrap_reduced(result, **wrap_kwargs)
         else:
             # Two input arrays
-            obj, other = reshape_fns.broadcast(self._obj, other, **broadcast_kwargs)
+            obj, other = reshape_fns.broadcast(self.obj, other, **broadcast_kwargs)
             checks.assert_dtype(other, np.bool_)
             result = nb.map_reduce_between_two_nb(
                 obj.vbt.to_2d_array(),
@@ -868,10 +868,10 @@ class SignalsAccessor(GenericAccessor):
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if reset_by is not None:
-            obj, reset_by = reshape_fns.broadcast(self._obj, reset_by, **broadcast_kwargs)
+            obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
             reset_by = reset_by.vbt.to_2d_array()
         else:
-            obj = self._obj
+            obj = self.obj
         ranked = nb.rank_nb(
             obj.vbt.to_2d_array(),
             reset_by=reset_by,
@@ -915,10 +915,10 @@ class SignalsAccessor(GenericAccessor):
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         if reset_by is not None:
-            obj, reset_by = reshape_fns.broadcast(self._obj, reset_by, **broadcast_kwargs)
+            obj, reset_by = reshape_fns.broadcast(self.obj, reset_by, **broadcast_kwargs)
             reset_by = reset_by.vbt.to_2d_array()
         else:
-            obj = self._obj
+            obj = self.obj
         ranked = nb.rank_partitions_nb(
             obj.vbt.to_2d_array(),
             reset_by=reset_by,
@@ -996,7 +996,7 @@ class SignalsAccessor(GenericAccessor):
             tickvals=[0, 1],
             ticktext=['false', 'true']
         )
-        return self._obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
+        return self.obj.vbt.lineplot(**merge_dicts(default_layout, kwargs))
 
 
 @register_series_accessor('signals')
@@ -1035,11 +1035,11 @@ class SignalsSRAccessor(SignalsAccessor, GenericSRAccessor):
         plotting_cfg = settings['plotting']
 
         if y is None:
-            y = pd.Series.vbt.empty_like(self._obj, 1)
+            y = pd.Series.vbt.empty_like(self.obj, 1)
         else:
             y = reshape_fns.to_pd_array(y)
 
-        return y[self._obj].vbt.scatterplot(**merge_dicts(dict(
+        return y[self.obj].vbt.scatterplot(**merge_dicts(dict(
             trace_kwargs=dict(
                 marker=dict(
                     symbol='circle',

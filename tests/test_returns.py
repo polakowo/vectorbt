@@ -49,12 +49,6 @@ class TestAccessors:
         assert pd.Series([1, 2, 3]).vbt.returns(freq='3D').wrapper.freq == day_dt * 3
         assert pd.Series([1, 2, 3]).vbt.returns(freq=np.timedelta64(4, 'D')).wrapper.freq == day_dt * 4
 
-    def test_year_freq(self):
-        assert ret.vbt.returns.year_freq == pd.to_timedelta(settings.returns['year_freq'])
-        assert ret['a'].vbt.returns.year_freq == pd.to_timedelta(settings.returns['year_freq'])
-        assert ret['a'].vbt.returns(year_freq='365 days').year_freq == pd.to_timedelta('365 days')
-        assert ret.vbt.returns(year_freq='365 days').year_freq == pd.to_timedelta('365 days')
-
     def test_ann_factor(self):
         assert ret['a'].vbt.returns(year_freq='365 days').ann_factor == 365
         assert ret.vbt.returns(year_freq='365 days').ann_factor == 365
@@ -62,8 +56,8 @@ class TestAccessors:
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
     def test_from_price(self):
-        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_price(ts['a'])._obj, ts['a'].pct_change())
-        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_price(ts)._obj, ts.pct_change())
+        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_price(ts['a']).obj, ts['a'].pct_change())
+        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_price(ts).obj, ts.pct_change())
         assert pd.Series.vbt.returns.from_price(ts['a'], year_freq='365 days').year_freq == pd.to_timedelta('365 days')
         assert pd.DataFrame.vbt.returns.from_price(ts, year_freq='365 days').year_freq == pd.to_timedelta('365 days')
 
@@ -246,11 +240,11 @@ class TestAccessors:
     def test_deflated_sharpe_ratio(self):
         pd.testing.assert_series_equal(
             ret.vbt.returns.deflated_sharpe_ratio(risk_free=0.01),
-            pd.Series([np.nan, np.nan, 0.004879167151489748], index=ret.columns).rename('deflated_sharpe_ratio')
+            pd.Series([np.nan, np.nan, 0.0005355605507117676], index=ret.columns).rename('deflated_sharpe_ratio')
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.deflated_sharpe_ratio(risk_free=0.03),
-            pd.Series([np.nan, np.nan, 0.0034902739533370438], index=ret.columns).rename('deflated_sharpe_ratio')
+            pd.Series([np.nan, np.nan, 0.0003423112350834066], index=ret.columns).rename('deflated_sharpe_ratio')
         )
 
     @pytest.mark.parametrize(
@@ -302,7 +296,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.rolling_information_ratio(
-                ret.shape[0], benchmark_rets, minp=1).iloc[-1],
+                benchmark_rets, ret.shape[0], minp=1).iloc[-1],
             pd.Series([res_a, res_b, res_c], index=ret.columns).rename(ret.index[-1])
         )
 
@@ -317,7 +311,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.rolling_beta(
-                ret.shape[0], benchmark_rets, minp=1).iloc[-1],
+                benchmark_rets, ret.shape[0], minp=1).iloc[-1],
             pd.Series([res_a, res_b, res_c], index=ret.columns).rename(ret.index[-1])
         )
 
@@ -336,7 +330,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.rolling_alpha(
-                ret.shape[0], benchmark_rets, minp=1, risk_free=test_risk_free).iloc[-1],
+                benchmark_rets, ret.shape[0], minp=1, risk_free=test_risk_free).iloc[-1],
             pd.Series([res_a, res_b, res_c], index=ret.columns).rename(ret.index[-1])
         )
 
@@ -406,7 +400,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.rolling_capture(
-                ret.shape[0], benchmark_rets, minp=1).iloc[-1],
+                benchmark_rets, ret.shape[0], minp=1).iloc[-1],
             pd.Series([res_a, res_b, res_c], index=ret.columns).rename(ret.index[-1])
         )
 
@@ -421,7 +415,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.rolling_up_capture(
-                ret.shape[0], benchmark_rets, minp=1).iloc[-1],
+                benchmark_rets, ret.shape[0], minp=1).iloc[-1],
             pd.Series([res_a, res_b, res_c], index=ret.columns).rename(ret.index[-1])
         )
 
@@ -436,7 +430,7 @@ class TestAccessors:
         )
         pd.testing.assert_series_equal(
             ret.vbt.returns.rolling_down_capture(
-                ret.shape[0], benchmark_rets, minp=1).iloc[-1],
+                benchmark_rets, ret.shape[0], minp=1).iloc[-1],
             pd.Series([res_a, res_b, res_c], index=ret.columns).rename(ret.index[-1])
         )
 

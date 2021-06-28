@@ -4,4 +4,3 @@ __pycache__
 .idea
 .mypy_cache
 .pytest_cache
-my_pipelines

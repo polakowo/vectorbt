@@ -233,7 +233,15 @@ settings = SettingsConfig(
             ),
         ),
         returns=dict(
-            year_freq='365 days'
+            year_freq='365 days',
+            start_value=0.,
+            window=10,
+            minp=None,
+            ddof=1,
+            risk_free=0.,
+            levy_alpha=2.,
+            required_return=0.,
+            cutoff=0.05
         ),
         portfolio=dict(
             call_seq='default',
@@ -291,12 +299,14 @@ settings = SettingsConfig(
             plot=dict(
                 subplots=['orders', 'trade_returns', 'cum_returns'],
                 grouped_subplots=None,
+                incl_unrealized=True,
+                use_asset_returns=False,
+                use_positions=False,
+                use_caching=True,
                 show_titles=True,
                 hide_id_labels=True,
                 group_id_labels=True,
                 make_subplots_kwargs=Config(),  # flex
-                silence_warnings=False,
-                template_mapping=Config(),  # flex
                 hline_shape_kwargs=Config(  # flex
                     dict(
                         type='line',
@@ -306,6 +316,9 @@ settings = SettingsConfig(
                         )
                     )
                 ),
+                silence_warnings=False,
+                template_mapping=Config(),  # flex
+                global_settings=Config(),  # flex
                 kwargs=Config()  # flex
             )
         ),

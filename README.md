@@ -1,4 +1,4 @@
-[![Build Status](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)](https://travis-ci.org/github/polakowo/vectorbt)
+[![Build Status](https://img.shields.io/travis/polakowo/vectorbt/master.svg?branch=master&style=for-the-badge)](https://travis-ci.com/github/polakowo/vectorbt)
 [![Code Coverage](https://img.shields.io/codecov/c/github/polakowo/vectorbt?style=for-the-badge)](https://codecov.io/gh/polakowo/vectorbt)
 [![Website](https://img.shields.io/website?style=for-the-badge&url=https%3A%2F%2Fpolakowo.io%2Fvectorbt%2Fdocs%2Findex.html)](https://polakowo.io/vectorbt)
 [![PyPi](https://img.shields.io/pypi/v/vectorbt?color=blueviolet&style=for-the-badge)](https://pypi.org/project/vectorbt)

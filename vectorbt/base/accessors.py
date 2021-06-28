@@ -105,7 +105,12 @@ class BaseAccessor:
     def __call__(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
         """Allows passing arguments to the initializer."""
 
-        return self.__class__(self._obj, *args, **kwargs)
+        return self.__class__(self.obj, *args, **kwargs)
+
+    @property
+    def obj(self):
+        """Pandas object."""
+        return self._obj
 
     @class_or_instancemethod
     def is_series(self_or_cls) -> bool:
@@ -153,12 +158,12 @@ class BaseAccessor:
         obj_index = apply_func(obj_index, *args, **kwargs)
         if inplace:
             if axis == 1:
-                self._obj.columns = obj_index
+                self.obj.columns = obj_index
             else:
-                self._obj.index = obj_index
+                self.obj.index = obj_index
             return None
         else:
-            obj = self._obj.copy()
+            obj = self.obj.copy()
             if axis == 1:
                 obj.columns = obj_index
             else:
@@ -240,13 +245,13 @@ class BaseAccessor:
         """Convert to 1-dim NumPy array
 
         See `vectorbt.base.reshape_fns.to_1d`."""
-        return reshape_fns.to_1d(self._obj, raw=True)
+        return reshape_fns.to_1d(self.obj, raw=True)
 
     def to_2d_array(self) -> tp.Array2d:
         """Convert to 2-dim NumPy array.
 
         See `vectorbt.base.reshape_fns.to_2d`."""
-        return reshape_fns.to_2d(self._obj, raw=True)
+        return reshape_fns.to_2d(self.obj, raw=True)
 
     def tile(self, n: int, keys: tp.Optional[tp.IndexLike] = None, axis: int = 1,
              wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
@@ -254,7 +259,7 @@ class BaseAccessor:
 
         Set `axis` to 1 for columns and 0 for index.
         Use `keys` as the outermost level."""
-        tiled = reshape_fns.tile(self._obj, n, axis=axis)
+        tiled = reshape_fns.tile(self.obj, n, axis=axis)
         if keys is not None:
             if axis == 1:
                 new_columns = index_fns.combine_indexes([keys, self.wrapper.columns])
@@ -272,7 +277,7 @@ class BaseAccessor:
 
         Set `axis` to 1 for columns and 0 for index.
         Use `keys` as the outermost level."""
-        repeated = reshape_fns.repeat(self._obj, n, axis=axis)
+        repeated = reshape_fns.repeat(self.obj, n, axis=axis)
         if keys is not None:
             if axis == 1:
                 new_columns = index_fns.combine_indexes([self.wrapper.columns, keys])
@@ -315,7 +320,7 @@ class BaseAccessor:
         ```
         """
         checks.assert_type(other, (pd.Series, pd.DataFrame))
-        obj = reshape_fns.to_2d(self._obj)
+        obj = reshape_fns.to_2d(self.obj)
         other = reshape_fns.to_2d(other)
 
         aligned_index = index_fns.align_index_to(obj.index, other.index)
@@ -328,28 +333,28 @@ class BaseAccessor:
     @class_or_instancemethod
     def broadcast(self_or_cls, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
         """See `vectorbt.base.reshape_fns.broadcast`."""
-        others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(self_or_cls, type):
             return reshape_fns.broadcast(*others, **kwargs)
-        return reshape_fns.broadcast(self_or_cls._obj, *others, **kwargs)
+        return reshape_fns.broadcast(self_or_cls.obj, *others, **kwargs)
 
     def broadcast_to(self, other: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
         """See `vectorbt.base.reshape_fns.broadcast_to`."""
         if isinstance(other, BaseAccessor):
-            other = other._obj
-        return reshape_fns.broadcast_to(self._obj, other, **kwargs)
+            other = other.obj
+        return reshape_fns.broadcast_to(self.obj, other, **kwargs)
 
     def make_symmetric(self) -> tp.Frame:  # pragma: no cover
         """See `vectorbt.base.reshape_fns.make_symmetric`."""
-        return reshape_fns.make_symmetric(self._obj)
+        return reshape_fns.make_symmetric(self.obj)
 
     def unstack_to_array(self, **kwargs) -> tp.Array:  # pragma: no cover
         """See `vectorbt.base.reshape_fns.unstack_to_array`."""
-        return reshape_fns.unstack_to_array(self._obj, **kwargs)
+        return reshape_fns.unstack_to_array(self.obj, **kwargs)
 
     def unstack_to_df(self, **kwargs) -> tp.Frame:  # pragma: no cover
         """See `vectorbt.base.reshape_fns.unstack_to_df`."""
-        return reshape_fns.unstack_to_df(self._obj, **kwargs)
+        return reshape_fns.unstack_to_df(self.obj, **kwargs)
 
     # ############# Combining ############# #
 
@@ -388,12 +393,12 @@ class BaseAccessor:
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
         if to_2d:
-            obj = reshape_fns.to_2d(self._obj, raw=not keep_pd)
+            obj = reshape_fns.to_2d(self.obj, raw=not keep_pd)
         else:
             if not keep_pd:
-                obj = np.asarray(self._obj)
+                obj = np.asarray(self.obj)
             else:
-                obj = self._obj
+                obj = self.obj
         result = apply_func(obj, *args, **kwargs)
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
@@ -422,11 +427,11 @@ class BaseAccessor:
         y  2  2  5  6
         ```
         """
-        others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
         if isinstance(self_or_cls, type):
             objs = others
         else:
-            objs = (self_or_cls._obj,) + others
+            objs = (self_or_cls.obj,) + others
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
@@ -500,12 +505,12 @@ class BaseAccessor:
         checks.assert_not_none(apply_func)
         # Optionally cast to 2d array
         if to_2d:
-            obj = reshape_fns.to_2d(self._obj, raw=not keep_pd)
+            obj = reshape_fns.to_2d(self.obj, raw=not keep_pd)
         else:
             if not keep_pd:
-                obj = np.asarray(self._obj)
+                obj = np.asarray(self.obj)
             else:
-                obj = self._obj
+                obj = self.obj
         if checks.is_numba_func(apply_func) and numba_loop:
             if use_ray:
                 raise ValueError("Ray cannot be used within Numba")
@@ -611,7 +616,7 @@ class BaseAccessor:
             others = (other,)
         else:
             others = other
-        others = tuple(map(lambda x: x._obj if isinstance(x, BaseAccessor) else x, others))
+        others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
         checks.assert_not_none(combine_func)
         # Broadcast arguments
         if broadcast:
@@ -621,9 +626,9 @@ class BaseAccessor:
                 # Numba requires writeable arrays
                 # Plus all of our arrays must be in the same order
                 broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements=['W', 'C'])), broadcast_kwargs)
-            new_obj, *new_others = reshape_fns.broadcast(self._obj, *others, **broadcast_kwargs)
+            new_obj, *new_others = reshape_fns.broadcast(self.obj, *others, **broadcast_kwargs)
         else:
-            new_obj, new_others = self._obj, others
+            new_obj, new_others = self.obj, others
         if not checks.is_pandas(new_obj):
             new_obj = ArrayWrapper.from_shape(new_obj.shape).wrap(new_obj)
         # Optionally cast to 2d array

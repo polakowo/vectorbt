@@ -1,10 +1,10 @@
 from setuptools import setup, find_packages
 
-with open('README.md', 'r') as fh:
+with open('README.md', 'r', encoding="utf-8", errors='ignore') as fh:
     long_description = fh.read()
 
 version = {}
-with open("vectorbt/_version.py") as fp:
+with open("vectorbt/_version.py", encoding="utf-8") as fp:
     exec(fp.read(), version)
 
 setup(
