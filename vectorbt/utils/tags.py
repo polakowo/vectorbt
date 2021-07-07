@@ -16,7 +16,7 @@ def match_tags(tags: tp.MaybeIterable[str], in_tags: tp.MaybeIterable[str]) -> b
     ## Example
 
     ```python-repl
-    >>> from vectorbt.utils.tag import match_tags
+    >>> from vectorbt.utils.tags import match_tags
 
     >>> match_tags('hello', 'hello')
     True

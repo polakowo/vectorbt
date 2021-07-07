@@ -353,6 +353,31 @@ class TestMappedArray:
             )
         )
 
+    def test_apply(self):
+        @njit
+        def cumsum_apply_nb(idxs, col, a):
+            return np.cumsum(a)
+
+        np.testing.assert_array_equal(
+            mapped_array['a'].apply(cumsum_apply_nb).values,
+            np.array([10., 21., 33.])
+        )
+        np.testing.assert_array_equal(
+            mapped_array.apply(cumsum_apply_nb).values,
+            np.array([10., 21., 33., 13., 27., 40., 12., 23., 33.])
+        )
+        np.testing.assert_array_equal(
+            mapped_array_grouped.apply(cumsum_apply_nb, apply_per_group=False).values,
+            np.array([10., 21., 33., 13., 27., 40., 12., 23., 33.])
+        )
+        np.testing.assert_array_equal(
+            mapped_array_grouped.apply(cumsum_apply_nb, apply_per_group=True).values,
+            np.array([10., 21., 33., 46., 60., 73., 12., 23., 33.])
+        )
+        assert mapped_array_grouped.apply(cumsum_apply_nb).wrapper == \
+               mapped_array.apply(cumsum_apply_nb, group_by=group_by).wrapper
+        assert mapped_array.apply(cumsum_apply_nb, group_by=False).wrapper.grouper.group_by is None
+
     def test_reduce(self):
         @njit
         def mean_reduce_nb(col, a):
@@ -909,6 +934,54 @@ class TestMappedArray:
         np.testing.assert_array_equal((+a).values, +a.values)
         np.testing.assert_array_equal((abs(-a)).values, abs((-a.values)))
 
+    def test_stats(self):
+        stat_index = pd.Index([
+            'Start', 'End', 'Period', 'Count', 'Mean', 'Std', 'Min', 'Median', 'Max', 'Min Index', 'Max Index'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            mapped_array.stats(),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'),
+                2.25, 11.777777777777779, 0.859116756396542, 11.0, 11.666666666666666, 12.666666666666666
+            ],
+                index=stat_index[:-2],
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            mapped_array.stats(column='a'),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'),
+                3, 11.0, 1.0, 10.0, 11.0, 12.0, 'x', 'z'
+            ],
+                index=stat_index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            mapped_array.stats(column='g1', group_by=group_by),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'),
+                6, 12.166666666666666, 1.4719601443879746, 10.0, 12.5, 14.0, 'x', 'y'
+            ],
+                index=stat_index,
+                name='g1'
+            )
+        )
+        pd.testing.assert_series_equal(
+            mapped_array.stats(column='a', settings=dict(value_map={10: 'test_value'})),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'), 3, 1, 1, 1, 0, 0
+            ],
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Count', 'Value Count: test_value',
+                    'Value Count: UNK - 11.0', 'Value Count: UNK - 12.0',
+                    'Value Count: UNK - 13.0', 'Value Count: UNK - 14.0'
+                ], dtype='object'),
+                name='a'
+            )
+        )
+
 
 # ############# base.py ############# #
 
@@ -975,7 +1048,8 @@ class TestRecords:
             records.map_field('some_field1', idx_field='col').idx_arr,
             records_arr['col']
         )
-        assert records_grouped.map_field('some_field1').wrapper == records_grouped.wrapper
+        assert records_grouped.map_field('some_field1').wrapper == \
+               records.map_field('some_field1', group_by=group_by).wrapper
         assert records_grouped.map_field('some_field1', group_by=False).wrapper.grouper.group_by is None
 
     def test_map(self):
@@ -995,7 +1069,8 @@ class TestRecords:
             records.map(map_func_nb, idx_field='col').idx_arr,
             records_arr['col']
         )
-        assert records_grouped.map(map_func_nb).wrapper == records_grouped.wrapper
+        assert records_grouped.map(map_func_nb).wrapper == \
+               records.map(map_func_nb, group_by=group_by).wrapper
         assert records_grouped.map(map_func_nb, group_by=False).wrapper.grouper.group_by is None
 
     def test_map_array(self):
@@ -1012,8 +1087,34 @@ class TestRecords:
             records.map_array(arr, idx_field='col').idx_arr,
             records_arr['col']
         )
-        assert records_grouped.map_array(arr).wrapper == records_grouped.wrapper
+        assert records_grouped.map_array(arr).wrapper == \
+               records.map_array(arr, group_by=group_by).wrapper
         assert records_grouped.map_array(arr, group_by=False).wrapper.grouper.group_by is None
+
+    def test_apply(self):
+        @njit
+        def cumsum_apply_nb(records):
+            return np.cumsum(records.some_field1)
+
+        np.testing.assert_array_equal(
+            records['a'].apply(cumsum_apply_nb).values,
+            np.array([10., 21., 33.])
+        )
+        np.testing.assert_array_equal(
+            records.apply(cumsum_apply_nb).values,
+            np.array([10., 21., 33., 13., 27., 40., 12., 23., 33.])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.apply(cumsum_apply_nb, apply_per_group=False).values,
+            np.array([10., 21., 33., 13., 27., 40., 12., 23., 33.])
+        )
+        np.testing.assert_array_equal(
+            records_grouped.apply(cumsum_apply_nb, apply_per_group=True).values,
+            np.array([10., 21., 33., 46., 60., 73., 12., 23., 33.])
+        )
+        assert records_grouped.apply(cumsum_apply_nb).wrapper == \
+               records.apply(cumsum_apply_nb, group_by=group_by).wrapper
+        assert records_grouped.apply(cumsum_apply_nb, group_by=False).wrapper.grouper.group_by is None
 
     def test_count(self):
         assert records['a'].count() == 3
@@ -1169,6 +1270,38 @@ class TestRecords:
         )
         assert np.isnan(filtered_records['d'].map_field('some_field1').min())
         assert filtered_records['d'].count() == 0.
+
+    def test_stats(self):
+        stat_index = pd.Index([
+            'Start', 'End', 'Period', 'Total Records'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            records.stats(),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'), 2.25
+            ],
+                index=stat_index,
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            records.stats(column='a'),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'), 3
+            ],
+                index=stat_index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            records.stats(column='g1', group_by=group_by),
+            pd.Series([
+                'x', 'z', pd.Timedelta('3 days 00:00:00'), 6
+            ],
+                index=stat_index,
+                name='g1'
+            )
+        )
 
 
 # ############# drawdowns.py ############# #
@@ -2059,6 +2192,26 @@ class TestTrades:
                 np.array([0.625, 0.4]),
                 index=pd.Index(['g1', 'g2'], dtype='object')
             ).rename('loss_rate')
+        )
+
+    def test_win_streak(self):
+        np.testing.assert_array_almost_equal(
+            trades['a'].win_streak.values,
+            np.array([1, 2, 3, 0])
+        )
+        np.testing.assert_array_almost_equal(
+            trades.win_streak.values,
+            np.array([1, 2, 3, 0, 0, 0, 0, 0, 1, 2, 3, 0, 0])
+        )
+
+    def test_loss_streak(self):
+        np.testing.assert_array_almost_equal(
+            trades['a'].loss_streak.values,
+            np.array([0, 0, 0, 1])
+        )
+        np.testing.assert_array_almost_equal(
+            trades.loss_streak.values,
+            np.array([0, 0, 0, 1, 1, 2, 3, 4, 0, 0, 0, 1, 2])
         )
 
     def test_profit_factor(self):

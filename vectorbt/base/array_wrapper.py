@@ -92,6 +92,7 @@ from vectorbt.utils.config import Configured, merge_dicts
 from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
 from vectorbt.utils.array import get_ranges_arr
 from vectorbt.utils.decorators import cached_method
+from vectorbt.utils.attr import AttrResolver, AttrResolverT
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.indexing import IndexingError, PandasIndexer
 from vectorbt.base.column_grouper import ColumnGrouper
@@ -435,8 +436,9 @@ class ArrayWrapper(Configured, PandasIndexer):
     def to_time_units(self, a: tp.MaybeArray[float]) -> tp.Union[pd.Timedelta, tp.Array]:
         """Convert array to time units."""
         if self.freq is None:
-            raise ValueError("Couldn't parse the frequency of index. "
-                             "Pass it as `freq` or define it globally under `settings.array_wrapper`.")
+            warnings.warn("Couldn't parse the frequency of index. "
+                          "Pass it as `freq` or define it globally under `settings.array_wrapper`.", stacklevel=2)
+            return a
         return a * self.freq
 
     @property
@@ -599,7 +601,7 @@ class ArrayWrapper(Configured, PandasIndexer):
 WrappingT = tp.TypeVar("WrappingT", bound="Wrapping")
 
 
-class Wrapping(Configured, PandasIndexer):
+class Wrapping(Configured, PandasIndexer, AttrResolver):
     """Class that uses `ArrayWrapper` globally."""
 
     def __init__(self, wrapper: ArrayWrapper, **kwargs) -> None:
@@ -608,6 +610,7 @@ class Wrapping(Configured, PandasIndexer):
 
         Configured.__init__(self, wrapper=wrapper, **kwargs)
         PandasIndexer.__init__(self)
+        AttrResolver.__init__(self)
 
     def indexing_func(self: WrappingT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> WrappingT:
         """Perform indexing on `Wrapping`."""
@@ -628,6 +631,36 @@ class Wrapping(Configured, PandasIndexer):
             self.wrapper.grouper.check_group_by(group_by=group_by)
             return self.copy(wrapper=self.wrapper.regroup(group_by, **kwargs))
         return self  # important for keeping cache
+
+    def resolve_self(self: AttrResolverT,
+                     cond_kwargs: tp.KwargsLike = None,
+                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
+                     impacts_caching: bool = True,
+                     silence_warnings: bool = False) -> AttrResolverT:
+        """Resolve self.
+
+        Creates a copy of this instance if a different `freq` can be found in `cond_kwargs`."""
+        if cond_kwargs is None:
+            cond_kwargs = {}
+        if custom_arg_names is None:
+            custom_arg_names = set()
+
+        if 'freq' in cond_kwargs:
+            wrapper_copy = self.wrapper.copy(freq=cond_kwargs['freq'])
+
+            if wrapper_copy.freq != self.wrapper.freq:
+                if not silence_warnings:
+                    warnings.warn(f"Changing the frequency will create a copy of this object. "
+                                  f"Consider setting it upon the creation to re-use cache.", stacklevel=2)
+                self_copy = self.copy(wrapper=wrapper_copy)
+                for alias in self.self_aliases:
+                    if alias not in custom_arg_names:
+                        cond_kwargs[alias] = self_copy
+                cond_kwargs['freq'] = self_copy.wrapper.freq
+                if impacts_caching:
+                    cond_kwargs['use_caching'] = False
+                return self_copy
+        return self
 
     def select_one(self: WrappingT, column: tp.Any = None, group_by: tp.GroupByLike = None, **kwargs) -> WrappingT:
         """Select one column/group."""

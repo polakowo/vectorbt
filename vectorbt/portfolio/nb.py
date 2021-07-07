@@ -57,6 +57,8 @@ from vectorbt.utils.math import (
 from vectorbt.utils.array import insert_argsort_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
+from vectorbt.signals import nb as signals_nb
+from vectorbt.returns import nb as returns_nb
 from vectorbt.portfolio.enums import *
 
 
@@ -1271,7 +1273,7 @@ def simulate_nb(target_shape: tp.Shape,
     Args:
         target_shape (tuple): Target shape.
 
-            A tuple with exactly two elements: the number of steps and columns.
+            A tuple with exactly two elements: the number of rows and columns.
         close (array_like of float): Last asset price at each time step.
 
             Should have shape `target_shape`.
@@ -1402,12 +1404,6 @@ def simulate_nb(target_shape: tp.Shape,
         together with `vectorbt.base.reshape_fns.flex_select_nb`.
 
         Also remember that indexing of 2-dim arrays in vectorbt follows that of pandas: `a[i, col]`.
-
-    !!! note
-        Function `pre_group_func_nb` is only called if there is at least on active segment in
-        the group. Functions `pre_segment_func_nb` and `order_func_nb` are only called if their
-        segment is active. If the main task of `pre_group_func_nb` is to activate/deactivate segments,
-        all segments should be activated by default to allow `pre_group_func_nb` to be called.
 
     !!! warning
         You can only safely access data of columns that are to the left of the current group and
@@ -1778,14 +1774,14 @@ def simulate_nb(target_shape: tp.Shape,
                     last_position,
                     last_val_price
                 )
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
                         last_value[col] = last_cash[col]
                     else:
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Is this segment active?
             if segment_mask[i, group]:
@@ -1891,9 +1887,9 @@ def simulate_nb(target_shape: tp.Shape,
                     val_price_now = new_state.val_price
                     value_now = new_state.value
                     if cash_sharing:
-                        return_now = get_return_nb(second_last_value[group], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[group], value_now)
                     else:
-                        return_now = get_return_nb(second_last_value[col], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[col], value_now)
                     oidx = new_state.oidx
                     lidx = new_state.lidx
 
@@ -1993,7 +1989,7 @@ def simulate_nb(target_shape: tp.Shape,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
@@ -2002,7 +1998,7 @@ def simulate_nb(target_shape: tp.Shape,
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
                     second_last_value[col] = temp_value[col]
                     temp_value[col] = last_value[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Update open position stats
             if fill_pos_record:
@@ -2380,14 +2376,14 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     last_position,
                     last_val_price
                 )
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
                         last_value[col] = last_cash[col]
                     else:
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Is this segment active?
             if segment_mask[i, group]:
@@ -2493,9 +2489,9 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                     val_price_now = new_state.val_price
                     value_now = new_state.value
                     if cash_sharing:
-                        return_now = get_return_nb(second_last_value[group], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[group], value_now)
                     else:
-                        return_now = get_return_nb(second_last_value[col], value_now)
+                        return_now = returns_nb.get_return_nb(second_last_value[col], value_now)
                     oidx = new_state.oidx
                     lidx = new_state.lidx
 
@@ -2595,7 +2591,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                 )
                 second_last_value[group] = temp_value[group]
                 temp_value[group] = last_value[group]
-                last_return[group] = get_return_nb(second_last_value[group], last_value[group])
+                last_return[group] = returns_nb.get_return_nb(second_last_value[group], last_value[group])
             else:
                 for col in range(from_col, to_col):
                     if last_position[col] == 0:
@@ -2604,7 +2600,7 @@ def simulate_row_wise_nb(target_shape: tp.Shape,
                         last_value[col] = last_cash[col] + last_position[col] * last_val_price[col]
                     second_last_value[col] = temp_value[col]
                     temp_value[col] = last_value[col]
-                    last_return[col] = get_return_nb(second_last_value[col], last_value[col])
+                    last_return[col] = returns_nb.get_return_nb(second_last_value[col], last_value[col])
 
             # Update open position stats
             if fill_pos_record:
@@ -3589,6 +3585,28 @@ def trade_duration_map_nb(record: tp.Record) -> int:
 
 
 @njit(cache=True)
+def trade_win_rank_apply_nb(records: tp.RecordArray) -> tp.Array1d:
+    """`map_func_nb` that returns ranks of winning trades (streak)."""
+    return signals_nb.rank_1d_nb(
+        records['pnl'] > 0,
+        reset_by=None,
+        after_false=False,
+        allow_gaps=False
+    )
+
+
+@njit(cache=True)
+def trade_loss_rank_apply_nb(records: tp.RecordArray) -> tp.Array1d:
+    """`map_func_nb` that returns ranks of losing trades (streak)."""
+    return signals_nb.rank_1d_nb(
+        records['pnl'] < 0,
+        reset_by=None,
+        after_false=False,
+        allow_gaps=False
+    )
+
+
+@njit(cache=True)
 def get_trade_stats_nb(size: float,
                        entry_price: float,
                        entry_fees: float,
@@ -4472,32 +4490,6 @@ def total_return_nb(total_profit: tp.Array1d, init_cash: tp.Array1d) -> tp.Array
 
 
 @njit(cache=True)
-def get_return_nb(input_value: float, output_value: float) -> float:
-    """Get return from input and output value."""
-    if input_value == 0:
-        if output_value == 0:
-            return 0.
-        return np.inf * np.sign(output_value)
-    return_value = (output_value - input_value) / input_value
-    if input_value < 0:
-        return_value *= -1
-    return return_value
-
-
-@njit(cache=True)
-def returns_nb(value: tp.Array2d, init_cash: tp.Array1d) -> tp.Array2d:
-    """Get portfolio return series per column/group."""
-    out = np.empty(value.shape, dtype=np.float_)
-    for col in range(out.shape[1]):
-        input_value = init_cash[col]
-        for i in range(out.shape[0]):
-            output_value = value[i, col]
-            out[i, col] = get_return_nb(input_value, output_value)
-            input_value = output_value
-    return out
-
-
-@njit(cache=True)
 def returns_in_sim_order_nb(value_iso: tp.Array2d,
                             group_lens: tp.Array1d,
                             init_cash_grouped: tp.Array1d,
@@ -4515,7 +4507,7 @@ def returns_in_sim_order_nb(value_iso: tp.Array2d,
             i = j // group_len
             col = from_col + call_seq[i, from_col + j % group_len]
             output_value = value_iso[i, col]
-            out[i, col] = get_return_nb(input_value, output_value)
+            out[i, col] = returns_nb.get_return_nb(input_value, output_value)
             input_value = output_value
         from_col = to_col
     return out
@@ -4529,7 +4521,7 @@ def asset_returns_nb(cash_flow: tp.Array2d, asset_value: tp.Array2d) -> tp.Array
         for i in range(cash_flow.shape[0]):
             input_value = 0. if i == 0 else asset_value[i - 1, col]
             output_value = asset_value[i, col] + cash_flow[i, col]
-            out[i, col] = get_return_nb(input_value, output_value)
+            out[i, col] = returns_nb.get_return_nb(input_value, output_value)
     return out
 
 
@@ -4561,7 +4553,7 @@ def total_market_return_nb(market_value: tp.Array2d) -> tp.Array1d:
     """Get total market return per column/group."""
     out = np.empty(market_value.shape[1], dtype=np.float_)
     for col in range(market_value.shape[1]):
-        out[col] = get_return_nb(market_value[0, col], market_value[-1, col])
+        out[col] = returns_nb.get_return_nb(market_value[0, col], market_value[-1, col])
     return out
 
 

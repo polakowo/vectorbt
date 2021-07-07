@@ -22,6 +22,7 @@ from vectorbt.utils import (
     attr,
     datetime,
     schedule,
+    tags,
     template
 )
 from datetime import datetime as _datetime, timedelta as _timedelta, time as _time, timezone as _timezone
@@ -887,7 +888,9 @@ class TestConfig:
 
     def test_configured(self, tmp_path):
         class H(config.Configured):
-            writeable_attrs = ['my_attr', 'my_cfg']
+            @property
+            def writeable_attrs(self):
+                return {'my_attr', 'my_cfg'}
 
             def __init__(self, a, b=2, **kwargs):
                 super().__init__(a=a, b=b, **kwargs)
@@ -908,10 +911,6 @@ class TestConfig:
         assert H(None) == H(None)
         assert H(None) != H(10.)
 
-        h = H(1)
-        h.writeable_attrs.append('my_attr2')
-        assert H.writeable_attrs == ['my_attr', 'my_cfg']
-        assert h != H(1)
         h = H(1)
         h.my_attr = 200
         h.my_cfg['df'] = pd.DataFrame([1, 2, 3])
@@ -969,39 +968,39 @@ class TestDecorators:
     )
     def test_caching(self, test_property, test_blacklist):
         np.random.seed(seed)
-        
+
         if test_property:
             call = lambda x: x
         else:
             call = lambda x: x()
-        
+
         if test_property:
 
             class G:
                 @decorators.cached_property
                 def cache_me(self): return np.random.uniform()
-    
+
             g = G()
             cached_number = g.cache_me
             assert g.cache_me == cached_number
-    
+
             class G:
                 @decorators.cached_property(a=0, b=0)
                 def cache_me(self): return np.random.uniform()
-    
+
             assert G.cache_me.flags == dict(a=0, b=0)
-    
+
             g = G()
             g2 = G()
-    
+
             class G3(G):
                 @decorators.cached_property(b=0, c=0)
                 def cache_me(self): return np.random.uniform()
-    
+
             g3 = G3()
-            
+
         else:
-            
+
             class G:
                 @decorators.cached_method
                 def cache_me(self): return np.random.uniform()
@@ -1091,12 +1090,12 @@ class TestDecorators:
             lst = 'blacklist'
         else:
             lst = 'whitelist'
-        
+
         def compare(a, b):
             if test_blacklist:
                 return a != b
             return a == b
-        
+
         def not_compare(a, b):
             if test_blacklist:
                 return a == b
@@ -1449,7 +1448,7 @@ class TestDecorators:
 
 # ############# attr.py ############# #
 
-class TestAttrs:
+class TestAttr:
     def test_deep_getattr(self):
         class A:
             def a(self, x, y=None):
@@ -2405,20 +2404,49 @@ class TestScheduleManager:
         assert kwargs['call_count'] == 5
 
 
+# ############# tags.py ############# #
+
+
+class TestTags:
+    def test_match_tags(self):
+        assert tags.match_tags('hello', 'hello')
+        assert not tags.match_tags('hello', 'world')
+        assert tags.match_tags(['hello', 'world'], 'world')
+        assert tags.match_tags('hello', ['hello', 'world'])
+        assert tags.match_tags('hello and world', ['hello', 'world'])
+        assert not tags.match_tags('hello and not world', ['hello', 'world'])
+
+
 # ############# template.py ############# #
 
 
 class TestTemplate:
+    def test_sub(self):
+        assert template.Sub('$hello$world', {'hello': 100}).substitute({'world': 300}) == '100300'
+        assert template.Sub('$hello$world', {'hello': 100}).substitute({'hello': 200, 'world': 300}) == '200300'
+
+    def test_rep(self):
+        assert template.Rep('hello', {'hello': 100}).replace() == 100
+        assert template.Rep('hello', {'hello': 100}).replace({'hello': 200}) == 200
+
+    def test_repeval(self):
+        assert template.RepEval('hello == 100', {'hello': 100}).eval()
+        assert not template.RepEval('hello == 100', {'hello': 100}).eval({'hello': 200})
+
+    def test_repfunc(self):
+        assert template.RepFunc(lambda hello: hello == 100, {'hello': 100}).call()
+        assert not template.RepFunc(lambda hello: hello == 100, {'hello': 100}).call({'hello': 200})
+
     def test_deep_substitute(self):
-        assert template.deep_substitute(template.Rep('hello'), mapping={'hello': 100}) == 100
+        assert template.deep_substitute(template.Rep('hello'), {'hello': 100}) == 100
         with pytest.raises(Exception):
-            _ = template.deep_substitute(template.Rep('hello2'), mapping={'hello': 100})
-        assert template.deep_substitute(template.Sub('$hello'), mapping={'hello': 100}) == '100'
+            _ = template.deep_substitute(template.Rep('hello2'), {'hello': 100})
+        assert template.deep_substitute(template.Sub('$hello'), {'hello': 100}) == '100'
         with pytest.raises(Exception):
-            _ = template.deep_substitute(template.Sub('$hello2'), mapping={'hello': 100})
-        assert template.deep_substitute([template.Rep('hello')], mapping={'hello': 100}) == [100]
-        assert template.deep_substitute((template.Rep('hello'),), mapping={'hello': 100}) == (100,)
-        assert template.deep_substitute({'test': template.Rep('hello')}, mapping={'hello': 100}) == {'test': 100}
+            _ = template.deep_substitute(template.Sub('$hello2'), {'hello': 100})
+        assert template.deep_substitute([template.Rep('hello')], {'hello': 100}) == [100]
+        assert template.deep_substitute((template.Rep('hello'),), {'hello': 100}) == (100,)
+        assert template.deep_substitute({'test': template.Rep('hello')}, {'hello': 100}) == {'test': 100}
         Tup = namedtuple('Tup', ['a'])
         tup = Tup(template.Rep('hello'))
-        assert template.deep_substitute(tup, mapping={'hello': 100}) == Tup(100)
+        assert template.deep_substitute(tup, {'hello': 100}) == Tup(100)

@@ -251,6 +251,41 @@ class SignalFactory(IndicatorFactory):
 
         ## Example
 
+        The simplest signal indicator that places True at the very first index:
+
+        ```python-repl
+        >>> from numba import njit
+        >>> import vectorbt as vbt
+        >>> import numpy as np
+
+        >>> @njit
+        ... def entry_choice_func(from_i, to_i, col):
+        ...     return np.array([from_i])
+
+        >>> @njit
+        ... def exit_choice_func(from_i, to_i, col):
+        ...     return np.array([from_i])
+
+        >>> MySignals = vbt.SignalFactory().from_choice_func(
+        ...     entry_choice_func=entry_choice_func,
+        ...     exit_choice_func=exit_choice_func,
+        ...     entry_kwargs=dict(wait=1),
+        ...     exit_kwargs=dict(wait=1)
+        ... )
+
+        >>> my_sig = MySignals.run(input_shape=(3, 3))
+        >>> my_sig.entries
+               0      1      2
+        0   True   True   True
+        1  False  False  False
+        2   True   True   True
+        >>> my_sig.exits
+               0      1      2
+        0  False  False  False
+        1   True   True   True
+        2  False  False  False
+        ```
+
         Take the first entry and place an exit after waiting `n` ticks. Find the next entry and repeat.
         Test three different `n` values.
 
@@ -402,6 +437,7 @@ class SignalFactory(IndicatorFactory):
         checks.assert_not_none(exit_choice_func)
         checks.assert_numba_func(exit_choice_func)
         if exit_only:
+            require_input_shape = False
             if iteratively:
                 if entry_choice_func is None:
                     entry_choice_func = first_choice_nb
@@ -411,8 +447,10 @@ class SignalFactory(IndicatorFactory):
                     pass_inputs=['entries']
                 ), entry_settings)
         else:
+            require_input_shape = True
             checks.assert_not_none(entry_choice_func)
             checks.assert_numba_func(entry_choice_func)
+        require_input_shape = kwargs.pop('require_input_shape', require_input_shape)
 
         if entry_settings is None:
             entry_settings = {}
@@ -561,7 +599,7 @@ class SignalFactory(IndicatorFactory):
             # Get arguments
             if len(input_list) == 0:
                 if input_shape is None:
-                    raise ValueError("Pass input_shape if no input time series passed")
+                    raise ValueError("Pass input_shape if no input time series were passed")
             else:
                 input_shape = input_list[0].shape
 
@@ -766,4 +804,9 @@ class SignalFactory(IndicatorFactory):
                     exit_args + exit_more_args + exit_cache
                 )
 
-        return self.from_custom_func(custom_func, as_lists=True, **kwargs)
+        return self.from_custom_func(
+            custom_func,
+            as_lists=True,
+            require_input_shape=require_input_shape,
+            **kwargs
+        )

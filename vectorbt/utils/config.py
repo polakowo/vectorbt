@@ -7,7 +7,6 @@ import inspect
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.attr import deep_getattr
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -172,8 +171,15 @@ def merge_dicts(*dicts: InConfigLikeT,
     if to_dict:
         dicts = tuple([convert_to_dict(dct, nested=nested) for dct in dicts])
     if copy_mode is not None:
-        dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
+        if not to_dict or copy_mode != 'shallow':
+            # to_dict already does a shallow copy
+            dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
     x, y = dicts[0], dicts[1]
+    if x.__class__ is dict and y.__class__ is dict:
+        if len(x) == 0:
+            return y
+        if len(y) == 0:
+            return x
     if isinstance(x, atomic_dict) or isinstance(y, atomic_dict):
         x = y
     else:
@@ -679,7 +685,7 @@ class Configured(Pickleable):
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
 
-    Config settings are defined under `config.configured` in `vectorbt._settings.settings`.
+    Settings are defined under `configured` in `vectorbt._settings.settings`.
 
     !!! warning
         If any attribute has been overwritten that isn't listed in `Configured.writeable_attrs`,
@@ -687,28 +693,38 @@ class Configured(Pickleable):
         their values won't be copied over. Make sure to pass them explicitly to
         make the saved & loaded / copied instance resilient to changes in globals."""
 
-    writeable_attrs: tp.ClassVar[tp.List[str]] = []
-    """List of writeable attributes that will be saved/copied along with the config."""
-
     def __init__(self, **config) -> None:
         from vectorbt._settings import settings
-        configured_cfg = settings['config']['configured']
+        configured_cfg = settings['configured']
 
-        self._config = Config(config, **configured_cfg)
-        self.writeable_attrs = copy(self.writeable_attrs)
+        self._config = Config(config, **configured_cfg['config'])
 
     @property
     def config(self) -> Config:
         """Initialization config."""
         return self._config
 
-    def copy(self: ConfiguredT, nested: tp.Optional[bool] = None, **new_config) -> ConfiguredT:
+    @property
+    def writeable_attrs(self) -> tp.Set[str]:
+        """Set of writeable attributes that will be saved/copied along with the config."""
+        return {
+            base_cls.writeable_attrs.__get__(self)
+            for base_cls in self.__class__.__bases__
+            if isinstance(base_cls, Configured)
+        }
+
+    def copy(self: ConfiguredT,
+             nested: tp.Optional[bool] = None,
+             _class: tp.Optional[type] = None,
+             **new_config) -> ConfiguredT:
         """Copy config and writeable attributes to initialize a new instance.
 
         !!! warning
             This "copy" operation won't return a copy of the instance but a new instance
             initialized with the same config and writeable attributes."""
-        new_instance = self.__class__(**self.config.merge_with(new_config, nested=nested))
+        if _class is None:
+            _class = self.__class__
+        new_instance = _class(**self.config.merge_with(new_config, nested=nested))
         for attr in self.writeable_attrs:
             setattr(new_instance, attr, getattr(self, attr))
         return new_instance
@@ -741,10 +757,6 @@ class Configured(Pickleable):
             if not checks.is_deep_equal(getattr(self, attr), getattr(other, attr)):
                 return False
         return self.config == other.config
-
-    def getattr(self, *args, **kwargs) -> tp.Any:
-        """See `vectorbt.utils.attr.deep_getattr`."""
-        return deep_getattr(self, *args, **kwargs)
 
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""

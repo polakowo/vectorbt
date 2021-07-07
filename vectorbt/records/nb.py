@@ -190,7 +190,7 @@ def is_col_idx_sorted_nb(col_arr: tp.Array1d, id_arr: tp.Array1d) -> bool:
 @njit
 def mapped_to_mask_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap,
                       inout_map_func_nb: tp.MaskInOutMapFunc, *args) -> tp.Array1d:
-    """Map mapped array to a mask.
+    """Map mapped array to a mask per column.
 
     Returns the same shape as `mapped_arr`.
 
@@ -221,6 +221,51 @@ def top_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_arr
 def bottom_n_inout_map_nb(inout: tp.Array1d, idxs: tp.Array1d, col: int, mapped_arr: tp.Array1d, n: int) -> None:
     """`inout_map_func_nb` that returns indices of bottom N elements."""
     inout[idxs[np.argsort(mapped_arr)[:n]]] = True
+
+
+@njit
+def apply_on_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap,
+                       apply_func_nb: tp.MappedApplyFunc, *args) -> tp.Array1d:
+    """Apply function on mapped array per column.
+
+    Returns the same shape as `mapped_arr`.
+
+    `apply_func_nb` should accept the indices of values, index of the column, values of the column,
+    and `*args`, and return an array."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.empty(mapped_arr.shape[0], dtype=np.float_)
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        start_idx = col_start_idxs[col]
+        idxs = col_idxs[start_idx:start_idx + col_len]
+        out[idxs] = apply_func_nb(idxs, col, mapped_arr[idxs], *args)
+    return out
+
+
+@njit
+def apply_on_records_nb(records: tp.RecordArray, col_map: tp.ColMap,
+                        apply_func_nb: tp.RecordApplyFunc, *args) -> tp.Array1d:
+    """Apply function on records per column.
+
+    Returns the same shape as `records`.
+
+    `apply_func_nb` should accept the records of the column and `*args`, and return an array."""
+    col_idxs, col_lens = col_map
+    col_start_idxs = np.cumsum(col_lens) - col_lens
+    out = np.empty(records.shape[0], dtype=np.float_)
+
+    for col in range(col_lens.shape[0]):
+        col_len = col_lens[col]
+        if col_len == 0:
+            continue
+        start_idx = col_start_idxs[col]
+        idxs = col_idxs[start_idx:start_idx + col_len]
+        out[idxs] = apply_func_nb(records[idxs], *args)
+    return out
 
 
 @njit

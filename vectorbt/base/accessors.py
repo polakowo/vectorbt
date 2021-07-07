@@ -66,7 +66,8 @@ from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base import combine_fns, index_fns, reshape_fns
-from vectorbt.base.array_wrapper import ArrayWrapper
+from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
+from vectorbt.base.reshape_fns import to_2d
 from vectorbt.base.class_helpers import (
     add_binary_magic_methods,
     add_unary_magic_methods,
@@ -85,7 +86,7 @@ BaseAccessorT = tp.TypeVar("BaseAccessorT", bound="BaseAccessor")
     unary_magic_methods,
     lambda self, np_func: self.apply(apply_func=np_func)
 )
-class BaseAccessor:
+class BaseAccessor(Wrapping):
     """Accessor on top of Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`, and all child accessors.
@@ -96,16 +97,47 @@ class BaseAccessor:
 
     `**kwargs` will be passed to `vectorbt.base.array_wrapper.ArrayWrapper`."""
 
-    def __init__(self, obj: tp.SeriesFrame, **kwargs) -> None:
+    def __init__(self, obj: tp.SeriesFrame, wrapper: tp.Optional[ArrayWrapper] = None, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
+        checks.assert_type(obj, (pd.Series, pd.DataFrame))
+
         self._obj = obj
-        self._wrapper = ArrayWrapper.from_obj(obj, **kwargs)
+
+        if wrapper is None:
+            wrapper = ArrayWrapper.from_obj(obj, **kwargs)
+        Wrapping.__init__(self, wrapper, obj=obj)
 
     def __call__(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
         """Allows passing arguments to the initializer."""
 
         return self.__class__(self.obj, *args, **kwargs)
+
+    @property
+    def sr_accessor_cls(self):
+        """Accessor class for `pd.Series`."""
+        return BaseSRAccessor
+
+    @property
+    def df_accessor_cls(self):
+        """Accessor class for `pd.DataFrame`."""
+        return BaseDFAccessor
+
+    def indexing_func(self: BaseAccessorT, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> BaseAccessorT:
+        """Perform indexing on `Wrapping`."""
+        new_wrapper, idx_idxs, _, col_idxs = self.wrapper.indexing_func_meta(pd_indexing_func, **kwargs)
+        new_obj = new_wrapper.wrap(to_2d(self.obj, raw=True)[idx_idxs, :][:, col_idxs], group_by=False)
+        if checks.is_series(new_obj):
+            return self.copy(
+                _class=self.sr_accessor_cls,
+                obj=new_obj,
+                wrapper=new_wrapper
+            )
+        return self.copy(
+            _class=self.df_accessor_cls,
+            obj=new_obj,
+            wrapper=new_wrapper
+        )
 
     @property
     def obj(self):
@@ -119,11 +151,6 @@ class BaseAccessor:
     @class_or_instancemethod
     def is_frame(self_or_cls) -> bool:
         raise NotImplementedError
-
-    @property
-    def wrapper(self) -> ArrayWrapper:
-        """Array wrapper."""
-        return self._wrapper
 
     # ############# Creation ############# #
 

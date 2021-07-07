@@ -29,6 +29,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     def __init__(self, obj: tp.Frame, column_names: tp.Optional[tp.Dict[str, str]] = None, **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
+
         self._column_names = column_names
 
         GenericDFAccessor.__init__(self, obj, **kwargs)

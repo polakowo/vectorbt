@@ -90,6 +90,16 @@ class SignalsAccessor(GenericAccessor):
 
         GenericAccessor.__init__(self, obj, **kwargs)
 
+    @property
+    def sr_accessor_cls(self):
+        """Accessor class for `pd.Series`."""
+        return SignalsSRAccessor
+
+    @property
+    def df_accessor_cls(self):
+        """Accessor class for `pd.DataFrame`."""
+        return SignalsDFAccessor
+
     @classmethod
     def empty(cls, *args, fill_value: bool = False, **kwargs) -> tp.SeriesFrame:
         """`vectorbt.base.accessors.BaseAccessor.empty` with `fill_value=False`.

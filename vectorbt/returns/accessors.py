@@ -5,15 +5,32 @@ Methods can be accessed as follows:
 * `ReturnsSRAccessor` -> `pd.Series.vbt.returns.*`
 * `ReturnsDFAccessor` -> `pd.DataFrame.vbt.returns.*`
 
+!!! note
+    The underlying Series/DataFrame must already be a return series.
+    To convert price to returns, use `ReturnsAccessor.from_value`.
+
+There are three options to compute returns and get the accessor:
+
 ```python-repl
 >>> import numpy as np
 >>> import pandas as pd
 >>> import vectorbt as vbt
 
->>> # vectorbt.returns.accessors.ReturnsAccessor.total
 >>> price = pd.Series([1.1, 1.2, 1.3, 1.2, 1.1])
->>> returns = price.pct_change()
->>> returns.vbt.returns.total()
+
+>>> # 1. pd.Series.pct_change
+>>> rets = price.pct_change()
+>>> ret_acc = rets.vbt.returns(freq='d')
+
+>>> # 2. vectorbt.generic.accessors.GenericAccessor.to_returns
+>>> rets = price.vbt.to_returns()
+>>> ret_acc = rets.vbt.returns(freq='d')
+
+>>> # 3. vectorbt.returns.accessors.ReturnsAccessor.from_value
+>>> ret_acc = pd.Series.vbt.returns.from_value(price, freq='d')
+
+>>> # vectorbt.returns.accessors.ReturnsAccessor.total
+>>> ret_acc.total()
 0.0
 ```
 
@@ -21,15 +38,14 @@ The accessors extend `vectorbt.generic.accessors`.
 
 ```python-repl
 >>> # inherited from GenericAccessor
->>> returns.vbt.returns.max()
+>>> ret_acc.max()
 0.09090909090909083
 ```
 
-!!! note
-    The underlying Series/DataFrame must already be a return series.
-    To convert price to returns, use `ReturnsAccessor.from_price`.
+## Defaults
 
-Here are some commonly used arguments:
+`vectorbt.returns.accessors.ReturnsAccessor` accepts `defaults` dictionary where you can pass
+defaults for arguments used throughout the accessor, such as
 
 * `start_value`: The starting returns.
 * `window`: Window length.
@@ -39,27 +55,91 @@ Here are some commonly used arguments:
 * `levy_alpha`: Scaling relation (Levy stability exponent).
 * `required_return`: Minimum acceptance return of the investor.
 * `cutoff`: Decimal representing the percentage cutoff for the bottom percentile of returns.
-* `benchmark_rets`: Benchmark return to compare returns against.
+
+## Stats
+
+!!! hint
+    For details on `ReturnsAccessor.stats`, see `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+    Also see `vectorbt.portfolio.base` for more examples.
+
+```python-repl
+>>> ret_acc.stats()
+UserWarning: Metric 'benchmark_return' requires benchmark_rets to be set
+UserWarning: Metric 'alpha' requires benchmark_rets to be set
+UserWarning: Metric 'beta' requires benchmark_rets to be set
+
+Start                                      0
+End                                        4
+Duration                     5 days 00:00:00
+Total Return [%]                           0
+Annualized Return [%]                      0
+Annualized Volatility [%]            184.643
+Sharpe Ratio                        0.691185
+Calmar Ratio                               0
+Max Drawdown [%]                     15.3846
+Omega Ratio                          1.08727
+Sortino Ratio                        1.17805
+Skew                              0.00151002
+Kurtosis                            -5.94737
+Tail Ratio                           1.08985
+Common Sense Ratio                   1.08985
+Value at Risk                     -0.0823718
+dtype: object
+```
+
+The missing `benchmark_rets` can be passed inside of `settings`:
+
+```python-repl
+>>> benchmark = pd.Series([1.05, 1.1, 1.15, 1.1, 1.05])
+>>> benchmark_rets = benchmark.vbt.to_returns()
+
+>>> ret_acc.stats(settings=dict(benchmark_rets=benchmark_rets))
+Start                                      0
+End                                        4
+Duration                     5 days 00:00:00
+Total Return [%]                           0
+Benchmark Return [%]                       0
+Annualized Return [%]                      0
+Annualized Volatility [%]            184.643
+Sharpe Ratio                        0.691185
+Calmar Ratio                               0
+Max Drawdown [%]                     15.3846
+Omega Ratio                          1.08727
+Sortino Ratio                        1.17805
+Skew                              0.00151002
+Kurtosis                            -5.94737
+Tail Ratio                           1.08985
+Common Sense Ratio                   1.08985
+Value at Risk                     -0.0823718
+Alpha                                0.78789
+Beta                                 1.83864
+dtype: object
+```
 """
 
 import numpy as np
 import pandas as pd
 from scipy.stats import skew, kurtosis
+import warnings
 
 from vectorbt import _typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
+from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
+from vectorbt.utils.attr import AttrResolverT
+from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
+from vectorbt.base.array_wrapper import Wrapping
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.accessors import (
     GenericAccessor,
     GenericSRAccessor,
     GenericDFAccessor
 )
-from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.returns import nb, metrics
 
 ReturnsAccessorT = tp.TypeVar("ReturnsAccessorT", bound="ReturnsAccessor")
@@ -73,26 +153,53 @@ class ReturnsAccessor(GenericAccessor):
     Args:
         obj (pd.Series or pd.DataFrame): Pandas object.
         year_freq (any): Year frequency for annualization purposes.
-        **kwargs: Keyword arguments that overwrite `ReturnsAccessor.settings`
-            or otherwise are passed down to `vectorbt.generic.accessors.GenericAccessor`."""
+        defaults (dict): Defaults that override `returns.defaults` in `vectorbt._settings.settings`.
+        **kwargs: Keyword arguments that are passed down to `vectorbt.generic.accessors.GenericAccessor`."""
 
-    def __init__(self, obj: tp.SeriesFrame, year_freq: tp.Optional[tp.FrequencyLike] = None, **kwargs) -> None:
+    def __init__(self,
+                 obj: tp.SeriesFrame,
+                 year_freq: tp.Optional[tp.FrequencyLike] = None,
+                 defaults: tp.KwargsLike = None,
+                 **kwargs) -> None:
         if not checks.is_pandas(obj):  # parent accessor
             obj = obj._obj
 
         # Set defaults
         self._year_freq = year_freq
-        self._defaults = {}
-        for k in list(self.defaults.keys()):
-            if k in kwargs:
-                self._defaults[k] = kwargs.pop(k)
+        self._defaults = defaults
 
         GenericAccessor.__init__(self, obj, **kwargs)
 
+    @property
+    def sr_accessor_cls(self):
+        """Accessor class for `pd.Series`."""
+        return ReturnsSRAccessor
+
+    @property
+    def df_accessor_cls(self):
+        """Accessor class for `pd.DataFrame`."""
+        return ReturnsDFAccessor
+
     @classmethod
-    def from_price(cls: tp.Type[ReturnsAccessorT], price: tp.SeriesFrame, **kwargs) -> ReturnsAccessorT:
-        """Returns a new `ReturnsAccessor` instance with returns from `price`."""
-        return cls(price.vbt.pct_change(), **kwargs)
+    def from_value(cls: tp.Type[ReturnsAccessorT],
+                   value: tp.SeriesFrame,
+                   init_value: tp.MaybeSeries = np.nan,
+                   broadcast_kwargs: tp.KwargsLike = None,
+                   wrap_kwargs: tp.KwargsLike = None,
+                   **kwargs) -> ReturnsAccessorT:
+        """Returns a new `ReturnsAccessor` instance with returns calculated from `value`."""
+        if broadcast_kwargs is None:
+            broadcast_kwargs = {}
+        if wrap_kwargs is None:
+            wrap_kwargs = {}
+        if not checks.is_any_array(value):
+            value = np.asarray(value)
+        value_2d = to_2d(value, raw=True)
+        init_value = broadcast(init_value, to_shape=value_2d.shape[1], **broadcast_kwargs)
+
+        returns = nb.returns_nb(value_2d, init_value)
+        returns = value.vbt.wrapper.wrap(returns, **wrap_kwargs)
+        return cls(returns, **kwargs)
 
     @property
     def year_freq(self) -> tp.Optional[pd.Timedelta]:
@@ -101,17 +208,20 @@ class ReturnsAccessor(GenericAccessor):
             from vectorbt._settings import settings
             returns_cfg = settings['returns']
 
-            return freq_to_timedelta(returns_cfg['year_freq'])
+            year_freq = returns_cfg['year_freq']
+            if year_freq is None:
+                return None
+            return freq_to_timedelta(year_freq)
         return freq_to_timedelta(self._year_freq)
 
     @property
     def ann_factor(self) -> float:
         """Get annualization factor."""
         if self.wrapper.freq is None:
-            raise ValueError("Index frequency could not be parsed. "
+            raise ValueError("Index frequency is None. "
                              "Pass it as `freq` or define it globally under `settings.array_wrapper`.")
         if self.year_freq is None:
-            raise ValueError("Year frequency is not known. "
+            raise ValueError("Year frequency is None. "
                              "Pass `year_freq` or define it globally under `settings.returns`.")
         return self.year_freq / self.wrapper.freq
 
@@ -119,21 +229,12 @@ class ReturnsAccessor(GenericAccessor):
     def defaults(self) -> tp.Kwargs:
         """Defaults for `ReturnsAccessor`.
 
-        Gets overridden/extended by `kwargs` from `ReturnsAccessor.__init__`."""
+        Merges `returns.defaults` in `vectorbt._settings.settings` with `defaults` from `ReturnsAccessor.__init__`."""
         from vectorbt._settings import settings
-        returns_cfg = settings['returns']
+        returns_defaults_cfg = settings['returns']['defaults']
 
         return merge_dicts(
-            dict(
-                start_value=returns_cfg['start_value'],
-                window=returns_cfg['window'],
-                minp=returns_cfg['minp'],
-                ddof=returns_cfg['ddof'],
-                risk_free=returns_cfg['risk_free'],
-                levy_alpha=returns_cfg['levy_alpha'],
-                required_return=returns_cfg['required_return'],
-                cutoff=returns_cfg['cutoff']
-            ),
+            returns_defaults_cfg,
             self._defaults
         )
 
@@ -689,75 +790,177 @@ class ReturnsAccessor(GenericAccessor):
             group_by = self.wrapper.grouper.group_by
         return self.cumulative(start_value=1.).vbt(freq=self.wrapper.freq, group_by=group_by).get_drawdowns(**kwargs)
 
-    def stats(self,
-              benchmark_rets: tp.ArrayLike,
-              wrap_kwargs: tp.KwargsLike = None,
-              **kwargs) -> tp.SeriesFrame:
-        """Compute various statistics on these returns.
+    def resolve_self(self: AttrResolverT,
+                     cond_kwargs: tp.KwargsLike = None,
+                     custom_arg_names: tp.Optional[tp.Set[str]] = None,
+                     impacts_caching: bool = True,
+                     silence_warnings: bool = False) -> AttrResolverT:
+        """Resolve self.
 
-        ## Example
+        Creates a copy of this instance if a different `year` or `year_freq` can be found in `cond_kwargs`."""
+        if cond_kwargs is None:
+            cond_kwargs = {}
+        if custom_arg_names is None:
+            custom_arg_names = set()
 
-        ```python-repl
-        >>> import pandas as pd
-        >>> from datetime import datetime
-        >>> import vectorbt as vbt
+        reself = Wrapping.resolve_self(
+            self,
+            cond_kwargs=cond_kwargs,
+            custom_arg_names=custom_arg_names,
+            impacts_caching=impacts_caching,
+            silence_warnings=silence_warnings
+        )
+        if 'year_freq' in cond_kwargs:
+            self_copy = reself.copy(year_freq=cond_kwargs['year_freq'])
 
-        >>> symbols = ["BTC-USD", "SPY"]
-        >>> price = vbt.YFData.download(symbols, missing_index='drop').get('Close')
-        >>> returns = price.pct_change()
-        >>> returns["BTC-USD"].vbt.returns(freq='D').stats(returns["SPY"])
-        Start                    2014-09-17 00:00:00
-        End                      2021-03-12 00:00:00
-        Duration                  1629 days 00:00:00
-        Total Return [%]                     12296.6
-        Benchmark Return [%]                 122.857
-        Annual Return [%]                    194.465
-        Annual Volatility [%]                88.4466
-        Sharpe Ratio                         1.66841
-        Calmar Ratio                         2.34193
-        Max Drawdown [%]                    -83.0363
-        Omega Ratio                          1.31107
-        Sortino Ratio                        2.54018
-        Skew                               0.0101324
-        Kurtosis                              6.6453
-        Tail Ratio                           1.19828
-        Common Sense Ratio                    3.5285
-        Value at Risk                     -0.0664826
-        Alpha                                2.90175
-        Beta                                0.548808
-        Name: BTC-USD, dtype: object
-        ```
-        """
-        # Run stats
-        benchmark_rets = broadcast_to(benchmark_rets, self.obj)
-        kwargs = merge_dicts(self.defaults, kwargs)
-        stats_df = pd.DataFrame({
-            'Start': self.wrapper.index[0],
-            'End': self.wrapper.index[-1],
-            'Duration': self.wrapper.shape[0] * self.wrapper.freq,
-            'Total Return [%]': self.total() * 100,
-            'Benchmark Return [%]': benchmark_rets.vbt.returns.total() * 100,
-            'Annual Return [%]': self.annualized() * 100,
-            'Annual Volatility [%]': self.annualized_volatility(levy_alpha=kwargs['levy_alpha']) * 100,
-            'Sharpe Ratio': self.sharpe_ratio(risk_free=kwargs['risk_free']),
-            'Calmar Ratio': self.calmar_ratio(),
-            'Max Drawdown [%]': self.max_drawdown() * 100,
-            'Omega Ratio': self.omega_ratio(required_return=kwargs['required_return']),
-            'Sortino Ratio': self.sortino_ratio(required_return=kwargs['required_return']),
-            'Skew': self.obj.skew(axis=0),
-            'Kurtosis': self.obj.kurtosis(axis=0),
-            'Tail Ratio': self.tail_ratio(),
-            'Common Sense Ratio': self.common_sense_ratio(),
-            'Value at Risk': self.value_at_risk(),
-            'Alpha': self.alpha(benchmark_rets, risk_free=kwargs['risk_free']),
-            'Beta': self.beta(benchmark_rets)
-        }, index=self.wrapper.columns)
+            if self_copy.year_freq != reself.year_freq:
+                if not silence_warnings:
+                    warnings.warn(f"Changing the year frequency will create a copy of this object. "
+                                  f"Consider setting it upon the creation to re-use cache.", stacklevel=2)
+                for alias in reself.self_aliases:
+                    if alias not in custom_arg_names:
+                        cond_kwargs[alias] = self_copy
+                cond_kwargs['year_freq'] = self_copy.year_freq
+                if impacts_caching:
+                    cond_kwargs['use_caching'] = False
+                return self_copy
+        return reself
 
-        # Select columns or reduce
-        if self.is_series():
-            wrap_kwargs = merge_dicts(dict(name_or_index=stats_df.columns), wrap_kwargs)
-            return self.wrapper.wrap_reduced(stats_df.iloc[0], **wrap_kwargs)
-        return stats_df
+    @property
+    def stats_defaults(self) -> tp.Kwargs:
+        """Defaults for `ReturnsAccessor.stats`.
+
+        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults`,
+        defaults from `ReturnsAccessor.defaults` (acting as `settings`), and
+        `returns.stats` in `vectorbt._settings.settings`"""
+        from vectorbt._settings import settings
+        returns_stats_cfg = settings['returns']['stats']
+
+        return merge_dicts(
+            StatsBuilderMixin.stats_defaults.__get__(self),
+            dict(settings=self.defaults),
+            dict(settings=dict(year_freq=self.year_freq)),
+            returns_stats_cfg
+        )
+
+    metrics: tp.ClassVar[Config] = Config(
+        dict(
+            start=dict(
+                title='Start',
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None
+            ),
+            end=dict(
+                title='End',
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None
+            ),
+            period=dict(
+                title='Period',
+                calc_func=lambda self:
+                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                agg_func=None
+            ),
+            total_return=dict(
+                title='Total Return [%]',
+                calc_func='total',
+                post_calc_func=lambda self, out, kwargs: out * 100
+            ),
+            benchmark_return=dict(
+                title='Benchmark Return [%]',
+                calc_func=lambda benchmark_rets: benchmark_rets.vbt.returns.total() * 100,
+                check_benchmark_rets=True
+            ),
+            ann_return=dict(
+                title='Annualized Return [%]',
+                calc_func='annualized',
+                post_calc_func=lambda self, out, kwargs: out * 100,
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            ann_volatility=dict(
+                title='Annualized Volatility [%]',
+                calc_func='annualized_volatility',
+                post_calc_func=lambda self, out, kwargs: out * 100,
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            max_dd=dict(
+                title='Max Drawdown [%]',
+                calc_func='drawdowns.max_drawdown',
+                post_calc_func=lambda self, out, kwargs: -out * 100
+            ),
+            max_dd_duration=dict(
+                title='Max Drawdown Duration',
+                calc_func='drawdowns.max_duration'
+            ),
+            sharpe_ratio=dict(
+                title='Sharpe Ratio',
+                calc_func='sharpe_ratio',
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            calmar_ratio=dict(
+                title='Calmar Ratio',
+                calc_func='calmar_ratio',
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            omega_ratio=dict(
+                title='Omega Ratio',
+                calc_func='omega_ratio',
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            sortino_ratio=dict(
+                title='Sortino Ratio',
+                calc_func='sortino_ratio',
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            skew=dict(
+                title='Skew',
+                calc_func='obj.skew'
+            ),
+            kurtosis=dict(
+                title='Kurtosis',
+                calc_func='obj.kurtosis'
+            ),
+            tail_ratio=dict(
+                title='Tail Ratio',
+                calc_func='tail_ratio'
+            ),
+            common_sense_ratio=dict(
+                title='Common Sense Ratio',
+                calc_func='common_sense_ratio',
+                check_has_freq=True,
+                check_has_year_freq=True
+            ),
+            value_at_risk=dict(
+                title='Value at Risk',
+                calc_func='value_at_risk'
+            ),
+            alpha=dict(
+                title='Alpha',
+                calc_func='alpha',
+                check_has_freq=True,
+                check_has_year_freq=True,
+                check_benchmark_rets=True
+            ),
+            beta=dict(
+                title='Beta',
+                calc_func='beta',
+                check_benchmark_rets=True
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+    """Metrics supported by `ReturnsAccessor.stats`.
+
+    !!! note
+        It's safe to change this config - it's a (deep) copy of the class variable.
+        
+        But copying `ReturnsAccessor` using `ReturnsAccessor.copy` won't create a copy of the config."""
 
 
 @register_series_accessor('returns')

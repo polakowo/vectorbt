@@ -68,7 +68,53 @@ Run for the examples below:
 2020-01-09    8
 2020-01-10    9
 dtype: int64
-```"""
+```
+
+## Stats
+
+!!! hint
+    For details on `GenericAccessor.stats`, see `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+    Also see `vectorbt.portfolio.base` for more examples.
+
+```python-repl
+>>> df2 = pd.DataFrame({
+...     'a': [np.nan, 2, 3],
+...     'b': [4, np.nan, 5],
+...     'c': [6, 7, np.nan]
+... }, index=['x', 'y', 'z'])
+Start               x
+End                 z
+Duration            3
+Count               2
+Mean              2.5
+Std          0.707107
+Min                 2
+Median            2.5
+Max                 3
+Min Index           y
+Max Index           z
+Name: a, dtype: object
+```
+
+`GenericAccessor.stats` also supports grouping:
+
+```python-repl
+>>> df2.vbt.stats(column=0, group_by=[0, 0, 1])
+Start              x
+End                z
+Duration           3
+Count              4
+Mean             3.5
+Std          1.29099
+Min                2
+Median           3.5
+Max                5
+Min Index          y
+Max Index          z
+Name: 0, dtype: object
+```
+"""
 
 import numpy as np
 import pandas as pd
@@ -90,7 +136,7 @@ from sklearn.preprocessing import (
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts, resolve_dict
+from vectorbt.utils.config import Config, merge_dicts, resolve_dict
 from vectorbt.utils.figure import make_figure, make_subplots
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.base import index_fns, reshape_fns
@@ -99,6 +145,7 @@ from vectorbt.base.class_helpers import add_nb_methods
 from vectorbt.generic import plotting, nb
 from vectorbt.generic.drawdowns import Drawdowns
 from vectorbt.generic.splitters import SplitterT, RangeSplitter, RollingSplitter, ExpandingSplitter
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records.mapped_array import MappedArray
 
 try:  # pragma: no cover
@@ -185,7 +232,7 @@ def add_transform_methods(transformers: tp.Iterable[TransformFuncInfoT]) -> Wrap
     ('quantile_transform', QuantileTransformer),
     ('power_transform', PowerTransformer)
 ])
-class GenericAccessor(BaseAccessor):
+class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     """Accessor on top of data of any type. For both, Series and DataFrames.
 
     Accessible through `pd.Series.vbt` and `pd.DataFrame.vbt`."""
@@ -195,6 +242,17 @@ class GenericAccessor(BaseAccessor):
             obj = obj._obj
 
         BaseAccessor.__init__(self, obj, **kwargs)
+        StatsBuilderMixin.__init__(self)
+
+    @property
+    def sr_accessor_cls(self):
+        """Accessor class for `pd.Series`."""
+        return GenericSRAccessor
+
+    @property
+    def df_accessor_cls(self):
+        """Accessor class for `pd.DataFrame`."""
+        return GenericDFAccessor
 
     def rolling_std(self, window: int, minp: tp.Optional[int] = None, ddof: int = 1,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:  # pragma: no cover
@@ -832,6 +890,86 @@ class GenericAccessor(BaseAccessor):
             nb.describe_reduce_nb, percentiles, ddof,
             to_array=True, wrap_kwargs=wrap_kwargs)
 
+    # ############# Stats ############# #
+
+    @property
+    def stats_defaults(self) -> tp.Kwargs:
+        """Defaults for `GenericAccessor.stats`.
+
+        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
+        `generic.stats` in `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        generic_stats_cfg = settings['generic']['stats']
+
+        return merge_dicts(
+            StatsBuilderMixin.stats_defaults.__get__(self),
+            generic_stats_cfg
+        )
+
+    metrics: tp.ClassVar[Config] = Config(
+        dict(
+            start=dict(
+                title='Start',
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None
+            ),
+            end=dict(
+                title='End',
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None
+            ),
+            period=dict(
+                title='Period',
+                calc_func=lambda self:
+                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                agg_func=None
+            ),
+            count=dict(
+                title='Count',
+                calc_func='count'
+            ),
+            mean=dict(
+                title='Mean',
+                calc_func='mean'
+            ),
+            std=dict(
+                title='Std',
+                calc_func='std'
+            ),
+            min=dict(
+                title='Min',
+                calc_func='min'
+            ),
+            median=dict(
+                title='Median',
+                calc_func='median'
+            ),
+            max=dict(
+                title='Max',
+                calc_func='max'
+            ),
+            idx_min=dict(
+                title='Min Index',
+                calc_func='idxmin',
+                agg_func=None
+            ),
+            idx_max=dict(
+                title='Max Index',
+                calc_func='idxmax',
+                agg_func=None
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+    """Metrics supported by `GenericAccessor.stats`.
+
+    !!! note
+        It's safe to change this config - it's a (deep) copy of the class variable.
+
+        But copying `GenericAccessor` using `GenericAccessor.copy` won't create a copy of the config."""
+
+    # ############# Convertion ############# #
+
     def drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Drawdown series."""
         out = self.to_2d_array() / nb.expanding_max_nb(self.to_2d_array()) - 1
@@ -861,11 +999,13 @@ class GenericAccessor(BaseAccessor):
             mapped_arr = mapped_arr[not_nan_mask]
             col_arr = col_arr[not_nan_mask]
             idx_arr = idx_arr[not_nan_mask]
-        if group_by is None:
-            group_by = self.wrapper.grouper.group_by
         return MappedArray(self.wrapper, mapped_arr, col_arr, idx_arr=idx_arr, **kwargs).regroup(group_by)
 
-    # ############# Transforming ############# #
+    def to_returns(self, **kwargs):
+        """Get returns of this object."""
+        return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
+
+    # ############# Transformation ############# #
 
     def transform(self, transformer: TransformerT, wrap_kwargs: tp.KwargsLike = None, **kwargs) -> tp.SeriesFrame:
         """Transform using a transformer.

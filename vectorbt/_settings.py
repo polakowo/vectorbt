@@ -13,7 +13,7 @@ For example, you can change default width and height of each plot:
 Changes take effect immediately.
 
 !!! note
-    All places in vectorbt import `settings` from `vectorbt._settings`, not from `vectorbt`.
+    All places in vectorbt import `settings` from `vectorbt._settings.settings`, not from `vectorbt`.
     Overwriting `vectorbt.settings` only overwrites the reference created for the user.
     Consider updating the settings config instead of replacing it.
 
@@ -46,6 +46,7 @@ from vectorbt.utils.docs import to_doc
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
+from vectorbt.utils.template import Sub
 from vectorbt.base.array_wrapper import ArrayWrapper
 from vectorbt.base.column_grouper import ColumnGrouper
 from vectorbt.records.col_mapper import ColumnMapper
@@ -78,12 +79,11 @@ class SettingsConfig(Config):
 
 settings = SettingsConfig(
     dict(
-        config=Config(  # flex
-            dict(
-                configured=Config(  # flex
-                    dict(
-                        readonly=True
-                    )
+        config=Config(),  # flex
+        configured=dict(
+            config=Config(  # flex
+                dict(
+                    readonly=True
                 )
             ),
         ),
@@ -222,6 +222,54 @@ settings = SettingsConfig(
                 )
             ),
         ),
+        stats_builder=dict(
+            metrics='all',
+            tags='all',
+            silence_warnings=False,
+            template_mapping=Config(),  # flex
+            filters=Config(  # flex
+                dict(
+                    is_not_grouped=dict(
+                        filter_func=lambda self, metric_settings:
+                        not self.wrapper.grouper.is_grouped(group_by=metric_settings['group_by']),
+                        warning_message=Sub("Metric '$metric_name' does not support grouped data")
+                    ),
+                    has_freq=dict(
+                        filter_func=lambda self, metric_settings:
+                        self.wrapper.freq is not None,
+                        warning_message=Sub("Metric '$metric_name' requires frequency to be set")
+                    )
+                )
+            ),
+            settings=Config(  # flex
+                dict(
+                    use_caching=True
+                )
+            ),
+            metric_kwargs=Config(),  # flex
+        ),
+        plot_builder=dict(
+            subplots='all',
+            grouped_subplots=None,
+            show_titles=True,
+            hide_id_labels=True,
+            group_id_labels=True,
+            make_subplots_kwargs=Config(),  # flex
+            silence_warnings=False,
+            template_mapping=Config(),  # flex
+            global_settings=Config(),  # flex
+            kwargs=Config(),  # flex
+            use_caching=True,
+            hline_shape_kwargs=Config(  # flex
+                dict(
+                    type='line',
+                    line=dict(
+                        color='gray',
+                        dash="dash",
+                    )
+                )
+            )
+        ),
         ohlcv=dict(
             plot_type='OHLC',
             column_names=dict(
@@ -232,16 +280,54 @@ settings = SettingsConfig(
                 volume='Volume'
             ),
         ),
+        generic=dict(
+            stats=Config()  # flex
+        ),
         returns=dict(
             year_freq='365 days',
-            start_value=0.,
-            window=10,
-            minp=None,
-            ddof=1,
-            risk_free=0.,
-            levy_alpha=2.,
-            required_return=0.,
-            cutoff=0.05
+            defaults=Config(  # flex
+                dict(
+                    start_value=0.,
+                    window=10,
+                    minp=None,
+                    ddof=1,
+                    risk_free=0.,
+                    levy_alpha=2.,
+                    required_return=0.,
+                    cutoff=0.05
+                )
+            ),
+            stats=Config(  # flex
+                dict(
+                    filters=dict(
+                        has_year_freq=dict(
+                            filter_func=lambda self, metric_settings:
+                            self.year_freq is not None,
+                            warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                        ),
+                        benchmark_rets=dict(
+                            filter_func=lambda self, metric_settings:
+                            'benchmark_rets' in metric_settings,
+                            warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set")
+                        )
+                    )
+                )
+            )
+        ),
+        records=dict(
+            stats=Config()  # flex
+        ),
+        mapped_array=dict(
+            stats=Config(  # flex
+                dict(
+                    filters=dict(
+                        has_value_map=dict(
+                            filter_func=lambda self, metric_settings:
+                            metric_settings.get('value_map', self.value_map) is not None
+                        )
+                    )
+                )
+            )
         ),
         portfolio=dict(
             call_seq='default',
@@ -285,41 +371,27 @@ settings = SettingsConfig(
             seed=None,
             freq=None,
             fillna_close=True,
-            stats=dict(
-                metrics='all',
-                incl_unrealized=False,
-                use_asset_returns=False,
-                use_positions=False,
-                use_caching=True,
-                silence_warnings=False,
-                template_mapping=Config(),  # flex
-                global_settings=Config(),  # flex
-                kwargs=Config()  # flex
+            stats=Config(  # flex
+                dict(
+                    filters=dict(
+                        has_year_freq=dict(
+                            filter_func=lambda self, metric_settings:
+                            metric_settings['year_freq'] is not None,
+                            warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
+                        )
+                    ),
+                    settings=dict(
+                        use_asset_returns=False,
+                        use_positions=False,
+                        incl_unrealized=False
+                    )
+                )
             ),
             plot=dict(
                 subplots=['orders', 'trade_returns', 'cum_returns'],
-                grouped_subplots=None,
-                incl_unrealized=True,
                 use_asset_returns=False,
                 use_positions=False,
-                use_caching=True,
-                show_titles=True,
-                hide_id_labels=True,
-                group_id_labels=True,
-                make_subplots_kwargs=Config(),  # flex
-                hline_shape_kwargs=Config(  # flex
-                    dict(
-                        type='line',
-                        line=dict(
-                            color='gray',
-                            dash="dash",
-                        )
-                    )
-                ),
-                silence_warnings=False,
-                template_mapping=Config(),  # flex
-                global_settings=Config(),  # flex
-                kwargs=Config()  # flex
+                incl_unrealized=True
             )
         ),
         messaging=dict(

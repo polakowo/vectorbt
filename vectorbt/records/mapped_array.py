@@ -73,6 +73,27 @@ idxmin  x  x  x
 idxmax  z  z  z
 ```
 
+## Mapping
+
+Use `MappedArray.apply` to apply a function on each column/group:
+
+```python-repl
+>>> @njit
+... def cumsum_apply_nb(idxs, col, a):
+...     return np.cumsum(a)
+
+>>> ma.apply(cumsum_apply_nb)
+<vectorbt.records.mapped_array.MappedArray at 0x7ff061382198>
+
+>>> ma.apply(cumsum_apply_nb).values
+array([10., 21., 33., 13., 27., 42., 16., 33., 51.])
+
+>>> group_by = np.array(['first', 'first', 'second'])
+>>> ma.apply(cumsum_apply_nb, group_by=group_by, apply_per_group=True).values
+array([10., 21., 33., 46., 60., 75., 16., 33., 51.])
+
+Notice how cumsum resets at each column in the first example and at each group in the second example.
+
 ## Conversion
 
 You can expand any `MappedArray` instance to pandas:
@@ -247,6 +268,71 @@ respectively. Caching can be disabled globally via `caching` in `vectorbt._setti
 
 Like any other class subclassing `vectorbt.utils.config.Pickleable`, we can save a `MappedArray`
 instance to the disk with `MappedArray.save` and load it with `MappedArray.load`.
+
+## Stats
+
+!!! hint
+    For details on `MappedArray.stats`, see `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+
+    Also see `vectorbt.portfolio.base` for more examples.
+
+Metric for mapped arrays are similar to that for `vectorbt.generic.accessors.GenericAccessor`.
+
+```python-repl
+>>> ma.stats(column='a')
+Start                      x
+End                        z
+Period       3 days 00:00:00
+Count                      3
+Mean                      11
+Std                        1
+Min                       10
+Median                    11
+Max                       12
+Min Index                  x
+Max Index                  z
+Name: a, dtype: object
+```
+
+The main difference unfolds once the mapped array has a value map:
+values are then considered as categorical and usual statistics are meaningless to compute.
+For this case, `MappedArray.stats` returns value counts:
+
+```python-repl
+>>> ma.stats(column='a', settings=dict(value_map={10: 'some_known_value'}))
+Start                                          x
+End                                            z
+Period                           3 days 00:00:00
+Count                                          3
+Value Count: some_known_value                  1
+Value Count: UNK - 11.0                        1
+Value Count: UNK - 12.0                        1
+Value Count: UNK - 13.0                        0
+Value Count: UNK - 14.0                        0
+Value Count: UNK - 15.0                        0
+Value Count: UNK - 16.0                        0
+Value Count: UNK - 17.0                        0
+Value Count: UNK - 18.0                        0
+Name: a, dtype: object
+
+`MappedArray.stats` also supports grouping:
+
+```python-repl
+>>> grouped_ma.stats(column='first')
+
+Start                      x
+End                        z
+Period       3 days 00:00:00
+Count                      6
+Mean                    12.5
+Std                  1.87083
+Min                       10
+Median                  12.5
+Max                       15
+Min Index                  x
+Max Index                  z
+Name: first, dtype: object
+```
 """
 
 import numpy as np
@@ -256,7 +342,7 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
 from vectorbt.utils.enum import enum_to_value_map
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.class_helpers import (
     add_binary_magic_methods,
@@ -266,6 +352,7 @@ from vectorbt.base.class_helpers import (
 )
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic import nb as generic_nb
+from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records import nb
 from vectorbt.records.col_mapper import ColumnMapper
 
@@ -301,7 +388,7 @@ def combine_mapped_with_other(self: MappedArrayT, other: tp.Union["MappedArray",
     unary_magic_methods,
     lambda self, np_func: self.copy(mapped_arr=np_func(self.values))
 )
-class MappedArray(Wrapping):
+class MappedArray(Wrapping, StatsBuilderMixin):
     """Exposes methods for reducing, converting, and plotting arrays mapped by
     `vectorbt.records.base.Records` class.
 
@@ -325,9 +412,14 @@ class MappedArray(Wrapping):
             Useful if any subclass wants to extend the config.
     """
 
-    def __init__(self, wrapper: ArrayWrapper, mapped_arr: tp.ArrayLike, col_arr: tp.ArrayLike,
-                 id_arr: tp.Optional[tp.ArrayLike] = None, idx_arr: tp.Optional[tp.ArrayLike] = None,
-                 value_map: tp.Optional[tp.ValueMapLike] = None, **kwargs) -> None:
+    def __init__(self,
+                 wrapper: ArrayWrapper,
+                 mapped_arr: tp.ArrayLike,
+                 col_arr: tp.ArrayLike,
+                 id_arr: tp.Optional[tp.ArrayLike] = None,
+                 idx_arr: tp.Optional[tp.ArrayLike] = None,
+                 value_map: tp.Optional[tp.ValueMapLike] = None,
+                 **kwargs) -> None:
         Wrapping.__init__(
             self,
             wrapper,
@@ -338,6 +430,8 @@ class MappedArray(Wrapping):
             value_map=value_map,
             **kwargs
         )
+        StatsBuilderMixin.__init__(self)
+
         mapped_arr = np.asarray(mapped_arr)
         col_arr = np.asarray(col_arr)
         checks.assert_shape_equal(mapped_arr, col_arr, axis=0)
@@ -431,9 +525,14 @@ class MappedArray(Wrapping):
             return nb.is_col_idx_sorted_nb(self.col_arr, self.id_arr)
         return nb.is_col_sorted_nb(self.col_arr)
 
-    def sort(self: MappedArrayT, incl_id: bool = False, idx_arr: tp.Optional[tp.Array1d] = None,
-             group_by: tp.GroupByLike = None, **kwargs) -> MappedArrayT:
-        """Sort mapped array by column array (primary) and id array (secondary, optional)."""
+    def sort(self: MappedArrayT,
+             incl_id: bool = False,
+             idx_arr: tp.Optional[tp.Array1d] = None,
+             group_by: tp.GroupByLike = None,
+             **kwargs) -> MappedArrayT:
+        """Sort mapped array by column array (primary) and id array (secondary, optional).
+
+        `**kwargs` are passed to `MappedArray.copy`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         if self.is_sorted(incl_id=incl_id):
@@ -450,9 +549,14 @@ class MappedArray(Wrapping):
             **kwargs
         ).regroup(group_by)
 
-    def filter_by_mask(self: MappedArrayT, mask: tp.Array1d, idx_arr: tp.Optional[tp.Array1d] = None,
-                       group_by: tp.GroupByLike = None, **kwargs) -> MappedArrayT:
-        """Return a new class instance, filtered by mask."""
+    def filter_by_mask(self: MappedArrayT,
+                       mask: tp.Array1d,
+                       idx_arr: tp.Optional[tp.Array1d] = None,
+                       group_by: tp.GroupByLike = None,
+                       **kwargs) -> MappedArrayT:
+        """Return a new class instance, filtered by mask.
+
+        `**kwargs` are passed to `MappedArray.copy`."""
         if idx_arr is None:
             idx_arr = self.idx_arr
         return self.copy(
@@ -502,8 +606,11 @@ class MappedArray(Wrapping):
         target_shape = self.wrapper.get_shape_2d(group_by=group_by)
         return nb.is_mapped_expandable_nb(col_arr, idx_arr, target_shape)
 
-    def to_pd(self, idx_arr: tp.Optional[tp.Array1d] = None, ignore_index: bool = False,
-              default_val: float = np.nan, group_by: tp.GroupByLike = None,
+    def to_pd(self,
+              idx_arr: tp.Optional[tp.Array1d] = None,
+              ignore_index: bool = False,
+              default_val: float = np.nan,
+              group_by: tp.GroupByLike = None,
               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Expand mapped array to a Series/DataFrame.
 
@@ -541,9 +648,36 @@ class MappedArray(Wrapping):
         out = nb.expand_mapped_nb(self.values, col_arr, idx_arr, target_shape, default_val)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
-    def reduce(self, reduce_func_nb: tp.ReduceFunc, *args, idx_arr: tp.Optional[tp.Array1d] = None,
-               to_array: bool = False, to_idx: bool = False, idx_labeled: bool = True,
-               default_val: float = np.nan, group_by: tp.GroupByLike = None,
+    def apply(self: MappedArrayT,
+              apply_func_nb: tp.MappedApplyFunc, *args,
+              group_by: tp.GroupByLike = None,
+              apply_per_group: bool = False,
+              dtype: tp.Optional[tp.DTypeLike] = None,
+              **kwargs) -> MappedArrayT:
+        """Apply function on mapped array per column/group. Returns mapped array.
+
+        Applies per group if `apply_per_group` is True.
+
+        See `vectorbt.records.nb.apply_on_mapped_nb`.
+
+        `**kwargs` are passed to `MappedArray.copy`."""
+        checks.assert_numba_func(apply_func_nb)
+        if apply_per_group:
+            col_map = self.col_mapper.get_col_map(group_by=group_by)
+        else:
+            col_map = self.col_mapper.get_col_map(group_by=False)
+        mapped_arr = nb.apply_on_mapped_nb(self.values, col_map, apply_func_nb, *args)
+        mapped_arr = np.asarray(mapped_arr, dtype=dtype)
+        return self.copy(mapped_arr=mapped_arr, **kwargs).regroup(group_by)
+
+    def reduce(self,
+               reduce_func_nb: tp.ReduceFunc, *args,
+               idx_arr: tp.Optional[tp.Array1d] = None,
+               to_array: bool = False,
+               to_idx: bool = False,
+               idx_labeled: bool = True,
+               default_val: float = np.nan,
+               group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame:
         """Reduce mapped array by column.
 
@@ -712,7 +846,9 @@ class MappedArray(Wrapping):
             group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def value_counts(self, group_by: tp.GroupByLike = None, value_map: tp.Optional[tp.ValueMapLike] = None,
+    def value_counts(self,
+                     group_by: tp.GroupByLike = None,
+                     value_map: tp.Optional[tp.ValueMapLike] = None,
                      wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Return a pandas object containing counts of unique values."""
         mapped_codes, mapped_uniques = pd.factorize(self.values)
@@ -729,8 +865,110 @@ class MappedArray(Wrapping):
         if value_map is not None:
             if checks.is_namedtuple(value_map):
                 value_map = enum_to_value_map(value_map)
-            value_counts_df.index = value_counts_df.index.map(value_map)
+
+            def _map_func(x: tp.Any) -> str:
+                if x not in value_map:
+                    return 'UNK - %s' % str(x)
+                return value_map[x]
+
+            value_counts_df.index = value_counts_df.index.map(_map_func)
         return value_counts_df
+
+    @property
+    def stats_defaults(self) -> tp.Kwargs:
+        """Defaults for `MappedArray.stats`.
+
+        Merges `vectorbt.generic.stats_builder.StatsBuilderMixin.stats_defaults` and
+        `mapped_array.stats` in `vectorbt._settings.settings`."""
+        from vectorbt._settings import settings
+        mapped_array_stats_cfg = settings['mapped_array']['stats']
+
+        return merge_dicts(
+            StatsBuilderMixin.stats_defaults.__get__(self),
+            mapped_array_stats_cfg
+        )
+
+    metrics: tp.ClassVar[Config] = Config(
+        dict(
+            start=dict(
+                title='Start',
+                calc_func=lambda self: self.wrapper.index[0],
+                agg_func=None
+            ),
+            end=dict(
+                title='End',
+                calc_func=lambda self: self.wrapper.index[-1],
+                agg_func=None
+            ),
+            period=dict(
+                title='Period',
+                calc_func=lambda self:
+                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                agg_func=None
+            ),
+            count=dict(
+                title='Count',
+                calc_func='count'
+            ),
+            mean=dict(
+                title='Mean',
+                calc_func='mean',
+                pass_group_by=True,
+                inv_check_has_value_map=True
+            ),
+            std=dict(
+                title='Std',
+                calc_func='std',
+                pass_group_by=True,
+                inv_check_has_value_map=True
+            ),
+            min=dict(
+                title='Min',
+                calc_func='min',
+                pass_group_by=True,
+                inv_check_has_value_map=True
+            ),
+            median=dict(
+                title='Median',
+                calc_func='median',
+                pass_group_by=True,
+                inv_check_has_value_map=True
+            ),
+            max=dict(
+                title='Max',
+                calc_func='max',
+                pass_group_by=True,
+                inv_check_has_value_map=True
+            ),
+            idx_min=dict(
+                title='Min Index',
+                calc_func='idxmin',
+                pass_group_by=True,
+                inv_check_has_value_map=True,
+                agg_func=None
+            ),
+            idx_max=dict(
+                title='Max Index',
+                calc_func='idxmax',
+                pass_group_by=True,
+                inv_check_has_value_map=True,
+                agg_func=None
+            ),
+            value_counts=dict(
+                title='Value Count',
+                calc_func=lambda value_counts:
+                {value_counts.index[i]: value_counts.iloc[i] for i in range(len(value_counts.index))},
+                check_has_value_map=True
+            )
+        ),
+        copy_kwargs=dict(copy_mode='deep')
+    )
+    """Metrics supported by `MappedArray.stats`.
+
+    !!! note
+        It's safe to change this config - it's a (deep) copy of the class variable.
+
+        But copying `MappedArray` using `MappedArray.copy` won't create a copy of the config."""
 
     def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot histogram by column."""

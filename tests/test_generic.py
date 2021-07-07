@@ -1433,3 +1433,68 @@ class TestAccessors:
             df.vbt.expanding_split(n=2, min_len=10)
         with pytest.raises(Exception) as e_info:
             df.vbt.expanding_split(n=10)
+
+    def test_stats(self):
+        stat_index = pd.Index([
+            'Start', 'End', 'Period', 'Count', 'Mean', 'Std', 'Min', 'Median', 'Max', 'Min Index', 'Max Index'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            df.vbt.stats(),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                4.0, 2.1666666666666665, 1.0531130555537456, 1.0, 2.1666666666666665, 3.3333333333333335
+            ],
+                index=stat_index[:-2],
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.stats(column='a'),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                4, 2.5, 1.2909944487358056, 1.0, 2.5, 4.0,
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-04 00:00:00')
+            ],
+                index=stat_index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            df.vbt.stats(column='g1', group_by=group_by),
+            pd.Series([
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-05 00:00:00'),
+                pd.Timedelta('5 days 00:00:00'),
+                8, 2.5, 1.1952286093343936, 1.0, 2.5, 4.0,
+                pd.Timestamp('2018-01-01 00:00:00'),
+                pd.Timestamp('2018-01-02 00:00:00')
+            ],
+                index=stat_index,
+                name='g1'
+            )
+        )
+        pd.testing.assert_series_equal(
+            df['c'].vbt.stats(),
+            df.vbt.stats(column='c')
+        )
+        pd.testing.assert_series_equal(
+            df['c'].vbt.stats(),
+            df.vbt.stats(column='c', group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(group_by=group_by)['g2'].stats(),
+            df.vbt(group_by=group_by).stats(column='g2')
+        )
+        pd.testing.assert_series_equal(
+            df.vbt(group_by=group_by)['g2'].stats(),
+            df.vbt.stats(column='g2', group_by=group_by)
+        )
+        stats_df = df.vbt.stats(agg_func=None)
+        assert stats_df.shape == (3, 11)
+        pd.testing.assert_index_equal(stats_df.index, df.vbt.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stat_index)

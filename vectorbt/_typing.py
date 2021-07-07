@@ -134,6 +134,8 @@ SignalReduceFunc = Callable[[int, Array1d, VarArg()], float]
 # Records
 ColRange = Array2d
 ColMap = Tuple[Array1d, Array1d]
+MappedApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], Array1d]
+RecordApplyFunc = Callable[[RecordArray, VarArg()], Array1d]
 RecordMapFunc = Callable[[np.void, VarArg()], R]
 MaskInOutMapFunc = Callable[[Array1d, Array1d, int, Array1d, VarArg()], None]
 ValueMap = Mapping

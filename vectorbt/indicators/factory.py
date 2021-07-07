@@ -194,10 +194,11 @@ scalar, an array, or any other object. Multiple values are passed as a list or a
 and each is having multiple values, their values will broadcast to a single shape:
 
 ```plaintext
-       p1      p2            result
-0       0       1          [(0, 1)]
-1  [0, 1]     [2]  [(0, 2), (1, 2)]
-2  [0, 1]  [2, 3]  [(0, 2), (1, 3)]
+       p1         p2            result
+0       0          1          [(0, 1)]
+1  [0, 1]        [2]  [(0, 2), (1, 2)]
+2  [0, 1]     [2, 3]  [(0, 2), (1, 3)]
+3  [0, 1]  [2, 3, 4]             error
 ```
 
 To illustrate the usage of parameters in indicators, let's build a basic indicator that returns 1

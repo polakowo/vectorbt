@@ -29,7 +29,38 @@ from vectorbt import _typing as tp
 from vectorbt.generic import nb as generic_nb
 
 
-# ############# Financial risk and performance metrics ############# #
+@njit(cache=True)
+def get_return_nb(input_value: float, output_value: float) -> float:
+    """Calculate return from input and output value."""
+    if input_value == 0:
+        if output_value == 0:
+            return 0.
+        return np.inf * np.sign(output_value)
+    return_value = (output_value - input_value) / input_value
+    if input_value < 0:
+        return_value *= -1
+    return return_value
+
+
+@njit(cache=True)
+def returns_1d_nb(value: tp.Array1d, init_value: float) -> tp.Array1d:
+    """Calculate returns from value."""
+    out = np.empty(value.shape, dtype=np.float_)
+    input_value = init_value
+    for i in range(out.shape[0]):
+        output_value = value[i]
+        out[i] = get_return_nb(input_value, output_value)
+        input_value = output_value
+    return out
+
+
+@njit(cache=True)
+def returns_nb(value: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
+    """2-dim version of `returns_1d_nb`."""
+    out = np.empty(value.shape, dtype=np.float_)
+    for col in range(out.shape[1]):
+        out[:, col] = returns_1d_nb(value[:, col], init_value[col])
+    return out
 
 
 @njit(cache=True)
