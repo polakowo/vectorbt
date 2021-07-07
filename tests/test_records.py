@@ -981,6 +981,26 @@ class TestMappedArray:
                 name='a'
             )
         )
+        pd.testing.assert_series_equal(
+            mapped_array['c'].stats(),
+            mapped_array.stats(column='c')
+        )
+        pd.testing.assert_series_equal(
+            mapped_array['c'].stats(),
+            mapped_array.stats(column='c', group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            mapped_array_grouped['g2'].stats(),
+            mapped_array_grouped.stats(column='g2')
+        )
+        pd.testing.assert_series_equal(
+            mapped_array_grouped['g2'].stats(),
+            mapped_array.stats(column='g2', group_by=group_by)
+        )
+        stats_df = mapped_array.stats(agg_func=None)
+        assert stats_df.shape == (4, 11)
+        pd.testing.assert_index_equal(stats_df.index, mapped_array.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stat_index)
 
 
 # ############# base.py ############# #
@@ -1302,6 +1322,26 @@ class TestRecords:
                 name='g1'
             )
         )
+        pd.testing.assert_series_equal(
+            records['c'].stats(),
+            records.stats(column='c')
+        )
+        pd.testing.assert_series_equal(
+            records['c'].stats(),
+            records.stats(column='c', group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            records_grouped['g2'].stats(),
+            records_grouped.stats(column='g2')
+        )
+        pd.testing.assert_series_equal(
+            records_grouped['g2'].stats(),
+            records.stats(column='g2', group_by=group_by)
+        )
+        stats_df = records.stats(agg_func=None)
+        assert stats_df.shape == (4, 4)
+        pd.testing.assert_index_equal(stats_df.index, records.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stat_index)
 
 
 # ############# drawdowns.py ############# #

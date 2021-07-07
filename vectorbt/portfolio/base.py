@@ -1365,9 +1365,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
 
                 Called for each element before each row.
 
-                Should accept index of the current row, index of the current column, the current position size,
-                the latest asset price, initial index of the stop, initial price of the stop, initial value
-                of the stop, initial trailing flag of the stop, and `*adjust_sl_args`.
+                Should accept `vectorbt.portfolio.enums.AdjustSLContext` and `*adjust_sl_args`.
                 Should return a tuple of a new stop value and trailing flag.
             adjust_sl_args (tuple): Packed arguments passed to `adjust_sl_func_nb`.
                 Defaults to `()`.
@@ -1376,8 +1374,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
 
                 Called for each element before each row.
 
-                Should accept index of the current row, index of the current column, the current position size,
-                the latest asset price, initial index of the stop, initial price of the stop, initial value
+                Should accept `vectorbt.portfolio.enums.AdjustTPContext` and `*adjust_tp_args`.
                 of the stop, and `*adjust_tp_args`. Should return a new stop value.
             adjust_tp_args (tuple): Packed arguments passed to `adjust_tp_func_nb`.
                 Defaults to `()`.
@@ -1594,19 +1591,18 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         >>> from numba import njit
 
         >>> @njit
-        ... def adjust_sl_func_nb(i, col, position, val_price, init_i, init_price, init_stop, init_trail):
-        ...     current_profit = (val_price - init_price) / init_price
+        ... def adjust_sl_func_nb(c):
+        ...     current_profit = (c.val_price_now - c.init_price) / c.init_price
         ...     if current_profit >= 0.40:
         ...         return 0.25, True
         ...     elif current_profit >= 0.25:
         ...         return 0.15, True
         ...     elif current_profit >= 0.20:
         ...         return 0.07, True
-        ...     return init_stop, init_trail
+        ...     return c.curr_stop, c.curr_trail
 
         >>> close = pd.Series([10, 11, 12, 11, 10])
-        >>> pf = vbt.Portfolio.from_signals(
-        ...     close, adjust_sl_func_nb=adjust_sl_func_nb)
+        >>> pf = vbt.Portfolio.from_signals(close, adjust_sl_func_nb=adjust_sl_func_nb)
         >>> pf.asset_flow()
         0    10.0
         1     0.0

@@ -2010,8 +2010,8 @@ class TestFromSignals:
         close = pd.Series([5., 4., 3., 2., 1.], index=price.index)
 
         @njit
-        def adjust_sl_func_nb(i, col, position, val_price, init_i, init_price, init_stop, init_trail, dur):
-            return 0. if i - init_i >= dur else init_stop, init_trail
+        def adjust_sl_func_nb(c, dur):
+            return 0. if c.i - c.init_i >= dur else c.curr_stop, c.curr_trail
 
         record_arrays_close(
             from_signals_longonly(
@@ -2022,14 +2022,32 @@ class TestFromSignals:
             ], dtype=order_dt)
         )
 
+    def test_adjust_ts_func(self):
+        entries = pd.Series([True, False, False, False, False], index=price.index)
+        exits = pd.Series([False, False, False, False, False], index=price.index)
+        close = pd.Series([10., 11., 12., 11., 10.], index=price.index)
+
+        @njit
+        def adjust_sl_func_nb(c, dur):
+            return 0. if c.i - c.curr_i >= dur else c.curr_stop, c.curr_trail
+
+        record_arrays_close(
+            from_signals_longonly(
+                close=close, entries=entries, exits=exits,
+                sl_stop=np.inf, adjust_sl_func_nb=adjust_sl_func_nb, adjust_sl_args=(2,)).order_records,
+            np.array([
+                (0, 0, 0, 10.0, 10.0, 0.0, 0), (1, 4, 0, 10.0, 10.0, 0.0, 1)
+            ], dtype=order_dt)
+        )
+
     def test_adjust_tp_func(self):
         entries = pd.Series([True, False, False, False, False], index=price.index)
         exits = pd.Series([False, False, False, False, False], index=price.index)
         close = pd.Series([1., 2., 3., 4., 5.], index=price.index)
 
         @njit
-        def adjust_tp_func_nb(i, col, position, val_price, init_i, init_price, init_stop, dur):
-            return 0. if i - init_i >= dur else init_stop
+        def adjust_tp_func_nb(c, dur):
+            return 0. if c.i - c.init_i >= dur else c.curr_stop
 
         record_arrays_close(
             from_signals_longonly(

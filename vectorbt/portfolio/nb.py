@@ -3068,8 +3068,8 @@ def should_update_stop_nb(stop: float, stop_update_mode: int) -> bool:
 
 @njit(cache=True)
 def get_stop_price_nb(position_now: float,
-                      init_price: float,
-                      init_stop: float,
+                      stop_price: float,
+                      stop: float,
                       open: float,
                       low: float,
                       high: float,
@@ -3077,17 +3077,17 @@ def get_stop_price_nb(position_now: float,
     """Get stop price.
 
     If hit before open, returns open."""
-    if init_stop < 0:
+    if stop < 0:
         raise ValueError("Stop value must be 0 or greater")
     if (position_now > 0 and hit_below) or (position_now < 0 and not hit_below):
-        stop_price = init_price * (1 - init_stop)
+        stop_price = stop_price * (1 - stop)
         if open <= stop_price:
             return open
         if low <= stop_price <= high:
             return stop_price
         return np.nan
     if (position_now < 0 and hit_below) or (position_now > 0 and not hit_below):
-        stop_price = init_price * (1 + init_stop)
+        stop_price = stop_price * (1 + stop)
         if stop_price <= open:
             return open
         if low <= stop_price <= high:
@@ -3097,34 +3097,19 @@ def get_stop_price_nb(position_now: float,
 
 
 @njit
-def no_adjust_sl_func_nb(i: int,
-                         col: int,
-                         position: float,
-                         val_price: float,
-                         init_i: int,
-                         init_price: float,
-                         init_stop: float,
-                         init_trail: bool,
-                         *args) -> tp.Tuple[float, bool]:
+def no_adjust_sl_func_nb(c: AdjustSLContext, *args) -> tp.Tuple[float, bool]:
     """Placeholder function that returns the initial stop-loss value and trailing flag."""
-    return init_stop, init_trail
+    return c.curr_stop, c.curr_trail
 
 
 @njit
-def no_adjust_tp_func_nb(i: int,
-                         col: int,
-                         position: float,
-                         val_price: float,
-                         init_i: int,
-                         init_price: float,
-                         init_stop: float,
-                         *args) -> float:
+def no_adjust_tp_func_nb(c: AdjustTPContext, *args) -> float:
     """Placeholder function that returns the initial take-profit value."""
-    return init_stop
+    return c.curr_stop
 
 
-AdjustSLFuncT = tp.Callable[[int, int, float, float, int, float, float, bool, tp.VarArg()], tp.Tuple[float, bool]]
-AdjustTPFuncT = tp.Callable[[int, int, float, float, int, float, float, tp.VarArg()], float]
+AdjustSLFuncT = tp.Callable[[AdjustSLContext, tp.VarArg()], tp.Tuple[float, bool]]
+AdjustTPFuncT = tp.Callable[[AdjustTPContext, tp.VarArg()], float]
 
 
 @njit(cache=True)
@@ -3229,19 +3214,23 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
     if use_stops:
         sl_init_i = np.full(target_shape[1], -1, dtype=np.int_)
         sl_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_init_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
-        sl_init_trail = np.full(target_shape[1], False, dtype=np.bool_)
+        sl_curr_i = np.full(target_shape[1], -1, dtype=np.int_)
+        sl_curr_price = np.full(target_shape[1], np.nan, dtype=np.float_)
+        sl_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+        sl_curr_trail = np.full(target_shape[1], False, dtype=np.bool_)
         tp_init_i = np.full(target_shape[1], -1, dtype=np.int_)
         tp_init_price = np.full(target_shape[1], np.nan, dtype=np.float_)
-        tp_init_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
+        tp_curr_stop = np.full(target_shape[1], np.nan, dtype=np.float_)
     else:
         sl_init_i = np.empty(0, dtype=np.int_)
         sl_init_price = np.empty(0, dtype=np.float_)
-        sl_init_stop = np.empty(0, dtype=np.float_)
-        sl_init_trail = np.empty(0, dtype=np.bool_)
+        sl_curr_i = np.empty(0, dtype=np.int_)
+        sl_curr_price = np.empty(0, dtype=np.float_)
+        sl_curr_stop = np.empty(0, dtype=np.float_)
+        sl_curr_trail = np.empty(0, dtype=np.bool_)
         tp_init_i = np.empty(0, dtype=np.int_)
         tp_init_price = np.empty(0, dtype=np.float_)
-        tp_init_stop = np.empty(0, dtype=np.float_)
+        tp_curr_stop = np.empty(0, dtype=np.float_)
     order_price = np.full(target_shape[1], np.nan, dtype=np.float_)
     order_size = np.empty(target_shape[1], dtype=np.float_)
     order_size_type = np.empty(target_shape[1], dtype=np.float_)
@@ -3297,29 +3286,31 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                 stop_price_hit = False
                 if use_stops:
                     # Adjust stops
-                    sl_init_stop[col], sl_init_trail[col] = adjust_sl_func_nb(
-                        i,
-                        col,
-                        last_position[col],
-                        last_val_price[col],
-                        sl_init_i[col],
-                        sl_init_price[col],
-                        sl_init_stop[col],
-                        sl_init_trail[col],
-                        *adjust_sl_args
+                    adjust_sl_ctx = AdjustSLContext(
+                        i=i,
+                        col=col,
+                        position_now=last_position[col],
+                        val_price_now=last_val_price[col],
+                        init_i=sl_init_i[col],
+                        init_price=sl_init_price[col],
+                        curr_i=sl_curr_i[col],
+                        curr_price=sl_curr_price[col],
+                        curr_stop=sl_curr_stop[col],
+                        curr_trail=sl_curr_trail[col]
                     )
-                    tp_init_stop[col] = adjust_tp_func_nb(
-                        i,
-                        col,
-                        last_position[col],
-                        last_val_price[col],
-                        tp_init_i[col],
-                        tp_init_price[col],
-                        tp_init_stop[col],
-                        *adjust_tp_args
+                    sl_curr_stop[col], sl_curr_trail[col] = adjust_sl_func_nb(adjust_sl_ctx, *adjust_sl_args)
+                    adjust_tp_ctx = AdjustTPContext(
+                        i=i,
+                        col=col,
+                        position_now=last_position[col],
+                        val_price_now=last_val_price[col],
+                        init_i=tp_init_i[col],
+                        init_price=tp_init_price[col],
+                        curr_stop=tp_curr_stop[col]
                     )
+                    tp_curr_stop[col] = adjust_tp_func_nb(adjust_tp_ctx, *adjust_tp_args)
 
-                    if not np.isnan(sl_init_stop[col]) or not np.isnan(tp_init_stop[col]):
+                    if not np.isnan(sl_curr_stop[col]) or not np.isnan(tp_curr_stop[col]):
                         # Get stop price
                         _open = flex_select_auto_nb(i, col, open, flex_2d)
                         _high = flex_select_auto_nb(i, col, high, flex_2d)
@@ -3334,31 +3325,33 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                         stop_price = np.nan
                         position_now = last_position[col]
-                        if not np.isnan(sl_init_stop[col]):
+                        if not np.isnan(sl_curr_stop[col]):
                             stop_price = get_stop_price_nb(
                                 position_now,
-                                sl_init_price[col],
-                                sl_init_stop[col],
+                                sl_curr_price[col],
+                                sl_curr_stop[col],
                                 _open, _low, _high,
                                 True
                             )
-                        if np.isnan(stop_price) and not np.isnan(tp_init_stop[col]):
+                        if np.isnan(stop_price) and not np.isnan(tp_curr_stop[col]):
                             stop_price = get_stop_price_nb(
                                 position_now,
                                 tp_init_price[col],
-                                tp_init_stop[col],
+                                tp_curr_stop[col],
                                 _open, _low, _high,
                                 False
                             )
 
-                        if not np.isnan(sl_init_stop[col]) and sl_init_trail[col]:
+                        if not np.isnan(sl_curr_stop[col]) and sl_curr_trail[col]:
                             # Update trailing stop
                             if position_now > 0:
-                                if _high > sl_init_price[col]:
-                                    sl_init_price[col] = _high
+                                if _high > sl_curr_price[col]:
+                                    sl_curr_i[col] = i
+                                    sl_curr_price[col] = _high
                             elif position_now < 0:
-                                if _low < sl_init_price[col]:
-                                    sl_init_price[col] = _low
+                                if _low < sl_curr_price[col]:
+                                    sl_curr_i[col] = i
+                                    sl_curr_price[col] = _low
 
                         if not np.isnan(stop_price):
                             # Stop price has been hit
@@ -3521,13 +3514,13 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         if order_result.status == OrderStatus.Filled:
                             if position_now == 0:
                                 # Position closed -> clear stops
-                                sl_init_i[col] = -1
-                                sl_init_price[col] = np.nan
-                                sl_init_stop[col] = np.nan
-                                sl_init_trail[col] = False
+                                sl_curr_i[col] = sl_init_i[col] = -1
+                                sl_curr_price[col] = sl_init_price[col] = np.nan
+                                sl_curr_stop[col] = np.nan
+                                sl_curr_trail[col] = False
                                 tp_init_i[col] = -1
                                 tp_init_price[col] = np.nan
-                                tp_init_stop[col] = np.nan
+                                tp_curr_stop[col] = np.nan
                             else:
                                 _stop_entry_price = flex_select_auto_nb(i, col, stop_entry_price, flex_2d)
                                 if _stop_entry_price == StopEntryPrice.ValPrice:
@@ -3545,24 +3538,24 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
 
                                 if state.position == 0 or np.sign(position_now) != np.sign(state.position):
                                     # Position opened/reversed -> set stops
-                                    sl_init_i[col] = i
-                                    sl_init_price[col] = new_init_price
-                                    sl_init_stop[col] = _sl_stop
-                                    sl_init_trail[col] = _sl_trail
+                                    sl_curr_i[col] = sl_init_i[col] = i
+                                    sl_curr_price[col] = sl_init_price[col] = new_init_price
+                                    sl_curr_stop[col] = _sl_stop
+                                    sl_curr_trail[col] = _sl_trail
                                     tp_init_i[col] = i
                                     tp_init_price[col] = new_init_price
-                                    tp_init_stop[col] = _tp_stop
+                                    tp_curr_stop[col] = _tp_stop
                                 elif abs(position_now) > abs(state.position):
                                     # Position increased -> keep/override stops
                                     if should_update_stop_nb(_sl_stop, _stop_update_mode):
-                                        sl_init_i[col] = i
-                                        sl_init_price[col] = new_init_price
-                                        sl_init_stop[col] = _sl_stop
-                                        sl_init_trail[col] = _sl_trail
+                                        sl_curr_i[col] = sl_init_i[col] = i
+                                        sl_curr_price[col] = sl_init_price[col] = new_init_price
+                                        sl_curr_stop[col] = _sl_stop
+                                        sl_curr_trail[col] = _sl_trail
                                     if should_update_stop_nb(_tp_stop, _stop_update_mode):
                                         tp_init_i[col] = i
                                         tp_init_price[col] = new_init_price
-                                        tp_init_stop[col] = _tp_stop
+                                        tp_curr_stop[col] = _tp_stop
 
                 # Now becomes last
                 last_position[col] = position_now
