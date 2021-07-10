@@ -22,8 +22,6 @@ The accessors inherit `vectorbt.base.accessors` and are inherited by more
 specialized accessors, such as `vectorbt.signals.accessors` and `vectorbt.returns.accessors`.
 
 !!! note
-    Input arrays can be of any type, but most output arrays are `np.float64`.
-
     Grouping is only supported by the methods that accept the `group_by` argument.
 
 Run for the examples below:
@@ -205,22 +203,22 @@ def add_transform_methods(transformers: tp.Iterable[TransformFuncInfoT]) -> Wrap
 
 
 @add_nb_methods([
-    (nb.shuffle_nb, False),
-    (nb.fillna_nb, False),
-    (nb.bshift_nb, False),
-    (nb.fshift_nb, False),
-    (nb.diff_nb, False),
-    (nb.pct_change_nb, False),
-    (nb.ffill_nb, False),
-    (nb.cumsum_nb, False),
-    (nb.cumprod_nb, False),
-    (nb.rolling_min_nb, False),
-    (nb.rolling_max_nb, False),
-    (nb.rolling_mean_nb, False),
-    (nb.expanding_min_nb, False),
-    (nb.expanding_max_nb, False),
-    (nb.expanding_mean_nb, False),
-    (nb.product_nb, True, 'product')
+    ('shuffle', nb.shuffle_nb, False),
+    ('fillna', nb.fillna_nb, False),
+    ('bshift', nb.bshift_nb, False),
+    ('fshift', nb.fshift_nb, False),
+    ('diff', nb.diff_nb, False),
+    ('pct_change', nb.pct_change_nb, False),
+    ('ffill', nb.ffill_nb, False),
+    ('cumsum', nb.nancumsum_nb, False),
+    ('cumprod', nb.nancumprod_nb, False),
+    ('rolling_min', nb.rolling_min_nb, False),
+    ('rolling_max', nb.rolling_max_nb, False),
+    ('rolling_mean', nb.rolling_mean_nb, False),
+    ('expanding_min', nb.expanding_min_nb, False),
+    ('expanding_max', nb.expanding_max_nb, False),
+    ('expanding_mean', nb.expanding_mean_nb, False),
+    ('product', nb.nanprod_nb, True)
 ], module_name='vectorbt.generic.nb')
 @add_transform_methods([
     ('binarize', Binarizer),
@@ -278,7 +276,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         out = nb.ewm_std_nb(self.to_2d_array(), span, minp=minp, adjust=adjust, ddof=ddof)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def apply_along_axis(self, apply_func_nb: tp.Union[nb.apply_nbT, nb.row_apply_nbT], *args, axis: int = 0,
+    def apply_along_axis(self, apply_func_nb: tp.Union[tp.ApplyFunc, tp.RowApplyFunc], *args, axis: int = 0,
                          wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Apply a function `apply_func_nb` along an axis."""
         checks.assert_numba_func(apply_func_nb)
@@ -291,7 +289,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             raise ValueError("Only axes 0 and 1 are supported")
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def rolling_apply(self, window: int, apply_func_nb: tp.Union[nb.rolling_apply_nbT, nb.rolling_matrix_apply_nbT],
+    def rolling_apply(self, window: int, apply_func_nb: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
                       *args, minp: tp.Optional[int] = None, on_matrix: bool = False,
                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.rolling_apply_nb` and
@@ -327,7 +325,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             out = nb.rolling_apply_nb(self.to_2d_array(), window, minp, apply_func_nb, *args)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def expanding_apply(self, apply_func_nb: tp.Union[nb.rolling_apply_nbT, nb.rolling_matrix_apply_nbT],
+    def expanding_apply(self, apply_func_nb: tp.Union[tp.RollApplyFunc, nb.tp.RollMatrixApplyFunc],
                         *args, minp: tp.Optional[int] = 1, on_matrix: bool = False,
                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.expanding_apply_nb` and
@@ -364,7 +362,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
     def groupby_apply(self, by: tp.PandasGroupByLike,
-                      apply_func_nb: tp.Union[nb.groupby_apply_nbT, nb.groupby_apply_matrix_nbT],
+                      apply_func_nb: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
                       *args, on_matrix: bool = False, wrap_kwargs: tp.KwargsLike = None,
                       **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.groupby_apply_nb` and
@@ -397,14 +395,14 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         for i, (k, v) in enumerate(regrouped.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = nb.groupby_matrix_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         wrap_kwargs = merge_dicts(dict(name_or_index=list(regrouped.indices.keys())), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, **wrap_kwargs)
 
     def resample_apply(self, freq: tp.PandasFrequencyLike,
-                       apply_func_nb: tp.Union[nb.groupby_apply_nbT, nb.groupby_apply_matrix_nbT],
+                       apply_func_nb: tp.Union[tp.GroupByApplyFunc, tp.GroupByMatrixApplyFunc],
                        *args, on_matrix: bool = False, wrap_kwargs: tp.KwargsLike = None,
                        **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.groupby_apply_nb` and
@@ -437,7 +435,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         for i, (k, v) in enumerate(resampled.indices.items()):
             groups[i] = np.asarray(v)
         if on_matrix:
-            out = nb.groupby_apply_matrix_nb(self.to_2d_array(), groups, apply_func_nb, *args)
+            out = nb.groupby_matrix_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         else:
             out = nb.groupby_apply_nb(self.to_2d_array(), groups, apply_func_nb, *args)
         out_obj = self.wrapper.wrap(out, index=list(resampled.indices.keys()))
@@ -450,7 +448,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         resampled_obj.loc[out_obj.index] = out_obj.values
         return resampled_obj
 
-    def applymap(self, apply_func_nb: nb.applymap_nbT, *args,
+    def applymap(self, apply_func_nb: tp.ApplyMapFunc, *args,
                  wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.applymap_nb`.
 
@@ -472,7 +470,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         out = nb.applymap_nb(self.to_2d_array(), apply_func_nb, *args)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def filter(self, filter_func_nb: nb.filter_nbT, *args,
+    def filter(self, filter_func_nb: tp.FilterFunc, *args,
                wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.filter_nb`.
 
@@ -494,7 +492,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         out = nb.filter_nb(self.to_2d_array(), filter_func_nb, *args)
         return self.wrapper.wrap(out, **merge_dicts({}, wrap_kwargs))
 
-    def apply_and_reduce(self, apply_func_nb: nb.apply_and_reduce_nbAT, reduce_func_nb: nb.apply_and_reduce_nbRT,
+    def apply_and_reduce(self, apply_func_nb: tp.ApplyFunc, reduce_func_nb: tp.ReduceFunc,
                          apply_args: tp.Optional[tuple] = None, reduce_args: tp.Optional[tuple] = None,
                          wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """See `vectorbt.generic.nb.apply_and_reduce_nb`.
@@ -522,14 +520,22 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         wrap_kwargs = merge_dicts(dict(name_or_index='apply_and_reduce'), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, **wrap_kwargs)
 
-    def reduce(self, reduce_func_nb: tp.Union[nb.flat_reduce_grouped_nbT,
-                                              nb.flat_reduce_grouped_to_array_nbT,
-                                              nb.reduce_grouped_nbT,
-                                              nb.reduce_grouped_to_array_nbT,
-                                              nb.reduce_nbT,
-                                              nb.reduce_to_array_nbT],
-               *args, to_array: bool = False, to_idx: bool = False, flatten: bool = False,
-               order: str = 'C', idx_labeled: bool = True, group_by: tp.GroupByLike = None,
+    def reduce(self,
+               reduce_func_nb: tp.Union[
+                   tp.FlatGroupReduceFunc,
+                   tp.FlatGroupReduceArrayFunc,
+                   tp.GroupReduceFunc,
+                   tp.GroupReduceArrayFunc,
+                   tp.ReduceFunc,
+                   tp.ReduceArrayFunc
+               ],
+               *args,
+               to_array: bool = False,
+               to_idx: bool = False,
+               flatten: bool = False,
+               order: str = 'C',
+               idx_labeled: bool = True,
+               group_by: tp.GroupByLike = None,
                wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeriesFrame[float]:
         """Reduce by column.
 
@@ -568,7 +574,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         dtype: int64
 
         >>> min_max_nb = njit(lambda col, a: np.array([np.nanmin(a), np.nanmax(a)]))
-        >>> df.vbt.reduce(min_max_nb, name_or_index=['min', 'max'], to_array=True)
+        >>> df.vbt.reduce(min_max_nb, to_array=True, wrap_kwargs=dict(name_or_index=['min', 'max']))
                a    b    c
         min  1.0  1.0  1.0
         max  5.0  5.0  3.0
@@ -632,7 +638,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         wrap_kwargs = merge_dicts(dict(name_or_index='reduce' if not to_array else None), wrap_kwargs)
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
-    def squeeze_grouped(self, reduce_func_nb: nb.squeeze_grouped_nbT, *args, group_by: tp.GroupByLike = None,
+    def squeeze_grouped(self, squeeze_func_nb: tp.GroupSqueezeFunc, *args, group_by: tp.GroupByLike = None,
                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Squeeze each group of columns into a single column.
 
@@ -642,8 +648,8 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
 
         ```python-repl
         >>> group_by = pd.Series(['first', 'first', 'second'], name='group')
-        >>> mean_nb = njit(lambda i, group, a: np.nanmean(a))
-        >>> df.vbt.squeeze_grouped(mean_nb, group_by=group_by)
+        >>> mean_squeeze_nb = njit(lambda i, group, a: np.nanmean(a))
+        >>> df.vbt.squeeze_grouped(mean_squeeze_nb, group_by=group_by)
         group       first  second
         2020-01-01    3.0     1.0
         2020-01-02    3.0     2.0
@@ -654,10 +660,10 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         """
         if not self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping required")
-        checks.assert_numba_func(reduce_func_nb)
+        checks.assert_numba_func(squeeze_func_nb)
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
-        out = nb.squeeze_grouped_nb(self.to_2d_array(), group_lens, reduce_func_nb, *args)
+        out = nb.squeeze_grouped_nb(self.to_2d_array(), group_lens, squeeze_func_nb, *args)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
     def flatten_grouped(self, group_by: tp.GroupByLike = None, order: str = 'C',
@@ -665,6 +671,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         """Flatten each group of columns.
 
         See `vectorbt.generic.nb.flatten_grouped_nb`.
+        If all groups have the same length, see `vectorbt.generic.nb.flatten_uniform_grouped_nb`.
 
         !!! warning
             Make sure that the distribution of group lengths is close to uniform, otherwise
@@ -706,11 +713,15 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         checks.assert_in(order.upper(), ['C', 'F'])
 
         group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+        if np.all(group_lens == group_lens.item(0)):
+            func = nb.flatten_uniform_grouped_nb
+        else:
+            func = nb.flatten_grouped_nb
         if order.upper() == 'C':
-            out = nb.flatten_grouped_nb(self.to_2d_array(), group_lens, True)
+            out = func(self.to_2d_array(), group_lens, True)
             new_index = index_fns.repeat_index(self.wrapper.index, np.max(group_lens))
         else:
-            out = nb.flatten_grouped_nb(self.to_2d_array(), group_lens, False)
+            out = func(self.to_2d_array(), group_lens, False)
             new_index = index_fns.tile_index(self.wrapper.index, np.max(group_lens))
         wrap_kwargs = merge_dicts(dict(index=new_index), wrap_kwargs)
         return self.wrapper.wrap(out, group_by=group_by, **wrap_kwargs)
@@ -989,7 +1000,11 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             group_by = self.wrapper.grouper.group_by
         return Drawdowns.from_ts(self.obj, freq=self.wrapper.freq, group_by=group_by, **kwargs)
 
-    def to_mapped_array(self, dropna: bool = True, group_by: tp.GroupByLike = None, **kwargs) -> MappedArray:
+    def to_mapped(self,
+                  dropna: bool = True,
+                  dtype: tp.Optional[tp.DTypeLike] = None,
+                  group_by: tp.GroupByLike = None,
+                  **kwargs) -> MappedArray:
         """Convert this object into an instance of `vectorbt.records.mapped_array.MappedArray`."""
         mapped_arr = reshape_fns.to_2d(self.obj, raw=True).flatten(order='F')
         col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
@@ -999,11 +1014,25 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             mapped_arr = mapped_arr[not_nan_mask]
             col_arr = col_arr[not_nan_mask]
             idx_arr = idx_arr[not_nan_mask]
-        return MappedArray(self.wrapper, mapped_arr, col_arr, idx_arr=idx_arr, **kwargs).regroup(group_by)
+        return MappedArray(
+            self.wrapper,
+            np.asarray(mapped_arr, dtype=dtype),
+            col_arr,
+            idx_arr=idx_arr,
+            **kwargs
+        ).regroup(group_by)
 
-    def to_returns(self, **kwargs):
+    def to_returns(self, **kwargs) -> tp.SeriesFrame:
         """Get returns of this object."""
         return self.obj.vbt.returns.from_value(self.obj, **kwargs).obj
+
+    def to_dict(self, orient: str = 'dict') -> tp.Mapping:
+        """See [pandas.DataFrame.to_dict](https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_dict.html).
+
+        Adds one more `orient` value: 'index_series'."""
+        if orient == 'index_series':
+            return {self.obj.index[i]: self.obj.iloc[i] for i in range(len(self.obj.index))}
+        return self.obj.to_dict(orient)
 
     # ############# Transformation ############# #
 
@@ -1328,6 +1357,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
 
     def map_enum(self, enum: tp.NamedTuple) -> tp.SeriesFrame:
         """Map integer values to field names of an enum."""
+
         def _mapper(x: int) -> str:
             if x in enum:
                 return enum._fields[x]

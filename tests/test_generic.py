@@ -105,7 +105,7 @@ class TestAccessors:
         pd.testing.assert_series_equal(df['a'].vbt.bshift(test_n), df['a'].shift(-test_n))
         np.testing.assert_array_equal(
             df['a'].vbt.bshift(test_n).values,
-            nb.bshift_nb(df['a'].values, test_n)
+            nb.bshift_1d_nb(df['a'].values, test_n)
         )
         pd.testing.assert_frame_equal(df.vbt.bshift(test_n), df.shift(-test_n))
 
@@ -140,12 +140,12 @@ class TestAccessors:
         np.testing.assert_array_equal(df.vbt.product(), df.product())
 
     def test_cumsum(self):
-        pd.testing.assert_series_equal(df['a'].vbt.cumsum(), df['a'].cumsum())
-        pd.testing.assert_frame_equal(df.vbt.cumsum(), df.cumsum())
+        pd.testing.assert_series_equal(df['a'].vbt.cumsum(), df['a'].cumsum().ffill().fillna(0))
+        pd.testing.assert_frame_equal(df.vbt.cumsum(), df.cumsum().ffill().fillna(0))
 
     def test_cumprod(self):
-        pd.testing.assert_series_equal(df['a'].vbt.cumprod(), df['a'].cumprod())
-        pd.testing.assert_frame_equal(df.vbt.cumprod(), df.cumprod())
+        pd.testing.assert_series_equal(df['a'].vbt.cumprod(), df['a'].cumprod().ffill().fillna(1))
+        pd.testing.assert_frame_equal(df.vbt.cumprod(), df.cumprod().ffill().fillna(1))
 
     @pytest.mark.parametrize(
         "test_window,test_minp",
@@ -768,29 +768,29 @@ class TestAccessors:
         assert df['a'].vbt.drawdowns.wrapper.ndim == df['a'].ndim
         assert df.vbt.drawdowns.wrapper.ndim == df.ndim
 
-    def test_to_mapped_array(self):
+    def test_to_mapped(self):
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array().values,
+            df.vbt.to_mapped().values,
             np.array([1., 2., 3., 4., 4., 3., 2., 1., 1., 2., 2., 1.])
         )
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array().col_arr,
+            df.vbt.to_mapped().col_arr,
             np.array([0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2])
         )
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array().idx_arr,
+            df.vbt.to_mapped().idx_arr,
             np.array([0, 1, 2, 3, 1, 2, 3, 4, 0, 1, 3, 4])
         )
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array(dropna=False).values,
+            df.vbt.to_mapped(dropna=False).values,
             np.array([1., 2., 3., 4., np.nan, np.nan, 4., 3., 2., 1., 1., 2., np.nan, 2., 1.])
         )
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array(dropna=False).col_arr,
+            df.vbt.to_mapped(dropna=False).col_arr,
             np.array([0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2])
         )
         np.testing.assert_array_equal(
-            df.vbt.to_mapped_array(dropna=False).idx_arr,
+            df.vbt.to_mapped(dropna=False).idx_arr,
             np.array([0, 1, 2, 3, 4, 0, 1, 2, 3, 4, 0, 1, 2, 3, 4])
         )
 

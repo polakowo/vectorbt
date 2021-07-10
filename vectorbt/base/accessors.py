@@ -56,7 +56,9 @@ under the hood, which is mostly much faster than with pandas.
 !!! note
     You should ensure that your `*.vbt` operand is on the left if the other operand is an array.
 
-    Accessors do not utilize caching."""
+    Accessors do not utilize caching.
+
+    Grouping is only supported by the methods that accept the `group_by` argument."""
 
 import numpy as np
 import pandas as pd

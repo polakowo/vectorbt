@@ -498,7 +498,9 @@ class ArrayWrapper(Configured, PandasIndexer):
              index: tp.Optional[tp.IndexLike] = None,
              columns: tp.Optional[tp.IndexLike] = None,
              dtype: tp.Optional[tp.PandasDTypeLike] = None,
-             group_by: tp.GroupByLike = None) -> tp.SeriesFrame:
+             group_by: tp.GroupByLike = None,
+             time_units: bool = False,
+             silence_warnings: bool = False) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata."""
         checks.assert_ndim(a, (1, 2))
         _self = self.resolve(group_by=group_by)
@@ -519,6 +521,15 @@ class ArrayWrapper(Configured, PandasIndexer):
             name = None
 
         arr = np.asarray(a)
+        if dtype is not None:
+            try:
+                arr = arr.astype(dtype)
+            except Exception as e:
+                if not silence_warnings:
+                    warnings.warn(repr(e), stacklevel=2)
+        if time_units:
+            arr = _self.to_time_units(arr)
+            dtype = None
         arr = reshape_fns.soft_to_ndim(arr, self.ndim)
         checks.assert_shape_equal(arr, index, axis=(0, 0))
         if arr.ndim == 2:
@@ -537,7 +548,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                      columns: tp.Optional[tp.IndexLike] = None,
                      dtype: tp.Optional[tp.PandasDTypeLike] = None,
                      group_by: tp.GroupByLike = None,
-                     time_units: bool = False) -> tp.MaybeSeriesFrame:
+                     time_units: bool = False,
+                     silence_warnings: bool = False) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
@@ -558,7 +570,8 @@ class ArrayWrapper(Configured, PandasIndexer):
             try:
                 arr = arr.astype(dtype)
             except Exception as e:
-                warnings.warn(repr(e), stacklevel=2)
+                if not silence_warnings:
+                    warnings.warn(repr(e), stacklevel=2)
         if time_units:
             arr = _self.to_time_units(arr)
             dtype = None

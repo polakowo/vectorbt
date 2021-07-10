@@ -175,14 +175,14 @@ def merge_dicts(*dicts: InConfigLikeT,
             # to_dict already does a shallow copy
             dicts = tuple([copy_dict(dct, copy_mode=copy_mode, nested=nested) for dct in dicts])
     x, y = dicts[0], dicts[1]
-    if x.__class__ is dict and y.__class__ is dict:
-        if len(x) == 0:
-            return y
-        if len(y) == 0:
-            return x
+    should_update = True
+    if x.__class__ is dict and y.__class__ is dict and len(x) == 0:
+        x = y
+        should_update = False
     if isinstance(x, atomic_dict) or isinstance(y, atomic_dict):
         x = y
-    else:
+        should_update = False
+    if should_update:
         update_dict(x, y, nested=nested, force=True, same_keys=same_keys)
     if len(dicts) > 2:
         return merge_dicts(

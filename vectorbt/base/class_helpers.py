@@ -8,61 +8,56 @@ import inspect
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
-from vectorbt.utils.config import merge_dicts
-
-
-def get_kwargs(func: tp.Callable) -> tp.Dict[str, tp.Any]:
-    """Get names and default values of keyword arguments from the signature of `func`."""
-    return {
-        k: v.default
-        for k, v in inspect.signature(func).parameters.items()
-        if v.default is not inspect.Parameter.empty
-    }
+from vectorbt.utils.config import merge_dicts, get_func_kwargs
+from vectorbt.base.array_wrapper import Wrapping
 
 
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
-NBFuncInfoT = tp.Union[tp.Tuple[tp.Callable, bool, tp.NameIndex], tp.Tuple[tp.Callable, bool]]
+NBFuncInfoT = tp.Tuple[str, tp.Callable, bool]
 
 
 def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[str] = None) -> WrapperFuncT:
     """Class decorator to wrap Numba functions methods of an accessor class.
 
-    `nb_funcs` should contain tuples of Numba functions, whether they are reducing, and optionally `index_or_name`.
+    `nb_funcs` should contain tuples each of:
 
-    Requires the instance to have attribute `wrapper` of type `vectorbt.base.array_wrapper.ArrayWrapper`."""
+    * target function name
+    * Numba function, and
+    * whether it's reducing.
+
+    Requires the instance to subclass `vectorbt.base.array_wrapper.Wrapping`."""
 
     def wrapper(cls: tp.Type[tp.T]) -> tp.Type[tp.T]:
+        checks.assert_subclass(cls, Wrapping)
+
         for info in nb_funcs:
             checks.assert_type(info, tuple)
 
             if len(info) == 3:
-                nb_func, is_reducing, name_or_index = info
-            elif len(info) == 2:
-                nb_func, is_reducing = info
-                name_or_index = None
+                fname, nb_func, is_reducing = info
             else:
-                raise ValueError("Each tuple should have either length 2 or 3")
+                raise ValueError("Each tuple should contain 3 elements")
 
             def nb_method(self,
                           *args,
+                          _fname: str = fname,
                           _nb_func: tp.Callable = nb_func,
                           _is_reducing: bool = is_reducing,
-                          _name_or_index: tp.NameIndex = name_or_index,
                           wrap_kwargs: tp.KwargsLike = None,
                           **kwargs) -> tp.SeriesFrame:
-                default_kwargs = get_kwargs(nb_func)
+                default_kwargs = get_func_kwargs(nb_func)
                 wrap_kwargs = merge_dicts({}, wrap_kwargs)
                 if '_1d' in _nb_func.__name__:
                     # One-dimensional array as input
                     a = _nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs})
                     if _is_reducing:
-                        return self.wrapper.wrap_reduced(a, name_or_index=_name_or_index, **wrap_kwargs)
+                        return self.wrapper.wrap_reduced(a, name_or_index=_fname, **wrap_kwargs)
                     return self.wrapper.wrap(a, **wrap_kwargs)
                 else:
                     # Two-dimensional array as input
                     a = _nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs})
                     if _is_reducing:
-                        return self.wrapper.wrap_reduced(a, name_or_index=_name_or_index, **wrap_kwargs)
+                        return self.wrapper.wrap_reduced(a, name_or_index=_fname, **wrap_kwargs)
                     return self.wrapper.wrap(a, **wrap_kwargs)
 
             # Replace the function's signature with the original one
@@ -74,7 +69,7 @@ def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[
                 nb_method.__doc__ = f"See `{module_name}.{nb_func.__name__}`"
             else:
                 nb_method.__doc__ = f"See `{nb_func.__name__}`"
-            setattr(cls, nb_func.__name__.replace('_1d', '').replace('_nb', ''), nb_method)
+            setattr(cls, fname, nb_method)
         return cls
 
     return wrapper

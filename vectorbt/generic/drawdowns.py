@@ -244,8 +244,8 @@ class Drawdowns(Records):
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        curr_end_val = self.active.end_value.nst(-1, group_by=group_by)
-        curr_start_val = self.active.start_value.nst(-1, group_by=group_by)
+        curr_end_val = self.active.end_value.nth(-1, group_by=group_by)
+        curr_start_val = self.active.start_value.nth(-1, group_by=group_by)
         curr_drawdown = (curr_end_val - curr_start_val) / curr_start_val
         wrap_kwargs = merge_dicts(dict(name_or_index='current_drawdown'), wrap_kwargs)
         return self.wrapper.wrap_reduced(curr_drawdown, group_by=group_by, **wrap_kwargs)
@@ -258,7 +258,7 @@ class Drawdowns(Records):
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
         kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='current_duration')), kwargs)
-        return self.active.duration.nst(-1, group_by=group_by, **kwargs)
+        return self.active.duration.nth(-1, group_by=group_by, **kwargs)
 
     @cached_method
     def current_return(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.MaybeSeries:
@@ -269,7 +269,7 @@ class Drawdowns(Records):
             raise ValueError("Grouping is not supported by this method")
         recovery_return = self.active.map(nb.dd_recovery_return_map_nb, self.ts.vbt.to_2d_array())
         kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='current_return')), kwargs)
-        return recovery_return.nst(-1, group_by=group_by, **kwargs)
+        return recovery_return.nth(-1, group_by=group_by, **kwargs)
 
     # ############# DrawdownStatus.Recovered ############# #
 

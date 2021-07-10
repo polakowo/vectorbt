@@ -99,14 +99,19 @@ class StatsBuilderMixin:
                     If any of these tags is in `tags`, keeps this metric.
                 * `check_{filter}` and `inv_check_{filter}`: Whether to check this metric against a
                     filter defined in `filters`. True (or False for inverse) means to keep this metric.
-                * `calc_func`: Calculation function for custom metrics. If the function can be accessed
-                    by traversing attributes of this object, you can specify the path to this function
-                    as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
+                * `calc_func`: Calculation function for custom metrics.
                     Should return either a scalar for one column/group, pd.Series for multiple columns/groups,
                     or a dict of such for multiple sub-metrics.
+                * `resolve_calc_func`: whether to resolve `calc_func`. If the function can be accessed
+                    by traversing attributes of this object, you can specify the path to this function
+                    as a string (see `vectorbt.utils.attr.deep_getattr` for the path format).
+                    If `calc_func` is a function, arguments from merged metric settings are matched with
+                    arguments in the signature (see below). If `resolve_calc_func` is False, `calc_func`
+                    should accept (resolved) self and dictionary of merged metric settings.
+                    Defaults to True.
                 * `post_calc_func`: Function to post-process the result of `calc_func`.
-                    Should accept (resolved) self, output of `calc_func`, and dictionary of keyword arguments
-                    passed to `calc_func`, and return whatever is acceptable to be returned by `calc_func`.
+                    Should accept (resolved) self, output of `calc_func`, and dictionary of merged metric settings,
+                    and return whatever is acceptable to be returned by `calc_func`.
                 * `pass_{arg}`: Whether to pass any optional argument (see below). Defaults to True if this argument
                     was found in the function's signature. Set to False to not pass.
                     If argument to be passed was not found, `pass_{arg}` is removed.
@@ -117,7 +122,7 @@ class StatsBuilderMixin:
                 * Any other keyword argument overrides optional arguments (see below)
                     or is passed directly to `calc_func`.
 
-                A calculation function may accept any keyword argument. It may "request" any of the
+                If `resolve_calc_func` is True, the calculation function may "request" any of the
                 following optional arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
                 * Each of `StatsBuilderMixin.self_aliases`: original object (ungrouped, with no column selected)
@@ -167,6 +172,7 @@ class StatsBuilderMixin:
                 * `warning_message`: Warning message to be shown when skipping a metric.
                     Can be a template that will be substituted using merged metric settings as mapping.
                     Defaults to None.
+                * `inv_warning_message`: Same as `warning_message` but for inverse checks.
 
                 Gets merged over `filters` from `StatsBuilderMixin.stats_defaults`.
             settings (dict): Global settings that override/extend optional arguments.
@@ -286,7 +292,7 @@ class StatsBuilderMixin:
 
             # Filter by tag
             if tags is not None:
-                in_tags = metric_settings.get('tags', None)
+                in_tags = merged_settings.get('tags', None)
                 if in_tags is None or not match_tags(tags, in_tags):
                     metrics_dct.pop(metric_name, None)
                     continue
@@ -311,6 +317,7 @@ class StatsBuilderMixin:
                 custom_reself = resolved_self_dct[metric_name]
                 filter_func = filter_settings['filter_func']
                 warning_message = filter_settings.get('warning_message', None)
+                inv_warning_message = filter_settings.get('inv_warning_message', None)
                 to_check = metric_settings.get('check_' + filter_name, False)
                 inv_to_check = metric_settings.get('inv_check_' + filter_name, False)
 
@@ -318,9 +325,12 @@ class StatsBuilderMixin:
                     whether_true = filter_func(custom_reself, metric_settings)
                     to_remove = (to_check and not whether_true) or (inv_to_check and whether_true)
                     if to_remove:
-                        if warning_message is not None and not silence_warnings:
+                        if to_check and warning_message is not None and not silence_warnings:
                             warning_message = deep_substitute(warning_message, mapping=metric_settings)
                             warnings.warn(warning_message)
+                        if inv_to_check and inv_warning_message is not None and not silence_warnings:
+                            inv_warning_message = deep_substitute(inv_warning_message, mapping=metric_settings)
+                            warnings.warn(inv_warning_message)
 
                         metrics_dct.pop(metric_name, None)
                         custom_arg_names_dct.pop(metric_name, None)
@@ -348,88 +358,93 @@ class StatsBuilderMixin:
                 _agg_func = final_kwargs.get('agg_func')
                 title = final_kwargs.pop('title', metric_name)
                 calc_func = final_kwargs.pop('calc_func')
+                resolve_calc_func = final_kwargs.pop('resolve_calc_func', True)
                 post_calc_func = final_kwargs.pop('post_calc_func', None)
                 use_caching = final_kwargs.pop('use_caching', True)
 
                 # Resolve calc_func
-                if not callable(calc_func):
-                    passed_kwargs_out = {}
+                if resolve_calc_func:
+                    if not callable(calc_func):
+                        passed_kwargs_out = {}
 
-                    def _getattr_func(obj: tp.Any,
-                                      attr: str,
-                                      args: tp.ArgsLike = None,
-                                      kwargs: tp.KwargsLike = None,
-                                      call_attr: bool = True,
-                                      _custom_arg_names: tp.Set[str] = custom_arg_names,
-                                      _arg_cache_dct: tp.Kwargs = arg_cache_dct,
-                                      _final_kwargs: tp.Kwargs = final_kwargs) -> tp.Any:
-                        if args is None:
-                            args = ()
-                        if kwargs is None:
-                            kwargs = {}
-                        if obj is custom_reself and _final_kwargs.pop('resolve_' + attr, True):
-                            if call_attr:
-                                return custom_reself.resolve_attr(
-                                    attr,
-                                    args=args,
-                                    cond_kwargs=_final_kwargs,
-                                    kwargs=kwargs,
-                                    custom_arg_names=_custom_arg_names,
-                                    cache_dct=_arg_cache_dct,
-                                    use_caching=use_caching,
-                                    passed_kwargs_out=passed_kwargs_out
-                                )
-                            return getattr(obj, attr)
-                        out = getattr(obj, attr)
-                        if callable(out) and call_attr:
-                            return out(*args, **kwargs)
-                        return out
+                        def _getattr_func(obj: tp.Any,
+                                          attr: str,
+                                          args: tp.ArgsLike = None,
+                                          kwargs: tp.KwargsLike = None,
+                                          call_attr: bool = True,
+                                          _custom_arg_names: tp.Set[str] = custom_arg_names,
+                                          _arg_cache_dct: tp.Kwargs = arg_cache_dct,
+                                          _final_kwargs: tp.Kwargs = final_kwargs) -> tp.Any:
+                            if args is None:
+                                args = ()
+                            if kwargs is None:
+                                kwargs = {}
+                            if obj is custom_reself and _final_kwargs.pop('resolve_' + attr, True):
+                                if call_attr:
+                                    return custom_reself.resolve_attr(
+                                        attr,
+                                        args=args,
+                                        cond_kwargs=_final_kwargs,
+                                        kwargs=kwargs,
+                                        custom_arg_names=_custom_arg_names,
+                                        cache_dct=_arg_cache_dct,
+                                        use_caching=use_caching,
+                                        passed_kwargs_out=passed_kwargs_out
+                                    )
+                                return getattr(obj, attr)
+                            out = getattr(obj, attr)
+                            if callable(out) and call_attr:
+                                return out(*args, **kwargs)
+                            return out
 
-                    calc_func = custom_reself.deep_getattr(
-                        calc_func,
-                        getattr_func=_getattr_func,
-                        call_last_attr=False
-                    )
+                        calc_func = custom_reself.deep_getattr(
+                            calc_func,
+                            getattr_func=_getattr_func,
+                            call_last_attr=False
+                        )
 
-                    if 'group_by' in passed_kwargs_out:
-                        if 'pass_group_by' not in final_kwargs:
-                            final_kwargs.pop('group_by', None)
-                if not callable(calc_func):
-                    raise TypeError("calc_func must be callable")
+                        if 'group_by' in passed_kwargs_out:
+                            if 'pass_group_by' not in final_kwargs:
+                                final_kwargs.pop('group_by', None)
+                    if not callable(calc_func):
+                        raise TypeError("calc_func must be callable")
 
-                # Resolve arguments
-                func_arg_names = get_func_arg_names(calc_func)
-                for k in func_arg_names:
-                    if k not in final_kwargs:
-                        if final_kwargs.pop('resolve_' + k, True):
-                            try:
-                                arg_out = custom_reself.resolve_attr(
-                                    k,
-                                    cond_kwargs=final_kwargs,
-                                    custom_arg_names=custom_arg_names,
-                                    cache_dct=arg_cache_dct,
-                                    use_caching=use_caching
-                                )
-                            except AttributeError:
-                                continue
-                            final_kwargs[k] = arg_out
-                for k in list(final_kwargs.keys()):
-                    if k in opt_arg_names:
-                        if 'pass_' + k in final_kwargs:
-                            if not final_kwargs.get('pass_' + k):  # first priority
+                    # Resolve arguments
+                    func_arg_names = get_func_arg_names(calc_func)
+                    for k in func_arg_names:
+                        if k not in final_kwargs:
+                            if final_kwargs.pop('resolve_' + k, True):
+                                try:
+                                    arg_out = custom_reself.resolve_attr(
+                                        k,
+                                        cond_kwargs=final_kwargs,
+                                        custom_arg_names=custom_arg_names,
+                                        cache_dct=arg_cache_dct,
+                                        use_caching=use_caching
+                                    )
+                                except AttributeError:
+                                    continue
+                                final_kwargs[k] = arg_out
+                    for k in list(final_kwargs.keys()):
+                        if k in opt_arg_names:
+                            if 'pass_' + k in final_kwargs:
+                                if not final_kwargs.get('pass_' + k):  # first priority
+                                    final_kwargs.pop(k, None)
+                            elif k not in func_arg_names:  # second priority
                                 final_kwargs.pop(k, None)
-                        elif k not in func_arg_names:  # second priority
-                            final_kwargs.pop(k, None)
-                for k in list(final_kwargs.keys()):
-                    if k.startswith('pass_'):
-                        final_kwargs.pop(k, None)  # cleanup
+                    for k in list(final_kwargs.keys()):
+                        if k.startswith('pass_'):
+                            final_kwargs.pop(k, None)  # cleanup
 
-                # Call calc_func
-                out = calc_func(**final_kwargs)
+                    # Call calc_func
+                    out = calc_func(**final_kwargs)
+                else:
+                    # Do not resolve calc_func
+                    out = calc_func(custom_reself, metric_settings)
 
                 # Call post_calc_func
                 if post_calc_func is not None:
-                    out = post_calc_func(custom_reself, out, final_kwargs)
+                    out = post_calc_func(custom_reself, out, metric_settings)
 
                 # Post-process and store the metric
                 if not isinstance(out, dict):
@@ -452,9 +467,13 @@ class StatsBuilderMixin:
                         elif _agg_func is not None and agg_func is not None:
                             v = _agg_func(v)
                         elif _agg_func is None and agg_func is not None:
-                            warnings.warn(f"Metric '{metric_name}' returned multiple values "
-                                          f"despite having no aggregation function", stacklevel=2)
+                            if not silence_warnings:
+                                warnings.warn(f"Metric '{metric_name}' returned multiple values "
+                                              f"despite having no aggregation function", stacklevel=2)
                             continue
+                    if t in stats_dct:
+                        if not silence_warnings:
+                            warnings.warn(f"Duplicate metric title '{t}'", stacklevel=2)
                     stats_dct[t] = v
             except Exception as e:
                 warnings.warn(f"Metric '{metric_name}' raised an exception", stacklevel=2)
@@ -466,7 +485,8 @@ class StatsBuilderMixin:
         if column is not None:
             return pd.Series(stats_dct, name=column)
         if agg_func is not None:
-            warnings.warn(f"Object has multiple columns. Aggregating using {agg_func}.", stacklevel=2)
+            if not silence_warnings:
+                warnings.warn(f"Object has multiple columns. Aggregating using {agg_func}.", stacklevel=2)
             return pd.Series(stats_dct, name='agg_func_' + agg_func.__name__)
         new_index = reself.wrapper.grouper.get_columns(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)

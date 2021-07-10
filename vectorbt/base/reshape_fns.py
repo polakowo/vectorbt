@@ -153,7 +153,7 @@ def broadcast_index(args: tp.Sequence[tp.AnyArray],
             * 'stack' - stack different indexes/columns using `vectorbt.base.index_fns.stack_indexes`
             * 'strict' - ensure that all pandas objects have the same index/columns
             * 'reset' - reset any index/columns (they become a simple range)
-            * integer - use the index/columns of the i-nth object in `args`
+            * integer - use the index/columns of the i-th object in `args`
             * everything else will be converted to `pd.Index`
 
         axis (int): Set to 0 for index and 1 for columns.
