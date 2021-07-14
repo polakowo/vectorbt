@@ -425,19 +425,29 @@ class ArrayWrapper(Configured, PandasIndexer):
                 try:
                     return freq_to_timedelta(self.index.freq)
                 except ValueError as e:
-                    warnings.warn(repr(e), stacklevel=2)
+                    if not array_wrapper_cfg['silence_warnings']:
+                        warnings.warn(repr(e), stacklevel=2)
             if self.index.inferred_freq is not None:
                 try:
                     return freq_to_timedelta(self.index.inferred_freq)
                 except ValueError as e:
-                    warnings.warn(repr(e), stacklevel=2)
+                    if not array_wrapper_cfg['silence_warnings']:
+                        warnings.warn(repr(e), stacklevel=2)
         return freq
 
-    def to_time_units(self, a: tp.MaybeArray[float]) -> tp.Union[pd.Timedelta, tp.Array]:
-        """Convert array to time units."""
+    def to_duration(self, a: tp.MaybeArray[float],
+                    silence_warnings: tp.Optional[bool] = None) -> tp.Union[pd.Timedelta, tp.Array]:
+        """Convert array to duration using `ArrayWrapper.freq`."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
         if self.freq is None:
-            warnings.warn("Couldn't parse the frequency of index. "
-                          "Pass it as `freq` or define it globally under `settings.array_wrapper`.", stacklevel=2)
+            if not silence_warnings:
+                warnings.warn("Couldn't parse the frequency of index. Pass it as `freq` or "
+                              "define it globally under `settings.array_wrapper`.", stacklevel=2)
             return a
         return a * self.freq
 
@@ -497,11 +507,18 @@ class ArrayWrapper(Configured, PandasIndexer):
              a: tp.ArrayLike,
              index: tp.Optional[tp.IndexLike] = None,
              columns: tp.Optional[tp.IndexLike] = None,
+             fillna: tp.Optional[tp.Scalar] = None,
              dtype: tp.Optional[tp.PandasDTypeLike] = None,
              group_by: tp.GroupByLike = None,
-             time_units: bool = False,
-             silence_warnings: bool = False) -> tp.SeriesFrame:
+             to_duration: bool = False,
+             silence_warnings: tp.Optional[bool] = None) -> tp.SeriesFrame:
         """Wrap a NumPy array using the stored metadata."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
         checks.assert_ndim(a, (1, 2))
         _self = self.resolve(group_by=group_by)
 
@@ -521,14 +538,16 @@ class ArrayWrapper(Configured, PandasIndexer):
             name = None
 
         arr = np.asarray(a)
+        if fillna is not None:
+            arr[np.isnan(arr)] = fillna
         if dtype is not None:
             try:
                 arr = arr.astype(dtype)
             except Exception as e:
                 if not silence_warnings:
                     warnings.warn(repr(e), stacklevel=2)
-        if time_units:
-            arr = _self.to_time_units(arr)
+        if to_duration:
+            arr = _self.to_duration(arr)
             dtype = None
         arr = reshape_fns.soft_to_ndim(arr, self.ndim)
         checks.assert_shape_equal(arr, index, axis=(0, 0))
@@ -546,17 +565,24 @@ class ArrayWrapper(Configured, PandasIndexer):
                      a: tp.ArrayLike,
                      name_or_index: tp.NameIndex = None,
                      columns: tp.Optional[tp.IndexLike] = None,
+                     fillna: tp.Optional[tp.Scalar] = None,
                      dtype: tp.Optional[tp.PandasDTypeLike] = None,
                      group_by: tp.GroupByLike = None,
-                     time_units: bool = False,
-                     silence_warnings: bool = False) -> tp.MaybeSeriesFrame:
+                     to_duration: bool = False,
+                     silence_warnings: tp.Optional[bool] = None) -> tp.MaybeSeriesFrame:
         """Wrap result of reduction.
 
         `name_or_index` can be the name of the resulting series if reducing to a scalar per column,
         or the index of the resulting series/dataframe if reducing to an array per column.
         `columns` can be set to override object's default columns.
 
-        If `time_units` is set, calls `to_time_units`."""
+        If `to_duration` is set, calls `ArrayWrapper.to_duration`."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
+
         checks.assert_not_none(self.ndim)
         _self = self.resolve(group_by=group_by)
 
@@ -566,25 +592,27 @@ class ArrayWrapper(Configured, PandasIndexer):
             columns = pd.Index(columns)
 
         arr = np.asarray(a)
+        if fillna is not None:
+            arr[np.isnan(arr)] = fillna
         if dtype is not None:
             try:
                 arr = arr.astype(dtype)
             except Exception as e:
                 if not silence_warnings:
                     warnings.warn(repr(e), stacklevel=2)
-        if time_units:
-            arr = _self.to_time_units(arr)
+        if to_duration:
+            arr = _self.to_duration(arr)
             dtype = None
         if arr.ndim == 0:
             # Scalar per Series/DataFrame
-            if time_units:
+            if to_duration:
                 return pd.to_timedelta(arr.item())
             return arr.item()
         if arr.ndim == 1:
             if _self.ndim == 1:
                 if arr.shape[0] == 1:
                     # Scalar per Series/DataFrame with one column
-                    if time_units:
+                    if to_duration:
                         return pd.to_timedelta(arr[0])
                     return arr[0]
                 # Array per Series
@@ -649,14 +677,19 @@ class Wrapping(Configured, PandasIndexer, AttrResolver):
                      cond_kwargs: tp.KwargsLike = None,
                      custom_arg_names: tp.Optional[tp.Set[str]] = None,
                      impacts_caching: bool = True,
-                     silence_warnings: bool = False) -> AttrResolverT:
+                     silence_warnings: tp.Optional[bool] = None) -> AttrResolverT:
         """Resolve self.
 
         Creates a copy of this instance if a different `freq` can be found in `cond_kwargs`."""
+        from vectorbt._settings import settings
+        array_wrapper_cfg = settings['array_wrapper']
+
         if cond_kwargs is None:
             cond_kwargs = {}
         if custom_arg_names is None:
             custom_arg_names = set()
+        if silence_warnings is None:
+            silence_warnings = array_wrapper_cfg['silence_warnings']
 
         if 'freq' in cond_kwargs:
             wrapper_copy = self.wrapper.copy(freq=cond_kwargs['freq'])

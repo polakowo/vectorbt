@@ -673,7 +673,7 @@ class Trades(Records):
                 if isinstance(self_col.wrapper.index, DatetimeIndexes):
                     duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
                 elif self_col.wrapper.freq is not None:
-                    duration = self_col.wrapper.to_time_units(to_idx - from_idx)
+                    duration = self_col.wrapper.to_duration(to_idx - from_idx)
                 else:
                     duration = to_idx - from_idx
                 return np.vectorize(str)(duration)

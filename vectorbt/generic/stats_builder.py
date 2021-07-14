@@ -4,17 +4,27 @@ import pandas as pd
 import numpy as np
 from collections import Counter
 import warnings
-import sys
+import inspect
+import string
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import Config, merge_dicts, get_func_arg_names
 from vectorbt.utils.template import deep_substitute
 from vectorbt.utils.tags import match_tags
+from vectorbt.utils.attr import get_dict_attr
 from vectorbt.base.array_wrapper import Wrapping
 
 
-class StatsBuilderMixin:
+class MetaStatsBuilderMixin(type):
+    """Meta class that exposes a read-only class property `StatsBuilderMixin.metrics`."""
+
+    @property
+    def metrics(cls) -> Config:
+        return cls._metrics
+
+
+class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
     """Mixin that implements `StatsBuilderMixin.stats`.
 
     Required to be a subclass of `vectorbt.base.array_wrapper.Wrapping`."""
@@ -23,12 +33,12 @@ class StatsBuilderMixin:
         checks.assert_type(self, Wrapping)
 
         # Copy writeable attrs
-        self.metrics = self.__class__.metrics.copy()
+        self._metrics = self.__class__._metrics.copy()
 
     @property
     def writeable_attrs(self) -> tp.Set[str]:
         """Set of writeable attributes that will be saved/copied along with the config."""
-        return {'metrics'}
+        return {'_metrics'}
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -43,7 +53,7 @@ class StatsBuilderMixin:
             dict(settings=dict(freq=self.wrapper.freq))
         )
 
-    metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = Config(
         dict(
             start=dict(
                 title='Start',
@@ -57,19 +67,28 @@ class StatsBuilderMixin:
             ),
             period=dict(
                 title='Period',
-                calc_func=lambda self:
-                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                calc_func=lambda self: len(self.wrapper.index),
+                auto_to_duration=True,
                 agg_func=None
             )
         ),
         copy_kwargs=dict(copy_mode='deep')
     )
-    """Metrics supported by `StatsBuilderMixin.stats`.
 
-    !!! note
-        It's safe to change this config - it's a (deep) copy of the class variable.
-        
-        But copying `StatsBuilderMixin` using `StatsBuilderMixin.copy` won't create a copy of the config."""
+    @property
+    def metrics(self) -> Config:
+        """Metrics supported by `StatsBuilderMixin.stats`.
+
+        ```json
+        ${metrics}
+        ```
+
+        Returns `StatsBuilderMixin._metrics`, which gets (deep) copied upon creation of each instance.
+        Thus, changing this config won't affect the class.
+
+        To change metrics, you can either change the config in-place, override `StatsBuilderMixin.metrics`,
+        or overwrite the instance variable `StatsBuilderMixin._metrics`."""
+        return self._metrics
 
     def stats(self,
               metrics: tp.Optional[tp.MaybeIterable[tp.Union[str, tp.Tuple[str, tp.Kwargs]]]] = None,
@@ -112,12 +131,17 @@ class StatsBuilderMixin:
                 * `post_calc_func`: Function to post-process the result of `calc_func`.
                     Should accept (resolved) self, output of `calc_func`, and dictionary of merged metric settings,
                     and return whatever is acceptable to be returned by `calc_func`.
+                * `auto_to_duration`: Whether to automatically convert the result to duration
+                    using `vectorbt.base.array_wrapper.ArrayWrapper.to_duration`. To disable this globally,
+                    pass `to_duration=False` in `settings`.
                 * `pass_{arg}`: Whether to pass any optional argument (see below). Defaults to True if this argument
                     was found in the function's signature. Set to False to not pass.
                     If argument to be passed was not found, `pass_{arg}` is removed.
                 * `resolve_{arg}`: Whether to resolve an argument that is meant to be an attribute of
                     this object (see `StatsBuilderMixin.resolve_attr`). Defaults to True if this argument
                     was found in the function's signature. Set to False to not resolve.
+                * `description`: Description of the metric. Usually, it's a reference to the calculation function.
+                    Defaults to None.
                 * `template_mapping`: Mapping to replace templates in metric settings. Used across all settings.
                 * Any other keyword argument overrides optional arguments (see below)
                     or is passed directly to `calc_func`.
@@ -154,7 +178,11 @@ class StatsBuilderMixin:
                 Should take `pd.Series` and return a const.
 
                 Has only effect if `column` was specified or this object contains only one column of data.
-                If `agg_func` has been overridden by a metric, it only takes effect if global `agg_func` is not None.
+
+                If `agg_func` has been overridden by a metric:
+
+                * it only takes effect if global `agg_func` is not None
+                * will raise a warning if it's None but the result of calculation has multiple values
             silence_warnings (bool): Whether to silence all warnings.
             template_mapping (mapping): Global mapping to replace templates.
 
@@ -199,6 +227,10 @@ class StatsBuilderMixin:
         !!! hint
             Make sure to resolve and then to re-use as many object attributes as possible to
             utilize built-in caching (even if global caching is disabled).
+
+        ## Example
+
+        See `vectorbt.portfolio.base` for examples.
         """
         # Resolve defaults
         if silence_warnings is None:
@@ -356,11 +388,13 @@ class StatsBuilderMixin:
                 _column = final_kwargs.get('column')
                 _group_by = final_kwargs.get('group_by')
                 _agg_func = final_kwargs.get('agg_func')
+                to_duration = final_kwargs.get('to_duration')
                 title = final_kwargs.pop('title', metric_name)
                 calc_func = final_kwargs.pop('calc_func')
                 resolve_calc_func = final_kwargs.pop('resolve_calc_func', True)
                 post_calc_func = final_kwargs.pop('post_calc_func', None)
                 use_caching = final_kwargs.pop('use_caching', True)
+                auto_to_duration = final_kwargs.pop('auto_to_duration', False)
 
                 # Resolve calc_func
                 if resolve_calc_func:
@@ -450,16 +484,25 @@ class StatsBuilderMixin:
                 if not isinstance(out, dict):
                     out = {None: out}
                 for k, v in out.items():
+                    # Resolve title
                     if k is None:
                         t = title
                     elif title is None:
                         t = str(k)
                     else:
                         t = title + ': ' + str(k)
+
+                    # Check result type
                     if checks.is_any_array(v) and not checks.is_series(v):
                         raise TypeError("calc_func must return either a scalar for one column/group, "
                                         "pd.Series for multiple columns/groups, or a dict of such. "
                                         f"Not {type(v)}.")
+
+                    # Handle auto_to_duration
+                    if auto_to_duration and to_duration:
+                        v = custom_reself.wrapper.to_duration(v, silence_warnings=silence_warnings)
+
+                    # Select column or aggregate
                     if checks.is_series(v):
                         if _column is not None:
                             v = custom_reself.select_one_from_obj(
@@ -471,6 +514,8 @@ class StatsBuilderMixin:
                                 warnings.warn(f"Metric '{metric_name}' returned multiple values "
                                               f"despite having no aggregation function", stacklevel=2)
                             continue
+
+                    # Store metric
                     if t in stats_dct:
                         if not silence_warnings:
                             warnings.warn(f"Duplicate metric title '{t}'", stacklevel=2)
@@ -491,3 +536,18 @@ class StatsBuilderMixin:
         new_index = reself.wrapper.grouper.get_columns(group_by=group_by)
         stats_df = pd.DataFrame(stats_dct, index=new_index)
         return stats_df
+
+    @classmethod
+    def override_metrics_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `metrics`."""
+        if source_cls is None:
+            source_cls = StatsBuilderMixin
+        __pdoc__[cls.__name__ + '.metrics'] = string.Template(
+            inspect.cleandoc(get_dict_attr(source_cls, 'metrics').__doc__)
+        ).substitute(
+            {'metrics': cls.metrics.to_doc()}
+        )
+
+
+__pdoc__ = dict()
+StatsBuilderMixin.override_metrics_doc(__pdoc__)

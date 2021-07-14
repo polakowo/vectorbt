@@ -66,7 +66,7 @@ def returns_nb(value: tp.Array2d, init_value: tp.Array1d) -> tp.Array2d:
 @njit(cache=True)
 def total_return_apply_nb(idxs: tp.Array1d, col: int, returns: tp.Array1d) -> float:
     """Calculate total return from returns."""
-    return generic_nb.product_1d_nb(returns + 1) - 1
+    return np.nanprod(returns + 1) - 1
 
 
 @njit(cache=True)
@@ -95,7 +95,7 @@ def cum_returns_nb(returns: tp.Array2d, start_value: float) -> tp.Array2d:
 @njit(cache=True)
 def cum_returns_final_1d_nb(returns: tp.Array1d, start_value: float = 0.) -> float:
     """See `empyrical.cum_returns_final`."""
-    out = generic_nb.product_1d_nb(returns + 1.)
+    out = np.nanprod(returns + 1.)
     if start_value == 0.:
         return out - 1.
     return out * start_value

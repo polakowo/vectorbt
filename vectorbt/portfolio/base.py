@@ -339,7 +339,7 @@ Name: sharpe_ratio, dtype: float64
 ## Stats
 
 !!! hint
-    For details on `Portfolio.stats`, see `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
 
 Let's simulate a portfolio with two columns:
 
@@ -833,7 +833,7 @@ The last option is to set `metrics` globally under `portfolio.stats` in `vectorb
 ## Plotting
 
 !!! hint
-    For details on `Portfolio.plot`, see `vectorbt.generic.plot_builder.PlotBuilderMixin.plot`.
+    See `vectorbt.generic.plot_builder.PlotBuilderMixin.plot`.
 
     The features implemented in this method are almost identical to `Portfolio.stats`.
     See also the examples under `Portfolio.stats`.
@@ -967,7 +967,6 @@ from vectorbt.portfolio.orders import Orders
 from vectorbt.portfolio.trades import Trades, Positions
 from vectorbt.portfolio.logs import Logs
 from vectorbt.portfolio.enums import *
-
 
 WrapperFuncT = tp.Callable[[tp.Type[tp.T]], tp.Type[tp.T]]
 PortfolioT = tp.TypeVar("PortfolioT", bound="Portfolio")
@@ -1701,7 +1700,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         if size is None:
             size = portfolio_cfg['size']
         if size_type is None:
-            size_type = portfolio_cfg['signal_size_type']
+            size_type = portfolio_cfg['size_type']
         size_type = cast_enum_value(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['signal_direction']
@@ -3418,7 +3417,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             portfolio_stats_cfg
         )
 
-    metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = Config(
         dict(
             start=dict(
                 title='Start',
@@ -3432,8 +3431,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             ),
             period=dict(
                 title='Period',
-                calc_func=lambda self:
-                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                calc_func=lambda self: len(self.wrapper.index),
+                auto_to_duration=True,
                 agg_func=None
             ),
             start_value=dict(
@@ -3449,19 +3448,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             total_return=dict(
                 title='Total Return [%]',
                 calc_func='total_return',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
             benchmark_return=dict(
                 title='Benchmark Return [%]',
                 calc_func='benchmark_rets.vbt.returns.total',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
             max_gross_exposure=dict(
                 title='Max Gross Exposure [%]',
                 calc_func='gross_exposure.vbt.max',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='portfolio'
             ),
             total_fees_paid=dict(
@@ -3471,13 +3470,14 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             ),
             max_dd=dict(
                 title='Max Drawdown [%]',
-                calc_func='drawdowns.max_drawdown',
-                post_calc_func=lambda self, out, kwargs: -out * 100,
+                calc_func='drawdowns.drawdown.min',
+                post_calc_func=lambda self, out, settings: -out * 100,
                 tags='drawdowns'
             ),
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
-                calc_func='drawdowns.max_duration',
+                calc_func='drawdowns.duration.max',
+                auto_to_duration=True,
                 tags=['drawdowns', 'duration']
             ),
             total_trades=dict(
@@ -3501,49 +3501,49 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             long_trade_rate=dict(
                 title=RepEval("'Long Positions [%]' if use_positions else 'Long Trades [%]'"),
                 calc_func='trades.long_rate',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='trades'
             ),
             win_rate=dict(
                 title='Win Rate [%]',
                 calc_func='trades.win_rate',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='trades'
             ),
             best_trade=dict(
                 title=RepEval("'Best Position [%]' if use_positions else 'Best Trade [%]'"),
                 calc_func='trades.returns.max',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='trades'
             ),
             worst_trade=dict(
                 title=RepEval("'Worst Position [%]' if use_positions else 'Worst Trade [%]'"),
                 calc_func='trades.returns.min',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='trades'
             ),
             avg_winning_trade=dict(
                 title=RepEval("'Avg Winning Position [%]' if use_positions else 'Avg Winning Trade [%]'"),
                 calc_func='trades.winning.returns.mean',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='trades'
             ),
             avg_winning_trade_duration=dict(
                 title=RepEval("'Avg Winning Position Duration' if use_positions else 'Avg Winning Trade Duration'"),
                 calc_func='trades.winning.duration.mean',
-                post_calc_func=lambda self, out, kwargs: self.wrapper.to_time_units(out),
+                auto_to_duration=True,
                 tags=['trades', 'duration']
             ),
             avg_losing_trade=dict(
                 title=RepEval("'Avg Losing Position [%]' if use_positions else 'Avg Losing Trade [%]'"),
                 calc_func='trades.losing.returns.mean',
-                post_calc_func=lambda self, out, kwargs: out * 100,
+                post_calc_func=lambda self, out, settings: out * 100,
                 tags='trades'
             ),
             avg_losing_trade_duration=dict(
                 title=RepEval("'Avg Losing Position Duration' if use_positions else 'Avg Losing Trade Duration'"),
                 calc_func='trades.losing.duration.mean',
-                post_calc_func=lambda self, out, kwargs: self.wrapper.to_time_units(out),
+                auto_to_duration=True,
                 tags=['trades', 'duration']
             ),
             profit_factor=dict(
@@ -3587,12 +3587,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         ),
         copy_kwargs=dict(copy_mode='deep')
     )
-    """Metrics supported by `Portfolio.stats`.
-    
-    !!! note
-        It's safe to change this config - it's a (deep) copy of the class variable.
-                
-        But copying `Portfolio` using `Portfolio.copy` won't create a copy of the config."""
+
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
 
     def returns_stats(self,
                       column: tp.Optional[tp.Label] = None,
@@ -4335,3 +4333,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         It's safe to change this config - it's a (deep) copy of the class variable.
                         
         But copying `Portfolio` using `Portfolio.copy` won't create a copy of the config."""
+
+
+__pdoc__ = dict()
+Portfolio.override_metrics_doc(__pdoc__)

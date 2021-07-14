@@ -933,8 +933,8 @@ class TestDecorators:
     def test_class_or_instancemethod(self):
         class G:
             @decorators.class_or_instancemethod
-            def g(self_or_cls):
-                if isinstance(self_or_cls, type):
+            def g(cls_or_self):
+                if isinstance(cls_or_self, type):
                     return True  # class
                 return False  # instance
 

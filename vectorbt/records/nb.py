@@ -327,7 +327,7 @@ def stack_expand_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_v
 
 @njit
 def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_val: float,
-                     reduce_func_nb: tp.ReduceFunc[float], *args) -> tp.Array1d:
+                     reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
     """Reduce mapped array by column to a single value.
 
     Faster than `expand_mapped_nb` and `vbt.*` used together, and also
@@ -351,7 +351,7 @@ def reduce_mapped_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_val: fl
 
 @njit
 def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr: tp.Array1d,
-                            default_val: float, reduce_func_nb: tp.ReduceFunc[int], *args) -> tp.Array1d:
+                            default_val: float, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array1d:
     """Reduce mapped array by column to an index.
 
     Same as `reduce_mapped_nb` except `idx_arr` should be passed.
@@ -375,7 +375,7 @@ def reduce_mapped_to_idx_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr:
 
 @njit
 def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, default_val: float,
-                              reduce_func_nb: tp.ReduceFunc[tp.Array1d], *args) -> tp.Array2d:
+                              reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array2d:
     """Reduce mapped array by column to an array.
 
     `reduce_func_nb` same as for `reduce_mapped_nb` but should return an array."""
@@ -404,7 +404,7 @@ def reduce_mapped_to_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, defaul
 
 @njit
 def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, idx_arr: tp.Array1d,
-                                  default_val: float, reduce_func_nb: tp.ReduceFunc[tp.Array1d], *args) -> tp.Array2d:
+                                  default_val: float, reduce_func_nb: tp.ReduceFunc, *args) -> tp.Array2d:
     """Reduce mapped array by column to an index array.
 
     Same as `reduce_mapped_to_array_nb` except `idx_arr` should be passed.

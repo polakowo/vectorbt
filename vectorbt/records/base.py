@@ -262,9 +262,7 @@ instance to the disk with `Records.save` and load it with `Records.load`.
 ## Stats
 
 !!! hint
-    For details on `Records.stats`, see `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
-
-    Also see `vectorbt.portfolio.base` for more examples.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
 
 ```python-repl
 >>> records.stats(column='a')
@@ -300,7 +298,6 @@ from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.records import nb
 from vectorbt.records.mapped_array import MappedArray
 from vectorbt.records.col_mapper import ColumnMapper
-
 
 RecordsT = tp.TypeVar("RecordsT", bound="Records")
 IndexingMetaT = tp.Tuple[ArrayWrapper, tp.RecordArray, tp.MaybeArray, tp.Array1d]
@@ -532,7 +529,7 @@ class Records(Wrapping, StatsBuilderMixin):
             records_stats_cfg
         )
 
-    metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = Config(
         dict(
             start=dict(
                 title='Start',
@@ -546,8 +543,8 @@ class Records(Wrapping, StatsBuilderMixin):
             ),
             period=dict(
                 title='Period',
-                calc_func=lambda self:
-                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                calc_func=lambda self: len(self.wrapper.index),
+                auto_to_duration=True,
                 agg_func=None
             ),
             total_records=dict(
@@ -557,9 +554,11 @@ class Records(Wrapping, StatsBuilderMixin):
         ),
         copy_kwargs=dict(copy_mode='deep')
     )
-    """Metrics supported by `Records.stats`.
 
-    !!! note
-        It's safe to change this config - it's a (deep) copy of the class variable.
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
 
-        But copying `Records` using `Records.copy` won't create a copy of the config."""
+
+__pdoc__ = dict()
+Records.override_metrics_doc(__pdoc__)

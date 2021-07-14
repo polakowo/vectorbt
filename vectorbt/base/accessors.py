@@ -147,11 +147,11 @@ class BaseAccessor(Wrapping):
         return self._obj
 
     @class_or_instancemethod
-    def is_series(self_or_cls) -> bool:
+    def is_series(cls_or_self) -> bool:
         raise NotImplementedError
 
     @class_or_instancemethod
-    def is_frame(self_or_cls) -> bool:
+    def is_frame(cls_or_self) -> bool:
         raise NotImplementedError
 
     # ############# Creation ############# #
@@ -360,12 +360,12 @@ class BaseAccessor(Wrapping):
             **merge_dicts(dict(index=other.index, columns=other.columns), wrap_kwargs))
 
     @class_or_instancemethod
-    def broadcast(self_or_cls, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
+    def broadcast(cls_or_self, *others: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
         """See `vectorbt.base.reshape_fns.broadcast`."""
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
-        if isinstance(self_or_cls, type):
+        if isinstance(cls_or_self, type):
             return reshape_fns.broadcast(*others, **kwargs)
-        return reshape_fns.broadcast(self_or_cls.obj, *others, **kwargs)
+        return reshape_fns.broadcast(cls_or_self.obj, *others, **kwargs)
 
     def broadcast_to(self, other: tp.Union[tp.ArrayLike, "BaseAccessor"], **kwargs) -> reshape_fns.BCRT:
         """See `vectorbt.base.reshape_fns.broadcast_to`."""
@@ -432,7 +432,7 @@ class BaseAccessor(Wrapping):
         return self.wrapper.wrap(result, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     @class_or_instancemethod
-    def concat(self_or_cls, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
+    def concat(cls_or_self, *others: tp.ArrayLike, broadcast_kwargs: tp.KwargsLike = None,
                keys: tp.Optional[tp.IndexLike] = None) -> tp.Frame:
         """Concatenate with `others` along columns.
 
@@ -457,10 +457,10 @@ class BaseAccessor(Wrapping):
         ```
         """
         others = tuple(map(lambda x: x.obj if isinstance(x, BaseAccessor) else x, others))
-        if isinstance(self_or_cls, type):
+        if isinstance(cls_or_self, type):
             objs = others
         else:
-            objs = (self_or_cls.obj,) + others
+            objs = (cls_or_self.obj,) + others
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
         broadcasted = reshape_fns.broadcast(*objs, **broadcast_kwargs)
@@ -720,11 +720,11 @@ class BaseSRAccessor(BaseAccessor):
         BaseAccessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
-    def is_series(self_or_cls) -> bool:
+    def is_series(cls_or_self) -> bool:
         return True
 
     @class_or_instancemethod
-    def is_frame(self_or_cls) -> bool:
+    def is_frame(cls_or_self) -> bool:
         return False
 
 
@@ -741,9 +741,9 @@ class BaseDFAccessor(BaseAccessor):
         BaseAccessor.__init__(self, obj, **kwargs)
 
     @class_or_instancemethod
-    def is_series(self_or_cls) -> bool:
+    def is_series(cls_or_self) -> bool:
         return False
 
     @class_or_instancemethod
-    def is_frame(self_or_cls) -> bool:
+    def is_frame(cls_or_self) -> bool:
         return True

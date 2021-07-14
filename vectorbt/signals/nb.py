@@ -8,9 +8,9 @@ These only accept NumPy arrays and other Numba-compatible types.
 >>> import numpy as np
 >>> import vectorbt as vbt
 
->>> # vectorbt.signals.nb.rank_1d_nb
->>> vbt.signals.nb.rank_1d_nb(np.array([False, True, True, True, False]))
-array([0, 1, 2, 3, 0])
+>>> # vectorbt.signals.nb.pos_rank_nb
+>>> vbt.signals.nb.pos_rank_nb(np.array([False, True, True, True, False])[:, None])[:, 0]
+[-1  0  1  2 -1]
 ```
 
 !!! note
@@ -26,16 +26,17 @@ from numba import njit
 import numpy as np
 
 from vectorbt import _typing as tp
-from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb
+from vectorbt.utils.array import uniform_summing_to_one_nb, rescale_float_to_int_nb, renormalize_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.signals.enums import StopType
+from vectorbt.records import nb as records_nb
 
 
 # ############# Generation ############# #
 
 
 @njit
-def generate_nb(shape: tp.Shape, choice_func_nb: tp.SignalChoiceFunc, *args) -> tp.Array2d:
+def generate_nb(shape: tp.Shape, choice_func_nb: tp.ChoiceFunc, *args) -> tp.Array2d:
     """Create a boolean matrix of `shape` and pick signals using `choice_func_nb`.
 
     `choice_func_nb` should accept index of the start of the range `from_i`,
@@ -70,7 +71,7 @@ def generate_nb(shape: tp.Shape, choice_func_nb: tp.SignalChoiceFunc, *args) -> 
 
 
 @njit
-def generate_ex_nb(entries: tp.Array2d, wait: int, exit_choice_func_nb: tp.SignalChoiceFunc, *args) -> tp.Array2d:
+def generate_ex_nb(entries: tp.Array2d, wait: int, exit_choice_func_nb: tp.ChoiceFunc, *args) -> tp.Array2d:
     """Pick exit signals using `exit_choice_func_nb` after each signal in `entries`.
 
     Set `wait` to a number of ticks to wait before placing exits.
@@ -103,9 +104,9 @@ def generate_ex_nb(entries: tp.Array2d, wait: int, exit_choice_func_nb: tp.Signa
 def generate_enex_nb(shape: tp.Shape,
                      entry_wait: int,
                      exit_wait: int,
-                     entry_choice_func_nb: tp.SignalChoiceFunc,
+                     entry_choice_func_nb: tp.ChoiceFunc,
                      entry_args: tp.Args,
-                     exit_choice_func_nb: tp.SignalChoiceFunc,
+                     exit_choice_func_nb: tp.ChoiceFunc,
                      exit_args: tp.Args) -> tp.Tuple[tp.Array2d, tp.Array2d]:
     """Pick entry signals using `entry_choice_func_nb` and exit signals using 
     `exit_choice_func_nb` iteratively.
@@ -803,109 +804,87 @@ def generate_ohlc_stop_ex_iter_nb(entries: tp.Array2d,
     )
 
 
-# ############# Map and reduce ############# #
+# ############# Map and reduce ranges ############# #
 
 
-@njit
-def map_reduce_between_nb(a: tp.Array2d,
-                          map_func_nb: tp.SignalMapFunc,
-                          map_args: tp.Args,
-                          reduce_func_nb: tp.SignalReduceFunc,
-                          reduce_args: tp.Args) -> tp.Array1d:
-    """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive
-    pair of signals in `a`.
+@njit(cache=True)
+def map_meta_between_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
+    """Map meta of each range between two signals in `a`.
 
-    Applies `map_func_nb` on each range `[from_i, to_i)`. Must accept index of the start of the
-    range `from_i`, index of the end of the range `to_i`, index of the column `col`, and `*map_args`.
-
-    Applies `reduce_func_nb` on all mapper results in a column. Must accept index of the column,
-    the array of results from `map_func_nb` for that column, and `*reduce_args`.
-
-    ## Example
-
-    ```python-repl
-    >>> import numpy as np
-    >>> from numba import njit
-    >>> from vectorbt.signals.nb import map_reduce_between_nb
-
-    >>> @njit
-    ... def map_func_nb(from_i, to_i, col):
-    ...     return to_i - from_i
-    >>> @njit
-    ... def reduce_func_nb(col, map_res):
-    ...     return np.nanmean(map_res)
-    >>> a = np.asarray([False, True, True, False, True])[:, None]
-
-    >>> map_reduce_between_nb(a, map_func_nb, (), reduce_func_nb, ())
-    array([1.5])
-    ```
-    """
-    out = np.full((a.shape[1],), np.nan, dtype=np.float_)
+    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
+    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    k = 0
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
         if a_idxs.shape[0] > 1:
-            map_res = np.empty(a_idxs.shape[0])
-            k = 0
             for j in range(1, a_idxs.shape[0]):
                 from_i = a_idxs[j - 1]
                 to_i = a_idxs[j]
-                map_res[k] = map_func_nb(from_i, to_i, col, *map_args)
+                from_idxs_out[k] = from_i
+                to_idxs_out[k] = to_i
+                cols_out[k] = col
                 k += 1
-            if k > 0:
-                out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
-    return out
+    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
 
 
-@njit
-def map_reduce_between_two_nb(a: tp.Array2d,
-                              b: tp.Array2d,
-                              map_func_nb: tp.SignalMapFunc,
-                              map_args: tp.Args,
-                              reduce_func_nb: tp.SignalReduceFunc,
-                              reduce_args: tp.Args) -> tp.Array1d:
-    """Map using `map_func_nb` and reduce using `reduce_func_nb` each consecutive
-    pair of signals between `a` and `b`.
+@njit(cache=True)
+def map_meta_between_two_nb(a: tp.Array2d, b: tp.Array2d, from_other: bool = False) -> tp.RangeMapMetaOutput:
+    """Map meta of each range between two signals in `a` and `b`.
 
-    Iterates over `b`, and for each found signal, looks for the preceding signal in `a`.
+    If `from_other` is False, returns ranges from each in `a` to the succeeding in `b`.
+    Otherwise, returns ranges from each in `b` to the preceding in `a`.
 
-    `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
-    out = np.full((a.shape[1],), np.nan, dtype=np.float_)
+    When `a` and `b` overlap (two signals at the same time), the distance between overlapping
+    signals is still considered and `from_i` would match `to_i`.
+
+    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
+    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    k = 0
 
     for col in range(a.shape[1]):
         a_idxs = np.flatnonzero(a[:, col])
         if a_idxs.shape[0] > 0:
             b_idxs = np.flatnonzero(b[:, col])
             if b_idxs.shape[0] > 0:
-                map_res = np.empty(b_idxs.shape)
-                k = 0
-                for j, to_i in enumerate(b_idxs):
-                    valid_a_idxs = a_idxs[a_idxs < to_i]
-                    if len(valid_a_idxs) > 0:
-                        from_i = valid_a_idxs[-1]  # preceding in a
-                        map_res[k] = map_func_nb(from_i, to_i, col, *map_args)
-                        k += 1
-                if k > 0:
-                    out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
-    return out
+                if from_other:
+                    for j, to_i in enumerate(b_idxs):
+                        valid_a_idxs = a_idxs[a_idxs <= to_i]
+                        if len(valid_a_idxs) > 0:
+                            from_i = valid_a_idxs[-1]  # preceding in a
+                            from_idxs_out[k] = from_i
+                            to_idxs_out[k] = to_i
+                            cols_out[k] = col
+                            k += 1
+                else:
+                    for j, from_i in enumerate(a_idxs):
+                        valid_b_idxs = b_idxs[b_idxs >= from_i]
+                        if len(valid_b_idxs) > 0:
+                            to_i = valid_b_idxs[0]  # succeeding in b
+                            from_idxs_out[k] = from_i
+                            to_idxs_out[k] = to_i
+                            cols_out[k] = col
+                            k += 1
+    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
 
 
-@njit
-def map_reduce_partitions_nb(a: tp.Array2d,
-                             map_func_nb: tp.SignalMapFunc,
-                             map_args: tp.Args,
-                             reduce_func_nb: tp.SignalReduceFunc,
-                             reduce_args: tp.Args) -> tp.Array1d:
-    """Map using `map_func_nb` and reduce using `reduce_func_nb` each partition of signals in `a`.
+@njit(cache=True)
+def map_meta_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
+    """Map meta of each partition of signals in `a`.
 
-    `map_func_nb` and `reduce_func_nb` are same as for `map_reduce_between_nb`."""
-    out = np.full((a.shape[1],), np.nan, dtype=np.float_)
+    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
+    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    k = 0
 
     for col in range(a.shape[1]):
         is_partition = False
         from_i = -1
-        map_res = np.empty(a.shape[0])
-        k = 0
         for i in range(a.shape[0]):
             if a[i, col]:
                 if not is_partition:
@@ -913,185 +892,224 @@ def map_reduce_partitions_nb(a: tp.Array2d,
                 is_partition = True
             elif is_partition:
                 to_i = i
-                map_res[k] = map_func_nb(from_i, to_i, col, *map_args)
+                from_idxs_out[k] = from_i
+                to_idxs_out[k] = to_i
+                cols_out[k] = col
                 k += 1
                 is_partition = False
             if i == a.shape[0] - 1:
                 if is_partition:
                     to_i = a.shape[0]
-                    map_res[k] = map_func_nb(from_i, to_i, col, *map_args)
+                    from_idxs_out[k] = from_i
+                    to_idxs_out[k] = to_i
+                    cols_out[k] = col
                     k += 1
-        if k > 0:
-            out[col] = reduce_func_nb(col, map_res[:k], *reduce_args)
+    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+
+
+@njit(cache=True)
+def map_meta_between_partitions_nb(a: tp.Array2d) -> tp.RangeMapMetaOutput:
+    """Map meta of each range between two partitions in `a`.
+
+    Returns three arrays: start indices (first signal), end indices (second signal), and columns."""
+    from_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    to_idxs_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    cols_out = np.empty(a.shape[0] * a.shape[1], dtype=np.int_)
+    k = 0
+
+    for col in range(a.shape[1]):
+        is_partition = False
+        from_i = -1
+        for i in range(a.shape[0]):
+            if a[i, col]:
+                if not is_partition and from_i != -1:
+                    to_i = i
+                    from_idxs_out[k] = from_i
+                    to_idxs_out[k] = to_i
+                    cols_out[k] = col
+                    k += 1
+                is_partition = True
+                from_i = i
+            else:
+                is_partition = False
+    return from_idxs_out[:k], to_idxs_out[:k], cols_out[:k]
+
+
+@njit
+def range_map_meta_nb(from_idxs: tp.Array1d,
+                      to_idxs: tp.Array1d,
+                      cols: tp.Array2d,
+                      n_cols: int,
+                      range_map_func_nb: tp.RangeMapFunc,
+                      *args) -> tp.Array1d:
+    """Map meta of each range using `range_map_func_nb`.
+
+    Applies `range_map_func_nb` on each range `[from_i, to_i)`. Should accept index of the start of the
+    range `from_i`, index of the end of the range `to_i`, index of the column `col`, and `*range_map_args`.
+    """
+    out = np.full(cols.shape[0], np.nan, dtype=np.float_)
+    col_range = records_nb.col_range_nb(cols, n_cols)
+
+    for col in range(n_cols):
+        from_k = col_range[col, 0]
+        to_k = col_range[col, 1]
+        if from_k != -1 and to_k != -1:
+            for k in range(from_k, to_k):
+                out[k] = range_map_func_nb(from_idxs[k], to_idxs[k], col, *args)
+    return out
+
+
+@njit
+def range_map_reduce_meta_nb(from_idxs: tp.Array1d,
+                             to_idxs: tp.Array1d,
+                             cols: tp.Array2d,
+                             n_cols: int,
+                             range_map_func_nb: tp.RangeMapFunc,
+                             range_map_args: tp.Args,
+                             reduce_func_nb: tp.ReduceFunc,
+                             reduce_args: tp.Args) -> tp.Array1d:
+    """Map meta of each range range_map_func_nb` and reduce per column using `reduce_func_nb`.
+
+    `range_map_func_nb` is same as for `map_meta`.
+
+    Applies `reduce_func_nb` on all mapper results in a column. Should accept index of the column,
+    the array of results from `range_map_func_nb` for that column, and `*reduce_args`.
+    """
+    out = np.full(n_cols, np.nan, dtype=np.float_)
+    map_res = np.empty(cols.shape[0], dtype=np.float_)
+    col_range = records_nb.col_range_nb(cols, n_cols)
+
+    for col in range(n_cols):
+        from_k = col_range[col, 0]
+        to_k = col_range[col, 1]
+        if from_k != -1 and to_k != -1:
+            for k in range(from_k, to_k):
+                map_res[k] = range_map_func_nb(from_idxs[k], to_idxs[k], col, *range_map_args)
+            out[col] = reduce_func_nb(col, map_res[from_k:to_k], *reduce_args)
     return out
 
 
 @njit(cache=True)
-def distance_map_nb(from_i: int, to_i: int, col: int) -> int:
-    """Distance mapper."""
+def range_len_map_nb(from_i: int, to_i: int, col: int) -> int:
+    """Range length mapper."""
     return to_i - from_i
 
 
 @njit(cache=True)
-def mean_reduce_nb(col: int, a: tp.Array1d) -> float:
-    """Average reducer."""
-    return np.nanmean(a)
+def range_count_map_nb(from_i: int, to_i: int, col: int) -> int:
+    """Range count mapper."""
+    return 1
 
 
 # ############# Ranking ############# #
 
-
-@njit(cache=True)
-def rank_1d_nb(a: tp.Array1d,
-               reset_by: tp.Optional[tp.Array1d] = None,
-               after_false: bool = False,
-               allow_gaps: bool = False) -> tp.Array1d:
-    """Rank signals in each partition.
-
-    Partition is some number of signals in a row. You can reset partitions by signals from
-    `reset_by` (should have the same shape). If `after_false` is True, the first partition should
-    come after at least one False value. If `allow_gaps` is True, ignores gaps between partitions.
-
-    ## Example
-
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbt.signals.nb import rank_1d_nb
-
-    >>> signals = np.asarray([True, True, False, True, True])
-    >>> reset_by = np.asarray([False, True, False, False, True])
-
-    >>> rank_1d_nb(signals)
-    [1 2 0 1 2]
-
-    >>> rank_1d_nb(signals, after_false=True)
-    [0 0 0 1 2]
-
-    >>> rank_1d_nb(signals, allow_gaps=True)
-    [1 2 0 3 4]
-
-    >>> rank_1d_nb(signals, allow_gaps=True, reset_by=reset_by)
-    [1 1 0 2 1]
-    ```
-    """
-    out = np.zeros(a.shape, dtype=np.int_)
-
-    false_seen = not after_false
-    inc = 0
-    for i in range(a.shape[0]):
-        if reset_by is not None:
-            if reset_by[i]:
-                # Signal in b_ref resets rank
-                false_seen = not after_false
-                inc = 0
-        if a[i]:
-            if false_seen:
-                inc += 1
-                out[i] = inc
-        else:
-            false_seen = True
-            if not allow_gaps:
-                inc = 0
-    return out
-
-
-@njit(cache=True)
+@njit
 def rank_nb(a: tp.Array2d,
-            reset_by: tp.Optional[tp.Array2d] = None,
-            after_false: bool = False,
-            allow_gaps: bool = False) -> tp.Array2d:
-    """2-dim version of `rank_1d_nb`."""
-    out = np.zeros(a.shape, dtype=np.int_)
+            reset_by: tp.Optional[tp.Array1d],
+            after_false: bool,
+            rank_func_nb: tp.RankFunc, *args) -> tp.Array2d:
+    """Rank each signal using `rank_func_nb`.
+
+    Applies `rank_func_nb` on each True value. Should accept index of the row, 
+    index of the column, index of the last reset signal, index of the end of the previous partition,
+    index of the start of the current partition, and `*args`. Should return -1 for no rank, otherwise 0 or greater.
+
+    Setting `after_false` to True will disregard the first partition of True values
+    if there is no False value before them."""
+    out = np.full(a.shape, -1, dtype=np.int_)
 
     for col in range(a.shape[1]):
-        out[:, col] = rank_1d_nb(
-            a[:, col],
-            None if reset_by is None else reset_by[:, col],
-            after_false=after_false,
-            allow_gaps=allow_gaps
-        )
+        reset_i = 0
+        prev_part_end_i = -1
+        part_start_i = -1
+        in_partition = False
+        false_seen = not after_false
+        for i in range(a.shape[0]):
+            if reset_by is not None:
+                if reset_by[i, col]:
+                    reset_i = i
+            if a[i, col] and not (after_false and not false_seen):
+                if not in_partition:
+                    part_start_i = i
+                in_partition = True
+                out[i, col] = rank_func_nb(i, col, reset_i, prev_part_end_i, part_start_i, *args)
+            elif not a[i, col]:
+                if in_partition:
+                    prev_part_end_i = i - 1
+                in_partition = False
+                false_seen = True
     return out
 
 
 @njit(cache=True)
-def rank_partitions_1d_nb(a: tp.Array1d,
-                          reset_by: tp.Optional[tp.Array1d] = None,
-                          after_false: bool = False) -> tp.Array1d:
-    """Rank partitions of signals.
-
-    For keyword arguments, see `rank_nb`.
-
-    ## Example
-
-    ```python-repl
-    >>> import numpy as np
-    >>> from vectorbt.signals.nb import rank_partitions_1d_nb
-
-    >>> signals = np.asarray([True, True, False, True, True])
-    >>> reset_by = np.asarray([False, True, False, False, True])
-
-    >>> rank_partitions_1d_nb(signals)
-    [1 1 0 2 2]
-
-    >>> rank_partitions_1d_nb(signals, after_false=True)
-    [0 0 0 1 1]
-
-    >>> rank_partitions_1d_nb(signals, reset_by=reset_by)
-    [1 1 0 2 1]
-    ```
-    """
-    out = np.zeros(a.shape, dtype=np.int_)
-
-    false_seen = not after_false
-    first_seen = False
-    inc = 0
-    for i in range(a.shape[0]):
-        if reset_by is not None:
-            if reset_by[i]:
-                # Signal in b_ref resets rank
-                false_seen = not after_false
-                first_seen = False
-                inc = 0
-        if a[i]:
-            if false_seen:
-                if not first_seen:
-                    inc += 1
-                    first_seen = True
-                out[i] = inc
-        else:
-            false_seen = True
-            first_seen = False
-    return out
+def sig_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int,
+                    sig_pos_temp: tp.Array1d, allow_gaps: bool) -> int:
+    """`rank_func_nb` that returns the rank of each signal by its position in the partition."""
+    if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
+        sig_pos_temp[col] = -1
+    elif not allow_gaps and part_start_i == i:
+        sig_pos_temp[col] = -1
+    sig_pos_temp[col] += 1
+    return sig_pos_temp[col]
 
 
 @njit(cache=True)
-def rank_partitions_nb(a: tp.Array2d,
-                       reset_by: tp.Optional[tp.Array2d] = None,
-                       after_false: bool = False) -> tp.Array2d:
-    """2-dim version of `rank_partitions_1d_nb`."""
-    out = np.zeros(a.shape, dtype=np.int_)
+def part_pos_rank_nb(i: int, col: int, reset_i: int, prev_part_end_i: int, part_start_i: int,
+                     part_pos_temp: tp.Array1d) -> int:
+    """`rank_func_nb` that returns the rank of each partition by its position in the series."""
+    if reset_i > prev_part_end_i and max(reset_i, part_start_i) == i:
+        part_pos_temp[col] = 0
+    elif part_start_i == i:
+        part_pos_temp[col] += 1
+    return part_pos_temp[col]
 
+
+# ############# Index ############# #
+
+
+@njit(cache=True)
+def nth_index_1d_nb(a: tp.Array1d, n: int) -> int:
+    """Get the index of the n-th True value.
+
+    !!! note
+        `n` starts with 0 and can be negative."""
+    if n >= 0:
+        found = -1
+        for i in range(a.shape[0]):
+            if a[i]:
+                found += 1
+                if found == n:
+                    return i
+    else:
+        found = 0
+        for i in range(a.shape[0] - 1, -1, -1):
+            if a[i]:
+                found -= 1
+                if found == n:
+                    return i
+    return -1
+
+
+@njit(cache=True)
+def nth_index_nb(a: tp.Array2d, n: int) -> tp.Array1d:
+    """2-dim version of `nth_index_1d_nb`."""
+    out = np.empty(a.shape[1], dtype=np.int_)
     for col in range(a.shape[1]):
-        out[:, col] = rank_partitions_1d_nb(
-            a[:, col],
-            None if reset_by is None else reset_by[:, col],
-            after_false=after_false
-        )
-    return out
-
-
-# ############# Boolean operations ############# #
-
-@njit(cache=True)
-def fshift_1d_nb(a: tp.Array1d, n: int) -> tp.Array1d:
-    """Shift forward `a` by `n` positions."""
-    out = np.empty_like(a, dtype=np.bool_)
-    out[:n] = False
-    out[n:] = a[:-n]
+        out[col] = nth_index_1d_nb(a[:, col], n)
     return out
 
 
 @njit(cache=True)
-def fshift_nb(a: tp.Array2d, n: int) -> tp.Array2d:
-    """2-dim version of `fshift_1d_nb`."""
-    return fshift_1d_nb(a, n)
+def norm_avg_index_1d_nb(a: tp.Array1d) -> float:
+    """Get mean index normalized to (-1, 1)."""
+    mean_index = np.mean(np.flatnonzero(a))
+    return renormalize_nb(mean_index, (0, len(a) - 1), (-1, 1))
+
+
+@njit(cache=True)
+def norm_avg_index_nb(a: tp.Array2d) -> tp.Array1d:
+    """2-dim version of `norm_avg_index_1d_nb`."""
+    out = np.empty(a.shape[1], dtype=np.float_)
+    for col in range(a.shape[1]):
+        out[col] = norm_avg_index_1d_nb(a[:, col])
+    return out

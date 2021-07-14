@@ -12,7 +12,7 @@ class class_or_instancemethod(classmethod):
     """Function decorator that binds `self` to a class if the function is called as class method,
     otherwise to an instance."""
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         descr_get = super().__get__ if instance is None else self.__func__.__get__
         return descr_get(instance, owner)
 
@@ -24,8 +24,28 @@ class classproperty(object):
         self.func = func
         self.__doc__ = getattr(func, '__doc__')
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         return self.func(owner)
+
+    def __set__(self, instance: object, value: tp.Any) -> None:
+        raise AttributeError("can't set attribute")
+
+
+class class_or_instanceproperty(object):
+    """Property that binds `self` to a class if the function is called as class method,
+    otherwise to an instance."""
+
+    def __init__(self, func: tp.Callable) -> None:
+        self.func = func
+        self.__doc__ = getattr(func, '__doc__')
+
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+        if instance is None:
+            return self.func(owner)
+        return self.func(instance)
+
+    def __set__(self, instance: object, value: tp.Any) -> None:
+        raise AttributeError("can't set attribute")
 
 
 custom_propertyT = tp.TypeVar("custom_propertyT", bound="custom_property")
@@ -63,12 +83,12 @@ class custom_property:
         self.flags = flags
         self.__doc__ = getattr(func, '__doc__')
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
             return self
         return self.func(instance)
 
-    def __set__(self, instance: tp.Any, value: tp.Any) -> None:
+    def __set__(self, instance: object, value: tp.Any) -> None:
         raise AttributeError("can't set attribute")
 
     def __call__(self, *args, **kwargs) -> tp.Any:
@@ -97,7 +117,7 @@ class CacheCondition(tp.NamedTuple):
     """Rank to override the default rank."""
 
 
-def should_cache(func_name: str, instance: tp.Any, func: tp.Optional[tp.Callable] = None, **flags) -> bool:
+def should_cache(func_name: str, instance: object, func: tp.Optional[tp.Callable] = None, **flags) -> bool:
     """Check whether to cache the method/property based on a range of conditions defined under
     `caching` in `vectorbt._settings.settings`.
 
@@ -284,7 +304,7 @@ class cached_property(custom_property):
         super().__init__(func, **flags)
         self.lock = RLock()
 
-    def clear_cache(self, instance: tp.Any) -> None:
+    def clear_cache(self, instance: object) -> None:
         """Clear the cache for this property belonging to `instance`."""
         if hasattr(instance, self.attrname):
             delattr(instance, self.attrname)
@@ -297,7 +317,7 @@ class cached_property(custom_property):
     def __set_name__(self, owner: tp.Type, name: str) -> None:
         self.name = name
 
-    def __get__(self, instance: tp.Any, owner: tp.Optional[tp.Type] = None) -> tp.Any:
+    def __get__(self, instance: object, owner: tp.Optional[tp.Type] = None) -> tp.Any:
         if instance is None:
             return self
         if not should_cache(self.name, instance, func=self.func, **self.flags):
@@ -382,7 +402,7 @@ def cached_method(*args, maxsize: int = 128, typed: bool = False,
 
     def decorator(func: tp.Callable) -> cached_methodT:
         @wraps(func)
-        def wrapper(instance: tp.Any, *args, **kwargs) -> tp.Any:
+        def wrapper(instance: object, *args, **kwargs) -> tp.Any:
             def partial_func(*args, **kwargs) -> tp.Any:
                 # Ignores non-hashable instances
                 return func(instance, *args, **kwargs)

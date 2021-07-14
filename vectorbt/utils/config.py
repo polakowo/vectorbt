@@ -7,6 +7,7 @@ import inspect
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
+from vectorbt.utils.docs import Documented, to_doc
 
 
 def resolve_dict(dct: tp.DictLikeSequence, i: tp.Optional[int] = None) -> dict:
@@ -262,7 +263,7 @@ class PickleableDict(Pickleable, dict):
 ConfigT = tp.TypeVar("ConfigT", bound="Config")
 
 
-class Config(PickleableDict):
+class Config(PickleableDict, Documented):
     """Extends dict with config features such as nested updates, frozen keys/values, and pickling.
 
     Args:
@@ -671,6 +672,22 @@ class Config(PickleableDict):
     def __eq__(self, other: tp.Any) -> bool:
         return checks.is_deep_equal(dict(self), dict(other))
 
+    def to_doc(self, with_params: bool = False, **kwargs) -> str:
+        """Convert to a doc."""
+        doc = self.__class__.__name__ + "(" + to_doc(dict(self), **kwargs) + ")"
+        if with_params:
+            doc += " with params " + to_doc(dict(
+                copy_kwargs=self.copy_kwargs_,
+                reset_dct=self.reset_dct_,
+                reset_dct_copy_kwargs=self.reset_dct_copy_kwargs_,
+                frozen_keys=self.frozen_keys_,
+                readonly=self.readonly_,
+                nested=self.nested_,
+                convert_dicts=self.convert_dicts_,
+                as_attrs=self.as_attrs_
+            ), **kwargs)
+        return doc
+
 
 class AtomicConfig(Config, atomic_dict):
     """Config that behaves like a single value when merging."""
@@ -680,7 +697,7 @@ class AtomicConfig(Config, atomic_dict):
 ConfiguredT = tp.TypeVar("ConfiguredT", bound="Configured")
 
 
-class Configured(Pickleable):
+class Configured(Pickleable, Documented):
     """Class with an initialization config.
 
     All subclasses of `Configured` are initialized using `Config`, which makes it easier to pickle.
@@ -714,6 +731,7 @@ class Configured(Pickleable):
         }
 
     def copy(self: ConfiguredT,
+             copy_mode: tp.Optional[str] = 'shallow',
              nested: tp.Optional[bool] = None,
              _class: tp.Optional[type] = None,
              **new_config) -> ConfiguredT:
@@ -721,12 +739,24 @@ class Configured(Pickleable):
 
         !!! warning
             This "copy" operation won't return a copy of the instance but a new instance
-            initialized with the same config and writeable attributes."""
+            initialized with the same config and writeable attributes (or their copy, depending on `copy_mode`)."""
         if _class is None:
             _class = self.__class__
-        new_instance = _class(**self.config.merge_with(new_config, nested=nested))
+        new_instance = _class(**self.config.merge_with(new_config, copy_mode=copy_mode, nested=nested))
         for attr in self.writeable_attrs:
-            setattr(new_instance, attr, getattr(self, attr))
+            attr_obj = getattr(self, attr)
+            if isinstance(attr_obj, Config):
+                attr_obj = attr_obj.copy(
+                    copy_mode=copy_mode,
+                    nested=nested
+                )
+            else:
+                if copy_mode is not None:
+                    if copy_mode == 'hybrid':
+                        attr_obj = copy(attr_obj)
+                    elif copy_mode == 'deep':
+                        attr_obj = deepcopy(attr_obj)
+            setattr(new_instance, attr, attr_obj)
         return new_instance
 
     def dumps(self, **kwargs) -> bytes:
@@ -761,3 +791,7 @@ class Configured(Pickleable):
     def update_config(self, *args, **kwargs) -> None:
         """Force-update the config."""
         self.config.update(*args, **kwargs, force=True)
+
+    def to_doc(self, **kwargs) -> str:
+        """Convert to a doc."""
+        return self.__class__.__name__ + "(**" + self.config.to_doc(**kwargs) + ")"

@@ -397,7 +397,7 @@ class TestMappedArray:
             pd.Series(np.array([11, 13, 11, 0]), index=wrapper.columns).rename('reduce')
         )
         pd.testing.assert_series_equal(
-            mapped_array.reduce(mean_reduce_nb, wrap_kwargs=dict(time_units=True)),
+            mapped_array.reduce(mean_reduce_nb, wrap_kwargs=dict(to_duration=True)),
             pd.Series(np.array([11., 13.333333333333334, 11., np.nan]), index=wrapper.columns).rename('reduce') * day_dt
         )
         pd.testing.assert_series_equal(
@@ -468,7 +468,7 @@ class TestMappedArray:
             )
         )
         pd.testing.assert_frame_equal(
-            mapped_array.reduce(min_max_reduce_nb, to_array=True, wrap_kwargs=dict(time_units=True)),
+            mapped_array.reduce(min_max_reduce_nb, to_array=True, wrap_kwargs=dict(to_duration=True)),
             pd.DataFrame(
                 np.array([
                     [10., 13., 10., np.nan],
@@ -569,22 +569,49 @@ class TestMappedArray:
             )
         )
 
-    def test_nst(self):
-        assert mapped_array['a'].nst(0) == 10.
+    def test_nth(self):
+        assert mapped_array['a'].nth(0) == 10.
         pd.testing.assert_series_equal(
-            mapped_array.nst(0),
-            pd.Series(np.array([10., 13., 12., np.nan]), index=wrapper.columns).rename('nst')
+            mapped_array.nth(0),
+            pd.Series(np.array([10., 13., 12., np.nan]), index=wrapper.columns).rename('nth')
         )
-        assert mapped_array['a'].nst(-1) == 12.
+        assert mapped_array['a'].nth(-1) == 12.
         pd.testing.assert_series_equal(
-            mapped_array.nst(-1),
-            pd.Series(np.array([12., 13., 10., np.nan]), index=wrapper.columns).rename('nst')
+            mapped_array.nth(-1),
+            pd.Series(np.array([12., 13., 10., np.nan]), index=wrapper.columns).rename('nth')
         )
         with pytest.raises(Exception) as e_info:
-            _ = mapped_array.nst(10)
+            _ = mapped_array.nth(10)
         pd.testing.assert_series_equal(
-            mapped_array_grouped.nst(0),
-            pd.Series(np.array([10., 12.]), index=pd.Index(['g1', 'g2'], dtype='object')).rename('nst')
+            mapped_array_grouped.nth(0),
+            pd.Series(np.array([10., 12.]), index=pd.Index(['g1', 'g2'], dtype='object')).rename('nth')
+        )
+
+    def test_nth_index(self):
+        assert mapped_array['a'].nth(0) == 10.
+        pd.testing.assert_series_equal(
+            mapped_array.nth_index(0),
+            pd.Series(
+                np.array(['x', 'x', 'x', np.nan], dtype='object'),
+                index=wrapper.columns
+            ).rename('nth_index')
+        )
+        assert mapped_array['a'].nth(-1) == 12.
+        pd.testing.assert_series_equal(
+            mapped_array.nth_index(-1),
+            pd.Series(
+                np.array(['z', 'z', 'z', np.nan], dtype='object'),
+                index=wrapper.columns
+            ).rename('nth_index')
+        )
+        with pytest.raises(Exception) as e_info:
+            _ = mapped_array.nth_index(10)
+        pd.testing.assert_series_equal(
+            mapped_array_grouped.nth_index(0),
+            pd.Series(
+                np.array(['x', 'x'], dtype='object'),
+                index=pd.Index(['g1', 'g2'], dtype='object')
+            ).rename('nth_index')
         )
 
     def test_min(self):

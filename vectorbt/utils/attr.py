@@ -1,10 +1,23 @@
 """Utilities for working with class/instance attributes."""
 
+import inspect
 from collections.abc import Iterable
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, get_func_arg_names
+
+
+def get_dict_attr(obj, attr):
+    """Get attribute without invoking the attribute lookup machinery."""
+    if inspect.isclass(obj):
+        cls = obj
+    else:
+        cls = obj.__class__
+    for obj in [obj] + cls.mro():
+        if attr in obj.__dict__:
+            return obj.__dict__[attr]
+    raise AttributeError
 
 
 def default_getattr_func(obj: tp.Any,

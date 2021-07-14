@@ -110,7 +110,8 @@ settings = SettingsConfig(
         array_wrapper=dict(
             column_only_select=False,
             group_select=True,
-            freq=None
+            freq=None,
+            silence_warnings=False
         ),
         datetime=dict(
             naive_tz=get_local_tz(),
@@ -243,6 +244,7 @@ settings = SettingsConfig(
             ),
             settings=Config(  # flex
                 dict(
+                    to_duration=True,
                     use_caching=True
                 )
             ),
@@ -283,6 +285,23 @@ settings = SettingsConfig(
         generic=dict(
             stats=Config()  # flex
         ),
+        signals=dict(
+            stats=Config(
+                dict(
+                    filters=dict(
+                        silent_has_other=dict(
+                            filter_func=lambda self, metric_settings:
+                            metric_settings.get('other', None) is not None
+                        ),
+                    ),
+                    settings=dict(
+                        other=None,
+                        other_name='Other',
+                        from_other=False
+                    )
+                )
+            )  # flex
+        ),
         returns=dict(
             year_freq='365 days',
             defaults=Config(  # flex
@@ -305,11 +324,14 @@ settings = SettingsConfig(
                             self.year_freq is not None,
                             warning_message=Sub("Metric '$metric_name' requires year frequency to be set")
                         ),
-                        benchmark_rets=dict(
+                        has_benchmark_rets=dict(
                             filter_func=lambda self, metric_settings:
-                            'benchmark_rets' in metric_settings,
+                            metric_settings.get('benchmark_rets', None) is not None,
                             warning_message=Sub("Metric '$metric_name' requires benchmark_rets to be set")
                         )
+                    ),
+                    settings=dict(
+                        check_is_not_grouped=True
                     )
                 )
             )
@@ -334,7 +356,6 @@ settings = SettingsConfig(
             init_cash=100.,
             size=np.inf,
             size_type='amount',
-            signal_size_type='amount',
             fees=0.,
             fixed_fees=0.,
             slippage=0.,
@@ -427,10 +448,18 @@ __pdoc__['settings'] = f"""Global settings config.
 
 ## settings.config
 
-Configuration settings applied across `vectorbt.utils.config`.
+Settings applied to `vectorbt.utils.config.Config`.
 
 ```json
-{to_doc(settings['config'])}
+{settings['config'].to_doc()}
+```
+
+## settings.configured
+
+Settings applied to `vectorbt.utils.config.Configured`.
+
+```json
+{settings['configured'].to_doc()}
 ```
 
 ## settings.caching
@@ -440,7 +469,7 @@ Settings applied across `vectorbt.utils.decorators`.
 See `vectorbt.utils.decorators.should_cache`.
 
 ```json
-{to_doc(settings['caching'])}
+{settings['caching'].to_doc()}
 ```
 
 ## settings.broadcasting
@@ -448,7 +477,7 @@ See `vectorbt.utils.decorators.should_cache`.
 Settings applied across `vectorbt.base.reshape_fns`.
 
 ```json
-{to_doc(settings['broadcasting'])}
+{settings['broadcasting'].to_doc()}
 ```
 
 ## settings.array_wrapper
@@ -456,23 +485,23 @@ Settings applied across `vectorbt.base.reshape_fns`.
 Settings applied to `vectorbt.base.array_wrapper.ArrayWrapper`.
 
 ```json
-{to_doc(settings['array_wrapper'])}
+{settings['array_wrapper'].to_doc()}
 ```
 
 ## settings.datetime
 
-Datetime settings applied across `vectorbt.utils.datetime`.
+Settings applied across `vectorbt.utils.datetime`.
 
 ```json
-{to_doc(settings['datetime'])}
+{settings['datetime'].to_doc()}
 ```
 
 ## settings.data
 
-Data settings applied across `vectorbt.data`.
+Settings applied across `vectorbt.data`.
 
 ```json
-{to_doc(settings['data'])}
+{settings['data'].to_doc()}
 ```
 
 ### settings.data.binance
@@ -489,27 +518,75 @@ Keys can be defined per exchange. If a key is defined at the root, it applies to
 Settings applied to plotting Plotly figures.
 
 ```json
-{to_doc(settings['plotting'], replace={
+{settings['plotting'].to_doc(replace={
     'settings.plotting.themes.light.template': "{ ... templates/light.json ... }",
     'settings.plotting.themes.dark.template': "{ ... templates/dark.json ... }",
     'settings.plotting.themes.seaborn.template': "{ ... templates/seaborn.json ... }"
 }, path='settings.plotting')}
 ```
 
-## settings.ohlcv
+## settings.stats_builder
 
-OHLCV settings applied across `vectorbt.ohlcv_accessors`.
+Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 
 ```json
-{to_doc(settings['ohlcv'])}
+{settings['stats_builder'].to_doc()}
 ```
 
 ## settings.returns
 
-Returns settings applied across `vectorbt.returns`.
+Settings applied across `vectorbt.returns`.
 
 ```json
-{to_doc(settings['returns'])}
+{settings['returns'].to_doc()}
+```
+
+## settings.ohlcv
+
+Settings applied across `vectorbt.ohlcv_accessors`.
+
+```json
+{settings['ohlcv'].to_doc()}
+```
+
+## settings.generic
+
+Settings applied across `vectorbt.generic`.
+
+```json
+{settings['generic'].to_doc()}
+```
+
+## settings.signals
+
+Settings applied across `vectorbt.signals`.
+
+```json
+{settings['signals'].to_doc()}
+```
+
+## settings.returns
+
+Settings applied across `vectorbt.returns`.
+
+```json
+{settings['returns'].to_doc()}
+```
+
+## settings.records
+
+Settings applied across `vectorbt.records`.
+
+```json
+{settings['records'].to_doc()}
+```
+
+## settings.mapped_array
+
+Settings applied across `vectorbt.mapped_array`.
+
+```json
+{settings['mapped_array'].to_doc()}
 ```
 
 ## settings.portfolio
@@ -517,15 +594,15 @@ Returns settings applied across `vectorbt.returns`.
 Settings applied to `vectorbt.portfolio.base.Portfolio`.
 
 ```json
-{to_doc(settings['portfolio'])}
+{settings['portfolio'].to_doc()}
 ```
 
 ## settings.messaging
 
-Messaging settings applied across `vectorbt.messaging`.
+Settings applied across `vectorbt.messaging`.
 
 ```json
-{to_doc(settings['messaging'])}
+{settings['messaging'].to_doc()}
 ```
 
 ### settings.messaging.telegram

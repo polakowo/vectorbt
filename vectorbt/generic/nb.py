@@ -1212,6 +1212,12 @@ def sum_squeeze_nb(col: int, group: int, a: tp.Array1d) -> float:
     return np.nansum(a)
 
 
+@njit(cache=True)
+def any_squeeze_nb(col: int, group: int, a: tp.Array1d) -> bool:
+    """Return any (ignores NaNs) of a group."""
+    return np.any(a)
+
+
 # ############# Drawdowns ############# #
 
 @njit(cache=True)

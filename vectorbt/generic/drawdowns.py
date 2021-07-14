@@ -174,13 +174,13 @@ class Drawdowns(Records):
     @cached_method
     def avg_duration(self, **kwargs) -> tp.MaybeSeries:
         """Average drawdown duration (in time units)."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='avg_duration')), kwargs)
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(to_duration=True, name_or_index='avg_duration')), kwargs)
         return self.duration.mean(**kwargs)
 
     @cached_method
     def max_duration(self, **kwargs) -> tp.MaybeSeries:
         """Maximum drawdown duration (in time units)."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='max_duration')), kwargs)
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(to_duration=True, name_or_index='max_duration')), kwargs)
         return self.duration.max(**kwargs)
 
     @cached_method
@@ -257,7 +257,7 @@ class Drawdowns(Records):
         Does not support grouping."""
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             raise ValueError("Grouping is not supported by this method")
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(time_units=True, name_or_index='current_duration')), kwargs)
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(to_duration=True, name_or_index='current_duration')), kwargs)
         return self.active.duration.nth(-1, group_by=group_by, **kwargs)
 
     @cached_method
@@ -399,7 +399,7 @@ class Drawdowns(Records):
                 if isinstance(self_col.wrapper.index, DatetimeIndexes):
                     duration = self_col.wrapper.index[to_idx] - self_col.wrapper.index[from_idx]
                 elif self_col.wrapper.freq is not None:
-                    duration = self_col.wrapper.to_time_units(to_idx - from_idx)
+                    duration = self_col.wrapper.to_duration(to_idx - from_idx)
                 else:
                     duration = to_idx - from_idx
                 return np.vectorize(str)(duration)

@@ -6,9 +6,10 @@ from string import Template
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import set_dict_item, get_func_arg_names, merge_dicts
+from vectorbt.utils.docs import SafeToStr, prepare_for_doc
 
 
-class Sub:
+class Sub(SafeToStr):
     """Template to substitute parts of the string with the respective values from `mapping`.
 
     Returns a string."""
@@ -39,8 +40,13 @@ class Sub:
         mapping = merge_dicts(self.mapping, mapping)
         return self.template.substitute(mapping)
 
+    def __str__(self):
+        return f"{self.__class__.__name__}(" \
+               f"template=\"{self.template.template}\", " \
+               f"mapping={prepare_for_doc(self.mapping)})"
 
-class Rep:
+
+class Rep(SafeToStr):
     """Key to be replaced with the respective value from `mapping`."""
 
     def __init__(self, key: tp.Hashable, mapping: tp.Optional[tp.Mapping] = None) -> None:
@@ -66,8 +72,13 @@ class Rep:
         mapping = merge_dicts(self.mapping, mapping)
         return mapping[self.key]
 
+    def __str__(self):
+        return f"{self.__class__.__name__}(" \
+               f"key='{self.key}', " \
+               f"mapping={prepare_for_doc(self.mapping)})"
 
-class RepEval:
+
+class RepEval(SafeToStr):
     """Expression to be evaluated with `mapping` used as locals."""
 
     def __init__(self, expression: str, mapping: tp.Optional[tp.Mapping] = None) -> None:
@@ -93,8 +104,13 @@ class RepEval:
         mapping = merge_dicts(self.mapping, mapping)
         return eval(self.expression, {}, mapping)
 
+    def __str__(self):
+        return f"{self.__class__.__name__}(" \
+               f"expression=\"{self.expression}\", " \
+               f"mapping={prepare_for_doc(self.mapping)})"
 
-class RepFunc:
+
+class RepFunc(SafeToStr):
     """Function to be called with argument names from `mapping`."""
 
     def __init__(self, func: tp.Callable, mapping: tp.Optional[tp.Mapping] = None) -> None:
@@ -124,6 +140,11 @@ class RepFunc:
             if k in func_arg_names:
                 func_kwargs[k] = v
         return self.func(**func_kwargs)
+
+    def __str__(self):
+        return f"{self.__class__.__name__}(" \
+               f"func={self.func}, " \
+               f"mapping={prepare_for_doc(self.mapping)})"
 
 
 def deep_substitute(obj: tp.Any, mapping: tp.Optional[tp.Mapping] = None) -> tp.Any:

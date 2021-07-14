@@ -42,7 +42,7 @@ setup(
     ],
     extras_require={
         'full': [
-            'yfinance',
+            'yfinance>=0.1.63',
             'python-binance',
             'ccxt',
             'ray; python_version < "3.9"',

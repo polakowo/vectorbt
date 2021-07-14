@@ -272,9 +272,7 @@ instance to the disk with `MappedArray.save` and load it with `MappedArray.load`
 ## Stats
 
 !!! hint
-    For details on `MappedArray.stats`, see `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
-
-    Also see `vectorbt.portfolio.base` for more examples.
+    See `vectorbt.generic.stats_builder.StatsBuilderMixin.stats`.
 
 Metric for mapped arrays are similar to that for `vectorbt.generic.accessors.GenericAccessor`.
 
@@ -749,10 +747,16 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         return self.wrapper.wrap_reduced(out, group_by=group_by, **wrap_kwargs)
 
     @cached_method
-    def nst(self, n: int, **kwargs) -> tp.MaybeSeries:
-        """Return nst element of each column."""
-        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nst')), kwargs)
-        return self.reduce(generic_nb.nst_reduce_nb, n, to_array=False, to_idx=False, **kwargs)
+    def nth(self, n: int, **kwargs) -> tp.MaybeSeries:
+        """Return n-th element of each column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nth')), kwargs)
+        return self.reduce(generic_nb.nth_reduce_nb, n, to_array=False, to_idx=False, **kwargs)
+
+    @cached_method
+    def nth_index(self, n: int, **kwargs) -> tp.MaybeSeries:
+        """Return index of n-th element of each column."""
+        kwargs = merge_dicts(dict(wrap_kwargs=dict(name_or_index='nth_index')), kwargs)
+        return self.reduce(generic_nb.nth_index_reduce_nb, n, to_array=False, to_idx=True, **kwargs)
 
     @cached_method
     def min(self, **kwargs) -> tp.MaybeSeries:
@@ -888,7 +892,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             mapped_array_stats_cfg
         )
 
-    metrics: tp.ClassVar[Config] = Config(
+    _metrics: tp.ClassVar[Config] = Config(
         dict(
             start=dict(
                 title='Start',
@@ -902,8 +906,8 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             ),
             period=dict(
                 title='Period',
-                calc_func=lambda self:
-                len(self.wrapper.index) * (self.wrapper.freq if self.wrapper.freq is not None else 1),
+                calc_func=lambda self: len(self.wrapper.index),
+                auto_to_duration=True,
                 agg_func=None
             ),
             count=dict(
@@ -956,19 +960,16 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             ),
             value_counts=dict(
                 title='Value Count',
-                calc_func=lambda value_counts:
-                {value_counts.index[i]: value_counts.iloc[i] for i in range(len(value_counts.index))},
+                calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
                 check_has_value_map=True
             )
         ),
         copy_kwargs=dict(copy_mode='deep')
     )
-    """Metrics supported by `MappedArray.stats`.
 
-    !!! note
-        It's safe to change this config - it's a (deep) copy of the class variable.
-
-        But copying `MappedArray` using `MappedArray.copy` won't create a copy of the config."""
+    @property
+    def metrics(self) -> Config:
+        return self._metrics
 
     def histplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot histogram by column."""
@@ -977,3 +978,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
     def boxplot(self, group_by: tp.GroupByLike = None, **kwargs) -> tp.BaseFigure:  # pragma: no cover
         """Plot box plot by column."""
         return self.to_pd(group_by=group_by, ignore_index=True).vbt.boxplot(**kwargs)
+
+
+__pdoc__ = dict()
+MappedArray.override_metrics_doc(__pdoc__)

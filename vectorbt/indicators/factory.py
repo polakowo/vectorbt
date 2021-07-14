@@ -528,7 +528,7 @@ generates synthetic price:
 >>> @njit
 ... def apply_func_nb(input_shape, start, mu, sigma):
 ...     rand_returns = np.random.normal(mu, sigma, input_shape)
-...     return start * vbt.nb.cumprod_nb(rand_returns + 1)
+...     return start * vbt.nb.nancumprod_nb(rand_returns + 1)
 
 >>> MyInd = vbt.IndicatorFactory(
 ...     param_names=['start', 'mu', 'sigma'],
@@ -1983,29 +1983,29 @@ class IndicatorBase(Wrapping):
         return self._level_names
 
     @classproperty
-    def input_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def input_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the input arrays."""
-        return self_or_cls._input_names
+        return cls_or_self._input_names
 
     @classproperty
-    def param_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def param_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the parameters."""
-        return self_or_cls._param_names
+        return cls_or_self._param_names
 
     @classproperty
-    def in_output_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def in_output_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the in-place output arrays."""
-        return self_or_cls._in_output_names
+        return cls_or_self._in_output_names
 
     @classproperty
-    def output_names(self_or_cls) -> tp.Tuple[str, ...]:
+    def output_names(cls_or_self) -> tp.Tuple[str, ...]:
         """Names of the regular output arrays."""
-        return self_or_cls._output_names
+        return cls_or_self._output_names
 
     @classproperty
-    def output_flags(self_or_cls) -> tp.Kwargs:
+    def output_flags(cls_or_self) -> tp.Kwargs:
         """Dictionary of output flags."""
-        return self_or_cls._output_flags
+        return cls_or_self._output_flags
 
     def __init__(self,
                  wrapper: ArrayWrapper,
@@ -2392,7 +2392,7 @@ class IndicatorFactory:
                     **kwargs
                 )
                 if crossover:
-                    return out.vbt.signals.nst(wait + 1, after_false=after_false)
+                    return out.vbt.signals.nth(wait + 1, after_false=after_false)
                 return out
 
             combine_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'

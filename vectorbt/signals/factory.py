@@ -140,8 +140,8 @@ class SignalFactory(IndicatorFactory):
 
     def from_choice_func(
             self,
-            entry_choice_func: tp.Optional[tp.SignalChoiceFunc] = None,
-            exit_choice_func: tp.Optional[tp.SignalChoiceFunc] = None,
+            entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
+            exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
             generate_ex_func: tp.Callable = generate_ex_nb,
             generate_enex_func: tp.Callable = generate_enex_nb,
             cache_func: tp.Callable = None,
