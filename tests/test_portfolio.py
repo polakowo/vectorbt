@@ -2119,7 +2119,7 @@ class TestFromRandomSignals:
         )
         pd.testing.assert_index_equal(
             result.wrapper.columns,
-            pd.Int64Index([1, 2], dtype='int64', name='rand_n')
+            pd.Int64Index([1, 2], dtype='int64', name='randnx_n')
         )
 
     def test_from_random_prob(self):
@@ -2157,7 +2157,9 @@ class TestFromRandomSignals:
         )
         pd.testing.assert_index_equal(
             result.wrapper.columns,
-            pd.MultiIndex.from_tuples([(0.25, 0.25), (0.5, 0.5)], names=['rprob_entry_prob', 'rprob_exit_prob'])
+            pd.MultiIndex.from_tuples(
+                [(0.25, 0.25), (0.5, 0.5)],
+                names=['rprobnx_entry_prob', 'rprobnx_exit_prob'])
         )
 
 
@@ -4904,7 +4906,7 @@ pf_shared = vbt.Portfolio.from_orders(
 class TestPortfolio:
     def test_config(self, tmp_path):
         pf2 = pf.copy()
-        pf2.metrics = pf2.metrics.copy()
+        pf2._metrics = pf2._metrics.copy()
         pf2.metrics['hello'] = 'world'
         pf2.subplots = pf2.subplots.copy()
         pf2.subplots['hello'] = 'world'

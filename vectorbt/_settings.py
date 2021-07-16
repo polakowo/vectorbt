@@ -42,7 +42,6 @@ import pkgutil
 import plotly.io as pio
 import plotly.graph_objects as go
 
-from vectorbt.utils.docs import to_doc
 from vectorbt.utils.config import Config
 from vectorbt.utils.datetime import get_local_tz, get_utc_tz
 from vectorbt.utils.decorators import CacheCondition
@@ -79,6 +78,10 @@ class SettingsConfig(Config):
 
 settings = SettingsConfig(
     dict(
+        numba=dict(
+            check_func_type=True,
+            check_func_suffix=False
+        ),
         config=Config(),  # flex
         configured=dict(
             config=Config(  # flex
@@ -446,6 +449,14 @@ settings.register_templates()
 
 __pdoc__['settings'] = f"""Global settings config.
 
+## settings.numba
+
+Settings applied to Numba.
+
+```json
+{settings['numba'].to_doc()}
+```
+
 ## settings.config
 
 Settings applied to `vectorbt.utils.config.Config`.
@@ -575,7 +586,7 @@ Settings applied across `vectorbt.returns`.
 
 ## settings.records
 
-Settings applied across `vectorbt.records`.
+Settings applied across `vectorbt.records.base`.
 
 ```json
 {settings['records'].to_doc()}
@@ -583,7 +594,7 @@ Settings applied across `vectorbt.records`.
 
 ## settings.mapped_array
 
-Settings applied across `vectorbt.mapped_array`.
+Settings applied across `vectorbt.records.mapped_array`.
 
 ```json
 {settings['mapped_array'].to_doc()}

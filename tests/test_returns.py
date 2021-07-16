@@ -55,11 +55,11 @@ class TestAccessors:
         with pytest.raises(Exception) as e_info:
             assert pd.Series([1, 2, 3]).vbt.returns(freq=None).ann_factor
 
-    def test_from_price(self):
-        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_price(ts['a']).obj, ts['a'].pct_change())
-        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_price(ts).obj, ts.pct_change())
-        assert pd.Series.vbt.returns.from_price(ts['a'], year_freq='365 days').year_freq == pd.to_timedelta('365 days')
-        assert pd.DataFrame.vbt.returns.from_price(ts, year_freq='365 days').year_freq == pd.to_timedelta('365 days')
+    def test_from_value(self):
+        pd.testing.assert_series_equal(pd.Series.vbt.returns.from_value(ts['a']).obj, ts['a'].pct_change())
+        pd.testing.assert_frame_equal(pd.DataFrame.vbt.returns.from_value(ts).obj, ts.pct_change())
+        assert pd.Series.vbt.returns.from_value(ts['a'], year_freq='365 days').year_freq == pd.to_timedelta('365 days')
+        assert pd.DataFrame.vbt.returns.from_value(ts, year_freq='365 days').year_freq == pd.to_timedelta('365 days')
 
     def test_daily(self):
         ret_12h = pd.DataFrame({
@@ -519,7 +519,7 @@ class TestAccessors:
                 106.66666666666667,
                 5.635947823148613e+36,
                 621.5038995587341,
-                48.888888888888886,
+                73.33333333333333,
                 pd.Timedelta('3 days 00:00:00'),
                 -3.4590654330766135,
                 -0.625,
@@ -544,7 +544,7 @@ class TestAccessors:
                 400.0,
                 1.690784346944584e+37,
                 533.2682251925386,
-                -0.0,
+                np.nan,
                 np.nan,
                 24.612379624271007,
                 np.nan,
@@ -569,7 +569,7 @@ class TestAccessors:
                 400.0,
                 62400.0,
                 150.23130314433288,
-                -0.0,
+                np.nan,
                 np.nan,
                 6.933752452815364,
                 np.nan,
@@ -595,7 +595,7 @@ class TestAccessors:
                 451.8597134178033,
                 1.690784346944584e+37,
                 533.2682251925386,
-                -0.0,
+                np.nan,
                 np.nan,
                 24.612379624271007,
                 np.nan,

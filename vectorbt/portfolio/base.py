@@ -959,7 +959,7 @@ from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.generic.stats_builder import StatsBuilderMixin
 from vectorbt.generic.plot_builder import PlotBuilderMixin
 from vectorbt.generic.drawdowns import Drawdowns
-from vectorbt.signals.generators import RAND, RPROB
+from vectorbt.signals.generators import RANDNX, RPROBNX
 from vectorbt.returns.accessors import ReturnsAccessor
 from vectorbt.returns import nb as returns_nb
 from vectorbt.portfolio import nb
@@ -1156,8 +1156,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         Generates signals based either on the number of signals `n` or the probability
         of encountering a signal `prob`.
 
-        If `n` is set, see `vectorbt.signals.generators.RAND`.
-        If `prob` is set, see `vectorbt.signals.generators.RPROB`.
+        If `n` is set, see `vectorbt.signals.generators.RANDNX`.
+        If `prob` is set, see `vectorbt.signals.generators.RPROBNX`.
 
         Based on `Portfolio.from_signals`."""
         from vectorbt._settings import settings
@@ -1176,7 +1176,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         if n is not None and (entry_prob is not None or exit_prob is not None):
             raise ValueError("Either n or entry_prob and exit_prob should be set")
         if n is not None:
-            rand = RAND.run(
+            rand = RANDNX.run(
                 n=n,
                 input_shape=close.shape,
                 input_index=close.vbt.wrapper.index,
@@ -1187,7 +1187,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             entries = rand.entries
             exits = rand.exits
         elif entry_prob is not None and exit_prob is not None:
-            rprob = RPROB.run(
+            rprobnx = RPROBNX.run(
                 entry_prob=entry_prob,
                 exit_prob=exit_prob,
                 param_product=param_product,
@@ -1197,8 +1197,8 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
                 seed=seed,
                 **run_kwargs
             )
-            entries = rprob.entries
-            exits = rprob.exits
+            entries = rprobnx.entries
+            exits = rprobnx.exits
         else:
             raise ValueError("At least n or entry_prob and exit_prob should be set")
 

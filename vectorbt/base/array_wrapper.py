@@ -619,6 +619,8 @@ class ArrayWrapper(Configured, PandasIndexer):
                 sr_name = columns[0]
                 if sr_name == 0:  # was arr Series before
                     sr_name = None
+                if isinstance(name_or_index, str):
+                    name_or_index = None
                 return pd.Series(arr, index=name_or_index, name=sr_name, dtype=dtype)
             # Scalar per column in arr DataFrame
             return pd.Series(arr, index=columns, name=name_or_index, dtype=dtype)
@@ -628,8 +630,12 @@ class ArrayWrapper(Configured, PandasIndexer):
                 sr_name = columns[0]
                 if sr_name == 0:  # was arr Series before
                     sr_name = None
+                if isinstance(name_or_index, str):
+                    name_or_index = None
                 return pd.Series(arr[:, 0], index=name_or_index, name=sr_name, dtype=dtype)
-            # Array per column in arr DataFrame
+            # Array per column in DataFrame
+            if isinstance(name_or_index, str):
+                name_or_index = None
             return pd.DataFrame(arr, index=name_or_index, columns=columns, dtype=dtype)
         raise ValueError(f"{arr.ndim}-d input is not supported")
 

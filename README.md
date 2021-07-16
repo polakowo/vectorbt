@@ -324,6 +324,7 @@ split_idx    0    1    2    3  4
 4          NaN  NaN  NaN  NaN  5
 ```
 
+- Transformation functions for rescaling and normalization
 - Drawdown analysis
 
 ```python-repl
@@ -349,23 +350,23 @@ dtype: bool
     - Includes basic generators such for random signal generation
 
 ```python-repl
->>> rand = vbt.RAND.run(n=[0, 1, 2], input_shape=(6,), seed=42)
->>> rand.entries
-rand_n      0      1      2
-0       False   True   True
-1       False  False  False
-2       False  False  False
-3       False  False   True
-4       False  False  False
-5       False  False  False
->>> rand.exits
-rand_n      0      1      2
-0       False  False  False
-1       False  False   True
-2       False  False  False
-3       False   True  False
-4       False  False   True
-5       False  False  False
+>>> randnx = vbt.RANDNX.run(n=[0, 1, 2], input_shape=(6,), seed=42)
+>>> randnx.entries
+randnx_n      0      1      2
+0         False   True   True
+1         False  False  False
+2         False  False  False
+3         False  False   True
+4         False  False  False
+5         False  False  False
+>>> randnx.exits
+randnx_n      0      1      2
+0         False  False  False
+1         False  False   True
+2         False  False  False
+3         False   True  False
+4         False  False   True
+5         False  False  False
 ```
     
 - Functions for working with returns
@@ -435,10 +436,42 @@ sma_timeperiod    2    3
 2               2.5  2.0
 3               3.5  3.0
 4               4.5  4.0
-``` 
+```
+
+- Tailored statistics for many backtesting components
+  
+```python-repl
+>>> entries = pd.Series([True, True, True, False])
+>>> exits = pd.Series([False, False, False, True])
+>>> entries.vbt.signals.stats(settings=dict(freq='d', other=exits, other_name='Exits'))
+Start                                     0
+End                                       3
+Period                      4 days 00:00:00
+Total                                     3
+Rate [%]                                 75
+Total Overlapping                         0
+Overlapping Rate [%]                      0
+First Index                               0
+Last Index                                2
+Norm Avg Index [-1, 1]            -0.333333
+Distance -> Exits: Min      1 days 00:00:00
+Distance -> Exits: Max      3 days 00:00:00
+Distance -> Exits: Mean     2 days 00:00:00
+Distance -> Exits: Std      1 days 00:00:00
+Total Partitions                          1
+Partition Rate [%]                  33.3333
+Partition Length: Min       3 days 00:00:00
+Partition Length: Max       3 days 00:00:00
+Partition Length: Mean      3 days 00:00:00
+Partition Length: Std                   NaT
+Partition Distance: Min                 NaT
+Partition Distance: Max                 NaT
+Partition Distance: Mean                NaT
+Partition Distance: Std                 NaT
+dtype: object
+```
 
 - Label generation for machine learning
-    - Labeling based on local extrema, breakouts, and more
 
 ```python-repl
 >>> price = np.cumprod(np.random.uniform(-0.1, 0.1, size=100) + 1)
@@ -477,6 +510,14 @@ Note: you must run the notebook to play with the widgets.
 ### Articles
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
+
+## Where to get help
+
+- [Start a new GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
+- [Ask a question on Gitter](https://gitter.im/vectorbt/community)
+- [Join a private chat](https://www.patreon.com/vectorbt)
+
+For other inquiries, contact the author: [olegpolakow@gmail.com](mailto:olegpolakow@gmail.com)
 
 ## How to contribute
 

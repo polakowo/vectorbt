@@ -138,8 +138,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     was found in the function's signature. Set to False to not pass.
                     If argument to be passed was not found, `pass_{arg}` is removed.
                 * `resolve_{arg}`: Whether to resolve an argument that is meant to be an attribute of
-                    this object (see `StatsBuilderMixin.resolve_attr`). Defaults to True if this argument
-                    was found in the function's signature. Set to False to not resolve.
+                    this object (see `vectorbt.utils.attr.AttrResolver.resolve_attr`). Defaults to True
+                    if this argument was found in the function's signature. Set to False to not resolve.
                 * `description`: Description of the metric. Usually, it's a reference to the calculation function.
                     Defaults to None.
                 * `template_mapping`: Mapping to replace templates in metric settings. Used across all settings.
@@ -149,14 +149,16 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 If `resolve_calc_func` is True, the calculation function may "request" any of the
                 following optional arguments by accepting them or if `pass_{arg}` was found in the settings dict:
 
-                * Each of `StatsBuilderMixin.self_aliases`: original object (ungrouped, with no column selected)
+                * Each of `vectorbt.utils.attr.AttrResolver.self_aliases`: original object
+                    (ungrouped, with no column selected)
                 * `group_by` - won't be passed if it was used in resolving the first attribute of `calc_func`
                     specified as a path, use `pass_group_by=True` to pass anyway
                 * `column`
                 * `metric_name`
                 * `agg_func`
                 * Any optional argument from `settings`
-                * Any attribute of this object if it meant to be resolved (see `StatsBuilderMixin.resolve_attr`)
+                * Any attribute of this object if it meant to be resolved
+                    (see `vectorbt.utils.attr.AttrResolver.resolve_attr`)
 
                 Pass `metrics='all'` to calculate all supported metrics.
             tags (str or iterable): Tags to select.

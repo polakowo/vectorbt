@@ -1,5 +1,7 @@
 from vectorbt import settings
 
+settings.numba['check_func_suffix'] = True
+
 
 # ############# settings.py ############# #
 

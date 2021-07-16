@@ -365,7 +365,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                       *args, on_matrix: bool = False, wrap_kwargs: tp.KwargsLike = None,
                       **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.groupby_apply_nb` and
-        `vectorbt.generic.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
+        `vectorbt.generic.nb.groupby_matrix_apply_nb` for `on_matrix=True`.
 
         For `by`, see `pd.DataFrame.groupby`.
 
@@ -405,7 +405,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
                        *args, on_matrix: bool = False, wrap_kwargs: tp.KwargsLike = None,
                        **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.generic.nb.groupby_apply_nb` and
-        `vectorbt.generic.nb.groupby_apply_matrix_nb` for `on_matrix=True`.
+        `vectorbt.generic.nb.groupby_matrix_apply_nb` for `on_matrix=True`.
 
         For `freq`, see `pd.DataFrame.resample`.
 

@@ -2392,7 +2392,7 @@ class IndicatorFactory:
                     **kwargs
                 )
                 if crossover:
-                    return out.vbt.signals.nth(wait + 1, after_false=after_false)
+                    return out.vbt.signals.nth(wait, after_false=after_false)
                 return out
 
             combine_method.__qualname__ = f'{Indicator.__name__}.{attr_name}_{func_name}'

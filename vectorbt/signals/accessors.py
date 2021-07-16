@@ -181,6 +181,7 @@ Name: 0, dtype: object
 
 import numpy as np
 import pandas as pd
+import warnings
 
 from vectorbt import _typing as tp
 from vectorbt.root_accessors import register_dataframe_accessor, register_series_accessor
@@ -227,11 +228,11 @@ class SignalsAccessor(GenericAccessor):
     # ############# Overriding ############# #
 
     def bshift(self, *args, fill_value: bool = False, **kwargs):
-        """`vectorbt.base.accessors.BaseAccessor.bshift` with `dtype=bool` and `fill_value=False`."""
+        """`vectorbt.generic.accessors.GenericAccessor.bshift` with `dtype=bool` and `fill_value=False`."""
         return GenericAccessor.bshift(self, *args, dtype=np.bool_, fill_value=fill_value, **kwargs)
 
     def fshift(self, *args, fill_value: bool = False, **kwargs):
-        """`vectorbt.base.accessors.BaseAccessor.fshift` with `dtype=bool` and `fill_value=False`."""
+        """`vectorbt.generic.accessors.GenericAccessor.fshift` with `dtype=bool` and `fill_value=False`."""
         return GenericAccessor.fshift(self, *args, dtype=np.bool_, fill_value=fill_value, **kwargs)
 
     @classmethod
@@ -247,7 +248,11 @@ class SignalsAccessor(GenericAccessor):
     # ############# Generation ############# #
 
     @classmethod
-    def generate(cls, shape: tp.RelaxedShape, choice_func_nb: tp.ChoiceFunc, *args, **kwargs) -> tp.SeriesFrame:
+    def generate(cls,
+                 shape: tp.RelaxedShape,
+                 choice_func_nb: tp.ChoiceFunc, *args,
+                 pick_first: bool = False,
+                 **kwargs) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_nb`.
 
         `**kwargs` will be passed to pandas constructor.
@@ -278,7 +283,7 @@ class SignalsAccessor(GenericAccessor):
         elif isinstance(shape, tuple) and len(shape) == 1:
             shape = (shape[0], 1)
 
-        result = nb.generate_nb(shape, choice_func_nb, *args)
+        result = nb.generate_nb(shape, pick_first, choice_func_nb, *args)
 
         if cls.is_series():
             if shape[1] > 1:
@@ -295,6 +300,8 @@ class SignalsAccessor(GenericAccessor):
                       exit_args: tp.ArgsLike = None,
                       entry_wait: int = 1,
                       exit_wait: int = 1,
+                      entry_pick_first: bool = True,
+                      exit_pick_first: bool = True,
                       **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
         """See `vectorbt.signals.nb.generate_enex_nb`.
 
@@ -354,7 +361,10 @@ class SignalsAccessor(GenericAccessor):
 
         result1, result2 = nb.generate_enex_nb(
             shape,
-            entry_wait, exit_wait,
+            entry_wait,
+            exit_wait,
+            entry_pick_first,
+            exit_pick_first,
             entry_choice_func_nb, entry_args,
             exit_choice_func_nb, exit_args
         )
@@ -364,8 +374,13 @@ class SignalsAccessor(GenericAccessor):
             return pd.Series(result1[:, 0], **kwargs), pd.Series(result2[:, 0], **kwargs)
         return pd.DataFrame(result1, **kwargs), pd.DataFrame(result2, **kwargs)
 
-    def generate_exits(self, exit_choice_func_nb: tp.ChoiceFunc, *args,
-                       wait: int = 1, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
+    def generate_exits(self,
+                       exit_choice_func_nb: tp.ChoiceFunc, *args,
+                       wait: int = 1,
+                       until_next: bool = True,
+                       skip_until_exit: bool = False,
+                       pick_first: bool = False,
+                       wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """See `vectorbt.signals.nb.generate_ex_nb`.
 
         ## Example
@@ -389,13 +404,22 @@ class SignalsAccessor(GenericAccessor):
         """
         checks.assert_numba_func(exit_choice_func_nb)
 
-        exits = nb.generate_ex_nb(self.to_2d_array(), wait, exit_choice_func_nb, *args)
+        exits = nb.generate_ex_nb(
+            self.to_2d_array(),
+            wait,
+            until_next,
+            skip_until_exit,
+            pick_first,
+            exit_choice_func_nb,
+            *args
+        )
         return self.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     # ############# Filtering ############# #
 
     @class_or_instancemethod
-    def clean(cls_or_self, *args,
+    def clean(cls_or_self,
+              *args,
               entry_first: bool = True,
               broadcast_kwargs: tp.KwargsLike = None,
               wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
@@ -434,6 +458,7 @@ class SignalsAccessor(GenericAccessor):
                         shape: tp.RelaxedShape,
                         n: tp.Optional[tp.ArrayLike] = None,
                         prob: tp.Optional[tp.ArrayLike] = None,
+                        pick_first: bool = False,
                         seed: tp.Optional[int] = None,
                         **kwargs) -> tp.SeriesFrame:
         """Generate signals randomly.
@@ -488,7 +513,7 @@ class SignalsAccessor(GenericAccessor):
             result = nb.generate_rand_nb(shape, n, seed=seed)
         elif prob is not None:
             prob = np.broadcast_to(prob, shape)
-            result = nb.generate_rand_by_prob_nb(shape, prob, flex_2d, seed=seed)
+            result = nb.generate_rand_by_prob_nb(shape, prob, pick_first, flex_2d, seed=seed)
         else:
             raise ValueError("At least n or prob should be set")
 
@@ -509,8 +534,10 @@ class SignalsAccessor(GenericAccessor):
                              seed: tp.Optional[int] = None,
                              entry_wait: int = 1,
                              exit_wait: int = 1,
+                             entry_pick_first: bool = True,
+                             exit_pick_first: bool = True,
                              **kwargs) -> tp.Tuple[tp.SeriesFrame, tp.SeriesFrame]:
-        """Generate entry and exit signals randomly and iteratively.
+        """Generate chain of entry and exit signals randomly.
 
         If `n` is set, see `vectorbt.signals.nb.generate_rand_enex_nb`.
         If `entry_prob` and `exit_prob` are set, see `vectorbt.signals.nb.generate_rand_enex_by_prob_nb`.
@@ -577,7 +604,16 @@ class SignalsAccessor(GenericAccessor):
             entry_prob = np.broadcast_to(entry_prob, shape)
             exit_prob = np.broadcast_to(exit_prob, shape)
             entries, exits = nb.generate_rand_enex_by_prob_nb(
-                shape, entry_prob, exit_prob, entry_wait, exit_wait, flex_2d, seed=seed)
+                shape,
+                entry_prob,
+                exit_prob,
+                entry_wait,
+                exit_wait,
+                entry_pick_first,
+                exit_pick_first,
+                flex_2d,
+                seed=seed
+            )
         else:
             raise ValueError("At least n, or entry_prob and exit_prob should be set")
 
@@ -591,6 +627,8 @@ class SignalsAccessor(GenericAccessor):
                               prob: tp.Optional[tp.ArrayLike] = None,
                               seed: tp.Optional[int] = None,
                               wait: int = 1,
+                              until_next: bool = True,
+                              skip_until_exit: bool = False,
                               wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Generate exit signals randomly.
 
@@ -625,9 +663,23 @@ class SignalsAccessor(GenericAccessor):
         """
         if prob is not None:
             obj, prob = reshape_fns.broadcast(self.obj, prob, keep_raw=[False, True])
-            exits = nb.generate_rand_ex_by_prob_nb(obj.vbt.to_2d_array(), prob, wait, obj.ndim == 2, seed=seed)
+            exits = nb.generate_rand_ex_by_prob_nb(
+                obj.vbt.to_2d_array(),
+                prob,
+                wait,
+                until_next,
+                skip_until_exit,
+                obj.ndim == 2,
+                seed=seed
+            )
             return obj.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
-        exits = nb.generate_rand_ex_nb(self.to_2d_array(), wait, seed=seed)
+        exits = nb.generate_rand_ex_nb(
+            self.to_2d_array(),
+            wait,
+            until_next,
+            skip_until_exit,
+            seed=seed
+        )
         return self.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def generate_stop_exits(self,
@@ -636,20 +688,32 @@ class SignalsAccessor(GenericAccessor):
                             trailing: tp.ArrayLike = False,
                             entry_wait: int = 1,
                             exit_wait: int = 1,
-                            first: bool = True,
-                            iteratively: bool = False,
+                            until_next: bool = True,
+                            skip_until_exit: bool = False,
+                            pick_first: bool = True,
+                            chain: bool = False,
                             broadcast_kwargs: tp.KwargsLike = None,
                             wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
         """Generate exits based on when `ts` hits the stop.
 
         For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
-        If `iteratively` is True, see `vectorbt.signals.nb.generate_stop_ex_iter_nb`.
+        If `chain` is True, see `vectorbt.signals.nb.generate_stop_enex_nb`.
         Otherwise, see `vectorbt.signals.nb.generate_stop_ex_nb`.
 
         Arguments `entries`, `ts` and `stop` will broadcast using `vectorbt.base.reshape_fns.broadcast`
         and `broadcast_kwargs`.
 
         For arguments, see `vectorbt.signals.nb.stop_choice_nb`.
+
+        !!! hint
+            Default arguments will generate an exit signal strictly between two entry signals.
+            If both entry signals are too close to each other, no exit will be generated.
+
+            To ignore all entries that come between an entry and its exit,
+            set `until_next` to False and `skip_until_exit` to True.
+
+            To remove all entries that come between an entry and its exit,
+            set `chain` to True. This will return two arrays: new entries and exits.
 
         ## Example
 
@@ -683,16 +747,37 @@ class SignalsAccessor(GenericAccessor):
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
         entries, ts, stop, trailing = reshape_fns.broadcast(
             entries, ts, stop, trailing, **broadcast_kwargs, keep_raw=keep_raw)
+        if np.any(stop == 0):
+            warnings.warn("At least one stop value is 0", stacklevel=2)
 
         # Perform generation
-        if iteratively:
-            new_entries, exits = nb.generate_stop_ex_iter_nb(
-                entries.vbt.to_2d_array(), ts, stop, trailing, entry_wait, exit_wait, entries.ndim == 2)
+        if chain:
+            new_entries, exits = nb.generate_stop_enex_nb(
+                entries.vbt.to_2d_array(),
+                ts,
+                stop,
+                trailing,
+                entry_wait,
+                exit_wait,
+                pick_first,
+                entries.ndim == 2
+            )
             return entries.vbt.wrapper.wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
                    entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         else:
+            if skip_until_exit and until_next:
+                warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
             exits = nb.generate_stop_ex_nb(
-                entries.vbt.to_2d_array(), ts, stop, trailing, exit_wait, first, entries.ndim == 2)
+                entries.vbt.to_2d_array(),
+                ts,
+                stop,
+                trailing,
+                exit_wait,
+                until_next,
+                skip_until_exit,
+                pick_first,
+                entries.ndim == 2
+            )
             return entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
 
     def generate_ohlc_stop_exits(self,
@@ -703,15 +788,21 @@ class SignalsAccessor(GenericAccessor):
                                  is_open_safe: bool = True,
                                  out_dict: tp.Optional[tp.Dict[str, tp.ArrayLike]] = None,
                                  sl_stop: tp.Optional[tp.ArrayLike] = np.nan,
-                                 ts_stop: tp.Optional[tp.ArrayLike] = np.nan,
+                                 sl_trail: tp.Optional[tp.ArrayLike] = False,
                                  tp_stop: tp.Optional[tp.ArrayLike] = np.nan,
                                  entry_wait: int = 1,
                                  exit_wait: int = 1,
-                                 first: bool = True,
-                                 iteratively: bool = False,
+                                 until_next: bool = True,
+                                 skip_until_exit: bool = False,
+                                 pick_first: bool = True,
+                                 chain: bool = False,
                                  broadcast_kwargs: tp.KwargsLike = None,
                                  wrap_kwargs: tp.KwargsLike = None) -> MaybeSeriesFrameTupleT:
         """Generate exits based on when the price hits (trailing) stop loss or take profit.
+
+        !!! hint
+            This function is meant for signal analysis. For backtesting, consider using
+            the stop logic integrated into `vectorbt.portfolio.base.Portfolio.from_signals`.
 
         If any of `high`, `low` or `close` is None, it will be set to `open`.
 
@@ -719,7 +810,7 @@ class SignalsAccessor(GenericAccessor):
         set `out_dict` to {} to produce these arrays automatically and still have access to them.
 
         For arguments, see `vectorbt.signals.nb.ohlc_stop_choice_nb`.
-        If `iteratively` is True, see `vectorbt.signals.nb.generate_ohlc_stop_ex_iter_nb`.
+        If `chain` is True, see `vectorbt.signals.nb.generate_ohlc_stop_enex_nb`.
         Otherwise, see `vectorbt.signals.nb.generate_ohlc_stop_ex_nb`.
 
         All array-like arguments including stops and `out_dict` will broadcast using
@@ -729,47 +820,125 @@ class SignalsAccessor(GenericAccessor):
 
         !!! note
             `open` isn't necessarily open price, but can be any entry price (even previous close).
-            Stop price is calculated based solely on `open`.
+            Stop price is calculated based solely on the entry price.
+
+        !!! hint
+            Default arguments will generate an exit signal strictly between two entry signals.
+            If both entry signals are too close to each other, no exit will be generated.
+
+            To ignore all entries that come between an entry and its exit,
+            set `until_next` to False and `skip_until_exit` to True.
+
+            To remove all entries that come between an entry and its exit,
+            set `chain` to True. This will return two arrays: new entries and exits.
 
         ## Example
+
+        The same example as under `vectorbt.signals.nb.generate_ohlc_stop_ex_nb`:
 
         ```python-repl
         >>> from vectorbt.signals.enums import StopType
 
         >>> price = pd.DataFrame({
-        ...     'open': [10, 11, 12, 11, 10],
-        ...     'high': [11, 12, 13, 12, 11],
-        ...     'low': [9, 10, 11, 10, 9],
-        ...     'close': [10, 11, 12, 11, 10]
+        ...     'open': [10, 11, 12, 11, 10, 9],
+        ...     'high': [11, 12, 13, 12, 11, 10],
+        ...     'low': [9, 10, 11, 10, 9, 8],
+        ...     'close': [10, 11, 12, 11, 10, 9]
         ... })
         >>> out_dict = {}
         >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
         ...     price['open'], price['high'], price['low'], price['close'],
-        ...     out_dict=out_dict, sl_stop=0.2, ts_stop=0.2, tp_stop=0.2)
+        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.1, out_dict=out_dict)
         >>> exits
                         a      b      c
         2020-01-01  False  False  False
         2020-01-02   True   True  False
         2020-01-03  False  False  False
-        2020-01-04  False  False  False
-        2020-01-05  False  False   True
+        2020-01-04  False   True   True
+        2020-01-05  False  False  False
 
         >>> out_dict['hit_price']
-                       a     b    c
-        2020-01-01   NaN   NaN  NaN
-        2020-01-02  12.0  12.0  NaN
-        2020-01-03   NaN   NaN  NaN
-        2020-01-04   NaN   NaN  NaN
-        2020-01-05   NaN   NaN  9.6
+                       a     b     c
+        2020-01-01   NaN   NaN   NaN
+        2020-01-02  11.0  11.0   NaN
+        2020-01-03   NaN   NaN   NaN
+        2020-01-04   NaN  10.8  10.8
+        2020-01-05   NaN   NaN   NaN
 
         >>> out_dict['stop_type'].vbt.map_enum(StopType)
-                             a           b         c
+                             a           b          c
         2020-01-01
         2020-01-02  TakeProfit  TakeProfit
         2020-01-03
-        2020-01-04
-        2020-01-05                          StopLoss
+        2020-01-04               TrailStop  TrailStop
+        2020-01-05
         ```
+
+        Notice how the first two entry signals in the third column have no exit signal - there is
+        no room between them for an exit signal. To find an exit for the first entry and ignore all
+        entries that are in-between them, we can pass `until_next=False` and `skip_until_exit=True`:
+
+        ```python-repl
+        >>> out_dict = {}
+        >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
+        ...     price['open'], price['high'], price['low'], price['close'],
+        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.1, out_dict=out_dict,
+        ...     until_next=False, skip_until_exit=True)
+        >>> exits
+                        a      b      c
+        2020-01-01  False  False  False
+        2020-01-02   True   True   True
+        2020-01-03  False  False  False
+        2020-01-04  False   True   True
+        2020-01-05  False  False  False
+
+        >>> out_dict['hit_price']
+        2020-01-01   NaN   NaN   NaN
+        2020-01-02  11.0  11.0  11.0
+        2020-01-03   NaN   NaN   NaN
+        2020-01-04   NaN  10.8  10.8
+        2020-01-05   NaN   NaN   NaN
+
+        >>> out_dict['stop_type'].vbt.map_enum(StopType)
+                             a           b           c
+        2020-01-01
+        2020-01-02  TakeProfit  TakeProfit  TakeProfit
+        2020-01-03
+        2020-01-04               TrailStop   TrailStop
+        2020-01-05
+        ```
+
+        Now, the first signal in the third column gets executed regardless of the entries that come next,
+        which is very similar to the logic that is implemented in `vectorbt.portfolio.base.Portfolio.from_signals`.
+
+        To automatically remove all ignored entry signals, pass `chain=True`.
+        This will return a new entries array:
+
+        ```python-repl
+        >>> out_dict = {}
+        >>> new_entries, exits = mask.vbt.signals.generate_ohlc_stop_exits(
+        ...     price['open'], price['high'], price['low'], price['close'],
+        ...     sl_stop=0.1, sl_trail=True, tp_stop=0.1, out_dict=out_dict,
+        ...     chain=True)
+        >>> new_entries
+                        a      b      c
+        2020-01-01   True   True   True
+        2020-01-02  False  False  False  << removed entry in the third column
+        2020-01-03  False   True   True
+        2020-01-04  False  False  False
+        2020-01-05  False   True  False
+        >>> exits
+                        a      b      c
+        2020-01-01  False  False  False
+        2020-01-02   True   True   True
+        2020-01-03  False  False  False
+        2020-01-04  False   True   True
+        2020-01-05  False  False  False
+        ```
+
+        !!! warning
+            The last two examples above make entries dependent upon exits - this makes only sense
+            if you have no other exit arrays to combine this stop exit array with.
         """
         if broadcast_kwargs is None:
             broadcast_kwargs = {}
@@ -795,9 +964,13 @@ class SignalsAccessor(GenericAccessor):
 
         keep_raw = (False, True, True, True, True, True, True, True) + (False,) * len(out_args)
         broadcast_kwargs = merge_dicts(dict(require_kwargs=dict(requirements='W')), broadcast_kwargs)
-        entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args = reshape_fns.broadcast(
-            entries, open, high, low, close, sl_stop, ts_stop, tp_stop, *out_args,
+        entries, open, high, low, close, sl_stop, sl_trail, tp_stop, *out_args = reshape_fns.broadcast(
+            entries, open, high, low, close, sl_stop, sl_trail, tp_stop, *out_args,
             **broadcast_kwargs, keep_raw=keep_raw)
+        if np.any(sl_stop == 0):
+            warnings.warn("At least one SL stop value is 0", stacklevel=2)
+        if np.any(tp_stop == 0):
+            warnings.warn("At least one TP stop value is 0", stacklevel=2)
         if hit_price_out is None:
             hit_price_out = np.empty_like(entries, dtype=np.float_)
         else:
@@ -811,11 +984,24 @@ class SignalsAccessor(GenericAccessor):
         stop_type_out = reshape_fns.to_2d(stop_type_out, raw=True)
 
         # Perform generation
-        if iteratively:
-            new_entries, exits = nb.generate_ohlc_stop_ex_iter_nb(
-                entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
-                stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, entry_wait,
-                exit_wait, first, entries.ndim == 2)
+        if chain:
+            new_entries, exits = nb.generate_ohlc_stop_enex_nb(
+                entries.vbt.to_2d_array(),
+                open,
+                high,
+                low,
+                close,
+                hit_price_out,
+                stop_type_out,
+                sl_stop,
+                sl_trail,
+                tp_stop,
+                is_open_safe,
+                entry_wait,
+                exit_wait,
+                pick_first,
+                entries.ndim == 2
+            )
             out_dict['hit_price'] = entries.vbt.wrapper.wrap(
                 hit_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             out_dict['stop_type'] = entries.vbt.wrapper.wrap(
@@ -823,10 +1009,26 @@ class SignalsAccessor(GenericAccessor):
             return entries.vbt.wrapper.wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
                    entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))
         else:
+            if skip_until_exit and until_next:
+                warnings.warn("skip_until_exit=True has only effect when until_next=False", stacklevel=2)
             exits = nb.generate_ohlc_stop_ex_nb(
-                entries.vbt.to_2d_array(), open, high, low, close, hit_price_out,
-                stop_type_out, sl_stop, ts_stop, tp_stop, is_open_safe, exit_wait,
-                first, entries.ndim == 2)
+                entries.vbt.to_2d_array(),
+                open,
+                high,
+                low,
+                close,
+                hit_price_out,
+                stop_type_out,
+                sl_stop,
+                sl_trail,
+                tp_stop,
+                is_open_safe,
+                exit_wait,
+                until_next,
+                skip_until_exit,
+                pick_first,
+                entries.ndim == 2
+            )
             out_dict['hit_price'] = entries.vbt.wrapper.wrap(
                 hit_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             out_dict['stop_type'] = entries.vbt.wrapper.wrap(

@@ -64,8 +64,15 @@ def is_iterable(arg: tp.Any) -> bool:
 
 def is_numba_func(arg: tp.Any) -> bool:
     """Check whether the argument is a Numba-compiled function."""
+    from vectorbt._settings import settings
+    numba_cfg = settings['numba']
+
+    if not numba_cfg['check_func_type']:
+        return True
     if 'NUMBA_DISABLE_JIT' in os.environ:
         if os.environ['NUMBA_DISABLE_JIT'] == '1':
+            if not numba_cfg['check_func_suffix']:
+                return True
             if arg.__name__.endswith('_nb'):
                 return True
     return isinstance(arg, CPUDispatcher)

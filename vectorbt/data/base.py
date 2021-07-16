@@ -26,9 +26,9 @@ random returns with provided mean and standard deviation:
 ...         rand_price = start_value + np.cumprod(rand_returns + 1)
 ...         return pd.Series(rand_price, index=index)
 
->>> rand_data = RandomData.download(['RAND1', 'RAND2'])
+>>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'])
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  101.042956  100.920462
 2021-01-02  100.987327  100.956455
 2021-01-03  101.022333  100.955128
@@ -44,10 +44,10 @@ symbol           RAND1       RAND2
 To provide different keyword arguments for different symbols, we can use `vectorbt.data.base.symbol_dict`:
 
 ```python-repl
->>> start_value = vbt.symbol_dict({'RAND2': 200})
->>> rand_data = RandomData.download(['RAND1', 'RAND2'], start_value=start_value)
+>>> start_value = vbt.symbol_dict({'RANDNX2': 200})
+>>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'], start_value=start_value)
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  101.083324  200.886078
 2021-01-02  101.113405  200.791934
 2021-01-03  101.169194  200.852877
@@ -64,13 +64,13 @@ In case two symbols have different index or columns, they are automatically alig
 `missing_index` and `missing_columns` (see `data` in `vectorbt._settings.settings`):
 
 ```python-repl
->>> start_dt = vbt.symbol_dict({'RAND2': '2021-01-03'})
->>> end_dt = vbt.symbol_dict({'RAND2': '2021-01-07'})
+>>> start_dt = vbt.symbol_dict({'RANDNX2': '2021-01-03'})
+>>> end_dt = vbt.symbol_dict({'RANDNX2': '2021-01-07'})
 >>> rand_data = RandomData.download(
-...     ['RAND1', 'RAND2'], start_value=start_value,
+...     ['RANDNX1', 'RANDNX2'], start_value=start_value,
 ...     start_dt=start_dt, end_dt=end_dt)
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  101.028054         NaN
 2021-01-02  101.032090         NaN
 2021-01-03  101.038531  200.936283
@@ -115,9 +115,9 @@ Note that updating data always returns a new `Data` instance.
 ...         kwargs = merge_dicts(download_kwargs, kwargs)
 ...         return self.download_symbol(symbol, **kwargs)
 
->>> rand_data = RandomData.download(['RAND1', 'RAND2'], end_dt='2021-01-05')
+>>> rand_data = RandomData.download(['RANDNX1', 'RANDNX2'], end_dt='2021-01-05')
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -126,7 +126,7 @@ symbol           RAND1       RAND2
 
 >>> rand_data = rand_data.update()
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -137,7 +137,7 @@ symbol           RAND1       RAND2
 
 >>> rand_data = rand_data.update()
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376
@@ -156,11 +156,11 @@ defining custom download and update methods, or by manually merging their data d
 into one data dict and passing it to the `Data.from_data` class method.
 
 ```python-repl
->>> rand_data1 = RandomData.download('RAND1', mean=0.2)
->>> rand_data2 = RandomData.download('RAND2', start_value=200, start_dt='2021-01-05')
+>>> rand_data1 = RandomData.download('RANDNX1', mean=0.2)
+>>> rand_data2 = RandomData.download('RANDNX2', start_value=200, start_dt='2021-01-05')
 >>> merged_data = vbt.Data.from_data(vbt.merge_dicts(rand_data1.data, rand_data2.data))
 >>> merged_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  101.160718         NaN
 2021-01-02  101.421020         NaN
 2021-01-03  101.959176         NaN
@@ -183,7 +183,7 @@ on a `Data` instance, which forwards indexing operation to each Series/DataFrame
 <__main__.RandomData at 0x7fdba4e36198>
 
 >>> rand_data.loc['2021-01-07':'2021-01-09'].get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-07  100.883400  100.874922
 2021-01-08  101.011738  100.780188
 2021-01-09  100.912639  100.934014
@@ -198,7 +198,7 @@ instance to the disk with `Data.save` and load it with `Data.load`:
 >>> rand_data.save('rand_data')
 >>> rand_data = RandomData.load('rand_data')
 >>> rand_data.get()
-symbol           RAND1       RAND2
+symbol           RANDNX1       RANDNX2
 2021-01-01  100.956601  100.970865
 2021-01-02  100.919011  100.987026
 2021-01-03  101.062733  100.835376

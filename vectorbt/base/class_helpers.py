@@ -46,19 +46,21 @@ def add_nb_methods(nb_funcs: tp.Iterable[NBFuncInfoT], module_name: tp.Optional[
                           wrap_kwargs: tp.KwargsLike = None,
                           **kwargs) -> tp.SeriesFrame:
                 default_kwargs = get_func_kwargs(nb_func)
-                wrap_kwargs = merge_dicts({}, wrap_kwargs)
+
                 if '_1d' in _nb_func.__name__:
                     # One-dimensional array as input
                     a = _nb_func(self.to_1d_array(), *args, **{**default_kwargs, **kwargs})
                     if _is_reducing:
-                        return self.wrapper.wrap_reduced(a, name_or_index=_fname, **wrap_kwargs)
-                    return self.wrapper.wrap(a, **wrap_kwargs)
+                        wrap_kwargs = merge_dicts(dict(name_or_index=_fname), wrap_kwargs)
+                        return self.wrapper.wrap_reduced(a, **wrap_kwargs)
+                    return self.wrapper.wrap(a, **merge_dicts({}, wrap_kwargs))
                 else:
                     # Two-dimensional array as input
                     a = _nb_func(self.to_2d_array(), *args, **{**default_kwargs, **kwargs})
                     if _is_reducing:
-                        return self.wrapper.wrap_reduced(a, name_or_index=_fname, **wrap_kwargs)
-                    return self.wrapper.wrap(a, **wrap_kwargs)
+                        wrap_kwargs = merge_dicts(dict(name_or_index=_fname), wrap_kwargs)
+                        return self.wrapper.wrap_reduced(a, **wrap_kwargs)
+                    return self.wrapper.wrap(a, **merge_dicts({}, wrap_kwargs))
 
             # Replace the function's signature with the original one
             sig = inspect.signature(nb_func)

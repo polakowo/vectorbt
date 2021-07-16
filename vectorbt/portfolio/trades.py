@@ -268,12 +268,12 @@ class Trades(Records):
     @cached_property
     def win_streak(self) -> MappedArray:
         """Winning streak at each trade in the current column."""
-        return self.apply(nb.trade_win_rank_apply_nb, dtype=np.int_)
+        return self.apply(nb.trade_win_streak_nb, dtype=np.int_)
 
     @cached_property
     def loss_streak(self) -> MappedArray:
         """Losing streak at each trade in the current column."""
-        return self.apply(nb.trade_loss_rank_apply_nb, dtype=np.int_)
+        return self.apply(nb.trade_loss_streak_nb, dtype=np.int_)
 
     @cached_method
     def profit_factor(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:

@@ -48,7 +48,7 @@ def index_from_values(values: tp.ArrayLikeSequence, name: tp.Optional[str] = Non
         if v is None or isinstance(v, scalar_types):
             value_names.append(v)
         elif isinstance(v, np.ndarray):
-            if (v == v.item(0)).all():
+            if np.isclose(v, v.item(0), equal_nan=True).all():
                 value_names.append(v.item(0))
             else:
                 value_names.append('array_%d' % i)

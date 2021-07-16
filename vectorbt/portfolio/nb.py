@@ -57,7 +57,6 @@ from vectorbt.utils.math import (
 from vectorbt.utils.array import insert_argsort_nb
 from vectorbt.base.reshape_fns import flex_select_auto_nb
 from vectorbt.generic import nb as generic_nb
-from vectorbt.signals import nb as signals_nb
 from vectorbt.returns import nb as returns_nb
 from vectorbt.portfolio.enums import *
 
@@ -3311,7 +3310,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                     tp_curr_stop[col] = adjust_tp_func_nb(adjust_tp_ctx, *adjust_tp_args)
 
                     if not np.isnan(sl_curr_stop[col]) or not np.isnan(tp_curr_stop[col]):
-                        # Get stop price
+                        # Resolve current bar
                         _open = flex_select_auto_nb(i, col, open, flex_2d)
                         _high = flex_select_auto_nb(i, col, high, flex_2d)
                         _low = flex_select_auto_nb(i, col, low, flex_2d)
@@ -3323,6 +3322,7 @@ def simulate_from_signals_nb(target_shape: tp.Shape,
                         if np.isnan(_high):
                             _high = max(_open, _close)
 
+                        # Get stop price
                         stop_price = np.nan
                         position_now = last_position[col]
                         if not np.isnan(sl_curr_stop[col]):
@@ -3578,25 +3578,31 @@ def trade_duration_map_nb(record: tp.Record) -> int:
 
 
 @njit(cache=True)
-def trade_win_rank_apply_nb(records: tp.RecordArray) -> tp.Array1d:
-    """`map_func_nb` that returns ranks of winning trades (streak)."""
-    return signals_nb.rank_1d_nb(
-        records['pnl'] > 0,
-        reset_by=None,
-        after_false=False,
-        allow_gaps=False
-    )
+def trade_win_streak_nb(records: tp.RecordArray) -> tp.Array1d:
+    """Return the current win streak of each trade."""
+    out = np.full(len(records), 0, dtype=np.int_)
+    curr_rank = 0
+    for i in range(len(records)):
+        if records[i]['pnl'] > 0:
+            curr_rank += 1
+        else:
+            curr_rank = 0
+        out[i] = curr_rank
+    return out
 
 
 @njit(cache=True)
-def trade_loss_rank_apply_nb(records: tp.RecordArray) -> tp.Array1d:
-    """`map_func_nb` that returns ranks of losing trades (streak)."""
-    return signals_nb.rank_1d_nb(
-        records['pnl'] < 0,
-        reset_by=None,
-        after_false=False,
-        allow_gaps=False
-    )
+def trade_loss_streak_nb(records: tp.RecordArray) -> tp.Array1d:
+    """Return the current loss streak of each trade."""
+    out = np.full(len(records), 0, dtype=np.int_)
+    curr_rank = 0
+    for i in range(len(records)):
+        if records[i]['pnl'] < 0:
+            curr_rank += 1
+        else:
+            curr_rank = 0
+        out[i] = curr_rank
+    return out
 
 
 @njit(cache=True)

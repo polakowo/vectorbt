@@ -1141,7 +1141,7 @@ class TestRecords:
     def test_apply(self):
         @njit
         def cumsum_apply_nb(records):
-            return np.cumsum(records.some_field1)
+            return np.cumsum(records['some_field1'])
 
         np.testing.assert_array_equal(
             records['a'].apply(cumsum_apply_nb).values,

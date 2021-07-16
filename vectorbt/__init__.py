@@ -483,6 +483,8 @@ modeling portfolio performance and visualizing results.
 
 ## Resources
 
+Head over to the [documentation](https://polakowo.io/vectorbt/docs/index.html) to get started.
+
 ### Notebooks
 
 - [Performance analysis of Moving Average Crossover](https://nbviewer.jupyter.org/github/polakowo/vectorbt/blob/master/examples/BitcoinDMAC.ipynb)
@@ -504,6 +506,39 @@ Note: you must run the notebook to play with the widgets.
 ### Articles
 
 - [Stop Loss, Trailing Stop, or Take Profit? 2 Million Backtests Shed Light](https://polakowo.medium.com/stop-loss-trailing-stop-or-take-profit-2-million-backtests-shed-light-dde23bda40be)
+
+## Where to get help
+
+- [Start a new GitHub Discussion](https://github.com/polakowo/vectorbt/discussions)
+- [Ask a question on Gitter](https://gitter.im/vectorbt/community)
+- [Join a private chat](https://www.patreon.com/vectorbt)
+
+For other inquiries, contact the author: [olegpolakow@gmail.com](mailto:olegpolakow@gmail.com)
+
+## How to contribute
+
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
+
+First, you need to install vectorbt from the repository:
+
+```bash
+pip uninstall vectorbt
+git clone https://github.com/polakowo/vectorbt.git
+cd vectorbt
+pip install -e .
+```
+
+After making changes, make sure you did not break any functionality:
+
+```bash
+pytest
+```
+
+Please make sure to update tests as appropriate.
+
+## License
+
+This work is licensed under Apache 2.0, but installing optional dependencies may be subject to a stronger license.
 
 ## Disclaimer
 

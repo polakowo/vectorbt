@@ -2596,11 +2596,11 @@ class TestCommon:
         def reduced_dim1_1d_nb(a): return np.zeros(a.shape[0] - 1)
 
         @class_helpers.add_nb_methods([
-            (same_shape_1d_nb, False),
-            (wkw_1d_nb, False),
-            (reduced_dim0_1d_nb, True, 'reduced_dim0'),
-            (reduced_dim1_one_1d_nb, True, 'reduced_dim1_one'),
-            (reduced_dim1_1d_nb, True)
+            ('same_shape', same_shape_1d_nb, False),
+            ('wkw', wkw_1d_nb, False),
+            ('reduced_dim0', reduced_dim0_1d_nb, True),
+            ('reduced_dim1_one', reduced_dim1_one_1d_nb, True),
+            ('reduced_dim1', reduced_dim1_1d_nb, True)
         ])
         class H_1d(accessors.BaseAccessor):
             def __init__(self, sr):
@@ -2630,11 +2630,11 @@ class TestCommon:
         def reduced_dim2_nb(a): return np.zeros((a.shape[0] - 1, a.shape[1]))
 
         @class_helpers.add_nb_methods([
-            (same_shape_nb, False),
-            (wkw_nb, False),
-            (reduced_dim0_nb, True, 'reduced_dim0'),
-            (reduced_dim1_nb, True, 'reduced_dim1'),
-            (reduced_dim2_nb, True),
+            ('same_shape', same_shape_nb, False),
+            ('wkw', wkw_nb, False),
+            ('reduced_dim0', reduced_dim0_nb, True),
+            ('reduced_dim1', reduced_dim1_nb, True),
+            ('reduced_dim2', reduced_dim2_nb, True),
         ])
         class H(accessors.BaseAccessor):
             pass

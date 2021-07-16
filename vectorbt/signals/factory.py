@@ -14,9 +14,16 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.params import to_typed_list
+from vectorbt.utils.enum import cast_enum_value
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
-from vectorbt.signals.nb import generate_ex_nb, generate_enex_nb, first_choice_nb
+from vectorbt.signals.nb import (
+    generate_nb,
+    generate_ex_nb,
+    generate_enex_nb,
+    first_choice_nb
+)
+from vectorbt.signals.enums import FactoryMode
 
 
 class SignalFactory(IndicatorFactory):
@@ -24,50 +31,45 @@ class SignalFactory(IndicatorFactory):
 
     Extends `vectorbt.indicators.factory.IndicatorFactory` with choice functions.
 
-    Generates a fixed number of outputs (see arguments). If you need to generate other outputs,
-    use in-place outputs (via `in_output_names`).
+    Generates a fixed number of outputs (depending upon `mode`).
+    If you need to generate other outputs, use in-place outputs (via `in_output_names`).
 
-    Args:
-        exit_only (bool): Whether to generate exit signals only.
-
-            If True, uses `entries` as input and `exits` as output.
-            Otherwise, uses `entries` and `exits` as outputs.
-        iteratively (bool): Whether to use entries to iteratively generate new entries and exits.
-
-            If True, uses `entries` as input and `new_entries` and `exits` as outputs.
+    See `vectorbt.signals.enums.FactoryMode` for supported generation modes.
 
     Other arguments are passed to `vectorbt.indicators.factory.IndicatorFactory`.
     ```"""
 
     def __init__(self,
                  *args,
+                 mode: tp.Union[str, int] = FactoryMode.Both,
                  input_names: tp.Optional[tp.Sequence[str]] = None,
                  attr_settings: tp.KwargsLike = None,
-                 exit_only: bool = False,
-                 iteratively: bool = False,
                  **kwargs) -> None:
+        mode = cast_enum_value(mode, FactoryMode)
         if input_names is None:
             input_names = []
         else:
             input_names = list(input_names)
         if attr_settings is None:
             attr_settings = {}
-        if iteratively:
-            exit_only = True
-        if exit_only:
-            if len(input_names) > 0:
-                if input_names[0] != 'entries':
-                    input_names = ['entries'] + input_names
-            else:
-                input_names = ['entries']
+
+        if 'entries' in input_names:
+            raise ValueError("entries cannot be used in input_names")
+        if 'exits' in input_names:
+            raise ValueError("exits cannot be used in input_names")
+        if mode == FactoryMode.Entries:
+            output_names = ['entries']
+        elif mode == FactoryMode.Exits:
+            input_names = ['entries'] + input_names
             output_names = ['exits']
-            if iteratively:
-                output_names = ['new_entries'] + output_names
-                attr_settings['new_entries'] = dict(dtype=np.bool_)
-        else:
+        elif mode == FactoryMode.Both:
             output_names = ['entries', 'exits']
-        attr_settings['entries'] = dict(dtype=np.bool_)
-        attr_settings['exits'] = dict(dtype=np.bool_)
+        else:
+            input_names = ['entries'] + input_names
+            output_names = ['new_entries', 'exits']
+        for output_name in output_names:
+            attr_settings[output_name] = dict(dtype=np.bool_)
+
         IndicatorFactory.__init__(
             self,
             *args,
@@ -76,8 +78,7 @@ class SignalFactory(IndicatorFactory):
             attr_settings=attr_settings,
             **kwargs
         )
-        self.exit_only = exit_only
-        self.iteratively = iteratively
+        self.mode = mode
 
         def plot(_self,
                  entry_y: tp.Optional[tp.ArrayLike] = None,
@@ -95,6 +96,14 @@ class SignalFactory(IndicatorFactory):
                 entry_trace_kwargs = {}
             if exit_trace_kwargs is None:
                 exit_trace_kwargs = {}
+            entry_trace_kwargs = merge_dicts(
+                dict(name="New Entry" if mode == FactoryMode.Chain else "Entry"),
+                entry_trace_kwargs
+            )
+            exit_trace_kwargs = merge_dicts(
+                dict(name="Exit"),
+                exit_trace_kwargs
+            )
             if entry_types is not None:
                 entry_types = np.asarray(entry_types)
                 entry_trace_kwargs = merge_dicts(dict(
@@ -107,15 +116,24 @@ class SignalFactory(IndicatorFactory):
                     customdata=exit_types,
                     hovertemplate="(%{x}, %{y})<br>Type: %{customdata}"
                 ), exit_trace_kwargs)
-            if exit_only and iteratively:
-                entries = _self.new_entries
+            if mode == FactoryMode.Entries:
+                fig = _self.entries.vbt.signals.plot_as_entry_markers(
+                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+            elif mode == FactoryMode.Exits:
+                fig = _self.entries.vbt.signals.plot_as_entry_markers(
+                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                fig = _self.exits.vbt.signals.plot_as_exit_markers(
+                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
+            elif mode == FactoryMode.Both:
+                fig = _self.entries.vbt.signals.plot_as_entry_markers(
+                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                fig = _self.exits.vbt.signals.plot_as_exit_markers(
+                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
             else:
-                entries = _self.entries
-            exits = _self.exits
-            fig = entries.vbt.signals.plot_as_entry_markers(
-                y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
-            fig = exits.vbt.signals.plot_as_exit_markers(
-                y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
+                fig = _self.new_entries.vbt.signals.plot_as_entry_markers(
+                    y=entry_y, trace_kwargs=entry_trace_kwargs, fig=fig, **kwargs)
+                fig = _self.exits.vbt.signals.plot_as_exit_markers(
+                    y=exit_y, trace_kwargs=exit_trace_kwargs, fig=fig, **kwargs)
 
             return fig
 
@@ -133,7 +151,7 @@ class SignalFactory(IndicatorFactory):
             fig (Figure or FigureWidget): Figure to add traces to.
             **kwargs: Keyword arguments passed to `vectorbt.signals.accessors.SignalsSRAccessor.plot_as_markers`.
         """.format(
-            self.class_name, 'new_entries' if exit_only and iteratively else 'entries'
+            self.class_name, 'new_entries' if mode == FactoryMode.Chain else 'entries'
         )
 
         setattr(self.Indicator, 'plot', plot)
@@ -142,6 +160,7 @@ class SignalFactory(IndicatorFactory):
             self,
             entry_choice_func: tp.Optional[tp.ChoiceFunc] = None,
             exit_choice_func: tp.Optional[tp.ChoiceFunc] = None,
+            generate_func: tp.Callable = generate_nb,
             generate_ex_func: tp.Callable = generate_ex_nb,
             generate_enex_func: tp.Callable = generate_enex_nb,
             cache_func: tp.Callable = None,
@@ -158,14 +177,14 @@ class SignalFactory(IndicatorFactory):
         broadcast parameter arrays, and other arguments, and returns an array of indices
         corresponding to chosen signals. See `vectorbt.signals.nb.generate_nb`.
 
-        If `exit_only` is True, calls `generate_ex_func`.
-        If `exit_only` is False or `iteratively` is True, calls `generate_enex_func`.
-
         Args:
             entry_choice_func (callable): `choice_func_nb` that returns indices of entries.
 
-                If `exit_only` is True, automatically set to `vectorbt.signals.nb.first_choice_nb`.
+                Defaults to `vectorbt.signals.nb.first_choice_nb` for `FactoryMode.Chain`.
             exit_choice_func (callable): `choice_func_nb` that returns indices of exits.
+            generate_func (callable): Entry generation function.
+
+                Defaults to `vectorbt.signals.nb.generate_nb`.
             generate_ex_func (callable): Exit generation function.
 
                 Defaults to `vectorbt.signals.nb.generate_ex_nb`.
@@ -204,7 +223,7 @@ class SignalFactory(IndicatorFactory):
             pass_params (list of str): Parameter names to pass to the choice function.
 
                 Defaults to []. Order matters. Each name must be in `param_names`.
-            pass_kwargs (list of str or list of tuple): Keyword arguments from `kwargs` dict to
+            pass_kwargs (dict, list of str or list of tuple): Keyword arguments from `kwargs` dict to
                 pass as positional arguments to the choice function.
 
                 Defaults to []. Order matters.
@@ -218,8 +237,16 @@ class SignalFactory(IndicatorFactory):
                     Default is provided by the pipeline if `pass_input_shape` is True.
                 * `wait`: Number of ticks to wait before placing signals.
                     Default is 1.
-                * `first`: Whether to stop as soon as the first exit signal is found.
+                * `until_next`: Whether to place signals up to the next entry signal.
                     Default is True.
+
+                    Applied in `generate_ex_func` only.
+                * `skip_until_exit`: Whether to skip processing entry signals until the next exit.
+                    Default is False.
+
+                    Applied in `generate_ex_func` only.
+                * `pick_first`: Whether to stop as soon as the first exit signal is found.
+                    Default is False with `FactoryMode.Entries`, otherwise is True.
                 * `temp_idx_arr`: Empty integer array used to temporarily store indices.
                     Default is an automatically generated array of shape `input_shape[0]`.
 
@@ -233,7 +260,8 @@ class SignalFactory(IndicatorFactory):
         The following arguments can be passed to `run` and `run_combs` methods:
 
         Args:
-            *args: Should be used instead of `exit_args` when `exit_only` is True.
+            *args: Should be used instead of `entry_args` with `FactoryMode.Entries` and instead of
+                `exit_args` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_choice_func`.
             entry_args (tuple): Arguments passed to the entry choice function.
             exit_args (tuple): Arguments passed to the exit choice function.
             cache_args (tuple): Arguments passed to the cache function.
@@ -245,7 +273,8 @@ class SignalFactory(IndicatorFactory):
                 passed as positional if in `pass_kwargs`.
             return_cache (bool): Whether to return only cache.
             use_cache (any): Cache to use.
-            **kwargs: Should be used instead of `exit_kwargs` when `exit_only` is True.
+            **kwargs: Should be used instead of `entry_kwargs` with `FactoryMode.Entries` and instead of
+                `exit_kwargs` with `FactoryMode.Exits` and `FactoryMode.Chain` with default `entry_choice_func`.
 
         For more arguments, see `vectorbt.indicators.factory.run_pipeline`.
 
@@ -302,8 +331,8 @@ class SignalFactory(IndicatorFactory):
 
         >>> # Build signal generator
         >>> MySignals = SignalFactory(
-        ...     param_names=['n'],
-        ...     iteratively=True
+        ...     mode='chain',
+        ...     param_names=['n']
         ... ).from_choice_func(
         ...     exit_choice_func=wait_choice_nb,
         ...     exit_settings=dict(
@@ -356,30 +385,28 @@ class SignalFactory(IndicatorFactory):
 
         >>> # Define exit choice function
         >>> @njit
-        ... def rand_exit_choice_nb(from_i, to_i, col, rand_type_out, prob1,
+        ... def rand_exit_choice_nb(from_i, to_i, col, rand_type, prob1,
         ...                         prob2, temp_idx_arr1, temp_idx_arr2, flex_2d):
-        ...     idxs1 = rand_by_prob_choice_nb(
-        ...         from_i, to_i, col, prob1, True, temp_idx_arr1, flex_2d)
+        ...     idxs1 = rand_by_prob_choice_nb(from_i, to_i, col, prob1, True, temp_idx_arr1, flex_2d)
         ...     if len(idxs1) > 0:
         ...         to_i = idxs1[0]  # no need to go beyond first the first found signal
-        ...     idxs2 = rand_by_prob_choice_nb(
-        ...         from_i, to_i, col, prob2, True, temp_idx_arr2, flex_2d)
+        ...     idxs2 = rand_by_prob_choice_nb(from_i, to_i, col, prob2, True, temp_idx_arr2, flex_2d)
         ...     if len(idxs2) > 0:
-        ...         rand_type_out[idxs2[0], col] = RandType.R2
+        ...         rand_type[idxs2[0], col] = RandType.R2
         ...         return idxs2
         ...     if len(idxs1) > 0:
-        ...         rand_type_out[idxs1[0], col] = RandType.R1
+        ...         rand_type[idxs1[0], col] = RandType.R1
         ...         return idxs1
         ...     return temp_idx_arr1[:0]
 
         >>> # Build signal generator
         >>> MySignals = SignalFactory(
+        ...     mode='chain',
         ...     in_output_names=['rand_type'],
         ...     param_names=['prob1', 'prob2'],
         ...     attr_settings=dict(
         ...         rand_type=dict(dtype=RandType)  # creates rand_type_readable
-        ...     ),
-        ...     iteratively=True
+        ...     )
         ... ).from_choice_func(
         ...     exit_choice_func=rand_exit_choice_nb,
         ...     exit_settings=dict(
@@ -428,28 +455,42 @@ class SignalFactory(IndicatorFactory):
         ```
         """
 
-        exit_only = self.exit_only
-        iteratively = self.iteratively
+        mode = self.mode
         input_names = self.input_names
         param_names = self.param_names
         in_output_names = self.in_output_names
 
-        checks.assert_not_none(exit_choice_func)
-        checks.assert_numba_func(exit_choice_func)
-        if exit_only:
-            require_input_shape = False
-            if iteratively:
-                if entry_choice_func is None:
-                    entry_choice_func = first_choice_nb
-                if entry_settings is None:
-                    entry_settings = {}
-                entry_settings = merge_dicts(dict(
-                    pass_inputs=['entries']
-                ), entry_settings)
-        else:
+        if mode == FactoryMode.Entries:
             require_input_shape = True
             checks.assert_not_none(entry_choice_func)
             checks.assert_numba_func(entry_choice_func)
+            if exit_choice_func is not None:
+                raise ValueError("exit_choice_func cannot be used with FactoryMode.Entries")
+        elif mode == FactoryMode.Exits:
+            require_input_shape = False
+            if entry_choice_func is not None:
+                raise ValueError("entry_choice_func cannot be used with FactoryMode.Exits")
+            checks.assert_not_none(exit_choice_func)
+            checks.assert_numba_func(exit_choice_func)
+        elif mode == FactoryMode.Both:
+            require_input_shape = True
+            checks.assert_not_none(entry_choice_func)
+            checks.assert_numba_func(entry_choice_func)
+            checks.assert_not_none(exit_choice_func)
+            checks.assert_numba_func(exit_choice_func)
+        else:
+            require_input_shape = False
+            if entry_choice_func is None:
+                entry_choice_func = first_choice_nb
+            if entry_settings is None:
+                entry_settings = {}
+            entry_settings = merge_dicts(dict(
+                pass_inputs=['entries']
+            ), entry_settings)
+            checks.assert_not_none(entry_choice_func)
+            checks.assert_numba_func(entry_choice_func)
+            checks.assert_not_none(exit_choice_func)
+            checks.assert_numba_func(exit_choice_func)
         require_input_shape = kwargs.pop('require_input_shape', require_input_shape)
 
         if entry_settings is None:
@@ -459,20 +500,16 @@ class SignalFactory(IndicatorFactory):
         if cache_settings is None:
             cache_settings = {}
 
-        def _check_settings(func_settings: tp.Kwargs) -> None:
-            for k in func_settings:
-                if k not in (
-                        'pass_inputs',
-                        'pass_in_outputs',
-                        'pass_params',
-                        'pass_kwargs',
-                        'pass_cache'
-                ):
-                    raise ValueError(f"Can't find key {k} in function settings")
-
-        _check_settings(entry_settings)
-        _check_settings(exit_settings)
-        _check_settings(cache_settings)
+        valid_keys = [
+            'pass_inputs',
+            'pass_in_outputs',
+            'pass_params',
+            'pass_kwargs',
+            'pass_cache'
+        ]
+        checks.assert_dict_valid(entry_settings, valid_keys)
+        checks.assert_dict_valid(exit_settings, valid_keys)
+        checks.assert_dict_valid(cache_settings, valid_keys)
 
         # Get input names for each function
         def _get_func_names(func_settings: tp.Kwargs, setting: str, all_names: tp.Sequence[str]) -> tp.List[str]:
@@ -497,10 +534,47 @@ class SignalFactory(IndicatorFactory):
         cache_param_names = _get_func_names(cache_settings, 'pass_params', param_names)
 
         # Build a function that selects a parameter tuple
-        if exit_only and not iteratively:
+        if mode == FactoryMode.Entries:
+            _0 = "i"
+            _0 += ", shape"
+            _0 += ", entry_pick_first"
+            _0 += ", entry_input_tuple"
+            if len(entry_in_output_names) > 0:
+                _0 += ", entry_in_output_tuples"
+            if len(entry_param_names) > 0:
+                _0 += ", entry_param_tuples"
+            _0 += ", entry_args"
+            _1 = "shape"
+            _1 += ", entry_pick_first"
+            _1 += ", entry_choice_func"
+            _1 += ", *entry_input_tuple"
+            if len(entry_in_output_names) > 0:
+                _1 += ", *entry_in_output_tuples[i]"
+            if len(entry_param_names) > 0:
+                _1 += ", *entry_param_tuples[i]"
+            _1 += ", *entry_args"
+            func_str = "def apply_func({0}):\n   return generate_func({1})".format(_0, _1)
+            scope = {
+                'generate_func': generate_func,
+                'entry_choice_func': entry_choice_func
+            }
+            filename = inspect.getfile(lambda: None)
+            code = compile(func_str, filename, 'single')
+            exec(code, scope)
+            apply_func = scope['apply_func']
+            if numba_loop:
+                apply_func = njit(apply_func)
+                apply_and_concat_func = combine_fns.apply_and_concat_one_nb
+            else:
+                apply_and_concat_func = combine_fns.apply_and_concat_one
+
+        elif mode == FactoryMode.Exits:
             _0 = "i"
             _0 += ", entries"
             _0 += ", exit_wait"
+            _0 += ", until_next"
+            _0 += ", skip_until_exit"
+            _0 += ", exit_pick_first"
             _0 += ", exit_input_tuple"
             if len(exit_in_output_names) > 0:
                 _0 += ", exit_in_output_tuples"
@@ -509,6 +583,9 @@ class SignalFactory(IndicatorFactory):
             _0 += ", exit_args"
             _1 = "entries"
             _1 += ", exit_wait"
+            _1 += ", until_next"
+            _1 += ", skip_until_exit"
+            _1 += ", exit_pick_first"
             _1 += ", exit_choice_func"
             _1 += ", *exit_input_tuple"
             if len(exit_in_output_names) > 0:
@@ -536,6 +613,8 @@ class SignalFactory(IndicatorFactory):
             _0 += ", shape"
             _0 += ", entry_wait"
             _0 += ", exit_wait"
+            _0 += ", entry_pick_first"
+            _0 += ", exit_pick_first"
             _0 += ", entry_input_tuple"
             _0 += ", exit_input_tuple"
             if len(entry_in_output_names) > 0:
@@ -551,6 +630,8 @@ class SignalFactory(IndicatorFactory):
             _1 = "shape"
             _1 += ", entry_wait"
             _1 += ", exit_wait"
+            _1 += ", entry_pick_first"
+            _1 += ", exit_pick_first"
             _1 += ", entry_choice_func"
             _1 += ", (*entry_input_tuple"
             if len(entry_in_output_names) > 0:
@@ -609,13 +690,18 @@ class SignalFactory(IndicatorFactory):
                 exit_args = ()
             if cache_args is None:
                 cache_args = ()
-            if exit_only:
+            if mode == FactoryMode.Entries:
+                if len(entry_args) > 0:
+                    raise ValueError("Use *args instead of entry_args with FactoryMode.Entries")
+                entry_args = args
+            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_choice_func == first_choice_nb):
                 if len(exit_args) > 0:
-                    raise ValueError("Use *args instead of exit_args when exit_only=True")
+                    raise ValueError("Use *args instead of exit_args "
+                                     "with FactoryMode.Exits or FactoryMode.Chain")
                 exit_args = args
             else:
                 if len(args) > 0:
-                    raise ValueError("*args can be only used when exit_only=True")
+                    raise ValueError("*args cannot be used with FactoryMode.Both")
 
             if entry_kwargs is None:
                 entry_kwargs = {}
@@ -623,25 +709,38 @@ class SignalFactory(IndicatorFactory):
                 exit_kwargs = {}
             if cache_kwargs is None:
                 cache_kwargs = {}
-            if exit_only:
+            if mode == FactoryMode.Entries:
+                if len(entry_kwargs) > 0:
+                    raise ValueError("Use **kwargs instead of entry_kwargs with FactoryMode.Entries")
+                entry_kwargs = _kwargs
+            elif mode == FactoryMode.Exits or (mode == FactoryMode.Chain and entry_choice_func == first_choice_nb):
                 if len(exit_kwargs) > 0:
-                    raise ValueError("Use **kwargs instead of exit_kwargs when exit_only=True")
+                    raise ValueError("Use **kwargs instead of exit_kwargs "
+                                     "with FactoryMode.Exits or FactoryMode.Chain")
                 exit_kwargs = _kwargs
             else:
                 if len(_kwargs) > 0:
-                    raise ValueError("**kwargs can be only used when exit_only=True")
+                    raise ValueError("*args cannot be used with FactoryMode.Both")
 
             kwargs_defaults = dict(
                 input_shape=input_shape,
                 wait=1,
-                first=True,
+                until_next=True,
+                skip_until_exit=False,
+                pick_first=True,
                 flex_2d=flex_2d,
             )
+            if mode == FactoryMode.Entries:
+                kwargs_defaults['pick_first'] = False
             entry_kwargs = merge_dicts(kwargs_defaults, entry_kwargs)
             exit_kwargs = merge_dicts(kwargs_defaults, exit_kwargs)
             cache_kwargs = merge_dicts(kwargs_defaults, cache_kwargs)
             entry_wait = entry_kwargs['wait']
             exit_wait = exit_kwargs['wait']
+            entry_pick_first = entry_kwargs['pick_first']
+            exit_pick_first = exit_kwargs['pick_first']
+            until_next = exit_kwargs['until_next']
+            skip_until_exit = exit_kwargs['skip_until_exit']
 
             # Distribute arguments across functions
             entry_input_tuple = ()
@@ -682,6 +781,8 @@ class SignalFactory(IndicatorFactory):
 
             def _build_more_args(func_settings: tp.Kwargs, func_kwargs: tp.Kwargs) -> tp.Args:
                 pass_kwargs = func_settings.get('pass_kwargs', [])
+                if isinstance(pass_kwargs, dict):
+                    pass_kwargs = list(pass_kwargs.items())
                 more_args = ()
                 for key in pass_kwargs:
                     value = None
@@ -731,7 +832,34 @@ class SignalFactory(IndicatorFactory):
                 exit_cache = cache
 
             # Apply and concatenate
-            if exit_only and not iteratively:
+            if mode == FactoryMode.Entries:
+                if len(entry_in_output_names) > 0:
+                    if numba_loop:
+                        _entry_in_output_tuples = (to_typed_list(entry_in_output_tuples),)
+                    else:
+                        _entry_in_output_tuples = (entry_in_output_tuples,)
+                else:
+                    _entry_in_output_tuples = ()
+                if len(entry_param_names) > 0:
+                    if numba_loop:
+                        _entry_param_tuples = (to_typed_list(entry_param_tuples),)
+                    else:
+                        _entry_param_tuples = (entry_param_tuples,)
+                else:
+                    _entry_param_tuples = ()
+
+                return apply_and_concat_func(
+                    n_params,
+                    apply_func,
+                    input_shape,
+                    entry_pick_first,
+                    entry_input_tuple,
+                    *_entry_in_output_tuples,
+                    *_entry_param_tuples,
+                    entry_args + entry_more_args + entry_cache
+                )
+
+            elif mode == FactoryMode.Exits:
                 if len(exit_in_output_names) > 0:
                     if numba_loop:
                         _exit_in_output_tuples = (to_typed_list(exit_in_output_tuples),)
@@ -752,6 +880,9 @@ class SignalFactory(IndicatorFactory):
                     apply_func,
                     input_list[0],
                     exit_wait,
+                    until_next,
+                    skip_until_exit,
+                    exit_pick_first,
                     exit_input_tuple,
                     *_exit_in_output_tuples,
                     *_exit_param_tuples,
@@ -794,6 +925,8 @@ class SignalFactory(IndicatorFactory):
                     input_shape,
                     entry_wait,
                     exit_wait,
+                    entry_pick_first,
+                    exit_pick_first,
                     entry_input_tuple,
                     exit_input_tuple,
                     *_entry_in_output_tuples,
