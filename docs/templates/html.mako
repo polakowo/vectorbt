@@ -25,7 +25,7 @@
     return annot
 %>
 
-<%def name="ident(name)"><span class="ident">${name}</span></%def>
+<%def name="ident(name, css_class)"><span class="ident ${css_class}">${name}</span></%def>
 
 <%def name="show_source(d)">
   % if (show_source_code or git_link_template) and d.source and d.obj is not getattr(d.inherits, 'obj', None):
@@ -103,13 +103,13 @@
   submodules = module.submodules()
   %>
 
-  <%def name="show_func(f)">
+  <%def name="show_func(f, css_class)">
     <dt id="${f.refname}"><code class="name flex">
         <%
             params = ', '.join(f.params(annotate=show_type_annotations, link=link))
             return_type = get_annotation(f.return_annotation, '\N{non-breaking hyphen}>')
         %>
-        <span>${f.funcdef()} ${ident(f.name)}</span>(<span class="params">${params}</span>)<span class="return_type">${return_type}</span>
+        <span>${f.funcdef()} ${ident(f.name, css_class)}</span>(<span class="params">${params}</span>)<span class="return_type">${return_type}</span>
     </code></dt>
     <dd>${show_desc(f)}</dd>
   </%def>
@@ -153,7 +153,7 @@
     <dl>
     % for v in variables:
       <% return_type = get_annotation(v.type_annotation) %>
-      <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+      <dt id="${v.refname}"><code class="name">var ${ident(v.name, "parent-name")}${return_type}</code></dt>
       <dd>${show_desc(v)}</dd>
     % endfor
     </dl>
@@ -165,7 +165,7 @@
     <h2 class="section-title" id="header-functions">Functions</h2>
     <dl>
     % for f in functions:
-      ${show_func(f)}
+      ${show_func(f, "parent-name")}
     % endfor
     </dl>
     % endif
@@ -186,7 +186,7 @@
       params = ', '.join(c.params(annotate=show_type_annotations, link=link))
       %>
       <dt id="${c.refname}"><code class="flex name class">
-          <span>class ${ident(c.name)}</span>
+          <span>class ${ident(c.name, "parent-name")}</span>
           % if params:
               (<span class="params">${params}</span>)
           % endif
@@ -216,7 +216,7 @@
           <dl>
           % for v in class_vars:
               <% return_type = get_annotation(v.type_annotation) %>
-              <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+              <dt id="${v.refname}"><code class="name">var ${ident(v.name, "child-name")}${return_type}</code></dt>
               <dd>${show_desc(v)}</dd>
           % endfor
           </dl>
@@ -225,7 +225,7 @@
           <h3 class="section-subtitle">Static methods</h3>
           <dl>
           % for f in smethods:
-              ${show_func(f)}
+              ${show_func(f, "child-name")}
           % endfor
           </dl>
       % endif
@@ -234,7 +234,7 @@
           <dl>
           % for v in inst_vars:
               <% return_type = get_annotation(v.type_annotation) %>
-              <dt id="${v.refname}"><code class="name">var ${ident(v.name)}${return_type}</code></dt>
+              <dt id="${v.refname}"><code class="name">var ${ident(v.name, "child-name")}${return_type}</code></dt>
               <dd>${show_desc(v)}</dd>
           % endfor
           </dl>
@@ -243,7 +243,7 @@
           <h3 class="section-subtitle">Methods</h3>
           <dl>
           % for f in methods:
-              ${show_func(f)}
+              ${show_func(f, "child-name")}
           % endfor
           </dl>
       % endif

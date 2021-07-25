@@ -100,11 +100,6 @@ a:hover {
     color: #e82;
 }
 
-.title code {
-    font-weight: bold;
-    word-break: break-all;
-}
-
 h2[id^="header-"] {
     margin-top: 2em;
 }
