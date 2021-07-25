@@ -109,7 +109,7 @@
             params = ', '.join(f.params(annotate=show_type_annotations, link=link))
             return_type = get_annotation(f.return_annotation, '\N{non-breaking hyphen}>')
         %>
-        <span>${f.funcdef()} ${ident(f.name)}</span>(<span>${params})${return_type}</span>
+        <span>${f.funcdef()} ${ident(f.name)}</span>(<span class="params">${params}</span>)<span class="return_type">${return_type}</span>
     </code></dt>
     <dd>${show_desc(f)}</dd>
   </%def>
@@ -188,7 +188,7 @@
       <dt id="${c.refname}"><code class="flex name class">
           <span>class ${ident(c.name)}</span>
           % if params:
-              <span>(</span><span>${params})</span>
+              (<span class="params">${params}</span>)
           % endif
       </code></dt>
 
@@ -383,7 +383,7 @@
   <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
   <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
   % if syntax_highlighting:
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.7.2/styles/${hljs_style}.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.1.0/styles/${hljs_style}.min.css" rel="stylesheet">
   %endif
 
   <%namespace name="css" file="css.mako" />
@@ -502,68 +502,13 @@ window.addEventListener('load', function() {
 });
 </script>
 
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/docsearch.js@2/dist/cdn/docsearch.min.js"></script>
-<script type="text/javascript">
-docsearch({
-    apiKey: 'ac97cfdd96a6e6fcdc67c570adaeaf94',
-    indexName: 'vectorbt',
-    inputSelector: '#search_input',
-    autocompleteOptions: {
-        autoWidth: false
-    },
-    debug: true // Set debug to true if you want to inspect the dropdown
-});
-</script>
-
-<script src="https://buttons.github.io/buttons.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/2.0.0/clipboard.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js" integrity="sha512-894YE6QWD5I59HgZOGReFYm4dnWc1Qt5NtvYSaNcOP+u1T9qYdvdihz0PPSiiqn/+/3e7Jo4EaG7TubfWGUrMQ==" crossorigin="anonymous"></script>
 <script>
-// Turn off ESLint for this file because it's sent down to users as-is.
-/* eslint-disable */
-window.addEventListener('load', function() {
-  function button(label, ariaLabel, icon, className) {
-    const btn = document.createElement('button');
-    btn.classList.add('btnIcon', className);
-    btn.setAttribute('type', 'button');
-    btn.setAttribute('aria-label', ariaLabel);
-    btn.innerHTML =
-      '<div class="btnIcon__body">' +
-      icon +
-      '<strong class="btnIcon__label">' +
-      label +
-      '</strong>' +
-      '</div>';
-    return btn;
-  }
-
-  function addButtons(codeBlockSelector, btn) {
-    document.querySelectorAll(codeBlockSelector).forEach(function(code) {
-      code.parentNode.appendChild(btn.cloneNode(true));
+$(document).ready(function() {
+    $("article dt[id], #section-intro [id]").each(function() {
+      const thisId = $(this).attr('id');
+      $(this).wrap('<a class="headerlink" href="#' + thisId + '">');
     });
-  }
-
-  const copyIcon =
-    '<svg width="12" height="12" viewBox="340 364 14 15" xmlns="http://www.w3.org/2000/svg"><path fill="currentColor" d="M342 375.974h4v.998h-4v-.998zm5-5.987h-5v.998h5v-.998zm2 2.994v-1.995l-3 2.993 3 2.994v-1.996h5v-1.995h-5zm-4.5-.997H342v.998h2.5v-.997zm-2.5 2.993h2.5v-.998H342v.998zm9 .998h1v1.996c-.016.28-.11.514-.297.702-.187.187-.422.28-.703.296h-10c-.547 0-1-.452-1-.998v-10.976c0-.546.453-.998 1-.998h3c0-1.107.89-1.996 2-1.996 1.11 0 2 .89 2 1.996h3c.547 0 1 .452 1 .998v4.99h-1v-2.995h-10v8.98h10v-1.996zm-9-7.983h8c0-.544-.453-.996-1-.996h-1c-.547 0-1-.453-1-.998 0-.546-.453-.998-1-.998-.547 0-1 .452-1 .998 0 .545-.453.998-1 .998h-1c-.547 0-1 .452-1 .997z" fill-rule="evenodd"/></svg>';
-
-  addButtons(
-    '.hljs',
-    button('Copy', 'Copy code to clipboard', copyIcon, 'btnClipboard'),
-  );
-
-  const clipboard = new ClipboardJS('.btnClipboard', {
-    target: function(trigger) {
-      return trigger.parentNode.querySelector('code');
-    },
-  });
-
-  clipboard.on('success', function(event) {
-    event.clearSelection();
-    const textEl = event.trigger.querySelector('.btnIcon__label');
-    textEl.textContent = 'Copied';
-    setTimeout(function() {
-      textEl.textContent = 'Copy';
-    }, 2000);
-  });
 });
 </script>
 
