@@ -728,7 +728,7 @@ def ohlc_stop_choice_nb(from_i: int,
                         high: tp.Array,
                         low: tp.Array,
                         close: tp.Array,
-                        hit_price_out: tp.Array2d,
+                        stop_price_out: tp.Array2d,
                         stop_type_out: tp.Array2d,
                         sl_stop: tp.MaybeArray[float],
                         sl_trail: tp.MaybeArray[bool],
@@ -757,7 +757,7 @@ def ohlc_stop_choice_nb(from_i: int,
         high (array of float): High price.
         low (array of float): Low price.
         close (array of float): Close price.
-        hit_price_out (array of float): Array where hit price of each exit will be stored.
+        stop_price_out (array of float): Array where hit price of each exit will be stored.
         stop_type_out (array of int): Array where stop type of each exit will be stored.
 
             0 for stop loss, 1 for take profit.
@@ -832,7 +832,7 @@ def ohlc_stop_choice_nb(from_i: int,
         if not np.isnan(init_sl_stop):
             if curr_low <= curr_sl_stop_price:
                 exit_signal = True
-                hit_price_out[i, col] = curr_sl_stop_price
+                stop_price_out[i, col] = curr_sl_stop_price
                 if init_sl_trail:
                     stop_type_out[i, col] = StopType.TrailStop
                 else:
@@ -840,7 +840,7 @@ def ohlc_stop_choice_nb(from_i: int,
         if not exit_signal and not np.isnan(init_tp_stop):
             if curr_high >= curr_tp_stop_price:
                 exit_signal = True
-                hit_price_out[i, col] = curr_tp_stop_price
+                stop_price_out[i, col] = curr_tp_stop_price
                 stop_type_out[i, col] = StopType.TakeProfit
         if exit_signal:
             temp_idx_arr[j] = i
@@ -862,7 +862,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
                              high: tp.Array,
                              low: tp.Array,
                              close: tp.Array,
-                             hit_price_out: tp.Array2d,
+                             stop_price_out: tp.Array2d,
                              stop_type_out: tp.Array2d,
                              sl_stop: tp.MaybeArray[float],
                              sl_trail: tp.MaybeArray[bool],
@@ -888,7 +888,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
     >>> high_price = entry_price + 1
     >>> low_price = entry_price - 1
     >>> close_price = entry_price
-    >>> hit_price_out = np.full_like(entries, np.nan, dtype=np.float_)
+    >>> stop_price_out = np.full_like(entries, np.nan, dtype=np.float_)
     >>> stop_type_out = np.full_like(entries, -1, dtype=np.int_)
 
     >>> generate_ohlc_stop_ex_nb(
@@ -897,7 +897,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
     ...     high=high_price,
     ...     low=low_price,
     ...     close=close_price,
-    ...     hit_price_out=hit_price_out,
+    ...     stop_price_out=stop_price_out,
     ...     stop_type_out=stop_type_out,
     ...     sl_stop=0.1,
     ...     sl_trail=True,
@@ -915,7 +915,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
            [ True],
            [False]])
 
-    >>> hit_price_out
+    >>> stop_price_out
     array([[ 9. ],  << trailing SL from 10 (entry_price)
            [ nan],
            [ nan],
@@ -946,7 +946,7 @@ def generate_ohlc_stop_ex_nb(entries: tp.Array2d,
         high,
         low,
         close,
-        hit_price_out,
+        stop_price_out,
         stop_type_out,
         sl_stop,
         sl_trail,
@@ -965,7 +965,7 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
                                high: tp.Array,
                                low: tp.Array,
                                close: tp.Array,
-                               hit_price_out: tp.Array2d,
+                               stop_price_out: tp.Array2d,
                                stop_type_out: tp.Array2d,
                                sl_stop: tp.MaybeArray[float],
                                sl_trail: tp.MaybeArray[bool],
@@ -995,7 +995,7 @@ def generate_ohlc_stop_enex_nb(entries: tp.Array2d,
             high,
             low,
             close,
-            hit_price_out,
+            stop_price_out,
             stop_type_out,
             sl_stop,
             sl_trail,

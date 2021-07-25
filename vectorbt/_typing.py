@@ -145,9 +145,11 @@ MappedApplyFunc = Callable[[Array1d, int, Array1d, VarArg()], Array1d]
 RecordApplyFunc = Callable[[RecordArray, VarArg()], Array1d]
 RecordMapFunc = Callable[[np.void, VarArg()], R]
 MaskInOutMapFunc = Callable[[Array1d, Array1d, int, Array1d, VarArg()], None]
-ValueMap = Mapping
-ValueMapLike = Union[NamedTuple, ValueMap]
 
 # Indicators
 Param = Any
 Params = Union[List[Param], Tuple[Param, ...], NumbaList, Array1d]
+
+# Mappings
+Enum = NamedTuple
+MappingLike = Union[Mapping, Enum, IndexLike]

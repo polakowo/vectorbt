@@ -47,6 +47,19 @@ records_grouped = vbt.records.Records(wrapper_grouped, records_arr)
 records_nosort = records.copy(records_arr=records.records_arr[::-1])
 
 
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
+
 # ############# col_mapper.py ############# #
 
 
@@ -767,9 +780,9 @@ class TestMappedArray:
                 name='a'
             )
         )
-        value_map = {10: 'ten', 11: 'eleven', 12: 'twelve'}
+        mapping = {10.: 'ten', 11.: 'eleven', 12.: 'twelve'}
         pd.testing.assert_series_equal(
-            mapped_array['a'].value_counts(value_map=value_map),
+            mapped_array['a'].value_counts(mapping=mapping),
             pd.Series(
                 np.array([1, 1, 1]),
                 index=pd.Index(['ten', 'eleven', 'twelve'], dtype='object'),
@@ -802,6 +815,90 @@ class TestMappedArray:
                 ]),
                 index=pd.Float64Index([10.0, 11.0, 12.0, 13.0, 14.0], dtype='float64'),
                 columns=pd.Index(['g1', 'g2'], dtype='object')
+            )
+        )
+        mapped_array2 = mapped_array.copy(mapped_arr=[4, 4, 3, 2, np.nan, 4, 3, 2, 1])
+        pd.testing.assert_frame_equal(
+            mapped_array2.value_counts(sort_labels=False),
+            pd.DataFrame(
+                np.array([
+                    [2, 1, 0, 0],
+                    [1, 0, 1, 0],
+                    [0, 1, 1, 0],
+                    [0, 0, 1, 0],
+                    [0, 1, 0, 0]
+                ]),
+                index=pd.Float64Index([4.0, 3.0, 2.0, 1.0, None], dtype='float64'),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array2.value_counts(sort_labels=True),
+            pd.DataFrame(
+                np.array([
+                    [0, 0, 1, 0],
+                    [0, 1, 1, 0],
+                    [1, 0, 1, 0],
+                    [2, 1, 0, 0],
+                    [0, 1, 0, 0]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, None], dtype='float64'),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array2.value_counts(sort=True),
+            pd.DataFrame(
+                np.array([
+                    [2, 1, 0, 0],
+                    [0, 1, 1, 0],
+                    [1, 0, 1, 0],
+                    [0, 0, 1, 0],
+                    [0, 1, 0, 0]
+                ]),
+                index=pd.Float64Index([4.0, 2.0, 3.0, 1.0, np.nan], dtype='float64'),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array2.value_counts(sort=True, ascending=True),
+            pd.DataFrame(
+                np.array([
+                    [0, 0, 1, 0],
+                    [0, 1, 0, 0],
+                    [0, 1, 1, 0],
+                    [1, 0, 1, 0],
+                    [2, 1, 0, 0]
+                ]),
+                index=pd.Float64Index([1.0, np.nan, 2.0, 3.0, 4.0], dtype='float64'),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array2.value_counts(sort=True, normalize=True),
+            pd.DataFrame(
+                np.array([
+                    [0.2222222222222222, 0.1111111111111111, 0.0, 0.0],
+                    [0.0, 0.1111111111111111, 0.1111111111111111, 0.0],
+                    [0.1111111111111111, 0.0, 0.1111111111111111, 0.0],
+                    [0.0, 0.0, 0.1111111111111111, 0.0],
+                    [0.0, 0.1111111111111111, 0.0, 0.0]
+                ]),
+                index=pd.Float64Index([4.0, 2.0, 3.0, 1.0, np.nan], dtype='float64'),
+                columns=wrapper.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            mapped_array2.value_counts(sort=True, normalize=True, dropna=True),
+            pd.DataFrame(
+                np.array([
+                    [0.25, 0.125, 0.0, 0.0],
+                    [0.0, 0.125, 0.125, 0.0],
+                    [0.125, 0.0, 0.125, 0.0],
+                    [0.0, 0.0, 0.125, 0.0]
+                ]),
+                index=pd.Float64Index([4.0, 2.0, 3.0, 1.0], dtype='float64'),
+                columns=wrapper.columns
             )
         )
 
@@ -996,14 +1093,14 @@ class TestMappedArray:
             )
         )
         pd.testing.assert_series_equal(
-            mapped_array.stats(column='a', settings=dict(value_map={10: 'test_value'})),
+            mapped_array.stats(column='a', settings=dict(mapping={10: 'test_value'})),
             pd.Series([
                 'x', 'z', pd.Timedelta('3 days 00:00:00'), 3, 1, 1, 1, 0, 0
             ],
                 index=pd.Index([
-                    'Start', 'End', 'Period', 'Count', 'Value Count: test_value',
-                    'Value Count: UNK - 11.0', 'Value Count: UNK - 12.0',
-                    'Value Count: UNK - 13.0', 'Value Count: UNK - 14.0'
+                    'Start', 'End', 'Period', 'Count', 'Value Counts: 10.0',
+                    'Value Counts: 11.0', 'Value Counts: 12.0',
+                    'Value Counts: 13.0', 'Value Counts: 14.0'
                 ], dtype='object'),
                 name='a'
             )

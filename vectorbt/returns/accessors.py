@@ -1,4 +1,4 @@
-"""Custom pandas accessors.
+"""Custom pandas accessors for returns data.
 
 Methods can be accessed as follows:
 
@@ -131,7 +131,7 @@ from vectorbt.root_accessors import register_dataframe_accessor, register_series
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.utils.figure import make_figure, get_domain
-from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.decorators import cached_property
 from vectorbt.utils.datetime import freq_to_timedelta, DatetimeIndexes
 from vectorbt.utils.attr import AttrResolverT
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast, broadcast_to
@@ -171,7 +171,7 @@ class ReturnsAccessor(GenericAccessor):
         self._year_freq = year_freq
         self._defaults = defaults
 
-        GenericAccessor.__init__(self, obj, **kwargs)
+        GenericAccessor.__init__(self, obj, year_freq=year_freq, defaults=defaults, **kwargs)
 
     @property
     def sr_accessor_cls(self):
@@ -784,7 +784,6 @@ class ReturnsAccessor(GenericAccessor):
         """`ReturnsAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    @cached_method
     def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records of cumulative returns.
 

@@ -66,8 +66,9 @@ import pandas as pd
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import class_or_instancemethod
-from vectorbt.utils.config import merge_dicts
+from vectorbt.utils.config import merge_dicts, get_func_arg_names
 from vectorbt.base import combine_fns, index_fns, reshape_fns
+from vectorbt.base.column_grouper import ColumnGrouper
 from vectorbt.base.array_wrapper import ArrayWrapper, Wrapping
 from vectorbt.base.reshape_fns import to_2d
 from vectorbt.base.class_helpers import (
@@ -106,9 +107,15 @@ class BaseAccessor(Wrapping):
 
         self._obj = obj
 
+        wrapper_arg_names = get_func_arg_names(ArrayWrapper.__init__)
+        grouper_arg_names = get_func_arg_names(ColumnGrouper.__init__)
+        wrapping_kwargs = dict()
+        for k, v in kwargs.items():
+            if k in wrapper_arg_names or k in grouper_arg_names:
+                wrapping_kwargs[k] = v
         if wrapper is None:
-            wrapper = ArrayWrapper.from_obj(obj, **kwargs)
-        Wrapping.__init__(self, wrapper, obj=obj)
+            wrapper = ArrayWrapper.from_obj(obj, **wrapping_kwargs)
+        Wrapping.__init__(self, wrapper, obj=obj, **kwargs)
 
     def __call__(self: BaseAccessorT, *args, **kwargs) -> BaseAccessorT:
         """Allows passing arguments to the initializer."""

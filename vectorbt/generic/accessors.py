@@ -1,4 +1,4 @@
-"""Custom pandas accessors.
+"""Custom pandas accessors for generic data.
 
 Methods can be accessed as follows:
 
@@ -135,7 +135,8 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import Config, merge_dicts, resolve_dict
 from vectorbt.utils.figure import make_figure, make_subplots
-from vectorbt.utils.decorators import cached_property, cached_method
+from vectorbt.utils.decorators import cached_property
+from vectorbt.utils.mapping import apply_mapping
 from vectorbt.base import index_fns, reshape_fns
 from vectorbt.base.accessors import BaseAccessor, BaseDFAccessor, BaseSRAccessor
 from vectorbt.base.class_helpers import add_nb_methods
@@ -813,6 +814,57 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             nb.describe_reduce_nb, percentiles, ddof,
             to_array=True, wrap_kwargs=wrap_kwargs)
 
+    def value_counts(self,
+                     normalize: bool = False,
+                     sort_labels: bool = True,
+                     sort: bool = False,
+                     ascending: bool = False,
+                     dropna: bool = False,
+                     group_by: tp.GroupByLike = None,
+                     mapping: tp.Optional[tp.MappingLike] = None,
+                     wrap_kwargs: tp.KwargsLike = None,
+                     **kwargs) -> tp.SeriesFrame:
+        """Return a Series/DataFrame containing counts of unique values.
+
+        * Enable `normalize` flag to return the relative frequencies of the unique values.
+        * Enable `sort_labels` flag to sort labels.
+        * Enable `sort` flag to sort by frequencies.
+        * Enable `ascending` flag to sort in ascending order.
+        * Enable `dropna` flag to exclude counts of NaN.
+
+        Mapping will be applied using `vectorbt.utils.mapping.apply_mapping` with `**kwargs`."""
+        codes, mapped_uniques = pd.factorize(self.obj.values.flatten(), sort=False, na_sentinel=None)
+        codes = codes.reshape(self.wrapper.shape_2d)
+        group_lens = self.wrapper.grouper.get_group_lens(group_by=group_by)
+        value_counts = nb.value_counts_nb(codes, len(mapped_uniques), group_lens)
+        nan_mask = np.isnan(mapped_uniques)
+        if dropna:
+            value_counts = value_counts[~nan_mask]
+            mapped_uniques = mapped_uniques[~nan_mask]
+        if sort_labels:
+            new_indices = mapped_uniques.argsort()
+            value_counts = value_counts[new_indices]
+            mapped_uniques = mapped_uniques[new_indices]
+        value_counts_sum = value_counts.sum(axis=1)
+        if normalize:
+            value_counts = value_counts / value_counts_sum.sum()
+        if sort:
+            if ascending:
+                new_indices = value_counts_sum.argsort()
+            else:
+                new_indices = (-value_counts_sum).argsort()
+            value_counts = value_counts[new_indices]
+            mapped_uniques = mapped_uniques[new_indices]
+        value_counts_pd = self.wrapper.wrap(
+            value_counts,
+            index=mapped_uniques,
+            group_by=group_by,
+            **merge_dicts({}, wrap_kwargs)
+        )
+        if mapping is not None:
+            value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
+        return value_counts_pd
+
     # ############# Stats ############# #
 
     @property
@@ -889,7 +941,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
     def metrics(self) -> Config:
         return self._metrics
 
-    # ############# Convertion ############# #
+    # ############# Conversion ############# #
 
     def drawdown(self, wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Drawdown series."""
@@ -901,7 +953,6 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         """`GenericAccessor.get_drawdowns` with default arguments."""
         return self.get_drawdowns()
 
-    @cached_method
     def get_drawdowns(self, group_by: tp.GroupByLike = None, **kwargs) -> Drawdowns:
         """Generate drawdown records.
 
@@ -919,7 +970,7 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         mapped_arr = reshape_fns.to_2d(self.obj, raw=True).flatten(order='F')
         col_arr = np.repeat(np.arange(self.wrapper.shape_2d[1]), self.wrapper.shape_2d[0])
         idx_arr = np.tile(np.arange(self.wrapper.shape_2d[0]), self.wrapper.shape_2d[1])
-        if dropna:
+        if dropna and np.isnan(mapped_arr).any():
             not_nan_mask = ~np.isnan(mapped_arr)
             mapped_arr = mapped_arr[not_nan_mask]
             col_arr = col_arr[not_nan_mask]
@@ -1263,22 +1314,6 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
         """
         return self.split(ExpandingSplitter(), **kwargs)
 
-    # ############# Enums ############# #
-
-    def map_enum(self, enum: tp.NamedTuple) -> tp.SeriesFrame:
-        """Map integer values to field names of an enum."""
-
-        def _mapper(x: int) -> str:
-            if x in enum:
-                return enum._fields[x]
-            if x == -1:
-                return ''
-            return 'UNK'
-
-        if self.is_series():
-            return self.obj.map(_mapper)
-        return self.obj.applymap(_mapper)
-
     # ############# Plotting ############# #
 
     def plot(self,
@@ -1440,7 +1475,9 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         BaseSRAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, **kwargs)
 
-    def squeeze_grouped(self, squeeze_func_nb: tp.GroupSqueezeFunc, *args, group_by: tp.GroupByLike = None,
+    def squeeze_grouped(self,
+                        squeeze_func_nb: tp.GroupSqueezeFunc, *args,
+                        group_by: tp.GroupByLike = None,
                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Squeeze each group of elements into a single element.
 
@@ -1450,7 +1487,9 @@ class GenericSRAccessor(GenericAccessor, BaseSRAccessor):
         wrap_kwargs = merge_dicts(dict(name_or_index=self.wrapper.name), wrap_kwargs)
         return obj_frame.vbt.wrapper.wrap_reduced(squeezed, group_by=group_by, **wrap_kwargs)
 
-    def flatten_grouped(self, group_by: tp.GroupByLike = None, order: str = 'C',
+    def flatten_grouped(self,
+                        group_by: tp.GroupByLike = None,
+                        order: str = 'C',
                         wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
         """Flatten each group of elements.
 
@@ -2024,7 +2063,9 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         BaseDFAccessor.__init__(self, obj, **kwargs)
         GenericAccessor.__init__(self, obj, **kwargs)
 
-    def squeeze_grouped(self, squeeze_func_nb: tp.GroupSqueezeFunc, *args, group_by: tp.GroupByLike = None,
+    def squeeze_grouped(self,
+                        squeeze_func_nb: tp.GroupSqueezeFunc, *args,
+                        group_by: tp.GroupByLike = None,
                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Squeeze each group of columns into a single column.
 
@@ -2052,7 +2093,9 @@ class GenericDFAccessor(GenericAccessor, BaseDFAccessor):
         out = nb.squeeze_grouped_nb(self.to_2d_array(), group_lens, squeeze_func_nb, *args)
         return self.wrapper.wrap(out, group_by=group_by, **merge_dicts({}, wrap_kwargs))
 
-    def flatten_grouped(self, group_by: tp.GroupByLike = None, order: str = 'C',
+    def flatten_grouped(self,
+                        group_by: tp.GroupByLike = None,
+                        order: str = 'C',
                         wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Flatten each group of columns.
 

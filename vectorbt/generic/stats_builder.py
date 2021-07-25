@@ -21,6 +21,7 @@ class MetaStatsBuilderMixin(type):
 
     @property
     def metrics(cls) -> Config:
+        """Metrics supported by `StatsBuilderMixin.stats`."""
         return cls._metrics
 
 
@@ -483,16 +484,19 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                     out = post_calc_func(custom_reself, out, metric_settings)
 
                 # Post-process and store the metric
+                multiple = True
                 if not isinstance(out, dict):
+                    multiple = False
                     out = {None: out}
                 for k, v in out.items():
                     # Resolve title
-                    if k is None:
-                        t = title
-                    elif title is None:
-                        t = str(k)
+                    if multiple:
+                        if title is None:
+                            t = str(k)
+                        else:
+                            t = title + ': ' + str(k)
                     else:
-                        t = title + ': ' + str(k)
+                        t = title
 
                     # Check result type
                     if checks.is_any_array(v) and not checks.is_series(v):
@@ -540,15 +544,20 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
         return stats_df
 
     @classmethod
-    def override_metrics_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
-        """Call this method on each subclass that overrides `metrics`."""
+    def build_metrics_doc(cls, source_cls: tp.Optional[type] = None) -> str:
+        """Build metrics documentation."""
         if source_cls is None:
             source_cls = StatsBuilderMixin
-        __pdoc__[cls.__name__ + '.metrics'] = string.Template(
+        return string.Template(
             inspect.cleandoc(get_dict_attr(source_cls, 'metrics').__doc__)
         ).substitute(
             {'metrics': cls.metrics.to_doc()}
         )
+
+    @classmethod
+    def override_metrics_doc(cls, __pdoc__: dict, source_cls: tp.Optional[type] = None) -> None:
+        """Call this method on each subclass that overrides `metrics`."""
+        __pdoc__[cls.__name__ + '.metrics'] = cls.build_metrics_doc(source_cls=source_cls)
 
 
 __pdoc__ = dict()

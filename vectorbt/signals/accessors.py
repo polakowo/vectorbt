@@ -1,4 +1,4 @@
-"""Custom pandas accessors.
+"""Custom pandas accessors for signals data.
 
 Methods can be accessed as follows:
 
@@ -294,9 +294,9 @@ class SignalsAccessor(GenericAccessor):
     @classmethod
     def generate_both(cls,
                       shape: tp.RelaxedShape,
-                      entry_choice_func_nb: tp.ChoiceFunc,
-                      exit_choice_func_nb: tp.ChoiceFunc,
+                      entry_choice_func_nb: tp.Optional[tp.ChoiceFunc] = None,
                       entry_args: tp.ArgsLike = None,
+                      exit_choice_func_nb: tp.Optional[tp.ChoiceFunc] = None,
                       exit_args: tp.ArgsLike = None,
                       entry_wait: int = 1,
                       exit_wait: int = 1,
@@ -328,8 +328,9 @@ class SignalsAccessor(GenericAccessor):
 
         >>> temp_idx_arr = np.empty((1,), dtype=np.int_)  # reuse memory
         >>> en, ex = pd.DataFrame.vbt.signals.generate_both(
-        ...     (5, 3), entry_choice_func_nb, exit_choice_func_nb,
-        ...     entry_args=(temp_idx_arr,), exit_args=(temp_idx_arr,),
+        ...     (5, 3),
+        ...     entry_choice_func_nb, (temp_idx_arr,),
+        ...     exit_choice_func_nb, (temp_idx_arr,),
         ...     index=mask.index, columns=mask.columns)
         >>> en
                         a      b      c
@@ -347,6 +348,8 @@ class SignalsAccessor(GenericAccessor):
         2020-01-05  False  False  False
         ```
         """
+        checks.assert_not_none(entry_choice_func_nb)
+        checks.assert_not_none(exit_choice_func_nb)
         checks.assert_numba_func(entry_choice_func_nb)
         checks.assert_numba_func(exit_choice_func_nb)
         if entry_args is None:
@@ -806,7 +809,7 @@ class SignalsAccessor(GenericAccessor):
 
         If any of `high`, `low` or `close` is None, it will be set to `open`.
 
-        Use `out_dict` as a dict to pass `hit_price` and `stop_type` arrays. You can also
+        Use `out_dict` as a dict to pass `stop_price` and `stop_type` arrays. You can also
         set `out_dict` to {} to produce these arrays automatically and still have access to them.
 
         For arguments, see `vectorbt.signals.nb.ohlc_stop_choice_nb`.
@@ -840,10 +843,10 @@ class SignalsAccessor(GenericAccessor):
         >>> from vectorbt.signals.enums import StopType
 
         >>> price = pd.DataFrame({
-        ...     'open': [10, 11, 12, 11, 10, 9],
-        ...     'high': [11, 12, 13, 12, 11, 10],
-        ...     'low': [9, 10, 11, 10, 9, 8],
-        ...     'close': [10, 11, 12, 11, 10, 9]
+        ...     'open': [10, 11, 12, 11, 10],
+        ...     'high': [11, 12, 13, 12, 11],
+        ...     'low': [9, 10, 11, 10, 9],
+        ...     'close': [10, 11, 12, 11, 10]
         ... })
         >>> out_dict = {}
         >>> exits = mask.vbt.signals.generate_ohlc_stop_exits(
@@ -857,7 +860,7 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04  False   True   True
         2020-01-05  False  False  False
 
-        >>> out_dict['hit_price']
+        >>> out_dict['stop_price']
                        a     b     c
         2020-01-01   NaN   NaN   NaN
         2020-01-02  11.0  11.0   NaN
@@ -865,13 +868,13 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04   NaN  10.8  10.8
         2020-01-05   NaN   NaN   NaN
 
-        >>> out_dict['stop_type'].vbt.map_enum(StopType)
+        >>> out_dict['stop_type'].vbt.cat(mapping=StopType).map()
                              a           b          c
-        2020-01-01
-        2020-01-02  TakeProfit  TakeProfit
-        2020-01-03
-        2020-01-04               TrailStop  TrailStop
-        2020-01-05
+        2020-01-01        None        None       None
+        2020-01-02  TakeProfit  TakeProfit       None
+        2020-01-03        None        None       None
+        2020-01-04        None   TrailStop  TrailStop
+        2020-01-05        None        None       None
         ```
 
         Notice how the first two entry signals in the third column have no exit signal - there is
@@ -892,20 +895,20 @@ class SignalsAccessor(GenericAccessor):
         2020-01-04  False   True   True
         2020-01-05  False  False  False
 
-        >>> out_dict['hit_price']
+        >>> out_dict['stop_price']
         2020-01-01   NaN   NaN   NaN
         2020-01-02  11.0  11.0  11.0
         2020-01-03   NaN   NaN   NaN
         2020-01-04   NaN  10.8  10.8
         2020-01-05   NaN   NaN   NaN
 
-        >>> out_dict['stop_type'].vbt.map_enum(StopType)
+        >>> out_dict['stop_type'].vbt.cat(mapping=StopType).map()
                              a           b           c
-        2020-01-01
+        2020-01-01        None        None        None
         2020-01-02  TakeProfit  TakeProfit  TakeProfit
-        2020-01-03
-        2020-01-04               TrailStop   TrailStop
-        2020-01-05
+        2020-01-03        None        None        None
+        2020-01-04        None   TrailStop   TrailStop
+        2020-01-05        None        None        None
         ```
 
         Now, the first signal in the third column gets executed regardless of the entries that come next,
@@ -954,11 +957,11 @@ class SignalsAccessor(GenericAccessor):
             out_dict = {}
         else:
             out_dict_passed = True
-        hit_price_out = out_dict.get('hit_price', np.nan if out_dict_passed else None)
+        stop_price_out = out_dict.get('stop_price', np.nan if out_dict_passed else None)
         stop_type_out = out_dict.get('stop_type', -1 if out_dict_passed else None)
         out_args = ()
-        if hit_price_out is not None:
-            out_args += (hit_price_out,)
+        if stop_price_out is not None:
+            out_args += (stop_price_out,)
         if stop_type_out is not None:
             out_args += (stop_type_out,)
 
@@ -971,16 +974,16 @@ class SignalsAccessor(GenericAccessor):
             warnings.warn("At least one SL stop value is 0", stacklevel=2)
         if np.any(tp_stop == 0):
             warnings.warn("At least one TP stop value is 0", stacklevel=2)
-        if hit_price_out is None:
-            hit_price_out = np.empty_like(entries, dtype=np.float_)
+        if stop_price_out is None:
+            stop_price_out = np.empty_like(entries, dtype=np.float_)
         else:
-            hit_price_out = out_args[0]
+            stop_price_out = out_args[0]
             out_args = out_args[1:]
         if stop_type_out is None:
             stop_type_out = np.empty_like(entries, dtype=np.int_)
         else:
             stop_type_out = out_args[0]
-        hit_price_out = reshape_fns.to_2d(hit_price_out, raw=True)
+        stop_price_out = reshape_fns.to_2d(stop_price_out, raw=True)
         stop_type_out = reshape_fns.to_2d(stop_type_out, raw=True)
 
         # Perform generation
@@ -991,7 +994,7 @@ class SignalsAccessor(GenericAccessor):
                 high,
                 low,
                 close,
-                hit_price_out,
+                stop_price_out,
                 stop_type_out,
                 sl_stop,
                 sl_trail,
@@ -1002,8 +1005,8 @@ class SignalsAccessor(GenericAccessor):
                 pick_first,
                 entries.ndim == 2
             )
-            out_dict['hit_price'] = entries.vbt.wrapper.wrap(
-                hit_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
+            out_dict['stop_price'] = entries.vbt.wrapper.wrap(
+                stop_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             out_dict['stop_type'] = entries.vbt.wrapper.wrap(
                 stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             return entries.vbt.wrapper.wrap(new_entries, group_by=False, **merge_dicts({}, wrap_kwargs)), \
@@ -1017,7 +1020,7 @@ class SignalsAccessor(GenericAccessor):
                 high,
                 low,
                 close,
-                hit_price_out,
+                stop_price_out,
                 stop_type_out,
                 sl_stop,
                 sl_trail,
@@ -1029,8 +1032,8 @@ class SignalsAccessor(GenericAccessor):
                 pick_first,
                 entries.ndim == 2
             )
-            out_dict['hit_price'] = entries.vbt.wrapper.wrap(
-                hit_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
+            out_dict['stop_price'] = entries.vbt.wrapper.wrap(
+                stop_price_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             out_dict['stop_type'] = entries.vbt.wrapper.wrap(
                 stop_type_out, group_by=False, **merge_dicts({}, wrap_kwargs))
             return entries.vbt.wrapper.wrap(exits, group_by=False, **merge_dicts({}, wrap_kwargs))

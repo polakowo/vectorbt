@@ -12,7 +12,7 @@ import plotly.graph_objects as go
 from vectorbt import _typing as tp
 from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.colors import adjust_lightness
-from vectorbt.utils.enum import enum_to_value_map
+from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure
 from vectorbt.utils.config import merge_dicts
 from vectorbt.base.reshape_fns import to_1d, to_2d, broadcast_to
@@ -97,7 +97,7 @@ class Orders(Records):
         out['Size'] = records_df['size']
         out['Price'] = records_df['price']
         out['Fees'] = records_df['fees']
-        out['Side'] = records_df['side'].map(enum_to_value_map(OrderSide))
+        out['Side'] = map_enum_values(records_df['side'], OrderSide)
         return out
 
     @cached_property

@@ -237,7 +237,7 @@ Just as orders, logs are also records and thus can be easily analyzed:
 ```python-repl
 >>> from vectorbt.portfolio.enums import OrderStatus
 
->>> pf.logs.map_field('res_status', value_map=OrderStatus).value_counts()
+>>> pf.logs.map_field('res_status', mapping=OrderStatus).value_counts()
 symbol   BTC-USD  ETH-USD  XRP-USD  BNB-USD  BCH-USD  LTC-USD
 Ignored       60       72       67       66       67       59
 Filled       184      172      177      178      177      185
@@ -516,6 +516,7 @@ Calmar Ratio                                    3.54108
 Omega Ratio                                     1.33162
 Sortino Ratio                                   2.08457
 Name: agg_func_mean, dtype: object
+```
 
 Here, the Sharpe ratio of 0.445231 (column=10) and 1.88616 (column=20) lead to the avarage of 1.16569.
 
@@ -948,7 +949,7 @@ import warnings
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_property, cached_method
-from vectorbt.utils.enum import cast_enum_value
+from vectorbt.utils.enum import map_enum_fields
 from vectorbt.utils.config import merge_dicts, get_func_arg_names, Config
 from vectorbt.utils.template import RepEval
 from vectorbt.utils.random import set_seed
@@ -1701,10 +1702,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
-        size_type = cast_enum_value(size_type, SizeType)
+        size_type = map_enum_fields(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['signal_direction']
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         if price is None:
             price = np.inf
         if fees is None:
@@ -1731,7 +1732,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             accumulate = portfolio_cfg['accumulate']
         if conflict_mode is None:
             conflict_mode = portfolio_cfg['conflict_mode']
-        conflict_mode = cast_enum_value(conflict_mode, ConflictMode)
+        conflict_mode = map_enum_fields(conflict_mode, ConflictMode)
         if close_first is None:
             close_first = portfolio_cfg['close_first']
         if val_price is None:
@@ -1750,19 +1751,19 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             tp_stop = portfolio_cfg['tp_stop']
         if stop_entry_price is None:
             stop_entry_price = portfolio_cfg['stop_entry_price']
-        stop_entry_price = cast_enum_value(stop_entry_price, StopEntryPrice)
+        stop_entry_price = map_enum_fields(stop_entry_price, StopEntryPrice)
         if stop_exit_price is None:
             stop_exit_price = portfolio_cfg['stop_exit_price']
-        stop_exit_price = cast_enum_value(stop_exit_price, StopExitPrice)
+        stop_exit_price = map_enum_fields(stop_exit_price, StopExitPrice)
         if stop_conflict_mode is None:
             stop_conflict_mode = portfolio_cfg['stop_conflict_mode']
-        stop_conflict_mode = cast_enum_value(stop_conflict_mode, ConflictMode)
+        stop_conflict_mode = map_enum_fields(stop_conflict_mode, ConflictMode)
         if stop_exit_mode is None:
             stop_exit_mode = portfolio_cfg['stop_exit_mode']
-        stop_exit_mode = cast_enum_value(stop_exit_mode, StopExitMode)
+        stop_exit_mode = map_enum_fields(stop_exit_mode, StopExitMode)
         if stop_update_mode is None:
             stop_update_mode = portfolio_cfg['stop_update_mode']
-        stop_update_mode = cast_enum_value(stop_update_mode, StopUpdateMode)
+        stop_update_mode = map_enum_fields(stop_update_mode, StopUpdateMode)
         if use_stops is None:
             use_stops = portfolio_cfg['use_stops']
         if use_stops is None:
@@ -1778,7 +1779,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
 
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
-        init_cash = cast_enum_value(init_cash, InitCashMode)
+        init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -1790,7 +1791,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             group_by = True
         if call_seq is None:
             call_seq = portfolio_cfg['call_seq']
-        call_seq = cast_enum_value(call_seq, CallSeqType)
+        call_seq = map_enum_fields(call_seq, CallSeqType)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -2178,10 +2179,10 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             size = portfolio_cfg['size']
         if size_type is None:
             size_type = portfolio_cfg['size_type']
-        size_type = cast_enum_value(size_type, SizeType)
+        size_type = map_enum_fields(size_type, SizeType)
         if direction is None:
             direction = portfolio_cfg['order_direction']
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         if price is None:
             price = np.inf
         if size is None:
@@ -2210,7 +2211,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             val_price = portfolio_cfg['val_price']
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
-        init_cash = cast_enum_value(init_cash, InitCashMode)
+        init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -2222,7 +2223,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             group_by = True
         if call_seq is None:
             call_seq = portfolio_cfg['call_seq']
-        call_seq = cast_enum_value(call_seq, CallSeqType)
+        call_seq = map_enum_fields(call_seq, CallSeqType)
         auto_call_seq = False
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
@@ -2733,7 +2734,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             target_shape = close.shape
         if init_cash is None:
             init_cash = portfolio_cfg['init_cash']
-        init_cash = cast_enum_value(init_cash, InitCashMode)
+        init_cash = map_enum_fields(init_cash, InitCashMode)
         if isinstance(init_cash, int) and init_cash in InitCashMode:
             init_cash_mode = init_cash
             init_cash = np.inf
@@ -2745,7 +2746,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             group_by = True
         if call_seq is None:
             call_seq = portfolio_cfg['call_seq']
-        call_seq = cast_enum_value(call_seq, CallSeqType)
+        call_seq = map_enum_fields(call_seq, CallSeqType)
         if isinstance(call_seq, int):
             if call_seq == CallSeqType.Auto:
                 raise ValueError("CallSeqType.Auto should be implemented manually. "
@@ -3038,7 +3039,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         """Get asset flow series per column.
 
         Returns the total transacted amount of assets at each time step."""
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         asset_flow = nb.asset_flow_nb(
             self.wrapper.shape_2d,
             self.orders.values,
@@ -3052,7 +3053,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         """Get asset series per column.
 
         Returns the current position at each time step."""
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         asset_flow = to_2d(self.asset_flow(direction='all'), raw=True)
         assets = nb.assets_nb(asset_flow)
         if direction == Direction.LongOnly:
@@ -3067,7 +3068,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
         """Get position mask per column/group.
 
         An element is True if the asset is in the market at this tick."""
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         assets = to_2d(self.assets(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             position_mask = to_2d(self.position_mask(direction=direction, group_by=False), raw=True)
@@ -3081,7 +3082,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
     def position_coverage(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                           wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get position coverage per column/group."""
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         assets = to_2d(self.assets(direction=direction), raw=True)
         if self.wrapper.grouper.is_grouped(group_by=group_by):
             position_mask = to_2d(self.position_mask(direction=direction, group_by=False), raw=True)
@@ -3181,7 +3182,7 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
     def asset_value(self, direction: str = 'all', group_by: tp.GroupByLike = None,
                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
         """Get asset value series per column/group."""
-        direction = cast_enum_value(direction, Direction)
+        direction = map_enum_fields(direction, Direction)
         if self.fillna_close:
             close = to_2d(self.get_filled_close(), raw=True).copy()
         else:

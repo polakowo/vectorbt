@@ -439,7 +439,7 @@ class Records(Wrapping, StatsBuilderMixin):
     def map_array(self,
                   a: tp.ArrayLike,
                   idx_field: tp.Optional[str] = None,
-                  value_map: tp.Optional[tp.ValueMapLike] = None,
+                  mapping: tp.Optional[tp.MappingLike] = None,
                   group_by: tp.GroupByLike = None,
                   **kwargs) -> MappedArray:
         """Convert array to mapped array.
@@ -460,7 +460,7 @@ class Records(Wrapping, StatsBuilderMixin):
             self.values['col'],
             id_arr=self.values['id'],
             idx_arr=idx_arr,
-            value_map=value_map,
+            mapping=mapping,
             **kwargs
         ).regroup(group_by)
 

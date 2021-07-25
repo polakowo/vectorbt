@@ -4,7 +4,7 @@ from numba import njit
 import pytest
 from datetime import datetime
 
-from vectorbt import settings
+import vectorbt as vbt
 from vectorbt.base import (
     accessors,
     array_wrapper,
@@ -21,9 +21,6 @@ try:
     import ray
 except ImportError:
     ray_available = False
-
-settings.broadcasting['index_from'] = 'stack'
-settings.broadcasting['columns_from'] = 'stack'
 
 day_dt = np.timedelta64(86400000000000)
 
@@ -56,6 +53,22 @@ df4 = pd.DataFrame(
 multi_i = pd.MultiIndex.from_arrays([['x7', 'y7', 'z7'], ['x8', 'y8', 'z8']], names=['i7', 'i8'])
 multi_c = pd.MultiIndex.from_arrays([['a7', 'b7', 'c7'], ['a8', 'b8', 'c8']], names=['c7', 'c8'])
 df5 = pd.DataFrame([[1, 2, 3], [4, 5, 6], [7, 8, 9]], index=multi_i, columns=multi_c)
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.broadcasting['index_from'] = 'stack'
+    vbt.settings.broadcasting['columns_from'] = 'stack'
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
 
 # ############# column_grouper.py ############# #
 
@@ -2205,7 +2218,6 @@ class TestReshapeFns:
 
 called_dict = {}
 
-
 PandasIndexer = indexing.PandasIndexer
 ParamIndexer = indexing.build_param_indexer(['param1', 'param2', 'tuple'])
 
@@ -3166,7 +3178,7 @@ class TestAccessors:
                 columns=pd.Index(['a6', 'b6', 'c6'], dtype='object', name='c6')
             )
         )
-        
+
         target = pd.DataFrame(
             np.array([
                 [232, 233, 234],

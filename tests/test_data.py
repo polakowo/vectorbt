@@ -9,6 +9,19 @@ from vectorbt.utils.config import merge_dicts
 seed = 42
 
 
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
+
 # ############# base.py ############# #
 
 

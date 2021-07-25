@@ -527,7 +527,7 @@ ohlcstx_config = Config(
         short_name='ohlcstx',
         mode='exits',
         input_names=['open', 'high', 'low', 'close'],
-        in_output_names=['hit_price', 'stop_type'],
+        in_output_names=['stop_price', 'stop_type'],
         param_names=['sl_stop', 'sl_trail', 'tp_stop'],
         attr_settings=dict(
             stop_type=dict(dtype=StopType)  # creates rand_type_readable
@@ -541,13 +541,13 @@ ohlcstx_func_config = Config(
         exit_choice_func=ohlc_stop_choice_nb,
         exit_settings=dict(
             pass_inputs=['open', 'high', 'low', 'close'],  # do not pass entries
-            pass_in_outputs=['hit_price', 'stop_type'],
+            pass_in_outputs=['stop_price', 'stop_type'],
             pass_params=['sl_stop', 'sl_trail', 'tp_stop'],
             pass_kwargs=[('is_open_safe', True), 'wait', 'pick_first', 'temp_idx_arr', 'flex_2d'],
         ),
         pass_flex_2d=True,
         in_output_settings=dict(
-            hit_price=dict(
+            stop_price=dict(
                 dtype=np.float_
             ),
             stop_type=dict(
@@ -562,7 +562,7 @@ ohlcstx_func_config = Config(
         sl_stop=np.nan,
         sl_trail=False,
         tp_stop=np.nan,
-        hit_price=np.nan,
+        stop_price=np.nan,
         stop_type=-1
     )
 )
@@ -648,7 +648,7 @@ def _bind_ohlcstx_plot(base_cls: type, entries_attr: str) -> tp.Callable:  # pra
         _base_cls_plot(
             self,
             entry_y=self.open,
-            exit_y=self.hit_price,
+            exit_y=self.stop_price,
             exit_types=self.stop_type_readable,
             entry_trace_kwargs=entry_trace_kwargs,
             exit_trace_kwargs=exit_trace_kwargs,
@@ -736,7 +736,7 @@ class _OHLCSTX(OHLCSTX):
     4                  True  False  False
     5                 False  False  False
 
-    >>> ohlcstx.hit_price
+    >>> ohlcstx.stop_price
     ohlcstx_sl_stop     0.1    0.1    NaN
     ohlcstx_sl_trail  False   True  False
     ohlcstx_tp_stop     NaN    NaN    0.1
@@ -751,12 +751,12 @@ class _OHLCSTX(OHLCSTX):
     ohlcstx_sl_stop        0.1        0.1         NaN
     ohlcstx_sl_trail     False       True       False
     ohlcstx_tp_stop        NaN        NaN         0.1
-    0
-    1                                      TakeProfit
-    2
-    3                           TrailStop
-    4                 StopLoss
-    5
+    0                     None       None        None
+    1                     None       None  TakeProfit
+    2                     None       None        None
+    3                     None  TrailStop        None
+    4                 StopLoss       None        None
+    5                     None       None        None
     ```
     """
 

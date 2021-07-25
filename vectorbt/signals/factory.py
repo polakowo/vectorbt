@@ -14,7 +14,7 @@ from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.params import to_typed_list
-from vectorbt.utils.enum import cast_enum_value
+from vectorbt.utils.enum import map_enum_fields
 from vectorbt.base import combine_fns
 from vectorbt.indicators.factory import IndicatorFactory, IndicatorBase, CacheOutputT
 from vectorbt.signals.nb import (
@@ -45,7 +45,7 @@ class SignalFactory(IndicatorFactory):
                  input_names: tp.Optional[tp.Sequence[str]] = None,
                  attr_settings: tp.KwargsLike = None,
                  **kwargs) -> None:
-        mode = cast_enum_value(mode, FactoryMode)
+        mode = map_enum_fields(mode, FactoryMode)
         if input_names is None:
             input_names = []
         else:
@@ -67,6 +67,8 @@ class SignalFactory(IndicatorFactory):
         else:
             input_names = ['entries'] + input_names
             output_names = ['new_entries', 'exits']
+        if 'entries' in input_names:
+            attr_settings['entries'] = dict(dtype=np.bool_)
         for output_name in output_names:
             attr_settings[output_name] = dict(dtype=np.bool_)
 

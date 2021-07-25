@@ -9,7 +9,6 @@ from copy import deepcopy
 import vectorbt as vbt
 from vectorbt.portfolio.enums import *
 from vectorbt.generic.enums import drawdown_dt
-from vectorbt import settings
 from vectorbt.utils.random import set_seed
 from vectorbt.portfolio import nb
 
@@ -18,8 +17,6 @@ from tests.utils import record_arrays_close
 seed = 42
 
 day_dt = np.timedelta64(86400000000000)
-
-settings.returns['year_freq'] = '252 days'  # same as empyrical
 
 price = pd.Series([1., 2., 3., 4., 5.], index=pd.Index([
     datetime(2020, 1, 1),
@@ -32,6 +29,20 @@ price_wide = price.vbt.tile(3, keys=['a', 'b', 'c'])
 big_price = pd.DataFrame(np.random.uniform(size=(1000,)))
 big_price.index = [datetime(2018, 1, 1) + timedelta(days=i) for i in range(1000)]
 big_price_wide = big_price.vbt.tile(1000)
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+    vbt.settings.returns['year_freq'] = '252 days'  # same as empyrical
+
+
+def teardown_module():
+    vbt.settings.reset()
 
 
 # ############# nb ############# #

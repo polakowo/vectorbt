@@ -1,14 +1,18 @@
-from vectorbt import settings
+import vectorbt as vbt
 
-settings.numba['check_func_suffix'] = True
+
+# ############# Global ############# #
+
+def teardown_module():
+    vbt.settings.reset()
 
 
 # ############# settings.py ############# #
 
 class TestSettings:
     def test_save_and_load(self, tmp_path):
-        settings.set_theme('seaborn')
-        settings.save(tmp_path / "settings")
-        new_settings = settings.load(tmp_path / "settings")
-        assert settings == new_settings
-        assert settings.__dict__ == new_settings.__dict__
+        vbt.settings.set_theme('seaborn')
+        vbt.settings.save(tmp_path / "settings")
+        new_settings = vbt.settings.load(tmp_path / "settings")
+        assert vbt.settings == new_settings
+        assert vbt.settings.__dict__ == new_settings.__dict__

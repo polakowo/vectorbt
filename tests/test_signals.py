@@ -37,6 +37,19 @@ price = pd.DataFrame({
 group_by = pd.Index(['g1', 'g1', 'g2'])
 
 
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
+
 # ############# accessors.py ############# #
 
 
@@ -159,7 +172,7 @@ class TestAccessors:
         temp_int = np.empty((mask.shape[0],), dtype=np.int_)
 
         en, ex = pd.Series.vbt.signals.generate_both(
-            5, entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            5, entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
             index=mask['a'].index, name=mask['a'].name)
         pd.testing.assert_series_equal(
             en,
@@ -178,7 +191,7 @@ class TestAccessors:
             )
         )
         en, ex = pd.DataFrame.vbt.signals.generate_both(
-            (5, 3), entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            (5, 3), entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
             index=mask.index, columns=mask.columns)
         pd.testing.assert_frame_equal(
             en,
@@ -209,7 +222,7 @@ class TestAccessors:
             )
         )
         en, ex = pd.Series.vbt.signals.generate_both(
-            (5,), entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            (5,), entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
             index=mask['a'].index, name=mask['a'].name, entry_wait=1, exit_wait=0)
         pd.testing.assert_series_equal(
             en,
@@ -228,7 +241,7 @@ class TestAccessors:
             )
         )
         en, ex = pd.Series.vbt.signals.generate_both(
-            (5,), entry_func_nb, exit_func_nb, (temp_int,), (temp_int,),
+            (5,), entry_func_nb, (temp_int,), exit_func_nb, (temp_int,),
             index=mask['a'].index, name=mask['a'].name, entry_wait=0, exit_wait=1)
         pd.testing.assert_series_equal(
             en,
@@ -264,7 +277,7 @@ class TestAccessors:
             return temp_int[:1]
 
         en, ex = pd.DataFrame.vbt.signals.generate_both(
-            (5, 3), entry_func2_nb, exit_func2_nb, (temp_int,), (temp_int,),
+            (5, 3), entry_func2_nb, (temp_int,), exit_func2_nb, (temp_int,),
             entry_pick_first=False, exit_pick_first=False,
             index=mask.index, columns=mask.columns)
         pd.testing.assert_frame_equal(
@@ -1149,7 +1162,7 @@ class TestAccessors:
         )
 
         def _test_ohlc_stop_exits(**kwargs):
-            out_dict = {'hit_price': np.nan, 'stop_type': -1}
+            out_dict = {'stop_price': np.nan, 'stop_type': -1}
             result = mask.vbt.signals.generate_ohlc_stop_exits(
                 price['open'], price['high'], price['low'], price['close'],
                 out_dict=out_dict, **kwargs
@@ -1158,9 +1171,9 @@ class TestAccessors:
                 _, ex = result
             else:
                 ex = result
-            return result, out_dict['hit_price'], out_dict['stop_type']
+            return result, out_dict['stop_price'], out_dict['stop_type']
 
-        ex, hit_price, stop_type = _test_ohlc_stop_exits()
+        ex, stop_price, stop_type = _test_ohlc_stop_exits()
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1172,7 +1185,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -1191,7 +1204,7 @@ class TestAccessors:
                 [-1, -1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
-        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1203,7 +1216,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -1222,7 +1235,7 @@ class TestAccessors:
                 [0, -1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
-        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1234,7 +1247,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -1253,7 +1266,7 @@ class TestAccessors:
                 [1, -1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
-        ex, hit_price, stop_type = _test_ohlc_stop_exits(tp_stop=0.1)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(tp_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1265,7 +1278,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [11.0, np.nan, np.nan],
@@ -1284,7 +1297,7 @@ class TestAccessors:
                 [-1, -1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
-        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1296,7 +1309,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [11.0, np.nan, np.nan],
@@ -1315,7 +1328,7 @@ class TestAccessors:
                 [1, -1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
-        ex, hit_price, stop_type = _test_ohlc_stop_exits(
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(
             sl_stop=[np.nan, 0.1, 0.2], sl_trail=True, tp_stop=[np.nan, 0.1, 0.2])
         pd.testing.assert_frame_equal(
             ex,
@@ -1328,7 +1341,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -1347,7 +1360,7 @@ class TestAccessors:
                 [-1, -1, 1]
             ]), index=mask.index, columns=mask.columns)
         )
-        ex, hit_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1, exit_wait=0)
+        ex, stop_price, stop_type = _test_ohlc_stop_exits(sl_stop=0.1, sl_trail=True, tp_stop=0.1, exit_wait=0)
         pd.testing.assert_frame_equal(
             ex,
             pd.DataFrame(np.array([
@@ -1359,7 +1372,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [9.0, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -1378,7 +1391,7 @@ class TestAccessors:
                 [1, 1, -1]
             ]), index=mask.index, columns=mask.columns)
         )
-        (en, ex), hit_price, stop_type = _test_ohlc_stop_exits(
+        (en, ex), stop_price, stop_type = _test_ohlc_stop_exits(
             sl_stop=0.1, sl_trail=True, tp_stop=0.1, chain=True)
         pd.testing.assert_frame_equal(
             en,
@@ -1401,7 +1414,7 @@ class TestAccessors:
             ]), index=mask.index, columns=mask.columns)
         )
         pd.testing.assert_frame_equal(
-            hit_price,
+            stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [11.0, np.nan, np.nan],
@@ -2297,7 +2310,8 @@ class TestAccessors:
         )
         pd.testing.assert_frame_equal(
             test_func(mask.vbt.signals, True, [[True], [False], [False], [False], [False]]),
-            test_func_pd(test_func_pd(mask, True), np.broadcast_to([[True], [False], [False], [False], [False]], (5, 3)))
+            test_func_pd(test_func_pd(mask, True),
+                         np.broadcast_to([[True], [False], [False], [False], [False]], (5, 3)))
         )
         pd.testing.assert_frame_equal(
             test_func(mask.vbt.signals, True, [[True], [False], [False], [False], [False]], concat=True),
@@ -3186,7 +3200,7 @@ class TestGenerators:
             )
         )
         pd.testing.assert_frame_equal(
-            ohlcstx.hit_price,
+            ohlcstx.stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan],
@@ -3241,7 +3255,7 @@ class TestGenerators:
             )
         )
         pd.testing.assert_frame_equal(
-            ohlcstx.hit_price,
+            ohlcstx.stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11., np.nan, np.nan],
@@ -3310,7 +3324,7 @@ class TestGenerators:
             )
         )
         pd.testing.assert_frame_equal(
-            ohlcstcx.hit_price,
+            ohlcstcx.stop_price,
             pd.DataFrame(np.array([
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan],
                 [np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, 11., np.nan, np.nan],
@@ -3351,4 +3365,3 @@ class TestGenerators:
             ], names=['ohlcstcx_sl_stop', 'ohlcstcx_sl_trail', 'ohlcstcx_tp_stop', None])
             )
         )
-

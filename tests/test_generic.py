@@ -57,6 +57,19 @@ def col_nanmean_nb(col, x):
     return np.nanmean(x)
 
 
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
+
+
 # ############# accessors.py ############# #
 
 
@@ -750,6 +763,122 @@ class TestAccessors:
                 'g1': df[['a', 'b']].stack().describe(percentiles=np.arange(0, 1, 0.1)).values,
                 'g2': df['c'].describe(percentiles=np.arange(0, 1, 0.1)).values
             }, index=test_against.index)
+        )
+
+    def test_value_counts(self):
+        pd.testing.assert_series_equal(
+            df['a'].vbt.value_counts(),
+            pd.Series(
+                np.array([1, 1, 1, 1, 1]),
+                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype='float64'),
+                name='a'
+            )
+        )
+        mapping = {1.: 'one', 2.: 'two', 3.: 'three', 4.: 'four'}
+        pd.testing.assert_series_equal(
+            df['a'].vbt.value_counts(mapping=mapping),
+            pd.Series(
+                np.array([1, 1, 1, 1, 1]),
+                index=pd.Index(['one', 'two', 'three', 'four', None], dtype='object'),
+                name='a'
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(),
+            pd.DataFrame(
+                np.array([
+                    [1, 1, 2],
+                    [1, 1, 2],
+                    [1, 1, 0],
+                    [1, 1, 0],
+                    [1, 1, 1]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype='float64'),
+                columns=df.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(group_by=group_by),
+            pd.DataFrame(
+                np.array([
+                    [2, 2],
+                    [2, 2],
+                    [2, 0],
+                    [2, 0],
+                    [2, 1]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0, np.nan], dtype='float64'),
+                columns=pd.Index(['g1', 'g2'], dtype='object')
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(sort_labels=False),
+            pd.DataFrame(
+                np.array([
+                    [1, 1, 2],
+                    [1, 1, 2],
+                    [1, 1, 0],
+                    [1, 1, 0],
+                    [1, 1, 1]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, 4.0, 3.0, np.nan], dtype='float64'),
+                columns=df.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(sort=True),
+            pd.DataFrame(
+                np.array([
+                    [1, 1, 2],
+                    [1, 1, 2],
+                    [1, 1, 1],
+                    [1, 1, 0],
+                    [1, 1, 0]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, np.nan, 3.0, 4.0], dtype='float64'),
+                columns=df.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(sort=True, ascending=True),
+            pd.DataFrame(
+                np.array([
+                    [1, 1, 0],
+                    [1, 1, 0],
+                    [1, 1, 1],
+                    [1, 1, 2],
+                    [1, 1, 2]
+                ]),
+                index=pd.Float64Index([3.0, 4.0, np.nan, 1.0, 2.0], dtype='float64'),
+                columns=df.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(sort=True, normalize=True),
+            pd.DataFrame(
+                np.array([
+                    [0.06666666666666667, 0.06666666666666667, 0.13333333333333333],
+                    [0.06666666666666667, 0.06666666666666667, 0.13333333333333333],
+                    [0.06666666666666667, 0.06666666666666667, 0.06666666666666667],
+                    [0.06666666666666667, 0.06666666666666667, 0.0],
+                    [0.06666666666666667, 0.06666666666666667, 0.0]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, np.nan, 3.0, 4.0], dtype='float64'),
+                columns=df.columns
+            )
+        )
+        pd.testing.assert_frame_equal(
+            df.vbt.value_counts(sort=True, normalize=True, dropna=True),
+            pd.DataFrame(
+                np.array([
+                    [0.08333333333333333, 0.08333333333333333, 0.16666666666666666],
+                    [0.08333333333333333, 0.08333333333333333, 0.16666666666666666],
+                    [0.08333333333333333, 0.08333333333333333, 0.0],
+                    [0.08333333333333333, 0.08333333333333333, 0.0]
+                ]),
+                index=pd.Float64Index([1.0, 2.0, 3.0, 4.0], dtype='float64'),
+                columns=df.columns
+            )
         )
 
     def test_drawdown(self):

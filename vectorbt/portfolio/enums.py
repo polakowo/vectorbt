@@ -1296,13 +1296,13 @@ Doesn't change."""
 __pdoc__['AdjustSLContext.curr_i'] = """Index of the row of the updated stop.
 
 Gets updated once the price is updated."""
-__pdoc__['AdjustSLContext.curr_price'] = """Price of the updated stop.
+__pdoc__['AdjustSLContext.curr_price'] = """Current stop price.
 
 Gets updated in trailing SL once a higher price is discovered."""
-__pdoc__['AdjustSLContext.curr_stop'] = """Stop value of the updated stop.
+__pdoc__['AdjustSLContext.curr_stop'] = """Current stop value.
 
 Can be updated by adjustment function."""
-__pdoc__['AdjustSLContext.curr_trail'] = """Trailing flag of the updated stop.
+__pdoc__['AdjustSLContext.curr_trail'] = """Current trailing flag.
 
 Can be updated by adjustment function."""
 

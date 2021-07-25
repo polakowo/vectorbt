@@ -297,7 +297,7 @@ values are then considered as categorical and usual statistics are meaningless t
 For this case, `MappedArray.stats` returns value counts:
 
 ```python-repl
->>> ma.stats(column='a', settings=dict(value_map={10: 'some_known_value'}))
+>>> ma.stats(column='a', settings=dict(mapping={10: 'some_known_value'}))
 Start                                          x
 End                                            z
 Period                           3 days 00:00:00
@@ -339,7 +339,7 @@ import pandas as pd
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
 from vectorbt.utils.decorators import cached_method
-from vectorbt.utils.enum import enum_to_value_map
+from vectorbt.utils.mapping import to_mapping, apply_mapping
 from vectorbt.utils.config import merge_dicts, Config
 from vectorbt.base.reshape_fns import to_1d
 from vectorbt.base.class_helpers import (
@@ -404,7 +404,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         idx_arr (array_like): A one-dimensional index array. Optional.
 
             Must be of the same size as `mapped_arr`.
-        value_map (namedtuple, dict or callable): Value map.
+        mapping (namedtuple, dict or callable): Mapping.
         **kwargs: Custom keyword arguments passed to the config.
 
             Useful if any subclass wants to extend the config.
@@ -416,7 +416,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                  col_arr: tp.ArrayLike,
                  id_arr: tp.Optional[tp.ArrayLike] = None,
                  idx_arr: tp.Optional[tp.ArrayLike] = None,
-                 value_map: tp.Optional[tp.ValueMapLike] = None,
+                 mapping: tp.Optional[tp.MappingLike] = None,
                  **kwargs) -> None:
         Wrapping.__init__(
             self,
@@ -425,7 +425,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             col_arr=col_arr,
             id_arr=id_arr,
             idx_arr=idx_arr,
-            value_map=value_map,
+            mapping=mapping,
             **kwargs
         )
         StatsBuilderMixin.__init__(self)
@@ -440,15 +440,14 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         if idx_arr is not None:
             idx_arr = np.asarray(idx_arr)
             checks.assert_shape_equal(mapped_arr, idx_arr, axis=0)
-        if value_map is not None:
-            if checks.is_namedtuple(value_map):
-                value_map = enum_to_value_map(value_map)
+        if mapping is not None:
+            mapping = to_mapping(mapping)
 
         self._mapped_arr = mapped_arr
         self._id_arr = id_arr
         self._col_arr = col_arr
         self._idx_arr = idx_arr
-        self._value_map = value_map
+        self._mapping = mapping
         self._col_mapper = ColumnMapper(wrapper, col_arr)
 
     def indexing_func_meta(self, pd_indexing_func: tp.PandasIndexingFunc, **kwargs) -> IndexingMetaT:
@@ -512,9 +511,9 @@ class MappedArray(Wrapping, StatsBuilderMixin):
         return self._idx_arr
 
     @property
-    def value_map(self) -> tp.Optional[tp.ValueMap]:
-        """Value map."""
-        return self._value_map
+    def mapping(self) -> tp.Optional[tp.Mapping]:
+        """Mapping."""
+        return self._mapping
 
     @cached_method
     def is_sorted(self, incl_id: bool = False) -> bool:
@@ -843,7 +842,7 @@ class MappedArray(Wrapping, StatsBuilderMixin):
 
     @cached_method
     def count(self, group_by: tp.GroupByLike = None, wrap_kwargs: tp.KwargsLike = None) -> tp.MaybeSeries:
-        """Return count by column."""
+        """Return number of values by column."""
         wrap_kwargs = merge_dicts(dict(name_or_index='count'), wrap_kwargs)
         return self.wrapper.wrap_reduced(
             self.col_mapper.get_col_map(group_by=group_by)[1],
@@ -851,32 +850,51 @@ class MappedArray(Wrapping, StatsBuilderMixin):
 
     @cached_method
     def value_counts(self,
+                     normalize: bool = False,
+                     sort_labels: bool = True,
+                     sort: bool = False,
+                     ascending: bool = False,
+                     dropna: bool = False,
                      group_by: tp.GroupByLike = None,
-                     value_map: tp.Optional[tp.ValueMapLike] = None,
-                     wrap_kwargs: tp.KwargsLike = None) -> tp.SeriesFrame:
-        """Return a pandas object containing counts of unique values."""
-        mapped_codes, mapped_uniques = pd.factorize(self.values)
+                     mapping: tp.Optional[tp.MappingLike] = None,
+                     wrap_kwargs: tp.KwargsLike = None,
+                     **kwargs) -> tp.SeriesFrame:
+        """See `vectorbt.generic.accessors.GenericAccessor.value_counts`.
+
+        !!! note
+            Does not take into account missing values."""
+        mapped_codes, mapped_uniques = pd.factorize(self.values, sort=False, na_sentinel=None)
         col_map = self.col_mapper.get_col_map(group_by=group_by)
-        value_counts = nb.mapped_value_counts_nb(mapped_codes, col_map)
-        value_counts_df = self.wrapper.wrap(
+        value_counts = nb.mapped_value_counts_nb(mapped_codes, len(mapped_uniques), col_map)
+        nan_mask = np.isnan(mapped_uniques)
+        if dropna:
+            value_counts = value_counts[~nan_mask]
+            mapped_uniques = mapped_uniques[~nan_mask]
+        if sort_labels:
+            new_indices = mapped_uniques.argsort()
+            value_counts = value_counts[new_indices]
+            mapped_uniques = mapped_uniques[new_indices]
+        value_counts_sum = value_counts.sum(axis=1)
+        if normalize:
+            value_counts = value_counts / value_counts_sum.sum()
+        if sort:
+            if ascending:
+                new_indices = value_counts_sum.argsort()
+            else:
+                new_indices = (-value_counts_sum).argsort()
+            value_counts = value_counts[new_indices]
+            mapped_uniques = mapped_uniques[new_indices]
+        value_counts_pd = self.wrapper.wrap(
             value_counts,
             index=mapped_uniques,
             group_by=group_by,
             **merge_dicts({}, wrap_kwargs)
         )
-        if value_map is None:
-            value_map = self.value_map
-        if value_map is not None:
-            if checks.is_namedtuple(value_map):
-                value_map = enum_to_value_map(value_map)
-
-            def _map_func(x: tp.Any) -> str:
-                if x not in value_map:
-                    return 'UNK - %s' % str(x)
-                return value_map[x]
-
-            value_counts_df.index = value_counts_df.index.map(_map_func)
-        return value_counts_df
+        if mapping is None:
+            mapping = self.mapping
+        if mapping is not None:
+            value_counts_pd.index = apply_mapping(value_counts_pd.index, mapping, **kwargs)
+        return value_counts_pd
 
     @property
     def stats_defaults(self) -> tp.Kwargs:
@@ -918,50 +936,50 @@ class MappedArray(Wrapping, StatsBuilderMixin):
                 title='Mean',
                 calc_func='mean',
                 pass_group_by=True,
-                inv_check_has_value_map=True
+                inv_check_has_mapping=True
             ),
             std=dict(
                 title='Std',
                 calc_func='std',
                 pass_group_by=True,
-                inv_check_has_value_map=True
+                inv_check_has_mapping=True
             ),
             min=dict(
                 title='Min',
                 calc_func='min',
                 pass_group_by=True,
-                inv_check_has_value_map=True
+                inv_check_has_mapping=True
             ),
             median=dict(
                 title='Median',
                 calc_func='median',
                 pass_group_by=True,
-                inv_check_has_value_map=True
+                inv_check_has_mapping=True
             ),
             max=dict(
                 title='Max',
                 calc_func='max',
                 pass_group_by=True,
-                inv_check_has_value_map=True
+                inv_check_has_mapping=True
             ),
             idx_min=dict(
                 title='Min Index',
                 calc_func='idxmin',
                 pass_group_by=True,
-                inv_check_has_value_map=True,
+                inv_check_has_mapping=True,
                 agg_func=None
             ),
             idx_max=dict(
                 title='Max Index',
                 calc_func='idxmax',
                 pass_group_by=True,
-                inv_check_has_value_map=True,
+                inv_check_has_mapping=True,
                 agg_func=None
             ),
             value_counts=dict(
-                title='Value Count',
+                title='Value Counts',
                 calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
-                check_has_value_map=True
+                check_has_mapping=True
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

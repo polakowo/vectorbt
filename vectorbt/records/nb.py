@@ -436,12 +436,11 @@ def reduce_mapped_to_idx_array_nb(mapped_arr: tp.Array1d, col_map: tp.ColMap, id
 
 
 @njit(cache=True)
-def mapped_value_counts_nb(mapped_codes: tp.Array1d, col_map: tp.ColMap) -> tp.Array2d:
+def mapped_value_counts_nb(codes: tp.Array1d, n_uniques: int, col_map: tp.ColMap) -> tp.Array2d:
     """Get value counts of an already factorized mapped array."""
     col_idxs, col_lens = col_map
     col_start_idxs = np.cumsum(col_lens) - col_lens
-    last_code = np.max(mapped_codes)
-    out = np.full((last_code + 1, col_lens.shape[0]), 0, dtype=np.int_)
+    out = np.full((n_uniques, col_lens.shape[0]), 0, dtype=np.int_)
 
     for col in range(col_lens.shape[0]):
         col_len = col_lens[col]
@@ -449,6 +448,6 @@ def mapped_value_counts_nb(mapped_codes: tp.Array1d, col_map: tp.ColMap) -> tp.A
             continue
         start_idx = col_start_idxs[col]
         for i in range(col_len):
-            out[mapped_codes[col_idxs[start_idx + i]], col] += 1
+            out[codes[col_idxs[start_idx + i]], col] += 1
     return out
 

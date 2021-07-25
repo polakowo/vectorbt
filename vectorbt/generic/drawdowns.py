@@ -25,7 +25,7 @@ from vectorbt.utils.decorators import cached_property, cached_method
 from vectorbt.utils.config import merge_dicts
 from vectorbt.utils.colors import adjust_lightness
 from vectorbt.utils.datetime import DatetimeIndexes
-from vectorbt.utils.enum import enum_to_value_map
+from vectorbt.utils.enum import map_enum_values
 from vectorbt.utils.figure import make_figure, get_domain
 from vectorbt.base.reshape_fns import to_1d, broadcast_to, to_pd_array
 from vectorbt.base.array_wrapper import ArrayWrapper
@@ -131,7 +131,7 @@ class Drawdowns(Records):
         out['Start Date'] = records_df['start_idx'].map(lambda x: self.wrapper.index[x])
         out['Valley Date'] = records_df['valley_idx'].map(lambda x: self.wrapper.index[x])
         out['End Date'] = records_df['end_idx'].map(lambda x: self.wrapper.index[x])
-        out['Status'] = records_df['status'].map(enum_to_value_map(DrawdownStatus))
+        out['Status'] = map_enum_values(records_df['status'], DrawdownStatus)
         return out
 
     @cached_property

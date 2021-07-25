@@ -6,7 +6,7 @@ import pandas as pd
 from numba.core.registry import CPUDispatcher
 from inspect import signature, getmro
 import dill
-from collections.abc import Hashable
+from collections.abc import Hashable, Mapping
 
 from vectorbt import _typing as tp
 
@@ -17,6 +17,11 @@ from vectorbt import _typing as tp
 def is_series(arg: tp.Any) -> bool:
     """Check whether the argument is `pd.Series`."""
     return isinstance(arg, pd.Series)
+
+
+def is_index(arg: tp.Any) -> bool:
+    """Check whether the argument is `pd.Index`."""
+    return isinstance(arg, pd.Index)
 
 
 def is_frame(arg: tp.Any) -> bool:
@@ -238,6 +243,16 @@ def is_instance_of(arg: tp.Any, types: tp.MaybeTuple[tp.Union[tp.Type, str]]) ->
 
     `types` can be one or multiple types or strings."""
     return is_subclass_of(type(arg), types)
+
+
+def is_mapping(arg: tp.Any) -> bool:
+    """Check whether the arguments is a mapping."""
+    return isinstance(arg, Mapping)
+
+
+def is_mapping_like(arg: tp.Any) -> bool:
+    """Check whether the arguments is a mapping-like object."""
+    return is_mapping(arg) or is_series(arg) or is_index(arg) or is_namedtuple(arg)
 
 
 # ############# Asserts ############# #

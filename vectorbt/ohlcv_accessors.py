@@ -1,7 +1,8 @@
-"""Custom pandas accessors.
+"""Custom pandas accessors for OHLC(V) data.
 
 Methods can be accessed as follows:
 
+* `OHLCVDFAccessor` -> `pd.DataFrame.vbt.ohlc.*`
 * `OHLCVDFAccessor` -> `pd.DataFrame.vbt.ohlcv.*`
 
 The accessors inherit `vectorbt.generic.accessors`.
@@ -20,6 +21,7 @@ from vectorbt.utils.config import merge_dicts
 from vectorbt.generic.accessors import GenericDFAccessor
 
 
+@register_dataframe_accessor('ohlc')
 @register_dataframe_accessor('ohlcv')
 class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
     """Accessor on top of OHLCV data. For DataFrames only.
@@ -32,11 +34,16 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
 
         self._column_names = column_names
 
-        GenericDFAccessor.__init__(self, obj, **kwargs)
+        GenericDFAccessor.__init__(self, obj, column_names=column_names, **kwargs)
+
+    @property
+    def column_names(self):
+        """Column names."""
+        return self._column_names
 
     def plot(self,
              plot_type: tp.Union[None, str, tp.BaseTraceType] = None,
-             display_volume: bool = True,
+             display_volume: tp.Optional[bool] = None,
              ohlc_kwargs: tp.KwargsLike = None,
              volume_kwargs: tp.KwargsLike = None,
              ohlc_add_trace_kwargs: tp.KwargsLike = None,
@@ -71,6 +78,9 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         ohlcv_cfg = settings['ohlcv']
         plotting_cfg = settings['plotting']
 
+        column_names = ohlcv_cfg['column_names'] if self.column_names is None else self.column_names
+        df_column_names = self.obj.columns.str.lower().tolist()
+
         if ohlc_kwargs is None:
             ohlc_kwargs = {}
         if volume_kwargs is None:
@@ -79,15 +89,16 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
             ohlc_add_trace_kwargs = {}
         if volume_add_trace_kwargs is None:
             volume_add_trace_kwargs = {}
+        if display_volume is None:
+            display_volume = column_names['volume'].lower() in df_column_names
         if display_volume:
             ohlc_add_trace_kwargs = merge_dicts(dict(row=1, col=1), ohlc_add_trace_kwargs)
             volume_add_trace_kwargs = merge_dicts(dict(row=2, col=1), volume_add_trace_kwargs)
 
-        column_names = ohlcv_cfg['column_names'] if self._column_names is None else self._column_names
-        open = self.obj[column_names['open']]
-        high = self.obj[column_names['high']]
-        low = self.obj[column_names['low']]
-        close = self.obj[column_names['close']]
+        open = self.obj.iloc[:, df_column_names.index(column_names['open'].lower())]
+        high = self.obj.iloc[:, df_column_names.index(column_names['high'].lower())]
+        low = self.obj.iloc[:, df_column_names.index(column_names['low'].lower())]
+        close = self.obj.iloc[:, df_column_names.index(column_names['close'].lower())]
 
         # Set up figure
         if fig is None:
@@ -151,7 +162,7 @@ class OHLCVDFAccessor(GenericDFAccessor):  # pragma: no cover
         fig.add_trace(ohlc, **ohlc_add_trace_kwargs)
 
         if display_volume:
-            volume = self.obj[column_names['volume']]
+            volume = self.obj.iloc[:, df_column_names.index(column_names['volume'].lower())]
 
             marker_colors = np.empty(volume.shape, dtype=object)
             marker_colors[(close.values - open.values) > 0] = plotting_cfg['color_schema']['increasing']

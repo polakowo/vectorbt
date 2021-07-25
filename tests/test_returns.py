@@ -5,7 +5,6 @@ import pytest
 import empyrical
 
 import vectorbt as vbt
-from vectorbt import settings
 
 from tests.utils import isclose
 
@@ -24,8 +23,6 @@ ts = pd.DataFrame({
 ]))
 ret = ts.pct_change()
 
-settings.returns['year_freq'] = '252 days'  # same as empyrical
-
 seed = 42
 
 np.random.seed(seed)
@@ -34,6 +31,20 @@ benchmark_rets = pd.DataFrame({
     'b': ret['b'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 2,
     'c': ret['c'] * np.random.uniform(0.8, 1.2, ret.shape[0]) * 3
 })
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+    vbt.settings.returns['year_freq'] = '252 days'  # same as empyrical
+
+
+def teardown_module():
+    vbt.settings.reset()
 
 
 # ############# accessors.py ############# #

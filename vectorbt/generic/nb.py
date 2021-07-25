@@ -1191,6 +1191,24 @@ def describe_reduce_nb(col: int, a: tp.Array1d, perc: tp.Array1d, ddof: int) -> 
     return out
 
 
+# ############# Value counts ############# #
+
+
+@njit(cache=True)
+def value_counts_nb(codes: tp.Array2d, n_uniques: int, group_lens: tp.Array1d) -> tp.Array2d:
+    """Return value counts per column/group."""
+    out = np.full((n_uniques, group_lens.shape[0]), 0, dtype=np.int_)
+
+    from_col = 0
+    for group in range(len(group_lens)):
+        to_col = from_col + group_lens[group]
+        for col in range(from_col, to_col):
+            for i in range(codes.shape[0]):
+                out[codes[i, col], group] += 1
+        from_col = to_col
+    return out
+
+
 # ############# Group squeezers ############# #
 
 

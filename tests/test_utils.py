@@ -9,7 +9,7 @@ import asyncio
 import pytz
 from copy import copy, deepcopy
 
-from vectorbt import settings
+import vectorbt as vbt
 from vectorbt.utils import (
     checks,
     config,
@@ -17,6 +17,7 @@ from vectorbt.utils import (
     math,
     array,
     random,
+    mapping,
     enum,
     params,
     attr,
@@ -28,6 +29,19 @@ from vectorbt.utils import (
 from datetime import datetime as _datetime, timedelta as _timedelta, time as _time, timezone as _timezone
 
 seed = 42
+
+
+# ############# Global ############# #
+
+def setup_module():
+    vbt.settings.numba['check_func_suffix'] = True
+    vbt.settings.caching.enabled = False
+    vbt.settings.caching.whitelist = []
+    vbt.settings.caching.blacklist = []
+
+
+def teardown_module():
+    vbt.settings.reset()
 
 
 # ############# config.py ############# #
@@ -541,14 +555,14 @@ class TestConfig:
         assert not cfg.convert_dicts_
         assert not cfg.as_attrs_
 
-        settings.config.reset()
-        settings.config['copy_kwargs'] = dict(copy_mode='deep')
-        settings.config['reset_dct_copy_kwargs'] = dict(copy_mode='deep')
-        settings.config['frozen_keys'] = True
-        settings.config['readonly'] = True
-        settings.config['nested'] = True
-        settings.config['convert_dicts'] = True
-        settings.config['as_attrs'] = True
+        vbt.settings.config.reset()
+        vbt.settings.config['copy_kwargs'] = dict(copy_mode='deep')
+        vbt.settings.config['reset_dct_copy_kwargs'] = dict(copy_mode='deep')
+        vbt.settings.config['frozen_keys'] = True
+        vbt.settings.config['readonly'] = True
+        vbt.settings.config['nested'] = True
+        vbt.settings.config['convert_dicts'] = True
+        vbt.settings.config['as_attrs'] = True
 
         cfg = config.Config(dict(a=0))
         assert dict(cfg) == dict(a=0)
@@ -567,7 +581,7 @@ class TestConfig:
         assert cfg.convert_dicts_
         assert cfg.as_attrs_
 
-        settings.config.reset()
+        vbt.settings.config.reset()
 
     def test_config_as_attrs(self):
         cfg = config.Config(dict(a=0, b=0, dct=dict(d=0)), as_attrs=True)
@@ -967,6 +981,8 @@ class TestDecorators:
         ]
     )
     def test_caching(self, test_property, test_blacklist):
+        vbt.settings.caching.enabled = True
+
         np.random.seed(seed)
 
         if test_property:
@@ -1044,45 +1060,45 @@ class TestDecorators:
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = True
-        settings.caching['blacklist'].append(decorators.CacheCondition(instance=g))
-        settings.caching['blacklist'].append(decorators.CacheCondition(cls=G))
-        settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
+        vbt.settings.caching['enabled'] = True
+        vbt.settings.caching['blacklist'].append(decorators.CacheCondition(instance=g))
+        vbt.settings.caching['blacklist'].append(decorators.CacheCondition(cls=G))
+        vbt.settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert call(g.cache_me) != cached_number
         assert call(g2.cache_me) == cached_number2
         assert call(g3.cache_me) == cached_number3
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = True
-        settings.caching['blacklist'].append(decorators.CacheCondition(cls=G))
-        settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
+        vbt.settings.caching['enabled'] = True
+        vbt.settings.caching['blacklist'].append(decorators.CacheCondition(cls=G))
+        vbt.settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert call(g.cache_me) == cached_number
         assert call(g2.cache_me) == cached_number2
         assert call(g3.cache_me) == cached_number3
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = True
-        settings.caching['blacklist'].append(decorators.CacheCondition(cls=G, rank=0))
-        settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
+        vbt.settings.caching['enabled'] = True
+        vbt.settings.caching['blacklist'].append(decorators.CacheCondition(cls=G, rank=0))
+        vbt.settings.caching['whitelist'].append(decorators.CacheCondition(cls=G))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert call(g.cache_me) != cached_number
         assert call(g2.cache_me) != cached_number2
         assert call(g3.cache_me) == cached_number3
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # test list
 
@@ -1103,347 +1119,347 @@ class TestDecorators:
 
         # condition health
         G.cache_me.clear_cache(g)
-        settings.caching[lst].append(decorators.CacheCondition(func=True))
+        vbt.settings.caching[lst].append(decorators.CacheCondition(func=True))
         with pytest.raises(Exception):
             _ = call(g.cache_me)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
-        settings.caching[lst].append(decorators.CacheCondition(cls=True))
+        vbt.settings.caching[lst].append(decorators.CacheCondition(cls=True))
         with pytest.raises(Exception):
             _ = call(g.cache_me)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
-        settings.caching[lst].append(decorators.CacheCondition(base_cls=True))
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls=True))
         with pytest.raises(Exception):
             _ = call(g.cache_me)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
-        settings.caching[lst].append(decorators.CacheCondition(flags=True))
+        vbt.settings.caching[lst].append(decorators.CacheCondition(flags=True))
         with pytest.raises(Exception):
             _ = call(g.cache_me)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
-        settings.caching[lst].append(decorators.CacheCondition(rank='test'))
+        vbt.settings.caching[lst].append(decorators.CacheCondition(rank='test'))
         with pytest.raises(Exception):
             _ = call(g.cache_me)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # instance + func
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(instance=g, func=G.cache_me))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(instance=g, func=G.cache_me))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         if not test_property:
             G.cache_me.clear_cache(g)
             G.cache_me.clear_cache(g2)
             G3.cache_me.clear_cache(g3)
-            settings.caching['enabled'] = test_blacklist
-            settings.caching[lst].append(decorators.CacheCondition(instance=g, func=g.cache_me))
+            vbt.settings.caching['enabled'] = test_blacklist
+            vbt.settings.caching[lst].append(decorators.CacheCondition(instance=g, func=g.cache_me))
             cached_number = call(g.cache_me)
             cached_number2 = call(g2.cache_me)
             cached_number3 = call(g3.cache_me)
             assert compare(call(g.cache_me), cached_number)
             assert not_compare(call(g2.cache_me), cached_number2)
             assert not_compare(call(g3.cache_me), cached_number3)
-            settings.caching.reset()
+            vbt.settings.caching.reset()
 
         # instance + func_name
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(instance=g, func='cache_me'))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(instance=g, func='cache_me'))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # instance + flags
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(instance=g, flags=dict(a=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(instance=g, flags=dict(a=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(instance=g, flags=dict(c=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(instance=g, flags=dict(c=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert not_compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # instance
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(instance=g))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(instance=g))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # class + func_name
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(cls=G, func='cache_me'))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(cls=G, func='cache_me'))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # class + flags
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(cls=G, flags=dict(a=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(cls=G, flags=dict(a=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # class
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(cls=G))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(cls=G))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(cls="G"))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(cls="G"))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # base class + func_name
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(base_cls=G, func='cache_me'))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls=G, func='cache_me'))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # base class + flags
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(base_cls=G, flags=dict(a=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls=G, flags=dict(a=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(base_cls=G, flags=dict(c=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls=G, flags=dict(c=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert not_compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # base class
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(base_cls=G))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls=G))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(base_cls="G"))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls="G"))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(base_cls=G3))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(base_cls=G3))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert not_compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # func_name and flags
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(func='cache_me', flags=dict(a=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(func='cache_me', flags=dict(a=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(func='cache_me', flags=dict(c=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(func='cache_me', flags=dict(c=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert not_compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # func_name
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(func='cache_me'))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(func='cache_me'))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # flags
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(flags=dict(a=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(flags=dict(a=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(flags=dict(c=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(flags=dict(c=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert not_compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = test_blacklist
-        settings.caching[lst].append(decorators.CacheCondition(flags=dict(d=0)))
+        vbt.settings.caching['enabled'] = test_blacklist
+        vbt.settings.caching[lst].append(decorators.CacheCondition(flags=dict(d=0)))
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert not_compare(call(g.cache_me), cached_number)
         assert not_compare(call(g2.cache_me), cached_number2)
         assert not_compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
         # disabled globally
         G.cache_me.clear_cache(g)
         G.cache_me.clear_cache(g2)
         G3.cache_me.clear_cache(g3)
-        settings.caching['enabled'] = not test_blacklist
+        vbt.settings.caching['enabled'] = not test_blacklist
         cached_number = call(g.cache_me)
         cached_number2 = call(g2.cache_me)
         cached_number3 = call(g3.cache_me)
         assert compare(call(g.cache_me), cached_number)
         assert compare(call(g2.cache_me), cached_number2)
         assert compare(call(g3.cache_me), cached_number3)
-        settings.caching.reset()
+        vbt.settings.caching.reset()
 
 
 # ############# attr.py ############# #
@@ -2133,84 +2149,166 @@ class TestRandom:
             assert test_seed_nb() == 0.3745401188473625
 
 
-# ############# enum.py ############# #
+# ############# mapping.py ############# #
 
 Enum = namedtuple('Enum', ['Attr1', 'Attr2'])(*range(2))
 
 
+class TestMapping:
+    def test_to_mapping(self):
+        assert mapping.to_mapping(Enum) == {0: 'Attr1', 1: 'Attr2', -1: None}
+        assert mapping.to_mapping(Enum, reverse=True) == {'Attr1': 0, 'Attr2': 1, None: -1}
+        assert mapping.to_mapping({0: 'Attr1', 1: 'Attr2', -1: None}) == {0: 'Attr1', 1: 'Attr2', -1: None}
+        assert mapping.to_mapping(['Attr1', 'Attr2']) == {0: 'Attr1', 1: 'Attr2'}
+        assert mapping.to_mapping(pd.Index(['Attr1', 'Attr2'])) == {0: 'Attr1', 1: 'Attr2'}
+        assert mapping.to_mapping(pd.Series(['Attr1', 'Attr2'])) == {0: 'Attr1', 1: 'Attr2'}
+
+# ############# enum.py ############# #
+
+
 class TestEnum:
-    def test_enum_to_field_map(self):
-        assert enum.enum_to_field_map(Enum) == {None: -1, 'attr1': 0, 'attr2': 1}
-
-    def test_enum_to_value_map(self):
-        assert enum.enum_to_value_map(Enum) == {-1: None, 0: 'Attr1', 1: 'Attr2'}
-
-    def test_cast_enum_value(self):
-        assert enum.cast_enum_value(0, Enum) == 0
-        assert enum.cast_enum_value(10, Enum) == 10
-        assert enum.cast_enum_value(10., Enum) == 10.
-        assert enum.cast_enum_value('Attr1', Enum) == 0
-        assert enum.cast_enum_value('attr1', Enum) == 0
-        assert enum.cast_enum_value(('attr1', 'attr2'), Enum) == (0, 1)
-        assert enum.cast_enum_value([['attr1', 'attr2']], Enum) == [[0, 1]]
+    def test_map_enum_fields(self):
+        assert enum.map_enum_fields(0, Enum) == 0
+        assert enum.map_enum_fields(10, Enum) == 10
+        assert enum.map_enum_fields(10., Enum) == 10.
+        assert enum.map_enum_fields('Attr1', Enum) == 0
+        assert enum.map_enum_fields('attr1', Enum) == 0
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields('hello', Enum)
+        assert enum.map_enum_fields('attr1', Enum, ignore_other_types=False) == 0
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(0, Enum, ignore_other_types=False)
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(0., Enum, ignore_other_types=False)
+        assert enum.map_enum_fields(('attr1', 'attr2'), Enum) == (0, 1)
+        assert enum.map_enum_fields([['attr1', 'attr2']], Enum) == [[0, 1]]
         np.testing.assert_array_equal(
-            enum.cast_enum_value(np.array([]), Enum),
+            enum.map_enum_fields(np.array([]), Enum),
             np.array([])
         )
         np.testing.assert_array_equal(
-            enum.cast_enum_value(np.array([[0., 1.]]), Enum),
+            enum.map_enum_fields(np.array([[0., 1.]]), Enum),
             np.array([[0., 1.]])
         )
         np.testing.assert_array_equal(
-            enum.cast_enum_value(np.array([[0, 1]]), Enum),
+            enum.map_enum_fields(np.array([[0, 1]]), Enum),
             np.array([[0, 1]])
         )
         np.testing.assert_array_equal(
-            enum.cast_enum_value(np.array([['attr1', 'attr2']]), Enum),
+            enum.map_enum_fields(np.array([['attr1', 'attr2']]), Enum),
             np.array([[0, 1]])
         )
         with pytest.raises(Exception):
-            _ = enum.cast_enum_value(np.array([['attr1', 0]]), Enum)
+            _ = enum.map_enum_fields(np.array([['attr1', 1]]), Enum)
         pd.testing.assert_series_equal(
-            enum.cast_enum_value(pd.Series([]), Enum),
+            enum.map_enum_fields(pd.Series([]), Enum),
             pd.Series([])
         )
         pd.testing.assert_series_equal(
-            enum.cast_enum_value(pd.Series([0., 1.]), Enum),
+            enum.map_enum_fields(pd.Series([0., 1.]), Enum),
             pd.Series([0., 1.])
         )
         pd.testing.assert_series_equal(
-            enum.cast_enum_value(pd.Series([0, 1]), Enum),
+            enum.map_enum_fields(pd.Series([0, 1]), Enum),
             pd.Series([0, 1])
         )
         pd.testing.assert_series_equal(
-            enum.cast_enum_value(pd.Series(['attr1', 'attr2']), Enum),
+            enum.map_enum_fields(pd.Series(['attr1', 'attr2']), Enum),
             pd.Series([0, 1])
         )
-        pd.testing.assert_series_equal(
-            enum.cast_enum_value(pd.Series(['attr1', 0]), Enum),
-            pd.Series([0, 0])
-        )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(pd.Series(['attr1', 0]), Enum)
         pd.testing.assert_frame_equal(
-            enum.cast_enum_value(pd.DataFrame([]), Enum),
+            enum.map_enum_fields(pd.DataFrame([]), Enum),
             pd.DataFrame([])
         )
         pd.testing.assert_frame_equal(
-            enum.cast_enum_value(pd.DataFrame([[0., 1.]]), Enum),
+            enum.map_enum_fields(pd.DataFrame([[0., 1.]]), Enum),
             pd.DataFrame([[0., 1.]])
         )
         pd.testing.assert_frame_equal(
-            enum.cast_enum_value(pd.DataFrame([[0, 1]]), Enum),
+            enum.map_enum_fields(pd.DataFrame([[0, 1]]), Enum),
             pd.DataFrame([[0, 1]])
         )
         pd.testing.assert_frame_equal(
-            enum.cast_enum_value(pd.DataFrame([['attr1', 'attr2']]), Enum),
+            enum.map_enum_fields(pd.DataFrame([['attr1', 'attr2']]), Enum),
             pd.DataFrame([[0, 1]])
         )
         pd.testing.assert_frame_equal(
-            enum.cast_enum_value(pd.DataFrame([['attr1', 0]]), Enum),
+            enum.map_enum_fields(pd.DataFrame([['attr1', 0]]), Enum),
             pd.DataFrame([[0, 0]])
         )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_fields(pd.DataFrame([['attr1', 0]]), Enum, ignore_other_types=False)
+
+    def test_map_enum_values(self):
+        assert enum.map_enum_values(0, Enum) == 'Attr1'
+        assert enum.map_enum_values(-1, Enum) is None
+        with pytest.raises(Exception):
+            _ = enum.map_enum_values(-2, Enum)
+        assert enum.map_enum_values((0, 1, 'Attr3'), Enum) == ('Attr1', 'Attr2', 'Attr3')
+        assert enum.map_enum_values([[0, 1, 'Attr3']], Enum) == [['Attr1', 'Attr2', 'Attr3']]
+        assert enum.map_enum_values(0, Enum, ignore_other_types=False) == 'Attr1'
+        with pytest.raises(Exception):
+            _ = enum.map_enum_values(0., Enum, ignore_other_types=False)
+        with pytest.raises(Exception):
+            _ = enum.map_enum_values('hello', Enum, ignore_other_types=False)
+        np.testing.assert_array_equal(
+            enum.map_enum_values(np.array([]), Enum),
+            np.array([])
+        )
+        np.testing.assert_array_equal(
+            enum.map_enum_values(np.array([[0., 1.]]), Enum),
+            np.array([[0., 1.]])
+        )
+        np.testing.assert_array_equal(
+            enum.map_enum_values(np.array([['Attr1', 'Attr2']]), Enum),
+            np.array([['Attr1', 'Attr2']])
+        )
+        np.testing.assert_array_equal(
+            enum.map_enum_values(np.array([[0, 'Attr2']]), Enum),
+            np.array([['0', 'Attr2']])
+        )
+        pd.testing.assert_series_equal(
+            enum.map_enum_values(pd.Series([]), Enum),
+            pd.Series([])
+        )
+        pd.testing.assert_series_equal(
+            enum.map_enum_values(pd.Series([0., 1.]), Enum),
+            pd.Series([0., 1.])
+        )
+        pd.testing.assert_series_equal(
+            enum.map_enum_values(pd.Series([0, 1]), Enum),
+            pd.Series(['Attr1', 'Attr2'])
+        )
+        pd.testing.assert_series_equal(
+            enum.map_enum_values(pd.Series(['Attr1', 'Attr2']), Enum),
+            pd.Series(['Attr1', 'Attr2'])
+        )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_values(pd.Series([0, 'Attr2']), Enum)
+        pd.testing.assert_frame_equal(
+            enum.map_enum_values(pd.DataFrame([]), Enum),
+            pd.DataFrame([])
+        )
+        pd.testing.assert_frame_equal(
+            enum.map_enum_values(pd.DataFrame([[0., 1.]]), Enum),
+            pd.DataFrame([[0., 1.]])
+        )
+        pd.testing.assert_frame_equal(
+            enum.map_enum_values(pd.DataFrame([[0, 1]]), Enum),
+            pd.DataFrame([['Attr1', 'Attr2']])
+        )
+        pd.testing.assert_frame_equal(
+            enum.map_enum_values(pd.DataFrame([['Attr1', 'Attr2']]), Enum),
+            pd.DataFrame([['Attr1', 'Attr2']])
+        )
+        pd.testing.assert_frame_equal(
+            enum.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum),
+            pd.DataFrame([['Attr1', 'Attr2']])
+        )
+        with pytest.raises(Exception):
+            _ = enum.map_enum_values(pd.DataFrame([[0, 'Attr2']]), Enum, ignore_other_types=False)
 
 
 # ############# params.py ############# #

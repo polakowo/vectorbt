@@ -275,6 +275,9 @@ settings = SettingsConfig(
                 )
             )
         ),
+        generic=dict(
+            stats=Config()  # flex
+        ),
         ohlcv=dict(
             plot_type='OHLC',
             column_names=dict(
@@ -284,9 +287,19 @@ settings = SettingsConfig(
                 close='Close',
                 volume='Volume'
             ),
-        ),
-        generic=dict(
             stats=Config()  # flex
+        ),
+        cat=dict(
+            stats=Config(  # flex
+                dict(
+                    filters=dict(
+                        has_mapping=dict(
+                            filter_func=lambda self, metric_settings:
+                            metric_settings.get('mapping', self.mapping) is not None
+                        )
+                    )
+                )
+            )
         ),
         signals=dict(
             stats=Config(
@@ -346,9 +359,9 @@ settings = SettingsConfig(
             stats=Config(  # flex
                 dict(
                     filters=dict(
-                        has_value_map=dict(
+                        has_mapping=dict(
                             filter_func=lambda self, metric_settings:
-                            metric_settings.get('value_map', self.value_map) is not None
+                            metric_settings.get('mapping', self.mapping) is not None
                         )
                     )
                 )
@@ -544,12 +557,20 @@ Settings applied to `vectorbt.generic.stats_builder.StatsBuilderMixin`.
 {settings['stats_builder'].to_doc()}
 ```
 
-## settings.returns
+## settings.plot_builder
 
-Settings applied across `vectorbt.returns`.
+Settings applied to `vectorbt.generic.plot_builder.PlotBuilderMixin`.
 
 ```json
-{settings['returns'].to_doc()}
+{settings['plot_builder'].to_doc()}
+```
+
+## settings.generic
+
+Settings applied across `vectorbt.generic`.
+
+```json
+{settings['generic'].to_doc()}
 ```
 
 ## settings.ohlcv
@@ -560,12 +581,12 @@ Settings applied across `vectorbt.ohlcv_accessors`.
 {settings['ohlcv'].to_doc()}
 ```
 
-## settings.generic
+## settings.cat
 
-Settings applied across `vectorbt.generic`.
+Settings applied across `vectorbt.cat_accessors`.
 
 ```json
-{settings['generic'].to_doc()}
+{settings['cat'].to_doc()}
 ```
 
 ## settings.signals
