@@ -9,12 +9,12 @@
 [![Join the chat at https://gitter.im/vectorbt/community](https://badges.gitter.im/vectorbt.svg)](https://gitter.im/vectorbt/community?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 [![Patreon](https://img.shields.io/badge/support-sponsor-ff69b4?logo=patreon)](https://www.patreon.com/vectorbt)
 
-# vectorbt
+# vectorbt :boom:
 
 ![Logo](https://raw.githubusercontent.com/polakowo/vectorbt/master/static/favicon/favicon-100x100-dark.png)
 
 vectorbt is a backtesting library on steroids - it operates entirely on pandas and NumPy objects, and is 
-accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale :fire:
+accelerated by [Numba](https://github.com/numba/numba) to analyze time series at speed and scale.
 
 In contrast to conventional libraries, vectorbt represents any data as nd-arrays.
 This enables superfast computation using vectorized operations with NumPy and non-vectorized but dynamically 
