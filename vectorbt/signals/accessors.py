@@ -1794,18 +1794,21 @@ class SignalsAccessor(GenericAccessor):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             ),
             total=dict(
                 title='Total',
@@ -1866,19 +1869,19 @@ class SignalsAccessor(GenericAccessor):
                 pass_group_by=True,  # hidden behind **kwargs
                 pass_other=True,  # hidden behind **kwargs
                 pass_from_other=True,  # hidden behind **kwargs
-                auto_to_duration=True,
+                apply_to_duration=True,
                 tags=RepEval("['signals', 'distance', 'other'] if other is not None else ['signals', 'distance']")
             ),
             total_partitions=dict(
                 title='Total Partitions',
                 calc_func='total_partitions',
-                tags='partitions'
+                tags=['signals', 'partitions']
             ),
             partition_rate=dict(
                 title='Partition Rate [%]',
                 calc_func='partition_rate',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='partitions'
+                tags=['signals', 'partitions']
             ),
             partition_len=dict(
                 title='Partition Length',
@@ -1890,8 +1893,8 @@ class SignalsAccessor(GenericAccessor):
                     'Std': out.std(ddof=settings.get('ddof', 1))
                 },
                 pass_group_by=True,  # hidden behind **kwargs
-                auto_to_duration=True,
-                tags=['partitions', 'distance']
+                apply_to_duration=True,
+                tags=['signals', 'partitions', 'distance']
             ),
             partition_distance=dict(
                 title='Partition Distance',
@@ -1903,8 +1906,8 @@ class SignalsAccessor(GenericAccessor):
                     'Std': out.std(ddof=settings.get('ddof', 1))
                 },
                 pass_group_by=True,  # hidden behind **kwargs
-                auto_to_duration=True,
-                tags=['partitions', 'distance']
+                apply_to_duration=True,
+                tags=['signals', 'partitions', 'distance']
             ),
         ),
         copy_kwargs=dict(copy_mode='deep')

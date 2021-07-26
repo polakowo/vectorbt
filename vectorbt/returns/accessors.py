@@ -851,112 +851,132 @@ class ReturnsAccessor(GenericAccessor):
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
                 agg_func=None,
-                check_is_not_grouped=False
+                check_is_not_grouped=False,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
                 agg_func=None,
-                check_is_not_grouped=False
+                check_is_not_grouped=False,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
+                apply_to_duration=True,
                 agg_func=None,
-                check_is_not_grouped=False
+                check_is_not_grouped=False,
+                tags='wrapper'
             ),
             total_return=dict(
                 title='Total Return [%]',
                 calc_func='total',
-                post_calc_func=lambda self, out, settings: out * 100
+                post_calc_func=lambda self, out, settings: out * 100,
+                tags='returns'
             ),
             benchmark_return=dict(
                 title='Benchmark Return [%]',
                 calc_func=lambda benchmark_rets: benchmark_rets.vbt.returns.total() * 100,
-                check_has_benchmark_rets=True
+                check_has_benchmark_rets=True,
+                tags='returns'
             ),
             ann_return=dict(
                 title='Annualized Return [%]',
                 calc_func='annualized',
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             ann_volatility=dict(
                 title='Annualized Volatility [%]',
                 calc_func='annualized_volatility',
                 post_calc_func=lambda self, out, settings: out * 100,
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             max_dd=dict(
                 title='Max Drawdown [%]',
-                calc_func='drawdowns.drawdown.min',
-                post_calc_func=lambda self, out, settings: -out * 100
+                calc_func='drawdowns.max_drawdown',
+                post_calc_func=lambda self, out, settings: -out * 100,
+                tags=['returns', 'drawdowns']
             ),
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
-                calc_func='drawdowns.duration.max',
-                auto_to_duration=True
+                calc_func='drawdowns.max_duration',
+                pass_wrap_to_duration=True,
+                tags=['returns', 'drawdowns', 'duration']
             ),
             sharpe_ratio=dict(
                 title='Sharpe Ratio',
                 calc_func='sharpe_ratio',
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             calmar_ratio=dict(
                 title='Calmar Ratio',
                 calc_func='calmar_ratio',
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             omega_ratio=dict(
                 title='Omega Ratio',
                 calc_func='omega_ratio',
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             sortino_ratio=dict(
                 title='Sortino Ratio',
                 calc_func='sortino_ratio',
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             skew=dict(
                 title='Skew',
-                calc_func='obj.skew'
+                calc_func='obj.skew',
+                tags='returns'
             ),
             kurtosis=dict(
                 title='Kurtosis',
-                calc_func='obj.kurtosis'
+                calc_func='obj.kurtosis',
+                tags='returns'
             ),
             tail_ratio=dict(
                 title='Tail Ratio',
-                calc_func='tail_ratio'
+                calc_func='tail_ratio',
+                tags='returns'
             ),
             common_sense_ratio=dict(
                 title='Common Sense Ratio',
                 calc_func='common_sense_ratio',
                 check_has_freq=True,
-                check_has_year_freq=True
+                check_has_year_freq=True,
+                tags='returns'
             ),
             value_at_risk=dict(
                 title='Value at Risk',
-                calc_func='value_at_risk'
+                calc_func='value_at_risk',
+                tags='returns'
             ),
             alpha=dict(
                 title='Alpha',
                 calc_func='alpha',
                 check_has_freq=True,
                 check_has_year_freq=True,
-                check_has_benchmark_rets=True
+                check_has_benchmark_rets=True,
+                tags='returns'
             ),
             beta=dict(
                 title='Beta',
                 calc_func='beta',
-                check_has_benchmark_rets=True
+                check_has_benchmark_rets=True,
+                tags='returns'
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

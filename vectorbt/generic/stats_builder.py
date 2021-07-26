@@ -59,18 +59,21 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             )
         ),
         copy_kwargs=dict(copy_mode='deep')
@@ -132,9 +135,9 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 * `post_calc_func`: Function to post-process the result of `calc_func`.
                     Should accept (resolved) self, output of `calc_func`, and dictionary of merged metric settings,
                     and return whatever is acceptable to be returned by `calc_func`.
-                * `auto_to_duration`: Whether to automatically convert the result to duration
-                    using `vectorbt.base.array_wrapper.ArrayWrapper.to_duration`. To disable this globally,
-                    pass `to_duration=False` in `settings`.
+                * `pass_wrap_to_duration`: Whether to pass `to_duration` inside of `wrap_kwargs`.
+                * `apply_to_duration`: Whether to apply `vectorbt.base.array_wrapper.ArrayWrapper.to_duration`
+                    on the result. To disable this globally, pass `to_duration=False` in `settings`.
                 * `pass_{arg}`: Whether to pass any optional argument (see below). Defaults to True if this argument
                     was found in the function's signature. Set to False to not pass.
                     If argument to be passed was not found, `pass_{arg}` is removed.
@@ -397,7 +400,7 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                 resolve_calc_func = final_kwargs.pop('resolve_calc_func', True)
                 post_calc_func = final_kwargs.pop('post_calc_func', None)
                 use_caching = final_kwargs.pop('use_caching', True)
-                auto_to_duration = final_kwargs.pop('auto_to_duration', False)
+                apply_to_duration = final_kwargs.pop('apply_to_duration', False)
 
                 # Resolve calc_func
                 if resolve_calc_func:
@@ -471,6 +474,11 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                 final_kwargs.pop(k, None)
                     for k in list(final_kwargs.keys()):
                         if k.startswith('pass_'):
+                            if k == 'pass_wrap_to_duration':
+                                final_kwargs['wrap_kwargs'] = merge_dicts(
+                                    dict(to_duration=to_duration),
+                                    final_kwargs.get('final_kwargs', {})
+                                )
                             final_kwargs.pop(k, None)  # cleanup
 
                     # Call calc_func
@@ -504,8 +512,8 @@ class StatsBuilderMixin(metaclass=MetaStatsBuilderMixin):
                                         "pd.Series for multiple columns/groups, or a dict of such. "
                                         f"Not {type(v)}.")
 
-                    # Handle auto_to_duration
-                    if auto_to_duration and to_duration:
+                    # Handle apply_to_duration
+                    if apply_to_duration and to_duration:
                         v = custom_reself.wrapper.to_duration(v, silence_warnings=silence_warnings)
 
                     # Select column or aggregate

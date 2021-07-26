@@ -1417,7 +1417,7 @@ class TestRecords:
 
     def test_stats(self):
         stat_index = pd.Index([
-            'Start', 'End', 'Period', 'Total Records'
+            'Start', 'End', 'Period', 'Count'
         ], dtype='object')
         pd.testing.assert_series_equal(
             records.stats(),
@@ -1612,7 +1612,7 @@ class TestDrawdowns:
         pd.testing.assert_series_equal(
             drawdowns.avg_drawdown(),
             pd.Series(
-                np.array([-0.63888889, -0.58333333, -0.66666667, 0.]),
+                np.array([-0.63888889, -0.58333333, -0.66666667, np.nan]),
                 index=wrapper.columns
             ).rename('avg_drawdown')
         )
@@ -1629,7 +1629,7 @@ class TestDrawdowns:
         pd.testing.assert_series_equal(
             drawdowns.max_drawdown(),
             pd.Series(
-                np.array([-0.75, -0.66666667, -0.66666667, 0.]),
+                np.array([-0.75, -0.66666667, -0.66666667, np.nan]),
                 index=wrapper.columns
             ).rename('max_drawdown')
         )
@@ -1702,13 +1702,13 @@ class TestDrawdowns:
             ).rename('coverage')
         )
 
-    def test_ptv_duration(self):
+    def test_decline_duration(self):
         np.testing.assert_array_almost_equal(
-            drawdowns['a'].ptv_duration.values,
+            drawdowns['a'].decline_duration.values,
             np.array([1., 1., 1.])
         )
         np.testing.assert_array_almost_equal(
-            drawdowns.ptv_duration.values,
+            drawdowns.decline_duration.values,
             np.array([1., 1., 1., 1., 1., 2.])
         )
 
@@ -1821,17 +1821,17 @@ class TestDrawdowns:
         with pytest.raises(Exception) as e_info:
             drawdowns_grouped.current_duration()
 
-    def test_current_return(self):
-        assert drawdowns['a'].current_return() == 0.
+    def test_current_recovery_return(self):
+        assert drawdowns['a'].current_recovery_return() == 0.
         pd.testing.assert_series_equal(
-            drawdowns.current_return(),
+            drawdowns.current_recovery_return(),
             pd.Series(
                 np.array([0., np.nan, 1., np.nan]),
                 index=wrapper.columns
-            ).rename('current_return')
+            ).rename('current_recovery_return')
         )
         with pytest.raises(Exception) as e_info:
-            drawdowns_grouped.current_return()
+            drawdowns_grouped.current_recovery_return()
 
     def test_recovery_return(self):
         np.testing.assert_array_almost_equal(
@@ -1843,25 +1843,115 @@ class TestDrawdowns:
             np.array([2., 3., 2., 3.])
         )
 
-    def test_vtr_duration(self):
+    def test_recovery_duration(self):
         np.testing.assert_array_almost_equal(
-            drawdowns['a'].recovered.vtr_duration.values,
+            drawdowns['a'].recovered.recovery_duration.values,
             np.array([1., 1.])
         )
         np.testing.assert_array_almost_equal(
-            drawdowns.recovered.vtr_duration.values,
+            drawdowns.recovered.recovery_duration.values,
             np.array([1., 1., 1., 1.])
         )
 
-    def test_vtr_duration_ratio(self):
+    def test_recovery_duration_ratio(self):
         np.testing.assert_array_almost_equal(
-            drawdowns['a'].recovered.vtr_duration_ratio.values,
+            drawdowns['a'].recovered.recovery_duration_ratio.values,
             np.array([0.5, 0.5])
         )
         np.testing.assert_array_almost_equal(
-            drawdowns.recovered.vtr_duration_ratio.values,
+            drawdowns.recovered.recovery_duration_ratio.values,
             np.array([0.5, 0.5, 0.5, 0.5])
         )
+
+    def test_stats(self):
+        stat_index = pd.Index([
+            'Start', 'End', 'Period', 'Count', 'Current Drawdown [%]',
+            'Current Duration', 'Current Recovery [%]',
+            'Current Recovery Return [%]', 'Current Recovery Duration',
+            'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
+            'Avg Drawdown Duration', 'Max Recovery Return [%]',
+            'Avg Recovery Return [%]', 'Max Recovery Duration',
+            'Avg Recovery Duration', 'Avg Recovery Duration Ratio'
+        ], dtype='object')
+        pd.testing.assert_series_equal(
+            drawdowns.stats(),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), 1.5, 54.166666666666664,
+                pd.Timedelta('2 days 00:00:00'), 25.0, 50.0, pd.Timedelta('0 days 12:00:00'),
+                66.66666666666666, 58.33333333333333, pd.Timedelta('2 days 00:00:00'),
+                pd.Timedelta('2 days 00:00:00'), 300.0, 250.0, pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), 0.5
+            ],
+                index=stat_index,
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            drawdowns.stats(settings=dict(incl_active=True)),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), 1.5, 54.166666666666664,
+                pd.Timedelta('2 days 00:00:00'), 25.0, 50.0, pd.Timedelta('0 days 12:00:00'),
+                69.44444444444444, 62.962962962962955, pd.Timedelta('2 days 08:00:00'),
+                pd.Timedelta('2 days 05:20:00'), 300.0, 250.0, pd.Timedelta('1 days 00:00:00'),
+                pd.Timedelta('1 days 00:00:00'), 0.5
+            ],
+                index=stat_index,
+                name='agg_func_mean'
+            )
+        )
+        pd.testing.assert_series_equal(
+            drawdowns.stats(column='a'),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), 3, 75.0, pd.Timedelta('1 days 00:00:00'),
+                0.0, 0.0, pd.Timedelta('0 days 00:00:00'), 66.66666666666666, 58.33333333333333,
+                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 300.0, 250.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 0.5
+            ],
+                index=stat_index,
+                name='a'
+            )
+        )
+        pd.testing.assert_series_equal(
+            drawdowns.stats(column='g1', group_by=group_by),
+            pd.Series([
+                pd.Timestamp('2020-01-01 00:00:00'), pd.Timestamp('2020-01-06 00:00:00'),
+                pd.Timedelta('6 days 00:00:00'), 5, 66.66666666666666, 58.33333333333333,
+                pd.Timedelta('2 days 00:00:00'), pd.Timedelta('2 days 00:00:00'), 300.0, 250.0,
+                pd.Timedelta('1 days 00:00:00'), pd.Timedelta('1 days 00:00:00'), 0.5
+            ],
+                index=pd.Index([
+                    'Start', 'End', 'Period', 'Count',
+                    'Max Drawdown [%]', 'Avg Drawdown [%]', 'Max Drawdown Duration',
+                    'Avg Drawdown Duration', 'Max Recovery Return [%]',
+                    'Avg Recovery Return [%]', 'Max Recovery Duration',
+                    'Avg Recovery Duration', 'Avg Recovery Duration Ratio'
+                ], dtype='object'),
+                name='g1'
+            )
+        )
+        pd.testing.assert_series_equal(
+            drawdowns['c'].stats(),
+            drawdowns.stats(column='c')
+        )
+        pd.testing.assert_series_equal(
+            drawdowns['c'].stats(),
+            drawdowns.stats(column='c', group_by=False)
+        )
+        pd.testing.assert_series_equal(
+            drawdowns_grouped['g2'].stats(),
+            drawdowns_grouped.stats(column='g2')
+        )
+        pd.testing.assert_series_equal(
+            drawdowns_grouped['g2'].stats(),
+            drawdowns.stats(column='g2', group_by=group_by)
+        )
+        stats_df = drawdowns.stats(agg_func=None)
+        assert stats_df.shape == (4, 18)
+        pd.testing.assert_index_equal(stats_df.index, drawdowns.wrapper.columns)
+        pd.testing.assert_index_equal(stats_df.columns, stat_index)
 
 
 # ############# orders.py ############# #

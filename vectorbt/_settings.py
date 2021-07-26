@@ -278,6 +278,15 @@ settings = SettingsConfig(
         generic=dict(
             stats=Config()  # flex
         ),
+        drawdowns=dict(
+            stats=Config(  # flex
+                dict(
+                    settings=dict(
+                        incl_active=False
+                    )
+                )
+            )
+        ),
         ohlcv=dict(
             plot_type='OHLC',
             column_names=dict(
@@ -571,6 +580,14 @@ Settings applied across `vectorbt.generic`.
 
 ```json
 {settings['generic'].to_doc()}
+```
+
+## settings.generic.drawdowns
+
+Settings applied across `vectorbt.generic.drawdowns`.
+
+```json
+{settings['drawdowns'].to_doc()}
 ```
 
 ## settings.ohlcv

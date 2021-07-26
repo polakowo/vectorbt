@@ -3423,18 +3423,21 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             ),
             start_value=dict(
                 title='Start Value',
@@ -3467,123 +3470,123 @@ class Portfolio(Wrapping, StatsBuilderMixin, PlotBuilderMixin):
             total_fees_paid=dict(
                 title='Total Fees Paid',
                 calc_func='orders.fees.sum',
-                tags='orders'
+                tags=['portfolio', 'orders']
             ),
             max_dd=dict(
                 title='Max Drawdown [%]',
-                calc_func='drawdowns.drawdown.min',
+                calc_func='drawdowns.max_drawdown',
                 post_calc_func=lambda self, out, settings: -out * 100,
-                tags='drawdowns'
+                tags=['portfolio', 'drawdowns']
             ),
             max_dd_duration=dict(
                 title='Max Drawdown Duration',
-                calc_func='drawdowns.duration.max',
-                auto_to_duration=True,
-                tags=['drawdowns', 'duration']
+                calc_func='drawdowns.max_duration',
+                pass_wrap_to_duration=True,
+                tags=['portfolio', 'drawdowns', 'duration']
             ),
             total_trades=dict(
                 title=RepEval("'Total Positions' if use_positions else 'Total Trades'"),
                 calc_func='trades.count',
                 incl_unrealized=True,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             total_open_trades=dict(
                 title=RepEval("'Total Open Positions' if use_positions else 'Total Open Trades'"),
                 calc_func='trades.open.count',
                 incl_unrealized=True,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             open_trade_return=dict(
                 title=RepEval("'Open Position P&L' if use_positions else 'Open Trade P&L'"),
                 calc_func='trades.open.pnl.sum',
                 incl_unrealized=True,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             long_trade_rate=dict(
                 title=RepEval("'Long Positions [%]' if use_positions else 'Long Trades [%]'"),
                 calc_func='trades.long_rate',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             win_rate=dict(
                 title='Win Rate [%]',
                 calc_func='trades.win_rate',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             best_trade=dict(
                 title=RepEval("'Best Position [%]' if use_positions else 'Best Trade [%]'"),
                 calc_func='trades.returns.max',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             worst_trade=dict(
                 title=RepEval("'Worst Position [%]' if use_positions else 'Worst Trade [%]'"),
                 calc_func='trades.returns.min',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             avg_winning_trade=dict(
                 title=RepEval("'Avg Winning Position [%]' if use_positions else 'Avg Winning Trade [%]'"),
                 calc_func='trades.winning.returns.mean',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             avg_winning_trade_duration=dict(
                 title=RepEval("'Avg Winning Position Duration' if use_positions else 'Avg Winning Trade Duration'"),
                 calc_func='trades.winning.duration.mean',
-                auto_to_duration=True,
-                tags=['trades', 'duration']
+                apply_to_duration=True,
+                tags=['portfolio', 'trades', 'duration']
             ),
             avg_losing_trade=dict(
                 title=RepEval("'Avg Losing Position [%]' if use_positions else 'Avg Losing Trade [%]'"),
                 calc_func='trades.losing.returns.mean',
                 post_calc_func=lambda self, out, settings: out * 100,
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             avg_losing_trade_duration=dict(
                 title=RepEval("'Avg Losing Position Duration' if use_positions else 'Avg Losing Trade Duration'"),
                 calc_func='trades.losing.duration.mean',
-                auto_to_duration=True,
-                tags=['trades', 'duration']
+                apply_to_duration=True,
+                tags=['portfolio', 'trades', 'duration']
             ),
             profit_factor=dict(
                 title='Profit Factor',
                 calc_func='trades.profit_factor',
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             expectancy=dict(
                 title='Expectancy',
                 calc_func='trades.expectancy',
-                tags='trades'
+                tags=['portfolio', 'trades']
             ),
             sharpe_ratio=dict(
                 title='Sharpe Ratio',
                 calc_func='returns_acc.sharpe_ratio',
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags='returns'
+                tags=['portfolio', 'returns']
             ),
             calmar_ratio=dict(
                 title='Calmar Ratio',
                 calc_func='returns_acc.calmar_ratio',
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags='returns'
+                tags=['portfolio', 'returns']
             ),
             omega_ratio=dict(
                 title='Omega Ratio',
                 calc_func='returns_acc.omega_ratio',
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags='returns'
+                tags=['portfolio', 'returns']
             ),
             sortino_ratio=dict(
                 title='Sortino Ratio',
                 calc_func='returns_acc.sortino_ratio',
                 check_has_freq=True,
                 check_has_year_freq=True,
-                tags='returns'
+                tags=['portfolio', 'returns']
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

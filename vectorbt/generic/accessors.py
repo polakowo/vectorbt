@@ -886,52 +886,63 @@ class GenericAccessor(BaseAccessor, StatsBuilderMixin):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             ),
             count=dict(
                 title='Count',
-                calc_func='count'
+                calc_func='count',
+                tags=['generic', 'describe']
             ),
             mean=dict(
                 title='Mean',
-                calc_func='mean'
+                calc_func='mean',
+                tags=['generic', 'describe']
             ),
             std=dict(
                 title='Std',
-                calc_func='std'
+                calc_func='std',
+                tags=['generic', 'describe']
             ),
             min=dict(
                 title='Min',
-                calc_func='min'
+                calc_func='min',
+                tags=['generic', 'describe']
             ),
             median=dict(
                 title='Median',
-                calc_func='median'
+                calc_func='median',
+                tags=['generic', 'describe']
             ),
             max=dict(
                 title='Max',
-                calc_func='max'
+                calc_func='max',
+                tags=['generic', 'describe']
             ),
             idx_min=dict(
                 title='Min Index',
                 calc_func='idxmin',
-                agg_func=None
+                agg_func=None,
+                tags=['generic', 'index']
             ),
             idx_max=dict(
                 title='Max Index',
                 calc_func='idxmax',
-                agg_func=None
+                agg_func=None,
+                tags=['generic', 'index']
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

@@ -497,7 +497,7 @@ class TestAccessors:
         assert ret.vbt.returns.drawdowns.wrapper.ndim == ret.ndim
         assert isclose(ret['a'].vbt.returns.drawdowns.max_drawdown(), ret['a'].vbt.returns.max_drawdown())
         pd.testing.assert_series_equal(
-            ret.vbt.returns.drawdowns.max_drawdown(),
+            ret.vbt.returns.drawdowns.max_drawdown(default_val=0.),
             ret.vbt.returns.max_drawdown()
         )
 

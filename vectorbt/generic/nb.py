@@ -1369,21 +1369,21 @@ def dd_duration_map_nb(record: tp.Record) -> int:
 
 
 @njit(cache=True)
-def dd_ptv_duration_map_nb(record: tp.Record) -> int:
-    """`map_func_nb` that returns duration of the peak-to-valley (PtV) phase."""
+def dd_decline_duration_map_nb(record: tp.Record) -> int:
+    """`map_func_nb` that returns duration of the peak-to-valley phase."""
     return record['valley_idx'] - record['start_idx']
 
 
 @njit(cache=True)
-def dd_vtr_duration_map_nb(record: tp.Record) -> int:
-    """`map_func_nb` that returns duration of the valley-to-recovery (VtR) phase."""
+def dd_recovery_duration_map_nb(record: tp.Record) -> int:
+    """`map_func_nb` that returns duration of the valley-to-recovery phase."""
     return record['end_idx'] - record['valley_idx']
 
 
 @njit(cache=True)
-def dd_vtr_duration_ratio_map_nb(record: tp.Record) -> float:
-    """`map_func_nb` that returns ratio of VtR duration to total duration."""
-    return dd_vtr_duration_map_nb(record) / dd_duration_map_nb(record)
+def dd_recovery_duration_ratio_map_nb(record: tp.Record) -> float:
+    """`map_func_nb` that returns ratio of recovery duration to total duration."""
+    return dd_recovery_duration_map_nb(record) / dd_duration_map_nb(record)
 
 
 @njit(cache=True)

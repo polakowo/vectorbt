@@ -77,22 +77,26 @@ class CatAccessor(GenericAccessor):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             ),
             value_counts=dict(
                 title='Value Counts',
-                calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series')
+                calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
+                tags=['cat', 'value_counts']
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

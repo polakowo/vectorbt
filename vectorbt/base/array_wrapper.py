@@ -605,14 +605,14 @@ class ArrayWrapper(Configured, PandasIndexer):
             dtype = None
         if arr.ndim == 0:
             # Scalar per Series/DataFrame
-            if to_duration:
+            if to_duration and self.freq is not None:
                 return pd.to_timedelta(arr.item())
             return arr.item()
         if arr.ndim == 1:
             if _self.ndim == 1:
                 if arr.shape[0] == 1:
                     # Scalar per Series/DataFrame with one column
-                    if to_duration:
+                    if to_duration and self.freq is not None:
                         return pd.to_timedelta(arr[0])
                     return arr[0]
                 # Array per Series

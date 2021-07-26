@@ -534,22 +534,26 @@ class Records(Wrapping, StatsBuilderMixin):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             ),
-            total_records=dict(
-                title='Total Records',
-                calc_func='count'
+            count=dict(
+                title='Count',
+                calc_func='count',
+                tags="records"
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

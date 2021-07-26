@@ -4,6 +4,7 @@ from copy import copy, deepcopy
 from collections import namedtuple
 import dill
 import inspect
+import pickle
 
 from vectorbt import _typing as tp
 from vectorbt.utils import checks
@@ -208,12 +209,12 @@ class Pickleable:
 
     def dumps(self, **kwargs) -> bytes:
         """Pickle to bytes."""
-        raise NotImplementedError
+        return pickle.dumps(self, protocol=pickle.HIGHEST_PROTOCOL)
 
     @classmethod
     def loads(cls: tp.Type[PickleableT], dumps: bytes, **kwargs) -> PickleableT:
         """Unpickle from bytes."""
-        raise NotImplementedError
+        return pickle.loads(dumps)
 
     def save(self, fname: tp.FileName, **kwargs) -> None:
         """Save dumps to a file."""
@@ -605,6 +606,10 @@ class Config(PickleableDict, Documented):
         if nested is None:
             nested = self.nested_
         return merge_dicts(self, other, nested=nested, **kwargs)
+
+    def to_dict(self, nested: tp.Optional[bool] = None) -> dict:
+        """Convert to dict."""
+        return convert_to_dict(self, nested=nested)
 
     def reset(self, force: bool = False, **reset_dct_copy_kwargs) -> None:
         """Clears the config and updates it with the initial config.

@@ -282,51 +282,51 @@ Start                      x
 End                        z
 Period       3 days 00:00:00
 Count                      3
-Mean                      11
-Std                        1
-Min                       10
-Median                    11
-Max                       12
+Mean                    11.0
+Std                      1.0
+Min                     10.0
+Median                  11.0
+Max                     12.0
 Min Index                  x
 Max Index                  z
 Name: a, dtype: object
 ```
 
-The main difference unfolds once the mapped array has a value map:
+The main difference unfolds once the mapped array has a mapping:
 values are then considered as categorical and usual statistics are meaningless to compute.
-For this case, `MappedArray.stats` returns value counts:
+For this case, `MappedArray.stats` returns the value counts:
 
 ```python-repl
->>> ma.stats(column='a', settings=dict(mapping={10: 'some_known_value'}))
-Start                                          x
-End                                            z
-Period                           3 days 00:00:00
-Count                                          3
-Value Count: some_known_value                  1
-Value Count: UNK - 11.0                        1
-Value Count: UNK - 12.0                        1
-Value Count: UNK - 13.0                        0
-Value Count: UNK - 14.0                        0
-Value Count: UNK - 15.0                        0
-Value Count: UNK - 16.0                        0
-Value Count: UNK - 17.0                        0
-Value Count: UNK - 18.0                        0
+>>> mapping = {v: "test_" + str(v) for v in np.unique(ma.values)}
+>>> ma.stats(column='a', settings=dict(mapping=mapping))
+Start                                    x
+End                                      z
+Period                     3 days 00:00:00
+Count                                    3
+Value Counts: test_10.0                  1
+Value Counts: test_11.0                  1
+Value Counts: test_12.0                  1
+Value Counts: test_13.0                  0
+Value Counts: test_14.0                  0
+Value Counts: test_15.0                  0
+Value Counts: test_16.0                  0
+Value Counts: test_17.0                  0
+Value Counts: test_18.0                  0
 Name: a, dtype: object
 
 `MappedArray.stats` also supports grouping:
 
 ```python-repl
 >>> grouped_ma.stats(column='first')
-
 Start                      x
 End                        z
 Period       3 days 00:00:00
 Count                      6
 Mean                    12.5
-Std                  1.87083
-Min                       10
+Std                 1.870829
+Min                     10.0
 Median                  12.5
-Max                       15
+Max                     15.0
 Min Index                  x
 Max Index                  z
 Name: first, dtype: object
@@ -915,71 +915,83 @@ class MappedArray(Wrapping, StatsBuilderMixin):
             start=dict(
                 title='Start',
                 calc_func=lambda self: self.wrapper.index[0],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             end=dict(
                 title='End',
                 calc_func=lambda self: self.wrapper.index[-1],
-                agg_func=None
+                agg_func=None,
+                tags='wrapper'
             ),
             period=dict(
                 title='Period',
                 calc_func=lambda self: len(self.wrapper.index),
-                auto_to_duration=True,
-                agg_func=None
+                apply_to_duration=True,
+                agg_func=None,
+                tags='wrapper'
             ),
             count=dict(
                 title='Count',
-                calc_func='count'
+                calc_func='count',
+                tags='mapped_array'
             ),
             mean=dict(
                 title='Mean',
                 calc_func='mean',
                 pass_group_by=True,
-                inv_check_has_mapping=True
+                inv_check_has_mapping=True,
+                tags=['mapped_array', 'describe']
             ),
             std=dict(
                 title='Std',
                 calc_func='std',
                 pass_group_by=True,
-                inv_check_has_mapping=True
+                inv_check_has_mapping=True,
+                tags=['mapped_array', 'describe']
             ),
             min=dict(
                 title='Min',
                 calc_func='min',
                 pass_group_by=True,
-                inv_check_has_mapping=True
+                inv_check_has_mapping=True,
+                tags=['mapped_array', 'describe']
             ),
             median=dict(
                 title='Median',
                 calc_func='median',
                 pass_group_by=True,
-                inv_check_has_mapping=True
+                inv_check_has_mapping=True,
+                tags=['mapped_array', 'describe']
             ),
             max=dict(
                 title='Max',
                 calc_func='max',
                 pass_group_by=True,
-                inv_check_has_mapping=True
+                inv_check_has_mapping=True,
+                tags=['mapped_array', 'describe']
             ),
             idx_min=dict(
                 title='Min Index',
                 calc_func='idxmin',
                 pass_group_by=True,
                 inv_check_has_mapping=True,
-                agg_func=None
+                agg_func=None,
+                tags=['mapped_array', 'index']
             ),
             idx_max=dict(
                 title='Max Index',
                 calc_func='idxmax',
                 pass_group_by=True,
                 inv_check_has_mapping=True,
-                agg_func=None
+                agg_func=None,
+                tags=['mapped_array', 'index']
             ),
             value_counts=dict(
                 title='Value Counts',
                 calc_func=lambda value_counts: value_counts.vbt.to_dict(orient='index_series'),
-                check_has_mapping=True
+                check_has_mapping=True,
+                tags=['mapped_array', 'value_counts']
             )
         ),
         copy_kwargs=dict(copy_mode='deep')

@@ -441,33 +441,25 @@ sma_timeperiod    2    3
 - Tailored statistics for many backtesting components
   
 ```python-repl
->>> entries = pd.Series([True, True, True, False])
->>> exits = pd.Series([False, False, False, True])
->>> entries.vbt.signals.stats(settings=dict(freq='d', other=exits, other_name='Exits'))
-Start                                     0
-End                                       3
-Period                      4 days 00:00:00
-Total                                     3
-Rate [%]                                 75
-Total Overlapping                         0
-Overlapping Rate [%]                      0
-First Index                               0
-Last Index                                2
-Norm Avg Index [-1, 1]            -0.333333
-Distance -> Exits: Min      1 days 00:00:00
-Distance -> Exits: Max      3 days 00:00:00
-Distance -> Exits: Mean     2 days 00:00:00
-Distance -> Exits: Std      1 days 00:00:00
-Total Partitions                          1
-Partition Rate [%]                  33.3333
-Partition Length: Min       3 days 00:00:00
-Partition Length: Max       3 days 00:00:00
-Partition Length: Mean      3 days 00:00:00
-Partition Length: Std                   NaT
-Partition Distance: Min                 NaT
-Partition Distance: Max                 NaT
-Partition Distance: Mean                NaT
-Partition Distance: Std                 NaT
+>>> pd.Series([1, 2, 3, 2, 3, 2, 1, 2]).vbt(freq='d').drawdowns.stats()
+Start                                        0
+End                                          7
+Period                         8 days 00:00:00
+Count                                        2
+Current Drawdown [%]                 33.333333
+Current Duration               3 days 00:00:00
+Current Recovery [%]                      50.0
+Current Recovery Return [%]              100.0
+Current Recovery Duration      1 days 00:00:00
+Max Drawdown [%]                     33.333333
+Avg Drawdown [%]                     33.333333
+Max Drawdown Duration          2 days 00:00:00
+Avg Drawdown Duration          2 days 00:00:00
+Max Recovery Return [%]                   50.0
+Avg Recovery Return [%]                   50.0
+Max Recovery Duration          1 days 00:00:00
+Avg Recovery Duration          1 days 00:00:00
+Avg Recovery Duration Ratio                0.5
 dtype: object
 ```
 
